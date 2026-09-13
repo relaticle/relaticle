@@ -121,7 +121,7 @@ final class ChatServiceProvider extends ServiceProvider
      *   which runs before every app provider's boot(), so a chat route added
      *   during boot is always the later of the two.
      *
-     * Both "r" and "chat" are reserved team slugs, so no legitimate tenant URL
+     * Both "r" and "chat" are reserved workspace slugs, so no legitimate tenant URL
      * can live under either prefix and winning the match here is correct.
      * tests/Feature/Routing/AppPanelRoutingTest.php pins both routing modes.
      */
@@ -166,9 +166,9 @@ final class ChatServiceProvider extends ServiceProvider
     private function registerInsightsCacheInvalidation(): void
     {
         $invalidate = function (Model $model): void {
-            $teamId = $model->getAttribute('team_id');
-            if (is_string($teamId) || is_int($teamId)) {
-                Cache::forget("crm_insights_{$teamId}");
+            $workspaceId = $model->getAttribute('workspace_id');
+            if (is_string($workspaceId) || is_int($workspaceId)) {
+                Cache::forget("crm_insights_{$workspaceId}");
             }
         };
 

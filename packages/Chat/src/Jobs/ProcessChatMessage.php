@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -73,7 +73,7 @@ final class ProcessChatMessage implements ShouldQueue
      */
     public function __construct(
         private readonly User $user,
-        private readonly Team $team,
+        private readonly Workspace $workspace,
         public readonly string $message,
         public readonly string $conversationId,
         private readonly array $resolved,
@@ -128,11 +128,11 @@ final class ProcessChatMessage implements ShouldQueue
     {
         $startedAt = microtime(true);
 
-        $this->team->refresh();
+        $this->workspace->refresh();
 
-        if (resolve(HostedWorkspaceAccess::class)->isPaused($this->team)) {
+        if (resolve(HostedWorkspaceAccess::class)->isPaused($this->workspace)) {
             $creditService->refundReservation(
-                $this->team,
+                $this->workspace,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
@@ -149,7 +149,7 @@ final class ProcessChatMessage implements ShouldQueue
 
         ChatTelemetry::tagCurrentScope(
             $this->conversationId,
-            (string) $this->team->getKey(),
+            (string) $this->workspace->getKey(),
             $this->resolved['model'] ?? 'unknown',
         );
         ChatTelemetry::breadcrumb('job.started', ['message_length' => strlen($this->message)]);
@@ -171,7 +171,7 @@ final class ProcessChatMessage implements ShouldQueue
             }
 
             $creditService->refundReservation(
-                $this->team,
+                $this->workspace,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
@@ -202,11 +202,11 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
-            $agent->withTeam($this->team);
+            $agent->withWorkspace($this->workspace);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
-                'role' => $this->user->ownsTeam($this->team) ? 'owner' : 'member',
+                'role' => $this->user->ownsWorkspace($this->workspace) ? 'owner' : 'member',
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
@@ -222,7 +222,7 @@ final class ProcessChatMessage implements ShouldQueue
             $broadcaster = new StreamEventBroadcaster($channel);
         } catch (Throwable $e) {
             $creditService->refundReservation(
-                $this->team,
+                $this->workspace,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
@@ -298,7 +298,7 @@ final class ProcessChatMessage implements ShouldQueue
 
             if ($cancelled) {
                 $creditService->settleReservedMinimum(
-                    team: $this->team,
+                    workspace: $this->workspace,
                     user: $this->user,
                     conversationId: $this->conversationId,
                     resolutionKey: $this->resolutionKey(),
@@ -331,7 +331,7 @@ final class ProcessChatMessage implements ShouldQueue
                 ));
 
                 $creditService->settleReservation(
-                    team: $this->team,
+                    workspace: $this->workspace,
                     user: $this->user,
                     type: AiCreditType::Chat,
                     model: $streamedResponse->meta->model ?? 'unknown',
@@ -409,7 +409,7 @@ final class ProcessChatMessage implements ShouldQueue
                     ));
                     dispatch(new self(
                         user: $this->user,
-                        team: $this->team,
+                        workspace: $this->workspace,
                         message: $this->message,
                         conversationId: $this->conversationId,
                         resolved: $next,
@@ -440,7 +440,7 @@ final class ProcessChatMessage implements ShouldQueue
             // unconditional.
             if ($this->streamedAnything) {
                 $creditService->settleReservedMinimum(
-                    team: $this->team,
+                    workspace: $this->workspace,
                     user: $this->user,
                     conversationId: $this->conversationId,
                     resolutionKey: $this->resolutionKey(),
@@ -524,7 +524,7 @@ final class ProcessChatMessage implements ShouldQueue
         // backlog past retryUntil() fails the job at pickup, before handle() is
         // entered, and nothing was ever sent to a provider to pay for.
         resolve(CreditService::class)->refundReservation(
-            $this->team,
+            $this->workspace,
             resolutionKey: $this->resolutionKey(),
             conversationId: $this->conversationId,
         );
@@ -648,7 +648,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
 
         $text = $this->failureMessage($exception);
-        $document = $this->getParser()->buildFromText($text, [], $this->team);
+        $document = $this->getParser()->buildFromText($text, [], $this->workspace);
 
         $table->insert([
             'id' => (string) Str::uuid7(),
@@ -832,7 +832,7 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
-        $document = $this->getParser()->buildFromText($assistantContent, [], $this->team);
+        $document = $this->getParser()->buildFromText($assistantContent, [], $this->workspace);
 
         $latestId = $this->latestMessageId('assistant');
 
@@ -982,9 +982,9 @@ final class ProcessChatMessage implements ShouldQueue
         // per-field validation rules that query other records (unique values,
         // above all) silently pass during tool validation, which is how a
         // duplicate unique email sailed through chat while the panel form
-        // rejected it. Same contract as SetApiTeamContext on the API path.
+        // rejected it. Same contract as SetApiWorkspaceContext on the API path.
         $this->previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($this->team->getKey());
+        TenantContextService::setTenantId($this->workspace->getKey());
     }
 
     private function releaseAuth(): void

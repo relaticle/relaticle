@@ -25,7 +25,7 @@ beforeEach(function (): void {
  *
  * When approve() runs there may be no resolvable tenant context, so the custom-fields
  * TenantScope no-ops and saveCustomFields() iterates EVERY tenant's field definitions.
- * PendingActionService::approve() sets the tenant context from the action's team before
+ * PendingActionService::approve() sets the tenant context from the action's workspace before
  * executing.
  *
  * The test invokes the service directly with the tenant context torn down, which
@@ -34,15 +34,15 @@ beforeEach(function (): void {
  */
 it('scopes custom-field writes to the action tenant when approving a create', function (): void {
     // A second tenant whose Task custom fields must never be touched.
-    $otherTeam = User::factory()->withPersonalTeam()->create()->currentTeam;
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     $ownTaskFieldCount = CustomField::query()->withoutGlobalScopes()
         ->where('entity_type', 'task')
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->count();
 
     $globalTaskFieldCount = CustomField::query()->withoutGlobalScopes()
@@ -55,7 +55,7 @@ it('scopes custom-field writes to the action tenant when approving a create', fu
 
     // An empty custom_fields map still drives saveCustomFields() across every defined field.
     $pending = PendingAction::query()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => null,
         'message_id' => null,
@@ -75,12 +75,12 @@ it('scopes custom-field writes to the action tenant when approving a create', fu
     app(PendingActionService::class)->approve($pending, $user);
 
     $task = Task::query()->withoutGlobalScopes()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('title', 'Tenant Scoped Task')
         ->sole();
 
     $otherTenantFieldIds = CustomField::query()->withoutGlobalScopes()
-        ->where('tenant_id', $otherTeam->getKey())
+        ->where('tenant_id', $otherWorkspace->getKey())
         ->pluck('id');
 
     // Correctness: not a single value row written against another tenant's fields.

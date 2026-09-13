@@ -6,7 +6,7 @@ namespace App\Mail;
 
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
-use App\Data\DigestTeamSection;
+use App\Data\DigestWorkspaceSection;
 use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\TaskResource;
@@ -54,7 +54,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
-        $tenant = $this->user->currentTeam ?? $this->user->allTeams()->first();
+        $tenant = $this->user->currentWorkspace ?? $this->user->allWorkspaces()->first();
         $timezone = $this->user->effectiveTimezone();
 
         return new Content(
@@ -65,11 +65,11 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                     'overdue' => $this->payload->overdueCount(),
                     'due' => $this->payload->upcomingCount(),
                 ]),
-                'sections' => array_map(fn (DigestTeamSection $team): array => [
-                    'name' => $team->teamName,
-                    'overdue' => $this->rows($team->overdue, $timezone),
-                    'upcoming' => $this->rows($team->upcoming, $timezone),
-                ], $this->payload->teams),
+                'sections' => array_map(fn (DigestWorkspaceSection $workspace): array => [
+                    'name' => $workspace->workspaceName,
+                    'overdue' => $this->rows($workspace->overdue, $timezone),
+                    'upcoming' => $this->rows($workspace->upcoming, $timezone),
+                ], $this->payload->workspaces),
                 'tasksUrl' => TaskResource::getUrl(
                     name: 'index',
                     parameters: [

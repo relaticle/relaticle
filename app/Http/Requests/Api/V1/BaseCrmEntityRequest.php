@@ -29,7 +29,7 @@ abstract class BaseCrmEntityRequest extends FormRequest
         $record = $this->routeRecord();
 
         return array_merge($this->entityRules($user), new ValidCustomFields(
-            $user->currentTeam->getKey(),
+            $user->currentWorkspace->getKey(),
             $this->entity()->value,
             isUpdate: $record instanceof Model,
             ignoreEntityId: $record?->getKey(),
@@ -46,7 +46,7 @@ abstract class BaseCrmEntityRequest extends FormRequest
 
         $this->merge([
             'custom_fields' => resolve(CustomFieldInput::class)->normalize(
-                $this->authenticatedUser()->currentTeam->getKey(),
+                $this->authenticatedUser()->currentWorkspace->getKey(),
                 $this->entity()->value,
                 $customFields,
             ),

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\CustomFieldSection;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\CustomFields\Data\CustomFieldSectionSettingsData;
 use Relaticle\CustomFields\Enums\CustomFieldSectionType;
@@ -25,7 +25,7 @@ final class CustomFieldSectionFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => Team::factory(),
+            'tenant_id' => Workspace::factory(),
             'entity_type' => 'company',
             'code' => 'section_'.fake()->unique()->lexify('????????'),
             'name' => fake()->words(2, true),

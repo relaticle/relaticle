@@ -36,7 +36,7 @@ return [
                 'title' => 'Delete them',
                 'description' => 'Removing a record is permanent.',
             ],
-            'excluded' => 'It cannot reach your other workspaces, team members, billing, or account settings.',
+            'excluded' => 'It cannot reach your other workspaces, workspace members, billing, or account settings.',
         ],
 
         'actions' => [

@@ -14,7 +14,7 @@ use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
-use App\Models\Team;
+use App\Models\Workspace;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -145,11 +145,11 @@ final class OpportunitiesBoard extends BoardResourcePage
                         ])
                         ->columns(2))
                     ->using(function (array $data, CreateAction $action): Opportunity {
-                        /** @var Team $currentTeam */
-                        $currentTeam = Auth::guard('web')->user()->currentTeam;
+                        /** @var Workspace $currentWorkspace */
+                        $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
 
                         /** @var Opportunity $opportunity */
-                        $opportunity = $currentTeam->opportunities()->create($data);
+                        $opportunity = $currentWorkspace->opportunities()->create($data);
 
                         $columnId = $action->getArguments()['column'] ?? null;
 

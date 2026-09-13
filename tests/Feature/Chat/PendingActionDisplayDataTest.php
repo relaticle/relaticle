@@ -18,13 +18,13 @@ mutates(DeleteCompanyTool::class);
 mutates(CreatePersonTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
 it('DeleteCompanyTool does not include record ID in action card display fields', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
@@ -42,7 +42,7 @@ it('DeleteCompanyTool does not include record ID in action card display fields',
 });
 
 it('DeleteCompanyTool returns the record ID in the LLM-facing JSON payload (internal use only)', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
@@ -64,7 +64,7 @@ it('DeleteCompanyTool returns the record ID in the LLM-facing JSON payload (inte
 });
 
 it('CreatePersonTool shows company name (not company ID) in action card display', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var CreatePersonTool $tool */
     $tool = app(CreatePersonTool::class);

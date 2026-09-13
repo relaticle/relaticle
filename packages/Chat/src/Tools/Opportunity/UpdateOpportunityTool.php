@@ -68,7 +68,7 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $fields = [];
 
@@ -84,8 +84,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
             $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
-                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $team),
-                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $team),
+                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $workspace),
+                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $workspace),
                 '_oldValue' => $model->getAttribute('company_id'),
                 '_newValue' => $newCompanyId,
             ];
@@ -95,8 +95,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
             $newContactId = $this->stringOrNull($request, 'contact_id');
             $fields[] = [
                 'label' => 'Contact',
-                'old' => $this->recordNames()->name($model->getAttribute('contact_id'), People::class, $team),
-                'new' => $newContactId === null ? __('(none)') : $this->recordNames()->name($newContactId, People::class, $team),
+                'old' => $this->recordNames()->name($model->getAttribute('contact_id'), People::class, $workspace),
+                'new' => $newContactId === null ? __('(none)') : $this->recordNames()->name($newContactId, People::class, $workspace),
                 '_oldValue' => $model->getAttribute('contact_id'),
                 '_newValue' => $newContactId,
             ];

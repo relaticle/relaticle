@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use App\Actions\Jetstream\AddTeamMember;
-use App\Actions\Jetstream\CreateTeam;
-use App\Actions\Jetstream\DeleteTeam;
+use App\Actions\Jetstream\AddWorkspaceMember;
+use App\Actions\Jetstream\CreateWorkspace;
 use App\Actions\Jetstream\DeleteUser;
-use App\Actions\Jetstream\InviteTeamMember;
-use App\Actions\Jetstream\RemoveTeamMember;
-use App\Actions\Jetstream\UpdateTeamName;
-use App\Enums\TeamRole;
+use App\Actions\Jetstream\DeleteWorkspace;
+use App\Actions\Jetstream\InviteWorkspaceMember;
+use App\Actions\Jetstream\RemoveWorkspaceMember;
+use App\Actions\Jetstream\UpdateWorkspaceName;
+use App\Enums\WorkspaceRole;
 use App\Livewire\App\Profile\DeleteAccount;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Jetstream\Jetstream;
 use Livewire\Livewire;
@@ -47,7 +48,8 @@ final class JetstreamServiceProvider extends ServiceProvider
     private function configureModels(): void
     {
         Jetstream::useUserModel(User::class);
-        Jetstream::useTeamModel(Team::class);
+        Jetstream::useTeamModel(Workspace::class);
+        Jetstream::useTeamInvitationModel(WorkspaceInvitation::class);
     }
 
     /**
@@ -55,12 +57,12 @@ final class JetstreamServiceProvider extends ServiceProvider
      */
     private function configureActions(): void
     {
-        Jetstream::createTeamsUsing(CreateTeam::class);
-        Jetstream::updateTeamNamesUsing(UpdateTeamName::class);
-        Jetstream::addTeamMembersUsing(AddTeamMember::class);
-        Jetstream::inviteTeamMembersUsing(InviteTeamMember::class);
-        Jetstream::removeTeamMembersUsing(RemoveTeamMember::class);
-        Jetstream::deleteTeamsUsing(DeleteTeam::class);
+        Jetstream::createTeamsUsing(CreateWorkspace::class);
+        Jetstream::updateTeamNamesUsing(UpdateWorkspaceName::class);
+        Jetstream::addTeamMembersUsing(AddWorkspaceMember::class);
+        Jetstream::inviteTeamMembersUsing(InviteWorkspaceMember::class);
+        Jetstream::removeTeamMembersUsing(RemoveWorkspaceMember::class);
+        Jetstream::deleteTeamsUsing(DeleteWorkspace::class);
         Jetstream::deleteUsersUsing(DeleteUser::class);
     }
 
@@ -71,21 +73,21 @@ final class JetstreamServiceProvider extends ServiceProvider
     {
         Jetstream::defaultApiTokenPermissions(['read']);
 
-        Jetstream::role(TeamRole::Admin->value, 'Administrator', [
+        Jetstream::role(WorkspaceRole::Admin->value, 'Administrator', [
             'create',
             'read',
             'update',
             'delete',
-        ])->description(__('teams.roles.admin.description'));
+        ])->description(__('workspaces.roles.admin.description'));
 
-        Jetstream::role(TeamRole::Editor->value, 'Editor', [
+        Jetstream::role(WorkspaceRole::Editor->value, 'Editor', [
             'read',
             'create',
             'update',
-        ])->description(__('teams.roles.editor.description'));
+        ])->description(__('workspaces.roles.editor.description'));
 
-        Jetstream::role(TeamRole::Viewer->value, 'Viewer', [
+        Jetstream::role(WorkspaceRole::Viewer->value, 'Viewer', [
             'read',
-        ])->description(__('teams.roles.viewer.description'));
+        ])->description(__('workspaces.roles.viewer.description'));
     }
 }

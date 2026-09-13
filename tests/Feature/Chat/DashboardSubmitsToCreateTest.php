@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Models\User;
 
 it('dashboard does not embed legacy ?message= URL anymore', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $this->actingAs($user);
 
-    $response = $this->get("/app/{$team->slug}");
+    $response = $this->get("/app/{$workspace->slug}");
     $response->assertOk();
 
     $response->assertDontSee("searchParams.set('message'", false);
@@ -27,11 +27,11 @@ it('dashboard does not embed legacy ?message= URL anymore', function (): void {
 });
 
 it('chat conversation page no longer reads ?message= query param', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $this->actingAs($user);
 
-    $response = $this->get("/app/{$team->slug}/chats?message=hello&model=claude-opus");
+    $response = $this->get("/app/{$workspace->slug}/chats?message=hello&model=claude-opus");
     $response->assertOk();
 
     $response->assertDontSee('hello');

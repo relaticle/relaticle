@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
-use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Resources\TaskResource;
@@ -13,7 +13,7 @@ use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
-use App\Models\Team;
+use App\Models\Workspace;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -131,11 +131,11 @@ final class TasksBoard extends BoardResourcePage
                     ->model(Task::class)
                     ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
                     ->using(function (array $data, CreateAction $action): Task {
-                        /** @var Team $currentTeam */
-                        $currentTeam = Auth::guard('web')->user()->currentTeam;
+                        /** @var Workspace $currentWorkspace */
+                        $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
 
                         /** @var Task $task */
-                        $task = $currentTeam->tasks()->create($data);
+                        $task = $currentWorkspace->tasks()->create($data);
 
                         $columnId = $action->getArguments()['column'] ?? null;
 
@@ -176,7 +176,7 @@ final class TasksBoard extends BoardResourcePage
             ->filters([
                 RecordSelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
-                    ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
+                    ->relationship('assignees', 'name', WorkspaceMemberSelect::currentWorkspaceMembers())
                     ->searchable()
                     ->preload()
                     ->multiple(),

@@ -9,14 +9,14 @@ use App\Models\User;
 mutates(ApplyTenantScopes::class);
 
 it('scopes user options to the tenant once a panel request has run', function (): void {
-    $member = User::factory()->withTeam()->create();
+    $member = User::factory()->withWorkspace()->create();
     $outsiders = User::factory()->count(3)->create();
 
     // Before any panel request the scope is not registered.
     expect(User::query()->count())->toBe(4);
 
     $this->actingAs($member)->get(
-        TaskResource::getUrl('index', tenant: $member->currentTeam),
+        TaskResource::getUrl('index', tenant: $member->currentWorkspace),
     );
 
     // ApplyTenantScopes is persistent tenant middleware, so the scope is now

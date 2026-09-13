@@ -3,21 +3,21 @@
 declare(strict_types=1);
 
 use App\Livewire\App\AccessTokens\CreateAccessToken;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
 
 mutates(User::class);
 
 test('the expiration field defaults to 180 days', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->assertFormSet(['expiration' => '180'])
         ->fillForm([
             'name' => 'Default Expiry Token',
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'permissions' => ['read'],
         ])
         ->call('createToken')
@@ -28,13 +28,13 @@ test('the expiration field defaults to 180 days', function () {
     expect($token->expires_at->startOfDay()->equalTo(now()->addDays(180)->startOfDay()))->toBeTrue();
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('api tokens can be created with team and expiration', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+test('api tokens can be created with workspace and expiration', function () {
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->fillForm([
             'name' => 'Test Token',
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'expiration' => '30',
             'permissions' => ['read', 'update'],
         ])
@@ -45,7 +45,7 @@ test('api tokens can be created with team and expiration', function () {
 
     expect($token)
         ->name->toEqual('Test Token')
-        ->team_id->toEqual($user->currentTeam->id)
+        ->workspace_id->toEqual($user->currentWorkspace->id)
         ->can('read')->toBeTrue()
         ->can('delete')->toBeFalse();
 
@@ -54,12 +54,12 @@ test('api tokens can be created with team and expiration', function () {
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('token with no expiration stores null expires_at', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->fillForm([
             'name' => 'Forever Token',
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'expiration' => '0',
             'permissions' => ['read'],
         ])
@@ -69,14 +69,14 @@ test('token with no expiration stores null expires_at', function () {
     expect($user->fresh()->tokens->first()->expires_at)->toBeNull();
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('cannot create token for a team user does not belong to', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
-    $otherTeam = Team::factory()->create();
+test('cannot create token for a workspace user does not belong to', function () {
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
+    $otherWorkspace = Workspace::factory()->create();
 
     livewire(CreateAccessToken::class)
         ->fillForm([
             'name' => 'Sneaky Token',
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
             'expiration' => '30',
             'permissions' => ['read'],
         ])
@@ -86,7 +86,7 @@ test('cannot create token for a team user does not belong to', function () {
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('token name is required', function () {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->fillForm([
@@ -98,7 +98,7 @@ test('token name is required', function () {
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('token name must be unique per user', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $user->tokens()->create([
         'name' => 'Existing Token',
@@ -116,7 +116,7 @@ test('token name must be unique per user', function () {
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('permissions are required', function () {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->fillForm([
@@ -128,12 +128,12 @@ test('permissions are required', function () {
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('plain text token is shown after creation', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $component = livewire(CreateAccessToken::class)
         ->fillForm([
             'name' => 'Test Token',
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'expiration' => '7',
             'permissions' => ['read'],
         ])
@@ -142,16 +142,16 @@ test('plain text token is shown after creation', function () {
     expect($component->get('plainTextToken'))->not->toBeNull();
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('team_id and expiration are required', function () {
-    $this->actingAs(User::factory()->withTeam()->create());
+test('workspace_id and expiration are required', function () {
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     livewire(CreateAccessToken::class)
         ->fillForm([
             'name' => 'Test Token',
-            'team_id' => null,
+            'workspace_id' => null,
             'expiration' => null,
             'permissions' => ['read'],
         ])
         ->call('createToken')
-        ->assertHasFormErrors(['team_id' => 'required', 'expiration' => 'required']);
+        ->assertHasFormErrors(['workspace_id' => 'required', 'expiration' => 'required']);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');

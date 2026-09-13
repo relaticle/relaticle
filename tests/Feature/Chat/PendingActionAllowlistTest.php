@@ -10,20 +10,20 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
 it('refuses to execute a pending action whose class is not allowlisted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-allowlist-test',
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => 'conv-allowlist-test',
         'action_class' => stdClass::class,

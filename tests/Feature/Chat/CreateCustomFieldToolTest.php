@@ -22,20 +22,20 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(CreateCustomFieldTool::class, CreateCustomField::class);
 
 beforeEach(function (): void {
-    $this->owner = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->owner->currentTeam;
+    $this->owner = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->owner->currentWorkspace;
 
     Auth::guard('web')->setUser($this->owner);
     $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-    TenantContextService::setTenantId($this->team->getKey());
+    Filament::setTenant($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
 
     $this->convId = '019df900-5555-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->owner->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -99,7 +99,7 @@ it('executes the approved proposal and creates the field + options in the databa
     $service->approve($pending, $this->owner);
 
     $field = CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('name', 'Priority')
         ->first();
@@ -109,7 +109,7 @@ it('executes the approved proposal and creates the field + options in the databa
         ->and($field->active)->toBeTrue()
         ->and($field->system_defined)->toBeFalse();
 
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
     $optionNames = CustomFieldOption::query()
         ->where('custom_field_id', $field->getKey())
         ->pluck('name')
@@ -122,8 +122,8 @@ it('executes the approved proposal and creates the field + options in the databa
 
 it('returns error and creates no proposal when a non-owner invokes the tool', function (): void {
     $nonOwner = User::factory()->create();
-    $nonOwner->teams()->attach($this->team, ['role' => 'editor']);
-    $nonOwner->switchTeam($this->team);
+    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
+    $nonOwner->switchWorkspace($this->workspace);
 
     Auth::guard('web')->setUser($nonOwner);
     $this->actingAs($nonOwner);
@@ -163,7 +163,7 @@ it('rejects when over the max_custom_fields_per_entity cap', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
     CustomField::factory()->count(2)->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
     ]);
 
@@ -214,7 +214,7 @@ it('creates a text field without options successfully', function (): void {
 it('rejects a duplicate field name at proposal time', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -238,7 +238,7 @@ it('rejects a duplicate field name at proposal time', function (): void {
 it('rejects a duplicate field name even when the existing field is deactivated', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -262,7 +262,7 @@ it('rejects a duplicate field name even when the existing field is deactivated',
 it('allows the same field name on a different entity type', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -292,7 +292,7 @@ it('rejects approval when a field with the same name appeared after the proposal
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -306,7 +306,7 @@ it('rejects approval when a field with the same name appeared after the proposal
 
     $ageFields = CustomField::query()
         ->withoutGlobalScope(CustomFieldsActivableScope::class)
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'people')
         ->where('name', 'Age')
         ->count();
@@ -318,7 +318,7 @@ it('rejects approval when a field with the same name appeared after the proposal
 it('rejects a duplicate explicit code at proposal time', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -351,7 +351,7 @@ it('rejects approval with a friendly message when the explicit code was taken af
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Ref Number',
         'code' => 'ref_no',
@@ -440,7 +440,7 @@ it('rejects empty option names', function (): void {
 it('rejects a field name that differs from an existing one only by case', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -475,7 +475,7 @@ it('rejects a recased duplicate at approval time, not just at proposal time', fu
 
     expect(CustomField::query()
         ->withoutGlobalScope(CustomFieldsActivableScope::class)
-        ->where($tenantKey, $this->team->getKey())
+        ->where($tenantKey, $this->workspace->getKey())
         ->where('entity_type', 'people')
         ->whereRaw('lower(name) = ?', ['renewal date'])
         ->count())->toBe(1);
@@ -484,7 +484,7 @@ it('rejects a recased duplicate at approval time, not just at proposal time', fu
 it('still allows a name that merely shares a prefix with an existing field', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',

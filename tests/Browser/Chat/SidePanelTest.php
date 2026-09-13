@@ -8,21 +8,21 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 mutates(ChatSidePanel::class);
 
 it('renders the side panel on the dashboard', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
+        ->assertPathIs("/app/{$workspace->slug}")
         ->assertSourceHas('data-chat-side-panel');
 });
 
 it('stays closed when the browser goes back to a page where it was closed', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
+        ->assertPathIs("/app/{$workspace->slug}")
         ->click('a.fi-sidebar-item-btn[href$="/people"]')
         ->waitForText('No people')
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
@@ -40,18 +40,18 @@ it('stays closed when the browser goes back to a page where it was closed', func
 });
 
 it('does not restore an open panel when the browser goes back', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
+        ->assertPathIs("/app/{$workspace->slug}")
         ->click('a.fi-sidebar-item-btn[href$="/people"]')
         ->waitForText('No people')
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
         ->assertVisible('[data-chat-side-panel]');
 
-    $page->script("window.Livewire.navigate('/app/{$team->slug}/companies')");
+    $page->script("window.Livewire.navigate('/app/{$workspace->slug}/companies')");
 
     $page->waitForText('No companies')
         ->back()

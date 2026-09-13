@@ -21,7 +21,7 @@ function seedRateLimitConversation(string $id, User $user): void
         'id' => $id,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'T',
         'created_at' => now(),
         'updated_at' => now(),
@@ -34,9 +34,9 @@ function httpClientException(int $status): RequestException
 }
 
 it('computes capped exponential backoff', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNAAAAAAAAAAAAAAAAAAAAA',
     );
 
@@ -46,9 +46,9 @@ it('computes capped exponential backoff', function (): void {
 });
 
 it('honors the provider Retry-After header when it exceeds the backoff', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNAAAAAAAAAAAAAAAAAAAAA',
     );
 
@@ -59,9 +59,9 @@ it('honors the provider Retry-After header when it exceeds the backoff', functio
 });
 
 it('caps an absurd Retry-After at 60 seconds', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNAAAAAAAAAAAAAAAAAAAAA',
     );
 
@@ -73,10 +73,10 @@ it('caps an absurd Retry-After at 60 seconds', function (): void {
 it('broadcasts a rate-limit-specific message when a rate-limited job ultimately fails', function (): void {
     Event::fake([ChatStreamFailed::class]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedRateLimitConversation('c-1', $user);
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNBBBBBBBBBBBBBBBBBBBBB',
     );
 
@@ -86,9 +86,9 @@ it('broadcasts a rate-limit-specific message when a rate-limited job ultimately 
 });
 
 it('treats a raw streaming 429/529/503 RequestException as rate-limited, but not a 400', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNDDDDDDDDDDDDDDDDDDDDD',
     );
 
@@ -103,10 +103,10 @@ it('treats a raw streaming 429/529/503 RequestException as rate-limited, but not
 it('broadcasts the rate-limit message for a raw 429 RequestException failure', function (): void {
     Event::fake([ChatStreamFailed::class]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedRateLimitConversation('c-1', $user);
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNFFFFFFFFFFFFFFFFFFFFF',
     );
 
@@ -123,9 +123,9 @@ function streamErrorException(?string $type): StreamErrorException
 }
 
 it('releases the turn for a dropped provider connection and a retryable stream error', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNGGGGGGGGGGGGGGGGGGGGG',
     );
 
@@ -143,10 +143,10 @@ it('releases the turn for a dropped provider connection and a retryable stream e
 it('does not tell the user they were rate-limited when the provider connection dropped', function (): void {
     Event::fake([ChatStreamFailed::class]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedRateLimitConversation('c-1', $user);
     $job = new ProcessChatMessage(
-        user: $user, team: $user->currentTeam, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $user->currentWorkspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNHHHHHHHHHHHHHHHHHHHHH',
     );
 

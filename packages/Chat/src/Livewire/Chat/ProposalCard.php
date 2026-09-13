@@ -30,7 +30,7 @@ use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -238,7 +238,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 Select::make('account_owner_id')
                     ->label(__('Account Owner'))
-                    ->options(collect(TeamMembersContext::for($this->authUser()))
+                    ->options(collect(WorkspaceMembersContext::for($this->authUser()))
                         ->pluck('name', 'id')
                         ->all())
                     ->searchable(),
@@ -363,7 +363,7 @@ final class ProposalCard extends BaseLivewireComponent
      *
      * Livewire runs every client-invoked method through implicit route-model
      * binding, so a public method typed `PendingAction` accepts a bare
-     * `where(id)->first()` on whatever id the browser sends, with no team, no
+     * `where(id)->first()` on whatever id the browser sends, with no workspace, no
      * user, no status and no expiry. PendingAction rows carry another tenant's
      * proposed record fields and old→new diffs, so the parameter has to stay off
      * the public surface: internal callers pass a step that loadStep() or
@@ -437,7 +437,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         return PendingAction::query()
             ->whereKey($id)
-            ->where('team_id', $user->currentTeam->getKey())
+            ->where('workspace_id', $user->currentWorkspace->getKey())
             ->where('user_id', $user->getKey())
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
@@ -1381,7 +1381,7 @@ final class ProposalCard extends BaseLivewireComponent
     private function cancelledDependentsOf(PendingAction $step): array
     {
         $candidates = PendingAction::query()
-            ->where('team_id', $step->team_id)
+            ->where('workspace_id', $step->workspace_id)
             ->where('conversation_id', $step->conversation_id)
             ->where('turn_id', $step->turn_id)
             ->whereKeyNot($step->getKey())
@@ -1497,7 +1497,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         $resolved = PendingAction::query()
             ->whereKey($this->pendingActionId ?? '')
-            ->where('team_id', $user->currentTeam->getKey())
+            ->where('workspace_id', $user->currentWorkspace->getKey())
             ->first();
 
         if (! $resolved instanceof PendingAction || $resolved->turn_id === null) {
@@ -1505,7 +1505,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         return PendingAction::query()
-            ->where('team_id', $user->currentTeam->getKey())
+            ->where('workspace_id', $user->currentWorkspace->getKey())
             ->where('user_id', $user->getKey())
             ->where('conversation_id', $resolved->conversation_id)
             ->where('turn_id', $resolved->turn_id)
@@ -1581,13 +1581,13 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        $team = $this->authUser()->currentTeam;
+        $workspace = $this->authUser()->currentWorkspace;
 
-        if ($team === null) {
+        if ($workspace === null) {
             return;
         }
 
-        Filament::setTenant($team, isQuiet: true);
+        Filament::setTenant($workspace, isQuiet: true);
     }
 
     /**
@@ -1728,7 +1728,7 @@ final class ProposalCard extends BaseLivewireComponent
         $steps = $this->stepViews();
 
         // recordFields and editableCodes are dropped: no partial reads them, and each
-        // ran its own CustomField query (editableCodes two more for team members) on
+        // ran its own CustomField query (editableCodes two more for workspace members) on
         // every dock round trip, only to be discarded. stepViews() already carries
         // both per step. The counters below stay: they are cheap array reads and the
         // batch footer's behaviour is asserted through them.

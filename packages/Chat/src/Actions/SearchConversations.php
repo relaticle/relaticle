@@ -30,7 +30,7 @@ final readonly class SearchConversations
             ->select(['ac.id', 'ac.title', 'ac.created_at', 'ac.updated_at'])
             ->where('ac.participant_type', $user->getMorphClass())
             ->where('ac.participant_id', (string) $user->getKey())
-            ->where('ac.team_id', (string) $user->current_team_id)
+            ->where('ac.workspace_id', (string) $user->current_workspace_id)
             ->where(function (Builder $q) use ($needle): void {
                 $q->where('ac.title', 'ilike', $needle)
                     ->orWhereExists(function (Builder $sub) use ($needle): void {

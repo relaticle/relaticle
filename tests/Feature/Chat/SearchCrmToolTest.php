@@ -16,12 +16,12 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(SearchCrmTool::class);
 
 it('finds a person by their email custom field value, not just their name', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    TenantContextService::setTenantId($team->getKey());
-    $person = People::factory()->for($team)->create(['name' => 'Patrick Collison']);
+    TenantContextService::setTenantId($workspace->getKey());
+    $person = People::factory()->for($workspace)->create(['name' => 'Patrick Collison']);
     $person->update(['custom_fields' => ['emails' => ['patrick@stripe.com']]]);
     TenantContextService::setTenantId(null);
 
@@ -31,24 +31,24 @@ it('finds a person by their email custom field value, not just their name', func
 });
 
 it('never matches an option id or rich text markup that merely contains the query', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
 
     $optionId = (string) $statusField->options->firstWhere('name', 'To do')->id;
 
-    $task = Task::factory()->for($team)->create(['title' => 'Roadmap task']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'Roadmap task']);
     $task->saveCustomFieldValue($statusField, $optionId);
 
-    TenantContextService::setTenantId($team->getKey());
-    $note = Note::factory()->for($team)->create(['title' => 'Meeting notes']);
+    TenantContextService::setTenantId($workspace->getKey());
+    $note = Note::factory()->for($workspace)->create(['title' => 'Meeting notes']);
     $note->update(['custom_fields' => ['body' => "<div data-ref=\"{$optionId}\">Follow up</div>"]]);
     TenantContextService::setTenantId(null);
 
@@ -71,21 +71,21 @@ it('never matches an option id or rich text markup that merely contains the quer
 });
 
 it('never surfaces another tenant\'s matching custom field value', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    $outsider = User::factory()->withPersonalTeam()->create();
-    $outsiderTeam = $outsider->currentTeam;
+    $outsider = User::factory()->withPersonalWorkspace()->create();
+    $outsiderWorkspace = $outsider->currentWorkspace;
 
-    TenantContextService::setTenantId($outsiderTeam->getKey());
-    $theirPerson = People::factory()->for($outsiderTeam)->create(['name' => 'Foreign Contact']);
+    TenantContextService::setTenantId($outsiderWorkspace->getKey());
+    $theirPerson = People::factory()->for($outsiderWorkspace)->create(['name' => 'Foreign Contact']);
     $theirPerson->update(['custom_fields' => ['emails' => ['contact@stripe.com']]]);
     TenantContextService::setTenantId(null);
 
     $storedEmails = DB::table('custom_field_values')
         ->where('entity_type', 'people')
         ->where('entity_id', $theirPerson->getKey())
-        ->where('tenant_id', $outsiderTeam->getKey())
+        ->where('tenant_id', $outsiderWorkspace->getKey())
         ->value('json_value');
 
     expect($storedEmails)->toContain('stripe');
@@ -96,9 +96,9 @@ it('never surfaces another tenant\'s matching custom field value', function (): 
 });
 
 it('discloses truncation instead of presenting a capped list as the whole truth', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Company::factory()->count(7)->for($user->currentTeam)->create(['name' => 'Truncation Probe Co']);
+    Company::factory()->count(7)->for($user->currentWorkspace)->create(['name' => 'Truncation Probe Co']);
 
     $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'Truncation Probe', 'limit' => 5])), true);
 
@@ -108,9 +108,9 @@ it('discloses truncation instead of presenting a capped list as the whole truth'
 });
 
 it('reports no truncation when every match fits under the limit', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Company::factory()->count(2)->for($user->currentTeam)->create(['name' => 'Fits Under Cap Co']);
+    Company::factory()->count(2)->for($user->currentWorkspace)->create(['name' => 'Fits Under Cap Co']);
 
     $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'Fits Under Cap', 'limit' => 5])), true);
 

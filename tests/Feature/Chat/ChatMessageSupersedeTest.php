@@ -17,7 +17,7 @@ function seedSupersedeConversation(User $user): array
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'supersede test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -56,7 +56,7 @@ function seedSupersedeConversation(User $user): array
 }
 
 it('supersedes the anchor user message and everything after it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedSupersedeConversation($user);
 
     $response = $this->actingAs($user)->postJson("/chat/conversations/{$conversationId}/messages/supersede", [
@@ -77,7 +77,7 @@ it('supersedes the anchor user message and everything after it', function (): vo
 });
 
 it('anchors on the latest user row when no anchor_id is given and content matches', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId] = seedSupersedeConversation($user);
 
     $response = $this->actingAs($user)->postJson("/chat/conversations/{$conversationId}/messages/supersede", [
@@ -89,7 +89,7 @@ it('anchors on the latest user row when no anchor_id is given and content matche
 });
 
 it('refuses to supersede when anchor_content does not match the latest user row', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId] = seedSupersedeConversation($user);
 
     $response = $this->actingAs($user)->postJson("/chat/conversations/{$conversationId}/messages/supersede", [
@@ -106,7 +106,7 @@ it('refuses to supersede when anchor_content does not match the latest user row'
 });
 
 it('rejects an assistant message as anchor', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedSupersedeConversation($user);
 
     $this->actingAs($user)
@@ -115,10 +115,10 @@ it('rejects an assistant message as anchor', function (): void {
 });
 
 it('hides foreign conversations with 404', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     [$conversationId] = seedSupersedeConversation($owner);
 
-    $intruder = User::factory()->withPersonalTeam()->create();
+    $intruder = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($intruder)
         ->postJson("/chat/conversations/{$conversationId}/messages/supersede", [])
@@ -126,7 +126,7 @@ it('hides foreign conversations with 404', function (): void {
 });
 
 it('excludes superseded messages from the rendered transcript', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedSupersedeConversation($user);
 
     $this->actingAs($user)
@@ -144,7 +144,7 @@ it('excludes superseded messages from the rendered transcript', function (): voi
 });
 
 it('excludes superseded messages from the agent history', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedSupersedeConversation($user);
 
     $this->actingAs($user)

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
-use App\Http\Middleware\SetApiTeamContext;
+use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Http\Middleware\ValidateMcpOrigin;
 use App\Mcp\Servers\RelaticleServer;
 use Illuminate\Support\Facades\Route;
@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 $mcpDomain = config('app.mcp_domain');
 $mcpPath = $mcpDomain ? '/' : '/mcp';
-$mcpMiddleware = [ValidateMcpOrigin::class, 'auth:sanctum,api', 'throttle:mcp', SetApiTeamContext::class, EnsureHostedWorkspaceAccess::class];
+$mcpMiddleware = [ValidateMcpOrigin::class, 'auth:sanctum,api', 'throttle:mcp', SetApiWorkspaceContext::class, EnsureHostedWorkspaceAccess::class];
 
 Route::middleware('throttle:mcp-oauth')->group(static fn () => Mcp::oauthRoutes());
 

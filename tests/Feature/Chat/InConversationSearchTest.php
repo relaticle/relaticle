@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Tests\Helpers\ChatDocument;
@@ -38,13 +38,13 @@ function seedSearchableMessage(User $participant, string $conversationId, string
     ]);
 }
 
-function seedSearchableConversation(User $participant, string $conversationId, ?string $teamId = null): void
+function seedSearchableConversation(User $participant, string $conversationId, ?string $workspaceId = null): void
 {
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => $participant->getMorphClass(),
         'participant_id' => (string) $participant->getKey(),
-        'team_id' => $teamId ?? (string) $participant->currentTeam->getKey(),
+        'workspace_id' => $workspaceId ?? (string) $participant->currentWorkspace->getKey(),
         'title' => 'Searchable',
         'created_at' => now(),
         'updated_at' => now(),
@@ -52,7 +52,7 @@ function seedSearchableConversation(User $participant, string $conversationId, ?
 }
 
 it('finds a message by substring and returns its id with a snippet', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-find');
     seedSearchableMessage($user, 'conv-find', 'm-1', 'Remind me about the Northwind renewal next quarter');
     seedSearchableMessage($user, 'conv-find', 'm-2', 'Completely unrelated chatter');
@@ -68,7 +68,7 @@ it('finds a message by substring and returns its id with a snippet', function ()
 });
 
 it('strips markdown syntax from snippets', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-md');
     seedSearchableMessage(
         $user,
@@ -91,7 +91,7 @@ it('strips markdown syntax from snippets', function (): void {
 });
 
 it('matches assistant messages too', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-assistant');
     seedSearchableMessage($user, 'conv-assistant', 'm-1', "Here is the pipeline:\n\n- **Northwind** renewal", ['role' => 'assistant']);
 
@@ -104,7 +104,7 @@ it('matches assistant messages too', function (): void {
 });
 
 it('excludes superseded messages', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-superseded');
     seedSearchableMessage($user, 'conv-superseded', 'm-1', 'Northwind renewal, first attempt', ['superseded_at' => now()]);
     seedSearchableMessage($user, 'conv-superseded', 'm-2', 'Northwind renewal, second attempt');
@@ -119,7 +119,7 @@ it('excludes superseded messages', function (): void {
 });
 
 it('excludes approval bookkeeping messages the transcript never renders', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-approval');
     seedSearchableMessage($user, 'conv-approval', 'm-1', '[approval] approved the Northwind update');
 
@@ -132,8 +132,8 @@ it('excludes approval bookkeeping messages the transcript never renders', functi
 });
 
 it('returns 404 for a conversation owned by another participant', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $intruder = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $intruder = User::factory()->withPersonalWorkspace()->create();
 
     seedSearchableConversation($owner, 'conv-owned');
     seedSearchableMessage($owner, 'conv-owned', 'm-1', 'Northwind renewal');
@@ -144,15 +144,15 @@ it('returns 404 for a conversation owned by another participant', function (): v
         ->assertNotFound();
 });
 
-it('returns 404 for a teammates conversation inside the very same team', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $team = $owner->currentTeam;
+it('returns 404 for a teammates conversation inside the very same workspace', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     $teammate = User::factory()->create();
-    $teammate->teams()->attach($team, ['role' => 'admin']);
-    $teammate->forceFill(['current_team_id' => $team->getKey()])->save();
+    $teammate->workspaces()->attach($workspace, ['role' => 'admin']);
+    $teammate->forceFill(['current_workspace_id' => $workspace->getKey()])->save();
 
-    seedSearchableConversation($owner, 'conv-teammate', (string) $team->getKey());
+    seedSearchableConversation($owner, 'conv-teammate', (string) $workspace->getKey());
     seedSearchableMessage($owner, 'conv-teammate', 'm-1', 'Northwind renewal');
 
     actingAs($teammate);
@@ -161,28 +161,28 @@ it('returns 404 for a teammates conversation inside the very same team', functio
         ->assertNotFound();
 });
 
-it('returns 404 for the participants own conversation in a team they are not currently in', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $otherTeam = Team::factory()->create(['user_id' => $user->getKey()]);
-    $user->teams()->attach($otherTeam, ['role' => 'admin']);
+it('returns 404 for the participants own conversation in a workspace they are not currently in', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $user->workspaces()->attach($otherWorkspace, ['role' => 'admin']);
 
-    seedSearchableConversation($user, 'conv-other-team', (string) $otherTeam->getKey());
-    seedSearchableMessage($user, 'conv-other-team', 'm-1', 'Northwind renewal');
+    seedSearchableConversation($user, 'conv-other-workspace', (string) $otherWorkspace->getKey());
+    seedSearchableMessage($user, 'conv-other-workspace', 'm-1', 'Northwind renewal');
 
     actingAs($user);
 
-    getJson(route('chat.conversations.search', ['conversationId' => 'conv-other-team', 'q' => 'northwind']))
+    getJson(route('chat.conversations.search', ['conversationId' => 'conv-other-workspace', 'q' => 'northwind']))
         ->assertNotFound();
 
-    $user->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
+    $user->forceFill(['current_workspace_id' => $otherWorkspace->getKey()])->save();
 
-    getJson(route('chat.conversations.search', ['conversationId' => 'conv-other-team', 'q' => 'northwind']))
+    getJson(route('chat.conversations.search', ['conversationId' => 'conv-other-workspace', 'q' => 'northwind']))
         ->assertOk()
         ->assertJsonPath('matches.0.message_id', 'm-1');
 });
 
 it('never returns another conversations messages', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-a');
     seedSearchableConversation($user, 'conv-b');
     seedSearchableMessage($user, 'conv-a', 'm-a', 'Northwind renewal in A');
@@ -198,7 +198,7 @@ it('never returns another conversations messages', function (): void {
 });
 
 it('treats underscore and percent in the query as literals', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-wildcards');
     seedSearchableMessage($user, 'conv-wildcards', 'm-literal', 'field foo_bar is stale');
     seedSearchableMessage($user, 'conv-wildcards', 'm-wildcard', 'field fooxbar is stale');
@@ -213,7 +213,7 @@ it('treats underscore and percent in the query as literals', function (): void {
 });
 
 it('caps results at twenty, newest first', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-cap');
 
     foreach (range(1, 25) as $i) {
@@ -230,7 +230,7 @@ it('caps results at twenty, newest first', function (): void {
 });
 
 it('returns an empty match list when nothing matches', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-empty');
     seedSearchableMessage($user, 'conv-empty', 'm-1', 'Nothing of interest here');
 
@@ -242,7 +242,7 @@ it('returns an empty match list when nothing matches', function (): void {
 });
 
 it('rejects a query shorter than two characters', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-short');
 
     actingAs($user);

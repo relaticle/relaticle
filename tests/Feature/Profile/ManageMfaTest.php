@@ -18,7 +18,7 @@ use PragmaRX\Google2FA\Google2FA;
 mutates(ManageMfa::class, ConfirmMfaEnrollment::class);
 
 test('the section renders and reports that MFA is off', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     Livewire::test(ManageMfa::class)
         ->assertSuccessful()
@@ -27,7 +27,7 @@ test('the section renders and reports that MFA is off', function (): void {
 });
 
 test('the section reports that MFA is on for an enrolled user', function (): void {
-    $this->actingAs(User::factory()->withTeam()->withConfirmedMfa()->create());
+    $this->actingAs(User::factory()->withWorkspace()->withConfirmedMfa()->create());
 
     Livewire::test(ManageMfa::class)
         ->assertSuccessful()
@@ -35,7 +35,7 @@ test('the section reports that MFA is on for an enrolled user', function (): voi
 });
 
 test('enrolling requires an identity proof and does not enforce MFA until a code is confirmed', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $component = Livewire::test(ManageMfa::class)
@@ -50,7 +50,7 @@ test('enrolling requires an identity proof and does not enforce MFA until a code
 });
 
 test('a wrong password cannot start enrolment', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageMfa::class)
@@ -61,7 +61,7 @@ test('a wrong password cannot start enrolment', function (): void {
 });
 
 test('confirming a valid code turns MFA on and spends the grant', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $component = Livewire::test(ManageMfa::class)
@@ -81,7 +81,7 @@ test('confirming a valid code turns MFA on and spends the grant', function (): v
 });
 
 test('an invalid code leaves MFA off', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageMfa::class)
@@ -97,7 +97,7 @@ test('an invalid code leaves MFA off', function (): void {
 
 test('setup rejects a code for an authenticator replaced in another tab', function (): void {
     $this->freezeTime();
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $firstTab = Livewire::test(ManageMfa::class)
@@ -124,7 +124,7 @@ test('setup rejects a code for an authenticator replaced in another tab', functi
 
 test('a stale settings tab cannot replace an enrolled authenticator', function (): void {
     $this->freezeTime();
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     $staleTab = Livewire::test(ManageMfa::class);
     $activeTab = Livewire::test(ManageMfa::class)
@@ -145,7 +145,7 @@ test('a stale settings tab cannot replace an enrolled authenticator', function (
 });
 
 test('turning MFA off requires the password and the current code', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $this->actingAs($user);
 
@@ -159,7 +159,7 @@ test('turning MFA off requires the password and the current code', function (): 
 });
 
 test('a wrong password cannot turn MFA off', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $this->actingAs($user);
 
@@ -174,7 +174,7 @@ test('a wrong password cannot turn MFA off', function (): void {
 });
 
 test('recovery codes are only revealed after a fresh proof', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $this->actingAs($user);
 
@@ -191,7 +191,7 @@ test('recovery codes are only revealed after a fresh proof', function (): void {
 });
 
 test('regenerating recovery codes replaces the previous set', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $before = $user->recoveryCodes();
     $this->actingAs($user);
@@ -206,7 +206,7 @@ test('regenerating recovery codes replaces the previous set', function (): void 
 });
 
 test('cancelling setup clears the secret and keeps MFA off', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageMfa::class)
@@ -220,7 +220,7 @@ test('cancelling setup clears the secret and keeps MFA off', function (): void {
 });
 
 test('leaving recovery codes hides them while leaving MFA on', function (string $method): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     $component = Livewire::test(ManageMfa::class)
         ->callAction(TestAction::make('enableMfa'), ['password' => 'password']);
@@ -239,7 +239,7 @@ test('leaving recovery codes hides them while leaving MFA on', function (string 
 })->with(['finish' => 'callMountedAction', 'close' => 'unmountAction']);
 
 test('a user who signs in with a recovery code can disable MFA with another recovery code', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
 
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password'])
         ->assertRedirect(route('two-factor.login'));
@@ -262,7 +262,7 @@ test('a user who signs in with a recovery code can disable MFA with another reco
 });
 
 test('a wrong password does not spend a recovery code while disabling MFA', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     $codes = $user->recoveryCodes();
 
@@ -279,7 +279,7 @@ test('a wrong password does not spend a recovery code while disabling MFA', func
 });
 
 test('an invalid recovery code cannot disable MFA', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     $codes = $user->recoveryCodes();
 
@@ -296,7 +296,7 @@ test('an invalid recovery code cannot disable MFA', function (): void {
 });
 
 test('a provider-only user returns from confirmation with the enrolment modal already open', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     $account = UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -324,7 +324,7 @@ test('a provider-only user returns from confirmation with the enrolment modal al
 });
 
 test('a provider-only user returns from confirmation with the mfa action already open', function (string $action): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->socialOnly()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $account = UserSocialAccount::factory()->create([

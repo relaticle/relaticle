@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
@@ -20,13 +20,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -57,7 +57,7 @@ it('processes 1000 row create import', function (): void {
 
 it('processes 1000 row mixed operations import', function (): void {
     $existingPeople = People::factory()->count(50)->create([
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $rows = [];
@@ -128,7 +128,7 @@ it('processes 1000 rows with entity link relationships and deduplication', funct
         ->and($import->failed_rows)->toBe(0)
         ->and($import->status)->toBe(ImportStatus::Completed);
 
-    $companies = Company::where('team_id', $this->team->id)
+    $companies = Company::where('workspace_id', $this->workspace->id)
         ->whereIn('name', $companyNames)
         ->get();
 

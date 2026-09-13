@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Models\Workspace;
 use App\Services\AvatarService;
 use Filament\Panel;
 
@@ -33,23 +33,23 @@ test('user belongs to many tasks', function () {
 
 test('user can access tenants', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create(['user_id' => $user->id]);
-    $user->ownedTeams()->save($team);
+    $workspace = Workspace::factory()->create(['user_id' => $user->id]);
+    $user->ownedWorkspaces()->save($workspace);
 
     $tenants = $user->getTenants(app(Panel::class)->id('app'));
 
     expect($tenants->count())->toBe(1)
-        ->and($tenants->first()->id)->toBe($team->id);
+        ->and($tenants->first()->id)->toBe($workspace->id);
 });
 
 test('user can access tenant', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create(['user_id' => $user->id]);
-    $user->ownedTeams()->save($team);
-    $user->currentTeam()->associate($team);
+    $workspace = Workspace::factory()->create(['user_id' => $user->id]);
+    $user->ownedWorkspaces()->save($workspace);
+    $user->currentWorkspace()->associate($workspace);
     $user->save();
 
-    expect($user->canAccessTenant($team))->toBeTrue();
+    expect($user->canAccessTenant($workspace))->toBeTrue();
 });
 
 test('user has a consistent local initial avatar', function () {

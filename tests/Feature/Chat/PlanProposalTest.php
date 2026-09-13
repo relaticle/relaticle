@@ -28,17 +28,17 @@ mutates(ProposalPlanService::class, PlanReferenceValidator::class, PlanReference
 beforeEach(function (): void {
     Bus::fake();
 
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
     Auth::guard('web')->setUser($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019dfa00-5555-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),

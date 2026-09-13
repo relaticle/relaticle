@@ -6,8 +6,8 @@ namespace App\Console\Commands;
 
 use App\Enums\Plan;
 use App\Mail\ProTrialEndingSoonMail;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -35,21 +35,21 @@ final class ProcessTrialsCommand extends Command
         $windowEnd = now()->addDays(3)->endOfDay();
         $count = 0;
 
-        Team::query()
+        Workspace::query()
             ->whereBetween('trial_ends_at', [$windowStart, $windowEnd])
             ->whereDoesntHave('subscriptions', function (Builder $query): void {
                 $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
             })
             ->with('owner')
-            ->chunkById(100, function (Collection $teams) use (&$count): void {
-                $teams->each(function (Team $team) use (&$count): void {
-                    $owner = $team->owner;
+            ->chunkById(100, function (Collection $workspaces) use (&$count): void {
+                $workspaces->each(function (Workspace $workspace) use (&$count): void {
+                    $owner = $workspace->owner;
 
                     if (! $owner instanceof User) {
                         return;
                     }
 
-                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($team));
+                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace));
                     $count++;
                 });
             });
@@ -61,13 +61,13 @@ final class ProcessTrialsCommand extends Command
     {
         $count = 0;
 
-        Team::query()
+        Workspace::query()
             ->whereNotNull('trial_ends_at')
             ->where('trial_ends_at', '<', now())
             ->with('subscriptions')
-            ->chunkById(100, function (Collection $teams) use ($credits, &$count): void {
-                $teams->each(function (Team $team) use ($credits, &$count): void {
-                    $hasLiveSubscription = $team->subscriptions()
+            ->chunkById(100, function (Collection $workspaces) use ($credits, &$count): void {
+                $workspaces->each(function (Workspace $workspace) use ($credits, &$count): void {
+                    $hasLiveSubscription = $workspace->subscriptions()
                         ->where(function (Builder $query): void {
                             $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
                         })
@@ -77,18 +77,18 @@ final class ProcessTrialsCommand extends Command
                     // subscription, or a plan assigned outside the trial (e.g. a
                     // sysadmin Enterprise grant), outlives the trial window, so
                     // clear the stale timestamp so it is not reprocessed daily.
-                    if ($hasLiveSubscription || $team->plan !== Plan::Pro) {
-                        $team->forceFill(['trial_ends_at' => null])->save();
+                    if ($hasLiveSubscription || $workspace->plan !== Plan::Pro) {
+                        $workspace->forceFill(['trial_ends_at' => null])->save();
 
                         return;
                     }
 
-                    DB::transaction(function () use ($team, $credits): void {
-                        $team->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
-                        $credits->resetPeriod($team);
+                    DB::transaction(function () use ($workspace, $credits): void {
+                        $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
+                        $credits->resetPeriod($workspace);
                     });
 
-                    $this->info("Trial expired, paused hosted access: {$team->name}");
+                    $this->info("Trial expired, paused hosted access: {$workspace->name}");
                     $count++;
                 });
             });

@@ -46,11 +46,11 @@ final class UpdatePeopleTool extends BaseUpdateTool
 
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('workspace_id', $workspaceId)],
         ];
     }
 }

@@ -69,7 +69,7 @@
                 </div>
 
                 <!-- Workspace Picker -->
-                @if($teams->count() > 0)
+                @if($workspaces->count() > 0)
                     <div>
                         <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.workspace.heading') }}</h2>
                         <p class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
@@ -77,8 +77,8 @@
                         </p>
 
                         <div class="mt-3 space-y-2" role="radiogroup" aria-label="{{ __('mcp.consent.workspace.aria_label') }}">
-                            @foreach($teams as $team)
-                                @php($isPaused = in_array($team->getKey(), $pausedTeamIds, true))
+                            @foreach($workspaces as $workspace)
+                                @php($isPaused = in_array($workspace->getKey(), $pausedWorkspaceIds, true))
                                 <label @class([
                                     'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 transition-colors',
                                     'cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 has-[:checked]:border-primary has-[:checked]:bg-primary-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 dark:hover:bg-gray-800/50 dark:has-[:checked]:border-primary-400 dark:has-[:checked]:bg-primary-950/50' => ! $isPaused,
@@ -86,28 +86,28 @@
                                 ])>
                                     <input
                                         type="radio"
-                                        name="team_id"
-                                        value="{{ $team->getKey() }}"
+                                        name="workspace_id"
+                                        value="{{ $workspace->getKey() }}"
                                         form="authorizeForm"
                                         required
                                         @disabled($isPaused)
-                                        @checked($team->getKey() === $selectedTeamId)
+                                        @checked($workspace->getKey() === $selectedWorkspaceId)
                                         class="size-4 shrink-0 accent-primary"
                                     >
-                                    <span class="min-w-0 flex-1 text-sm font-medium break-words text-gray-900 dark:text-white">{{ $team->name }}</span>
+                                    <span class="min-w-0 flex-1 text-sm font-medium break-words text-gray-900 dark:text-white">{{ $workspace->name }}</span>
                                     {{-- The card is narrower than the `sm` breakpoint, so these badges sit
                                          inline on desktop and drop to their own line on a phone rather than
                                          squeezing the workspace name into one word per line. --}}
                                     @if($isPaused)
                                         <span class="w-full pl-7 text-xs font-medium text-red-600 sm:w-auto sm:pl-0 sm:text-right dark:text-red-400">{{ __('mcp.consent.workspace.paused') }}</span>
-                                    @elseif($team->personal_team)
+                                    @elseif($workspace->personal_workspace)
                                         <span class="w-full pl-7 text-xs text-gray-500 sm:w-auto sm:pl-0 sm:text-right dark:text-gray-400">{{ __('mcp.consent.workspace.personal') }}</span>
                                     @endif
                                 </label>
                             @endforeach
                         </div>
 
-                        @if($teams->count() === count($pausedTeamIds))
+                        @if($workspaces->count() === count($pausedWorkspaceIds))
                             <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
                                 {{ __('mcp.consent.workspace.all_paused') }}
                             </p>
@@ -194,7 +194,7 @@
                     <input type="hidden" name="state" value="{{ $request->state }}">
                     <input type="hidden" name="client_id" value="{{ $client->id }}">
                     <input type="hidden" name="auth_token" value="{{ $authToken }}">
-                    <button type="submit" @disabled($teams->count() === 0 || $teams->count() === count($pausedTeamIds)) class="inline-flex h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50" id="authorizeButton">
+                    <button type="submit" @disabled($workspaces->count() === 0 || $workspaces->count() === count($pausedWorkspaceIds)) class="inline-flex h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50" id="authorizeButton">
                         <svg id="loadingSpinner" class="hidden size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

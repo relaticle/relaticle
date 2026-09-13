@@ -20,11 +20,11 @@ final class UpdatePeopleRequest extends BaseCrmEntityRequest
      */
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'company_id' => ['nullable', 'string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_id' => ['nullable', 'string', Rule::exists('companies', 'id')->where('workspace_id', $workspaceId)],
         ];
     }
 }

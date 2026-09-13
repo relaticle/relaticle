@@ -50,11 +50,11 @@ final readonly class CreateCustomField
      */
     public function execute(User $user, array $data): CustomField
     {
-        abort_unless($user->ownsTeam($user->currentTeam), 403, 'Only team owners can manage custom field definitions.');
+        abort_unless($user->ownsWorkspace($user->currentWorkspace), 403, 'Only workspace owners can manage custom field definitions.');
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
+        TenantContextService::setTenantId($workspaceId);
 
         try {
             // Re-validated here, not just at proposal time: a proposal approved after
@@ -74,16 +74,16 @@ final readonly class CreateCustomField
 
             $nextSortOrder = (int) CustomField::query()
                 ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->where('entity_type', $entityType)
                 ->max('sort_order') + 1;
 
-            $field = DB::transaction(function () use ($teamId, $entityType, $type, $name, $code, $nextSortOrder, $optionNames): CustomField {
+            $field = DB::transaction(function () use ($workspaceId, $entityType, $type, $name, $code, $nextSortOrder, $optionNames): CustomField {
                 $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
                 /** @var CustomField $created */
                 $created = CustomField::query()->create([
-                    $tenantKey => $teamId,
+                    $tenantKey => $workspaceId,
                     'entity_type' => $entityType,
                     'type' => $type,
                     'name' => $name,
@@ -97,7 +97,7 @@ final readonly class CreateCustomField
 
                 foreach ($optionNames as $index => $optionName) {
                     $created->options()->create([
-                        $tenantKey => $teamId,
+                        $tenantKey => $workspaceId,
                         'name' => $optionName,
                         'sort_order' => $index,
                     ]);

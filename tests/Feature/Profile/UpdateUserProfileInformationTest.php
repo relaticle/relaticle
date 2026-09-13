@@ -39,7 +39,7 @@ beforeEach(function () {
 
 describe('profile component functionality', function () {
     test('profile information component renders correctly', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
@@ -55,7 +55,7 @@ describe('profile component functionality', function () {
     });
 
     test('can update name without changing email', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'stable@example.com',
             'email_verified_at' => now(),
         ]);
@@ -81,7 +81,7 @@ describe('email change verification', function () {
     beforeEach(function () {
         Notification::fake();
 
-        $this->verifiedUser = User::factory()->withTeam()->create([
+        $this->verifiedUser = User::factory()->withWorkspace()->create([
             'email' => 'original@example.com',
             'email_verified_at' => now(),
         ]);
@@ -205,7 +205,7 @@ describe('email change verification', function () {
     });
 
     test('an enrolled user must prove MFA before requesting an email change', function (): void {
-        $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+        $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
         $this->actingAs($user);
         AuthenticationSession::markComplete($user);
         $component = Livewire::test(UpdateProfileInformationComponent::class)
@@ -230,7 +230,7 @@ describe('email change verification', function () {
     });
 
     test('a passkey user requests the email change after completing the confirmation ceremony', function (): void {
-        $user = User::factory()->withTeam()->create(['password' => null]);
+        $user = User::factory()->withWorkspace()->create(['password' => null]);
         $this->actingAs($user);
         Passkey::create([
             'user_id' => $user->id,
@@ -253,7 +253,7 @@ describe('email change verification', function () {
     });
 
     test('a provider-only user resumes the email change after returning from confirmation', function (): void {
-        $user = User::factory()->withTeam()->socialOnly()->create();
+        $user = User::factory()->withWorkspace()->socialOnly()->create();
         $this->actingAs($user);
         $account = UserSocialAccount::factory()->create([
             'user_id' => $user->id,
@@ -432,7 +432,7 @@ describe('photo upload', function () {
 
     test('removeProfilePhoto livewire method deletes photo and file', function () {
         Storage::fake('public');
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'remove-photo@example.com',
         ]);
         $this->actingAs($user);
@@ -452,7 +452,7 @@ describe('photo upload', function () {
     });
 
     test('removeProfilePhoto also clears pending FileUpload state', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'pending-photo@example.com',
         ]);
         $this->actingAs($user);
@@ -474,7 +474,7 @@ describe('photo upload', function () {
 
     test('can update profile through livewire component with photo', function () {
         Storage::fake('public');
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'photo-test@example.com',
         ]);
         $this->actingAs($user);
@@ -500,7 +500,7 @@ describe('photo upload', function () {
 
 describe('validation', function () {
     test('validates required fields through livewire component', function () {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
@@ -514,7 +514,7 @@ describe('validation', function () {
 
     test('rejects duplicate email through livewire component', function () {
         User::factory()->create(['email' => 'existing@example.com']);
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
@@ -622,7 +622,7 @@ describe('photo url generation', function () {
 
 describe('timezone', function () {
     test('form is prefilled with the stored timezone', function () {
-        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+        $user = User::factory()->withWorkspace()->create(['timezone' => 'Asia/Tokyo']);
         $this->actingAs($user);
 
         Livewire::test(UpdateProfileInformationComponent::class)
@@ -630,7 +630,7 @@ describe('timezone', function () {
     });
 
     test('can set a timezone through the component', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'tz@example.com',
             'timezone' => null,
         ]);
@@ -649,7 +649,7 @@ describe('timezone', function () {
     });
 
     test('clearing the select writes null so the app default applies again', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'tz-clear@example.com',
             'timezone' => 'Asia/Tokyo',
         ]);
@@ -670,7 +670,7 @@ describe('timezone', function () {
     test('timezone survives a deferred email change', function () {
         Notification::fake();
 
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'tz-email@example.com',
             'email_verified_at' => now(),
             'timezone' => null,
@@ -692,7 +692,7 @@ describe('timezone', function () {
     });
 
     test('rejects an identifier that is not a real timezone', function () {
-        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+        $user = User::factory()->withWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
         expect(fn () => $this->action->update($user, [
             'name' => $user->name,
@@ -704,7 +704,7 @@ describe('timezone', function () {
     });
 
     test('action leaves the timezone untouched when the key is absent from input', function () {
-        $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+        $user = User::factory()->withWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
         $this->action->update($user, [
             'name' => 'Renamed Without Timezone Key',
@@ -719,7 +719,7 @@ describe('timezone', function () {
 
 describe('the raw profile-information route', function () {
     test('a direct request cannot change the account email without an identity proof', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'email' => 'owner@example.com',
             'email_verified_at' => now(),
         ]);
@@ -737,7 +737,7 @@ describe('the raw profile-information route', function () {
     });
 
     test('a direct request may still update non-credential fields', function () {
-        $user = User::factory()->withTeam()->create([
+        $user = User::factory()->withWorkspace()->create([
             'name' => 'Original Name',
             'email' => 'owner@example.com',
         ]);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Models\PendingAction;
 
@@ -23,16 +23,16 @@ final readonly class RecordNameResolver
     /**
      * @param  class-string<Model>  $modelClass
      */
-    public function name(mixed $id, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
+    public function name(mixed $id, string $modelClass, ?Workspace $workspace, string $nameAttribute = 'name'): string
     {
-        return $this->names([$id], $modelClass, $team, $nameAttribute);
+        return $this->names([$id], $modelClass, $workspace, $nameAttribute);
     }
 
     /**
      * @param  array<array-key, mixed>|null  $ids
      * @param  class-string<Model>  $modelClass
      */
-    public function names(?array $ids, string $modelClass, ?Team $team, string $nameAttribute = 'name'): string
+    public function names(?array $ids, string $modelClass, ?Workspace $workspace, string $nameAttribute = 'name'): string
     {
         if ($ids === null || $ids === []) {
             return '';
@@ -54,8 +54,8 @@ final readonly class RecordNameResolver
         if ($storedIds !== []) {
             $query = $modelClass::query()->whereKey($storedIds);
 
-            if ($team instanceof Team) {
-                $query->where('team_id', $team->getKey());
+            if ($workspace instanceof Workspace) {
+                $query->where('workspace_id', $workspace->getKey());
             }
 
             $resolved = $query
@@ -68,7 +68,7 @@ final readonly class RecordNameResolver
 
         foreach ($ids as $id) {
             $name = PlanReference::is($id)
-                ? $this->pendingName($id, $team)
+                ? $this->pendingName($id, $workspace)
                 : ($resolved[is_string($id) ? $id : ''] ?? '');
 
             if ($name !== '') {
@@ -83,7 +83,7 @@ final readonly class RecordNameResolver
      * The proposed name of a record an earlier step of this turn will create,
      * labelled with that step's position so the card says where it comes from.
      */
-    private function pendingName(mixed $reference, ?Team $team): string
+    private function pendingName(mixed $reference, ?Workspace $workspace): string
     {
         $target = PlanReference::target($reference);
 
@@ -91,14 +91,14 @@ final readonly class RecordNameResolver
             return '';
         }
 
-        // Scoped by team even though the write tools validate the reference before
+        // Scoped by workspace even though the write tools validate the reference before
         // buildDisplayData runs: that call ordering is the only thing standing between
         // a hallucinated $ref and another tenant's proposed record name on the card, and
         // this resolver should not depend on its caller getting the order right.
         $query = PendingAction::query();
 
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
+        if ($workspace instanceof Workspace) {
+            $query->where('workspace_id', $workspace->getKey());
         }
 
         $action = $query->find(PlanReference::actionId($target));
@@ -137,7 +137,7 @@ final readonly class RecordNameResolver
         // Keys are ULIDs, so they sort in creation order: counting the turn's
         // proposals up to and including this one gives its step number.
         return PendingAction::query()
-            ->where('team_id', $action->team_id)
+            ->where('workspace_id', $action->workspace_id)
             ->where('turn_id', $action->turn_id)
             ->where('id', '<=', $action->getKey())
             ->count();

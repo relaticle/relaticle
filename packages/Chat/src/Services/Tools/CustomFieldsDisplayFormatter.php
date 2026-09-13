@@ -34,9 +34,9 @@ final readonly class CustomFieldsDisplayFormatter
             return [];
         }
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $fields = CustomField::query()
-            ->where('tenant_id', $teamId)
+            ->where('tenant_id', $workspaceId)
             ->where('entity_type', $entityType)
             ->active()
             ->whereIn('code', array_keys($cleanFields))

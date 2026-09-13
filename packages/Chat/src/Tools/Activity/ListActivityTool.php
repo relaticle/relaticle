@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Activity;
 
 use App\Models\ActivityLog\Activity;
-use App\Models\ActivityLog\Scopes\TeamScope;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -62,7 +62,7 @@ final readonly class ListActivityTool implements Tool
     {
         return 'Read the change history of CRM records: who changed what, and when.'
             .' Use it for questions like "what changed on this deal last week", "what did'
-            .' my team update recently", or "who edited this company".'
+            .' my workspace update recently", or "who edited this company".'
             .' Scope it to one record with record_type + record_id, to one entity type with'
             .' record_type alone, or leave both out for the whole workspace.'
             .' This is history, not search: to list or filter records themselves, use the list tools.';
@@ -86,7 +86,7 @@ final readonly class ListActivityTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $recordType = $this->stringOrNull($request['record_type'] ?? null);
         $recordId = $this->stringOrNull($request['record_id'] ?? null);
@@ -109,7 +109,7 @@ final readonly class ListActivityTool implements Tool
 
         $days = $this->days($request);
         $page = $this->page($request);
-        $scope = $this->scopedQuery((string) $team->getKey(), $days, $recordType, $recordId);
+        $scope = $this->scopedQuery((string) $workspace->getKey(), $days, $recordType, $recordId);
 
         // Paged by SAVE, never by row. A save that touches a native column and a
         // custom field writes one row for each, and paging the rows put those two
@@ -160,15 +160,15 @@ final readonly class ListActivityTool implements Tool
      *
      * @return Builder<Activity>
      */
-    private function scopedQuery(string $teamId, int $days, ?string $recordType, ?string $recordId): Builder
+    private function scopedQuery(string $workspaceId, int $days, ?string $recordType, ?string $recordId): Builder
     {
         $query = Activity::query()
             // The agent runs in a queued job with no Filament tenant bound, and
-            // TeamScope answers a null tenant with `1 = 0` -- every row would
-            // vanish in production while passing in a panel request. The team
+            // WorkspaceScope answers a null tenant with `1 = 0` -- every row would
+            // vanish in production while passing in a panel request. The workspace
             // predicate below is the real boundary, stated explicitly.
-            ->withoutGlobalScope(TeamScope::class)
-            ->where('team_id', $teamId)
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $workspaceId)
             ->where('created_at', '>=', now()->subDays($days))
             // Nothing cascades activity rows, so a force-deleted record leaves
             // history that can be neither named nor opened. Dropped HERE rather
@@ -598,7 +598,7 @@ final readonly class ListActivityTool implements Tool
     }
 
     /**
-     * The record must belong to the caller's team before its history is read;
+     * The record must belong to the caller's workspace before its history is read;
      * a stranger's id must not even reveal that the record exists.
      */
     private function assertRecordVisible(User $user, string $recordType, string $recordId): ?string
@@ -611,7 +611,7 @@ final readonly class ListActivityTool implements Tool
         }
 
         $record = $modelClass::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($recordId)
             ->first();
 

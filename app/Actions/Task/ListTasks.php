@@ -37,7 +37,7 @@ final readonly class ListTasks
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(
-            Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
             ->allowedFilters(

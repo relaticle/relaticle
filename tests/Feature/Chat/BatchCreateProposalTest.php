@@ -13,17 +13,17 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019df900-4444-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -82,7 +82,7 @@ it('collapses an identical re-proposed batch (job retry idempotency)', function 
 });
 
 it('rejects a linked record from another workspace at proposal time', function (): void {
-    $foreign = Company::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+    $foreign = Company::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
 
     $result = json_decode(proposeTasks($this->convId, [['title' => 'Call', 'company_ids' => [(string) $foreign->getKey()]]]), true);
 

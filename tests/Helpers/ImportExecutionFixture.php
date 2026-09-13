@@ -30,7 +30,7 @@ final class ImportExecutionFixture
         ImportEntityType $entityType = ImportEntityType::People,
     ): array {
         $import = Import::factory()->create([
-            'team_id' => (string) $context->team->id,
+            'workspace_id' => (string) $context->workspace->id,
             'user_id' => (string) $context->user->id,
             'entity_type' => $entityType,
             'file_name' => 'test.csv',
@@ -53,7 +53,7 @@ final class ImportExecutionFixture
     {
         $job = new ExecuteImportJob(
             importId: $context->import->id,
-            teamId: (string) $context->team->id,
+            workspaceId: (string) $context->workspace->id,
         );
 
         $job->handle();
@@ -104,7 +104,7 @@ final class ImportExecutionFixture
         array $options = [],
     ): CustomField {
         $customField = CustomField::forceCreate([
-            'tenant_id' => $context->team->id,
+            'tenant_id' => $context->workspace->id,
             'code' => $code,
             'name' => ucfirst(str_replace('_', ' ', $code)),
             'type' => $type,
@@ -119,7 +119,7 @@ final class ImportExecutionFixture
         foreach ($options as $index => $optionName) {
             $customField->options()->forceCreate([
                 'custom_field_id' => $customField->id,
-                'tenant_id' => $context->team->id,
+                'tenant_id' => $context->workspace->id,
                 'name' => $optionName,
                 'sort_order' => $index + 1,
             ]);
@@ -135,7 +135,7 @@ final class ImportExecutionFixture
     ): ?CustomFieldValue {
         return CustomFieldValue::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $context->team->id)
+            ->where('tenant_id', $context->workspace->id)
             ->where('entity_id', $entityId)
             ->where('custom_field_id', $customFieldId)
             ->first();

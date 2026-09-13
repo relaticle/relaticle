@@ -47,10 +47,10 @@ function seedNextStepTurn(string $conversationId, User $user, string $reply, arr
 }
 
 it('renders the persisted next steps inside the transcript, in order', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'next steps', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'next steps', $conversationId);
 
     seedNextStepTurn($conversationId, $user, 'Your workspace is empty.', [
         ['label' => 'Import your companies', 'prompt' => 'Help me import my companies from a file'],
@@ -58,7 +58,7 @@ it('renders the persisted next steps inside the transcript, in order', function 
         ['label' => 'Invite a teammate', 'prompt' => 'Invite a teammate to this workspace'],
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Your workspace is empty.');
 
     $page->assertCount('[data-next-step]', 3);
@@ -89,16 +89,16 @@ it('renders the persisted next steps inside the transcript, in order', function 
 });
 
 it('sits at the floor of the transcript when the conversation is short', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'next steps', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'next steps', $conversationId);
 
     seedNextStepTurn($conversationId, $user, 'Your workspace is empty.', [
         ['label' => 'Import your companies', 'prompt' => 'Help me import my companies from a file'],
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Your workspace is empty.');
 
     // One turn cannot fill the viewport, and the offer belongs where the eye
@@ -126,16 +126,16 @@ it('sits at the floor of the transcript when the conversation is short', functio
 });
 
 it('sends the step prompt, not its label, and clears the strip', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'next steps', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'next steps', $conversationId);
 
     seedNextStepTurn($conversationId, $user, 'Your workspace is empty.', [
         ['label' => 'Import your companies', 'prompt' => 'Help me import my companies from a file'],
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Your workspace is empty.');
 
     $resolve = ChatBrowser::resolveInterface();
@@ -168,16 +168,16 @@ it('sends the step prompt, not its label, and clears the strip', function (): vo
 });
 
 it('hides the strip while a turn is streaming', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'next steps', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'next steps', $conversationId);
 
     seedNextStepTurn($conversationId, $user, 'Your workspace is empty.', [
         ['label' => 'Import your companies', 'prompt' => 'Help me import my companies from a file'],
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Your workspace is empty.');
 
     $resolve = ChatBrowser::resolveInterface();

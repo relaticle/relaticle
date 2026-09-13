@@ -5,18 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\App\Exports;
 
 use App\Enums\CustomFields\PeopleField;
+use App\Events\WorkspaceCreated;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Models\CustomField;
 use App\Models\Export;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Livewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -25,16 +25,16 @@ mutates(PeopleExporter::class);
 
 beforeEach(function () {
     Event::fake()->except([
-        TeamCreated::class,
-        'eloquent.creating: App\\Models\\Team',
+        WorkspaceCreated::class,
+        'eloquent.creating: App\\Models\\Workspace',
     ]);
 
-    $this->team = Team::factory()->create();
-    $this->user = User::factory()->create(['current_team_id' => $this->team->id]);
-    $this->user->teams()->attach($this->team);
+    $this->workspace = Workspace::factory()->create();
+    $this->user = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->user->workspaces()->attach($this->workspace);
 
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 test('exports people records', function () {
@@ -48,12 +48,12 @@ test('exports people records', function () {
     expect($export)->not->toBeNull()
         ->and($export->exporter)->toBe(PeopleExporter::class)
         ->and($export->file_disk)->toBe('local')
-        ->and($export->team_id)->toBe($this->team->id);
+        ->and($export->workspace_id)->toBe($this->workspace->id);
 });
 
-test('exports respect team scoping', function () {
-    $otherTeam = Team::factory()->create(['personal_team' => false]);
-    $this->user->teams()->attach($otherTeam);
+test('exports respect workspace scoping', function () {
+    $otherWorkspace = Workspace::factory()->create(['personal_workspace' => false]);
+    $this->user->workspaces()->attach($otherWorkspace);
 
     Livewire::test(ListPeople::class)
         ->callAction('export')
@@ -61,11 +61,11 @@ test('exports respect team scoping', function () {
 
     $export = Export::latest()->first();
 
-    expect($export->team_id)->toBe($this->team->id);
+    expect($export->workspace_id)->toBe($this->workspace->id);
 });
 
 test('export columns include system-seeded custom fields', function () {
-    TenantContextService::setTenantId($this->team->id);
+    TenantContextService::setTenantId($this->workspace->id);
 
     $columns = PeopleExporter::getColumns();
     $columnLabels = collect($columns)->map(fn ($column) => $column->getLabel())->all();
@@ -76,14 +76,14 @@ test('export columns include system-seeded custom fields', function () {
 });
 
 test('export columns include user-created custom fields', function () {
-    TenantContextService::setTenantId($this->team->id);
+    TenantContextService::setTenantId($this->workspace->id);
 
     CustomField::forceCreate([
         'name' => 'Lead Score',
         'code' => 'lead_score',
         'type' => 'number',
         'entity_type' => 'people',
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'sort_order' => 99,
         'active' => true,
         'system_defined' => false,
@@ -100,7 +100,7 @@ test('export generates CSV with correct data', function () {
     Storage::fake('local');
 
     People::factory()->create([
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
         'name' => 'Jane Doe',
     ]);
 
@@ -129,7 +129,7 @@ test('export datetimes name and use the requesting user timezone', function () {
         ->and($labels)->toContain('Deleted At (Asia/Tokyo)');
 
     $person = People::factory()->create([
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
         'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
 

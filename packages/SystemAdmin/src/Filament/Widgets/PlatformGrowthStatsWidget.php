@@ -10,8 +10,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 use Filament\Widgets\StatsOverviewWidget;
@@ -40,7 +40,7 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
 
         return [
             $this->buildUsersStat($currentStart, $currentEnd, $previousStart, $previousEnd),
-            $this->buildTeamsStat($currentStart, $currentEnd, $previousStart, $previousEnd),
+            $this->buildWorkspacesStat($currentStart, $currentEnd, $previousStart, $previousEnd),
             $this->buildRecordsStat($currentStart, $currentEnd, $previousStart, $previousEnd),
             $this->buildActiveUsersStat($currentStart, $currentEnd, $previousStart, $previousEnd),
         ];
@@ -64,24 +64,24 @@ final class PlatformGrowthStatsWidget extends StatsOverviewWidget
             ->chart($this->buildModelSparkline(User::class, $currentStart, $currentEnd));
     }
 
-    private function buildTeamsStat(
+    private function buildWorkspacesStat(
         CarbonImmutable $currentStart,
         CarbonImmutable $currentEnd,
         CarbonImmutable $previousStart,
         CarbonImmutable $previousEnd,
     ): Stat {
-        $nonPersonalScope = fn (Builder $query): Builder => $query->where('personal_team', false);
+        $nonPersonalScope = fn (Builder $query): Builder => $query->where('personal_workspace', false);
 
-        $total = Team::query()->where('personal_team', false)->count();
-        $newCurrent = Team::query()->where('personal_team', false)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
-        $newPrevious = Team::query()->where('personal_team', false)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
+        $total = Workspace::query()->where('personal_workspace', false)->count();
+        $newCurrent = Workspace::query()->where('personal_workspace', false)->whereBetween('created_at', [$currentStart, $currentEnd])->count();
+        $newPrevious = Workspace::query()->where('personal_workspace', false)->whereBetween('created_at', [$previousStart, $previousEnd])->count();
         $change = $this->calculateChange($newCurrent, $newPrevious);
 
-        return Stat::make('Total Teams', number_format($total))
+        return Stat::make('Total Workspaces', number_format($total))
             ->description("{$newCurrent} new this period".$this->formatChange($change))
             ->descriptionIcon($change >= 0 ? 'heroicon-o-arrow-trending-up' : 'heroicon-o-arrow-trending-down')
             ->color($change >= 0 ? 'success' : 'danger')
-            ->chart($this->buildModelSparkline(Team::class, $currentStart, $currentEnd, $nonPersonalScope));
+            ->chart($this->buildModelSparkline(Workspace::class, $currentStart, $currentEnd, $nonPersonalScope));
     }
 
     private function buildRecordsStat(

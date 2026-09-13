@@ -17,14 +17,14 @@ beforeEach(function (): void {
 
 function seedAdminFeedbackRow(): ChatMessageFeedback
 {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $conversationId = (string) Str::uuid7();
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'admin feedback test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -50,7 +50,7 @@ function seedAdminFeedbackRow(): ChatMessageFeedback
     ]);
 
     return ChatMessageFeedback::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'message_id' => $messageId,

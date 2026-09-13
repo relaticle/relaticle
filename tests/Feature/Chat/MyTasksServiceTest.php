@@ -18,19 +18,19 @@ beforeEach(function (): void {
 });
 
 /**
- * Resolve the auto-seeded `due_date` custom field id for the given team.
+ * Resolve the auto-seeded `due_date` custom field id for the given workspace.
  *
- * The `TeamCreated` listener seeds task custom fields, so this helper just looks them up.
+ * The `WorkspaceCreated` listener seeds task custom fields, so this helper just looks them up.
  */
-function resolveDueDateField(string $teamId): string
+function resolveDueDateField(string $workspaceId): string
 {
     $row = DB::table('custom_fields')
-        ->where('tenant_id', $teamId)
+        ->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')
         ->where('code', 'due_date')
         ->first();
 
-    throw_if($row === null, RuntimeException::class, "Due date field not seeded for team {$teamId}");
+    throw_if($row === null, RuntimeException::class, "Due date field not seeded for workspace {$workspaceId}");
 
     return trim((string) $row->id);
 }
@@ -40,15 +40,15 @@ function resolveDueDateField(string $teamId): string
  *
  * @return array{0: string, 1: string, 2: string}
  */
-function resolveStatusField(string $teamId): array
+function resolveStatusField(string $workspaceId): array
 {
     $field = DB::table('custom_fields')
-        ->where('tenant_id', $teamId)
+        ->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->first();
 
-    throw_if($field === null, RuntimeException::class, "Status field not seeded for team {$teamId}");
+    throw_if($field === null, RuntimeException::class, "Status field not seeded for workspace {$workspaceId}");
 
     $fieldId = trim((string) $field->id);
 
@@ -62,7 +62,7 @@ function resolveStatusField(string $teamId): array
         ->where('name', 'To do')
         ->first();
 
-    throw_if($done === null || $todo === null, RuntimeException::class, "Status options not seeded for team {$teamId}");
+    throw_if($done === null || $todo === null, RuntimeException::class, "Status options not seeded for workspace {$workspaceId}");
 
     return [$fieldId, trim((string) $done->id), trim((string) $todo->id)];
 }
@@ -74,7 +74,7 @@ function attachDueDate(Task $task, string $fieldId, DateTimeInterface $dueAt): v
         'entity_type' => 'task',
         'entity_id' => $task->id,
         'custom_field_id' => $fieldId,
-        'tenant_id' => $task->team_id,
+        'tenant_id' => $task->workspace_id,
         'datetime_value' => $dueAt->format('Y-m-d H:i:s'),
     ]);
 }
@@ -86,45 +86,45 @@ function attachStatus(Task $task, string $statusFieldId, string $optionId): void
         'entity_type' => 'task',
         'entity_id' => $task->id,
         'custom_field_id' => $statusFieldId,
-        'tenant_id' => $task->team_id,
+        'tenant_id' => $task->workspace_id,
         'string_value' => $optionId,
     ]);
 }
 
 it('returns an empty collection when the user has no tasks', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
-    $items = (new MyTasksService)->forUser($user, $user->currentTeam);
+    $items = (new MyTasksService)->forUser($user, $user->currentWorkspace);
 
     expect($items)->toBeEmpty();
 });
 
 it('only returns tasks assigned to the given user', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
     $other = User::factory()->create();
-    $team->users()->attach($other, ['role' => 'editor']);
+    $workspace->users()->attach($other, ['role' => 'editor']);
 
-    $dueFieldId = resolveDueDateField($team->id);
+    $dueFieldId = resolveDueDateField($workspace->id);
 
-    $mine = Task::factory()->for($team)->create(['title' => 'mine']);
+    $mine = Task::factory()->for($workspace)->create(['title' => 'mine']);
     $mine->assignees()->attach($owner);
     attachDueDate($mine, $dueFieldId, now());
 
-    $theirs = Task::factory()->for($team)->create(['title' => 'theirs']);
+    $theirs = Task::factory()->for($workspace)->create(['title' => 'theirs']);
     $theirs->assignees()->attach($other);
     attachDueDate($theirs, $dueFieldId, now());
 
-    $items = (new MyTasksService)->forUser($owner, $team);
+    $items = (new MyTasksService)->forUser($owner, $workspace);
 
     expect($items)->toHaveCount(1)
         ->and($items->first()->title)->toBe('mine');
 });
 
 it('includes tasks at any due date plus tasks without a due date', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
     $cases = [
         'overdue' => now()->subDay(),
@@ -134,65 +134,65 @@ it('includes tasks at any due date plus tasks without a due date', function (): 
     ];
 
     foreach ($cases as $label => $when) {
-        $task = Task::factory()->for($team)->create(['title' => $label]);
+        $task = Task::factory()->for($workspace)->create(['title' => $label]);
         $task->assignees()->attach($user);
         attachDueDate($task, $dueFieldId, $when);
     }
 
-    $noDate = Task::factory()->for($team)->create(['title' => 'no_due_date']);
+    $noDate = Task::factory()->for($workspace)->create(['title' => 'no_due_date']);
     $noDate->assignees()->attach($user);
 
-    $items = (new MyTasksService)->forUser($user, $team);
+    $items = (new MyTasksService)->forUser($user, $workspace);
 
     expect($items->pluck('title')->all())
         ->toEqualCanonicalizing(['overdue', 'today', 'tomorrow', 'far_future', 'no_due_date']);
 });
 
 it('excludes tasks whose status is Done', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    $dueFieldId = resolveDueDateField($team->id);
-    [$statusFieldId, $doneId, $todoId] = resolveStatusField($team->id);
+    $dueFieldId = resolveDueDateField($workspace->id);
+    [$statusFieldId, $doneId, $todoId] = resolveStatusField($workspace->id);
 
-    $done = Task::factory()->for($team)->create(['title' => 'done']);
+    $done = Task::factory()->for($workspace)->create(['title' => 'done']);
     $done->assignees()->attach($user);
     attachDueDate($done, $dueFieldId, now()->subHour());
     attachStatus($done, $statusFieldId, $doneId);
 
-    $open = Task::factory()->for($team)->create(['title' => 'open']);
+    $open = Task::factory()->for($workspace)->create(['title' => 'open']);
     $open->assignees()->attach($user);
     attachDueDate($open, $dueFieldId, now()->subHour());
     attachStatus($open, $statusFieldId, $todoId);
 
-    $noStatus = Task::factory()->for($team)->create(['title' => 'no_status']);
+    $noStatus = Task::factory()->for($workspace)->create(['title' => 'no_status']);
     $noStatus->assignees()->attach($user);
     attachDueDate($noStatus, $dueFieldId, now()->subHour());
 
-    $items = (new MyTasksService)->forUser($user, $team);
+    $items = (new MyTasksService)->forUser($user, $workspace);
 
     expect($items->pluck('title')->all())
         ->toEqualCanonicalizing(['open', 'no_status']);
 });
 
 it('sorts ascending by due date and tags severity correctly', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
-    $a = Task::factory()->for($team)->create(['title' => 'a']);
+    $a = Task::factory()->for($workspace)->create(['title' => 'a']);
     $a->assignees()->attach($user);
     attachDueDate($a, $dueFieldId, now()->subDay());
 
-    $b = Task::factory()->for($team)->create(['title' => 'b']);
+    $b = Task::factory()->for($workspace)->create(['title' => 'b']);
     $b->assignees()->attach($user);
     attachDueDate($b, $dueFieldId, now()->setTime(14, 0));
 
-    $c = Task::factory()->for($team)->create(['title' => 'c']);
+    $c = Task::factory()->for($workspace)->create(['title' => 'c']);
     $c->assignees()->attach($user);
     attachDueDate($c, $dueFieldId, now()->addDay());
 
-    $items = (new MyTasksService)->forUser($user, $team)->values();
+    $items = (new MyTasksService)->forUser($user, $workspace)->values();
 
     expect($items->pluck('title')->all())->toBe(['a', 'b', 'c'])
         ->and($items[0]->severity)->toBe('overdue')
@@ -201,34 +201,34 @@ it('sorts ascending by due date and tags severity correctly', function (): void 
 });
 
 it('caps results at five tasks', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
     foreach (range(1, 8) as $i) {
-        $task = Task::factory()->for($team)->create(['title' => "t{$i}"]);
+        $task = Task::factory()->for($workspace)->create(['title' => "t{$i}"]);
         $task->assignees()->attach($user);
         attachDueDate($task, $dueFieldId, now()->subMinutes($i));
     }
 
-    $items = (new MyTasksService)->forUser($user, $team);
+    $items = (new MyTasksService)->forUser($user, $workspace);
 
     expect($items)->toHaveCount(5);
 });
 
-it('does not leak tasks from another team where the user is also a member', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamA = $user->currentTeam;
-    $teamB = User::factory()->withPersonalTeam()->create()->currentTeam;
-    $teamB->users()->attach($user, ['role' => 'editor']);
+it('does not leak tasks from another workspace where the user is also a member', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceA = $user->currentWorkspace;
+    $workspaceB = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $workspaceB->users()->attach($user, ['role' => 'editor']);
 
-    $dueFieldB = resolveDueDateField($teamB->id);
+    $dueFieldB = resolveDueDateField($workspaceB->id);
 
-    $leaked = Task::factory()->for($teamB)->create(['title' => 'leaked']);
+    $leaked = Task::factory()->for($workspaceB)->create(['title' => 'leaked']);
     $leaked->assignees()->attach($user);
     attachDueDate($leaked, $dueFieldB, now());
 
-    $items = (new MyTasksService)->forUser($user, $teamA);
+    $items = (new MyTasksService)->forUser($user, $workspaceA);
 
     expect($items)->toBeEmpty();
 });
@@ -239,29 +239,29 @@ it('bounds today on the user calendar, not the server clock', function (): void 
     // it (overdue) while for a UTC reader at the very same instant it is still today.
     $this->travelTo(Date::parse('2026-08-18 23:30:00', 'UTC'));
 
-    $tokyo = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
-    $team = $tokyo->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $tokyo = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
+    $workspace = $tokyo->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
-    $task = Task::factory()->for($team)->create(['title' => 'crosses midnight in Tokyo']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'crosses midnight in Tokyo']);
     $task->assignees()->attach($tokyo);
     attachDueDate($task, $dueFieldId, Date::parse('2026-08-18 10:00:00', 'UTC'));
 
-    expect((new MyTasksService)->forUser($tokyo, $team)->first()->severity)->toBe('overdue');
+    expect((new MyTasksService)->forUser($tokyo, $workspace)->first()->severity)->toBe('overdue');
 });
 
 it('reads the same task as due today for a user whose calendar has not rolled over', function (): void {
     $this->travelTo(Date::parse('2026-08-18 23:30:00', 'UTC'));
 
-    $london = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
-    $team = $london->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $london = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
+    $workspace = $london->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
-    $task = Task::factory()->for($team)->create(['title' => 'still today in UTC']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'still today in UTC']);
     $task->assignees()->attach($london);
     attachDueDate($task, $dueFieldId, Date::parse('2026-08-18 10:00:00', 'UTC'));
 
-    expect((new MyTasksService)->forUser($london, $team)->first()->severity)->toBe('today');
+    expect((new MyTasksService)->forUser($london, $workspace)->first()->severity)->toBe('today');
 });
 
 it('ends today at local midnight across a dst transition, not 24 hours after it starts', function (): void {
@@ -271,13 +271,13 @@ it('ends today at local midnight across a dst transition, not 24 hours after it 
     // a task due half an hour later into tomorrow.
     $this->travelTo(Date::parse('2026-10-25 10:00:00', 'Europe/London'));
 
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Europe/London']);
-    $team = $user->currentTeam;
-    $dueFieldId = resolveDueDateField($team->id);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Europe/London']);
+    $workspace = $user->currentWorkspace;
+    $dueFieldId = resolveDueDateField($workspace->id);
 
-    $task = Task::factory()->for($team)->create(['title' => 'late on the long day']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'late on the long day']);
     $task->assignees()->attach($user);
     attachDueDate($task, $dueFieldId, Date::parse('2026-10-25 23:30:00', 'Europe/London')->utc());
 
-    expect((new MyTasksService)->forUser($user, $team)->first()->severity)->toBe('today');
+    expect((new MyTasksService)->forUser($user, $workspace)->first()->severity)->toBe('today');
 });

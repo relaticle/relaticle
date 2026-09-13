@@ -72,13 +72,13 @@ abstract class BaseCreateTool extends Tool
         $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
-            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentTeam->getKey(), $this->entityType(), $customFields);
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields);
             $request->merge(['custom_fields' => $customFields]);
         }
 
         $rules = array_merge(
             $this->entityRules($user),
-            new ValidCustomFields($user->currentTeam->getKey(), $this->entityType())->toRules($customFields),
+            new ValidCustomFields($user->currentWorkspace->getKey(), $this->entityType())->toRules($customFields),
         );
 
         $validated = $request->validate($rules);

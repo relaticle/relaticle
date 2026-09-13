@@ -3,7 +3,7 @@
         $user = auth()->user();
         $deletionDate = $user->scheduled_deletion_at;
         $daysRemaining = (int) now()->diffInDays($deletionDate, absolute: false);
-        $teamCount = $user->ownedTeams()->count();
+        $workspaceCount = $user->ownedWorkspaces()->count();
     @endphp
 
     <div class="flex flex-1 items-center justify-center px-4 py-12">
@@ -54,7 +54,7 @@
                         <strong class="text-gray-950 dark:text-white">{{ $deletionDate->format('F j, Y') }}</strong>
                     </p>
                     <p>
-                        {{ trans_choice('profile.scheduled_deletion_interstitial.details.workspaces', $teamCount, ['count' => $teamCount]) }}
+                        {{ trans_choice('profile.scheduled_deletion_interstitial.details.workspaces', $workspaceCount, ['count' => $workspaceCount]) }}
                     </p>
                     <p>
                         {{ __('profile.scheduled_deletion_interstitial.details.shared_records') }}

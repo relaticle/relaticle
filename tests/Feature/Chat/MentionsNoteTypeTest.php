@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Note;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
@@ -16,14 +16,14 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatController::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
     RateLimiter::clear('60|'.request()->ip());
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -32,7 +32,7 @@ beforeEach(function (): void {
 });
 
 it('returns matching notes from the mentions endpoint', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Customer feedback summary']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Customer feedback summary']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'feedback']))->assertOk();
 
@@ -44,7 +44,7 @@ it('returns matching notes from the mentions endpoint', function (): void {
 
 it('accepts a note type in the send mentions payload on chat.send', function (): void {
     Queue::fake();
-    $note = Note::factory()->for($this->team)->create(['title' => 'Q3 retro']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Q3 retro']);
 
     $document = ChatDocument::fromText('Summarize ', [
         ['type' => 'note', 'id' => $note->id, 'label' => 'Q3 retro'],
@@ -69,13 +69,13 @@ it('accepts a note type in the send mentions payload on chat.send', function ():
     });
 });
 
-it('drops note mentions belonging to another team on chat.send', function (): void {
+it('drops note mentions belonging to another workspace on chat.send', function (): void {
     Queue::fake();
-    $otherTeam = Team::factory()->create();
-    $foreignNote = Note::factory()->for($otherTeam)->create(['title' => 'Cross-team']);
+    $otherWorkspace = Workspace::factory()->create();
+    $foreignNote = Note::factory()->for($otherWorkspace)->create(['title' => 'Cross-workspace']);
 
     $document = ChatDocument::fromText('Tell me about ', [
-        ['type' => 'note', 'id' => $foreignNote->id, 'label' => 'Cross-team'],
+        ['type' => 'note', 'id' => $foreignNote->id, 'label' => 'Cross-workspace'],
     ]);
 
     $createRes = $this->postJson(route('chat.conversations.create'), [

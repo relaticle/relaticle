@@ -12,10 +12,10 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 mutates(ChatSidePanel::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 function panelUrl(string $slug, string $segment, string $id): string
@@ -24,11 +24,11 @@ function panelUrl(string $slug, string $segment, string $id): string
 }
 
 it('populates record context from a url while the panel is closed', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     Livewire::test(ChatSidePanel::class)
         ->set('isOpen', false)
-        ->call('refreshContext', panelUrl($this->team->slug, 'companies', (string) $company->getKey()))
+        ->call('refreshContext', panelUrl($this->workspace->slug, 'companies', (string) $company->getKey()))
         ->assertSet('isOpen', false)
         ->assertSet('recordType', 'company')
         ->assertSet('recordId', (string) $company->getKey())
@@ -39,25 +39,25 @@ it('clears record context when the url has no record', function (): void {
     Livewire::test(ChatSidePanel::class)
         ->set('recordType', 'company')
         ->set('recordId', 'stale-id')
-        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/companies")
+        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/companies")
         ->assertSet('recordType', null)
         ->assertSet('recordId', null);
 });
 
-it('refuses a url pointing at another team record', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Theirs']);
+it('refuses a url pointing at another workspace record', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = Company::factory()->for($otherUser->currentWorkspace)->create(['name' => 'Theirs']);
 
     Livewire::test(ChatSidePanel::class)
-        ->call('refreshContext', panelUrl($this->team->slug, 'companies', (string) $theirs->getKey()))
+        ->call('refreshContext', panelUrl($this->workspace->slug, 'companies', (string) $theirs->getKey()))
         ->assertSet('recordType', null)
         ->assertSet('recordName', null);
 });
 
 it('dispatches the context-updated browser event with the resolved record', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Manch Minasyan']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Manch Minasyan']);
 
     Livewire::test(ChatSidePanel::class)
-        ->call('refreshContext', panelUrl($this->team->slug, 'people', (string) $person->getKey()))
+        ->call('refreshContext', panelUrl($this->workspace->slug, 'people', (string) $person->getKey()))
         ->assertDispatched('chat:context-updated');
 });

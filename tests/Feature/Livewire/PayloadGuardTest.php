@@ -6,7 +6,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 it('answers an oversized livewire request with a message the panel can show', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     $response = $this->withHeaders(['X-Livewire' => 'true'])
         ->postJson(Livewire::getUpdateUri(), ['components' => [['snapshot' => str_repeat('a', 1024 * 1024 + 1)]]]);

@@ -18,7 +18,7 @@ final readonly class CustomFieldInput
      * @param  array<array-key, mixed>  $customFields
      * @return array<array-key, mixed>
      */
-    public function normalize(string $teamId, string $entityType, array $customFields): array
+    public function normalize(string $workspaceId, string $entityType, array $customFields): array
     {
         if ($customFields === []) {
             return [];
@@ -26,7 +26,7 @@ final readonly class CustomFieldInput
 
         $fields = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $teamId)
+            ->where('tenant_id', $workspaceId)
             ->where('entity_type', $entityType)
             ->active()
             ->whereIn('code', array_keys($customFields))

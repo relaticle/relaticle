@@ -6,7 +6,7 @@ namespace App\Livewire\App\AccessTokens;
 
 use App\Actions\Mcp\RevokeOAuthConnector;
 use App\Livewire\BaseLivewireComponent;
-use App\Models\Team;
+use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -42,8 +42,8 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
                     ->where('user_id', $userId)
                     ->where('revoked', false)
                     ->where('expires_at', '>', now()))
-                ->addSelect(['bound_team_id' => DB::table('oauth_access_tokens')
-                    ->select('team_id')
+                ->addSelect(['bound_workspace_id' => DB::table('oauth_access_tokens')
+                    ->select('workspace_id')
                     ->whereColumn('client_id', 'oauth_clients.id')
                     ->where('user_id', $userId)
                     ->where('revoked', false)
@@ -58,12 +58,12 @@ final class ManageOAuthConnectors extends BaseLivewireComponent implements HasTa
                 ]))
             ->columns([
                 TextColumn::make('name')->label(__('access-tokens.connectors.columns.name')),
-                TextColumn::make('bound_team_id')
-                    ->label(__('access-tokens.connectors.columns.team'))
+                TextColumn::make('bound_workspace_id')
+                    ->label(__('access-tokens.connectors.columns.workspace'))
                     ->formatStateUsing(fn (?string $state): ?string => $state === null
                         ? null
-                        : Team::query()->whereKey($state)->value('name'))
-                    ->placeholder(__('access-tokens.table.placeholders.no_team')),
+                        : Workspace::query()->whereKey($state)->value('name'))
+                    ->placeholder(__('access-tokens.table.placeholders.no_workspace')),
                 TextColumn::make('active_tokens_count')
                     ->label(__('access-tokens.connectors.columns.active_tokens'))
                     ->badge(),

@@ -18,7 +18,7 @@ final readonly class GuideToPageTool implements Tool
     {
         return 'Get a direct link to the workspace page where the user can perform an action this assistant '
             .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
-            .'from a file; exporting records to a file; or managing team members. Call this instead of telling '
+            .'from a file; exporting records to a file; or managing workspace members. Call this instead of telling '
             .'the user something is impossible.';
     }
 
@@ -37,7 +37,7 @@ final readonly class GuideToPageTool implements Tool
                     .'(bulk-import many records of that type from a file); '
                     .'"export_companies", "export_people", "export_opportunities", "export_tasks", "export_notes" '
                     .'(export records of that type to a CSV or XLSX file); '
-                    .'"team_members" (invite or manage team members).',
+                    .'"workspace_members" (invite or manage workspace members).',
                 ),
         ];
     }
@@ -46,11 +46,11 @@ final readonly class GuideToPageTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $destination = (string) ($request['destination'] ?? '');
 
-        $url = $team === null ? null : $this->destinations->resolve($destination, $team);
+        $url = $workspace === null ? null : $this->destinations->resolve($destination, $workspace);
 
         if ($url === null) {
             return (string) json_encode([

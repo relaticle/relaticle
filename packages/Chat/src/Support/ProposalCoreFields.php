@@ -21,7 +21,7 @@ final readonly class ProposalCoreFields
     {
         return match (true) {
             in_array($entityType, ['task', 'note'], true) => 'title',
-            $entityType === 'team_invitations' => 'email',
+            $entityType === 'workspace_invitations' => 'email',
             default => 'name',
         };
     }
@@ -39,7 +39,7 @@ final readonly class ProposalCoreFields
             return [$titleKey, 'account_owner_id'];
         }
 
-        if ($entityType === 'team_invitations') {
+        if ($entityType === 'workspace_invitations') {
             return [$titleKey, 'role'];
         }
 

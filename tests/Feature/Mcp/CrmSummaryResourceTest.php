@@ -13,8 +13,8 @@ use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 
 mutates(
     AggregateOpportunities::class,
@@ -23,14 +23,14 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('returns CRM summary with record counts', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->count(3)->create();
-    People::factory()->recycle([$this->user, $this->team])->count(5)->create();
-    Opportunity::factory()->recycle([$this->user, $this->team])->count(2)->create();
+    Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
+    People::factory()->recycle([$this->user, $this->workspace])->count(5)->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->count(2)->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->resource(CrmSummaryResource::class);
@@ -44,11 +44,11 @@ it('returns CRM summary with record counts', function (): void {
 });
 
 it('includes opportunity pipeline breakdown', function (): void {
-    $opp = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $opp = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     $stageField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->first();
@@ -66,7 +66,7 @@ it('includes opportunity pipeline breakdown', function (): void {
 });
 
 it('includes task overdue and due this week counts', function (): void {
-    Task::factory()->recycle([$this->user, $this->team])->create();
+    Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->resource(CrmSummaryResource::class);
@@ -77,13 +77,13 @@ it('includes task overdue and due this week counts', function (): void {
 });
 
 it('keeps unstaged and orphaned-stage opportunities in separate pipeline buckets', function (): void {
-    $stageField = opportunityField($this->team, 'stage');
-    $amountField = opportunityField($this->team, 'amount');
+    $stageField = opportunityField($this->workspace, 'stage');
+    $amountField = opportunityField($this->workspace, 'amount');
 
-    $unstaged = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'No Stage']);
+    $unstaged = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'No Stage']);
     $unstaged->saveCustomFieldValue($amountField, 1000);
 
-    $orphaned = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Orphan Stage']);
+    $orphaned = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Orphan Stage']);
     $orphaned->saveCustomFieldValue($amountField, 2000);
     $orphaned->saveCustomFieldValue($stageField, 'Proposal');
 
@@ -104,11 +104,11 @@ it('keeps unstaged and orphaned-stage opportunities in separate pipeline buckets
         ->toBe($summary['total_pipeline_value']);
 });
 
-function opportunityField(Team $team, string $code): CustomField
+function opportunityField(Workspace $workspace, string $code): CustomField
 {
     return CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', $code)
         ->firstOrFail();

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories\Relaticle\Chat\Models;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -26,7 +26,7 @@ final class AiCreditTransactionFactory extends Factory
         $outputTokens = fake()->numberBetween(100, 2_000);
 
         return [
-            'team_id' => Team::factory(),
+            'workspace_id' => Workspace::factory(),
             'user_id' => User::factory(),
             'conversation_id' => null,
             'idempotency_key' => 'test-'.fake()->unique()->uuid(),

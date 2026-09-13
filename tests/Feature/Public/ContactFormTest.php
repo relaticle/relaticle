@@ -47,7 +47,7 @@ it('preserves the visitor message when an Enterprise inquiry fails validation', 
 it('delivers the Enterprise inquiry details through the contact workflow', function (): void {
     Mail::fake();
     Feature::define(BillingFeature::class, true);
-    $message = "We are interested in Relaticle Enterprise.\nIntegrate our Salesforce pipeline with our operations system.\nTeam size: 40.\nTarget timeline: November.";
+    $message = "We are interested in Relaticle Enterprise.\nIntegrate our Salesforce pipeline with our operations system.\nWorkspace size: 40.\nTarget timeline: November.";
 
     $this->post('/contact?plan=enterprise', honeypotFields() + [
         'name' => 'Maya Chen',

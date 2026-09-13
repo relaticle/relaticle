@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 mutates(CompleteAuthentication::class, AuthenticationSession::class);
 
 test('completing authentication rotates the session id so a fixated session cannot be reused', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     session()->put('attacker.planted', 'pre-login value');
     AuthenticationSession::begin($user, AuthMethod::PASSWORD, null, false);
@@ -26,7 +26,7 @@ test('completing authentication rotates the session id so a fixated session cann
 });
 
 test('a pending authentication proof cannot be spent twice', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     AuthenticationSession::begin($user, AuthMethod::PASSWORD, null, false);
     $pending = AuthenticationSession::pending();
@@ -39,7 +39,7 @@ test('a pending authentication proof cannot be spent twice', function (): void {
 });
 
 test('an unproven operation grant never authorizes its write', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     AuthenticationSession::startOperation($user, 'add_passkey', null);

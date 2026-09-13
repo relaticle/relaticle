@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -15,7 +16,6 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -30,13 +30,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -54,17 +54,17 @@ it('creates new People records for rows with match_action=Create', function (): 
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $initialCount = People::where('team_id', $this->team->id)->count();
+    $initialCount = People::where('workspace_id', $this->workspace->id)->count();
 
     ImportExecutionFixture::run($this);
 
-    $newPeople = People::where('team_id', $this->team->id)->get();
+    $newPeople = People::where('workspace_id', $this->workspace->id)->get();
     expect($newPeople)->toHaveCount($initialCount + 2)
         ->and($newPeople->pluck('name')->toArray())->toContain('John Doe', 'Jane Smith');
 
-    $john = People::where('team_id', $this->team->id)->where('name', 'John Doe')->first();
+    $john = People::where('workspace_id', $this->workspace->id)->where('name', 'John Doe')->first();
     expect($john->creation_source)->toBe(CreationSource::IMPORT)
-        ->and((string) $john->team_id)->toBe((string) $this->team->id);
+        ->and((string) $john->workspace_id)->toBe((string) $this->workspace->id);
 });
 
 it('creates new Company records for rows with match_action=Create', function (): void {
@@ -76,7 +76,7 @@ it('creates new Company records for rows with match_action=Create', function ():
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Acme Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Acme Corp')->first();
     expect($company)->not->toBeNull()
         ->and($company->creation_source)->toBe(CreationSource::IMPORT);
 });
@@ -91,12 +91,12 @@ it('sets custom field values on created records', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -114,7 +114,7 @@ it('sets custom field values on created records', function (): void {
 it('resolves multiple custom field values via batch JSON query', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -129,14 +129,14 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
     foreach ($emails as $email) {
         $person = People::factory()->create([
             'name' => "Person {$email}",
-            'team_id' => $this->team->id,
+            'workspace_id' => $this->workspace->id,
         ]);
 
         CustomFieldValue::factory()->withJsonValue([$email])->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
         ]);
 
         $existingPeople[$email] = $person;
@@ -172,7 +172,7 @@ it('resolves multiple custom field values via batch JSON query', function (): vo
 it('updates existing People records for rows with match_action=Update', function (): void {
     $person = People::factory()->create([
         'name' => 'Old Name',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name'], [
@@ -194,7 +194,7 @@ it('updates existing People records for rows with match_action=Update', function
 it('preserves existing data when updating with partial fields', function (): void {
     $person = People::factory()->create([
         'name' => 'Original Name',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
         'creator_id' => $this->user->id,
     ]);
 
@@ -213,7 +213,7 @@ it('preserves existing data when updating with partial fields', function (): voi
     $person->refresh();
     expect($person->name)->toBe('Updated Name')
         ->and((string) $person->creator_id)->toBe((string) $this->user->id)
-        ->and((string) $person->team_id)->toBe((string) $this->team->id);
+        ->and((string) $person->workspace_id)->toBe((string) $this->workspace->id);
 });
 
 it('skips rows with match_action=Skip', function (): void {
@@ -223,17 +223,17 @@ it('skips rows with match_action=Skip', function (): void {
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
 
-    $initialCount = People::where('team_id', $this->team->id)->count();
+    $initialCount = People::where('workspace_id', $this->workspace->id)->count();
 
     ImportExecutionFixture::run($this);
 
-    expect(People::where('team_id', $this->team->id)->count())->toBe($initialCount);
+    expect(People::where('workspace_id', $this->workspace->id)->count())->toBe($initialCount);
 });
 
 it('creates company relationship on People record via entity link', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $relationships = json_encode([
@@ -252,7 +252,7 @@ it('creates company relationship on People record via entity link', function ():
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull()
         ->and((string) $person->company_id)->toBe((string) $company->id);
 });
@@ -269,10 +269,10 @@ it('uses corrected values over raw values', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
-    expect(People::where('team_id', $this->team->id)->where('name', 'Jhon')->exists())->toBeFalse();
+    expect(People::where('workspace_id', $this->workspace->id)->where('name', 'Jhon')->exists())->toBeFalse();
 });
 
 it('skips individual values marked as skipped', function (): void {
@@ -288,7 +288,7 @@ it('skips individual values marked as skipped', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 });
 
@@ -315,7 +315,7 @@ it('fails before writing records when match resolution is incomplete', function 
 
     $job = new ExecuteImportJob(
         importId: $this->import->id,
-        teamId: (string) $this->team->id,
+        workspaceId: (string) $this->workspace->id,
     );
 
     expect(fn () => $job->handle())
@@ -330,7 +330,7 @@ it('fails before writing records when match resolution is incomplete', function 
         ->and($import->failed_rows)->toBe(0);
 
     expect(People::query()
-        ->where('team_id', $this->team->id)
+        ->where('workspace_id', $this->workspace->id)
         ->where('name', 'Good Person')
         ->exists())->toBeFalse();
 });
@@ -344,7 +344,7 @@ it('fails incomplete match resolution without retrying', function (): void {
 
     $job = (new ExecuteImportJob(
         importId: $this->import->id,
-        teamId: (string) $this->team->id,
+        workspaceId: (string) $this->workspace->id,
     ))->withFakeQueueInteractions();
 
     $middleware = $job->middleware()[0];
@@ -359,7 +359,7 @@ it('fails incomplete match resolution without retrying', function (): void {
 it('stores results with counts in meta', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name'], [
@@ -457,10 +457,10 @@ it('auto-creates company when entity link value is unresolved', function (): voi
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
-    $newCompany = Company::where('team_id', $this->team->id)->where('name', 'New Corp')->first();
+    $newCompany = Company::where('workspace_id', $this->workspace->id)->where('name', 'New Corp')->first();
     expect($newCompany)->not->toBeNull()
         ->and((string) $person->company_id)->toBe((string) $newCompany->id);
 });
@@ -490,10 +490,10 @@ it('deduplicates auto-created companies across multiple rows', function (): void
 
     ImportExecutionFixture::run($this);
 
-    $companies = Company::where('team_id', $this->team->id)->where('name', 'Same Corp')->get();
+    $companies = Company::where('workspace_id', $this->workspace->id)->where('name', 'Same Corp')->get();
     expect($companies)->toHaveCount(1);
 
-    $people = People::where('team_id', $this->team->id)->whereIn('name', ['Alice', 'Bob', 'Carol'])->get();
+    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['Alice', 'Bob', 'Carol'])->get();
     expect($people)->toHaveCount(3);
 
     $people->each(function ($person) use ($companies): void {
@@ -516,17 +516,17 @@ it('skips auto-creation for entity links with only MatchOnly matchers', function
         ColumnData::toEntityLink(source: 'Opportunity', matcherKey: 'id', entityLinkKey: 'opportunities'),
     ], ImportEntityType::Task);
 
-    $initialOpportunityCount = Opportunity::where('team_id', $this->team->id)->count();
+    $initialOpportunityCount = Opportunity::where('workspace_id', $this->workspace->id)->count();
 
     ImportExecutionFixture::run($this);
 
-    expect(Opportunity::where('team_id', $this->team->id)->count())->toBe($initialOpportunityCount);
+    expect(Opportunity::where('workspace_id', $this->workspace->id)->count())->toBe($initialOpportunityCount);
 });
 
 it('calls store() for MorphToMany entity links after record save', function (): void {
     $company = Company::factory()->create([
         'name' => 'Linked Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $relationships = json_encode([
@@ -545,14 +545,14 @@ it('calls store() for MorphToMany entity links after record save', function (): 
 
     ImportExecutionFixture::run($this);
 
-    $task = Task::where('team_id', $this->team->id)->where('title', 'Follow up')->first();
+    $task = Task::where('workspace_id', $this->workspace->id)->where('title', 'Follow up')->first();
     expect($task)->not->toBeNull();
 
     $linkedCompanies = $task->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all();
     expect($linkedCompanies)->toContain((string) $company->id);
 });
 
-it('auto-created records have correct team and creation source', function (): void {
+it('auto-created records have correct workspace and creation source', function (): void {
     $relationships = json_encode([
         ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'Auto Corp', 'behavior' => MatchBehavior::Create->value],
     ]);
@@ -569,10 +569,10 @@ it('auto-created records have correct team and creation source', function (): vo
 
     ImportExecutionFixture::run($this);
 
-    $autoCreatedCompany = Company::where('team_id', $this->team->id)->where('name', 'Auto Corp')->first();
+    $autoCreatedCompany = Company::where('workspace_id', $this->workspace->id)->where('name', 'Auto Corp')->first();
     expect($autoCreatedCompany)->not->toBeNull()
         ->and($autoCreatedCompany->creation_source)->toBe(CreationSource::IMPORT)
-        ->and((string) $autoCreatedCompany->team_id)->toBe((string) $this->team->id)
+        ->and((string) $autoCreatedCompany->workspace_id)->toBe((string) $this->workspace->id)
         ->and((string) $autoCreatedCompany->creator_id)->toBe((string) $this->user->id);
 });
 
@@ -597,8 +597,8 @@ it('skips Update row when matched record no longer exists', function (): void {
 });
 
 it('processes row with multiple entity links', function (): void {
-    $company = Company::factory()->create(['name' => 'Multi Corp', 'team_id' => $this->team->id]);
-    $person = People::factory()->create(['name' => 'Contact Person', 'team_id' => $this->team->id]);
+    $company = Company::factory()->create(['name' => 'Multi Corp', 'workspace_id' => $this->workspace->id]);
+    $person = People::factory()->create(['name' => 'Contact Person', 'workspace_id' => $this->workspace->id]);
 
     $relationships = json_encode([
         ['relationship' => 'companies', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
@@ -618,7 +618,7 @@ it('processes row with multiple entity links', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $task = Task::where('team_id', $this->team->id)->where('title', 'Multi-link task')->first();
+    $task = Task::where('workspace_id', $this->workspace->id)->where('title', 'Multi-link task')->first();
     expect($task)->not->toBeNull();
 
     expect($task->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all())
@@ -629,7 +629,7 @@ it('processes row with multiple entity links', function (): void {
 });
 
 it('handles nonexistent import gracefully', function (): void {
-    $job = new ExecuteImportJob('nonexistent-id', (string) $this->team->id);
+    $job = new ExecuteImportJob('nonexistent-id', (string) $this->workspace->id);
 
     try {
         $job->handle();
@@ -651,7 +651,7 @@ it('filters out unexpected attributes from CSV data before saving', function ():
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Safe Person')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Safe Person')->first();
     expect($person)->not->toBeNull();
 
     $raw = DB::table('people')->where('id', $person->id)->first();
@@ -696,7 +696,7 @@ it('sends success notification to user on import completion', function (): void 
 it('includes result counts in completion notification body', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name'], [
@@ -755,8 +755,8 @@ it('handles Japanese characters in name fields', function (): void {
     $import = $this->import->fresh();
     expect($import->status)->toBe(ImportStatus::Completed);
 
-    expect(People::where('team_id', $this->team->id)->where('name', '田中太郎')->exists())->toBeTrue()
-        ->and(People::where('team_id', $this->team->id)->where('name', '佐藤花子')->exists())->toBeTrue();
+    expect(People::where('workspace_id', $this->workspace->id)->where('name', '田中太郎')->exists())->toBeTrue()
+        ->and(People::where('workspace_id', $this->workspace->id)->where('name', '佐藤花子')->exists())->toBeTrue();
 });
 
 it('handles Arabic characters in name fields', function (): void {
@@ -768,7 +768,7 @@ it('handles Arabic characters in name fields', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'محمد أحمد')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'محمد أحمد')->first();
     expect($person)->not->toBeNull()
         ->and($person->name)->toBe('محمد أحمد');
 });
@@ -782,7 +782,7 @@ it('handles emoji characters in name fields', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Test User 🚀')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Test User 🚀')->first();
     expect($person)->not->toBeNull()
         ->and($person->name)->toBe('Test User 🚀');
 });
@@ -797,8 +797,8 @@ it('handles accented Latin characters in name fields', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    expect(People::where('team_id', $this->team->id)->where('name', 'José García')->exists())->toBeTrue()
-        ->and(People::where('team_id', $this->team->id)->where('name', 'François Müller')->exists())->toBeTrue();
+    expect(People::where('workspace_id', $this->workspace->id)->where('name', 'José García')->exists())->toBeTrue()
+        ->and(People::where('workspace_id', $this->workspace->id)->where('name', 'François Müller')->exists())->toBeTrue();
 });
 
 it('handles international data with entity link auto-creation', function (): void {
@@ -818,10 +818,10 @@ it('handles international data with entity link auto-creation', function (): voi
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', '田中太郎')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', '田中太郎')->first();
     expect($person)->not->toBeNull();
 
-    $company = Company::where('team_id', $this->team->id)->where('name', '株式会社テスト')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', '株式会社テスト')->first();
     expect($company)->not->toBeNull()
         ->and((string) $person->company_id)->toBe((string) $company->id);
 });
@@ -859,7 +859,7 @@ it('marks import as Failed when job exhausts retries via failed() handler', func
 
     $job = new ExecuteImportJob(
         importId: $this->import->id,
-        teamId: (string) $this->team->id,
+        workspaceId: (string) $this->workspace->id,
     );
 
     $job->failed(new RuntimeException('Queue worker gave up'));

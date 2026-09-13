@@ -19,7 +19,10 @@ final readonly class RecordNameResolver
 
     public function __construct()
     {
-        $this->names = new Collection;
+        /** @var Collection<string, ?string> $names */
+        $names = new Collection;
+
+        $this->names = $names;
     }
 
     /** @param  iterable<Model>  $models */
@@ -79,8 +82,8 @@ final readonly class RecordNameResolver
             return;
         }
 
-        $teamId = TenantContextService::getCurrentTenantId();
-        $entity = $teamId !== null ? CrmEntity::tryFrom($lookupType) : null;
+        $workspaceId = TenantContextService::getCurrentTenantId();
+        $entity = $workspaceId !== null ? CrmEntity::tryFrom($lookupType) : null;
 
         if ($entity === null) {
             foreach ($missing as $id) {
@@ -93,7 +96,7 @@ final readonly class RecordNameResolver
         $model = $entity->model();
 
         $found = $model::query()
-            ->where('team_id', $teamId)
+            ->where('workspace_id', $workspaceId)
             ->whereIn('id', $missing)
             ->pluck($entity->titleColumn(), 'id');
 

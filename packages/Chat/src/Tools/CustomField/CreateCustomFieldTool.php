@@ -60,9 +60,9 @@ final class CreateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsTeam($user->currentTeam)) {
+        if (! $user->ownsWorkspace($user->currentWorkspace)) {
             return (string) json_encode([
-                'error' => 'Only team owners can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask your team owner to do this.',
+                'error' => 'Only workspace owners can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask your workspace owner to do this.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

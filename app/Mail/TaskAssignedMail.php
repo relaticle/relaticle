@@ -19,7 +19,7 @@ final class TaskAssignedMail extends Mailable implements ShouldQueue
     public function __construct(
         public string $taskTitle,
         public string $taskUrl,
-        public ?string $teamName = null,
+        public ?string $workspaceName = null,
     ) {}
 
     public function envelope(): Envelope
@@ -32,13 +32,13 @@ final class TaskAssignedMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'mail.task-assigned',
             with: [
-                'teamName' => $this->teamName,
-                'preheader' => $this->teamName === null
-                    ? __('mail.task_assigned.preheader_without_team')
-                    : __('mail.task_assigned.preheader', ['team' => $this->teamName]),
+                'workspaceName' => $this->workspaceName,
+                'preheader' => $this->workspaceName === null
+                    ? __('mail.task_assigned.preheader_without_workspace')
+                    : __('mail.task_assigned.preheader', ['workspace' => $this->workspaceName]),
                 'rows' => array_filter([
                     ['label' => $this->taskTitle, 'url' => $this->taskUrl],
-                    $this->teamName === null ? null : ['label' => __('mail.task_assigned.team_label'), 'value' => $this->teamName],
+                    $this->workspaceName === null ? null : ['label' => __('mail.task_assigned.workspace_label'), 'value' => $this->workspaceName],
                 ]),
             ],
         );

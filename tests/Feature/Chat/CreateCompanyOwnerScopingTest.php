@@ -11,9 +11,9 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 
-it('rejects creating a company with account_owner_id from a foreign team', function (): void {
-    $userA = User::factory()->withPersonalTeam()->create();
-    $foreignUser = User::factory()->withPersonalTeam()->create();
+it('rejects creating a company with account_owner_id from a foreign workspace', function (): void {
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $foreignUser = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($userA);
 
@@ -26,9 +26,9 @@ it('rejects creating a company with account_owner_id from a foreign team', funct
 });
 
 it('accepts a company whose account_owner_id is a member of the workspace', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $teammate = User::factory()->create();
-    $owner->currentTeam->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
 
     $this->actingAs($owner);
 
@@ -49,7 +49,7 @@ function createToolConversationFor(User $owner, string $conversationId): CreateC
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -61,10 +61,10 @@ function createToolConversationFor(User $owner, string $conversationId): CreateC
     return $tool;
 }
 
-it('CreateCompanyTool accepts an explicit team-member owner and shows it on the card', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+it('CreateCompanyTool accepts an explicit workspace-member owner and shows it on the card', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $teammate = User::factory()->create(['name' => 'Casey Closer']);
-    $owner->currentTeam->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
 
     $tool = createToolConversationFor($owner, '019df800-3333-7000-8000-000000000077');
 
@@ -75,7 +75,7 @@ it('CreateCompanyTool accepts an explicit team-member owner and shows it on the 
     expect($response)->toContain('pending_action');
 
     $pending = PendingAction::query()
-        ->where('team_id', $owner->currentTeam->getKey())
+        ->where('workspace_id', $owner->currentWorkspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -86,8 +86,8 @@ it('CreateCompanyTool accepts an explicit team-member owner and shows it on the 
 });
 
 it('CreateCompanyTool rejects a non-member owner id before proposing', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $stranger = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
 
     $tool = createToolConversationFor($owner, '019df800-3333-7000-8000-000000000078');
 
@@ -95,6 +95,6 @@ it('CreateCompanyTool rejects a non-member owner id before proposing', function 
         'records' => [['name' => 'Blocked Co', 'account_owner_id' => (string) $stranger->getKey()]],
     ]));
 
-    expect($response)->toContain('must be a workspace team member')
-        ->and(PendingAction::query()->where('team_id', $owner->currentTeam->getKey())->count())->toBe(0);
+    expect($response)->toContain('must be a workspace member')
+        ->and(PendingAction::query()->where('workspace_id', $owner->currentWorkspace->getKey())->count())->toBe(0);
 });

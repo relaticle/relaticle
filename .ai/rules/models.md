@@ -9,7 +9,7 @@ paths:
 ## Email canonicalization
 
 - Emails are stored canonical: trimmed, lowercase. The `AsCanonicalEmail`
-  inbound cast enforces it on `User.email` and `TeamInvitation.email`; reuse it
+  inbound cast enforces it on `User.email` and `WorkspaceInvitation.email`; reuse it
   for any new email column. Casts never touch query input, so every lookup
   against an email column must canonicalize first via
   `App\Support\EmailAddress::canonicalize()`; never write a raw

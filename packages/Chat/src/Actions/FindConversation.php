@@ -15,7 +15,7 @@ final readonly class FindConversation
             ->where('id', $conversationId)
             ->where('participant_type', $user->getMorphClass())
             ->where('participant_id', $user->getKey())
-            ->where('team_id', $user->current_team_id)
+            ->where('workspace_id', $user->current_workspace_id)
             ->first(['id', 'title', 'created_at', 'updated_at']);
     }
 }

@@ -1,0 +1,517 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Models;
+
+use App\Enums\BillingStatus;
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
+use App\Enums\WorkspaceRole;
+use App\Events\WorkspaceCreated;
+use App\Events\WorkspaceDeleted;
+use App\Events\WorkspaceUpdated;
+use App\Models\ActivityLog\Activity;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
+use App\Services\AvatarService;
+use App\Support\ReservedSlugAwareGenerateSlugAction;
+use Carbon\CarbonImmutable;
+use Database\Factories\WorkspaceFactory;
+use Filament\Models\Contracts\HasAvatar;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
+use Laravel\Cashier\Subscription;
+use Relaticle\Chat\Models\AgentConversation;
+use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\ImportWizard\Models\Import;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\Onboard\Concerns\GetsOnboarded;
+use Spatie\Onboard\Concerns\Onboardable;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
+
+/**
+ * @property string $name
+ * @property string $slug
+ * @property Plan $plan
+ * @property ?string $invite_link_token
+ * @property ?CarbonImmutable $invite_link_token_expires_at
+ * @property ?OnboardingUseCase $onboarding_use_case
+ * @property ?array<string, string> $onboarding_context
+ * @property ?OnboardingReferralSource $onboarding_referral_source
+ * @property CarbonImmutable|null $scheduled_deletion_at
+ * @property ?string $stripe_id
+ * @property ?string $pm_type
+ * @property ?string $pm_last_four
+ * @property CarbonImmutable|null $trial_ends_at
+ * @property CarbonImmutable|null $pro_trial_used_at
+ * @property CarbonImmutable|null $hosted_free_grandfathered_at
+ * @property string $invite_link_default_role
+ * @property-read Membership|null $membership the `workspace_user` row, populated only when the workspace was
+ *     loaded through `User::workspaces()`; null on a workspace reached any other way
+ */
+#[Fillable([
+    'name',
+    'slug',
+    'personal_workspace',
+    'onboarding_use_case',
+    'onboarding_context',
+    'onboarding_referral_source',
+    'invite_link_default_role',
+])]
+#[Hidden([
+    'invite_link_token',
+])]
+final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
+{
+    use Billable;
+    use GetsOnboarded;
+
+    /** @use HasFactory<WorkspaceFactory> */
+    use HasFactory;
+
+    use HasSlug;
+    use HasUlids;
+    use InteractsWithMedia;
+
+    public const string LOGO_MEDIA_COLLECTION = 'logo';
+
+    // SVG is excluded on purpose: it carries script, and a workspace logo is the
+    // one image members upload to the public disk on our own origin.
+    /** @var list<string> */
+    public const array LOGO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    public const int LOGO_MAX_KILOBYTES = 2048;
+
+    public const string SLUG_REGEX = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
+
+    /**
+     * Slugs reserved for application routes that must not be used as workspace slugs.
+     *
+     * @var list<string>
+     */
+    public const array RESERVED_SLUGS = [
+        // Authentication & authorization
+        'login', 'logout', 'register', 'signin', 'signout', 'signup',
+        'auth', 'oauth', 'sso', 'callback', '.well-known',
+        'forgot-password', 'reset-password', 'password-reset', 'verify-email', 'email-verification',
+        'confirm-password', 'two-factor-challenge', 'passkeys', 'identity',
+
+        // Administration
+        'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',
+
+        // Account & billing
+        'account', 'billing', 'checkout', 'invoices', 'plan', 'plans',
+        'pricing', 'settings', 'subscription', 'subscriptions', 'stripe',
+
+        // Workspaces & orgs
+        'workspaces', 'workspace', 'org', 'organization', 'workspace', 'invitations', 'invite',
+        'workspace-invitations', 'join',
+
+        // App routes
+        'companies', 'people', 'tasks', 'opportunities', 'notes',
+        'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
+        'opportunities-board', 'tasks-board', 'chat', 'r',
+
+        // Content & info pages
+        'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
+        'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
+        'discord', 'llms.txt',
+
+        // API & developer
+        'api', 'graphql', 'mcp', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
+
+        // Marketing & public
+        'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
+        'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
+        'press', 'compare', 'alternatives', 'ai', 'ai-native-crm', 'self-hosted',
+
+        // Communication
+        'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
+
+        // Infrastructure & framework
+        'filament', 'livewire', 'storage', 'imports', 'horizon', 'scalar', 'engagement',
+        'broadcasting',
+        'system-administrators',
+        'up', 'health', 'status', 'metrics',
+        'static', 'assets', 'cdn', 'public', 'uploads',
+        'www', 'ftp', 'ssh', 'dns', 'ns1', 'ns2',
+
+        // Common actions
+        'new', 'create', 'edit', 'delete', 'search', 'explore',
+
+        // Misc
+        'null', 'undefined', 'error', 'test', 'staging', 'preview',
+    ];
+
+    /**
+     * How many days an invite-link token stays valid after creation/rotation.
+     */
+    public const int INVITE_LINK_TTL_DAYS = 7;
+
+    /**
+     * The event map for the model.
+     *
+     * @var array<string, class-string>
+     */
+    protected $dispatchesEvents = [
+        'created' => WorkspaceCreated::class,
+        'updated' => WorkspaceUpdated::class,
+        'deleted' => WorkspaceDeleted::class,
+    ];
+
+    /**
+     * The model's default attribute values.
+     *
+     * @var array<string, string>
+     */
+    protected $attributes = [
+        'invite_link_default_role' => WorkspaceRole::Editor->value,
+    ];
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'personal_workspace' => 'boolean',
+            'plan' => Plan::class,
+            'onboarding_use_case' => OnboardingUseCase::class,
+            'onboarding_context' => 'array',
+            'onboarding_referral_source' => OnboardingReferralSource::class,
+            'activation_checklist_dismissed_at' => 'datetime',
+            'setup_nudge_sent_at' => 'datetime',
+            'invite_link_token_expires_at' => 'datetime',
+            'scheduled_deletion_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
+            'pro_trial_used_at' => 'datetime',
+            'hosted_free_grandfathered_at' => 'datetime',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        self::creating(function (Workspace $workspace): void {
+            if ($workspace->invite_link_token === null) {
+                $workspace->invite_link_token = Str::random(40);
+                $workspace->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
+            }
+        });
+    }
+
+    public function rotateInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => Str::random(40),
+            'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
+        ])->save();
+    }
+
+    /**
+     * Clearing the token is what turns the link off: every lookup matches on the
+     * column, and no request token can equal null, so the link stops resolving
+     * without a second flag that could disagree with it.
+     */
+    public function disableInviteLink(): void
+    {
+        $this->forceFill([
+            'invite_link_token' => null,
+            'invite_link_token_expires_at' => null,
+        ])->save();
+    }
+
+    public function hasInviteLink(): bool
+    {
+        return $this->invite_link_token !== null;
+    }
+
+    public function isInviteLinkTokenExpired(): bool
+    {
+        if ($this->invite_link_token_expires_at === null) {
+            return true;
+        }
+
+        return $this->invite_link_token_expires_at->isPast();
+    }
+
+    /**
+     * The Mailcoach subscriber tags derived from this workspace's onboarding answers.
+     *
+     * @return list<string>
+     */
+    public function onboardingSubscriberTags(): array
+    {
+        $tags = [];
+
+        if ($this->onboarding_use_case) {
+            $tags[] = $this->onboarding_use_case->toSubscriberTag();
+        }
+
+        if ($this->onboarding_referral_source) {
+            $tags[] = $this->onboarding_referral_source->toSubscriberTag();
+        }
+
+        return $tags;
+    }
+
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom(function (): string {
+                $slug = Str::slug($this->name);
+
+                if ($slug === '') {
+                    return Str::lower(Str::random(8));
+                }
+
+                return $slug;
+            })
+            ->saveSlugsTo('slug')
+            ->preventOverwrite()
+            ->doNotGenerateSlugsOnUpdate();
+    }
+
+    protected function generateSlugAction(): ReservedSlugAwareGenerateSlugAction
+    {
+        return new ReservedSlugAwareGenerateSlugAction(self::RESERVED_SLUGS);
+    }
+
+    public function isPersonalWorkspace(): bool
+    {
+        return $this->personal_workspace;
+    }
+
+    public function isScheduledForDeletion(): bool
+    {
+        return $this->scheduled_deletion_at !== null;
+    }
+
+    /**
+     * Reads the `subscriptions` relation, so eager load it when rendering this
+     * for more than one workspace. It deliberately does not `loadMissing()` on your
+     * behalf: that would turn a visible N+1 into a silent one.
+     */
+    public function billingStatus(): BillingStatus
+    {
+        return BillingStatus::fromWorkspace($this);
+    }
+
+    /**
+     * The single row `Cashier::subscription()` resolves: the newest `default`
+     * subscription. It exists so a query can ask what `billingStatus()` asks:
+     * `whereHas('subscriptions', ...)` would match a superseded row and label a
+     * workspace by a subscription it no longer bills on.
+     *
+     * The type filter lives in the aggregate closure because the `ofMany`
+     * sub-query is built from a fresh query and does not inherit outer
+     * constraints. Filtering only on the outside would take MAX(created_at)
+     * across every type and then discard it.
+     *
+     * @return HasOne<Subscription, $this>
+     */
+    public function latestDefaultSubscription(): HasOne
+    {
+        return $this->hasOne(Subscription::class, $this->getForeignKey())
+            ->ofMany(
+                ['created_at' => 'MAX', 'id' => 'MAX'],
+                fn (Builder $query): Builder => $query->where('type', 'default'),
+            );
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function scheduledForDeletion(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function expiredDeletion(Builder $query): Builder
+    {
+        return $query->whereNotNull('scheduled_deletion_at')
+            ->where('scheduled_deletion_at', '<=', now());
+    }
+
+    public function getFilamentAvatarUrl(): string
+    {
+        $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
+
+        if ($logo !== '') {
+            return $logo;
+        }
+
+        return resolve(AvatarService::class)->generate(name: $this->name, bgColor: '#000000', textColor: '#ffffff');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
+            ->acceptsMimeTypes(self::LOGO_MIME_TYPES)
+            ->singleFile();
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function owner(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * @return BelongsToMany<User, $this, Membership, 'membership'>
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, Membership::class)
+            ->withPivot('role')
+            ->withTimestamps()
+            ->as('membership');
+    }
+
+    /** @return Collection<int, User> */
+    public function allUsers(): Collection
+    {
+        return $this->users->merge([$this->owner]);
+    }
+
+    public function hasUser(User $user): bool
+    {
+        return $this->users->contains($user) || $user->ownsWorkspace($this);
+    }
+
+    public function hasUserWithEmail(string $email): bool
+    {
+        return $this->allUsers()->contains(fn (User $user): bool => $user->email === $email);
+    }
+
+    /**
+     * @return HasMany<WorkspaceInvitation, $this>
+     */
+    public function workspaceInvitations(): HasMany
+    {
+        return $this->hasMany(WorkspaceInvitation::class);
+    }
+
+    public function removeUser(User $user): void
+    {
+        if ($user->current_workspace_id === $this->getKey()) {
+            $user->forceFill(['current_workspace_id' => null])->save();
+        }
+
+        $this->users()->detach($user);
+    }
+
+    public function purge(): void
+    {
+        $this->owner()->where('current_workspace_id', $this->getKey())
+            ->update(['current_workspace_id' => null]);
+
+        $this->users()->where('current_workspace_id', $this->getKey())
+            ->update(['current_workspace_id' => null]);
+
+        $this->users()->detach();
+
+        $this->delete();
+    }
+
+    /**
+     * @return HasMany<People, $this>
+     */
+    public function people(): HasMany
+    {
+        return $this->hasMany(People::class);
+    }
+
+    /**
+     * @return HasMany<Company, $this>
+     */
+    public function companies(): HasMany
+    {
+        return $this->hasMany(Company::class);
+    }
+
+    /**
+     * @return HasMany<Task, $this>
+     */
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    /**
+     * @return HasMany<Opportunity, $this>
+     */
+    public function opportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class);
+    }
+
+    /**
+     * @return HasMany<Note, $this>
+     */
+    public function notes(): HasMany
+    {
+        return $this->hasMany(Note::class);
+    }
+
+    /**
+     * @return HasOne<AiCreditBalance, $this>
+     */
+    public function aiCreditBalance(): HasOne
+    {
+        return $this->hasOne(AiCreditBalance::class);
+    }
+
+    /**
+     * @return HasMany<AgentConversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(AgentConversation::class);
+    }
+
+    /**
+     * @return HasMany<Import, $this>
+     */
+    public function imports(): HasMany
+    {
+        return $this->hasMany(Import::class);
+    }
+
+    /**
+     * The relation already pins `workspace_id`, so the tenant scope adds nothing.
+     * Outside the app panel there is no tenant, which would narrow it to
+     * nothing at all.
+     *
+     * @return HasMany<Activity, $this>
+     */
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class)->withoutGlobalScope(WorkspaceScope::class);
+    }
+}

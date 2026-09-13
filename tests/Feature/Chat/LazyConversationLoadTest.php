@@ -9,9 +9,9 @@ use Livewire\Livewire;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 /**
@@ -25,22 +25,22 @@ beforeEach(function (): void {
  * record binding that remains.
  */
 it('resolves the record binding regardless of panel state when closed', function (): void {
-    $person = People::factory()->for($this->user->currentTeam)->create(['name' => 'Manch Minasyan']);
+    $person = People::factory()->for($this->user->currentWorkspace)->create(['name' => 'Manch Minasyan']);
 
     $component = Livewire::test(ChatSidePanel::class)
         ->set('isOpen', false)
-        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->user->currentTeam->slug}/people/{$person->getKey()}");
+        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->user->currentWorkspace->slug}/people/{$person->getKey()}");
 
     expect($component->get('recordType'))->toBe('people')
         ->and($component->get('recordName'))->toBe('Manch Minasyan');
 });
 
 it('resolves the record binding regardless of panel state when open', function (): void {
-    $person = People::factory()->for($this->user->currentTeam)->create(['name' => 'Manch Minasyan']);
+    $person = People::factory()->for($this->user->currentWorkspace)->create(['name' => 'Manch Minasyan']);
 
     $component = Livewire::test(ChatSidePanel::class)
         ->set('isOpen', true)
-        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->user->currentTeam->slug}/people/{$person->getKey()}");
+        ->call('refreshContext', "https://consolidate-ask-relaticle.test/app/{$this->user->currentWorkspace->slug}/people/{$person->getKey()}");
 
     expect($component->get('recordType'))->toBe('people')
         ->and($component->get('recordName'))->toBe('Manch Minasyan');

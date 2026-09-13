@@ -2,7 +2,7 @@
 
 ## Overview
 
-OnboardSeed provides a structured way to seed demo data for new teams. It uses YAML fixtures to define entities and
+OnboardSeed provides a structured way to seed demo data for new workspaces. It uses YAML fixtures to define entities and
 their relationships, with a clean API for generating consistent demo data across multiple environments.
 
 ## Features
@@ -185,13 +185,13 @@ final class NewEntityTypeSeeder extends BaseModelSeeder
         'field2',
     ];
     
-    protected function createEntitiesFromFixtures(Team $team, User $user, array $context = []): array
+    protected function createEntitiesFromFixtures(Workspace $workspace, User $user, array $context = []): array
     {
         $fixtures = $this->loadEntityFixtures();
         $entities = [];
         
         foreach ($fixtures as $key => $data) {
-            $entity = $this->createEntityFromFixture($team, $user, $key, $data);
+            $entity = $this->createEntityFromFixture($workspace, $user, $key, $data);
             $entities[$key] = $entity;
         }
         
@@ -200,7 +200,7 @@ final class NewEntityTypeSeeder extends BaseModelSeeder
         ];
     }
     
-    private function createEntityFromFixture(Team $team, User $user, string $key, array $data): NewEntityType
+    private function createEntityFromFixture(Workspace $workspace, User $user, string $key, array $data): NewEntityType
     {
         $attributes = [
             'name' => $data['name'],
@@ -209,7 +209,7 @@ final class NewEntityTypeSeeder extends BaseModelSeeder
         
         $customFields = $data['custom_fields'] ?? [];
         
-        return $this->registerEntityFromFixture($key, $attributes, $customFields, $team, $user);
+        return $this->registerEntityFromFixture($key, $attributes, $customFields, $workspace, $user);
     }
 }
 ```

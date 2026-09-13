@@ -16,12 +16,12 @@ use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
  * exactly the history an admin opens a deleted record to read.
  */
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 
-    $this->company = Company::factory()->for($this->team)->create(['name' => 'Trashed Timeline Co']);
+    $this->company = Company::factory()->for($this->workspace)->create(['name' => 'Trashed Timeline Co']);
     $this->company->update(['name' => 'Renamed Before Deletion']);
     $this->company->delete();
 });

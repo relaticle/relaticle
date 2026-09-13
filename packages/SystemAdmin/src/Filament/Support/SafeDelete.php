@@ -15,10 +15,10 @@ use Throwable;
 
 /**
  * Filament's delete actions call `$record->delete()` on the model, which is the
- * wrong entry point for a user or a team. Both are owned by a Jetstream deleter
+ * wrong entry point for a user or a workspace. Both are owned by a Jetstream deleter
  * that runs side effects the model knows nothing about: deleting a user must
- * also delete the teams it owns, and deleting a team must first cancel its
- * Stripe subscription. Skipping them leaves ownerless workspaces (`teams.user_id`
+ * also delete the workspaces it owns, and deleting a workspace must first cancel its
+ * Stripe subscription. Skipping them leaves ownerless workspaces (`workspaces.user_id`
  * carries no foreign key) and subscriptions that keep billing a workspace nobody
  * can reach.
  *

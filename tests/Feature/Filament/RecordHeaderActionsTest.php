@@ -14,14 +14,14 @@ use Filament\Facades\Filament;
 mutates(ViewCompany::class, ViewPeople::class, ViewOpportunity::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('no longer exposes the AI summary or ask-about-this actions on a company', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->assertActionDoesNotExist('generateSummary')
@@ -30,7 +30,7 @@ it('no longer exposes the AI summary or ask-about-this actions on a company', fu
 });
 
 it('no longer exposes the AI summary or ask-about-this actions on a person', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->assertActionDoesNotExist('generateSummary')
@@ -39,7 +39,7 @@ it('no longer exposes the AI summary or ask-about-this actions on a person', fun
 });
 
 it('no longer exposes the AI summary or ask-about-this actions on an opportunity', function (): void {
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
         ->assertActionDoesNotExist('generateSummary')

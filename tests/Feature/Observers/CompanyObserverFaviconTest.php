@@ -15,15 +15,15 @@ use Illuminate\Support\Facades\Bus;
 mutates(CompanyObserver::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 test('observer dispatches favicon job when company has domain and no existing logo', function (): void {
     Bus::fake([FetchFaviconForCompany::class]);
 
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     $domainsField = CustomField::query()
         ->where('code', CompanyField::DOMAINS->value)
@@ -31,7 +31,7 @@ test('observer dispatches favicon job when company has domain and no existing lo
         ->firstOrFail();
 
     CustomFieldValue::forceCreate([
-        'tenant_id' => $this->user->currentTeam->getKey(),
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domainsField->getKey(),
@@ -44,7 +44,7 @@ test('observer dispatches favicon job when company has domain and no existing lo
 });
 
 test('observer does not dispatch favicon job when company already has a logo', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     $domainsField = CustomField::query()
         ->where('code', CompanyField::DOMAINS->value)
@@ -52,7 +52,7 @@ test('observer does not dispatch favicon job when company already has a logo', f
         ->firstOrFail();
 
     CustomFieldValue::forceCreate([
-        'tenant_id' => $this->user->currentTeam->getKey(),
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domainsField->getKey(),
@@ -71,7 +71,7 @@ test('observer does not dispatch favicon job when company already has a logo', f
 test('observer does not dispatch when domain custom field is empty', function (): void {
     Bus::fake([FetchFaviconForCompany::class]);
 
-    Company::factory()->for($this->user->currentTeam)->create();
+    Company::factory()->for($this->user->currentWorkspace)->create();
 
     Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });

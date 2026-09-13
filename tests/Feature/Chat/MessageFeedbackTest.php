@@ -16,7 +16,7 @@ function seedFeedbackConversation(User $user): array
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'feedback test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -50,7 +50,7 @@ function seedFeedbackConversation(User $user): array
 }
 
 it('records a thumbs up', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)
@@ -63,11 +63,11 @@ it('records a thumbs up', function (): void {
     expect($row)->not->toBeNull()
         ->and($row->rating)->toBe('up')
         ->and($row->model)->toBe('claude-sonnet-4')
-        ->and($row->team_id)->toBe($user->currentTeam->getKey());
+        ->and($row->workspace_id)->toBe($user->currentWorkspace->getKey());
 });
 
 it('switches the rating in place instead of stacking rows', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)->postJson("/chat/messages/{$ids['assistant']}/feedback", ['rating' => 'up'])->assertOk();
@@ -86,7 +86,7 @@ it('switches the rating in place instead of stacking rows', function (): void {
 });
 
 it('retracts a rating via DELETE', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)->postJson("/chat/messages/{$ids['assistant']}/feedback", ['rating' => 'down'])->assertOk();
@@ -96,7 +96,7 @@ it('retracts a rating via DELETE', function (): void {
 });
 
 it('rejects rating a user message', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)
@@ -105,10 +105,10 @@ it('rejects rating a user message', function (): void {
 });
 
 it('hides foreign messages with 404', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($owner);
 
-    $intruder = User::factory()->withPersonalTeam()->create();
+    $intruder = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($intruder)
         ->postJson("/chat/messages/{$ids['assistant']}/feedback", ['rating' => 'up'])
@@ -116,7 +116,7 @@ it('hides foreign messages with 404', function (): void {
 });
 
 it('rejects unknown categories', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)
@@ -125,7 +125,7 @@ it('rejects unknown categories', function (): void {
 });
 
 it('includes the current user feedback in the rendered transcript', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedFeedbackConversation($user);
 
     $this->actingAs($user)->postJson("/chat/messages/{$ids['assistant']}/feedback", [

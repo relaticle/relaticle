@@ -11,8 +11,8 @@ use Relaticle\Chat\Tools\SearchDocsTool;
 mutates(SearchDocsTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
@@ -95,7 +95,7 @@ it('caps the number of sections returned', function (): void {
 });
 
 it('does not create a pending action because it is not a write', function (): void {
-    searchDocs('how do I invite my team');
+    searchDocs('how do I invite my workspace');
 
     expect(PendingAction::query()->count())->toBe(0);
 });

@@ -284,7 +284,7 @@ final class ChatInterface extends BaseLivewireComponent
      * one: on the FIRST turn of a new chat the conversation is created by the
      * client's fetch, so $conversationId is still null here and reconcile would
      * hand back nothing, leaving the turn's tables missing until a reload. The
-     * query below is scoped to the authed participant and team, so an id from
+     * query below is scoped to the authed participant and workspace, so an id from
      * the client cannot reach another user's conversation.
      *
      * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
@@ -338,7 +338,7 @@ final class ChatInterface extends BaseLivewireComponent
         $actions = PendingAction::query()
             ->where('conversation_id', $conversationId)
             ->where('user_id', $user->getKey())
-            ->where('team_id', $user->current_team_id)
+            ->where('workspace_id', $user->current_workspace_id)
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '>', now())
             ->oldest()
@@ -369,7 +369,7 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * On a brand-new chat the conversation is created client-side via a fetch,
      * so the server-side $conversationId stays null until a reload. The client
-     * therefore passes its own id, scoped to the authed user and team by
+     * therefore passes its own id, scoped to the authed user and workspace by
      * FindConversation.
      */
     public function conversationTitle(?string $conversationId = null): ?string

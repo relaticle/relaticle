@@ -48,7 +48,7 @@ final class ImportHistory extends Page implements HasTable
         return $table
             ->query(
                 Import::query()
-                    ->forTeam((string) filament()->getTenant()?->getKey())
+                    ->forWorkspace((string) filament()->getTenant()?->getKey())
                     ->whereIn('status', [ImportStatus::Completed, ImportStatus::Failed, ImportStatus::Importing])
                     ->latest()
             )

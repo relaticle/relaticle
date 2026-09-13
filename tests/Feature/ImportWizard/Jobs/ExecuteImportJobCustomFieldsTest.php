@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\DateFormat;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -21,13 +21,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -51,7 +51,7 @@ it('imports text custom field value', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
@@ -71,7 +71,7 @@ it('imports number custom field as integer', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Acme')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->integer_value)->toBe(42);
@@ -89,7 +89,7 @@ it('imports currency custom field with point decimal format', function (): void 
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Acme')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->float_value)->toBe(1234.56);
@@ -111,7 +111,7 @@ it('imports currency custom field with comma decimal format', function (): void 
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Acme')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Acme')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->float_value)->toBe(1234.56);
@@ -129,7 +129,7 @@ it('imports date custom field with ISO format', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
@@ -151,7 +151,7 @@ it('imports date custom field with European format', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
@@ -173,7 +173,7 @@ it('imports date custom field with American format', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->date_value->format('Y-m-d'))->toBe('2024-05-15');
@@ -191,7 +191,7 @@ it('imports datetime custom field with ISO format including time', function (): 
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->datetime_value->format('Y-m-d H:i:s'))->toBe('2024-05-15 14:30:00');
@@ -213,7 +213,7 @@ it('imports datetime custom field with European format including time', function
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->datetime_value->format('Y-m-d H:i'))->toBe('2024-05-15 14:30');
@@ -231,7 +231,7 @@ it('imports boolean custom field with truthy values', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->boolean_value)->toBeTrue();
@@ -250,7 +250,7 @@ it('imports select custom field with option name resolved to ID', function (): v
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->string_value)->toBe((string) $mediumOption->id);
@@ -270,7 +270,7 @@ it('imports multi-select custom field with option names resolved to IDs', functi
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -291,7 +291,7 @@ it('imports tags-input custom field with comma-separated values', function (): v
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -313,7 +313,7 @@ it('persists a blank mapped custom field value on create as carried, not skipped
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull();
 
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
@@ -326,14 +326,14 @@ it('updates existing custom field value on record update', function (): void {
 
     $person = People::factory()->create([
         'name' => 'John',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::forceCreate([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'text_value' => 'old value',
     ]);
 
@@ -360,14 +360,14 @@ it('clears existing custom field value when mapped column is blank on update', f
 
     $person = People::factory()->create([
         'name' => 'John',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::forceCreate([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'text_value' => 'old value',
     ]);
 
@@ -405,7 +405,7 @@ it('stores a blank mapped date custom field as null instead of failing the impor
 
     expect($this->import->fresh()->status)->toBe(ImportStatus::Completed);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull()
         ->and(ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $date->id)->date_value)->toBeNull()
         ->and(ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $dateTime->id)->datetime_value)->toBeNull();
@@ -416,14 +416,14 @@ it('clears an existing date custom field value when the mapped column is blank o
 
     $person = People::factory()->create([
         'name' => 'John',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::forceCreate([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'date_value' => '2024-05-15',
     ]);
 
@@ -459,7 +459,7 @@ it('stores a whitespace-only mapped date custom field as null instead of failing
 
     expect($this->import->fresh()->status)->toBe(ImportStatus::Completed);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     expect($person)->not->toBeNull()
         ->and(ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id)->date_value)->toBeNull();
 });
@@ -469,14 +469,14 @@ it('leaves an existing custom field value untouched when the cell was skipped in
 
     $person = People::factory()->create([
         'name' => 'John',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::forceCreate([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'text_value' => 'keep me',
     ]);
 
@@ -511,7 +511,7 @@ it('imports email custom field with comma-separated addresses as array', functio
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -534,7 +534,7 @@ it('imports select custom field with case-insensitive option name', function ():
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->string_value)->toBe((string) $mediumOption->id);
@@ -553,7 +553,7 @@ it('imports select custom field with value already being an option ID', function
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->string_value)->toBe((string) $mediumOption->id);
@@ -573,7 +573,7 @@ it('imports multi-select custom field with mixed option names resolved to IDs', 
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 

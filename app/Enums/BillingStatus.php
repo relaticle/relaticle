@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasDescription;
 use Filament\Support\Contracts\HasLabel;
@@ -14,7 +14,7 @@ use Laravel\Cashier\Subscription;
 /**
  * Why a workspace has the plan it has.
  *
- * `teams.plan` records capability, not provenance: a trial writes `Plan::Pro`
+ * `workspaces.plan` records capability, not provenance: a trial writes `Plan::Pro`
  * so that the workspace gets Pro credits and rate limits, which makes a
  * trialling workspace indistinguishable from a paying one wherever the plan
  * column is rendered on its own. This answers the question that column cannot.
@@ -44,9 +44,9 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
      * subscribed because this app calls `Cashier::keepPastDueSubscriptionsActive()`,
      * which leaves `valid()` true for a subscription that has stopped paying.
      */
-    public static function fromTeam(Team $team): self
+    public static function fromWorkspace(Workspace $workspace): self
     {
-        $subscription = $team->subscription();
+        $subscription = $workspace->subscription();
 
         if ($subscription?->pastDue() === true) {
             return self::PastDue;
@@ -56,19 +56,19 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             return self::Subscribed;
         }
 
-        if ($team->plan === Plan::Enterprise) {
+        if ($workspace->plan === Plan::Enterprise) {
             return self::Enterprise;
         }
 
-        if ($team->onGenericTrial()) {
+        if ($workspace->onGenericTrial()) {
             return self::Trialing;
         }
 
-        if ($team->hosted_free_grandfathered_at !== null) {
+        if ($workspace->hosted_free_grandfathered_at !== null) {
             return self::Grandfathered;
         }
 
-        if ($team->plan !== Plan::Free) {
+        if ($workspace->plan !== Plan::Free) {
             return self::Granted;
         }
 
@@ -76,17 +76,17 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     }
 
     /**
-     * The query counterpart of fromTeam(), so a table can be filtered by the
+     * The query counterpart of fromWorkspace(), so a table can be filtered by the
      * badge it renders.
      *
-     * fromTeam() returns on the first predicate that holds, which a filter has
+     * fromWorkspace() returns on the first predicate that holds, which a filter has
      * to reproduce: matching Subscribed on its own would also return every
      * past-due workspace. Case declaration order is the precedence order, so
      * every status that outranks this one is excluded before its own predicate
      * applies.
      *
-     * @param  Builder<Team>  $query
-     * @return Builder<Team>
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
      */
     public function applyToQuery(Builder $query): Builder
     {
@@ -148,8 +148,8 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
      * This status's own predicate, blind to the statuses that outrank it.
      * Only applyToQuery() may call it.
      *
-     * @param  Builder<Team>  $query
-     * @return Builder<Team>
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
      */
     private function constrain(Builder $query): Builder
     {

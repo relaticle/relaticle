@@ -76,7 +76,7 @@ final class TaskSchemaResource extends Resource implements ProvidesEntitySchema
                 ],
                 'assignee_ids' => [
                     'type' => 'array of user IDs',
-                    'description' => 'Assign team members to this task. Use whoami tool to discover valid user IDs.',
+                    'description' => 'Assign workspace members to this task. Use whoami tool to discover valid user IDs.',
                 ],
             ],
             'tools_hint' => 'Use attach-task-to-entities and detach-task-from-entities tools for post-creation relationship management.',

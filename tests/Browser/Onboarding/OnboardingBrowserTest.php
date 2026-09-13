@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\CreateTeam;
+use App\Filament\Pages\CreateWorkspace;
 use App\Models\User;
 
-mutates(CreateTeam::class);
+mutates(CreateWorkspace::class);
 
-it('new user without teams is directed to onboarding wizard', function (): void {
+it('new user without workspaces is directed to onboarding wizard', function (): void {
     $user = User::factory()->create();
 
     loginViaBrowser($user)
@@ -33,8 +33,8 @@ it('new user without teams is directed to onboarding wizard', function (): void 
 
     $user->refresh();
 
-    expect($user->ownedTeams)->toHaveCount(1)
-        ->and($user->ownedTeams->first()->name)->toBe('My First Workspace');
+    expect($user->ownedWorkspaces)->toHaveCount(1)
+        ->and($user->ownedWorkspaces->first()->name)->toBe('My First Workspace');
 });
 
 it('completes the wizard when Copy invite link is clicked before Send invites', function (): void {
@@ -60,8 +60,8 @@ it('completes the wizard when Copy invite link is clicked before Send invites', 
 
     $user->refresh();
 
-    expect($user->ownedTeams)->toHaveCount(1)
-        ->and($user->ownedTeams->first()->slug)->toBe('copy-link-first');
+    expect($user->ownedWorkspaces)->toHaveCount(1)
+        ->and($user->ownedWorkspaces->first()->slug)->toBe('copy-link-first');
 });
 
 it('persists slug edits made after Copy invite link was clicked', function (): void {
@@ -69,7 +69,7 @@ it('persists slug edits made after Copy invite link was clicked', function (): v
 
     // Back navigation makes this reachable: the workspace already exists from Copy
     // invite link, and the user returns to step 1 to rename it. Without the reconcile
-    // in CreateTeam::handleRegistration the edit would be silently discarded.
+    // in CreateWorkspace::handleRegistration the edit would be silently discarded.
     loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
@@ -103,8 +103,8 @@ it('persists slug edits made after Copy invite link was clicked', function (): v
 
     $user->refresh();
 
-    expect($user->ownedTeams)->toHaveCount(1)
-        ->and($user->ownedTeams->first()->slug)->toBe('after-the-edit');
+    expect($user->ownedWorkspaces)->toHaveCount(1)
+        ->and($user->ownedWorkspaces->first()->slug)->toBe('after-the-edit');
 });
 
 it('offers the invite skip only while there is an invite to skip', function (): void {

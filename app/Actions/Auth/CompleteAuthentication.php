@@ -16,7 +16,7 @@ final readonly class CompleteAuthentication
     private const array PRESERVED_SESSION_KEYS = [
         'fathom.track_signup',
         'fathom.track_workspace_created',
-        'mcp.oauth.team_id',
+        'mcp.oauth.workspace_id',
         'auth.link_suggestion',
     ];
 

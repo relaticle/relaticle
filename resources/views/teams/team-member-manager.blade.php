@@ -2,21 +2,21 @@
     @if (Gate::check('addTeamMember', $team))
         <x-section-border />
 
-        <!-- Add Team Member -->
+        <!-- Add Workspace Member -->
         <div class="mt-10 sm:mt-0">
             <x-form-section submit="addTeamMember">
                 <x-slot name="title">
-                    {{ __('Add Team Member') }}
+                    {{ __('Add Workspace Member') }}
                 </x-slot>
 
                 <x-slot name="description">
-                    {{ __('Add a new team member to your team, allowing them to collaborate with you.') }}
+                    {{ __('Add a new workspace member to your workspace, allowing them to collaborate with you.') }}
                 </x-slot>
 
                 <x-slot name="form">
                     <div class="col-span-6">
                         <div class="max-w-xl text-sm text-gray-600 dark:text-gray-400">
-                            {{ __('Please provide the email address of the person you would like to add to this team.') }}
+                            {{ __('Please provide the email address of the person you would like to add to this workspace.') }}
                         </div>
                     </div>
 
@@ -76,29 +76,29 @@
         </div>
     @endif
 
-    @if ($team->teamInvitations->isNotEmpty() && Gate::check('addTeamMember', $team))
+    @if ($team->workspaceInvitations->isNotEmpty() && Gate::check('addTeamMember', $team))
         <x-section-border />
 
-        <!-- Team Member Invitations -->
+        <!-- Workspace Member Invitations -->
         <div class="mt-10 sm:mt-0">
             <x-action-section>
                 <x-slot name="title">
-                    {{ __('Pending Team Invitations') }}
+                    {{ __('Pending Workspace Invitations') }}
                 </x-slot>
 
                 <x-slot name="description">
-                    {{ __('These people have been invited to your team and have been sent an invitation email. They may join the team by accepting the email invitation.') }}
+                    {{ __('These people have been invited to your workspace and have been sent an invitation email. They may join the workspace by accepting the email invitation.') }}
                 </x-slot>
 
                 <x-slot name="content">
                     <div class="space-y-6">
-                        @foreach ($team->teamInvitations as $invitation)
+                        @foreach ($team->workspaceInvitations as $invitation)
                             <div class="flex items-center justify-between">
                                 <div class="text-gray-600 dark:text-gray-400">{{ $invitation->email }}</div>
 
                                 <div class="flex items-center">
                                     @if (Gate::check('removeTeamMember', $team))
-                                        <!-- Cancel Team Invitation -->
+                                        <!-- Cancel Workspace Invitation -->
                                         <button class="cursor-pointer ms-6 text-sm text-red-500 focus:outline-none"
                                                             wire:click="cancelTeamInvitation({{ $invitation->id }})">
                                             {{ __('Cancel') }}
@@ -116,18 +116,18 @@
     @if ($team->users->isNotEmpty())
         <x-section-border />
 
-        <!-- Manage Team Members -->
+        <!-- Manage Workspace Members -->
         <div class="mt-10 sm:mt-0">
             <x-action-section>
                 <x-slot name="title">
-                    {{ __('Team Members') }}
+                    {{ __('Workspace Members') }}
                 </x-slot>
 
                 <x-slot name="description">
-                    {{ __('All of the people that are part of this team.') }}
+                    {{ __('All of the people that are part of this workspace.') }}
                 </x-slot>
 
-                <!-- Team Member List -->
+                <!-- Workspace Member List -->
                 <x-slot name="content">
                     <div class="space-y-6">
                         @foreach ($team->users->sortBy('name') as $user)
@@ -138,8 +138,8 @@
                                 </div>
 
                                 <div class="flex items-center">
-                                    <!-- Manage Team Member Role -->
-                                    @if (Gate::check('updateTeamMember', $team) && Laravel\Jetstream\Jetstream::hasRoles())
+                                    <!-- Manage Workspace Member Role -->
+                                    @if (Gate::check('updateWorkspaceMember', $team) && Laravel\Jetstream\Jetstream::hasRoles())
                                         <button class="ms-2 text-sm text-gray-400 underline" wire:click="manageRole('{{ $user->id }}')">
                                             {{ Laravel\Jetstream\Jetstream::findRole($user->membership->role)->name }}
                                         </button>
@@ -149,13 +149,13 @@
                                         </div>
                                     @endif
 
-                                    <!-- Leave Team -->
+                                    <!-- Leave Workspace -->
                                     @if ($this->user->id === $user->id)
                                         <button class="cursor-pointer ms-6 text-sm text-red-500" wire:click="$toggle('confirmingLeavingTeam')">
                                             {{ __('Leave') }}
                                         </button>
 
-                                    <!-- Remove Team Member -->
+                                    <!-- Remove Workspace Member -->
                                     @elseif (Gate::check('removeTeamMember', $team))
                                         <button class="cursor-pointer ms-6 text-sm text-red-500" wire:click="confirmTeamMemberRemoval('{{ $user->id }}')">
                                             {{ __('Remove') }}
@@ -216,14 +216,14 @@
         </x-slot>
     </x-dialog-modal>
 
-    <!-- Leave Team Confirmation Modal -->
+    <!-- Leave Workspace Confirmation Modal -->
     <x-confirmation-modal wire:model.live="confirmingLeavingTeam">
         <x-slot name="title">
-            {{ __('Leave Team') }}
+            {{ __('Leave Workspace') }}
         </x-slot>
 
         <x-slot name="content">
-            {{ __('Are you sure you would like to leave this team?') }}
+            {{ __('Are you sure you would like to leave this workspace?') }}
         </x-slot>
 
         <x-slot name="footer">
@@ -237,14 +237,14 @@
         </x-slot>
     </x-confirmation-modal>
 
-    <!-- Remove Team Member Confirmation Modal -->
+    <!-- Remove Workspace Member Confirmation Modal -->
     <x-confirmation-modal wire:model.live="confirmingTeamMemberRemoval">
         <x-slot name="title">
-            {{ __('Remove Team Member') }}
+            {{ __('Remove Workspace Member') }}
         </x-slot>
 
         <x-slot name="content">
-            {{ __('Are you sure you would like to remove this person from the team?') }}
+            {{ __('Are you sure you would like to remove this person from the workspace?') }}
         </x-slot>
 
         <x-slot name="footer">

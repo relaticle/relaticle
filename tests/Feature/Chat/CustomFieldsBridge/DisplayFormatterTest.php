@@ -19,10 +19,10 @@ beforeEach(function (): void {
 });
 
 it('formats a single-choice field with the option label, not the id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
     $statusField = CustomField::query()
-        ->where('tenant_id', $teamId)
+        ->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
@@ -36,7 +36,7 @@ it('formats a single-choice field with the option label, not the id', function (
 });
 
 it('formats a date-time field as a localized date string', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: ['due_date' => '2026-05-20T14:00:00Z'], oldModel: null);
@@ -46,7 +46,7 @@ it('formats a date-time field as a localized date string', function (): void {
 });
 
 it('formats rich-text fields by stripping HTML for the proposal card', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: ['description' => '<p>Hello <strong>world</strong></p>'], oldModel: null);
@@ -55,12 +55,12 @@ it('formats rich-text fields by stripping HTML for the proposal card', function 
 });
 
 it('includes the old value for updates with a current value on the model', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $task = Task::factory()->for($team)->create(['title' => 'T']);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $task = Task::factory()->for($workspace)->create(['title' => 'T']);
 
     $descField = CustomField::query()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'description')
         ->firstOrFail();
@@ -86,12 +86,12 @@ it('includes the old value for updates with a current value on the model', funct
  * path so the two cannot diverge again.
  */
 it('renders the old value of a multi-value field as its members, not raw json', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $company = Company::factory()->for($team)->create(['name' => 'Acme']);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $company = Company::factory()->for($workspace)->create(['name' => 'Acme']);
 
     $domains = CustomField::query()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'domains')
         ->firstOrFail();
@@ -109,7 +109,7 @@ it('renders the old value of a multi-value field as its members, not raw json', 
 });
 
 it('returns an empty array when no custom_fields are submitted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: [], oldModel: null);
@@ -118,11 +118,11 @@ it('returns an empty array when no custom_fields are submitted', function (): vo
 });
 
 it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $company = Company::factory()->create(['team_id' => $user->currentTeam->getKey(), 'name' => 'Globex']);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Globex']);
 
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'entity_type' => 'task',
         'name' => 'Links',
         'code' => 'links',
@@ -132,7 +132,7 @@ it('renders a record custom field on the proposal card as the record name, not i
     ]);
 
     $field = CustomField::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => 'task',
         'code' => 'linked_company',
@@ -144,7 +144,7 @@ it('renders a record custom field on the proposal card as the record name, not i
         'validation_rules' => [],
     ]);
 
-    TenantContextService::setTenantId($user->currentTeam->getKey());
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     try {
         $rows = resolve(CustomFieldsDisplayFormatter::class)
@@ -159,11 +159,11 @@ it('renders a record custom field on the proposal card as the record name, not i
 });
 
 it('names the record on a stored record card, not its id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $company = Company::factory()->create(['team_id' => $user->currentTeam->getKey(), 'name' => 'Initech']);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Initech']);
 
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'entity_type' => 'task',
         'name' => 'Links',
         'code' => 'links',
@@ -173,7 +173,7 @@ it('names the record on a stored record card, not its id', function (): void {
     ]);
 
     $field = CustomField::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => 'task',
         'code' => 'linked_company',
@@ -185,10 +185,10 @@ it('names the record on a stored record card, not its id', function (): void {
         'validation_rules' => [],
     ]);
 
-    $task = Task::factory()->create(['team_id' => $user->currentTeam->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $user->currentWorkspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
 
-    TenantContextService::setTenantId($user->currentTeam->getKey());
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     try {
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(

@@ -64,9 +64,9 @@ final class UpdateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsTeam($user->currentTeam)) {
+        if (! $user->ownsWorkspace($user->currentWorkspace)) {
             return (string) json_encode([
-                'error' => 'Only team owners can update custom field definitions.',
+                'error' => 'Only workspace owners can update custom field definitions.',
             ], JSON_UNESCAPED_SLASHES);
         }
 
@@ -82,7 +82,7 @@ final class UpdateCustomFieldTool implements Tool
             return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $actionRecords = [];
         $items = [];
 
@@ -98,7 +98,7 @@ final class UpdateCustomFieldTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}]: Both entity_type and code are required to identify the field."], JSON_UNESCAPED_SLASHES);
             }
 
-            $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
+            $field = $this->resolveOwnedCustomField($workspaceId, $entityType, $code);
 
             if (! $field instanceof CustomField) {
                 return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);

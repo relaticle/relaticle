@@ -15,8 +15,8 @@ final readonly class CancelUserDeletion
         DB::transaction(function () use ($user): void {
             $user->forceFill(['scheduled_deletion_at' => null])->save();
 
-            $user->ownedTeams()
-                ->where('personal_team', true)
+            $user->ownedWorkspaces()
+                ->where('personal_workspace', true)
                 ->update(['scheduled_deletion_at' => null]);
         });
 

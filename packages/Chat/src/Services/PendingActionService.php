@@ -22,7 +22,7 @@ use App\Actions\People\UpdatePeople;
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
-use App\Actions\Team\CreateTeamInvitation;
+use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -79,7 +79,7 @@ final readonly class PendingActionService
         CreateCustomField::class,
         UpdateCustomField::class,
         AddCustomFieldOptions::class,
-        CreateTeamInvitation::class,
+        CreateWorkspaceInvitation::class,
     ];
 
     /**
@@ -121,7 +121,7 @@ final readonly class PendingActionService
         }
 
         return PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => $conversationId,
             'turn_id' => $turnId,
@@ -172,11 +172,11 @@ final readonly class PendingActionService
         // custom-fields one). Without it the custom-fields TenantScope no-ops and
         // saveCustomFields() iterates EVERY tenant's field definitions, writing value rows
         // across all tenants (cross-tenant leak) and, at scale, exceeding the request
-        // timeout. Scope it to the action's team, and restore the prior value afterward so
+        // timeout. Scope it to the action's workspace, and restore the prior value afterward so
         // the override never outlives this call (TenantContextService resolves its context
         // before the Filament tenant).
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->team_id);
+        TenantContextService::setTenantId($pendingAction->workspace_id);
 
         try {
             $resolved = DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
@@ -303,7 +303,7 @@ final readonly class PendingActionService
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->team_id);
+        TenantContextService::setTenantId($pendingAction->workspace_id);
 
         try {
             [$finalized, $record, $itemStatus] = DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
@@ -508,8 +508,8 @@ final readonly class PendingActionService
         $recordId = ProposalPayload::recordIdOf($record, 'delete batch item');
 
         $model = $modelClass::query()
-            ->with(['team'])
-            ->where('team_id', $pendingAction->team_id)
+            ->with(['workspace'])
+            ->where('workspace_id', $pendingAction->workspace_id)
             ->find($recordId);
 
         // A vanished record fails only this item (RuntimeException -> resolve-failed),
@@ -1067,12 +1067,12 @@ final readonly class PendingActionService
     private function resolveModel(string $modelClass, PendingAction $pendingAction, string $recordId): Model
     {
         // CustomField uses tenant_id (from the custom-fields package) rather than the
-        // team_id column used by all other CRM models. Scope the lookup accordingly.
+        // workspace_id column used by all other CRM models. Scope the lookup accordingly.
         $tenantColumn = $modelClass === CustomField::class
             ? (string) config('custom-fields.database.column_names.tenant_foreign_key', 'tenant_id')
-            : 'team_id';
+            : 'workspace_id';
 
-        $query = $modelClass::query()->where($tenantColumn, $pendingAction->team_id);
+        $query = $modelClass::query()->where($tenantColumn, $pendingAction->workspace_id);
 
         // CustomField has a global active scope that would exclude deactivated fields;
         // skip it so an update-to-deactivate proposal can find the field regardless.
@@ -1093,8 +1093,8 @@ final readonly class PendingActionService
 
         return array_values(
             $modelClass::query()
-                ->with(['team'])
-                ->where('team_id', $pendingAction->team_id)
+                ->with(['workspace'])
+                ->where('workspace_id', $pendingAction->workspace_id)
                 ->findOrFail($ids)
                 ->all(),
         );

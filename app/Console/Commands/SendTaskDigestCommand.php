@@ -27,7 +27,7 @@ final class SendTaskDigestCommand extends Command
         $sent = 0;
 
         $this->recipientsAtLocalHour(8)
-            ->with(['ownedTeams', 'teams'])
+            ->with(['ownedWorkspaces', 'workspaces'])
             ->chunkById(500, function (Collection $users) use ($digestService, &$sent): void {
                 foreach ($users as $user) {
                     if ($this->sendForUser($user, $digestService)) {

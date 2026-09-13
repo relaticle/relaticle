@@ -24,9 +24,9 @@ beforeEach(function (): void {
 });
 
 it('renders the empty state when the user has no qualifying tasks', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(Dashboard::class)
         ->assertSee(__('filament/pages/dashboard.tasks.heading'))
@@ -35,28 +35,28 @@ it('renders the empty state when the user has no qualifying tasks', function ():
 });
 
 it('renders task rows and the count when the user has qualifying tasks', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
     $dueFieldId = DB::table('custom_fields')
-        ->where('tenant_id', $team->id)
+        ->where('tenant_id', $workspace->id)
         ->where('entity_type', 'task')
         ->where('code', 'due_date')
         ->value('id');
 
-    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'Ship the widget']);
     $task->assignees()->attach($user);
     CustomFieldValue::query()->create([
         'id' => (string) Str::ulid(),
         'entity_type' => 'task',
         'entity_id' => $task->id,
         'custom_field_id' => $dueFieldId,
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'datetime_value' => now()->subHour(),
     ]);
 
     $this->actingAs($user);
-    Filament::setTenant($team);
+    Filament::setTenant($workspace);
 
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
@@ -65,9 +65,9 @@ it('renders task rows and the count when the user has qualifying tasks', functio
 });
 
 it('mounts the createTask action on the page', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(Dashboard::class)
         ->assertActionExists('createTask');
@@ -76,18 +76,18 @@ it('mounts the createTask action on the page', function (): void {
 it('notifies only the assignees submitted through the dashboard create action', function (): void {
     Mail::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $intendedAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
 
     $this->actingAs($user);
-    Filament::setTenant($team);
+    Filament::setTenant($workspace);
 
     $concurrentAssignmentAdded = false;
     DB::listen(function (QueryExecuted $query) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -122,14 +122,14 @@ it('notifies only the assignees submitted through the dashboard create action', 
 });
 
 it('completes a task from the dashboard and drops it from the list', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'Ship the widget']);
     $task->assignees()->attach($user);
 
     $this->actingAs($user);
-    Filament::setTenant($team);
+    Filament::setTenant($workspace);
 
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
@@ -139,7 +139,7 @@ it('completes a task from the dashboard and drops it from the list', function ()
 
     $doneId = DB::table('custom_field_options as o')
         ->join('custom_fields as f', 'f.id', '=', 'o.custom_field_id')
-        ->where('f.tenant_id', $team->id)
+        ->where('f.tenant_id', $workspace->id)
         ->where('f.entity_type', 'task')
         ->where('f.code', 'status')
         ->where('o.name', 'Done')
@@ -149,13 +149,13 @@ it('completes a task from the dashboard and drops it from the list', function ()
         ->toBe(trim((string) $doneId));
 });
 
-it('leaves a task from another team untouched', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $stranger = User::factory()->withPersonalTeam()->create();
-    $foreign = Task::factory()->for($stranger->currentTeam)->create(['title' => 'Not yours']);
+it('leaves a task from another workspace untouched', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Task::factory()->for($stranger->currentWorkspace)->create(['title' => 'Not yours']);
 
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(Dashboard::class)->call('completeTask', $foreign->id);
 
@@ -163,10 +163,10 @@ it('leaves a task from another team untouched', function (): void {
 });
 
 it('ignores a task id that no longer resolves', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(Dashboard::class)
         ->call('completeTask', 'gone')
@@ -175,15 +175,15 @@ it('ignores a task id that no longer resolves', function (): void {
 });
 
 it('hides the completion control when the tenant has no Done status option', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    $task = Task::factory()->for($team)->create(['title' => 'Ship the widget']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'Ship the widget']);
     $task->assignees()->attach($user);
 
     DB::table('custom_field_options')
         ->whereIn('custom_field_id', DB::table('custom_fields')
-            ->where('tenant_id', $team->id)
+            ->where('tenant_id', $workspace->id)
             ->where('entity_type', 'task')
             ->where('code', 'status')
             ->select('id'))
@@ -191,22 +191,22 @@ it('hides the completion control when the tenant has no Done status option', fun
         ->delete();
 
     $this->actingAs($user);
-    Filament::setTenant($team);
+    Filament::setTenant($workspace);
 
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
         ->assertDontSeeHtml('role="checkbox"');
 });
 
-it('writes the Done option of the task team, not the ambient tenant, when the user belongs to both', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $other = User::factory()->withPersonalTeam()->create();
-    $other->currentTeam->users()->attach($user, ['role' => 'editor']);
+it('writes the Done option of the task workspace, not the ambient tenant, when the user belongs to both', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
+    $other->currentWorkspace->users()->attach($user, ['role' => 'editor']);
 
-    $task = Task::factory()->for($other->currentTeam)->create(['title' => 'Cross-team task']);
+    $task = Task::factory()->for($other->currentWorkspace)->create(['title' => 'Cross-workspace task']);
 
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     resolve(CompleteTask::class)->execute($user, $task);
 
@@ -216,13 +216,13 @@ it('writes the Done option of the task team, not the ambient tenant, when the us
         ->where('f.code', 'status')
         ->first(['f.tenant_id', 'v.string_value']);
 
-    $doneOfTaskTeam = DB::table('custom_field_options as o')
+    $doneOfTaskWorkspace = DB::table('custom_field_options as o')
         ->join('custom_fields as f', 'f.id', '=', 'o.custom_field_id')
-        ->where('f.tenant_id', $other->currentTeam->getKey())
+        ->where('f.tenant_id', $other->currentWorkspace->getKey())
         ->where('f.entity_type', 'task')->where('f.code', 'status')
         ->where('o.name', 'Done')
         ->value('o.id');
 
-    expect($written->tenant_id)->toBe($other->currentTeam->getKey())
-        ->and($written->string_value)->toBe($doneOfTaskTeam);
+    expect($written->tenant_id)->toBe($other->currentWorkspace->getKey())
+        ->and($written->string_value)->toBe($doneOfTaskWorkspace);
 });

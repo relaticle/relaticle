@@ -79,7 +79,7 @@ final class ListCustomFieldsTool extends Tool
 
         $fields = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $user->currentTeam->getKey())
+            ->where('tenant_id', $user->currentWorkspace->getKey())
             ->when(
                 isset($validated['entity_type']),
                 fn (Builder $query): Builder => $query->where('entity_type', $validated['entity_type']),

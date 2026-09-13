@@ -33,12 +33,12 @@ final readonly class GetCrmSummary
             abort_unless($user->can('viewAny', $entity->model()), 403);
         }
 
-        $teamId = (string) $user->currentTeam->getKey();
+        $workspaceId = (string) $user->currentWorkspace->getKey();
         $timezone = $user->effectiveTimezone();
         $today = Date::now($timezone)->startOfDay();
-        $cacheKey = "crm_summary_{$teamId}_{$timezone}_{$today->toDateString()}";
+        $cacheKey = "crm_summary_{$workspaceId}_{$timezone}_{$today->toDateString()}";
 
-        return Cache::remember($cacheKey, 60, function () use ($user, $teamId, $timezone, $today): array {
+        return Cache::remember($cacheKey, 60, function () use ($user, $workspaceId, $timezone, $today): array {
             $opportunities = $this->aggregateOpportunities->execute($user, 'stage');
             $rows = collect($opportunities['rows']);
 
@@ -57,25 +57,25 @@ final readonly class GetCrmSummary
                     'date' => $today->toDateString(),
                     'timezone' => $timezone,
                 ],
-                'companies' => ['total' => Company::query()->where('team_id', $teamId)->count()],
-                'people' => ['total' => People::query()->where('team_id', $teamId)->count()],
+                'companies' => ['total' => Company::query()->where('workspace_id', $workspaceId)->count()],
+                'people' => ['total' => People::query()->where('workspace_id', $workspaceId)->count()],
                 'opportunities' => [
                     'total' => $opportunities['total_count'],
                     'by_stage' => $byStage,
                     'total_pipeline_value' => $opportunities['total_amount'],
                     'truncated' => $opportunities['truncated'],
                 ],
-                'tasks' => $this->taskSummary($teamId, $today->clone()->utc(), $today->clone()->addDays(7)->utc()),
-                'notes' => ['total' => Note::query()->where('team_id', $teamId)->count()],
+                'tasks' => $this->taskSummary($workspaceId, $today->clone()->utc(), $today->clone()->addDays(7)->utc()),
+                'notes' => ['total' => Note::query()->where('workspace_id', $workspaceId)->count()],
             ];
         });
     }
 
     /** @return array{total: int, overdue: int, due_this_week: int} */
-    private function taskSummary(string $teamId, DateTimeInterface $todayUtc, DateTimeInterface $weekEndUtc): array
+    private function taskSummary(string $workspaceId, DateTimeInterface $todayUtc, DateTimeInterface $weekEndUtc): array
     {
-        $total = Task::query()->where('team_id', $teamId)->count();
-        $fields = $this->taskFieldMetadata($teamId);
+        $total = Task::query()->where('workspace_id', $workspaceId)->count();
+        $fields = $this->taskFieldMetadata($workspaceId);
         $dueDateFieldId = $fields['due_field_id'];
 
         if ($dueDateFieldId === null) {
@@ -88,7 +88,7 @@ final readonly class GetCrmSummary
                     ->where('due_cfv.entity_type', 'task')
                     ->where('due_cfv.custom_field_id', $dueDateFieldId);
             })
-            ->where('task.team_id', $teamId)
+            ->where('task.workspace_id', $workspaceId)
             ->whereNull('task.deleted_at')
             ->when($fields['done_option_id'] !== null, function (QueryBuilder $query) use ($fields): void {
                 $query->whereNotExists(function (QueryBuilder $status) use ($fields): void {
@@ -115,14 +115,14 @@ final readonly class GetCrmSummary
     }
 
     /** @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string} */
-    private function taskFieldMetadata(string $teamId): array
+    private function taskFieldMetadata(string $workspaceId): array
     {
         $row = DB::table('custom_fields as field')
             ->leftJoin('custom_field_options as option', function (JoinClause $join): void {
                 $join->on('option.custom_field_id', '=', 'field.id')
                     ->where('option.name', 'Done');
             })
-            ->where('field.tenant_id', $teamId)
+            ->where('field.tenant_id', $workspaceId)
             ->where('field.entity_type', 'task')
             ->where('field.active', true)
             ->whereIn('field.code', [TaskField::DUE_DATE->value, TaskField::STATUS->value])

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Helpers;
 
 use App\Models\CustomField;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -33,7 +33,7 @@ final class ProposalCardFixture
     public static function proposal(User $user, array $action, array $display): PendingAction
     {
         return PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => null,
             'action_class' => 'App\\Actions\\Company\\CreateCompany',
@@ -71,7 +71,7 @@ final class ProposalCardFixture
     public static function task(User $user, array $actionData): PendingAction
     {
         return PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => null,
             'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -100,7 +100,7 @@ final class ProposalCardFixture
         }, $records);
 
         return PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => null,
             'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -116,10 +116,10 @@ final class ProposalCardFixture
     /**
      * @return array{0: CustomField, 1: list<string>}
      */
-    public static function seededTaskChoice(Team $team): array
+    public static function seededTaskChoice(Workspace $workspace): array
     {
         $status = CustomField::query()
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('entity_type', 'task')
             ->where('code', 'status')
             ->with('options')
@@ -134,12 +134,12 @@ final class ProposalCardFixture
         return [$status, $optionIds];
     }
 
-    public static function taskFieldWithVisibilityCondition(Team $team): CustomField
+    public static function taskFieldWithVisibilityCondition(Workspace $workspace): CustomField
     {
-        [$status] = self::seededTaskChoice($team);
+        [$status] = self::seededTaskChoice($workspace);
 
         return CustomField::query()->create([
-            'tenant_id' => $team->getKey(),
+            'tenant_id' => $workspace->getKey(),
             'entity_type' => 'task',
             'code' => 'completion_note',
             'name' => 'Completion note',
@@ -167,7 +167,7 @@ final class ProposalCardFixture
     public static function customField(User $user, string $entityType, string $name, string $type): PendingAction
     {
         return PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => null,
             'action_class' => 'App\\Actions\\CustomFields\\CreateCustomField',
@@ -200,7 +200,7 @@ final class ProposalCardFixture
             'id' => $conversationId,
             'participant_type' => 'user',
             'participant_id' => (string) $user->getKey(),
-            'team_id' => $user->currentTeam->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'title' => '',
             'created_at' => now(),
             'updated_at' => now(),

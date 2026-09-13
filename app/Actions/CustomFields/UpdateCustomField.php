@@ -16,12 +16,12 @@ final readonly class UpdateCustomField
      */
     public function execute(User $user, CustomField $field, array $data): CustomField
     {
-        abort_unless($user->ownsTeam($user->currentTeam), 403, 'Only team owners can manage custom field definitions.');
+        abort_unless($user->ownsWorkspace($user->currentWorkspace), 403, 'Only workspace owners can manage custom field definitions.');
         abort_if($field->isSystemDefined(), 422, 'System-defined custom fields cannot be modified.');
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
+        TenantContextService::setTenantId($workspaceId);
 
         try {
             // Re-validated here, not just at proposal time: a rename approved after

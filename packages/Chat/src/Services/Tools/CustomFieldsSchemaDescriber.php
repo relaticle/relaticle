@@ -6,7 +6,7 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
-use App\Models\Team;
+use App\Models\Workspace;
 use Relaticle\Chat\Support\PromptText;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -20,11 +20,11 @@ final readonly class CustomFieldsSchemaDescriber
      * schema slot. The LLM sees this string and uses it to pick valid codes
      * and value shapes without a separate discovery round-trip.
      */
-    public function describe(Team $team, string $entityType): string
+    public function describe(Workspace $workspace, string $entityType): string
     {
         $fields = CustomField::query()
             ->withoutGlobalScope(CustomFieldsActivableScope::class)
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('entity_type', $entityType)
             ->orderByDesc('active')
             ->orderBy('code')

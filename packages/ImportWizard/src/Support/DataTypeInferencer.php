@@ -29,7 +29,7 @@ final class DataTypeInferencer
 
     public function __construct(
         private readonly ?string $entityName = null,
-        private readonly ?string $teamId = null,
+        private readonly ?string $workspaceId = null,
     ) {}
 
     /**
@@ -206,7 +206,7 @@ final class DataTypeInferencer
      */
     private function getSuggestedFieldsForType(string $fieldTypeKey): array
     {
-        if ($this->entityName === null || $this->teamId === null) {
+        if ($this->entityName === null || $this->workspaceId === null) {
             return [];
         }
 
@@ -214,7 +214,7 @@ final class DataTypeInferencer
         return CustomField::query()
             ->withoutGlobalScopes()
             ->where('entity_type', $this->entityName)
-            ->where('tenant_id', $this->teamId)
+            ->where('tenant_id', $this->workspaceId)
             ->where('type', $fieldTypeKey)
             ->active()
             ->pluck('code')

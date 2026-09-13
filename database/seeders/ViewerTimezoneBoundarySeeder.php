@@ -6,14 +6,14 @@ namespace Database\Seeders;
 
 use App\Enums\CreationSource;
 use App\Models\ActivityLog\Activity;
-use App\Models\ActivityLog\Scopes\TeamScope;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Date;
@@ -93,21 +93,21 @@ final class ViewerTimezoneBoundarySeeder extends Seeder
             'updated_at' => $instant,
         ])->save();
 
-        $team = $owner->ownedTeams()->where('name', "Boundary {$label} Team")->first()
-            ?? Team::factory()->create(['user_id' => $owner->getKey(), 'name' => "Boundary {$label} Team"]);
+        $workspace = $owner->ownedWorkspaces()->where('name', "Boundary {$label} Workspace")->first()
+            ?? Workspace::factory()->create(['user_id' => $owner->getKey(), 'name' => "Boundary {$label} Workspace"]);
 
-        $team->forceFill([
-            'personal_team' => false,
+        $workspace->forceFill([
+            'personal_workspace' => false,
             'created_at' => $instant,
             'updated_at' => $instant,
         ])->save();
 
-        $owner->forceFill(['current_team_id' => $team->getKey()])->save();
+        $owner->forceFill(['current_workspace_id' => $workspace->getKey()])->save();
 
         foreach ([Company::class, People::class, Task::class, Note::class, Opportunity::class] as $model) {
-            $model::query()->where('team_id', $team->getKey())->delete();
+            $model::query()->where('workspace_id', $workspace->getKey())->delete();
 
-            $model::withoutEvents(fn () => $model::factory()->for($team)->create([
+            $model::withoutEvents(fn () => $model::factory()->for($workspace)->create([
                 'creator_id' => $owner->getKey(),
                 'creation_source' => CreationSource::WEB,
                 'created_at' => $instant,
@@ -115,9 +115,9 @@ final class ViewerTimezoneBoundarySeeder extends Seeder
             ]));
         }
 
-        Activity::query()->withoutGlobalScope(TeamScope::class)->where('team_id', $team->getKey())->delete();
+        Activity::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspace->getKey())->delete();
 
-        Activity::query()->withoutGlobalScope(TeamScope::class)->create([
+        Activity::query()->withoutGlobalScope(WorkspaceScope::class)->create([
             'log_name' => 'crm',
             'description' => "boundary {$label}",
             'event' => 'updated',
@@ -125,7 +125,7 @@ final class ViewerTimezoneBoundarySeeder extends Seeder
             'subject_id' => (string) Str::ulid(),
             'causer_type' => 'user',
             'causer_id' => $owner->getKey(),
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'properties' => [],
             'created_at' => $instant,
         ]);

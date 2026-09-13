@@ -12,16 +12,16 @@ use Tests\Helpers\ChatDocument;
 mutates(ListConversationMessages::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-perf',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Perf',
         'created_at' => now(),
         'updated_at' => now(),
@@ -53,7 +53,7 @@ beforeEach(function (): void {
 
         PendingAction::query()->create([
             'id' => "pa-{$i}",
-            'team_id' => $this->team->getKey(),
+            'workspace_id' => $this->workspace->getKey(),
             'user_id' => $this->user->getKey(),
             'conversation_id' => 'c-perf',
             'message_id' => "m-{$i}",

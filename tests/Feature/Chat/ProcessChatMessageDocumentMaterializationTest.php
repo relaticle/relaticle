@@ -14,12 +14,12 @@ use Relaticle\Chat\Services\TipTapDocumentParser;
 mutates(ProcessChatMessage::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -33,7 +33,7 @@ it('materializes the assistant message document at stream end', function (): voi
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -43,7 +43,7 @@ it('materializes the assistant message document at stream end', function (): voi
 
     new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'Show me my deals',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -76,7 +76,7 @@ it('records turn duration in assistant message meta', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -86,7 +86,7 @@ it('records turn duration in assistant message meta', function (): void {
 
     new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'Show me my deals',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -108,7 +108,7 @@ it('records turn duration in assistant message meta', function (): void {
 it('TipTapDocumentParser::buildFromText produces the expected stored shape', function (): void {
     $parser = resolve(TipTapDocumentParser::class);
 
-    $document = $parser->buildFromText('I found 2 deals.', [], $this->team);
+    $document = $parser->buildFromText('I found 2 deals.', [], $this->workspace);
 
     expect($document)->toMatchArray([
         'type' => 'doc',

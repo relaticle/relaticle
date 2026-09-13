@@ -14,12 +14,12 @@ use Tests\Helpers\ChatBrowser;
  * rendering what the server DOES emit: record chips and tables.
  */
 it('strips raw HTML the server strips while keeping chips and tables', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'sanitizer', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'sanitizer', $conversationId);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId);
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId);
 
     $result = $page->script(<<<'JS'
         (() => {

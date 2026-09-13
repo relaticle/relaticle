@@ -60,13 +60,13 @@ final readonly class TurnContinuationService
      * runs on the model the user chose rather than silently dropping to auto
      * mid-flow (the pick lives in the browser, not on the user record).
      * AiModelResolver re-checks availability and the plan, so a value that
-     * arrived from the client cannot buy a model the team may not use.
+     * arrived from the client cannot buy a model the workspace may not use.
      */
     public function resume(User $user, string $conversationId, string $resolvedTurnId, ?string $model = null): bool
     {
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        if ($team === null) {
+        if ($workspace === null) {
             return false;
         }
 
@@ -83,7 +83,7 @@ final readonly class TurnContinuationService
         $turnId = (string) Str::ulid();
 
         if (! $this->credits->reserveCredit(
-            $team,
+            $workspace,
             reservationKey: "reserve-{$turnId}",
             conversationId: $conversationId,
             userId: (string) $user->getKey(),
@@ -97,7 +97,7 @@ final readonly class TurnContinuationService
 
         dispatch(new ProcessChatMessage(
             user: $user,
-            team: $team,
+            workspace: $workspace,
             message: self::PROMPT,
             conversationId: $conversationId,
             resolved: $this->models->resolve($user, $model),

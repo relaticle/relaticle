@@ -6,42 +6,42 @@ namespace App\Services\Billing;
 
 use App\Enums\Plan;
 use App\Features\Billing;
-use App\Models\Team;
+use App\Models\Workspace;
 use Laravel\Pennant\Feature;
 
 final readonly class HostedWorkspaceAccess
 {
-    public function allows(Team $team): bool
+    public function allows(Workspace $workspace): bool
     {
         if (! Feature::active(Billing::class)) {
             return true;
         }
 
-        if ($team->hosted_free_grandfathered_at !== null) {
+        if ($workspace->hosted_free_grandfathered_at !== null) {
             return true;
         }
 
-        if ($team->subscription()?->valid() === true) {
+        if ($workspace->subscription()?->valid() === true) {
             return true;
         }
 
-        if ($team->plan === Plan::Enterprise) {
+        if ($workspace->plan === Plan::Enterprise) {
             return true;
         }
 
-        if ($team->onGenericTrial()) {
+        if ($workspace->onGenericTrial()) {
             return true;
         }
 
-        if ($team->trial_ends_at !== null) {
+        if ($workspace->trial_ends_at !== null) {
             return false;
         }
 
-        return $team->plan === Plan::Pro;
+        return $workspace->plan === Plan::Pro;
     }
 
-    public function isPaused(Team $team): bool
+    public function isPaused(Workspace $workspace): bool
     {
-        return ! $this->allows($team);
+        return ! $this->allows($workspace);
     }
 }

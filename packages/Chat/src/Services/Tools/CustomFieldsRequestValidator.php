@@ -30,10 +30,10 @@ final readonly class CustomFieldsRequestValidator
             return new CustomFieldsValidationResult(cleanFields: [], error: null);
         }
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         try {
-            $clean = $this->input->normalize($teamId, $entityType, $rawCustomFields);
+            $clean = $this->input->normalize($workspaceId, $entityType, $rawCustomFields);
         } catch (ValidationException $exception) {
             return new CustomFieldsValidationResult(
                 cleanFields: [],
@@ -41,7 +41,7 @@ final readonly class CustomFieldsRequestValidator
             );
         }
 
-        $rules = new ValidCustomFields($teamId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
+        $rules = new ValidCustomFields($workspaceId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
             ->toRules($clean);
 
         $validator = Validator::make(['custom_fields' => $clean], $rules);

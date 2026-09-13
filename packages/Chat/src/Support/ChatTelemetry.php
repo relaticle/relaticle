@@ -23,16 +23,16 @@ final class ChatTelemetry
         ));
     }
 
-    public static function tagCurrentScope(string $conversationId, string $teamId, string $model): void
+    public static function tagCurrentScope(string $conversationId, string $workspaceId, string $model): void
     {
-        \Sentry\configureScope(function (Scope $scope) use ($conversationId, $teamId, $model): void {
+        \Sentry\configureScope(function (Scope $scope) use ($conversationId, $workspaceId, $model): void {
             $scope->setTag('chat.conversation_id', $conversationId);
-            $scope->setTag('chat.team_id', $teamId);
+            $scope->setTag('chat.workspace_id', $workspaceId);
             $scope->setTag('chat.model', $model);
         });
     }
 
-    public static function rateLimited(string $teamId, string $plan): void
+    public static function rateLimited(string $workspaceId, string $plan): void
     {
         \Sentry\addBreadcrumb(new Breadcrumb(
             level: Breadcrumb::LEVEL_INFO,
@@ -40,7 +40,7 @@ final class ChatTelemetry
             category: 'chat.rate_limit',
             message: 'rate_limited',
             metadata: [
-                'team_id' => $teamId,
+                'workspace_id' => $workspaceId,
                 'plan' => $plan,
             ],
         ));

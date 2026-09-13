@@ -67,7 +67,7 @@ test('two factor authentication can be disabled', function () {
 }, 'Two factor authentication is not enabled.');
 
 test('confirming TOTP enrollment marks the session complete so the next request is not force-logged-out', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     $this->withSession(['auth.password_confirmed_at' => time()]);
 
@@ -81,7 +81,7 @@ test('confirming TOTP enrollment marks the session complete so the next request 
 
     expect($user->fresh()->two_factor_confirmed_at)->not->toBeNull();
 
-    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))->assertOk();
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))->assertOk();
     $this->assertAuthenticatedAs($user);
 })->skip(function () {
     return ! Features::canManageTwoFactorAuthentication();
@@ -183,7 +183,7 @@ test('a proven manage_mfa grant still reaches the two-factor secret', function (
 
 test('a recovery-code viewing confirmation cannot authorize another MFA operation', function (string $method, string $routeName): void {
     $this->freezeTime();
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);

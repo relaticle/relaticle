@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -15,23 +15,23 @@ use Relaticle\Chat\Services\CreditService;
 mutates(CreditService::class);
 
 it('does not double-charge when settle is called twice with the same idempotency key', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
-    $service->resetPeriod($team);
+    $service->resetPeriod($workspace);
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv_1',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Credit idempotency',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $args = [
-        'team' => $team,
+        'workspace' => $workspace,
         'user' => $user,
         'type' => AiCreditType::Chat,
         'model' => 'claude-sonnet-4',
@@ -48,12 +48,12 @@ it('does not double-charge when settle is called twice with the same idempotency
     expect(AiCreditTransaction::query()->where('type', AiCreditType::Chat)->count())->toBe(1);
 });
 
-it('rejects inserting two transactions with the same key for the same team', function (): void {
-    $team = Team::factory()->create();
+it('rejects inserting two transactions with the same key for the same workspace', function (): void {
+    $workspace = Workspace::factory()->create();
     $key = 'fixed-key-'.Str::ulid();
 
     AiCreditTransaction::query()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'idempotency_key' => $key,
         'type' => AiCreditType::Adjustment,
         'model' => 'system',
@@ -61,7 +61,7 @@ it('rejects inserting two transactions with the same key for the same team', fun
     ]);
 
     expect(fn () => AiCreditTransaction::query()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'idempotency_key' => $key,
         'type' => AiCreditType::Adjustment,
         'model' => 'system',
@@ -70,11 +70,11 @@ it('rejects inserting two transactions with the same key for the same team', fun
 });
 
 it('requires a non-null idempotency_key', function (): void {
-    $team = Team::factory()->create();
+    $workspace = Workspace::factory()->create();
 
     expect(fn () => DB::table('ai_credit_transactions')->insert([
         'id' => (string) Str::ulid(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'idempotency_key' => null,
         'type' => 'adjustment',
         'model' => 'system',
@@ -83,16 +83,16 @@ it('requires a non-null idempotency_key', function (): void {
 });
 
 it('settles a reservation exactly once even when called twice with the same key', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);
 
-    AiCreditBalance::query()->where('team_id', $team->getKey())
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
-    $service->reserveCredit($team); // remaining 99, used 1
+    $service->reserveCredit($workspace); // remaining 99, used 1
 
     $args = [
-        'team' => $team, 'user' => $user, 'type' => AiCreditType::Chat,
+        'workspace' => $workspace, 'user' => $user, 'type' => AiCreditType::Chat,
         'model' => 'claude-sonnet', 'inputTokens' => 10, 'outputTokens' => 20,
         'toolCallsCount' => 0, 'conversationId' => null, 'reservedCredits' => 1,
         'resolutionKey' => 'resolve-TURN-1',
@@ -100,25 +100,25 @@ it('settles a reservation exactly once even when called twice with the same key'
     $service->settleReservation(...$args);
     $service->settleReservation(...$args); // duplicate, which must be a no-op
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
     expect($balance->credits_used)->toBe(1); // sonnet multiplier 1 → charged 1, reserved 1, no extra
     expect(AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())->where('idempotency_key', 'resolve-TURN-1')->count())->toBe(1);
+        ->where('workspace_id', $workspace->getKey())->where('idempotency_key', 'resolve-TURN-1')->count())->toBe(1);
 });
 
 it('makes settle and refund mutually exclusive for one resolution key', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);
-    AiCreditBalance::query()->where('team_id', $team->getKey())
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
-    $service->reserveCredit($team); // used 1
+    $service->reserveCredit($workspace); // used 1
 
-    $service->refundReservation($team, resolutionKey: 'resolve-TURN-2'); // refund wins
-    $service->settleReservedMinimum($team, $user, null, 'resolve-TURN-2', 'cancelled'); // must no-op
+    $service->refundReservation($workspace, resolutionKey: 'resolve-TURN-2'); // refund wins
+    $service->settleReservedMinimum($workspace, $user, null, 'resolve-TURN-2', 'cancelled'); // must no-op
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
     expect($balance->credits_used)->toBe(0); // refund returned the reserved credit; settle no-op
     expect(AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())->where('idempotency_key', 'resolve-TURN-2')->count())->toBe(1);
+        ->where('workspace_id', $workspace->getKey())->where('idempotency_key', 'resolve-TURN-2')->count())->toBe(1);
 });

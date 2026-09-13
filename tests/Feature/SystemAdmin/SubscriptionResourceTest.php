@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Enums\BillingStatus;
 use App\Enums\StripeSubscriptionStatus;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Laravel\Cashier\Subscription;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource;
@@ -20,29 +20,29 @@ beforeEach(function (): void {
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
 });
 
-it('lists subscriptions with team and status for sysadmins', function (): void {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+it('lists subscriptions with workspace and status for sysadmins', function (): void {
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $subscription = Subscription::factory()->active()->withPrice('price_pro_monthly_test')
-        ->create(['team_id' => $team->getKey()]);
+        ->create(['workspace_id' => $workspace->getKey()]);
 
     livewire(ListSubscriptions::class)
         ->assertCanSeeTableRecords([$subscription])
         ->assertCanRenderTableColumn('owner.name')
         ->assertCanRenderTableColumn('stripe_status')
-        ->assertSee($team->name);
+        ->assertSee($workspace->name);
 });
 
 it('filters subscriptions by status', function (): void {
-    /** @var Team $teamA */
-    $teamA = User::factory()->withPersonalTeam()->create()->currentTeam;
-    /** @var Team $teamB */
-    $teamB = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspaceA */
+    $workspaceA = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    /** @var Workspace $workspaceB */
+    $workspaceB = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     $active = Subscription::factory()->active()->withPrice('price_pro_monthly_test')
-        ->create(['team_id' => $teamA->getKey()]);
+        ->create(['workspace_id' => $workspaceA->getKey()]);
     $canceled = Subscription::factory()->canceled()->withPrice('price_pro_monthly_test')
-        ->create(['team_id' => $teamB->getKey(), 'ends_at' => now()->subDay()]);
+        ->create(['workspace_id' => $workspaceB->getKey(), 'ends_at' => now()->subDay()]);
 
     livewire(ListSubscriptions::class)
         ->filterTable('stripe_status', 'active')
@@ -51,10 +51,10 @@ it('filters subscriptions by status', function (): void {
 });
 
 it('spells a stripe status the way the workspace billing badge spells it', function (): void {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $subscription = Subscription::factory()->pastDue()->withPrice('price_pro_monthly_test')
-        ->create(['team_id' => $team->getKey()]);
+        ->create(['workspace_id' => $workspace->getKey()]);
 
     livewire(ListSubscriptions::class)
         ->assertCanSeeTableRecords([$subscription])
@@ -66,10 +66,10 @@ it('spells a stripe status the way the workspace billing badge spells it', funct
 });
 
 it('renders a status Stripe adds later as its raw value instead of failing', function (): void {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $subscription = Subscription::factory()->withPrice('price_pro_monthly_test')
-        ->create(['team_id' => $team->getKey(), 'stripe_status' => 'some_future_status']);
+        ->create(['workspace_id' => $workspace->getKey(), 'stripe_status' => 'some_future_status']);
 
     livewire(ListSubscriptions::class)
         ->assertCanSeeTableRecords([$subscription])
@@ -79,10 +79,10 @@ it('renders a status Stripe adds later as its raw value instead of failing', fun
 it('labels a subscription by the plan and interval its price maps to', function (): void {
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $subscription = Subscription::factory()->active()->withPrice('price_pro_yearly_test')
-        ->create(['team_id' => $team->getKey()]);
+        ->create(['workspace_id' => $workspace->getKey()]);
 
     livewire(ListSubscriptions::class)
         ->assertCanSeeTableRecords([$subscription])
@@ -90,10 +90,10 @@ it('labels a subscription by the plan and interval its price maps to', function 
 });
 
 it('falls back to the raw price id when it is not in the configured price map', function (): void {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
     $subscription = Subscription::factory()->active()->withPrice('price_not_in_the_map')
-        ->create(['team_id' => $team->getKey()]);
+        ->create(['workspace_id' => $workspace->getKey()]);
 
     livewire(ListSubscriptions::class)
         ->assertCanSeeTableRecords([$subscription])

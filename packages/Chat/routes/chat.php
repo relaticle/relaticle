@@ -51,7 +51,7 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     // limiters on different routes share one bucket and starve each other
     // (e.g. 10 mention autocompletes used to consume the transcribe allowance).
     Route::post('/chat/transcribe', TranscribeController::class)
-        ->middleware(['throttle:10,1,transcribe-minute', 'throttle:60,1440,transcribe-daily', 'throttle:transcribe-team-daily'])
+        ->middleware(['throttle:10,1,transcribe-minute', 'throttle:60,1440,transcribe-daily', 'throttle:transcribe-workspace-daily'])
         ->name('chat.transcribe');
 
     Route::post('/chat/messages/{messageId}/feedback', [MessageFeedbackController::class, 'store'])

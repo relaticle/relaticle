@@ -39,8 +39,8 @@ beforeEach(function (): void {
     // those loops quietly shrink to the handful of rows each test creates.
     Feature::define(OnboardSeed::class, true);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
     // Deliberately no Filament::setTenant(), mirroring job context
 });
@@ -48,7 +48,7 @@ beforeEach(function (): void {
 // --- GetCompanyTool ---
 
 it('GetCompanyTool output url is the /r/company/{id} reference url', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     $payload = json_decode(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])), true);
 
@@ -59,7 +59,7 @@ it('GetCompanyTool output url is the /r/company/{id} reference url', function ()
 // --- ListCompaniesTool ---
 
 it('ListCompaniesTool output items each have a /r/company/{id} reference url', function (): void {
-    Company::factory()->count(2)->for($this->user->currentTeam)->create();
+    Company::factory()->count(2)->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true)['data'];
 
@@ -74,7 +74,7 @@ it('ListCompaniesTool output items each have a /r/company/{id} reference url', f
 // --- GetPersonTool ---
 
 it('GetPersonTool output url is the /r/people/{id} reference url', function (): void {
-    $person = People::factory()->for($this->user->currentTeam)->create();
+    $person = People::factory()->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(GetPersonTool::class)->handle(new Request(['id' => (string) $person->getKey()])), true);
 
@@ -85,7 +85,7 @@ it('GetPersonTool output url is the /r/people/{id} reference url', function (): 
 // --- ListPeopleTool ---
 
 it('ListPeopleTool output items each have a /r/people/{id} reference url', function (): void {
-    People::factory()->count(2)->for($this->user->currentTeam)->create();
+    People::factory()->count(2)->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListPeopleTool::class)->handle(new Request([])), true)['data'];
 
@@ -100,7 +100,7 @@ it('ListPeopleTool output items each have a /r/people/{id} reference url', funct
 // --- GetOpportunityTool ---
 
 it('GetOpportunityTool output url is the /r/opportunity/{id} reference url', function (): void {
-    $opportunity = Opportunity::factory()->for($this->user->currentTeam)->create();
+    $opportunity = Opportunity::factory()->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(GetOpportunityTool::class)->handle(new Request(['id' => (string) $opportunity->getKey()])), true);
 
@@ -111,7 +111,7 @@ it('GetOpportunityTool output url is the /r/opportunity/{id} reference url', fun
 // --- ListOpportunitiesTool ---
 
 it('ListOpportunitiesTool output items each have a /r/opportunity/{id} reference url', function (): void {
-    Opportunity::factory()->count(2)->for($this->user->currentTeam)->create();
+    Opportunity::factory()->count(2)->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListOpportunitiesTool::class)->handle(new Request([])), true)['data'];
 
@@ -126,7 +126,7 @@ it('ListOpportunitiesTool output items each have a /r/opportunity/{id} reference
 // --- GetTaskTool ---
 
 it('GetTaskTool output url is the /r/task/{id} reference url', function (): void {
-    $task = Task::factory()->for($this->user->currentTeam)->create();
+    $task = Task::factory()->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(GetTaskTool::class)->handle(new Request(['id' => (string) $task->getKey()])), true);
 
@@ -137,7 +137,7 @@ it('GetTaskTool output url is the /r/task/{id} reference url', function (): void
 // --- ListTasksTool ---
 
 it('ListTasksTool output items each have a /r/task/{id} reference url', function (): void {
-    Task::factory()->count(2)->for($this->user->currentTeam)->create();
+    Task::factory()->count(2)->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListTasksTool::class)->handle(new Request([])), true)['data'];
 
@@ -152,7 +152,7 @@ it('ListTasksTool output items each have a /r/task/{id} reference url', function
 // --- GetNoteTool ---
 
 it('GetNoteTool output url is the /r/note/{id} reference url', function (): void {
-    $note = Note::factory()->for($this->user->currentTeam)->create();
+    $note = Note::factory()->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(GetNoteTool::class)->handle(new Request(['id' => (string) $note->getKey()])), true);
 
@@ -163,7 +163,7 @@ it('GetNoteTool output url is the /r/note/{id} reference url', function (): void
 // --- ListNotesTool ---
 
 it('ListNotesTool output items each have a /r/note/{id} reference url', function (): void {
-    Note::factory()->count(2)->for($this->user->currentTeam)->create();
+    Note::factory()->count(2)->for($this->user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListNotesTool::class)->handle(new Request([])), true)['data'];
 
@@ -176,7 +176,7 @@ it('ListNotesTool output items each have a /r/note/{id} reference url', function
 });
 
 it('serializes tool results without escaped slashes or pretty printing', function (): void {
-    Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     $raw = app(ListCompaniesTool::class)->handle(new Request([]));
 

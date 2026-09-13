@@ -9,9 +9,9 @@ use Livewire\Livewire;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidebarNav;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 /**
@@ -25,7 +25,7 @@ it('asks filament to repaint the sidebar when a conversation is deleted', functi
         'id' => 'c-repaint',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->current_team_id,
+        'workspace_id' => $this->user->current_workspace_id,
         'title' => 'Delete me',
         'created_at' => now(),
         'updated_at' => now(),
@@ -41,7 +41,7 @@ it('deletes a conversation via livewire action', function (): void {
         'id' => 'c-del',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->current_team_id,
+        'workspace_id' => $this->user->current_workspace_id,
         'title' => 'Kill me',
         'created_at' => now(),
         'updated_at' => now(),
@@ -66,7 +66,7 @@ it('renders an "All chats" trigger when more than 7 chats exist', function (): v
             'id' => "all-{$i}",
             'participant_type' => 'user',
             'participant_id' => $this->user->getKey(),
-            'team_id' => $this->user->current_team_id,
+            'workspace_id' => $this->user->current_workspace_id,
             'title' => "Chat {$i}",
             'created_at' => now()->subMinutes($i),
             'updated_at' => now()->subMinutes($i),
@@ -86,7 +86,7 @@ it('hides the "All chats" trigger when 7 or fewer chats exist', function (): voi
             'id' => "few-{$i}",
             'participant_type' => 'user',
             'participant_id' => $this->user->getKey(),
-            'team_id' => $this->user->current_team_id,
+            'workspace_id' => $this->user->current_workspace_id,
             'title' => "Chat {$i}",
             'created_at' => now()->subMinutes($i),
             'updated_at' => now()->subMinutes($i),
@@ -113,7 +113,7 @@ it('gives each conversation row an identity the morph can follow', function (): 
             'id' => $id,
             'participant_type' => 'user',
             'participant_id' => $this->user->getKey(),
-            'team_id' => $this->user->current_team_id,
+            'workspace_id' => $this->user->current_workspace_id,
             'title' => "Chat {$index}",
             'created_at' => now()->subMinutes(10 - $index),
             'updated_at' => now()->subMinutes(10 - $index),

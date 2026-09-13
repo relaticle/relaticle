@@ -38,7 +38,7 @@ it('tells the model it can read a record\'s change history', function (): void {
 
 /**
  * Only the list tools, the show tools and ListActivityTool emit a display_block.
- * SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool return plain JSON,
+ * SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool return plain JSON,
  * so an unscoped "your read results are rendered as a block" plus Rule 3's ban on
  * tables, bullet lists and per-record prose leaves the model no way to show a
  * search hit at all: the user gets "I found 3 matches" over an empty screen.
@@ -60,7 +60,7 @@ it('scopes the block claim to the read tools that emit one', function (): void {
 
     expect($instructions)
         ->toContain('rendered as a table or card block')
-        ->toContain('SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
+        ->toContain('SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
         ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool')
         ->toContain('A list with zero results renders no block either')
         ->toContain('ONE short lead-in sentence');
@@ -93,7 +93,7 @@ it('routes export requests to the export destinations', function (): void {
 
     expect($instructions)
         ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
-        ->toContain('(custom field definitions, bulk imports, exports, team members)');
+        ->toContain('(custom field definitions, bulk imports, exports, workspace members)');
 });
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
@@ -103,7 +103,7 @@ it('tells the model who it is talking to so "me" and "mine" resolve without a qu
 
     expect($instructions)
         ->toContain('## Current user')
-        ->toContain('Manuk bMinasyan/b (user id: 01USER, team owner)')
+        ->toContain('Manuk bMinasyan/b (user id: 01USER, workspace owner)')
         ->toContain('"me", "my", "mine" and "I" refer to this user');
 });
 
@@ -212,15 +212,15 @@ it('tells the model to name sample data as sample data when the workspace state 
 });
 
 it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     People::factory()->count(2)->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
 
-    $agent = resolve(CrmAssistant::class)->withTeam($team);
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace);
 
     expect($agent->dynamicInstructions())
         ->toContain('<workspace_state>')
@@ -228,21 +228,21 @@ it('renders the workspace_state block naming the seeded sample count when the wo
 });
 
 it('stops claiming only sample records once the user has a record of their own', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     People::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
     People::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creation_source' => CreationSource::WEB,
     ]);
 
-    resolve(WorkspaceActivationFacts::class)->forget($team);
+    resolve(WorkspaceActivationFacts::class)->forget($workspace);
 
-    $agent = resolve(CrmAssistant::class)->withTeam($team);
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace);
 
     expect($agent->dynamicInstructions())
         ->toContain('<workspace_state>')
@@ -251,20 +251,20 @@ it('stops claiming only sample records once the user has a record of their own',
 });
 
 it('renders no workspace_state block for a workspace with no seeded sample data at all', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     People::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creation_source' => CreationSource::WEB,
     ]);
 
-    $agent = resolve(CrmAssistant::class)->withTeam($team);
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace);
 
     expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
 });
 
-it('renders no workspace_state block when no team is bound', function (): void {
+it('renders no workspace_state block when no workspace is bound', function (): void {
     $agent = resolve(CrmAssistant::class);
 
     expect($agent->dynamicInstructions())->not->toContain('<workspace_state>');
@@ -285,7 +285,7 @@ it('marks the proposals the resumed turn just decided', function (): void {
     $agent = resolve(CrmAssistant::class);
     $agent->resolvedActions = [
         [
-            'operation' => 'create', 'entity_type' => 'team_invitations', 'status' => 'approved',
+            'operation' => 'create', 'entity_type' => 'workspace_invitations', 'status' => 'approved',
             'label' => 'fresh@example.com', 'record_id' => '01JUSTNOW', 'record_ids' => [],
             'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
             'just_decided' => true,
@@ -301,7 +301,7 @@ it('marks the proposals the resumed turn just decided', function (): void {
     $block = $agent->instructions();
 
     expect($block)
-        ->toContain('JUST DECIDED, approved: create team_invitations')
+        ->toContain('JUST DECIDED, approved: create workspace_invitations')
         ->not->toContain('JUST DECIDED, approved: create companies')
         ->not->toContain('already decided by the user earlier in this conversation')
         ->toContain('Never call it already done, already sent, already invited');

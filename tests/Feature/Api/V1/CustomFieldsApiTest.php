@@ -5,18 +5,18 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\CustomFieldsController;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Laravel\Sanctum\Sanctum;
 
 mutates(CustomFieldsController::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 
     $this->section = CustomFieldSection::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'entity_type' => 'company',
         'name' => 'API Test',
         'code' => 'api_test',
@@ -27,7 +27,7 @@ beforeEach(function () {
 
     $this->seededCount = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('active', true)
         ->count();
 });
@@ -40,7 +40,7 @@ it('can list custom fields with expected structure', function (): void {
     Sanctum::actingAs($this->user);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_industry',
@@ -76,7 +76,7 @@ it('returns required as false when field has no required rule', function (): voi
     Sanctum::actingAs($this->user);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_notes',
@@ -102,7 +102,7 @@ it('can filter by entity_type', function (): void {
     Sanctum::actingAs($this->user);
 
     $personSection = CustomFieldSection::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'entity_type' => 'people',
         'name' => 'API Test Person',
         'code' => 'api_test_person',
@@ -112,7 +112,7 @@ it('can filter by entity_type', function (): void {
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_industry',
@@ -124,7 +124,7 @@ it('can filter by entity_type', function (): void {
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $personSection->id,
         'entity_type' => 'people',
         'code' => 'cf_birthday',
@@ -148,23 +148,23 @@ it('can filter by entity_type', function (): void {
     expect($codes)->not->toContain('cf_birthday');
 });
 
-it('does not return custom fields from other teams', function (): void {
+it('does not return custom fields from other workspaces', function (): void {
     Sanctum::actingAs($this->user);
 
-    $otherTeam = Team::factory()->create();
+    $otherWorkspace = Workspace::factory()->create();
 
     $otherSection = CustomFieldSection::factory()->create([
-        'tenant_id' => $otherTeam->id,
+        'tenant_id' => $otherWorkspace->id,
         'entity_type' => 'company',
-        'name' => 'Other Team',
-        'code' => 'other_team',
+        'name' => 'Other Workspace',
+        'code' => 'other_workspace',
         'type' => 'section',
         'sort_order' => 1,
         'active' => true,
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_own_field',
@@ -176,7 +176,7 @@ it('does not return custom fields from other teams', function (): void {
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $otherTeam->id,
+        'tenant_id' => $otherWorkspace->id,
         'custom_field_section_id' => $otherSection->id,
         'entity_type' => 'company',
         'code' => 'cf_secret_field',
@@ -200,7 +200,7 @@ it('includes options for select fields', function (): void {
     Sanctum::actingAs($this->user);
 
     $field = CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_status',
@@ -212,8 +212,8 @@ it('includes options for select fields', function (): void {
     ]);
 
     $field->options()->createMany([
-        ['name' => 'Active', 'sort_order' => 1, 'tenant_id' => $this->team->id],
-        ['name' => 'Inactive', 'sort_order' => 2, 'tenant_id' => $this->team->id],
+        ['name' => 'Active', 'sort_order' => 1, 'tenant_id' => $this->workspace->id],
+        ['name' => 'Inactive', 'sort_order' => 2, 'tenant_id' => $this->workspace->id],
     ]);
 
     $response = $this->getJson('/api/v1/custom-fields?per_page=100');
@@ -234,7 +234,7 @@ it('paginates results by default', function (): void {
 
     foreach (range(1, 20) as $i) {
         CustomField::factory()->create([
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => "cf_field_{$i}",
@@ -260,7 +260,7 @@ it('respects per_page parameter', function (): void {
 
     foreach (range(1, 10) as $i) {
         CustomField::factory()->create([
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => "cf_page_field_{$i}",
@@ -301,7 +301,7 @@ it('supports page navigation', function (): void {
 
     foreach (range(1, 5) as $i) {
         CustomField::factory()->create([
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => "cf_nav_field_{$i}",
@@ -334,7 +334,7 @@ it('excludes inactive custom fields', function (): void {
     Sanctum::actingAs($this->user);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_active_field',
@@ -346,7 +346,7 @@ it('excludes inactive custom fields', function (): void {
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'custom_field_section_id' => $this->section->id,
         'entity_type' => 'company',
         'code' => 'cf_inactive_field',

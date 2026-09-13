@@ -16,13 +16,13 @@ use Relaticle\SystemAdmin\Filament\Widgets\Concerns\HasPeriodComparison;
  * Signup -> activation -> subscription funnel for the selected period.
  *
  * "Organic sign-up" excludes invited members: a user who accepted an
- * invitation gets a `team_user` row for the inviting (unowned) team within
+ * invitation gets a `workspace_user` row for the inviting (unowned) workspace within
  * seconds of registering, so a pivot row created within 24h of the user's
  * own `created_at` marks them as invited rather than organic.
  *
- * "Activated team" and "Subscribed team" mirror ActivationRateWidget's
+ * "Activated workspace" and "Subscribed workspace" mirror ActivationRateWidget's
  * creator-source filter and the app's own subscription-validity predicate,
- * at team grain, restricted to the selected period.
+ * at workspace grain, restricted to the selected period.
  */
 final class FunnelWidget extends StatsOverviewWidget
 {
@@ -42,31 +42,31 @@ final class FunnelWidget extends StatsOverviewWidget
         $currentSignups = $this->countOrganicSignups($currentStart, $currentEnd);
         $previousSignups = $this->countOrganicSignups($previousStart, $previousEnd);
 
-        $currentActivatedTeams = $this->countActivatedTeams($currentStart, $currentEnd);
-        $previousActivatedTeams = $this->countActivatedTeams($previousStart, $previousEnd);
+        $currentActivatedWorkspaces = $this->countActivatedWorkspaces($currentStart, $currentEnd);
+        $previousActivatedWorkspaces = $this->countActivatedWorkspaces($previousStart, $previousEnd);
 
-        $currentSubscribedTeams = $this->countSubscribedTeams($currentStart, $currentEnd);
-        $previousSubscribedTeams = $this->countSubscribedTeams($previousStart, $previousEnd);
+        $currentSubscribedWorkspaces = $this->countSubscribedWorkspaces($currentStart, $currentEnd);
+        $previousSubscribedWorkspaces = $this->countSubscribedWorkspaces($previousStart, $previousEnd);
 
         $activatedDescription = $currentSignups > 0
-            ? round($currentActivatedTeams / $currentSignups * 100, 1).'% of sign-ups'
+            ? round($currentActivatedWorkspaces / $currentSignups * 100, 1).'% of sign-ups'
             : 'created a record';
 
-        $subscribedDescription = $currentActivatedTeams > 0
-            ? round($currentSubscribedTeams / $currentActivatedTeams * 100, 1).'% of activated'
+        $subscribedDescription = $currentActivatedWorkspaces > 0
+            ? round($currentSubscribedWorkspaces / $currentActivatedWorkspaces * 100, 1).'% of activated'
             : 'this period';
 
         return [
             $this->buildCountStat('Organic Sign-ups', 'this period', $currentSignups, $previousSignups),
-            $this->buildCountStat('Activated Teams', $activatedDescription, $currentActivatedTeams, $previousActivatedTeams),
-            $this->buildCountStat('Subscribed Teams', $subscribedDescription, $currentSubscribedTeams, $previousSubscribedTeams),
+            $this->buildCountStat('Activated Workspaces', $activatedDescription, $currentActivatedWorkspaces, $previousActivatedWorkspaces),
+            $this->buildCountStat('Subscribed Workspaces', $subscribedDescription, $currentSubscribedWorkspaces, $previousSubscribedWorkspaces),
         ];
     }
 
     /**
-     * A user counts as an organic sign-up unless they were added to a team
+     * A user counts as an organic sign-up unless they were added to a workspace
      * they do not own within 24h of registering, the signature of accepting
-     * an invitation (register -> immediately attached to the inviter's team).
+     * an invitation (register -> immediately attached to the inviter's workspace).
      */
     private function countOrganicSignups(CarbonImmutable $start, CarbonImmutable $end): int
     {
@@ -76,8 +76,8 @@ final class FunnelWidget extends StatsOverviewWidget
             WHERE u.created_at BETWEEN ? AND ?
             AND NOT EXISTS (
                 SELECT 1
-                FROM team_user tu
-                INNER JOIN teams t ON t.id = tu.team_id
+                FROM workspace_user tu
+                INNER JOIN workspaces t ON t.id = tu.workspace_id
                 WHERE tu.user_id = u.id
                   AND t.user_id != u.id
                   AND tu.created_at <= u.created_at + INTERVAL '24 hours'
@@ -91,28 +91,28 @@ final class FunnelWidget extends StatsOverviewWidget
 
     /**
      * Reuses HasPeriodComparison::getDistinctActiveColumnValues(), the same
-     * helper ActivationRateWidget's getActiveCreatorIds() calls, at team
+     * helper ActivationRateWidget's getActiveCreatorIds() calls, at workspace
      * grain instead of creator grain, so the source filter only lives in one
      * place.
      */
-    private function countActivatedTeams(CarbonImmutable $start, CarbonImmutable $end): int
+    private function countActivatedWorkspaces(CarbonImmutable $start, CarbonImmutable $end): int
     {
-        return $this->getDistinctActiveColumnValues('team_id', $start, $end)->count();
+        return $this->getDistinctActiveColumnValues('workspace_id', $start, $end)->count();
     }
 
     /**
      * Reuses Cashier's own `active` scope (the same predicate
-     * SyncTeamPlanFromSubscription/HostedWorkspaceAccess rely on via
+     * SyncWorkspacePlanFromSubscription/HostedWorkspaceAccess rely on via
      * Subscription::valid()) rather than hardcoding a stripe_status list.
      * This app also calls Cashier::keepPastDueSubscriptionsActive(), so the
      * "active" set is wider than a literal ['active', 'trialing'].
      */
-    private function countSubscribedTeams(CarbonImmutable $start, CarbonImmutable $end): int
+    private function countSubscribedWorkspaces(CarbonImmutable $start, CarbonImmutable $end): int
     {
         return Subscription::query()
             ->active()
             ->whereBetween('created_at', [$start, $end])
-            ->distinct('team_id')
+            ->distinct('workspace_id')
             ->count();
     }
 

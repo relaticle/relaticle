@@ -84,7 +84,7 @@ abstract class BaseUpdateTool extends Tool
         $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
-            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentTeam->getKey(), $this->entityType(), $customFields);
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields);
             $request->merge(['custom_fields' => $customFields]);
         }
 
@@ -92,7 +92,7 @@ abstract class BaseUpdateTool extends Tool
             ['id' => ['required', 'string']],
             $this->entityRules($user),
             new ValidCustomFields(
-                $user->currentTeam->getKey(),
+                $user->currentWorkspace->getKey(),
                 $this->entityType(),
                 isUpdate: true,
                 ignoreEntityId: is_string($entityId) || is_int($entityId) ? $entityId : null,

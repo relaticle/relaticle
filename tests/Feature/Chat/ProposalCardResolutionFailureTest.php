@@ -21,18 +21,18 @@ mutates(ProposalCard::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 it('keeps a batch open when the active record fails and keeps the earlier commits', function (): void {
     Bus::fake();
-    $company = Company::factory()->for($this->team)->create(['name' => 'Old name']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Old name']);
 
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Company\\UpdateCompany',
@@ -73,10 +73,10 @@ it('keeps a batch open when the active record fails and keeps the earlier commit
 
 it('resolves a delete batch per item through the component, deleting only approved records', function (): void {
     Bus::fake();
-    $tasks = Task::factory()->count(2)->for($this->team)->create();
+    $tasks = Task::factory()->count(2)->for($this->workspace)->create();
 
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Task\\DeleteTask',
@@ -115,10 +115,10 @@ it('resolves a delete batch per item through the component, deleting only approv
 });
 
 it('offers no inline-edit codes for a delete proposal', function (): void {
-    $task = Task::factory()->for($this->team)->create();
+    $task = Task::factory()->for($this->workspace)->create();
 
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Task\\DeleteTask',
@@ -139,10 +139,10 @@ it('offers no inline-edit codes for a delete proposal', function (): void {
 
 it('surfaces a failure when the assignee left the workspace between proposal and approval', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -154,7 +154,7 @@ it('surfaces a failure when the assignee left the workspace between proposal and
         'expires_at' => now()->addMinutes(15),
     ]);
 
-    $this->team->users()->detach($member);
+    $this->workspace->users()->detach($member);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
@@ -171,7 +171,7 @@ it('surfaces a failure when the assignee left the workspace between proposal and
 
 it('renders the resolve failure in the dock so the approval is never a silent no-op', function (): void {
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -211,7 +211,7 @@ it('surfaces a readable error on the card when the field name was taken after th
     $action = ProposalCardFixture::customField($this->user, 'people', 'Age', 'number');
 
     CustomField::factory()->create([
-        config('custom-fields.database.column_names.tenant_foreign_key') => $this->team->getKey(),
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
         'entity_type' => 'people',
         'name' => 'Age',
         'code' => 'age',
@@ -253,5 +253,5 @@ it('never puts a database error message on the card or in the transcript', funct
         ->and($shown)->toBe('This change could not be saved. Please try again.');
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });

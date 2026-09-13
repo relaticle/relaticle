@@ -32,11 +32,11 @@ function listToolRows(string $json): array
     return $decoded['data'] ?? $decoded;
 }
 
-function taskCustomFieldOptionId(string $teamId, string $code, string $label): string
+function taskCustomFieldOptionId(string $workspaceId, string $code, string $label): string
 {
     $field = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $teamId)
+        ->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')
         ->where('code', $code)
         ->firstOrFail();
@@ -45,13 +45,13 @@ function taskCustomFieldOptionId(string $teamId, string $code, string $label): s
 }
 
 it('applies a filter when searching for the literal term "0" instead of returning all', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->for($team)->create(['name' => '0']);
-    Company::factory()->for($team)->create(['name' => 'Acme']);
-    Company::factory()->for($team)->create(['name' => 'Globex']);
+    Company::factory()->for($workspace)->create(['name' => '0']);
+    Company::factory()->for($workspace)->create(['name' => 'Acme']);
+    Company::factory()->for($workspace)->create(['name' => 'Globex']);
 
     $tool = new ListCompaniesTool;
     $json = $tool->handle(new Request(['search' => '0']));
@@ -62,17 +62,17 @@ it('applies a filter when searching for the literal term "0" instead of returnin
 });
 
 it('restricts tasks to the current user when assigned_to_me is set', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     $colleague = User::factory()->create();
-    $colleague->teams()->attach($team, ['role' => 'editor']);
+    $colleague->workspaces()->attach($workspace, ['role' => 'editor']);
 
-    $mine = Task::factory()->for($team)->create(['title' => 'Mine']);
+    $mine = Task::factory()->for($workspace)->create(['title' => 'Mine']);
     $mine->assignees()->attach($user);
 
-    $theirs = Task::factory()->for($team)->create(['title' => 'Theirs']);
+    $theirs = Task::factory()->for($workspace)->create(['title' => 'Theirs']);
     $theirs->assignees()->attach($colleague);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request(['assigned_to_me' => true])));
@@ -82,12 +82,12 @@ it('restricts tasks to the current user when assigned_to_me is set', function ()
 });
 
 it('returns every workspace task when assigned_to_me is not set', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Task::factory()->for($team)->create(['title' => 'Mine'])->assignees()->attach($user);
-    Task::factory()->for($team)->create(['title' => 'Unassigned']);
+    Task::factory()->for($workspace)->create(['title' => 'Mine'])->assignees()->attach($user);
+    Task::factory()->for($workspace)->create(['title' => 'Unassigned']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([])));
 
@@ -95,24 +95,24 @@ it('returns every workspace task when assigned_to_me is not set', function (): v
 });
 
 it('filters tasks by a choice custom field using the option label', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    TenantContextService::setTenantId($team->getKey());
+    TenantContextService::setTenantId($workspace->getKey());
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
 
-    $open = Task::factory()->for($team)->create(['title' => 'Open one']);
-    $done = Task::factory()->for($team)->create(['title' => 'Finished']);
+    $open = Task::factory()->for($workspace)->create(['title' => 'Open one']);
+    $done = Task::factory()->for($workspace)->create(['title' => 'Finished']);
 
-    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($team->getKey(), 'status', 'To do'));
-    $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($team->getKey(), 'status', 'Done'));
+    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'To do'));
+    $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
         'custom_fields' => ['status' => ['eq' => 'Done']],
@@ -125,24 +125,24 @@ it('filters tasks by a choice custom field using the option label', function ():
 });
 
 it('filters tasks by a choice custom field using the option id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    TenantContextService::setTenantId($team->getKey());
+    TenantContextService::setTenantId($workspace->getKey());
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
 
-    $open = Task::factory()->for($team)->create(['title' => 'Open one']);
-    $done = Task::factory()->for($team)->create(['title' => 'Finished']);
-    $doneId = taskCustomFieldOptionId($team->getKey(), 'status', 'Done');
+    $open = Task::factory()->for($workspace)->create(['title' => 'Open one']);
+    $done = Task::factory()->for($workspace)->create(['title' => 'Finished']);
+    $doneId = taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done');
 
-    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($team->getKey(), 'status', 'To do'));
+    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'To do'));
     $done->saveCustomFieldValue($statusField, $doneId);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
@@ -156,21 +156,21 @@ it('filters tasks by a choice custom field using the option id', function (): vo
 });
 
 it('rejects a label shared by two options and asks for the id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    TenantContextService::setTenantId($team->getKey());
+    TenantContextService::setTenantId($workspace->getKey());
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
 
     CustomFieldOption::query()->create([
-        'tenant_id' => $team->getKey(),
+        'tenant_id' => $workspace->getKey(),
         'custom_field_id' => $statusField->getKey(),
         'name' => 'DONE',
         'sort_order' => 99,
@@ -187,10 +187,10 @@ it('rejects a label shared by two options and asks for the id', function (): voi
 });
 
 it('rejects an unknown custom field code instead of silently returning everything', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    Task::factory()->for($user->currentTeam)->create(['title' => 'Anything']);
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
         'custom_fields' => ['not_a_field' => ['eq' => 'x']],
@@ -201,11 +201,11 @@ it('rejects an unknown custom field code instead of silently returning everythin
 });
 
 it('rejects an unknown option label instead of silently returning everything', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    TenantContextService::setTenantId($user->currentTeam->getKey());
-    Task::factory()->for($user->currentTeam)->create(['title' => 'Anything']);
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
         'custom_fields' => ['status' => ['eq' => 'Nope']],
@@ -218,10 +218,10 @@ it('rejects an unknown option label instead of silently returning everything', f
 });
 
 it('rejects an operator the field does not support', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    TenantContextService::setTenantId($user->currentTeam->getKey());
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
         'custom_fields' => ['status' => ['contains' => 'Done']],
@@ -234,12 +234,12 @@ it('rejects an operator the field does not support', function (): void {
 });
 
 it('sorts companies by the requested column and direction', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->for($team)->create(['name' => 'Alpha']);
-    Company::factory()->for($team)->create(['name' => 'Zulu']);
+    Company::factory()->for($workspace)->create(['name' => 'Alpha']);
+    Company::factory()->for($workspace)->create(['name' => 'Zulu']);
 
     $descending = listToolRows((new ListCompaniesTool)->handle(new Request(['sort' => '-name'])));
     $ascending = listToolRows((new ListCompaniesTool)->handle(new Request(['sort' => 'name'])));
@@ -249,10 +249,10 @@ it('sorts companies by the requested column and direction', function (): void {
 });
 
 it('reports an unknown sort column instead of failing silently', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    Company::factory()->for($user->currentTeam)->create(['name' => 'Alpha']);
+    Company::factory()->for($user->currentWorkspace)->create(['name' => 'Alpha']);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request(['sort' => 'not_a_column'])), true);
 
@@ -260,9 +260,9 @@ it('reports an unknown sort column instead of failing silently', function (): vo
 });
 
 it('can filter by a custom field immediately after creating it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     // Warm the filter schema the way any earlier turn in the conversation would.
     (new ListCompaniesTool)->handle(new Request);
@@ -283,7 +283,7 @@ it('can filter by a custom field immediately after creating it', function (): vo
 });
 
 it('stops offering a custom field for filtering once it is deactivated', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $field = app(CreateCustomField::class)->execute($user, [
@@ -307,7 +307,7 @@ it('stops offering a custom field for filtering once it is deactivated', functio
 });
 
 it('can filter by an option added to an existing custom field', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $field = app(CreateCustomField::class)->execute($user, [
@@ -333,20 +333,20 @@ it('can filter by an option added to an existing custom field', function (): voi
 });
 
 it('restricts tasks to a named colleague when assignee_ids is set', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     $colleague = User::factory()->create();
-    $team->users()->attach($colleague, ['role' => 'editor']);
+    $workspace->users()->attach($colleague, ['role' => 'editor']);
 
-    $theirs = Task::factory()->for($team)->create(['title' => 'Colleague task']);
+    $theirs = Task::factory()->for($workspace)->create(['title' => 'Colleague task']);
     $theirs->assignees()->attach($colleague);
 
-    $mine = Task::factory()->for($team)->create(['title' => 'My task']);
+    $mine = Task::factory()->for($workspace)->create(['title' => 'My task']);
     $mine->assignees()->attach($user);
 
-    Task::factory()->for($team)->create(['title' => 'Unassigned task']);
+    Task::factory()->for($workspace)->create(['title' => 'Unassigned task']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
         'assignee_ids' => [(string) $colleague->getKey()],
@@ -357,18 +357,18 @@ it('restricts tasks to a named colleague when assignee_ids is set', function ():
 });
 
 it('matches tasks assigned to any of several people', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
     $one = User::factory()->create();
     $two = User::factory()->create();
-    $team->users()->attach($one, ['role' => 'editor']);
-    $team->users()->attach($two, ['role' => 'editor']);
+    $workspace->users()->attach($one, ['role' => 'editor']);
+    $workspace->users()->attach($two, ['role' => 'editor']);
 
-    Task::factory()->for($team)->create(['title' => 'First'])->assignees()->attach($one);
-    Task::factory()->for($team)->create(['title' => 'Second'])->assignees()->attach($two);
-    Task::factory()->for($team)->create(['title' => 'Third']);
+    Task::factory()->for($workspace)->create(['title' => 'First'])->assignees()->attach($one);
+    Task::factory()->for($workspace)->create(['title' => 'Second'])->assignees()->attach($two);
+    Task::factory()->for($workspace)->create(['title' => 'Third']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
         'assignee_ids' => [(string) $one->getKey(), (string) $two->getKey()],
@@ -378,14 +378,14 @@ it('matches tasks assigned to any of several people', function (): void {
 });
 
 it('never leaks another workspace\'s tasks through assignee_ids', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    $outsider = User::factory()->withPersonalTeam()->create();
-    $theirTask = Task::factory()->for($outsider->currentTeam)->create(['title' => 'Other workspace task']);
+    $outsider = User::factory()->withPersonalWorkspace()->create();
+    $theirTask = Task::factory()->for($outsider->currentWorkspace)->create(['title' => 'Other workspace task']);
     $theirTask->assignees()->attach($outsider);
 
-    Task::factory()->for($user->currentTeam)->create(['title' => 'Mine']);
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Mine']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
         'assignee_ids' => [(string) $outsider->getKey()],
@@ -395,10 +395,10 @@ it('never leaks another workspace\'s tasks through assignee_ids', function (): v
 });
 
 it('ignores an empty assignee_ids list rather than returning nothing', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    Task::factory()->for($user->currentTeam)->create(['title' => 'Alpha']);
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Alpha']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request(['assignee_ids' => []])));
 
@@ -406,10 +406,10 @@ it('ignores an empty assignee_ids list rather than returning nothing', function 
 });
 
 it('filters every list tool by creation date, including tasks and notes', function (string $toolClass, string $factory): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
-    $factory::factory()->for($user->currentTeam)->create();
+    $factory::factory()->for($user->currentWorkspace)->create();
 
     $tool = new $toolClass;
 
@@ -423,11 +423,11 @@ it('filters every list tool by creation date, including tasks and notes', functi
 ]);
 
 it('reports total and showing when results exceed one page', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->count(17)->for($team)->create();
+    Company::factory()->count(17)->for($workspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
@@ -437,11 +437,11 @@ it('reports total and showing when results exceed one page', function (): void {
 });
 
 it('reports total equal to showing when results fit on one page', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->count(3)->for($team)->create();
+    Company::factory()->count(3)->for($workspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
@@ -451,11 +451,11 @@ it('reports total equal to showing when results fit on one page', function (): v
 });
 
 it('defaults to 10 rows per page when per_page is not given', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->count(30)->for($team)->create();
+    Company::factory()->count(30)->for($workspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
@@ -463,11 +463,11 @@ it('defaults to 10 rows per page when per_page is not given', function (): void 
 });
 
 it('clamps per_page at 25 even when a larger value is requested', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->count(30)->for($team)->create();
+    Company::factory()->count(30)->for($workspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 50])), true);
 

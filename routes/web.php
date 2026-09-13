@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Enums\Notifications\NotificationType;
 use App\Features\Documentation;
 use App\Features\SocialAuth;
-use App\Http\Controllers\AcceptTeamInvitationController;
+use App\Http\Controllers\AcceptWorkspaceInvitationController;
 use App\Http\Controllers\AlternativesController;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\EmailChallengeController;
@@ -22,7 +22,7 @@ use App\Http\Controllers\ComparisonController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\HomeController;
-use App\Http\Controllers\JoinTeamViaLinkController;
+use App\Http\Controllers\JoinWorkspaceViaLinkController;
 use App\Http\Controllers\Mail\UnsubscribeController;
 use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\SwitchInvitationAccountController;
@@ -157,35 +157,35 @@ Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('das
 Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
     // Separate buckets: a shared one lets repeated views of the invite page
     // spend the allowance the accept POST needs.
-    Route::get('/invitations/{token}', [AcceptTeamInvitationController::class, 'show'])
+    Route::get('/invitations/{token}', [AcceptWorkspaceInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
-        ->name('team-invitations.token.accept');
+        ->name('workspace-invitations.token.accept');
 
-    Route::post('/invitations/{token}', [AcceptTeamInvitationController::class, 'store'])
+    Route::post('/invitations/{token}', [AcceptWorkspaceInvitationController::class, 'store'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
-        ->name('team-invitations.token.join');
+        ->name('workspace-invitations.token.join');
 
     // Signing out returns here rather than to the marketing home, so the invitee
     // lands back on the invitation instead of losing it with the session.
     Route::post('/invitations/{token}/switch-account', SwitchInvitationAccountController::class)
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-switch')
-        ->name('team-invitations.token.switch');
+        ->name('workspace-invitations.token.switch');
 });
 
 Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class])
     ->group(function (): void {
-        Route::get('/join/{token}', [JoinTeamViaLinkController::class, 'show'])
+        Route::get('/join/{token}', [JoinWorkspaceViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-show')
-            ->name('teams.join');
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,workspace-join-show')
+            ->name('workspaces.join');
 
-        Route::post('/join/{token}', [JoinTeamViaLinkController::class, 'store'])
+        Route::post('/join/{token}', [JoinWorkspaceViaLinkController::class, 'store'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware(ThrottleBeforeAuthentication::class.':10,1,team-join-confirm')
-            ->name('teams.join.confirm');
+            ->middleware(ThrottleBeforeAuthentication::class.':10,1,workspace-join-confirm')
+            ->name('workspaces.join.confirm');
     });
 
 // Legacy documentation redirects. Two indexed generations point here: the

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Personas;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Console\Command;
 use Illuminate\Support\Sleep;
 use Laravel\Cashier\Cashier;
@@ -40,27 +40,27 @@ final readonly class StripeSandbox
     /**
      * Give the workspace a live subscription, replacing whatever it had.
      */
-    public function subscribe(Team $team, Persona $persona): void
+    public function subscribe(Workspace $workspace, Persona $persona): void
     {
         $this->assertTestMode();
-        $this->reset($team);
+        $this->reset($workspace);
 
         $price = (string) config('services.stripe.prices.pro_monthly');
 
         if ($persona->pastDue) {
-            $this->subscribeThenFailRenewal($team, $price, $persona);
+            $this->subscribeThenFailRenewal($workspace, $price, $persona);
 
             return;
         }
 
-        $team->newSubscription('default', $price)->create(
+        $workspace->newSubscription('default', $price)->create(
             $persona->stripe,
             $this->customerOptions($persona),
         );
     }
 
     /**
-     * A Team carries no email, so Cashier would create a nameless customer that
+     * A Workspace carries no email, so Cashier would create a nameless customer that
      * is impossible to identify in the Stripe dashboard. Naming it after the
      * persona is what makes a sandbox customer recognisable at a glance.
      *
@@ -79,19 +79,19 @@ final readonly class StripeSandbox
      * Subscribe on a test clock, swap in a card that declines, then advance past
      * the renewal so Stripe itself moves the subscription to `past_due`.
      */
-    private function subscribeThenFailRenewal(Team $team, string $price, Persona $persona): void
+    private function subscribeThenFailRenewal(Workspace $workspace, string $price, Persona $persona): void
     {
         $stripe = Cashier::stripe();
 
         $clock = $stripe->testHelpers->testClocks->create([
             'frozen_time' => now()->timestamp,
-            'name' => "local-{$team->slug}",
+            'name' => "local-{$workspace->slug}",
         ]);
 
-        $team->createAsStripeCustomer([...$this->customerOptions($persona), 'test_clock' => $clock->id]);
-        $subscription = $team->newSubscription('default', $price)->create('pm_card_visa');
+        $workspace->createAsStripeCustomer([...$this->customerOptions($persona), 'test_clock' => $clock->id]);
+        $subscription = $workspace->newSubscription('default', $price)->create('pm_card_visa');
 
-        $team->updateDefaultPaymentMethod(self::DECLINING_CARD);
+        $workspace->updateDefaultPaymentMethod(self::DECLINING_CARD);
 
         $renewal = $stripe->subscriptions->retrieve($subscription->stripe_id);
         $periodEnd = $renewal->items->data[0]->current_period_end ?? null;
@@ -132,20 +132,20 @@ final readonly class StripeSandbox
      * Detach the workspace from any sandbox customer a previous run left behind,
      * so re-seeding does not strand billable objects in Stripe.
      */
-    private function reset(Team $team): void
+    private function reset(Workspace $workspace): void
     {
-        if (! $team->hasStripeId()) {
+        if (! $workspace->hasStripeId()) {
             return;
         }
 
         try {
-            Cashier::stripe()->customers->delete($team->stripe_id);
+            Cashier::stripe()->customers->delete($workspace->stripe_id);
         } catch (InvalidRequestException) {
             // Already gone from Stripe; the local row below is the only cleanup left.
         }
 
-        Subscription::query()->where('team_id', $team->getKey())->delete();
-        $team->forceFill(['stripe_id' => null, 'pm_type' => null, 'pm_last_four' => null])->save();
+        Subscription::query()->where('workspace_id', $workspace->getKey())->delete();
+        $workspace->forceFill(['stripe_id' => null, 'pm_type' => null, 'pm_last_four' => null])->save();
     }
 
     /**

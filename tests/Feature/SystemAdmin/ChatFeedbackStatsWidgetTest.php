@@ -26,7 +26,7 @@ beforeEach(function (): void {
  */
 function seedFeedbackAt(string $utc): ChatMessageFeedback
 {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $conversationId = (string) Str::uuid7();
     $messageId = (string) Str::uuid7();
 
@@ -34,7 +34,7 @@ function seedFeedbackAt(string $utc): ChatMessageFeedback
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'feedback window test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -58,7 +58,7 @@ function seedFeedbackAt(string $utc): ChatMessageFeedback
     ]);
 
     return ChatMessageFeedback::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'message_id' => $messageId,

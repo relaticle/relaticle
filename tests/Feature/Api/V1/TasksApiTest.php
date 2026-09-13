@@ -12,8 +12,8 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -28,8 +28,8 @@ mutates(
 );
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('requires authentication', function (): void {
@@ -39,8 +39,8 @@ it('requires authentication', function (): void {
 it('can list tasks', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Task::query()->where('team_id', $this->team->id)->count();
-    Task::factory(3)->recycle([$this->user, $this->team])->create();
+    $seeded = Task::query()->where('workspace_id', $this->workspace->id)->count();
+    Task::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/tasks')
         ->assertOk()
@@ -63,7 +63,7 @@ it('can create a task', function (): void {
                     ->where('creation_source', CreationSource::API->value)
                     ->whereType('created_at', 'string')
                     ->whereType('custom_fields', 'array')
-                    ->missing('team_id')
+                    ->missing('workspace_id')
                     ->missing('creator_id')
                     ->etc()
                 )
@@ -71,7 +71,7 @@ it('can create a task', function (): void {
             )
         );
 
-    $this->assertDatabaseHas('tasks', ['title' => 'Fix bug', 'team_id' => $this->team->id]);
+    $this->assertDatabaseHas('tasks', ['title' => 'Fix bug', 'workspace_id' => $this->workspace->id]);
 });
 
 it('validates required fields on create', function (): void {
@@ -86,7 +86,7 @@ it('validates a required custom field on create', function (): void {
     Sanctum::actingAs($this->user);
 
     DB::table('custom_fields')
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->update(['validation_rules' => json_encode(['required' => true])]);
@@ -99,10 +99,10 @@ it('validates a required custom field on create', function (): void {
 it('lets an update omit a required custom field it does not touch', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Before']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Before']);
 
     DB::table('custom_fields')
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->update(['validation_rules' => json_encode(['required' => true])]);
@@ -115,7 +115,7 @@ it('lets an update omit a required custom field it does not touch', function ():
 it('can show a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Show Test']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Show Test']);
 
     $this->getJson("/api/v1/tasks/{$task->id}")
         ->assertOk()
@@ -127,7 +127,7 @@ it('can show a task', function (): void {
                     ->where('title', 'Show Test')
                     ->whereType('creation_source', 'string')
                     ->whereType('custom_fields', 'array')
-                    ->missing('team_id')
+                    ->missing('workspace_id')
                     ->missing('creator_id')
                     ->etc()
                 )
@@ -139,7 +139,7 @@ it('can show a task', function (): void {
 it('can update a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $this->putJson("/api/v1/tasks/{$task->id}", ['title' => 'Updated Title'])
         ->assertOk()
@@ -160,7 +160,7 @@ it('can update a task', function (): void {
 it('can delete a task', function (): void {
     Sanctum::actingAs($this->user);
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $this->deleteJson("/api/v1/tasks/{$task->id}")
         ->assertNoContent();
@@ -168,12 +168,12 @@ it('can delete a task', function (): void {
     $this->assertSoftDeleted('tasks', ['id' => $task->id]);
 });
 
-it('scopes tasks to current team', function (): void {
-    $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['team_id' => Team::factory()->create()->id]));
+it('scopes tasks to current workspace', function (): void {
+    $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['workspace_id' => Workspace::factory()->create()->id]));
 
     Sanctum::actingAs($this->user);
 
-    $ownTask = Task::factory()->recycle([$this->user, $this->team])->create();
+    $ownTask = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = $this->getJson('/api/v1/tasks');
 
@@ -187,9 +187,9 @@ it('scopes tasks to current team', function (): void {
 it('can create a task with relationship ids', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     $this->postJson('/api/v1/tasks', [
         'title' => 'Linked task',
@@ -210,8 +210,8 @@ it('can create a task with relationship ids', function (): void {
 it('rejects cross-tenant relationship ids on task create', function (): void {
     Sanctum::actingAs($this->user);
 
-    $otherTeam = Team::factory()->create();
-    $otherCompany = Company::factory()->for($otherTeam)->create();
+    $otherWorkspace = Workspace::factory()->create();
+    $otherCompany = Company::factory()->for($otherWorkspace)->create();
 
     $this->postJson('/api/v1/tasks', [
         'title' => 'Should fail',
@@ -224,9 +224,9 @@ it('rejects cross-tenant relationship ids on task create', function (): void {
 it('reports per-item validation errors with correct array index', function (): void {
     Sanctum::actingAs($this->user);
 
-    $validCompany = Company::factory()->recycle([$this->user, $this->team])->create();
-    $otherTeam = Team::factory()->create();
-    $invalidCompany = Company::factory()->for($otherTeam)->create();
+    $validCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherWorkspace = Workspace::factory()->create();
+    $invalidCompany = Company::factory()->for($otherWorkspace)->create();
 
     $this->postJson('/api/v1/tasks', [
         'title' => 'Mixed valid and invalid',
@@ -238,31 +238,31 @@ it('reports per-item validation errors with correct array index', function (): v
 });
 
 describe('cross-tenant isolation', function (): void {
-    it('cannot show a task from another team', function (): void {
+    it('cannot show a task from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->getJson("/api/v1/tasks/{$otherTask->id}")
             ->assertNotFound();
     });
 
-    it('cannot update a task from another team', function (): void {
+    it('cannot update a task from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->putJson("/api/v1/tasks/{$otherTask->id}", ['title' => 'Hacked'])
             ->assertNotFound();
     });
 
-    it('cannot delete a task from another team', function (): void {
+    it('cannot delete a task from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherTask = Task::withoutEvents(fn () => Task::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->deleteJson("/api/v1/tasks/{$otherTask->id}")
             ->assertNotFound();
@@ -273,7 +273,7 @@ describe('includes', function (): void {
     it('can include creator on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=creator")
             ->assertOk()
@@ -295,7 +295,7 @@ describe('includes', function (): void {
     it('can include creator on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->recycle([$this->user, $this->team])->create();
+        Task::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/tasks?include=creator')
             ->assertOk()
@@ -309,7 +309,7 @@ describe('includes', function (): void {
     it('can include assignees on show endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
         $task->assignees()->attach($this->user);
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=assignees")
@@ -324,7 +324,7 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
         $task->assignees()->attach($this->user);
 
         $this->getJson("/api/v1/tasks/{$task->id}?include=creator,assignees")
@@ -339,7 +339,7 @@ describe('includes', function (): void {
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
         $response = $this->getJson("/api/v1/tasks/{$task->id}")
             ->assertOk();
@@ -350,7 +350,7 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
         $response = $this->getJson('/api/v1/tasks?include=assigneesCount');
 
@@ -373,8 +373,8 @@ describe('filtering and sorting', function (): void {
     it('ignores assigned_to_me filter when value is false', function (): void {
         Sanctum::actingAs($this->user);
 
-        $unassignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unassigned']);
-        $assignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Assigned']);
+        $unassignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned']);
+        $assignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Assigned']);
         $assignedTask->assignees()->attach($this->user);
 
         $this->getJson('/api/v1/tasks?filter[assigned_to_me]=false')
@@ -386,8 +386,8 @@ describe('filtering and sorting', function (): void {
     it('can filter tasks by title', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Fix login bug']);
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Deploy to staging']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Fix login bug']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Deploy to staging']);
 
         $response = $this->getJson('/api/v1/tasks?filter[title]=login');
 
@@ -401,8 +401,8 @@ describe('filtering and sorting', function (): void {
     it('can sort tasks by title ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Task']);
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Task']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Zulu Task']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Alpha Task']);
 
         $response = $this->getJson('/api/v1/tasks?sort=title');
 
@@ -417,8 +417,8 @@ describe('filtering and sorting', function (): void {
     it('can sort tasks by title descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Alpha Task']);
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Zulu Task']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Alpha Task']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Zulu Task']);
 
         $response = $this->getJson('/api/v1/tasks?sort=-title');
 
@@ -433,14 +433,14 @@ describe('filtering and sorting', function (): void {
     it('rejects disallowed filter fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        $this->getJson('/api/v1/tasks?filter[team_id]=fake')
+        $this->getJson('/api/v1/tasks?filter[workspace_id]=fake')
             ->assertStatus(400);
     });
 
     it('rejects disallowed sort fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        $this->getJson('/api/v1/tasks?sort=team_id')
+        $this->getJson('/api/v1/tasks?sort=workspace_id')
             ->assertStatus(400);
     });
 });
@@ -449,7 +449,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(5)->recycle([$this->user, $this->team])->create();
+        Task::factory(5)->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/tasks?per_page=2')
             ->assertOk()
@@ -459,7 +459,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(5)->recycle([$this->user, $this->team])->create();
+        Task::factory(5)->recycle([$this->user, $this->workspace])->create();
 
         $page1 = $this->getJson('/api/v1/tasks?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/tasks?per_page=3&page=2');
@@ -483,7 +483,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Task::factory(2)->recycle([$this->user, $this->team])->create();
+        Task::factory(2)->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/tasks?page=999')
             ->assertOk()
@@ -492,19 +492,19 @@ describe('pagination', function (): void {
 });
 
 describe('mass assignment protection', function (): void {
-    it('ignores team_id in create request', function (): void {
+    it('ignores workspace_id in create request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
+        $otherWorkspace = Workspace::factory()->create();
 
         $this->postJson('/api/v1/tasks', [
             'title' => 'Test Task',
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ])
             ->assertCreated();
 
         $task = Task::query()->where('title', 'Test Task')->first();
-        expect($task->team_id)->toBe($this->team->id);
+        expect($task->workspace_id)->toBe($this->workspace->id);
     });
 
     it('ignores creator_id in create request', function (): void {
@@ -522,19 +522,19 @@ describe('mass assignment protection', function (): void {
         expect($task->creator_id)->toBe($this->user->id);
     });
 
-    it('ignores team_id in update request', function (): void {
+    it('ignores workspace_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
-        $otherTeam = Team::factory()->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+        $otherWorkspace = Workspace::factory()->create();
 
         $this->putJson("/api/v1/tasks/{$task->id}", [
             'title' => 'Updated',
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ])
             ->assertOk();
 
-        expect($task->refresh()->team_id)->toBe($this->team->id);
+        expect($task->refresh()->workspace_id)->toBe($this->workspace->id);
     });
 });
 
@@ -575,8 +575,8 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted tasks from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
-        $deleted = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+        $deleted = Task::factory()->recycle([$this->user, $this->workspace])->create();
         $deleted->delete();
 
         $ids = collect($this->getJson('/api/v1/tasks')->json('data'))->pluck('id');
@@ -587,7 +587,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted task', function (): void {
         Sanctum::actingAs($this->user);
 
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
         $task->delete();
 
         $this->getJson("/api/v1/tasks/{$task->id}")
@@ -607,9 +607,9 @@ describe('non-existent record', function (): void {
 it('validates large arrays of relationship ids in a bounded number of queries', function (): void {
     Sanctum::actingAs($this->user);
 
-    $companies = Company::factory()->count(10)->recycle([$this->user, $this->team])->create();
-    $people = People::factory()->count(10)->recycle([$this->user, $this->team])->create();
-    $opportunities = Opportunity::factory()->count(10)->recycle([$this->user, $this->team])->create();
+    $companies = Company::factory()->count(10)->recycle([$this->user, $this->workspace])->create();
+    $people = People::factory()->count(10)->recycle([$this->user, $this->workspace])->create();
+    $opportunities = Opportunity::factory()->count(10)->recycle([$this->user, $this->workspace])->create();
 
     DB::enableQueryLog();
     DB::flushQueryLog();
@@ -623,9 +623,9 @@ it('validates large arrays of relationship ids in a bounded number of queries', 
 
     $log = DB::getQueryLog();
 
-    $companyLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'team_id'))->count();
-    $peopleLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "people"') && str_contains($q['query'], 'team_id'))->count();
-    $opportunityLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "opportunities"') && str_contains($q['query'], 'team_id'))->count();
+    $companyLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'workspace_id'))->count();
+    $peopleLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "people"') && str_contains($q['query'], 'workspace_id'))->count();
+    $opportunityLookupCount = collect($log)->filter(fn (array $q): bool => str_contains($q['query'], 'from "opportunities"') && str_contains($q['query'], 'workspace_id'))->count();
 
     expect($companyLookupCount)->toBeLessThanOrEqual(3, 'company validation should not be N+1');
     expect($peopleLookupCount)->toBeLessThanOrEqual(3, 'people validation should not be N+1');

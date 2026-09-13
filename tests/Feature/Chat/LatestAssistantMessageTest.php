@@ -20,7 +20,7 @@ function latestAssistantSeedConversation(User $user, string $title = 'T'): strin
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => $title,
         'created_at' => now(),
         'updated_at' => now(),
@@ -55,7 +55,7 @@ function latestAssistantSeedMessage(User $user, string $conversationId, array $o
 }
 
 it('returns the persisted latest assistant message for reconciliation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user);
@@ -68,13 +68,13 @@ it('returns the persisted latest assistant message for reconciliation', function
 });
 
 it('returns still-pending proposal cards so a dropped tool_result can be reconciled (R7)', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user);
     latestAssistantSeedMessage($user, $conversationId, ['content' => 'Proposed it']);
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => CreateTask::class,
@@ -96,13 +96,13 @@ it('returns still-pending proposal cards so a dropped tool_result can be reconci
 });
 
 it('does not return resolved or expired cards for reconciliation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId, 'participant_type' => 'user', 'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(), 'title' => 'T',
+        'workspace_id' => $user->currentWorkspace->getKey(), 'title' => 'T',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     DB::table('agent_conversation_messages')->insert([
@@ -114,7 +114,7 @@ it('does not return resolved or expired cards for reconciliation', function (): 
         'created_at' => now(), 'updated_at' => now(),
     ]);
     $base = [
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => $conversationId, 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'x'], 'display_data' => ['title' => 'x'],
@@ -129,7 +129,7 @@ it('does not return resolved or expired cards for reconciliation', function (): 
 });
 
 it('returns the most recent assistant message when several exist', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user);
@@ -172,7 +172,7 @@ it('returns the most recent assistant message when several exist', function (): 
 });
 
 it('returns null when the conversation has no assistant message', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user);
@@ -200,7 +200,7 @@ it('returns null when the conversation has no assistant message', function (): v
 });
 
 it('returns null when there is no conversation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $component = Livewire::test(ChatInterface::class);
@@ -209,15 +209,15 @@ it('returns null when there is no conversation', function (): void {
 });
 
 it('does not leak another tenant assistant message (cross-tenant scoping)', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $attacker = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $attacker = User::factory()->withPersonalWorkspace()->create();
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => 'Secret',
         'created_at' => now(),
         'updated_at' => now(),
@@ -254,7 +254,7 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
  * stayed missing until a full page reload.
  */
 it('returns display blocks from a client-supplied id when the server property is unset (first turn)', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user);
@@ -293,15 +293,15 @@ it('returns display blocks from a client-supplied id when the server property is
 });
 
 it('does not leak another tenant assistant message via a client-supplied id', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $attacker = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $attacker = User::factory()->withPersonalWorkspace()->create();
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => 'Secret',
         'created_at' => now(),
         'updated_at' => now(),
@@ -330,7 +330,7 @@ it('does not leak another tenant assistant message via a client-supplied id', fu
 });
 
 it('exposes the conversation title for header sync', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user, 'Create 3 random companies');
@@ -341,7 +341,7 @@ it('exposes the conversation title for header sync', function (): void {
 });
 
 it('resolves the title from a client-supplied id when the server property is unset (first turn)', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = latestAssistantSeedConversation($user, 'What companies do I have?');
@@ -353,15 +353,15 @@ it('resolves the title from a client-supplied id when the server property is uns
 });
 
 it('does not leak another tenant conversation title via a client-supplied id', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $attacker = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $attacker = User::factory()->withPersonalWorkspace()->create();
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => 'Secret title',
         'created_at' => now(),
         'updated_at' => now(),

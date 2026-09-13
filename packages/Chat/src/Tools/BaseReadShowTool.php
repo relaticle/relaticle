@@ -132,7 +132,7 @@ abstract class BaseReadShowTool implements Tool
         $id = $request->string('id');
         $modelClass = $this->modelClass();
         $model = $modelClass::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($id)
             ->first();
 
@@ -197,7 +197,7 @@ abstract class BaseReadShowTool implements Tool
     {
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
             $model,
-            resolve(DisplayFieldSelector::class)->cardFields($user->currentTeam, $this->citationType()),
+            resolve(DisplayFieldSelector::class)->cardFields($user->currentWorkspace, $this->citationType()),
             self::FREE_TEXT_LIMIT,
         );
 
@@ -310,15 +310,15 @@ abstract class BaseReadShowTool implements Tool
 
         foreach ($includes as $relationName) {
             // Scoped like the load below it: an unscoped count would report a
-            // cross-team related record the items list then omits, so the same
+            // cross-workspace related record the items list then omits, so the same
             // relation would show two different totals here and in a list row.
             $model->loadCount([$relationName => function (Builder $query) use ($user): void {
-                $query->whereBelongsTo($user->currentTeam);
+                $query->whereBelongsTo($user->currentWorkspace);
             }]);
             $model->load([$relationName => function (Relation $query) use ($user): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
-                $query->whereBelongsTo($user->currentTeam)
+                $query->whereBelongsTo($user->currentWorkspace)
                     ->with(self::CUSTOM_FIELD_RELATION)
                     ->latest($orderColumn)
                     ->limit(self::INCLUDE_LIMIT);

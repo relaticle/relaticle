@@ -40,7 +40,7 @@ final class CreateCompanyTool extends BaseCreateTool
     {
         return [
             'name' => $schema->string()->description('The company name.')->required(),
-            'account_owner_id' => $schema->string()->description('Team member ID responsible for this company. Use whoami to discover valid IDs.'),
+            'account_owner_id' => $schema->string()->description('Workspace member ID responsible for this company. Use whoami to discover valid IDs.'),
         ];
     }
 
@@ -48,7 +48,7 @@ final class CreateCompanyTool extends BaseCreateTool
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentTeam->allUsers()->pluck('id')->all())],
+            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentWorkspace->allUsers()->pluck('id')->all())],
         ];
     }
 }

@@ -36,7 +36,7 @@ final readonly class ListPeople
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(
-            People::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            People::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
             ->allowedFilters(

@@ -40,7 +40,7 @@ final class UpdateCompanyTool extends BaseUpdateTool
     {
         return [
             'name' => $schema->string()->description('The company name.'),
-            'account_owner_id' => $schema->string()->nullable()->description('Team member ID responsible for this company. Pass null to clear it. Use whoami to discover valid IDs.'),
+            'account_owner_id' => $schema->string()->nullable()->description('Workspace member ID responsible for this company. Pass null to clear it. Use whoami to discover valid IDs.'),
         ];
     }
 
@@ -48,7 +48,7 @@ final class UpdateCompanyTool extends BaseUpdateTool
     {
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentTeam->allUsers()->pluck('id')->all())],
+            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentWorkspace->allUsers()->pluck('id')->all())],
         ];
     }
 }

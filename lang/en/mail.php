@@ -10,12 +10,12 @@ return [
         'unsubscribe' => 'Unsubscribe from the daily digest',
         'copyright' => '© :year :company',
         'reason' => [
-            'owner' => 'You received this because you own the :team workspace.',
-            'member' => 'You received this because you are a member of :team.',
-            'former_member' => 'You received this because you were a member of :team.',
+            'owner' => 'You received this because you own the :workspace workspace.',
+            'member' => 'You received this because you are a member of :workspace.',
+            'former_member' => 'You received this because you were a member of :workspace.',
             'digest' => 'You received this because you enabled the daily digest.',
-            'assignee' => 'You received this because a task in :team was assigned to you.',
-            'invitee' => 'You received this because :email was invited to :team.',
+            'assignee' => 'You received this because a task in :workspace was assigned to you.',
+            'invitee' => 'You received this because :email was invited to :workspace.',
             'contact' => 'You received this because someone submitted the contact form.',
             'account' => 'You received this because of a request on your :company account.',
             'onboarding' => 'You received this because you created a :company workspace.',
@@ -35,29 +35,29 @@ return [
     'trial_ending' => [
         'subject' => 'Your Pro trial ends in 3 days',
         'preheader' => 'Keep every AI model and 2,000 credits for one flat price',
-        'heading' => '3 days left on Pro for :team',
+        'heading' => '3 days left on Pro for :workspace',
         'ends_on' => 'Your 14-day Pro trial ends on :date.',
         'keeps' => 'Pro keeps every AI model, 2,000 monthly credits, and higher rate limits.',
         'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
-        'grandfathered' => 'If you do nothing, :team returns to its grandfathered Cloud Free plan. Your data is untouched.',
+        'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
         'paused' => 'If you do nothing, Cloud access pauses when the trial ends. Your data stays stored, and you can subscribe at any time to pick up where you left off.',
         'cta' => 'Keep Pro',
     ],
 
     'setup_nudge' => [
         'subject' => 'Your workspace is waiting',
-        'preheader' => 'One step gets :team working: :step',
-        'heading' => ':name, :team is still empty',
+        'preheader' => 'One step gets :workspace working: :step',
+        'heading' => ':name, :workspace is still empty',
         'step' => 'Next step: :step.',
         'cta' => 'Continue in :assistant',
     ],
 
     'task_assigned' => [
         'subject' => 'New task: :title',
-        'preheader' => 'Assigned to you in :team',
-        'preheader_without_team' => 'A task was assigned to you',
+        'preheader' => 'Assigned to you in :workspace',
+        'preheader_without_workspace' => 'A task was assigned to you',
         'heading' => 'You have a new task',
-        'team_label' => 'Workspace',
+        'workspace_label' => 'Workspace',
         'cta' => 'View task',
     ],
 
@@ -71,49 +71,49 @@ return [
         'cta' => 'View all my tasks',
     ],
 
-    'team_invitation' => [
-        'subject' => ':inviter invited you to :team',
-        'subject_without_inviter' => 'You were invited to :team',
-        'preheader' => 'Join :team on Relaticle as :role',
-        'heading' => 'Join :team',
-        'line_with_inviter' => ':inviter invited you to the :team workspace on Relaticle with :role access.',
-        'line' => 'You were invited to the :team workspace on Relaticle with :role access.',
+    'workspace_invitation' => [
+        'subject' => ':inviter invited you to :workspace',
+        'subject_without_inviter' => 'You were invited to :workspace',
+        'preheader' => 'Join :workspace on Relaticle as :role',
+        'heading' => 'Join :workspace',
+        'line_with_inviter' => ':inviter invited you to the :workspace workspace on Relaticle with :role access.',
+        'line' => 'You were invited to the :workspace workspace on Relaticle with :role access.',
         'expiry' => 'This invitation expires :expiry.',
         'ignore' => 'Not expecting this? Ignore this email.',
         'cta' => 'Accept invitation',
     ],
 
-    'team_deletion_scheduled' => [
-        'subject' => ':team is scheduled for deletion',
+    'workspace_deletion_scheduled' => [
+        'subject' => ':workspace is scheduled for deletion',
         'preheader' => 'Deletes on :date. Cancel any time before then',
-        'heading' => ':team will be deleted on :date',
-        'removes' => 'Contacts, companies, tasks, opportunities, notes, and every other record in :team are removed after that date.',
+        'heading' => ':workspace will be deleted on :date',
+        'removes' => 'Contacts, companies, tasks, opportunities, notes, and every other record in :workspace are removed after that date.',
         'cancel' => 'You can cancel from the workspace settings at any time before then.',
         'cta' => 'Cancel deletion',
     ],
 
-    'team_deletion_reminder' => [
-        'subject' => ':team deletes in :days day|:team deletes in :days days',
+    'workspace_deletion_reminder' => [
+        'subject' => ':workspace deletes in :days day|:workspace deletes in :days days',
         'preheader' => 'Last reminder before :date',
-        'heading' => ':days day until :team is deleted|:days days until :team is deleted',
-        'final' => 'This is the last reminder. Everything in :team is removed after :date.',
+        'heading' => ':days day until :workspace is deleted|:days days until :workspace is deleted',
+        'final' => 'This is the last reminder. Everything in :workspace is removed after :date.',
         'cancel' => 'You can cancel from the workspace settings at any time before then.',
         'cta' => 'Cancel deletion',
     ],
 
-    'team_deletion_cancelled' => [
-        'subject' => ':team deletion cancelled',
+    'workspace_deletion_cancelled' => [
+        'subject' => ':workspace deletion cancelled',
         'preheader' => 'Your data is safe',
-        'heading' => ':team is staying',
-        'body' => 'The scheduled deletion of :team was cancelled. Nothing was removed.',
-        'cta' => 'Open :team',
+        'heading' => ':workspace is staying',
+        'body' => 'The scheduled deletion of :workspace was cancelled. Nothing was removed.',
+        'cta' => 'Open :workspace',
     ],
 
-    'team_member_removed' => [
-        'subject' => 'You were removed from :team',
+    'workspace_member_removed' => [
+        'subject' => 'You were removed from :workspace',
         'preheader' => 'You no longer have access to this workspace',
-        'heading' => 'You were removed from :team',
-        'body' => 'Your access to :team and its records ended. Your other workspaces are unaffected.',
+        'heading' => 'You were removed from :workspace',
+        'body' => 'Your access to :workspace and its records ended. Your other workspaces are unaffected.',
         'cta' => 'Open Relaticle',
     ],
 

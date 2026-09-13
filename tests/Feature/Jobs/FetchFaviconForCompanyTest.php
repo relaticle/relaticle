@@ -16,13 +16,13 @@ use Illuminate\Support\Facades\Storage;
 mutates(FetchFaviconForCompany::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 test('job declares timeout, tries, uniqueFor consistent with horizon worker timeout', function (): void {
-    $job = new FetchFaviconForCompany(Company::factory()->for($this->user->currentTeam)->create());
+    $job = new FetchFaviconForCompany(Company::factory()->for($this->user->currentWorkspace)->create());
 
     expect($job->tries)->toBe(1)
         ->and($job->timeout)->toBe(30)
@@ -30,7 +30,7 @@ test('job declares timeout, tries, uniqueFor consistent with horizon worker time
 });
 
 test('job swallows throwable from favicon driver instead of letting it escape', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     $domainsField = CustomField::query()
         ->where('code', CompanyField::DOMAINS->value)
@@ -38,7 +38,7 @@ test('job swallows throwable from favicon driver instead of letting it escape', 
         ->firstOrFail();
 
     CustomFieldValue::forceCreate([
-        'tenant_id' => $this->user->currentTeam->getKey(),
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domainsField->getKey(),
@@ -57,7 +57,7 @@ test('job swallows throwable from favicon driver instead of letting it escape', 
 });
 
 test('job rejects favicon url that resolves to private address', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     $domainsField = CustomField::query()
         ->where('code', CompanyField::DOMAINS->value)
@@ -65,7 +65,7 @@ test('job rejects favicon url that resolves to private address', function (): vo
         ->firstOrFail();
 
     CustomFieldValue::forceCreate([
-        'tenant_id' => $this->user->currentTeam->getKey(),
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domainsField->getKey(),
@@ -87,7 +87,7 @@ test('job rejects favicon url that resolves to private address', function (): vo
 test('downloads the favicon through the guarded client and stores it', function (): void {
     Storage::fake('public');
 
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     $domainsField = CustomField::query()
         ->where('code', CompanyField::DOMAINS->value)
@@ -95,7 +95,7 @@ test('downloads the favicon through the guarded client and stores it', function 
         ->firstOrFail();
 
     CustomFieldValue::forceCreate([
-        'tenant_id' => $this->user->currentTeam->getKey(),
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domainsField->getKey(),
@@ -121,11 +121,11 @@ test('downloads the favicon through the guarded client and stores it', function 
 test('downloads the favicon when the company carries several custom field values', function (): void {
     Storage::fake('public');
 
-    $company = Company::factory()->for($this->user->currentTeam)->create();
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
 
     foreach ([CompanyField::DOMAINS->value => ['example.com'], CompanyField::LINKEDIN->value => 'www.linkedin.com/company/example'] as $code => $value) {
         CustomFieldValue::forceCreate([
-            'tenant_id' => $this->user->currentTeam->getKey(),
+            'tenant_id' => $this->user->currentWorkspace->getKey(),
             'entity_type' => 'company',
             'entity_id' => $company->getKey(),
             'custom_field_id' => CustomField::query()->where('code', $code)->forEntity(Company::class)->firstOrFail()->getKey(),

@@ -56,7 +56,7 @@ const RECORDS_TABLE_COLLAPSE_ROWS = 10;
 // is a defense-in-depth measure (in normal operation login/logout are hard
 // navigations that already wipe `window`), not the only thing keeping
 // conversations apart: conversation ids are unique per row regardless of
-// team, so there is no id collision vector between two different teams'
+// workspace, so there is no id collision vector between two different workspaces'
 // conversations to begin with.
 function conversationCacheEntries(userId) {
     const existing = window.__chatConversationCache;
@@ -394,9 +394,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     // Only columns THIS build named are ours to translate, and the map is
-    // keyed by block type so a team's own custom field can share a key with
+    // keyed by block type so a workspace's own custom field can share a key with
     // one of ours without inheriting our label: a records_table's non-core
-    // columns are custom fields, named by the team in the team's own words,
+    // columns are custom fields, named by the workspace in the workspace's own words,
     // while an activity table's columns are all ours.
     blockColumnLabel(block, column) {
         return blockColumnLabels[block?.type]?.[column?.key] ?? (column?.label || '');

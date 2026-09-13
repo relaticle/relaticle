@@ -25,11 +25,11 @@ it('renders the widget', function (): void {
 it('opens its window at midnight on the administrator calendar', function (): void {
     $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
 
-    $owner = User::factory()->withTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     $company = fn (string $utc): Company => Company::withoutEvents(fn (): Company => Company::factory()
-        ->for($team)
+        ->for($workspace)
         ->create([
             'creator_id' => $owner->id,
             'creation_source' => CreationSource::WEB,

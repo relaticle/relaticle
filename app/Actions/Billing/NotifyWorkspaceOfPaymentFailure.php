@@ -6,8 +6,8 @@ namespace App\Actions\Billing;
 
 use App\Enums\Plan;
 use App\Filament\Pages\Billing;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -20,17 +20,17 @@ use Filament\Support\Icons\Heroicon;
  */
 final readonly class NotifyWorkspaceOfPaymentFailure
 {
-    public function execute(Team $team): void
+    public function execute(Workspace $workspace): void
     {
-        $owner = $team->owner()->first();
+        $owner = $workspace->owner()->first();
 
         if (! $owner instanceof User) {
             return;
         }
 
         Notification::make()
-            ->title(__('billing.payment_failed.notification_title', ['workspace' => $team->name]))
-            ->body($team->plan === Plan::Enterprise
+            ->title(__('billing.payment_failed.notification_title', ['workspace' => $workspace->name]))
+            ->body($workspace->plan === Plan::Enterprise
                 ? __('billing.enterprise.previous_subscription_past_due')
                 : __('billing.payment_failed.notification_body'))
             ->icon(Heroicon::OutlinedExclamationTriangle)
@@ -41,7 +41,7 @@ final readonly class NotifyWorkspaceOfPaymentFailure
                     ->label(__('billing.payment_failed.notification_action'))
                     // A webhook binds no Filament tenant, so the panel and tenant
                     // have to be named or getUrl() resolves against neither.
-                    ->url(Billing::getUrl(panel: 'app', tenant: $team))
+                    ->url(Billing::getUrl(panel: 'app', tenant: $workspace))
                     ->markAsRead(),
             ])
             ->sendToDatabase($owner);

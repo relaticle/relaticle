@@ -9,8 +9,8 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Query\JoinClause;
 use Laravel\Ai\Contracts\Tool;
@@ -100,19 +100,19 @@ final class AggregateCrmTool implements Tool
     {
         abort_unless($user->can('viewAny', People::class), 403);
 
-        /** @var Team $team */
-        $team = $user->currentTeam;
+        /** @var Workspace $workspace */
+        $workspace = $user->currentWorkspace;
 
         // Rooted in companies, not people: a company with no contacts has to appear
         // as a zero row. Grouped from the people side it would be missing entirely,
         // and "which company has the most contacts" would be answered off a list
         // that silently drops every company the answer might be about.
         $rows = Company::query()
-            ->whereBelongsTo($team)
-            ->leftJoin('people', function (JoinClause $join) use ($team): void {
+            ->whereBelongsTo($workspace)
+            ->leftJoin('people', function (JoinClause $join) use ($workspace): void {
                 $join->on('people.company_id', '=', 'companies.id')
                     ->whereNull('people.deleted_at')
-                    ->where('people.team_id', $team->getKey());
+                    ->where('people.workspace_id', $workspace->getKey());
             })
             ->groupBy('companies.id', 'companies.name')
             ->selectRaw('companies.name as label, count(people.id) as count')
@@ -127,7 +127,7 @@ final class AggregateCrmTool implements Tool
 
         // Contacts attached to no company at all, plus any left pointing at a
         // deleted one: they are in total_count, so they need a row of their own.
-        $unassigned = People::query()->whereBelongsTo($team)->whereDoesntHave('company')->count();
+        $unassigned = People::query()->whereBelongsTo($workspace)->whereDoesntHave('company')->count();
 
         if ($unassigned > 0) {
             $mappedRows[] = ['label' => self::NO_COMPANY_LABEL, 'count' => $unassigned];
@@ -135,12 +135,12 @@ final class AggregateCrmTool implements Tool
         }
 
         // Counted separately rather than summed off $rows: the group list is
-        // capped, so summing it would under-report the moment a team has more
+        // capped, so summing it would under-report the moment a workspace has more
         // than MAX_COMPANY_GROUPS companies. Mirrors AggregateOpportunities::grandTotals().
         return (string) json_encode([
             'group_by' => 'people_per_company',
             'rows' => $mappedRows,
-            'total_count' => People::query()->whereBelongsTo($team)->count(),
+            'total_count' => People::query()->whereBelongsTo($workspace)->count(),
             'truncated' => $rows->count() === self::MAX_COMPANY_GROUPS,
         ], JSON_UNESCAPED_SLASHES);
     }
@@ -149,9 +149,9 @@ final class AggregateCrmTool implements Tool
     {
         abort_unless($user->can('viewAny', Task::class), 403);
 
-        /** @var Team $team */
-        $team = $user->currentTeam;
-        $tenantId = (string) $team->getKey();
+        /** @var Workspace $workspace */
+        $workspace = $user->currentWorkspace;
+        $tenantId = (string) $workspace->getKey();
 
         // Tenant filtered explicitly rather than through the ambient scope: this tool
         // runs inside the queued chat job, where no Filament tenant is bound.
@@ -176,7 +176,7 @@ final class AggregateCrmTool implements Tool
         $valueColumn = $field->getValueColumn();
 
         $rows = Task::query()
-            ->whereBelongsTo($team)
+            ->whereBelongsTo($workspace)
             ->leftJoin('custom_field_values as cfv', function (JoinClause $join) use ($tenantId, $field): void {
                 $join->on('cfv.entity_id', '=', 'tasks.id')
                     ->where('cfv.entity_type', 'task')

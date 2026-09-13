@@ -6,62 +6,62 @@ namespace App\Policies;
 
 use App\Models\Task;
 use App\Models\User;
-use App\Policies\Concerns\ChecksTeamWriteAccess;
+use App\Policies\Concerns\ChecksWorkspaceWriteAccess;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class TaskPolicy
 {
-    use ChecksTeamWriteAccess;
+    use ChecksWorkspaceWriteAccess;
     use HandlesAuthorization;
 
     public function viewAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $user->hasVerifiedEmail() && $user->currentWorkspace !== null;
     }
 
     public function view(User $user, Task $task): bool
     {
-        return $user->belongsToTeamId($task->team_id);
+        return $user->belongsToWorkspaceId($task->workspace_id);
     }
 
     public function create(User $user): bool
     {
-        return $this->canCreateInCurrentTeam($user);
+        return $this->canCreateInCurrentWorkspace($user);
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $this->canWriteInTeam($user, $task->team_id);
+        return $this->canWriteInWorkspace($user, $task->workspace_id);
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $this->canWriteInTeam($user, $task->team_id);
+        return $this->canWriteInWorkspace($user, $task->workspace_id);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $this->canCreateInCurrentTeam($user);
+        return $this->canCreateInCurrentWorkspace($user);
     }
 
     public function restore(User $user, Task $task): bool
     {
-        return $this->canWriteInTeam($user, $task->team_id);
+        return $this->canWriteInWorkspace($user, $task->workspace_id);
     }
 
     public function restoreAny(User $user): bool
     {
-        return $this->canCreateInCurrentTeam($user);
+        return $this->canCreateInCurrentWorkspace($user);
     }
 
     public function forceDelete(User $user, Task $task): bool
     {
-        return $user->hasTeamRoleForTeamId($task->team_id, 'admin');
+        return $user->hasWorkspaceRoleForWorkspaceId($task->workspace_id, 'admin');
     }
 
     public function forceDeleteAny(User $user): bool
     {
-        return $user->hasTeamRole(Filament::getTenant(), 'admin');
+        return $user->hasWorkspaceRole(Filament::getTenant(), 'admin');
     }
 }

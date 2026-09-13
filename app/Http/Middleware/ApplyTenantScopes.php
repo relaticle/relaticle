@@ -8,7 +8,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\TeamScope;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use Closure;
@@ -25,15 +25,15 @@ final readonly class ApplyTenantScopes
         User::addGlobalScope(
             filament()->getTenancyScopeName(),
             fn (Builder $query) => $query
-                ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $tenantId))
-                ->orWhereHas('ownedTeams', fn (Builder $query) => $query->where('teams.id', $tenantId))
+                ->whereHas('workspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
+                ->orWhereHas('ownedWorkspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
         );
 
-        Company::addGlobalScope(new TeamScope);
-        People::addGlobalScope(new TeamScope);
-        Opportunity::addGlobalScope(new TeamScope);
-        Task::addGlobalScope(new TeamScope);
-        Note::addGlobalScope(new TeamScope);
+        Company::addGlobalScope(new WorkspaceScope);
+        People::addGlobalScope(new WorkspaceScope);
+        Opportunity::addGlobalScope(new WorkspaceScope);
+        Task::addGlobalScope(new WorkspaceScope);
+        Note::addGlobalScope(new WorkspaceScope);
 
         return $next($request);
     }

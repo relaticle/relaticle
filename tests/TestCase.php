@@ -53,8 +53,8 @@ abstract class TestCase extends BaseTestCase
         // directly (e.g. Shiki) is not intercepted.
         Process::preventStrayProcesses();
 
-        // TeamFactory creates personal teams, which fire CreateTeamCustomFields
-        // and seed a full demo workspace, ~91 extra rows per team, the majority
+        // WorkspaceFactory creates personal workspaces, which fire CreateWorkspaceCustomFields
+        // and seed a full demo workspace, ~91 extra rows per workspace, the majority
         // of every insert this suite performs. Tests that exercise onboarding or
         // read demo data re-enable it explicitly.
         Feature::define(OnboardSeed::class, false);

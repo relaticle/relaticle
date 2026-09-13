@@ -13,14 +13,14 @@ use Relaticle\Chat\Services\PendingActionService;
 mutates(PendingActionService::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
 });
 
 function makePendingAction(User $user, string $conversationId, string $name = 'Acme'): PendingAction
 {
     return PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => CreateCompany::class,
@@ -38,7 +38,7 @@ it('marks every still-pending action on the conversation as superseded and retur
         'id' => 'conv-supersede',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -62,7 +62,7 @@ it('does not touch already-resolved actions on the same conversation', function 
         'id' => 'conv-mixed',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -85,7 +85,7 @@ it('returns an empty list when there are no pending actions on the conversation'
         'id' => 'conv-empty',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),

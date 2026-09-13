@@ -33,10 +33,10 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 function peoplePicker(string $name): Select
@@ -91,7 +91,7 @@ function mediaQueryCount(): int
 }
 
 it('renders the person avatar in the people list name column', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Adam Clark']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
 
     livewire(ListPeople::class)
         ->assertSee('Adam Clark')
@@ -99,8 +99,8 @@ it('renders the person avatar in the people list name column', function (): void
 });
 
 it('renders the company entity icon in the people list company column', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->getKey()]);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->getKey()]);
 
     livewire(ListPeople::class)
         ->assertSee('Acme Corp')
@@ -108,15 +108,15 @@ it('renders the company entity icon in the people list company column', function
 });
 
 it('renders the company entity icon in the companies list name column', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
     livewire(ListCompanies::class)
         ->assertSee(CrmEntity::Company->iconPath(), escape: false);
 });
 
 it('renders an avatar for every related person in a multi-record column', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $people = People::factory(2)->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $people = People::factory(2)->recycle([$this->user, $this->workspace])->create();
     $note->people()->attach($people);
 
     $rendered = livewire(ManageNotes::class);
@@ -127,14 +127,14 @@ it('renders an avatar for every related person in a multi-record column', functi
 });
 
 it('renders the person avatar on the view page', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->assertSee($person->avatar, escape: false);
 });
 
 it('renders the company entity icon in a picker option label', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
     $label = peoplePicker('company_id')->getOptionLabelFromRecord($company);
 
@@ -143,7 +143,7 @@ it('renders the company entity icon in a picker option label', function (): void
 });
 
 it('escapes a record name in a picker option label', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create([
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
         'name' => '<script>alert(1)</script>',
     ]);
 
@@ -154,7 +154,7 @@ it('escapes a record name in a picker option label', function (): void {
 });
 
 it('loads company logos in one query when a picker preloads its options', function (): void {
-    Company::factory(3)->recycle([$this->user, $this->team])->create();
+    Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $picker = peoplePicker('company_id');
 
@@ -166,7 +166,7 @@ it('loads company logos in one query when a picker preloads its options', functi
 });
 
 it('loads company logos in one query on the companies list', function (): void {
-    Company::factory(3)->recycle([$this->user, $this->team])->create();
+    Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     DB::enableQueryLog();
     livewire(ListCompanies::class)->assertOk();
@@ -175,10 +175,10 @@ it('loads company logos in one query on the companies list', function (): void {
 });
 
 it('loads company logos in one query on the people list', function (): void {
-    $companies = Company::factory(3)->recycle([$this->user, $this->team])->create();
+    $companies = Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     foreach ($companies as $company) {
-        People::factory()->recycle([$this->user, $this->team])->create(['company_id' => $company->getKey()]);
+        People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->getKey()]);
     }
 
     DB::enableQueryLog();
@@ -189,7 +189,7 @@ it('loads company logos in one query on the people list', function (): void {
 
 it('renders member chips in the assignees filter and lets the caller order win', function (): void {
     $mate = User::factory()->create(['name' => 'Aaron Ant']);
-    $this->team->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'editor']);
 
     $page = livewire(ManageTasks::class)->instance();
     $field = assigneesFilterField($page);
@@ -202,7 +202,7 @@ it('renders member chips in the assignees filter and lets the caller order win',
 });
 
 it('falls back to the shared entity icon for a company with no logo', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
     $chip = RecordChip::forRecord($company);
 
@@ -213,15 +213,15 @@ it('falls back to the shared entity icon for a company with no logo', function (
 });
 
 it('gives two logoless companies the same icon, so colour only ever means a real logo', function (): void {
-    $acme = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    $zeta = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zeta Industries']);
+    $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    $zeta = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zeta Industries']);
 
     expect(RecordChip::forRecord($acme)->iconPath)->toBe(RecordChip::forRecord($zeta)->iconPath);
 });
 
 it('still colours people by name so two of them stay distinguishable', function (): void {
-    $adam = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Adam Clark']);
-    $zoe = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zoe Baker']);
+    $adam = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
+    $zoe = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zoe Baker']);
 
     expect($adam->avatar)->not->toBe($zoe->avatar)
         ->and(RecordChip::forRecord($adam)->iconPath)->toBeNull()
@@ -229,7 +229,7 @@ it('still colours people by name so two of them stay distinguishable', function 
 });
 
 it('carries the avatar in a global search result title', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
     $results = CompanyResource::getGlobalSearchResults('Acme');
 
@@ -239,8 +239,8 @@ it('carries the avatar in a global search result title', function (): void {
 });
 
 it('squares a company chip and rounds a person chip', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     $companyChip = RecordChip::forRecord($company)->toHtml();
     $personChip = RecordChip::forRecord($person)->toHtml();
@@ -251,7 +251,7 @@ it('squares a company chip and rounds a person chip', function (): void {
 });
 
 it('keeps a chip avatar smaller than the themed filament avatar', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     $chip = RecordChip::forRecord($person)->toHtml();
 
@@ -260,7 +260,7 @@ it('keeps a chip avatar smaller than the themed filament avatar', function (): v
 });
 
 it('renders no chip when the related record is missing', function (): void {
-    People::factory()->recycle([$this->user, $this->team])->create(['company_id' => null]);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => null]);
 
     livewire(ListPeople::class)->assertOk();
 

@@ -23,7 +23,7 @@ use Symfony\Component\Finder\Finder;
  * Covers both PHP array files and the top-level JSON file (e.g. `lang/en.json`).
  *
  * Snapshots live at `lang/.snapshots/<locale>.json` and should be committed
- * to the fork so team members share translation state.
+ * to the fork so workspace members share translation state.
  */
 #[Description('Compare keys/values between lang/en/ and lang/<locale>/, report missing, orphaned, and stale translations')]
 #[Signature('locale:diff

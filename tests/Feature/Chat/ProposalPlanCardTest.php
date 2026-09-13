@@ -21,10 +21,10 @@ mutates(ProposalCard::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 describe('plan card', function (): void {
@@ -137,7 +137,7 @@ it('refuses a client-set editing target, so one payload cannot open the same fie
 
 it('ignores skipItem and focusItem against another tenant\'s proposal', function (): void {
     Bus::fake();
-    $stranger = User::factory()->withPersonalTeam()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
     $foreignRecords = array_map(static fn (string $n): array => ['name' => $n], ['Contoso A', 'Contoso B']);
     $foreign = ProposalCardFixture::proposal($stranger, ['_batch' => true, 'records' => $foreignRecords], [
         'title' => 'Create Companies',
@@ -158,7 +158,7 @@ it('ignores skipItem and focusItem against another tenant\'s proposal', function
 });
 
 it('never resolves a dock read from a client-supplied id, so another tenant cannot be read through it', function (): void {
-    $stranger = User::factory()->withPersonalTeam()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
     $foreign = ProposalCardFixture::proposal(
         $stranger,
         ['name' => 'Contoso Holdings', 'account_owner_id' => (string) $stranger->getKey()],

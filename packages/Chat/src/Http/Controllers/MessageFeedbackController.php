@@ -42,7 +42,7 @@ final class MessageFeedbackController
                 'message_id' => $messageId,
             ],
             [
-                'team_id' => $user->current_team_id,
+                'workspace_id' => $user->current_workspace_id,
                 'conversation_id' => (string) $message->conversation_id,
                 'rating' => $validated['rating'],
                 'category' => $validated['category'] ?? null,
@@ -90,7 +90,7 @@ final class MessageFeedbackController
             ->where('m.id', $messageId)
             ->where('m.participant_type', $user->getMorphClass())
             ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
+            ->where('c.workspace_id', $user->current_workspace_id)
             ->where('m.role', 'assistant')
             ->first(['m.id', 'm.conversation_id', 'm.meta']);
     }

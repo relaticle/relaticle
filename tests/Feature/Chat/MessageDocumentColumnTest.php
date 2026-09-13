@@ -29,7 +29,7 @@ it('rejects null document on insert', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => null,
-        'team_id' => null,
+        'workspace_id' => null,
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),

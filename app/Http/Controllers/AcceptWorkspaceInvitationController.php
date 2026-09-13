@@ -1,0 +1,121 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers;
+
+use App\Actions\Jetstream\AcceptWorkspaceInvitation;
+use App\Enums\WorkspaceRole;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
+use Laravel\Jetstream\Jetstream;
+
+/**
+ * GET renders a confirm page and never mutates membership; POST is the only
+ * action that joins. Invitations resolve solely by the opaque minted token.
+ */
+final readonly class AcceptWorkspaceInvitationController
+{
+    public function show(Request $request, string $token): View|RedirectResponse
+    {
+        return $this->render($request, WorkspaceInvitation::findByRawToken($token));
+    }
+
+    public function store(Request $request, string $token, AcceptWorkspaceInvitation $acceptWorkspaceInvitation): RedirectResponse|View
+    {
+        $invitation = WorkspaceInvitation::findByRawToken($token);
+        $user = $this->user($request);
+
+        if (! $invitation instanceof WorkspaceInvitation || $invitation->isExpired()) {
+            return $this->render($request, $invitation);
+        }
+
+        if (! $this->emailMatches($user, $invitation)) {
+            return $this->render($request, $invitation);
+        }
+
+        $workspace = $acceptWorkspaceInvitation->execute($user, $invitation);
+
+        return $this->redirectToWorkspace($workspace, __('workspaces.accept.joined', ['workspace' => $workspace->name]));
+    }
+
+    private function emailMatches(User $user, WorkspaceInvitation $invitation): bool
+    {
+        return Str::lower($user->email) === Str::lower($invitation->email);
+    }
+
+    private function render(Request $request, ?WorkspaceInvitation $invitation): View|RedirectResponse
+    {
+        $user = $this->user($request);
+
+        if (! $invitation instanceof WorkspaceInvitation || $invitation->isExpired()) {
+            Log::warning('Invalid or expired invitation accessed', [
+                'invitation_id' => $invitation?->id,
+            ]);
+
+            return view('workspaces.accept-invitation', ['state' => 'expired']);
+        }
+
+        if (! $this->emailMatches($user, $invitation)) {
+            Log::warning('Invitation email mismatch', [
+                'invitation_id' => $invitation->id,
+                'user_id' => $user->id,
+            ]);
+
+            return view('workspaces.accept-invitation', [
+                'state' => 'wrong-account',
+                'invitedEmail' => $invitation->email,
+                'currentEmail' => $user->email,
+                'workspaceName' => $invitation->workspace->name,
+                'switchUrl' => route('workspace-invitations.token.switch', ['token' => $request->route('token')]),
+            ]);
+        }
+
+        if ($user->belongsToWorkspace($invitation->workspace)) {
+            $user->switchWorkspace($invitation->workspace);
+
+            return $this->redirectToWorkspace($invitation->workspace, __('workspaces.accept.already_member', ['workspace' => $invitation->workspace->name]));
+        }
+
+        return view('workspaces.accept-invitation', [
+            'state' => 'ready',
+            'workspaceName' => $invitation->workspace->name,
+            'workspaceAvatarUrl' => $invitation->workspace->getFilamentAvatarUrl(),
+            'inviterName' => $invitation->inviter?->name,
+            'roleName' => Jetstream::findRole($invitation->role)?->name,
+            'roleDescription' => WorkspaceRole::description($invitation->role),
+            'memberCount' => $invitation->workspace->users()->count() + 1,
+            'joinUrl' => route('workspace-invitations.token.join', ['token' => $request->route('token')]),
+        ]);
+    }
+
+    private function user(Request $request): User
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return $user;
+    }
+
+    // getHomeUrl() resolves through the ambient tenant, not the request user, so
+    // it must be primed when called from outside panel middleware.
+    private function redirectToWorkspace(Workspace $workspace, string $message): RedirectResponse
+    {
+        Filament::setTenant($workspace, isQuiet: true);
+
+        Notification::make()
+            ->title($message)
+            ->success()
+            ->send();
+
+        return redirect(Filament::getHomeUrl() ?? url()->getAppUrl());
+    }
+}

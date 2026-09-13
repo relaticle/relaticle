@@ -8,8 +8,8 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentTimezone;
@@ -31,11 +31,11 @@ function knownInstant(): CarbonImmutable
 
 function actAsTokyoUser(): User
 {
-    $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $user = User::factory()->withWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
     test()->actingAs($user);
     Filament::setCurrentPanel(Filament::getPanel('app'));
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     return $user;
 }
@@ -47,7 +47,7 @@ it('resolves the app panel timezone to the signed-in user', function (): void {
 });
 
 it('falls back to the app timezone for a user who has not set one', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => null]);
+    $user = User::factory()->withWorkspace()->create(['timezone' => null]);
     $this->actingAs($user);
     Filament::setCurrentPanel(Filament::getPanel('app'));
 
@@ -56,7 +56,7 @@ it('falls back to the app timezone for a user who has not set one', function ():
 });
 
 it('resolves each panel through its own guard, so a customer zone never leaks into sysadmin', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $user = User::factory()->withWorkspace()->create(['timezone' => 'Asia/Tokyo']);
     $this->actingAs($user);
 
     // The administrator has chosen no zone of their own, so the panel stays on UTC
@@ -70,11 +70,11 @@ it('resolves each panel through its own guard, so a customer zone never leaks in
 it('renders a stored utc datetime in the user timezone in the app panel', function (): void {
     $user = actAsTokyoUser();
 
-    /** @var Team $team */
-    $team = $user->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = $user->currentWorkspace;
 
     Note::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creator_id' => $user->getKey(),
         'created_at' => knownInstant(),
         'updated_at' => knownInstant(),
@@ -95,11 +95,11 @@ it('renders a stored utc datetime in the user timezone in the app panel', functi
 it('renders every app panel datetime in the format the panel declares', function (): void {
     $user = actAsTokyoUser();
 
-    /** @var Team $team */
-    $team = $user->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = $user->currentWorkspace;
 
     Note::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creator_id' => $user->getKey(),
         'created_at' => knownInstant(),
         'updated_at' => knownInstant(),
@@ -139,21 +139,21 @@ it('does not ship the timezone detection script to signed-out visitors', functio
 });
 
 it('ships the timezone detection script to a signed-in user who has none yet', function (): void {
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => null]);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => null]);
     $this->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
-    $this->get(Dashboard::getUrl(tenant: $user->personalTeam()))
+    $this->get(Dashboard::getUrl(tenant: $user->personalWorkspace()))
         ->assertOk()
         ->assertSee('resolvedOptions().timeZone', escape: false);
 });
 
 it('stops shipping the detection script once the user has a timezone', function (): void {
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
     $this->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
-    $this->get(Dashboard::getUrl(tenant: $user->personalTeam()))
+    $this->get(Dashboard::getUrl(tenant: $user->personalWorkspace()))
         ->assertOk()
         ->assertDontSee('resolvedOptions().timeZone', escape: false);
 });
@@ -167,13 +167,13 @@ it('stops shipping the detection script once the user has a timezone', function 
 it('renders a custom-field datetime on a record page in the panel format, not a raw literal', function (): void {
     $user = actAsTokyoUser();
 
-    /** @var Team $team */
-    $team = $user->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = $user->currentWorkspace;
 
-    TenantContextService::setTenantId($team->getKey());
+    TenantContextService::setTenantId($workspace->getKey());
 
     $field = CustomField::query()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'people')
         ->where('type', 'date-time')
         ->first();
@@ -184,7 +184,7 @@ it('renders a custom-field datetime on a record page in the panel format, not a 
             'code' => 'tz_meeting_at',
             'type' => 'date-time',
             'entity_type' => 'people',
-            'tenant_id' => $team->getKey(),
+            'tenant_id' => $workspace->getKey(),
             'sort_order' => 97,
             'active' => true,
             'system_defined' => false,
@@ -193,7 +193,7 @@ it('renders a custom-field datetime on a record page in the panel format, not a 
     }
 
     $person = People::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'creator_id' => $user->getKey(),
     ]);
     $person->saveCustomFieldValue($field, knownInstant()->toDateTimeString());

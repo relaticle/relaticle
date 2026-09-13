@@ -49,7 +49,7 @@ final readonly class PlanReferenceValidator
 
         $referenced = PendingAction::query()
             ->whereKey(PlanReference::actionId($target))
-            ->where('team_id', $user->currentTeam->getKey())
+            ->where('workspace_id', $user->currentWorkspace->getKey())
             ->where('user_id', $user->getKey())
             ->where('conversation_id', $conversationId)
             ->where('turn_id', $turnId)

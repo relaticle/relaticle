@@ -9,7 +9,7 @@ use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
-use App\Http\Middleware\SetApiTeamContext;
+use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
@@ -124,7 +124,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->prependToPriorityList(
             before: SubstituteBindings::class,
-            prepend: SetApiTeamContext::class,
+            prepend: SetApiWorkspaceContext::class,
         );
 
         // Textual order in a route's middleware array does not decide execution
@@ -160,7 +160,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // The login page's signup branch handles both an invited email that
             // already has an account and one that does not, from the same URL,
             // and a shared join link carries no email to tell them apart with.
-            if ($request->routeIs('team-invitations.token.accept', 'teams.join')) {
+            if ($request->routeIs('workspace-invitations.token.accept', 'workspaces.join')) {
                 return Filament::getLoginUrl();
             }
 

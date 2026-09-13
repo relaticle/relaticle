@@ -14,9 +14,9 @@ mutates(Dashboard::class);
 it('shows good morning for a Tokyo user at 6am local time', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-04-19 21:00:00', new DateTimeZone('UTC'))); // 06:00 JST next day
 
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     Livewire::test(Dashboard::class)->assertSee('Good morning');
 });
@@ -24,9 +24,9 @@ it('shows good morning for a Tokyo user at 6am local time', function (): void {
 it('shows good evening for a Los Angeles user at 9pm local time', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-04-20 04:00:00', new DateTimeZone('UTC'))); // 21:00 LA prev day
 
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => 'America/Los_Angeles']);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'America/Los_Angeles']);
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     Livewire::test(Dashboard::class)->assertSee('Good evening');
 });
@@ -34,9 +34,9 @@ it('shows good evening for a Los Angeles user at 9pm local time', function (): v
 it('greets without a time of day while the timezone is still unknown', function (): void {
     $this->travelTo(new DateTimeImmutable('2026-04-19 10:00:00', new DateTimeZone('UTC')));
 
-    $user = User::factory()->withPersonalTeam()->create(['name' => 'Casey Lee', 'timezone' => null]);
+    $user = User::factory()->withPersonalWorkspace()->create(['name' => 'Casey Lee', 'timezone' => null]);
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     Livewire::test(Dashboard::class)
         ->assertSee('Welcome, Casey.')
@@ -51,9 +51,9 @@ it('greets a fresh seeded workspace by the clock, with no assistant message in t
 
     Feature::define(OnboardSeed::class, true);
 
-    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed', 'timezone' => 'UTC']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed', 'timezone' => 'UTC']);
     $this->actingAs($owner);
-    Filament::setTenant($owner->currentTeam);
+    Filament::setTenant($owner->currentWorkspace);
 
     Livewire::test(Dashboard::class)
         ->assertSee('Good morning, Dana.')

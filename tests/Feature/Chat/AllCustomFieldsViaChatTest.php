@@ -32,15 +32,15 @@ use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-3333-7000-8000-000000000123',
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -48,7 +48,7 @@ beforeEach(function (): void {
 });
 
 it('updates the task description via custom_fields and persists as text_value', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => 'Long body text']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -57,7 +57,7 @@ it('updates the task description via custom_fields and persists as text_value', 
 });
 
 it('updates the task status by option label and persists the option id', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => 'In progress']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -66,7 +66,7 @@ it('updates the task status by option label and persists the option id', functio
 });
 
 it('updates the task priority by option label and persists the option id', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => 'High']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -75,7 +75,7 @@ it('updates the task priority by option label and persists the option id', funct
 });
 
 it('updates the task due_date via ISO 8601 and persists as datetime_value', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['due_date' => '2026-06-15T09:30:00Z']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -86,7 +86,7 @@ it('updates the task due_date via ISO 8601 and persists as datetime_value', func
 });
 
 it('updates company domains via custom_fields and persists as json_value', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $company, ['domains' => ['acme.com', 'acme.io']]);
     resolve(UpdateCompany::class)->execute($this->user, $company, latestPendingForCustomFieldsTest()->action_data);
@@ -96,7 +96,7 @@ it('updates company domains via custom_fields and persists as json_value', funct
 });
 
 it('updates the note body via custom_fields and persists as text_value', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'N']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'N']);
 
     runUpdateToolForCustomFieldsTest(UpdateNoteTool::class, $note, ['body' => 'Body text']);
     resolve(UpdateNote::class)->execute($this->user, $note, latestPendingForCustomFieldsTest()->action_data);
@@ -105,10 +105,10 @@ it('updates the note body via custom_fields and persists as text_value', functio
 });
 
 it('updates the opportunity stage by option label and persists the option id', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'O']);
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'O']);
 
     $stageLabel = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->firstOrFail()
@@ -123,7 +123,7 @@ it('updates the opportunity stage by option label and persists the option id', f
 });
 
 it('updates person emails via custom_fields and persists as json_value', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'P']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'P']);
 
     runUpdateToolForCustomFieldsTest(UpdatePersonTool::class, $person, ['emails' => ['p@example.com']]);
     resolve(UpdatePeople::class)->execute($this->user, $person, latestPendingForCustomFieldsTest()->action_data);
@@ -132,7 +132,7 @@ it('updates person emails via custom_fields and persists as json_value', functio
 });
 
 it('returns a tool error for an unknown custom field code', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
@@ -146,7 +146,7 @@ it('returns a tool error for an unknown custom field code', function (): void {
 });
 
 it('returns a tool error for an unknown option label on a choice field', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000123');
@@ -183,7 +183,7 @@ function latestPendingForCustomFieldsTest(): PendingAction
 }
 
 it('clears a single-choice custom field when chat passes null', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['priority' => 'High']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -197,7 +197,7 @@ it('clears a single-choice custom field when chat passes null', function (): voi
 });
 
 it('clears a text custom field when chat passes null', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['description' => 'Long body text']);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -213,7 +213,7 @@ it('clears a text custom field when chat passes null', function (): void {
 function rawValueForCustomFieldsTest(Model $model, string $code, string $column): mixed
 {
     $field = CustomField::query()
-        ->where('tenant_id', $model->getAttribute('team_id'))
+        ->where('tenant_id', $model->getAttribute('workspace_id'))
         ->where('entity_type', morphAliasForCustomFieldsTest($model))
         ->where('code', $code)
         ->firstOrFail();
@@ -252,7 +252,7 @@ function jsonValueForCustomFieldsTest(Model $model, string $code): ?array
 function optionLabelForCustomFieldsTest(Model $model, string $code): ?string
 {
     $field = CustomField::query()
-        ->where('tenant_id', $model->getAttribute('team_id'))
+        ->where('tenant_id', $model->getAttribute('workspace_id'))
         ->where('entity_type', morphAliasForCustomFieldsTest($model))
         ->where('code', $code)
         ->with('options')
@@ -285,7 +285,7 @@ function morphAliasForCustomFieldsTest(Model $model): string
 }
 
 it('accepts an option label in any casing when writing a choice field', function (string $label): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'T']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => $label]);
     resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
@@ -294,7 +294,7 @@ it('accepts an option label in any casing when writing a choice field', function
 })->with(['In progress', 'in progress', 'IN PROGRESS', 'In Progress']);
 
 it('resolves an option label identically whether filtering or writing', function (string $label, bool $valid): void {
-    Task::factory()->for($this->team)->create(['title' => 'T']);
+    Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
     $readAccepted = true;
     try {

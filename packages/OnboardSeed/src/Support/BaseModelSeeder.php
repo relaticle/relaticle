@@ -6,7 +6,7 @@ namespace Relaticle\OnboardSeed\Support;
 
 use App\Enums\CreationSource;
 use App\Models\CustomField;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -29,7 +29,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
     /** @var array<int, string> */
     protected array $fieldCodes = [];
 
-    protected ?string $teamId = null;
+    protected ?string $workspaceId = null;
 
     private ?BulkCustomFieldValueWriter $bulkWriter = null;
 
@@ -45,49 +45,49 @@ abstract class BaseModelSeeder implements ModelSeederInterface
         return $this;
     }
 
-    protected function setTeamId(string $teamId): void
+    protected function setWorkspaceId(string $workspaceId): void
     {
-        $this->teamId = $teamId;
+        $this->workspaceId = $workspaceId;
     }
 
     /** @return Collection<string, mixed> */
     public function customFields(): Collection
     {
-        if ($this->teamId === null) {
+        if ($this->workspaceId === null) {
             return collect();
         }
 
         return CustomField::query()
             ->with('options')
-            ->whereTenantId($this->teamId)
+            ->whereTenantId($this->workspaceId)
             ->forEntity($this->modelClass)
             ->whereIn('code', $this->fieldCodes)
             ->get()
             ->keyBy('code');
     }
 
-    protected function prepareForSeed(Team $team): void
+    protected function prepareForSeed(Workspace $workspace): void
     {
-        $this->setTeamId($team->id);
+        $this->setWorkspaceId($workspace->id);
         $this->customFieldDefinitions = $this->customFields();
         $this->positionCounter = 0;
     }
 
-    public function seed(Team $team, Authenticatable $user): void
+    public function seed(Workspace $workspace, Authenticatable $user): void
     {
-        $this->prepareForSeed($team);
+        $this->prepareForSeed($workspace);
 
-        $this->createEntitiesFromFixtures($team, $user);
+        $this->createEntitiesFromFixtures($workspace, $user);
 
         $this->flushCustomFieldValues();
     }
 
-    abstract protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void;
+    abstract protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void;
 
     /** @param  array<string, mixed>  $data */
     protected function applyCustomFields(HasCustomFields&Model $model, array $data): void
     {
-        if ($this->teamId === null) {
+        if ($this->workspaceId === null) {
             return;
         }
 
@@ -98,7 +98,7 @@ abstract class BaseModelSeeder implements ModelSeederInterface
                     value: $value,
                     entityId: $model->getKey(),
                     entityType: $model->getMorphClass(),
-                    tenantId: $this->teamId,
+                    tenantId: $this->workspaceId,
                 );
             }
         }
@@ -215,10 +215,10 @@ abstract class BaseModelSeeder implements ModelSeederInterface
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $customFields
      */
-    protected function registerEntityFromFixture(string $key, array $attributes, array $customFields, Team $team, Authenticatable $user): Model
+    protected function registerEntityFromFixture(string $key, array $attributes, array $customFields, Workspace $workspace, Authenticatable $user): Model
     {
         $attributes = array_merge($attributes, [
-            'team_id' => $team->id,
+            'workspace_id' => $workspace->id,
             'creator_id' => $user->getAuthIdentifier(),
             ...$this->getGlobalAttributes(),
         ]);

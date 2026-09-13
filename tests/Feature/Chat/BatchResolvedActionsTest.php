@@ -18,17 +18,17 @@ use Relaticle\Chat\Services\PendingActionService;
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
     Bus::fake();
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019df901-5555-7000-8000-000000000002';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -37,7 +37,7 @@ beforeEach(function (): void {
 
 it('returns record_ids for a batch-approved action in resolvedForConversation', function (): void {
     PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -61,7 +61,7 @@ it('returns record_ids for a batch-approved action in resolvedForConversation', 
 
 it('includes both batch ids in the resolved block of agent instructions', function (): void {
     PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -88,7 +88,7 @@ it('includes both batch ids in the resolved block of agent instructions', functi
 
 it('returns an empty record_ids list and still emits record_id for a flat approval', function (): void {
     PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -115,7 +115,7 @@ it('returns an empty record_ids list and still emits record_id for a flat approv
 
 it('names the skipped batch records in the resolved block so the model never reports them as created', function (): void {
     PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',

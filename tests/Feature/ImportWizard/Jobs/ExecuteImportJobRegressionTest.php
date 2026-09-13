@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -9,7 +10,6 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
 use Relaticle\ImportWizard\Data\MatchableField;
@@ -26,13 +26,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -56,7 +56,7 @@ it('adds a new imported tags-input value to the field option list', function ():
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Tagged Co 282')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Tagged Co 282')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $company->id, (string) $cf->id);
 
     expect(collect($cfv->json_value)->all())->toContain('BrandNewTag');
@@ -103,18 +103,18 @@ it('does not create options when importing an arbitrary email custom field', fun
 
 it('does not match a soft-deleted company by domain (resolver)', function (): void {
     $domainField = CustomField::query()->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+        ->where('tenant_id', $this->workspace->id)->where('entity_type', 'company')->where('code', 'domains')->first();
 
     expect($domainField)->not->toBeNull();
 
-    $live = Company::factory()->create(['name' => 'Live Co', 'team_id' => $this->team->id]);
-    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $live->id, 'tenant_id' => $this->team->id, 'json_value' => ['live282.com']]);
+    $live = Company::factory()->create(['name' => 'Live Co', 'workspace_id' => $this->workspace->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $live->id, 'tenant_id' => $this->workspace->id, 'json_value' => ['live282.com']]);
 
-    $trashed = Company::factory()->create(['name' => 'Trashed Co', 'team_id' => $this->team->id]);
-    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $trashed->id, 'tenant_id' => $this->team->id, 'json_value' => ['ghost282.com']]);
+    $trashed = Company::factory()->create(['name' => 'Trashed Co', 'workspace_id' => $this->workspace->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $trashed->id, 'tenant_id' => $this->workspace->id, 'json_value' => ['ghost282.com']]);
     $trashed->delete();
 
-    $resolver = new EntityLinkResolver((string) $this->team->id);
+    $resolver = new EntityLinkResolver((string) $this->workspace->id);
     $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'company', targetModelClass: Company::class);
     $matcher = MatchableField::domain('custom_fields_domains');
 
@@ -126,12 +126,12 @@ it('does not match a soft-deleted company by domain (resolver)', function (): vo
 
 it('creates a new company when re-importing a domain whose company was soft-deleted', function (): void {
     $domainField = CustomField::query()->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)->where('entity_type', 'company')->where('code', 'domains')->first();
+        ->where('tenant_id', $this->workspace->id)->where('entity_type', 'company')->where('code', 'domains')->first();
 
     expect($domainField)->not->toBeNull();
 
-    $original = Company::factory()->create(['name' => 'Acme Original 282', 'team_id' => $this->team->id]);
-    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $original->id, 'tenant_id' => $this->team->id, 'json_value' => ['acme282.com']]);
+    $original = Company::factory()->create(['name' => 'Acme Original 282', 'workspace_id' => $this->workspace->id]);
+    CustomFieldValue::forceCreate(['custom_field_id' => $domainField->id, 'entity_type' => 'company', 'entity_id' => $original->id, 'tenant_id' => $this->workspace->id, 'json_value' => ['acme282.com']]);
     $original->delete();
 
     ImportExecutionFixture::readyStore($this, ['Name', 'Domain'], [
@@ -147,7 +147,7 @@ it('creates a new company when re-importing a domain whose company was soft-dele
     $import = $this->import->fresh();
     expect($import->created_rows)->toBe(1)
         ->and($import->skipped_rows)->toBe(0)
-        ->and(Company::where('team_id', $this->team->id)->where('name', 'Acme Reimport 282')->exists())->toBeTrue();
+        ->and(Company::where('workspace_id', $this->workspace->id)->where('name', 'Acme Reimport 282')->exists())->toBeTrue();
 });
 
 /**
@@ -170,7 +170,7 @@ it('parses an imported datetime in the importer timezone, matching what the form
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
 
     // 08:30 on the 19th in Tokyo is 23:30 the previous evening in UTC, the exact value
@@ -197,7 +197,7 @@ it('does not shift a date-only custom field for an importer in another timezone'
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
 
     expect($cfv)->not->toBeNull()
@@ -226,8 +226,8 @@ it('fails a row whose datetime cannot be parsed instead of dropping the value', 
 
     expect($import->created_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(1)
-        ->and(People::where('team_id', $this->team->id)->where('name', 'Bad Row')->exists())->toBeFalse()
-        ->and(People::where('team_id', $this->team->id)->where('name', 'Valid Row')->exists())->toBeTrue();
+        ->and(People::where('workspace_id', $this->workspace->id)->where('name', 'Bad Row')->exists())->toBeFalse()
+        ->and(People::where('workspace_id', $this->workspace->id)->where('name', 'Valid Row')->exists())->toBeTrue();
 
     // The failed-rows table is what the user downloads, so the message has to name the
     // column and quote the value rather than read like a stack trace.
@@ -255,7 +255,7 @@ it('fails a row that leaves a required field empty rather than creating a namele
 
     expect($import->created_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(1)
-        ->and(People::where('team_id', $this->team->id)->where('name', '')->exists())->toBeFalse();
+        ->and(People::where('workspace_id', $this->workspace->id)->where('name', '')->exists())->toBeFalse();
 
     expect($import->failedRows()->value('validation_error'))->toContain('required');
 });

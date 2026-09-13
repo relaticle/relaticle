@@ -15,10 +15,10 @@ use Laravel\Sanctum\Sanctum;
 mutates(BaseCrmEntityRequest::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
     $this->status = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
@@ -38,7 +38,7 @@ it('returns 422 with the field key for an unknown label', function (): void {
 });
 
 it('updates a task select value by label', function (): void {
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
 
     $this->patchJson("/api/v1/tasks/{$task->getKey()}", ['custom_fields' => ['status' => 'in progress']])
         ->assertOk()
@@ -51,9 +51,9 @@ it('stores markdown note bodies as html', function (): void {
         ->assertJsonPath('data.attributes.custom_fields.body', fn (string $body): bool => str_contains($body, '<strong>bold</strong>'));
 });
 
-it('returns a record field as id and name pairs for an own-team company', function (): void {
+it('returns a record field as id and name pairs for an own-workspace company', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -64,8 +64,8 @@ it('returns a record field as id and name pairs for an own-team company', functi
         'active' => true,
         'system_defined' => false,
     ]);
-    $company = Company::factory()->create(['team_id' => $this->team->getKey(), 'name' => 'Globex']);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'name' => 'Globex']);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
 
     $this->getJson("/api/v1/tasks/{$task->getKey()}")
@@ -76,7 +76,7 @@ it('returns a record field as id and name pairs for an own-team company', functi
 
 it('accepts an option label on create and update for every CRM endpoint', function (string $entityType, string $endpoint, string $titleKey): void {
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => $entityType,
         'name' => 'Agent writes',
         'code' => 'agent_writes',
@@ -86,7 +86,7 @@ it('accepts an option label on create and update for every CRM endpoint', functi
     ]);
 
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => $entityType,
         'code' => 'tier',
@@ -99,13 +99,13 @@ it('accepts an option label on create and update for every CRM endpoint', functi
     ]);
 
     $gold = CustomFieldOption::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_id' => $field->getKey(),
         'name' => 'Gold',
         'sort_order' => 1,
     ]);
     CustomFieldOption::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_id' => $field->getKey(),
         'name' => 'Silver',
         'sort_order' => 2,
@@ -134,7 +134,7 @@ it('accepts an option label on create and update for every CRM endpoint', functi
 
 it('resolves record names with a constant number of lookups, not one per row', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -147,9 +147,9 @@ it('resolves record names with a constant number of lookups, not one per row', f
     ]);
 
     $link = function (int $count) use ($field): void {
-        Company::factory()->count($count)->create(['team_id' => $this->team->getKey()])
+        Company::factory()->count($count)->create(['workspace_id' => $this->workspace->getKey()])
             ->each(fn (Company $company) => Task::factory()
-                ->create(['team_id' => $this->team->getKey()])
+                ->create(['workspace_id' => $this->workspace->getKey()])
                 ->saveCustomFieldValue($field, [$company->getKey()]));
     };
 

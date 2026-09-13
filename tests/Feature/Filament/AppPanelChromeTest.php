@@ -10,12 +10,12 @@ use Filament\Facades\Filament;
 mutates(AppSidebar::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 
-    $this->html = $this->get(Dashboard::getUrl(tenant: $this->team))->getContent();
+    $this->html = $this->get(Dashboard::getUrl(tenant: $this->workspace))->getContent();
 });
 
 it('renders the search row inside the sidebar, above the navigation', function (): void {

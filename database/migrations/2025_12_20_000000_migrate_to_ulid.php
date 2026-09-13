@@ -8,7 +8,6 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Migrations\Migration;
@@ -1021,7 +1020,7 @@ return new class extends Migration
             // Populate using full class name mapping
             $fullClassMap = [
                 User::class => 'users',
-                Team::class => 'teams',
+                'App\\Models\\Team' => 'teams',
                 Company::class => 'companies',
                 People::class => 'people',
                 Opportunity::class => 'opportunities',

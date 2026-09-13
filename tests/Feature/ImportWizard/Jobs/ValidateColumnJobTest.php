@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -24,13 +24,13 @@ use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 mutates(ValidateColumnJob::class, ColumnValidator::class, EntityLinkValidator::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -48,7 +48,7 @@ function createValidationStore(
     ImportEntityType $entityType = ImportEntityType::People,
 ): array {
     $import = Import::factory()->create([
-        'team_id' => (string) $context->team->id,
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
         'file_name' => 'test.csv',
@@ -104,7 +104,7 @@ it('writes RelationshipMatch create for Create entity links', function (): void 
 it('writes RelationshipMatch existing when resolved to existing record', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $column = ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company');
@@ -295,7 +295,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
 {
     $existing = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $context->team->id)
+        ->where('tenant_id', $context->workspace->id)
         ->where('entity_type', $entityType)
         ->where('code', $code)
         ->first();
@@ -305,7 +305,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
     }
 
     return CustomField::forceCreate([
-        'tenant_id' => $context->team->id,
+        'tenant_id' => $context->workspace->id,
         'code' => $code,
         'name' => ucfirst(str_replace('_', ' ', $code)),
         'type' => $type,

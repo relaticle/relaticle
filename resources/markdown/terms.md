@@ -42,7 +42,7 @@ We reserve the right to suspend or terminate accounts that violate these terms.
 
 ## 5. API and MCP Access
 
-Access to the REST API and MCP server is governed by API tokens scoped to specific teams and permissions. You are responsible for keeping your API tokens secure. Revoke any token you believe has been compromised.
+Access to the REST API and MCP server is governed by API tokens scoped to specific workspaces and permissions. You are responsible for keeping your API tokens secure. Revoke any token you believe has been compromised.
 
 ## 6. Pricing
 

@@ -25,10 +25,10 @@ use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Models\Company;
-use App\Models\Scopes\TeamScope;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -61,8 +61,8 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 afterEach(function (): void {
@@ -70,7 +70,7 @@ afterEach(function (): void {
 });
 
 it('can create a task with assignees and company', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, [
@@ -88,9 +88,9 @@ it('can create a task with assignees and company', function (): void {
 });
 
 it('reports per-item validation errors with correct array index via MCP', function (): void {
-    $validCompany = Company::factory()->recycle([$this->user, $this->team])->create();
-    $otherTeam = Team::factory()->create();
-    $invalidCompany = Company::factory()->for($otherTeam)->create();
+    $validCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherWorkspace = Workspace::factory()->create();
+    $invalidCompany = Company::factory()->for($otherWorkspace)->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, [
@@ -101,7 +101,7 @@ it('reports per-item validation errors with correct array index via MCP', functi
 });
 
 it('validates large arrays in bounded queries via MCP', function (): void {
-    $companies = Company::factory()->count(10)->recycle([$this->user, $this->team])->create();
+    $companies = Company::factory()->count(10)->recycle([$this->user, $this->workspace])->create();
 
     DB::enableQueryLog();
     DB::flushQueryLog();
@@ -114,16 +114,16 @@ it('validates large arrays in bounded queries via MCP', function (): void {
         ->assertOk();
 
     $lookups = collect(DB::getQueryLog())
-        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'team_id'))
+        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'workspace_id'))
         ->count();
 
     expect($lookups)->toBeLessThanOrEqual(2);
 });
 
 it('can update task assignees', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $member = User::factory()->create();
-    $this->team->users()->attach($member);
+    $this->workspace->users()->attach($member);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateTaskTool::class, [
@@ -137,7 +137,7 @@ it('can update task assignees', function (): void {
 });
 
 it('can get a task by ID', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Follow Up Call']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Follow Up Call']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetTaskTool::class, ['id' => $task->id])
@@ -146,7 +146,7 @@ it('can get a task by ID', function (): void {
 });
 
 it('can update a task via MCP tool', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Old Task']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Old Task']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateTaskTool::class, [
@@ -160,7 +160,7 @@ it('can update a task via MCP tool', function (): void {
 });
 
 it('can delete a task via MCP tool', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Delete Me']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Delete Me']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteTaskTool::class, [
@@ -178,7 +178,7 @@ it('can delete a task via MCP tool', function (): void {
 });
 
 it('can attach assignees to a task', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachTaskToEntitiesTool::class, [
@@ -197,11 +197,11 @@ it('can attach assignees to a task', function (): void {
 it('notifies assignees added through the MCP attach tool', function (): void {
     Mail::fake();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $member = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachTaskToEntitiesTool::class, [
@@ -218,14 +218,14 @@ it('notifies assignees added through the MCP attach tool', function (): void {
 it('only notifies assignees attached by its own write', function (): void {
     Mail::fake();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $intendedAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($task, $concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -256,14 +256,14 @@ it('only notifies assignees attached by its own write', function (): void {
 it('only notifies assignees added by its own update', function (): void {
     Mail::fake();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $intendedAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($task, $concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -294,14 +294,14 @@ it('only notifies assignees added by its own update', function (): void {
 it('does not re-notify an assignee the update kept in place', function (): void {
     Mail::fake();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $existingAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
     $newAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach([$existingAssignee->id, $newAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$existingAssignee->id, $newAssignee->id], ['role' => 'editor']);
     $task->assignees()->attach($existingAssignee);
 
     RelaticleServer::actingAs($this->user)
@@ -326,7 +326,7 @@ it('only notifies assignees added by its own create', function (): void {
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -363,11 +363,11 @@ it('only notifies assignees added by its own create', function (): void {
 it('does not duplicate assignees or notifications when an attachment is repeated', function (): void {
     Mail::fake();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $member = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
     foreach (range(1, 2) as $attempt) {
         RelaticleServer::actingAs($this->user)
@@ -393,7 +393,7 @@ it('waits for a concurrent task row lock before attaching relationships', functi
     $this->user->update([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $defaultConnectionName = DB::getDefaultConnection();
     /** @var array<string, mixed> $connectionConfig */
@@ -461,12 +461,12 @@ it('waits for a concurrent task row lock before attaching relationships', functi
     }
 });
 
-it('can detach a former team member from a task', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+it('can detach a former workspace member from a task', function (): void {
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $formerMember = User::factory()->create();
-    $this->team->users()->attach($formerMember, ['role' => 'editor']);
+    $this->workspace->users()->attach($formerMember, ['role' => 'editor']);
     $task->assignees()->attach($formerMember);
-    $this->team->users()->detach($formerMember);
+    $this->workspace->users()->detach($formerMember);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DetachTaskFromEntitiesTool::class, [
@@ -485,11 +485,11 @@ it('can detach a former team member from a task', function (): void {
         ->exists())->toBeFalse();
 });
 
-it('cannot attach relationships to a task outside the current team', function (): void {
-    $otherTeam = Team::factory()->for($this->user, 'owner')->create();
-    $this->user->unsetRelation('ownedTeams');
-    $otherTask = Task::withoutEvents(fn () => Task::factory()->for($otherTeam)->create());
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+it('cannot attach relationships to a task outside the current workspace', function (): void {
+    $otherWorkspace = Workspace::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedWorkspaces');
+    $otherTask = Task::withoutEvents(fn () => Task::factory()->for($otherWorkspace)->create());
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachTaskToEntitiesTool::class, [
@@ -501,11 +501,11 @@ it('cannot attach relationships to a task outside the current team', function ()
     expect($otherTask->companies()->whereKey($company->id)->exists())->toBeFalse();
 });
 
-it('cannot detach relationships from a task outside the current team', function (): void {
-    $otherTeam = Team::factory()->for($this->user, 'owner')->create();
-    $this->user->unsetRelation('ownedTeams');
-    $otherTask = Task::withoutEvents(fn () => Task::factory()->for($otherTeam)->create());
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+it('cannot detach relationships from a task outside the current workspace', function (): void {
+    $otherWorkspace = Workspace::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedWorkspaces');
+    $otherTask = Task::withoutEvents(fn () => Task::factory()->for($otherWorkspace)->create());
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $otherTask->companies()->attach($company);
 
     RelaticleServer::actingAs($this->user)
@@ -519,10 +519,10 @@ it('cannot detach relationships from a task outside the current team', function 
 });
 
 it('can filter tasks by company_id', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    $linkedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Linked Task']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $linkedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Linked Task']);
     $linkedTask->companies()->attach($company);
-    $unlinkedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unlinked Task']);
+    $unlinkedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unlinked Task']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListTasksTool::class, [
@@ -533,28 +533,28 @@ it('can filter tasks by company_id', function (): void {
         ->assertDontSee('Unlinked Task');
 });
 
-describe('team scoping', function (): void {
+describe('workspace scoping', function (): void {
     beforeEach(function (): void {
-        Task::addGlobalScope(new TeamScope);
+        Task::addGlobalScope(new WorkspaceScope);
     });
 
-    it('scopes tasks to current team', function (): void {
+    it('scopes tasks to current workspace', function (): void {
         $otherTask = Task::withoutEvents(fn () => Task::factory()->create([
-            'team_id' => Team::factory()->create()->id,
-            'title' => 'Other Team Task',
+            'workspace_id' => Workspace::factory()->create()->id,
+            'title' => 'Other Workspace Task',
         ]));
-        $ownTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Own Team Task']);
+        $ownTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Own Workspace Task']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListTasksTool::class)
             ->assertOk()
-            ->assertSee('Own Team Task')
-            ->assertDontSee('Other Team Task');
+            ->assertSee('Own Workspace Task')
+            ->assertDontSee('Other Workspace Task');
     });
 
-    it('cannot update a task from another team', function (): void {
+    it('cannot update a task from another workspace', function (): void {
         $otherTask = Task::withoutEvents(fn () => Task::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -565,9 +565,9 @@ describe('team scoping', function (): void {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot delete a task from another team', function (): void {
+    it('cannot delete a task from another workspace', function (): void {
         $otherTask = Task::withoutEvents(fn () => Task::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -577,9 +577,9 @@ describe('team scoping', function (): void {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot get a task from another team', function (): void {
+    it('cannot get a task from another workspace', function (): void {
         $otherTask = Task::withoutEvents(fn () => Task::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)

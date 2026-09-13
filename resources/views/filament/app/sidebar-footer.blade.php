@@ -1,17 +1,17 @@
 @php
-    /** @var \App\Models\Team|null $team */
-    $team = \Filament\Facades\Filament::getTenant();
+    /** @var \App\Models\Workspace|null $workspace */
+    $workspace = \Filament\Facades\Filament::getTenant();
     $user = \Filament\Facades\Filament::auth()->user();
 
     // Every row below links somewhere only a workspace admin can act on:
     // Members::canAccess() is can('update', $tenant), and the billing page is
     // the same. Showing them to an editor would be a footer of 403s.
-    $canManage = $team instanceof \App\Models\Team
+    $canManage = $workspace instanceof \App\Models\Workspace
         && $user instanceof \App\Models\User
-        && $user->can('update', $team);
+        && $user->can('update', $workspace);
 
     $billing = $canManage
-        ? resolve(\App\Services\Billing\SidebarBillingState::class)->for($team)
+        ? resolve(\App\Services\Billing\SidebarBillingState::class)->for($workspace)
         : null;
 
     $panel = \Filament\Facades\Filament::getCurrentOrDefaultPanel();
@@ -41,7 +41,7 @@
         @livewire(\App\Livewire\App\Onboarding\ActivationChecklist::class)
 
         <div class="border-t border-gray-200 pt-2 dark:border-white/10">
-            <a href="{{ \App\Filament\Pages\Team\Members::getUrl() }}" class="{{ $rowClasses }}">
+            <a href="{{ \App\Filament\Pages\Workspace\Members::getUrl() }}" class="{{ $rowClasses }}">
                 <x-heroicon-o-user-plus class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
                 <span class="truncate">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
             </a>

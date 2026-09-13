@@ -7,7 +7,7 @@ namespace App\Filament\Resources;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\RecordSelect;
-use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
@@ -77,7 +77,7 @@ final class PeopleResource extends Resource
                                     ->schema(fn (Schema $schema): Schema => $schema->components([
                                         TextInput::make('name')
                                             ->required(),
-                                        TeamMemberSelect::make('account_owner_id')
+                                        WorkspaceMemberSelect::make('account_owner_id')
                                             ->model(Company::class)
                                             ->relationship('accountOwner', 'name')
                                             ->label(__('filament/resources/person.fields.account_owner_id.label'))

@@ -12,12 +12,12 @@ use Illuminate\Support\Facades\DB;
 mutates(Note::class, Task::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('prevents duplicate task assignee relationships', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     $task->assignees()->attach($this->user);
 
@@ -28,8 +28,8 @@ it('prevents duplicate task assignee relationships', function (): void {
 });
 
 it('prevents duplicate task entity relationships', function (): void {
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $task->companies()->attach($company);
 
@@ -41,8 +41,8 @@ it('prevents duplicate task entity relationships', function (): void {
 });
 
 it('prevents duplicate note entity relationships', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $note->companies()->attach($company);
 

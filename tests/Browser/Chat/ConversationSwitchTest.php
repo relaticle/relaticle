@@ -16,16 +16,16 @@ mutates(ChatInterface::class);
 mutates(ChatConversation::class);
 
 it('places the conversation title in the topbar and the toggle beside the workspace menu', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    // A faker team name can wrap to a second line in the sidebar (font-load
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    // A faker workspace name can wrap to a second line in the sidebar (font-load
     // dependent), which drops the tenant-menu center 8px and flakes the strict
     // alignment probes. Pin a short name so the geometry is deterministic.
-    $team->update(['name' => 'Acme']);
+    $workspace->update(['name' => 'Acme']);
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Pipeline review', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Pipeline review', $conversationId);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertVisible('[data-page-heading]')
         ->assertMissing('main h1')
         ->assertNoJavaScriptErrors();
@@ -219,22 +219,22 @@ function switchTestReadSwitchProbe(AwaitableWebpage $page): array
 }
 
 it('paints a previously visited conversation instantly, strictly before the real navigation swap', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo seed message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     // A -> B is a normal (uncached) transition: it is what causes A's
     // outgoing destroy() to stash A's transcript into the window cache.
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}")
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}")
         ->assertSourceHas('Bravo seed message');
 
     switchTestArmSwitchProbe($page);
@@ -247,27 +247,27 @@ it('paints a previously visited conversation instantly, strictly before the real
     expect($probe['navigatedAt'])->not->toBeNull();
     expect($probe['paint']['at'])->toBeLessThan($probe['navigatedAt']);
 
-    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationA}")
+    $page->assertPathIs("/app/{$workspace->slug}/chats/{$conversationA}")
         ->assertSourceHas('Alpha seed message');
 });
 
 it('reconciles a cached (stale) paint against server truth once the real switch completes', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha original message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo original message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('Alpha original message');
 
     // A's cache entry is now stashed (its destroy() just ran as part of
     // this switch).
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}")
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}")
         ->assertSourceHas('Bravo original message');
 
     // Simulates a second session (or another user) sending into A while
@@ -289,25 +289,25 @@ it('reconciles a cached (stale) paint against server truth once the real switch 
 
     // The real navigation that follows always finishes with authoritative
     // content, wholesale-replacing the stale paint above.
-    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationA}")
+    $page->assertPathIs("/app/{$workspace->slug}/chats/{$conversationA}")
         ->assertSourceHas('Alpha message inserted while B was open');
 });
 
 it('never paints a transcript cached under a different user', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat b', $conversationB);
     switchTestInsertMessage($conversationA, $user, 'user', 'Alpha real message');
     switchTestInsertMessage($conversationB, $user, 'user', 'Bravo real message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('Alpha real message');
 
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}")
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}")
         ->assertSourceHas('Bravo real message');
 
     // Tamper the window cache to simulate what a leak from a different
@@ -356,7 +356,7 @@ it('never paints a transcript cached under a different user', function (): void 
     JS);
 
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationA}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationA}")
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationA}")
         ->assertSourceHas('Alpha real message');
 
     $leakSeen = $page->script(<<<'JS'
@@ -374,13 +374,13 @@ it('never paints a transcript cached under a different user', function (): void 
 });
 
 it('caps the conversation cache at 5 entries, evicting the least recently used', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationSeed = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat seed', $conversationSeed);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat seed', $conversationSeed);
     switchTestInsertMessage($conversationSeed, $user, 'user', 'Seed message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationSeed)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationSeed)
         ->assertSourceHas('Seed message');
 
     $resolveInterface = ChatBrowser::resolveInterface();

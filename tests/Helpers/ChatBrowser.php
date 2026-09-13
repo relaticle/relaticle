@@ -16,7 +16,7 @@ final class ChatBrowser
      * conversations at the SQL layer so a page mounts with history already
      * present. Pass $id when the test builds URLs before seeding.
      */
-    public static function seedConversation(User $user, int|string $teamId, string $title, ?string $id = null): string
+    public static function seedConversation(User $user, int|string $workspaceId, string $title, ?string $id = null): string
     {
         $id ??= (string) Str::uuid7();
 
@@ -24,7 +24,7 @@ final class ChatBrowser
             'id' => $id,
             'participant_type' => 'user',
             'participant_id' => (string) $user->getKey(),
-            'team_id' => $teamId,
+            'workspace_id' => $workspaceId,
             'title' => $title,
             'created_at' => now(),
             'updated_at' => now(),
@@ -34,7 +34,7 @@ final class ChatBrowser
     }
 
     /**
-     * Log in through the real form and land on the team dashboard; pass a
+     * Log in through the real form and land on the workspace dashboard; pass a
      * conversation id to continue into that chat.
      */
     public static function logIn(User $user, string $slug, ?string $conversationId = null): AwaitableWebpage

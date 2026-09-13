@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
@@ -16,13 +16,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -46,7 +46,7 @@ it('imports phone custom field with comma-separated numbers as array', function 
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -68,7 +68,7 @@ it('imports link custom field with URL value', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -88,7 +88,7 @@ it('imports toggle custom field with truthy values', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->boolean_value)->toBeTrue();
@@ -106,7 +106,7 @@ it('imports toggle custom field with falsy values', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->boolean_value)->toBeFalse();
@@ -124,7 +124,7 @@ it('imports textarea custom field value', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->text_value)->toBe('A long biography text that spans multiple lines conceptually.');
@@ -142,7 +142,7 @@ it('imports rich-editor custom field value as text', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->text_value)->toBe('<p>Bold statement</p>');
@@ -162,7 +162,7 @@ it('imports checkbox-list custom field with option names resolved to IDs', funct
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull();
 
@@ -185,7 +185,7 @@ it('imports radio custom field with option name resolved to ID', function (): vo
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->string_value)->toBe((string) $mediumOption->id);
@@ -204,7 +204,7 @@ it('imports toggle-buttons custom field with option name resolved to ID', functi
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->string_value)->toBe((string) $urgentOption->id);
@@ -222,7 +222,7 @@ it('imports color-picker custom field value as text', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'John')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'John')->first();
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $cf->id);
     expect($cfv)->not->toBeNull()
         ->and($cfv->text_value)->toBe('#ff5733');

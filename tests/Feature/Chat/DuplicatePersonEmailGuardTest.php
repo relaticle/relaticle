@@ -20,21 +20,21 @@ mutates(BaseWriteCreateTool::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 
     // Mirror ProcessChatMessage::bindAuth(): tool validation runs inside the
     // chat job with the custom-fields tenant bound, which is what arms the
     // per-field unique rules this guard relies on.
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
 
     $this->convId = '019df800-4444-7000-8000-000000000321';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -47,7 +47,7 @@ afterEach(function (): void {
 
 function seedPersonWithEmail(User $user, string $name, string $email): People
 {
-    $person = People::factory()->for($user->currentTeam)->create(['name' => $name]);
+    $person = People::factory()->for($user->currentWorkspace)->create(['name' => $name]);
     resolve(UpdatePeople::class)->execute($user, $person, ['custom_fields' => ['emails' => [$email]]]);
 
     return $person;
@@ -73,7 +73,7 @@ it('rejects a single create whose email is already taken, with no proposal', fun
         ->toContain('test@example.com')
         ->not->toContain('pending_action_id');
 
-    expect(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('skips only the failing record of a batch and reports it to the model', function (): void {
@@ -91,7 +91,7 @@ it('skips only the failing record of a batch and reports it to the model', funct
         ->and($decoded['skipped_records'][0]['record'] ?? null)->toBe('Copy Person')
         ->and($decoded['skipped_records'][0]['reason'] ?? '')->toContain('already assigned');
 
-    $pending = PendingAction::query()->where('team_id', $this->team->getKey())->get();
+    $pending = PendingAction::query()->where('workspace_id', $this->workspace->getKey())->get();
 
     expect($pending)->toHaveCount(1)
         ->and($pending->first()->action_data['name'] ?? null)->toBe('Fresh Person');
@@ -144,10 +144,10 @@ it('still blocks an update that takes another record\'s unique email', function 
         ->not->toContain('pending_action_id');
 });
 
-it('ignores matching emails on another team', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
+it('ignores matching emails on another workspace', function (): void {
+    $other = User::factory()->withPersonalWorkspace()->create();
     $previousTenantId = TenantContextService::getCurrentTenantId();
-    TenantContextService::setTenantId($other->currentTeam->getKey());
+    TenantContextService::setTenantId($other->currentWorkspace->getKey());
     seedPersonWithEmail($other, 'Foreign Person', 'test@example.com');
     TenantContextService::setTenantId($previousTenantId);
 

@@ -79,7 +79,7 @@ describe('getAppUrl macro - path mode', function () {
     });
 
     it('handles nested path segments', function () {
-        expect(url()->getAppUrl('teams/1/companies'))->toBe('https://example.com/app/teams/1/companies');
+        expect(url()->getAppUrl('workspaces/1/companies'))->toBe('https://example.com/app/workspaces/1/companies');
     });
 
     it('handles path with leading slash', function () {
@@ -122,7 +122,7 @@ describe('getAppUrl macro - domain mode', function () {
     });
 
     it('handles nested path segments', function () {
-        expect(url()->getAppUrl('teams/1/companies'))->toBe('https://app.example.com/teams/1/companies');
+        expect(url()->getAppUrl('workspaces/1/companies'))->toBe('https://app.example.com/workspaces/1/companies');
     });
 
     it('handles path with leading slash', function () {
@@ -243,7 +243,7 @@ it('gives every chat route throttle its own bucket so limiters cannot starve eac
 });
 
 it('does not let one chat route consume another route\'s rate limit allowance', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     // Exhaust the mentions bucket (60/min).
@@ -262,9 +262,9 @@ it('does not let one chat route consume another route\'s rate limit allowance', 
 });
 
 test('profile and security have separate settings', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(EditProfile::class)
         ->assertSeeLivewire(UpdateProfileInformation::class)

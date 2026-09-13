@@ -22,12 +22,12 @@ use Tests\Helpers\ChatDocument;
 mutates(TurnPresence::class, ChatInterface::class, TurnContinuationService::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -42,7 +42,7 @@ function turnPresenceSeedConversation(User $user): string
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'T',
         'created_at' => now(),
         'updated_at' => now(),
@@ -76,7 +76,7 @@ function turnPresenceSeedMessage(User $user, string $conversationId, array $over
 function turnPresenceSeedPendingAction(User $user, string $conversationId): string
 {
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => CreateTask::class,
@@ -181,7 +181,7 @@ it('clears the marker when the job fails for good', function (): void {
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'doomed',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'x', 'id' => 'x', 'source' => 'auto'],
@@ -212,7 +212,7 @@ it('anchors the dock server-side from the initial pending action id', function (
 });
 
 it('ignores an initial pending action id belonging to another user', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
     $conversationId = turnPresenceSeedConversation($other);
     $foreignId = turnPresenceSeedPendingAction($other, $conversationId);
 
@@ -220,8 +220,8 @@ it('ignores an initial pending action id belonging to another user', function ()
         ->assertSet('pendingActionId', null);
 });
 
-it('never leaks another team conversation in-flight turn on mount', function (): void {
-    $victim = User::factory()->withPersonalTeam()->create();
+it('never leaks another workspace conversation in-flight turn on mount', function (): void {
+    $victim = User::factory()->withPersonalWorkspace()->create();
     $conversationId = turnPresenceSeedConversation($victim);
     $pendingId = turnPresenceSeedPendingAction($victim, $conversationId);
 
@@ -238,8 +238,8 @@ it('never leaks another team conversation in-flight turn on mount', function ():
 
 it('never leaks a teammate conversation in-flight turn on mount', function (): void {
     $teammate = User::factory()->create();
-    $this->team->users()->attach($teammate, ['role' => 'editor']);
-    $teammate->forceFill(['current_team_id' => $this->team->getKey()])->save();
+    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
 
     $conversationId = turnPresenceSeedConversation($teammate);
     $pendingId = turnPresenceSeedPendingAction($teammate, $conversationId);

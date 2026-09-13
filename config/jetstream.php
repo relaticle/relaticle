@@ -84,9 +84,9 @@ return [
     | Invitation Expiry
     |--------------------------------------------------------------------------
     |
-    | This value determines how many days a team invitation link remains valid.
+    | This value determines how many days a workspace invitation link remains valid.
     | After this period, the invitation is considered expired and the invitee
-    | must request a new invitation from the team owner.
+    | must request a new invitation from the workspace owner.
     |
     */
 

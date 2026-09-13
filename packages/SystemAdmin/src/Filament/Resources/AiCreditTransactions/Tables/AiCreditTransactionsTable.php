@@ -13,8 +13,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
-use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
 
@@ -28,12 +28,12 @@ final class AiCreditTransactionsTable
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->searchable()
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->placeholder('—')
@@ -65,8 +65,8 @@ final class AiCreditTransactionsTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('team')
-                    ->relationship('team', 'name')
+                SelectFilter::make('workspace')
+                    ->relationship('workspace', 'name')
                     ->searchable(),
                 SelectFilter::make('type')
                     ->options(

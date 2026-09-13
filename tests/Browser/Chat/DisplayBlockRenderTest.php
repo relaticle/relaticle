@@ -135,9 +135,9 @@ function displayBlockCardFixture(string $longUrl): array
 }
 
 it('paints persisted read results as a real table and card, and drops an unknown block type', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     $longUrl = 'https://example.com/?ref='.str_repeat('a', 600);
 
@@ -152,7 +152,7 @@ it('paints persisted read results as a real table and card, and drops an unknown
         displayBlockCardFixture($longUrl),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here is Acme Corporation.');
 
     $page->assertCount('[data-block]', 2);
@@ -215,9 +215,9 @@ it('paints persisted read results as a real table and card, and drops an unknown
 });
 
 it('places a block at its {{block:N}} marker inside the reply and appends unplaced blocks below', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     $longUrl = 'https://example.com/?ref=inline';
 
@@ -229,7 +229,7 @@ it('places a block at its {{block:N}} marker inside the reply and appends unplac
         60,
     );
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Commentary after the table.');
 
     $shape = json_decode((string) $page->script(<<<'JS'
@@ -252,9 +252,9 @@ it('places a block at its {{block:N}} marker inside the reply and appends unplac
 });
 
 it('honors markers separated by single newlines, the shape the model actually writes', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     // Single newlines reflect the model's observed output.
     // Parsers fold these markers into one paragraph unless normalization isolates them.
@@ -266,7 +266,7 @@ it('honors markers separated by single newlines, the shape the model actually wr
         60,
     );
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Enjoy!');
 
     $shape = json_decode((string) $page->script(<<<'JS'
@@ -287,9 +287,9 @@ it('honors markers separated by single newlines, the shape the model actually wr
 });
 
 it('resolves markers by tool-call order when a blockless tool was called first', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     // The first tool emits no block. Therefore, marker 2 maps to the first
     // display block instead of array index 2.
@@ -301,7 +301,7 @@ it('resolves markers by tool-call order when a blockless tool was called first',
         60,
     );
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Overview first.');
 
     $shape = json_decode((string) $page->script(<<<'JS'
@@ -322,13 +322,13 @@ it('resolves markers by tool-call order when a blockless tool was called first',
 });
 
 it('renders streamed text as markdown and hides incomplete trailing tokens', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage($conversationId, $user, 'Earlier turn.', [], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Earlier turn.');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -369,15 +369,15 @@ it('renders streamed text as markdown and hides incomplete trailing tokens', fun
 });
 
 it('attaches display blocks to the streamed bubble at stream-end reconcile', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
         displayBlockTableFixture(),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
     $page->assertCount('[data-block]', 1);
@@ -417,9 +417,9 @@ it('attaches display blocks to the streamed bubble at stream-end reconcile', fun
 });
 
 it('collapses a table past ten rows and reveals the rest when the toggle is clicked', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     // 25 rows on the page (the model's whole page, per BaseReadListTool/D1),
     // 42 across the full result set: the footer's count must keep tracking
@@ -428,7 +428,7 @@ it('collapses a table past ten rows and reveals the rest when the toggle is clic
         displayBlockLongTableFixture(25, 42),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
     $collapsed = json_decode((string) $page->script(<<<'JS'
@@ -492,15 +492,15 @@ it('collapses a table past ten rows and reveals the rest when the toggle is clic
 });
 
 it('renders no toggle for a table with exactly the collapse threshold of rows', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
         displayBlockLongTableFixture(10, 10),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
     $shape = json_decode((string) $page->script(<<<'JS'
@@ -519,11 +519,11 @@ it('renders no toggle for a table with exactly the collapse threshold of rows', 
 });
 
 it('renders the open_url link to the entity list page when the tool has more pages', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
-    $openUrl = 'https://relaticle.test/app/'.$team->slug.'/companies';
+    $openUrl = 'https://relaticle.test/app/'.$workspace->slug.'/companies';
 
     // Under the collapse threshold on purpose: `open_url` is the tool's OWN
     // "more pages exist" signal (D5), independent of the client-side row
@@ -532,7 +532,7 @@ it('renders the open_url link to the entity list page when the tool has more pag
         displayBlockLongTableFixture(6, 42, $openUrl),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
     $shape = json_decode((string) $page->script(<<<'JS'
@@ -556,9 +556,9 @@ it('renders the open_url link to the entity list page when the tool has more pag
 });
 
 it('expands two records_table blocks in one message independently', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     // Both blocks come from the SAME message, so blockKey(msg, block) can only
     // tell them apart via block.tool_call_order (DisplayBlocks::collect() stamps
@@ -570,7 +570,7 @@ it('expands two records_table blocks in one message independently', function ():
         displayBlockLongTableFixture(15, 15),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are two tables.');
 
     $page->assertCount('[data-block="records_table"]', 2);
@@ -608,15 +608,15 @@ it('expands two records_table blocks in one message independently', function ():
 });
 
 it('keeps a table expanded across a second stream-end reconcile that replaces the block object', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
         displayBlockLongTableFixture(25, 25),
     ], 60);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here are your companies.');
 
     $page->click('[data-block="records_table"] [data-block-toggle]');
@@ -685,9 +685,9 @@ it('keeps a table expanded across a second stream-end reconcile that replaces th
  * reply built around a table copied as tags wrapped around nothing.
  */
 it('copies a rehydrated reply as plain text with its blocks serialized in reading order', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'display blocks');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'display blocks');
 
     displayBlockInsertAssistantMessage(
         $conversationId,
@@ -697,7 +697,7 @@ it('copies a rehydrated reply as plain text with its blocks serialized in readin
         60,
     );
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Send the deck');
 
     // Clicking the real button rather than calling copyMessage() directly:

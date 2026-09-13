@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\TeamRole;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +17,6 @@ return new class extends Migration
     {
         DB::table('team_user')
             ->where('role', 'member')
-            ->update(['role' => TeamRole::Editor->value, 'updated_at' => now()]);
+            ->update(['role' => 'editor', 'updated_at' => now()]);
     }
 };

@@ -24,12 +24,12 @@ use Tests\Helpers\ChatDocument;
 mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -45,7 +45,7 @@ function seedTitlingConversation(string $title): string
         'id' => $id,
         'participant_type' => test()->user->getMorphClass(),
         'participant_id' => (string) test()->user->getKey(),
-        'team_id' => test()->team->getKey(),
+        'workspace_id' => test()->workspace->getKey(),
         'title' => $title,
         'created_at' => now(),
         'updated_at' => now(),
@@ -294,7 +294,7 @@ it('stops attempting to title after the opening few messages', function (): void
 it('gives the titler the record the user was viewing', function (): void {
     Queue::fake();
 
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme Corp']);
 
     $conversationId = $this->postJson(route('chat.conversations.create'), [
         'document' => ChatDocument::fromText('add a note here'),
@@ -360,7 +360,7 @@ it('titles from the assistant reply when the opening message named nothing', fun
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'hey',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -382,7 +382,7 @@ it('does not re-title at turn end when the conversation already has a generated 
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'how is globex doing',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -422,7 +422,7 @@ it('titles at turn end from what the user typed, not from the rows the system wr
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'how is globex doing',
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],

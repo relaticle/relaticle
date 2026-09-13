@@ -34,16 +34,16 @@ mutates(ChatInterface::class);
  *   polling avoids ever waiting for a slow operation through that bridge.
  */
 it('restores a typed draft into the composer after a reload', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'draft test', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'draft test', $conversationId);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $editorJson = json_encode($editor);
     $draftKeyJson = json_encode("chat.draft.{$conversationId}");
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click($editor)->type($editor, 'draft survives reload');
@@ -56,30 +56,30 @@ it('restores a typed draft into the composer after a reload', function (): void 
 });
 
 it('keeps drafts scoped per conversation when switching between chats', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat b', $conversationB);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $editorJson = json_encode($editor);
     $draftAKeyJson = json_encode("chat.draft.{$conversationA}");
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click($editor)->type($editor, 'draft for chat a');
 
     $page->assertScript("(() => localStorage.getItem({$draftAKeyJson}) !== null)()");
 
-    $page->navigate("/app/{$team->slug}/chats/{$conversationB}")
+    $page->navigate("/app/{$workspace->slug}/chats/{$conversationB}")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->assertScript("(() => document.querySelector({$editorJson})?.textContent.trim() ?? null)()", '');
 
-    $page->navigate("/app/{$team->slug}/chats/{$conversationA}")
+    $page->navigate("/app/{$workspace->slug}/chats/{$conversationA}")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->assertScript("(() => document.querySelector({$editorJson})?.textContent.trim() ?? null)()", 'draft for chat a');
@@ -105,18 +105,18 @@ it('keeps drafts scoped per conversation when switching between chats', function
  * whichever instance the global query happens to resolve to.
  */
 it('does not leak a pending draft timer across a real SPA conversation switch', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'chat b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'chat b', $conversationB);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $draftAKeyJson = json_encode("chat.draft.{$conversationA}");
     $draftBKeyJson = json_encode("chat.draft.{$conversationB}");
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Type in A, then switch to B via the real sidebar wire:navigate link
@@ -126,7 +126,7 @@ it('does not leak a pending draft timer across a real SPA conversation switch', 
     // Scoped to the persistent sidebar nav: an unscoped href match also hits
     // the topbar's "recent chats" menu link for the same conversation.
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}");
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}");
 
     // A fresh, distinct fragment in B: this is the exact content a leaked
     // A-bound timer would read (via localEditor()'s global-by-context
@@ -161,15 +161,15 @@ it('does not leak a pending draft timer across a real SPA conversation switch', 
 it('clears the draft once the message is actually sent', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'draft test', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'draft test', $conversationId);
 
     $editorJson = json_encode('[data-chat-context="conversation"] [contenteditable="true"]');
     $draftKeyJson = json_encode("chat.draft.{$conversationId}");
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -213,10 +213,10 @@ it('clears the draft once the message is actually sent', function (): void {
 it('clears the new-conversation draft bucket once the first message creates the conversation', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

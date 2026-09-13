@@ -25,12 +25,12 @@ use Relaticle\Chat\Tools\Task\CreateTaskTool;
 mutates(SuggestNextSteps::class, NextSteps::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -43,7 +43,7 @@ beforeEach(function (): void {
         'id' => $this->conversationId,
         'participant_type' => $this->user->getMorphClass(),
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Workspace setup',
         'created_at' => now(),
         'updated_at' => now(),
@@ -304,7 +304,7 @@ it('dispatches the suggester at the end of a turn with what the turn produced', 
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'how is acme doing',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -334,7 +334,7 @@ it('offers no steps on a turn that ends waiting for a decision', function (): vo
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'create a task to call acme',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],

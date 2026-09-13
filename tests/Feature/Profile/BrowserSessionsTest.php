@@ -29,7 +29,7 @@ mutates(AuthenticationSession::class, IdentityConfirmationRedirectController::cl
 mutates(EnsureAuthenticationComplete::class);
 
 test('social user can log out other sessions without confirmation', function (): void {
-    $this->actingAs(User::factory()->withTeam()->socialOnly()->create());
+    $this->actingAs(User::factory()->withWorkspace()->socialOnly()->create());
     session()->put('auth.password_confirmed_at', time());
 
     Livewire::test(LogoutOtherBrowserSessions::class)
@@ -38,7 +38,7 @@ test('social user can log out other sessions without confirmation', function ():
 });
 
 test('password user can log out other sessions after confirmation', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
     session()->put('auth.password_confirmed_at', time());
 
     Livewire::test(LogoutOtherBrowserSessions::class)
@@ -47,7 +47,7 @@ test('password user can log out other sessions after confirmation', function ():
 });
 
 test('blocked without confirmation', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(LogoutOtherBrowserSessions::class)
@@ -58,7 +58,7 @@ test('blocked without confirmation', function (): void {
 test('a passkey-only user (no password, no social account) can log out other sessions through the ceremony', function (): void {
     config(['session.driver' => 'database']);
 
-    $user = User::factory()->withTeam()->create(['password' => null]);
+    $user = User::factory()->withWorkspace()->create(['password' => null]);
     $this->actingAs($user);
 
     Passkey::create([
@@ -82,7 +82,7 @@ test('a passkey-only user (no password, no social account) can log out other ses
 test('a social-only user can log out other sessions through the real modal after a realistic delay', function (): void {
     config(['session.driver' => 'database']);
 
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     session()->put('auth.password_confirmed_at', time());
 
@@ -94,7 +94,7 @@ test('a social-only user can log out other sessions through the real modal after
 });
 
 test('password user with a passkey triggers the ceremony', function (): void {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Passkey::create([
@@ -114,7 +114,7 @@ test('confirmed passkey logout rotates the remember token', function (): void {
     config(['session.driver' => 'database']);
     session()->put('auth.password_confirmed_at', time());
 
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
     $user->forceFill(['remember_token' => 'original-token'])->save();
 
     Passkey::create([
@@ -134,7 +134,7 @@ test('deletes other sessions and sends success notification', function (): void 
     config(['session.driver' => 'database']);
     session()->put('auth.password_confirmed_at', time());
 
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $currentSessionId = Session::getId();
 
@@ -172,7 +172,7 @@ test('keeps the current session while deleting the others', function (): void {
     config(['session.driver' => 'database']);
     session()->put('auth.password_confirmed_at', time());
 
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $currentSessionId = Session::getId();
 
@@ -195,7 +195,7 @@ test('keeps the current session while deleting the others', function (): void {
 });
 
 test('browser sessions component renders correctly', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     Livewire::test(LogoutOtherBrowserSessions::class)
         ->assertSuccessful()
@@ -203,7 +203,7 @@ test('browser sessions component renders correctly', function (): void {
 });
 
 test('a confirmation older than the confirmation window no longer satisfies the gate', function (): void {
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
     session()->put('auth.password_confirmed_at', time() - 1000); // ~16.6 min > 900s window
 
     Livewire::test(LogoutOtherBrowserSessions::class)
@@ -213,7 +213,7 @@ test('a confirmation older than the confirmation window no longer satisfies the 
 
 test('a confirmation inside the confirmation window still satisfies the gate', function (): void {
     config(['session.driver' => 'database']);
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
     session()->put('auth.password_confirmed_at', time() - 60);
 
     Livewire::test(LogoutOtherBrowserSessions::class)
@@ -222,7 +222,7 @@ test('a confirmation inside the confirmation window still satisfies the gate', f
 });
 
 test('a genuine remember-me cookie with enrolled MFA is suspended and its recaller cookie cleared', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $rememberToken = Str::random(60);
     $user->forceFill(['remember_token' => $rememberToken])->save();
 
@@ -230,7 +230,7 @@ test('a genuine remember-me cookie with enrolled MFA is suspended and its recall
     $recallerValue = "{$user->getAuthIdentifier()}|{$rememberToken}|{$user->password}";
 
     $this->withCookie($recallerName, $recallerValue)
-        ->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
         ->assertRedirect(route('two-factor.login'))
         ->assertCookieExpired($recallerName);
 
@@ -239,12 +239,12 @@ test('a genuine remember-me cookie with enrolled MFA is suspended and its recall
 });
 
 test('a restored session with enrolled MFA is suspended before reaching a protected page', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $user->forceFill(['remember_token' => 'original-remember-token'])->save();
 
     $this->actingAs($user);
 
-    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
         ->assertRedirect(route('two-factor.login'));
 
     $this->assertGuest('web');
@@ -253,10 +253,10 @@ test('a restored session with enrolled MFA is suspended before reaching a protec
 });
 
 test('a restored session stays challenged across repeated requests until MFA completes', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
 
-    $dashboard = Dashboard::getUrl(['tenant' => $user->currentTeam]);
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
 
     $this->get($dashboard)->assertRedirect(route('two-factor.login'));
     $this->assertGuest('web');
@@ -266,24 +266,24 @@ test('a restored session stays challenged across repeated requests until MFA com
 });
 
 test('completing the challenge after a restored-session suspension resumes the original destination', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
+    $workspace = $user->currentWorkspace;
     $this->actingAs($user);
 
-    $this->get("/app/{$team->slug}/companies")->assertRedirect(route('two-factor.login'));
+    $this->get("/app/{$workspace->slug}/companies")->assertRedirect(route('two-factor.login'));
     $this->assertGuest('web');
 
     $this->post(route('two-factor.login.store'), [
         'recovery_code' => 'recovery-code-one',
-    ])->assertRedirect("/app/{$team->slug}/companies");
+    ])->assertRedirect("/app/{$workspace->slug}/companies");
 
     $this->assertAuthenticatedAs($user);
 });
 test('suspending a non-remembered incomplete session does not escalate into a persistent remember-me cookie', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
 
-    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
         ->assertRedirect(route('two-factor.login'));
 
     $this->assertGuest('web');
@@ -302,10 +302,10 @@ test('suspending a non-remembered incomplete session does not escalate into a pe
 test('a restored session with enrolled MFA dispatches the same challenge event every other primary method uses', function (): void {
     Event::fake([TwoFactorAuthenticationChallenged::class]);
 
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
 
-    $this->get(Dashboard::getUrl(['tenant' => $user->currentTeam]))
+    $this->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
         ->assertRedirect(route('two-factor.login'));
 
     Event::assertDispatched(
@@ -315,13 +315,13 @@ test('a restored session with enrolled MFA dispatches the same challenge event e
 });
 
 test('a provider-only user returns from confirmation with the log-out modal already open', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     $account = UserSocialAccount::factory()->create([
         'user_id' => $user->id,
         'provider_name' => SocialiteProvider::GOOGLE->value,
     ]);
-    $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
+    $settingsUrl = Security::getUrl(['tenant' => $user->currentWorkspace]);
 
     Livewire::test(LogoutOtherBrowserSessions::class)
         ->mountAction('deleteBrowserSessions')
@@ -347,7 +347,7 @@ test('a provider-only user returns from confirmation with the log-out modal alre
 });
 
 test('opening the modal without starting the round trip records nothing to reopen', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -362,7 +362,7 @@ test('opening the modal without starting the round trip records nothing to reope
 });
 
 test('a round trip that returns without the proof is not reopened by a later unrelated confirmation', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,

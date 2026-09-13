@@ -16,7 +16,7 @@ beforeEach(function (): void {
 });
 
 test('dispatches a profile sync when a user verifies their email', function (): void {
-    $user = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $user = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
 
     event(new Verified($user));
 

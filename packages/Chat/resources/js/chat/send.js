@@ -179,7 +179,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
 
     async regenerateMessage(index) {
         if (this.isStreaming) return;
-        // The composer is throttled team-wide right now: sendMessage() below
+        // The composer is throttled workspace-wide right now: sendMessage() below
         // would bail on its own `if (this.rateLimit) return` guard without
         // pushing anything back, so splicing first would just delete the
         // turn with nothing to replace it (issue #499). Bailing here instead

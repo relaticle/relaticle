@@ -16,25 +16,25 @@ use Tests\Helpers\ChatDocument;
 mutates(ListConversationMessages::class);
 
 it('approved actions expose record.url after conversation reload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
-    $angel = People::factory()->for($user->currentTeam)->create(['name' => 'Angel']);
+    $angel = People::factory()->for($user->currentWorkspace)->create(['name' => 'Angel']);
 
     $convId = '019df800-4444-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -98,25 +98,25 @@ it('approved actions expose record.url after conversation reload', function (): 
 });
 
 it('reconstructs per-item batch chips so resolved items survive reload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
-    $angel = People::factory()->for($user->currentTeam)->create(['name' => 'Angel']);
+    $angel = People::factory()->for($user->currentWorkspace)->create(['name' => 'Angel']);
 
     $convId = '019df800-4444-7000-8000-000000000003';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -188,23 +188,23 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
 });
 
 it('does not expose record on pending or rejected actions', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     $convId = '019df800-4444-7000-8000-000000000002';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -258,23 +258,23 @@ it('does not expose record on pending or rejected actions', function (): void {
 });
 
 it('rehydrates a pending proposal with the instant it lapses', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     $convId = '019df800-4444-7000-8000-000000000005';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',

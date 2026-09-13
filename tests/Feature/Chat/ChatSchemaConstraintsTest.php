@@ -8,16 +8,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Models\AiCreditBalance;
 
-it('cascades agent_conversations when the team is hard-deleted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+it('cascades agent_conversations when the workspace is hard-deleted', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -25,7 +25,7 @@ it('cascades agent_conversations when the team is hard-deleted', function (): vo
 
     expect(DB::table('agent_conversations')->where('id', $conversationId)->count())->toBe(1);
 
-    $team->forceDelete();
+    $workspace->forceDelete();
 
     expect(DB::table('agent_conversations')->where('id', $conversationId)->count())->toBe(0);
 });
@@ -45,12 +45,12 @@ it('has a composite (status, expires_at) index on pending_actions', function ():
 });
 
 it('rejects negative credits_used on ai_credit_balances', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
 
     expect(
-        fn () => AiCreditBalance::query()->updateOrCreate(['team_id' => $teamId], [
-            'team_id' => $teamId,
+        fn () => AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspaceId], [
+            'workspace_id' => $workspaceId,
             'credits_remaining' => 10,
             'credits_used' => -5,
             'period_starts_at' => now()->startOfMonth(),
@@ -60,12 +60,12 @@ it('rejects negative credits_used on ai_credit_balances', function (): void {
 });
 
 it('rejects period end-before-start on ai_credit_balances', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
 
     expect(
-        fn () => AiCreditBalance::query()->updateOrCreate(['team_id' => $teamId], [
-            'team_id' => $teamId,
+        fn () => AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspaceId], [
+            'workspace_id' => $workspaceId,
             'credits_remaining' => 10,
             'credits_used' => 0,
             'period_starts_at' => now()->endOfMonth(),
@@ -75,13 +75,13 @@ it('rejects period end-before-start on ai_credit_balances', function (): void {
 });
 
 it('rejects negative tokens on ai_credit_transactions', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
 
     expect(
         fn () => DB::table('ai_credit_transactions')->insert([
             'id' => (string) Str::ulid(),
-            'team_id' => $teamId,
+            'workspace_id' => $workspaceId,
             'user_id' => $user->getKey(),
             'type' => 'chat',
             'model' => 'sonnet',

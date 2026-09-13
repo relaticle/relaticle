@@ -15,10 +15,10 @@ use Illuminate\Support\Facades\DB;
 mutates(OpportunityResource::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('can render the index page', function (): void {
@@ -27,7 +27,7 @@ it('can render the index page', function (): void {
 });
 
 it('can render the view page', function (): void {
-    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ViewOpportunity::class, ['record' => $record->getKey()])
         ->assertOk();
@@ -57,7 +57,7 @@ it('exposes the expected table columns', function (): void {
 });
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Opportunity::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Opportunity::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -71,7 +71,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Opportunity::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Opportunity::factory(3)->recycle([$this->user, $this->workspace])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ListOpportunities::class)
@@ -81,8 +81,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Opportunity::factory()->count(4)->recycle([$this->user, $this->team])->create();
-    $trashedRecords = Opportunity::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
+    $records = Opportunity::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
+    $trashedRecords = Opportunity::factory()->trashed()->count(6)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records)
@@ -91,7 +91,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Opportunity::factory(20)->recycle([$this->user, $this->team])->create();
+    $records = Opportunity::factory(20)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -100,7 +100,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Opportunity::factory(5)->recycle([$this->user, $this->team])->create();
+    $records = Opportunity::factory(5)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
         ->assertCanSeeTableRecords($records)
@@ -123,12 +123,12 @@ it('can create an opportunity', function (): void {
 
     $this->assertDatabaseHas(Opportunity::class, [
         'name' => 'Big Deal',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 });
 
 it('can edit an opportunity', function (): void {
-    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -140,7 +140,7 @@ it('can edit an opportunity', function (): void {
 });
 
 it('can delete an opportunity', function (): void {
-    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListOpportunities::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -161,7 +161,7 @@ it('has `:dataset` filter', function (string $filter): void {
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
 
-it('sets creator_id and team_id via observer when creating an opportunity', function (): void {
+it('sets creator_id and workspace_id via observer when creating an opportunity', function (): void {
     livewire(ListOpportunities::class)
         ->callAction('create', data: [
             'name' => 'Observer Test Deal',
@@ -171,23 +171,23 @@ it('sets creator_id and team_id via observer when creating an opportunity', func
     $opportunity = Opportunity::query()->where('name', 'Observer Test Deal')->first();
 
     expect($opportunity->creator_id)->toBe($this->user->id)
-        ->and($opportunity->team_id)->toBe($this->team->id);
+        ->and($opportunity->workspace_id)->toBe($this->workspace->id);
 });
 
-it('authorizes team member to view and update own team opportunity', function (): void {
-    $record = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+it('authorizes workspace member to view and update own workspace opportunity', function (): void {
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()
         ->and($this->user->can('delete', $record))->toBeTrue();
 });
 
-it('denies non-team-member from viewing another team opportunity', function (): void {
-    $otherUser = User::factory()->withTeam()->create();
-    $otherTeam = $otherUser->currentTeam;
+it('denies non-workspace-member from viewing another workspace opportunity', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $otherWorkspace = $otherUser->currentWorkspace;
 
     $this->actingAs($otherUser);
-    $record = Opportunity::factory()->for($otherTeam)->create();
+    $record = Opportunity::factory()->for($otherWorkspace)->create();
     $this->actingAs($this->user);
 
     expect($this->user->can('view', $record))->toBeFalse()
@@ -206,14 +206,14 @@ it('does not shift a date-only custom field into the user timezone', function ()
     Filament::setCurrentPanel(Filament::getPanel('app'));
 
     $closeDateField = DB::table('custom_fields')
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'close_date')
         ->value('id');
 
     expect($closeDateField)->not->toBeNull();
 
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
     $opportunity->saveCustomFields(['close_date' => '2026-08-19']);
 
     livewire(ListOpportunities::class)

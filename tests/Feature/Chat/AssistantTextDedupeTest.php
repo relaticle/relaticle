@@ -24,7 +24,7 @@ function storeAssistantTextFixture(User $user, string $text): string
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'T',
         'created_at' => now(),
         'updated_at' => now(),
@@ -43,7 +43,7 @@ function storeAssistantTextFixture(User $user, string $text): string
 }
 
 it('collapses a fully-repeated assistant text down to a single copy when persisting', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = storeAssistantTextFixture($user, 'Review the proposal below.Review the proposal below.');
@@ -57,7 +57,7 @@ it('collapses a fully-repeated assistant text down to a single copy when persist
 });
 
 it('persists non-repeated assistant text unchanged', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = storeAssistantTextFixture($user, 'Created Alpha and Beta.');

@@ -35,7 +35,7 @@ trait ChecksTokenAbility
         // OAuth clients can only ever ask for `mcp:use`. It is the single entry in
         // the authorization-server metadata laravel/mcp publishes, so per-ability
         // grants are not expressible over OAuth. Holding it authorizes the toolset;
-        // which team's data those tools reach is bound separately on the token.
+        // which workspace's data those tools reach is bound separately on the token.
         if ($token instanceof PassportAccessToken && ! $token->can(Registrar::OAUTH_SCOPE)) {
             return Response::error('Invalid ability provided.');
         }

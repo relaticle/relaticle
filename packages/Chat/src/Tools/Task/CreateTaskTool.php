@@ -12,7 +12,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 
@@ -58,7 +58,7 @@ final class CreateTaskTool extends BaseWriteCreateTool
 
     protected function validateRecord(array $record, User $user): ?string
     {
-        return TeamMembersContext::memberFieldError($user, 'assignee_ids', $record['assignee_ids'] ?? null);
+        return WorkspaceMembersContext::memberFieldError($user, 'assignee_ids', $record['assignee_ids'] ?? null);
     }
 
     protected function extractRecordData(array $record): array
@@ -76,22 +76,22 @@ final class CreateTaskTool extends BaseWriteCreateTool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $title = (string) ($record['title'] ?? '');
         $fields = [['label' => 'Title', 'value' => $title]];
 
-        $peopleNames = $this->recordNames()->names($this->idListFromArray($record, 'people_ids'), People::class, $team);
+        $peopleNames = $this->recordNames()->names($this->idListFromArray($record, 'people_ids'), People::class, $workspace);
         if ($peopleNames !== '') {
             $fields[] = ['label' => 'Linked people', 'value' => $peopleNames];
         }
 
-        $companyNames = $this->recordNames()->names($this->idListFromArray($record, 'company_ids'), Company::class, $team);
+        $companyNames = $this->recordNames()->names($this->idListFromArray($record, 'company_ids'), Company::class, $workspace);
         if ($companyNames !== '') {
             $fields[] = ['label' => 'Linked companies', 'value' => $companyNames];
         }
 
-        $opportunityNames = $this->recordNames()->names($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, $team);
+        $opportunityNames = $this->recordNames()->names($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, $workspace);
         if ($opportunityNames !== '') {
             $fields[] = ['label' => 'Linked opportunities', 'value' => $opportunityNames];
         }

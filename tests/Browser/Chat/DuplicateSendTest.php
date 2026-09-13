@@ -6,12 +6,12 @@ use App\Models\User;
 use Tests\Helpers\ChatBrowser;
 
 it('does not push two user messages when sendMessage is called twice in the same tick', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

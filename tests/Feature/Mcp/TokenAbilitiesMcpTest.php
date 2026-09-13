@@ -13,8 +13,8 @@ use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\Passport;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 describe('read-only token', function (): void {
@@ -36,7 +36,7 @@ describe('read-only token', function (): void {
     });
 
     it('cannot update a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -47,7 +47,7 @@ describe('read-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
@@ -76,7 +76,7 @@ describe('create-only token', function (): void {
     });
 
     it('cannot delete a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
@@ -105,7 +105,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can update a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -116,7 +116,7 @@ describe('wildcard token', function (): void {
     });
 
     it('can delete a company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeleteCompanyTool::class, [
@@ -164,7 +164,7 @@ describe('passport oauth token', function (): void {
             ->assertHasErrors(['Invalid ability provided.']);
 
         RelaticleServer::actingAs($this->user)
-            ->tool(DeleteCompanyTool::class, ['id' => Company::factory()->recycle([$this->user, $this->team])->create()->id])
+            ->tool(DeleteCompanyTool::class, ['id' => Company::factory()->recycle([$this->user, $this->workspace])->create()->id])
             ->assertHasErrors(['Invalid ability provided.']);
     });
 });

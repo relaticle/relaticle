@@ -12,7 +12,7 @@ use App\Mcp\Tools\People\ListPeopleTool;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\TeamScope;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -29,10 +29,10 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
     $this->actingAs($this->user);
-    Opportunity::addGlobalScope(new TeamScope);
+    Opportunity::addGlobalScope(new WorkspaceScope);
 });
 
 afterEach(function (): void {
@@ -40,12 +40,12 @@ afterEach(function (): void {
 });
 
 it('filters by custom field equality', function (): void {
-    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deal A']);
-    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deal B']);
+    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal A']);
+    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal B']);
 
     $stageField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->first();
@@ -74,12 +74,12 @@ it('filters by custom field equality', function (): void {
 });
 
 it('filters by currency field with gte operator', function (): void {
-    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Big Deal']);
-    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Small Deal']);
+    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Big Deal']);
+    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Small Deal']);
 
     $amountField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'amount')
         ->first();
@@ -126,7 +126,7 @@ it('rejects unknown field codes', function (): void {
 it('rejects unknown operators', function (): void {
     $amountField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'amount')
         ->firstOrFail();
@@ -195,12 +195,12 @@ it('returns an actionable MCP error for an operand that is not the declared type
 });
 
 it('accepts a single value for an array operand', function (): void {
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Qualified Deal']);
-    Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Proposed Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Qualified Deal']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Proposed Deal']);
 
     $stageField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->firstOrFail();
@@ -230,11 +230,11 @@ it('publishes only array-compatible operators for email, phone, and link fields'
 });
 
 it('filters json array custom fields through the people list tool', function (string $fieldCode, mixed $matchingValue, mixed $otherValue, string $operand): void {
-    $matchingPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Matching Person']);
-    $otherPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Other Person']);
+    $matchingPerson = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Matching Person']);
+    $otherPerson = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Other Person']);
     $field = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'people')
         ->where('code', $fieldCode)
         ->firstOrFail();
@@ -260,7 +260,7 @@ it('filters json array custom fields through the people list tool', function (st
 it('handles empty filter object as no-op', function (): void {
     $countBefore = Opportunity::query()->count();
 
-    Opportunity::factory()->recycle([$this->user, $this->team])->count(3)->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
 
     $request = new Request([
         'filter' => [

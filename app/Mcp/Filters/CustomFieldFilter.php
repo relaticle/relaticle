@@ -228,7 +228,7 @@ final readonly class CustomFieldFilter implements Filter
         /** @var Collection<string, CustomField> */
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $user->currentTeam->getKey())
+            ->where('tenant_id', $user->currentWorkspace->getKey())
             ->where('entity_type', $this->entityType)
             ->whereIn('code', $fieldCodes)
             ->active()

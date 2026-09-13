@@ -44,10 +44,10 @@ function transcriptShapeInsertMessage(string $conversationId, User $user, string
 }
 
 it('groups messages under a 3-minute gap and renders exactly one day separator across a day change', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 10:00:00', 'UTC');
 
@@ -59,7 +59,7 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
     transcriptShapeInsertMessage($conversationId, $user, 'Second today message', $baseline->copy()->addMinute());
     transcriptShapeInsertMessage($conversationId, $user, 'Third today message', $baseline->copy()->addMinutes(5));
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Third today message');
 
     $page->assertCount('[data-user-bubble]', 4);
@@ -168,15 +168,15 @@ function transcriptShapeBubbleInViewport(AwaitableWebpage $page, string $text): 
 }
 
 it('auto-loads earlier messages on scroll-to-top, without a click, preserving scroll position', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
     // Only the most recent 50 render initially, and the top-sentinel observer
@@ -241,15 +241,15 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
 });
 
 it('guards against a duplicate load when triggered again while one is already in flight', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
     $page->assertCount('[data-user-bubble]', 50);
@@ -292,15 +292,15 @@ it('guards against a duplicate load when triggered again while one is already in
 });
 
 it('clears the in-flight guard on a failed request, so history loading is not permanently disabled', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
 
     $page->assertCount('[data-user-bubble]', 50);
@@ -356,19 +356,19 @@ it('clears the in-flight guard on a failed request, so history loading is not pe
 });
 
 it('auto-loads on mount when a short first page leaves the sentinel visible without any scroll', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'transcript shape', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     // One more than PAGE_SIZE (50): the initial fetch returns the newest 50
     // and reports hasMoreMessages = true, leaving exactly one message behind.
     transcriptShapeInsertSequencedMessages($conversationId, $user, 51, $baseline);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->resize(1400, 9000)
-        ->navigate("/app/{$team->slug}/chats/{$conversationId}")
+        ->navigate("/app/{$workspace->slug}/chats/{$conversationId}")
         ->assertSourceHas('Seeded message 0051');
 
     // No scroll action anywhere in this test: on a viewport this tall, 50
@@ -393,8 +393,8 @@ it('auto-loads on mount when a short first page leaves the sentinel visible with
  * implementations cannot drift apart unnoticed.
  */
 it('paints a cited record as the same chip on the streamed and the reloaded pipeline', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $markdown = 'Closed [Acme Corporation](/r/company/01ABCDEF) this morning.';
     $serverHtml = (new MarkdownRenderer)->render($markdown);
@@ -405,8 +405,8 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
     $serverHtmlJson = json_encode($serverHtml, JSON_THROW_ON_ERROR);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -456,15 +456,15 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
  * absolutized so the link is pasteable anywhere.
  */
 it('copies both message shapes as the same plain text with absolute record urls', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $markdown = 'Closed [Acme Corporation](/r/company/01ABCDEF) this morning.';
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
     $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -507,8 +507,8 @@ it('copies both message shapes as the same plain text with absolute record urls'
  * a reload.
  */
 it('copies every markdown structure back as text, identically from both pipelines', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $markdown = <<<'MD'
         ### Next steps
@@ -531,8 +531,8 @@ it('copies every markdown structure back as text, identically from both pipeline
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
     $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -597,8 +597,8 @@ function transcriptShapeExtractChip(string $html): ?string
  * marked) to one flattened label on both sides.
  */
 it('emits chip markup identical to the server for every citable type, and chips nothing else', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $renderer = new MarkdownRenderer;
     $neverChipped = ['custom_field', '__proto__', 'constructor'];
@@ -617,8 +617,8 @@ it('emits chip markup identical to the server for every citable type, and chips 
 
     $casesJson = json_encode($cases, JSON_THROW_ON_ERROR);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $actual = json_decode((string) $page->script(<<<JS
@@ -658,10 +658,10 @@ it('emits chip markup identical to the server for every citable type, and chips 
  * through the border. Assert the rendered height, not the classes.
  */
 it('renders the sticky transcript pills at their natural height inside the zero-height sticky row', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'sticky pills', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'sticky pills', $conversationId);
 
     // Two calendar days so the transcript carries a day separator for the
     // sticky date pill to mirror; ids stay lexicographically ordered across
@@ -670,7 +670,7 @@ it('renders the sticky transcript pills at their natural height inside the zero-
     transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline->copy()->subDay(), 'dayA');
     transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline, 'dayB');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0020');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -724,10 +724,10 @@ it('renders the sticky transcript pills at their natural height inside the zero-
  * with no new message needed to summon it.
  */
 it('shows the scroll-to-bottom button whenever the transcript is scrolled up, with no new messages', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'scroll affordance', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'scroll affordance', $conversationId);
 
     transcriptShapeInsertSequencedMessages(
         $conversationId,
@@ -736,7 +736,7 @@ it('shows the scroll-to-bottom button whenever the transcript is scrolled up, wi
         Date::parse('2026-08-19 08:00:00', 'UTC'),
     );
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0040');
 
     // The button fades both ways and the click scrolls smoothly, so measure
@@ -803,15 +803,15 @@ it('shows the scroll-to-bottom button whenever the transcript is scrolled up, wi
  * frame grows with the text instead of sitting at one fixed width.
  */
 it('focuses the message editor on open and grows its width with the text', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'edit affordance', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'edit affordance', $conversationId);
 
     $baseline = Date::parse('2026-08-19 09:00:00', 'UTC');
     transcriptShapeInsertMessage($conversationId, $user, 'short', $baseline);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('short');
 
     // The real affordance, not startEdit() directly: the click destroys the

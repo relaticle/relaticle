@@ -59,12 +59,12 @@ final class SearchCrmTool implements Tool
         $limit = max(1, min((int) ($request['limit'] ?? 5), 10));
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
-        $tenantId = (string) $team->getKey();
+        $workspace = $user->currentWorkspace;
+        $tenantId = (string) $workspace->getKey();
 
         $results = [
             'companies' => Company::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->where(function (Builder $q) use ($query, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'company', 'companies', $query, $tenantId);
@@ -73,7 +73,7 @@ final class SearchCrmTool implements Tool
                 ->get(['id', 'name', 'created_at'])
                 ->toArray(),
             'people' => People::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->where(function (Builder $q) use ($query, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'people', 'people', $query, $tenantId);
@@ -82,7 +82,7 @@ final class SearchCrmTool implements Tool
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'opportunities' => Opportunity::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->where(function (Builder $q) use ($query, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'opportunity', 'opportunities', $query, $tenantId);
@@ -91,7 +91,7 @@ final class SearchCrmTool implements Tool
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'tasks' => Task::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->where(function (Builder $q) use ($query, $tenantId): void {
                     $q->where('title', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'task', 'tasks', $query, $tenantId);
@@ -100,7 +100,7 @@ final class SearchCrmTool implements Tool
                 ->get(['id', 'title', 'created_at'])
                 ->toArray(),
             'notes' => Note::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->where(function (Builder $q) use ($query, $tenantId): void {
                     $q->where('title', 'ilike', "%{$query}%");
                     $this->orMatchesCustomFields($q, 'note', 'notes', $query, $tenantId);

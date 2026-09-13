@@ -6,7 +6,7 @@ namespace App\Services\Billing;
 
 use App\Enums\Plan;
 use App\Features\Billing;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
 
@@ -28,7 +28,7 @@ final readonly class SidebarBillingState
      *
      * @return array{label: string, action: string, urgent: bool}|null
      */
-    public function for(Team $team): ?array
+    public function for(Workspace $workspace): ?array
     {
         if (! Feature::active(Billing::class)) {
             return null;
@@ -38,7 +38,7 @@ final readonly class SidebarBillingState
         // PastDue above Subscribed: keepPastDueSubscriptionsActive() leaves
         // valid() true throughout dunning, so asking it first returns null and
         // leaves the one state that ends in losing the workspace unmentioned.
-        if ($team->subscription()?->pastDue() === true) {
+        if ($workspace->subscription()?->pastDue() === true) {
             return [
                 'label' => __('billing.sidebar.past_due'),
                 'action' => __('billing.sidebar.fix'),
@@ -46,14 +46,14 @@ final readonly class SidebarBillingState
             ];
         }
 
-        if ($team->subscription()?->valid() === true || $team->plan === Plan::Enterprise) {
+        if ($workspace->subscription()?->valid() === true || $workspace->plan === Plan::Enterprise) {
             return null;
         }
 
-        if ($team->onGenericTrial()) {
+        if ($workspace->onGenericTrial()) {
             return [
-                'label' => trans_choice('billing.sidebar.trial_days_left', $this->daysLeft($team), [
-                    'days' => $this->daysLeft($team),
+                'label' => trans_choice('billing.sidebar.trial_days_left', $this->daysLeft($workspace), [
+                    'days' => $this->daysLeft($workspace),
                 ]),
                 'action' => __('billing.sidebar.keep_pro'),
                 'urgent' => false,
@@ -63,7 +63,7 @@ final readonly class SidebarBillingState
         // A grandfathered free workspace still has access and nothing to buy,
         // so it gets no prompt. Everything else that cannot reach the app is
         // paused and needs the only row here that must never 403.
-        if ($this->access->allows($team)) {
+        if ($this->access->allows($workspace)) {
             return null;
         }
 
@@ -80,12 +80,12 @@ final readonly class SidebarBillingState
      * diffInDays() already returns a float, which is what the page's older
      * floatDiffInDays() alias resolves to.
      */
-    private function daysLeft(Team $team): int
+    private function daysLeft(Workspace $workspace): int
     {
-        if ($team->trial_ends_at === null) {
+        if ($workspace->trial_ends_at === null) {
             return 0;
         }
 
-        return max(0, (int) ceil(Date::now()->diffInDays($team->trial_ends_at)));
+        return max(0, (int) ceil(Date::now()->diffInDays($workspace->trial_ends_at)));
     }
 }

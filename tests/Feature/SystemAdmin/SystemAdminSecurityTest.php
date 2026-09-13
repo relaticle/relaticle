@@ -51,7 +51,7 @@ describe('SystemAdmin Security', function () {
         'companies' => '/sysadmin/companies',
         'imports' => '/sysadmin/imports',
         'users' => '/sysadmin/users',
-        'teams' => '/sysadmin/teams',
+        'workspaces' => '/sysadmin/workspaces',
         'system-administrators' => '/sysadmin/system-administrators',
     ]);
 

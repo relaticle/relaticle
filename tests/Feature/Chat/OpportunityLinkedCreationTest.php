@@ -24,15 +24,15 @@ mutates(CreateOpportunity::class);
 mutates(UpdateOpportunity::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-4444-7000-8000-000000000001',
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -47,8 +47,8 @@ it('CreateOpportunityTool wraps entity fields inside a records[] schema', functi
 });
 
 it('persists company_id and contact_id in the pending action data', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $contact = People::factory()->for($this->team)->create(['name' => 'Angel']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $contact = People::factory()->for($this->workspace)->create(['name' => 'Angel']);
 
     $tool = resolve(CreateOpportunityTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
@@ -58,7 +58,7 @@ it('persists company_id and contact_id in the pending action data', function ():
     ]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->latest()
         ->firstOrFail();
@@ -70,8 +70,8 @@ it('persists company_id and contact_id in the pending action data', function ():
 });
 
 it('approving an opportunity creates it linked to a company and contact', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $contact = People::factory()->for($this->team)->create(['name' => 'Angel']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $contact = People::factory()->for($this->workspace)->create(['name' => 'Angel']);
 
     $opportunity = resolve(CreateOpportunity::class)->execute(
         $this->user,
@@ -89,8 +89,8 @@ it('approving an opportunity creates it linked to a company and contact', functi
 });
 
 it('rejects cross-tenant company_id at the action layer', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
-    $foreign = Company::factory()->for($other->currentTeam)->create(['name' => 'Mallory Co']);
+    $other = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Company::factory()->for($other->currentWorkspace)->create(['name' => 'Mallory Co']);
 
     expect(fn () => resolve(CreateOpportunity::class)->execute(
         $this->user,
@@ -100,8 +100,8 @@ it('rejects cross-tenant company_id at the action layer', function (): void {
 });
 
 it('rejects cross-tenant contact_id at the action layer', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
-    $foreign = People::factory()->for($other->currentTeam)->create(['name' => 'Mallory']);
+    $other = User::factory()->withPersonalWorkspace()->create();
+    $foreign = People::factory()->for($other->currentWorkspace)->create(['name' => 'Mallory']);
 
     expect(fn () => resolve(CreateOpportunity::class)->execute(
         $this->user,
@@ -111,8 +111,8 @@ it('rejects cross-tenant contact_id at the action layer', function (): void {
 });
 
 it('renders linked company and contact names in the create proposal display data', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $contact = People::factory()->for($this->team)->create(['name' => 'Angel']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $contact = People::factory()->for($this->workspace)->create(['name' => 'Angel']);
 
     $tool = resolve(CreateOpportunityTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000001');
@@ -122,7 +122,7 @@ it('renders linked company and contact names in the create proposal display data
     ]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->latest()
         ->firstOrFail();
@@ -136,12 +136,12 @@ it('renders linked company and contact names in the create proposal display data
 });
 
 it('UpdateOpportunityTool renders linked names in the update proposal display data', function (): void {
-    $oldCompany = Company::factory()->for($this->team)->create(['name' => 'Old Co']);
-    $newCompany = Company::factory()->for($this->team)->create(['name' => 'New Co']);
-    $newContact = People::factory()->for($this->team)->create(['name' => 'Angel']);
+    $oldCompany = Company::factory()->for($this->workspace)->create(['name' => 'Old Co']);
+    $newCompany = Company::factory()->for($this->workspace)->create(['name' => 'New Co']);
+    $newContact = People::factory()->for($this->workspace)->create(['name' => 'Angel']);
 
     $opportunity = Opportunity::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create(['name' => 'Existing deal', 'company_id' => $oldCompany->id]);
 
     $tool = resolve(UpdateOpportunityTool::class);
@@ -154,7 +154,7 @@ it('UpdateOpportunityTool renders linked names in the update proposal display da
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->latest()
         ->firstOrFail();

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Models\ActivityLog\Activity;
-use App\Models\ActivityLog\Scopes\TeamScope;
-use App\Models\Team;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Models\Workspace;
 use Closure;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -49,7 +49,7 @@ final class ActivityResource extends Resource
     #[Override]
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->withoutGlobalScope(TeamScope::class);
+        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 
     public static function canCreate(): bool
@@ -89,7 +89,7 @@ final class ActivityResource extends Resource
             'opportunity' => OpportunityResource::class,
             'task' => TaskResource::class,
             'note' => NoteResource::class,
-            'team' => TeamResource::class,
+            'workspace' => WorkspaceResource::class,
             'user' => UserResource::class,
         ];
     }
@@ -169,17 +169,17 @@ final class ActivityResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['team', 'causer', 'subject']))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['workspace', 'causer', 'subject']))
             ->columns([
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->placeholder('—')
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('causer.name')
                     ->label('User')
                     ->placeholder('System')
@@ -212,9 +212,9 @@ final class ActivityResource extends Resource
                     ->wrap(),
             ])
             ->filters([
-                SelectFilter::make('team_id')
-                    ->label('Team')
-                    ->options(fn (): array => Team::query()->orderBy('name')->pluck('name', 'id')->all())
+                SelectFilter::make('workspace_id')
+                    ->label('Workspace')
+                    ->options(fn (): array => Workspace::query()->orderBy('name')->pluck('name', 'id')->all())
                     ->searchable(),
                 self::causerFilter(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all()),
                 ...self::commonFilters(),
@@ -248,11 +248,11 @@ final class ActivityResource extends Resource
                             default => 'gray',
                         })
                         ->formatStateUsing(self::eventLabel(...)),
-                    TextEntry::make('team.name')
-                        ->label('Team')
+                    TextEntry::make('workspace.name')
+                        ->label('Workspace')
                         ->placeholder('—')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                     TextEntry::make('causer.name')
                         ->label('User')
                         ->placeholder('System')
@@ -290,7 +290,7 @@ final class ActivityResource extends Resource
     }
 
     /**
-     * The subject's display name: CRM records and teams/users use `name`,
+     * The subject's display name: CRM records and workspaces/users use `name`,
      * tasks and notes use `title`. Soft-deleted subjects still resolve
      * (the activity relation loads trashed models); null only when the
      * subject was hard-deleted or has neither attribute.

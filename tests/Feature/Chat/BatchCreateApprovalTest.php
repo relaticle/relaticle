@@ -24,17 +24,17 @@ mutates(PendingActionService::class);
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
     Bus::fake();
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019df900-5555-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -44,7 +44,7 @@ beforeEach(function (): void {
 function makeBatchProposal(string $convId, User $user, array $records): PendingAction
 {
     return PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => CreateTask::class,
@@ -60,7 +60,7 @@ function makeBatchProposal(string $convId, User $user, array $records): PendingA
 function makeSingleProposal(string $convId, User $user, string $title): PendingAction
 {
     return PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => CreateTask::class,
@@ -81,7 +81,7 @@ it('refuses a whole-batch approval: a batch resolves only per item', function ()
     expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
         ->toThrow(RuntimeException::class);
 
-    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0)
+    expect(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->count())->toBe(0)
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
@@ -93,7 +93,7 @@ it('approves one batch item without creating the others and stays pending', func
     $result = resolve(PendingActionService::class)->approveItem($action, $this->user, 0);
 
     expect($result['finalized'])->toBeFalse()
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->all())->toBe(['Item A']);
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->pluck('title')->all())->toBe(['Item A']);
 
     $fresh = $action->fresh();
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
@@ -119,7 +119,7 @@ it('finalizes the batch without dispatching a continuation after the last item r
         ->and($fresh->result_data['ids'])->toHaveCount(2)
         ->and($fresh->result_data['type'])->toBe('task')
         ->and($fresh->result_data['items']['1']['status'])->toBe('rejected')
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Keep 1', 'Keep 2']);
 });
 
@@ -131,7 +131,7 @@ it('marks the batch rejected when every item is skipped', function (): void {
     $service->rejectItem($action, $this->user, 1);
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected)
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->count())->toBe(0);
 });
 
 it('is idempotent: re-approving the same item does not double-create', function (): void {
@@ -141,7 +141,7 @@ it('is idempotent: re-approving the same item does not double-create', function 
     $service->approveItem($action, $this->user, 0);
     $service->approveItem($action, $this->user, 0);
 
-    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Once')->count())->toBe(1)
+    expect(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->where('title', 'Once')->count())->toBe(1)
         ->and($action->fresh()->result_data['ids'])->toHaveCount(1);
 });
 
@@ -154,7 +154,7 @@ it('throws when approving an out-of-range item index on a batch', function (): v
 
 it('throws when calling approveItem on a non-batch proposal', function (): void {
     $flat = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => CreateTask::class,
@@ -187,7 +187,7 @@ it('finalizes to Approved when the last resolution is a skip but earlier items w
         ->and($fresh->result_data['count'])->toBe(2)
         ->and($fresh->result_data['ids'])->toHaveCount(2)
         ->and($fresh->result_data['items']['2']['status'])->toBe('rejected')
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->pluck('title')->sort()->values()->all())
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->pluck('title')->sort()->values()->all())
         ->toBe(['Made A', 'Made B']);
 });
 
@@ -198,7 +198,7 @@ it('dispatches no continuation on a single approve and persists the record', fun
 
     expect($resolved->status)->toBe(PendingActionStatus::Approved)
         ->and($resolved->result_data['type'])->toBe('task')
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Approve')->count())->toBe(1);
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->where('title', 'Single Approve')->count())->toBe(1);
 });
 
 it('dispatches no continuation on a single reject and creates nothing', function (): void {
@@ -207,7 +207,7 @@ it('dispatches no continuation on a single reject and creates nothing', function
     $resolved = resolve(PendingActionService::class)->reject($action, $this->user);
 
     expect($resolved->status)->toBe(PendingActionStatus::Rejected)
-        ->and(Task::query()->where('team_id', $this->user->currentTeam->getKey())->where('title', 'Single Reject')->count())->toBe(0);
+        ->and(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->where('title', 'Single Reject')->count())->toBe(0);
 });
 
 it('rejecting an already-resolved action throws', function (): void {
@@ -221,7 +221,7 @@ it('rejecting an already-resolved action throws', function (): void {
 
 it('approving an expired action throws and creates nothing', function (): void {
     $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => CreateTask::class,
@@ -236,12 +236,12 @@ it('approving an expired action throws and creates nothing', function (): void {
     expect(fn () => resolve(PendingActionService::class)->approve($action, $this->user))
         ->toThrow(RuntimeException::class, 'This action has expired');
 
-    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+    expect(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->count())->toBe(0);
 });
 
 it('approving an already-resolved action throws', function (): void {
     $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => $this->convId,
         'action_class' => CreateTask::class,
@@ -368,13 +368,13 @@ it('reports the item\'s real stored status when approveItem is called again on a
     Event::assertNotDispatched(fn (PendingActionResolved $event): bool => $event->pendingActionId === $action->getKey()
         && $event->index === 0
         && $event->status === 'approved');
-    expect(Task::query()->where('team_id', $this->user->currentTeam->getKey())->count())->toBe(0);
+    expect(Task::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->count())->toBe(0);
 });
 
 it('does not broadcast when the pending action has no conversation_id', function (): void {
     Event::fake([PendingActionResolved::class]);
     $action = PendingAction::query()->create([
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => CreateTask::class,
@@ -391,22 +391,22 @@ it('does not broadcast when the pending action has no conversation_id', function
     Event::assertNotDispatched(PendingActionResolved::class);
 });
 
-it('refuses to approve a proposal belonging to another team', function (): void {
-    $proposal = makeSingleProposal($this->convId, $this->user, 'Owned by my team');
+it('refuses to approve a proposal belonging to another workspace', function (): void {
+    $proposal = makeSingleProposal($this->convId, $this->user, 'Owned by my workspace');
 
-    $outsider = User::factory()->withPersonalTeam()->create();
+    $outsider = User::factory()->withPersonalWorkspace()->create();
 
     expect(fn (): PendingAction => resolve(PendingActionService::class)->approve($proposal, $outsider))
         ->toThrow(RuntimeException::class);
 
-    expect(Task::query()->where('title', 'Owned by my team')->exists())->toBeFalse()
+    expect(Task::query()->where('title', 'Owned by my workspace')->exists())->toBeFalse()
         ->and($proposal->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
-it('refuses to approve a batch item belonging to another team', function (): void {
+it('refuses to approve a batch item belonging to another workspace', function (): void {
     $proposal = makeBatchProposal($this->convId, $this->user, [['title' => 'Batch item A']]);
 
-    $outsider = User::factory()->withPersonalTeam()->create();
+    $outsider = User::factory()->withPersonalWorkspace()->create();
 
     expect(fn (): array => resolve(PendingActionService::class)->approveItem($proposal, $outsider, 0))
         ->toThrow(RuntimeException::class);
@@ -432,7 +432,7 @@ it('refuses every mutating entry point when the actor belongs to another workspa
         ['name' => 'Task B'],
     ]);
 
-    $outsider = User::factory()->withPersonalTeam()->create();
+    $outsider = User::factory()->withPersonalWorkspace()->create();
     $service = resolve(PendingActionService::class);
 
     $calls = [

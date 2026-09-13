@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
-use App\Models\Concerns\BelongsToTeamCreator;
+use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
-use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\HasWorkspace;
 use Carbon\CarbonImmutable;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -35,14 +35,14 @@ use Spatie\Activitylog\Support\LogOptions;
 ])]
 final class Note extends Model implements HasCustomFields, HasTimeline
 {
-    use BelongsToTeamCreator;
+    use BelongsToWorkspaceCreator;
     use HasCreator;
 
     /** @use HasFactory<NoteFactory> */
     use HasFactory;
 
-    use HasTeam;
     use HasUlids;
+    use HasWorkspace;
     use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
@@ -126,7 +126,7 @@ final class Note extends Model implements HasCustomFields, HasTimeline
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->logExcept([
-                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
+                'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
             ])
             ->useLogName('crm')

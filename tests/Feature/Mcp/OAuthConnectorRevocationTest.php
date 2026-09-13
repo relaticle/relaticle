@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Actions\Mcp\RevokeOAuthConnector;
 use App\Livewire\App\AccessTokens\ManageOAuthConnectors;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -16,16 +16,16 @@ use Livewire\Livewire;
 mutates(RevokeOAuthConnector::class, ManageOAuthConnectors::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 
     $this->actingAs($this->user);
 
     Filament::setCurrentPanel(Filament::getPanel('app'));
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
-function connectorFor(User $user, Team $team, string $name = 'Claude'): Client
+function connectorFor(User $user, Workspace $workspace, string $name = 'Claude'): Client
 {
     $client = Client::query()->forceCreate([
         'id' => (string) Str::uuid(),
@@ -43,7 +43,7 @@ function connectorFor(User $user, Team $team, string $name = 'Claude'): Client
         'id' => $accessTokenId,
         'user_id' => $user->getKey(),
         'client_id' => $client->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'name' => $name,
         'scopes' => '["mcp:use"]',
         'revoked' => false,
@@ -63,22 +63,22 @@ function connectorFor(User $user, Team $team, string $name = 'Claude'): Client
 }
 
 it('lists the connectors a user has authorized', function (): void {
-    $connector = connectorFor($this->user, $this->team);
+    $connector = connectorFor($this->user, $this->workspace);
 
     Livewire::test(ManageOAuthConnectors::class)
         ->assertCanSeeTableRecords([$connector]);
 });
 
 it('does not list another user\'s connectors', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = connectorFor($otherUser, $otherUser->personalTeam(), 'Someone else ChatGPT');
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = connectorFor($otherUser, $otherUser->personalWorkspace(), 'Someone else ChatGPT');
 
     Livewire::test(ManageOAuthConnectors::class)
         ->assertCanNotSeeTableRecords([$theirs]);
 });
 
 it('revokes both the access token and its refresh token', function (): void {
-    $connector = connectorFor($this->user, $this->team);
+    $connector = connectorFor($this->user, $this->workspace);
 
     Livewire::test(ManageOAuthConnectors::class)
         ->callAction(TestAction::make('revoke')->table($connector))
@@ -89,7 +89,7 @@ it('revokes both the access token and its refresh token', function (): void {
 });
 
 it('drops the connector from the list once revoked', function (): void {
-    $connector = connectorFor($this->user, $this->team);
+    $connector = connectorFor($this->user, $this->workspace);
 
     Livewire::test(ManageOAuthConnectors::class)
         ->callAction(TestAction::make('revoke')->table($connector))
@@ -97,16 +97,16 @@ it('drops the connector from the list once revoked', function (): void {
 });
 
 it('leaves other users tokens for the same client untouched', function (): void {
-    $connector = connectorFor($this->user, $this->team);
+    $connector = connectorFor($this->user, $this->workspace);
 
-    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
     $otherTokenId = Str::random(80);
 
     DB::table('oauth_access_tokens')->insert([
         'id' => $otherTokenId,
         'user_id' => $otherUser->getKey(),
         'client_id' => $connector->getKey(),
-        'team_id' => $otherUser->personalTeam()->getKey(),
+        'workspace_id' => $otherUser->personalWorkspace()->getKey(),
         'name' => 'Claude',
         'scopes' => '["mcp:use"]',
         'revoked' => false,

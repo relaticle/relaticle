@@ -8,8 +8,8 @@ use App\Enums\SubscriberTagEnum;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\Chat\Models\AgentConversationMessage;
 
@@ -32,9 +32,9 @@ final readonly class SubscriberProfileDeriver
     {
         $tags = [SubscriberTagEnum::Verified->value, $this->signupSourceTag($user)];
 
-        foreach ($user->ownedTeams as $team) {
-            /** @var Team $team */
-            $tags = [...$tags, ...$team->onboardingSubscriberTags()];
+        foreach ($user->ownedWorkspaces as $workspace) {
+            /** @var Workspace $workspace */
+            $tags = [...$tags, ...$workspace->onboardingSubscriberTags()];
         }
 
         if ($this->hasCrmData($user)) {
@@ -45,8 +45,8 @@ final readonly class SubscriberProfileDeriver
             $tags[] = SubscriberTagEnum::HasApiToken->value;
         }
 
-        if ($user->ownedTeams()->whereHas('users')->exists()) {
-            $tags[] = SubscriberTagEnum::HasTeamMembers->value;
+        if ($user->ownedWorkspaces()->whereHas('users')->exists()) {
+            $tags[] = SubscriberTagEnum::HasWorkspaceMembers->value;
         }
 
         if ($this->hasChatUsage($user)) {
@@ -88,10 +88,10 @@ final readonly class SubscriberProfileDeriver
      */
     public function hasCrmData(User $user, ?Model $excluding = null): bool
     {
-        $teamIds = $user->allTeams()->pluck('id');
+        $workspaceIds = $user->allWorkspaces()->pluck('id');
 
         foreach ([Company::class, People::class, Opportunity::class] as $entity) {
-            $query = $entity::query()->whereIn('team_id', $teamIds);
+            $query = $entity::query()->whereIn('workspace_id', $workspaceIds);
 
             if ($excluding instanceof $entity) {
                 $query->whereKeyNot($excluding->getKey());

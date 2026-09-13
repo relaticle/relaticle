@@ -24,7 +24,7 @@ $markdownField = function (string $code, bool $encrypted): CustomField {
         'code' => $code,
         'type' => 'markdown-editor',
         'entity_type' => 'note',
-        'tenant_id' => test()->team->id,
+        'tenant_id' => test()->workspace->id,
         'sort_order' => 90,
         'active' => true,
         'system_defined' => false,
@@ -33,9 +33,9 @@ $markdownField = function (string $code, bool $encrypted): CustomField {
 };
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
-    $this->team = $this->user->currentTeam;
-    TenantContextService::setTenantId($this->team->id);
+    $this->user = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
+    TenantContextService::setTenantId($this->workspace->id);
 });
 
 it('no longer offers the markdown editor as a field type', function (): void {
@@ -50,8 +50,8 @@ it('moves markdown fields to the rich editor and converts their content', functi
     $encrypted = $markdownField('md_encrypted', encrypted: true);
 
     DB::table('custom_field_values')->insert([
-        ['id' => (string) Str::ulid(), 'custom_field_id' => $plain->id, 'entity_id' => (string) Str::ulid(), 'entity_type' => 'note', 'tenant_id' => $this->team->id, 'text_value' => $markdown],
-        ['id' => (string) Str::ulid(), 'custom_field_id' => $encrypted->id, 'entity_id' => (string) Str::ulid(), 'entity_type' => 'note', 'tenant_id' => $this->team->id, 'text_value' => Crypt::encryptString($markdown)],
+        ['id' => (string) Str::ulid(), 'custom_field_id' => $plain->id, 'entity_id' => (string) Str::ulid(), 'entity_type' => 'note', 'tenant_id' => $this->workspace->id, 'text_value' => $markdown],
+        ['id' => (string) Str::ulid(), 'custom_field_id' => $encrypted->id, 'entity_id' => (string) Str::ulid(), 'entity_type' => 'note', 'tenant_id' => $this->workspace->id, 'text_value' => Crypt::encryptString($markdown)],
     ]);
 
     $migration();
@@ -74,7 +74,7 @@ it('converts every value when a blank value empties out mid-run', function () us
         'custom_field_id' => $field->id,
         'entity_id' => (string) Str::ulid(),
         'entity_type' => 'note',
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'text_value' => $index === 0 ? '   ' : $markdown,
     ])->all());
 
@@ -96,7 +96,7 @@ it('leaves a markdown field without a value alone', function () use ($migration,
         'custom_field_id' => $field->id,
         'entity_id' => (string) Str::ulid(),
         'entity_type' => 'note',
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
         'text_value' => null,
     ]);
 

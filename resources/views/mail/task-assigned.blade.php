@@ -1,4 +1,4 @@
-<x-mail::message :reason="$teamName === null ? null : __('mail.footer.reason.assignee', ['team' => $teamName])">
+<x-mail::message :reason="$workspaceName === null ? null : __('mail.footer.reason.assignee', ['workspace' => $workspaceName])">
 <x-slot:preheader>{{ $preheader }}</x-slot:preheader>
 # {{ __('mail.task_assigned.heading') }}
 

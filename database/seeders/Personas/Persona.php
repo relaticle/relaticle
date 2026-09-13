@@ -18,7 +18,7 @@ final readonly class Persona
 {
     /**
      * @param  string  $purpose  What this login is for, shown in the local persona switcher.
-     * @param  array<string, mixed>  $team  Attributes force-filled onto the workspace.
+     * @param  array<string, mixed>  $workspaceAttributes  Attributes force-filled onto the workspace.
      * @param  ?OnboardingUseCase  $useCase  Drives which fixture set onboarding seeds; null leaves the workspace empty.
      * @param  ?string  $stripe  A Stripe test payment method, when this persona bills for real.
      * @param  array<int, array{email: string, role: string}>  $members
@@ -30,7 +30,7 @@ final readonly class Persona
         public string $workspace,
         public string $purpose,
         public BillingStatus $expect,
-        public array $team = [],
+        public array $workspaceAttributes = [],
         public ?OnboardingUseCase $useCase = null,
         public ?string $stripe = null,
         public bool $pastDue = false,

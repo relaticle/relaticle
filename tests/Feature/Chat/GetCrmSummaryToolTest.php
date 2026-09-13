@@ -40,7 +40,7 @@ function crmSummaryWeekCount(User $user): int
     Auth::guard('web')->setUser($user);
 
     Company::factory()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'created_at' => companyCreatedAt(),
     ]);
 
@@ -53,7 +53,7 @@ function crmSummaryWeekCount(User $user): int
 it('excludes a record from this week once the user calendar has rolled into a new week', function (): void {
     $this->travelTo(crmSummaryInstant());
 
-    $tokyo = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $tokyo = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
     expect(crmSummaryWeekCount($tokyo))->toBe(0);
 });
@@ -61,7 +61,7 @@ it('excludes a record from this week once the user calendar has rolled into a ne
 it('counts that same record for a user still inside the previous week', function (): void {
     $this->travelTo(crmSummaryInstant());
 
-    $utc = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $utc = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     expect(crmSummaryWeekCount($utc))->toBe(1);
 });

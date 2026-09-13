@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Casts\AsCanonicalEmail;
-use App\Models\Team;
 use App\Models\User;
 use App\Support\EmailAddress;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Tests\Helpers\HistoricalSchema;
 
 mutates(EmailAddress::class, AsCanonicalEmail::class);
 
@@ -51,6 +51,8 @@ function insertRawInvitation(string $teamId, string $email): string
 }
 
 it('lowercases a mixed-case user email', function (): void {
+    HistoricalSchema::createTeamInvitationsTable();
+
     $id = insertRawUser('Legacy-Mixed@Example.com');
 
     runEmailNormalizationMigration();
@@ -59,6 +61,8 @@ it('lowercases a mixed-case user email', function (): void {
 });
 
 it('leaves colliding user rows untouched rather than merging accounts', function (): void {
+    HistoricalSchema::createTeamInvitationsTable();
+
     $lower = insertRawUser('collide@example.com');
     $upper = insertRawUser('Collide@Example.com');
 
@@ -69,27 +73,30 @@ it('leaves colliding user rows untouched rather than merging accounts', function
 });
 
 it('lowercases a mixed-case invitation email', function (): void {
-    $team = Team::factory()->create();
-    $id = insertRawInvitation($team->id, 'Invited@Example.com');
+    HistoricalSchema::createTeamInvitationsTable();
+
+    $id = insertRawInvitation((string) Str::ulid(), 'Invited@Example.com');
 
     runEmailNormalizationMigration();
 
     expect(DB::table('team_invitations')->where('id', $id)->value('email'))->toBe('invited@example.com');
 });
 
-it('scopes the invitation collision check to one team', function (): void {
-    $teamA = Team::factory()->create();
-    $teamB = Team::factory()->create();
+it('scopes the invitation collision check to one workspace', function (): void {
+    HistoricalSchema::createTeamInvitationsTable();
 
-    $sameTeamLower = insertRawInvitation($teamA->id, 'dup@example.com');
-    $sameTeamUpper = insertRawInvitation($teamA->id, 'Dup@Example.com');
-    $otherTeam = insertRawInvitation($teamB->id, 'Dup@Example.com');
+    $teamA = (string) Str::ulid();
+    $teamB = (string) Str::ulid();
+
+    $sameWorkspaceLower = insertRawInvitation($teamA, 'dup@example.com');
+    $sameWorkspaceUpper = insertRawInvitation($teamA, 'Dup@Example.com');
+    $otherWorkspace = insertRawInvitation($teamB, 'Dup@Example.com');
 
     runEmailNormalizationMigration();
 
-    expect(DB::table('team_invitations')->where('id', $sameTeamLower)->value('email'))->toBe('dup@example.com')
-        ->and(DB::table('team_invitations')->where('id', $sameTeamUpper)->value('email'))->toBe('Dup@Example.com')
-        ->and(DB::table('team_invitations')->where('id', $otherTeam)->value('email'))->toBe('dup@example.com');
+    expect(DB::table('team_invitations')->where('id', $sameWorkspaceLower)->value('email'))->toBe('dup@example.com')
+        ->and(DB::table('team_invitations')->where('id', $sameWorkspaceUpper)->value('email'))->toBe('Dup@Example.com')
+        ->and(DB::table('team_invitations')->where('id', $otherWorkspace)->value('email'))->toBe('dup@example.com');
 });
 
 it('canonicalizes an email written through the model cast', function (): void {

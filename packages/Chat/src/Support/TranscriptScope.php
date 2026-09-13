@@ -24,7 +24,7 @@ final readonly class TranscriptScope
 {
     /**
      * Expects a query already rooted on `agent_conversation_messages as m`.
-     * The `agent_conversations as c` join is added here, since the team
+     * The `agent_conversations as c` join is added here, since the workspace
      * predicate below depends on it.
      */
     public static function apply(Builder $query, User $user, string $conversationId): Builder
@@ -34,7 +34,7 @@ final readonly class TranscriptScope
             ->where('m.conversation_id', $conversationId)
             ->where('m.participant_type', $user->getMorphClass())
             ->where('m.participant_id', $user->getKey())
-            ->where('c.team_id', $user->current_team_id)
+            ->where('c.workspace_id', $user->current_workspace_id)
             ->whereNull('m.superseded_at')
             // Approval echoes are internal turn bookkeeping and are never
             // rendered. Excluded in SQL rather than after the fetch so a LIMIT

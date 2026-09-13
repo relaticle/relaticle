@@ -18,20 +18,20 @@ final readonly class AddCustomFieldOptions
      */
     public function execute(User $user, array $data): Model
     {
-        abort_unless($user->ownsTeam($user->currentTeam), 403, 'Only team owners can manage custom field definitions.');
+        abort_unless($user->ownsWorkspace($user->currentWorkspace), 403, 'Only workspace owners can manage custom field definitions.');
 
         $fieldId = $data['_record_id'] ?? null;
 
         abort_if(! is_string($fieldId) && ! is_int($fieldId), 422, 'Missing field ID (_record_id).');
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
+        TenantContextService::setTenantId($workspaceId);
 
         try {
             $field = CustomField::query()
                 ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->findOrFail($fieldId);
 
             abort_unless(
@@ -48,7 +48,7 @@ final readonly class AddCustomFieldOptions
 
             foreach (array_column($validated['options'], 'name') as $index => $optionName) {
                 $field->options()->create([
-                    config('custom-fields.database.column_names.tenant_foreign_key') => $teamId,
+                    config('custom-fields.database.column_names.tenant_foreign_key') => $workspaceId,
                     'name' => $optionName,
                     'sort_order' => $nextSortOrder + $index,
                 ]);

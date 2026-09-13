@@ -31,11 +31,11 @@ final readonly class AggregateOpportunities
     ): array {
         abort_unless($user->can('viewAny', Opportunity::class), 403);
 
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return match ($groupBy) {
-            'stage' => $this->byStage($teamId, $dateFrom, $dateTo),
-            'company' => $this->byCompany($teamId, $dateFrom, $dateTo),
+            'stage' => $this->byStage($workspaceId, $dateFrom, $dateTo),
+            'company' => $this->byCompany($workspaceId, $dateFrom, $dateTo),
             default => abort(422, "Invalid group_by value: {$groupBy}. Must be 'stage' or 'company'."),
         };
     }
@@ -43,10 +43,10 @@ final readonly class AggregateOpportunities
     /**
      * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
-    private function byStage(mixed $teamId, ?string $dateFrom, ?string $dateTo): array
+    private function byStage(mixed $workspaceId, ?string $dateFrom, ?string $dateTo): array
     {
-        $stageFieldId = $this->resolveFieldId($teamId, OpportunityField::STAGE->value);
-        $amountFieldId = $this->resolveFieldId($teamId, OpportunityField::AMOUNT->value);
+        $stageFieldId = $this->resolveFieldId($workspaceId, OpportunityField::STAGE->value);
+        $amountFieldId = $this->resolveFieldId($workspaceId, OpportunityField::AMOUNT->value);
 
         $dateClause = $this->dateClause($dateFrom, $dateTo);
         $dateBindings = $this->dateBindings($dateFrom, $dateTo);
@@ -59,7 +59,7 @@ final readonly class AggregateOpportunities
             : '0 as total_amount';
         $amountBindings = $amountFieldId !== null ? [$amountFieldId] : [];
 
-        $totals = $this->grandTotals($teamId, $amountFieldId, $dateFrom, $dateTo);
+        $totals = $this->grandTotals($workspaceId, $amountFieldId, $dateFrom, $dateTo);
 
         if ($stageFieldId === null) {
             $mappedRows = [[
@@ -76,11 +76,11 @@ final readonly class AggregateOpportunities
              FROM opportunities o
              LEFT JOIN custom_field_values stage_cfv ON stage_cfv.entity_id = o.id AND stage_cfv.entity_type = 'opportunity' AND stage_cfv.custom_field_id = ?
              {$amountJoin}
-             WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
+             WHERE o.workspace_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY stage_cfv.string_value
              ORDER BY count DESC
              LIMIT ".(self::MAX_GROUPS + 1),
-            [$stageFieldId, ...$amountBindings, $teamId, ...$dateBindings],
+            [$stageFieldId, ...$amountBindings, $workspaceId, ...$dateBindings],
         );
 
         $stageOptions = DB::table('custom_field_options')
@@ -110,9 +110,9 @@ final readonly class AggregateOpportunities
     /**
      * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
-    private function byCompany(mixed $teamId, ?string $dateFrom, ?string $dateTo): array
+    private function byCompany(mixed $workspaceId, ?string $dateFrom, ?string $dateTo): array
     {
-        $amountFieldId = $this->resolveFieldId($teamId, OpportunityField::AMOUNT->value);
+        $amountFieldId = $this->resolveFieldId($workspaceId, OpportunityField::AMOUNT->value);
 
         $dateClause = $this->dateClause($dateFrom, $dateTo);
         $dateBindings = $this->dateBindings($dateFrom, $dateTo);
@@ -130,11 +130,11 @@ final readonly class AggregateOpportunities
              FROM opportunities o
              LEFT JOIN companies c ON c.id = o.company_id AND c.deleted_at IS NULL
              {$amountJoin}
-             WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}
+             WHERE o.workspace_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY c.id, c.name
              ORDER BY count DESC
              LIMIT ".(self::MAX_GROUPS + 1),
-            [...$amountBindings, $teamId, ...$dateBindings],
+            [...$amountBindings, $workspaceId, ...$dateBindings],
         );
 
         $mappedRows = [];
@@ -146,7 +146,7 @@ final readonly class AggregateOpportunities
             ];
         }
 
-        $totals = $this->grandTotals($teamId, $amountFieldId, $dateFrom, $dateTo);
+        $totals = $this->grandTotals($workspaceId, $amountFieldId, $dateFrom, $dateTo);
 
         return $this->buildResult('company', $mappedRows, $totals['count'], $totals['amount']);
     }
@@ -158,7 +158,7 @@ final readonly class AggregateOpportunities
      *
      * @return array{count: int, amount: float}
      */
-    private function grandTotals(mixed $teamId, mixed $amountFieldId, ?string $dateFrom, ?string $dateTo): array
+    private function grandTotals(mixed $workspaceId, mixed $amountFieldId, ?string $dateFrom, ?string $dateTo): array
     {
         $dateClause = $this->dateClause($dateFrom, $dateTo);
         $dateBindings = $this->dateBindings($dateFrom, $dateTo);
@@ -175,8 +175,8 @@ final readonly class AggregateOpportunities
             "SELECT COUNT(*) as count, {$amountSelect}
              FROM opportunities o
              {$amountJoin}
-             WHERE o.team_id = ? AND o.deleted_at IS NULL{$dateClause}",
-            [...$amountBindings, $teamId, ...$dateBindings],
+             WHERE o.workspace_id = ? AND o.deleted_at IS NULL{$dateClause}",
+            [...$amountBindings, $workspaceId, ...$dateBindings],
         );
 
         return [
@@ -185,11 +185,11 @@ final readonly class AggregateOpportunities
         ];
     }
 
-    private function resolveFieldId(mixed $teamId, string $code): mixed
+    private function resolveFieldId(mixed $workspaceId, string $code): mixed
     {
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $teamId)
+            ->where('tenant_id', $workspaceId)
             ->where('entity_type', 'opportunity')
             ->where('code', $code)
             ->active()

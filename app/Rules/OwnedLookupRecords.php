@@ -11,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 final readonly class OwnedLookupRecords implements ValidationRule
 {
     public function __construct(
-        private string $teamId,
+        private string $workspaceId,
         private string $lookupType,
         private string $fieldName,
     ) {}
@@ -51,7 +51,7 @@ final readonly class OwnedLookupRecords implements ValidationRule
         $model = $entity->model();
         $owned = $model::query()
             ->whereIn('id', $ids->all())
-            ->where('team_id', $this->teamId)
+            ->where('workspace_id', $this->workspaceId)
             ->pluck('id')
             ->map(fn (mixed $id): string => (string) $id);
 

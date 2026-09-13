@@ -47,7 +47,7 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('leaves authenticated GET routes untouched', function (): void {
-        $user = User::factory()->withPersonalTeam()->unverified()->create();
+        $user = User::factory()->withPersonalWorkspace()->unverified()->create();
 
         $primaryStatus = $this->actingAs($user)->get('http://relaticle.test/email/verify')->status();
         $secondary = $this->actingAs($user)->get('http://app.relaticle.test/email/verify');
@@ -56,7 +56,7 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('leaves signed routes untouched so host-bound signatures fail loudly instead of silently breaking', function (): void {
-        $user = User::factory()->withPersonalTeam()->unverified()->create();
+        $user = User::factory()->withPersonalWorkspace()->unverified()->create();
 
         $this->actingAs($user)
             ->get('http://app.relaticle.test/email/verify/'.$user->getKey().'/invalid-hash?signature=invalid')
@@ -85,7 +85,7 @@ describe('app plumbing on secondary hosts', function () {
     });
 
     it('leaves filament export downloads untouched', function (): void {
-        $user = User::factory()->withPersonalTeam()->create();
+        $user = User::factory()->withPersonalWorkspace()->create();
 
         $export = new Export;
         $export->user()->associate($user);

@@ -7,11 +7,11 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Schema;
 
-mutates(User::class, Team::class, Company::class, People::class, Opportunity::class, Task::class, Note::class);
+mutates(User::class, Workspace::class, Company::class, People::class, Opportunity::class, Task::class, Note::class);
 
 /**
  * Tests for the ULID migration.
@@ -25,24 +25,24 @@ mutates(User::class, Team::class, Company::class, People::class, Opportunity::cl
 describe('ULID Migration', function (): void {
 
     it('uses ULID for user primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
 
         expect($user->id)->toBeString()
             ->and(strlen($user->id))->toBe(26);
     });
 
-    it('uses ULID for team primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
-        $team = $user->currentTeam;
+    it('uses ULID for workspace primary key', function (): void {
+        $user = User::factory()->withWorkspace()->create();
+        $workspace = $user->currentWorkspace;
 
-        expect($team->id)->toBeString()
-            ->and(strlen($team->id))->toBe(26);
+        expect($workspace->id)->toBeString()
+            ->and(strlen($workspace->id))->toBe(26);
     });
 
     it('uses ULID for company primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $company = Company::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -51,9 +51,9 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for people primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $person = People::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -62,9 +62,9 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for opportunity primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $opportunity = Opportunity::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -73,9 +73,9 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for task primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $task = Task::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -84,9 +84,9 @@ describe('ULID Migration', function (): void {
     });
 
     it('uses ULID for note primary key', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $note = Note::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -94,56 +94,56 @@ describe('ULID Migration', function (): void {
             ->and(strlen($note->id))->toBe(26);
     });
 
-    it('maintains user-team relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
-        $team = $user->currentTeam;
+    it('maintains user-workspace relationship', function (): void {
+        $user = User::factory()->withWorkspace()->create();
+        $workspace = $user->currentWorkspace;
 
-        expect($team->user_id)->toBe($user->id)
-            ->and($user->current_team_id)->toBe($team->id);
+        expect($workspace->user_id)->toBe($user->id)
+            ->and($user->current_workspace_id)->toBe($workspace->id);
     });
 
-    it('maintains team-user pivot relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
-        $team = $user->currentTeam;
+    it('maintains workspace-user pivot relationship', function (): void {
+        $user = User::factory()->withWorkspace()->create();
+        $workspace = $user->currentWorkspace;
 
-        // Attach user to team via pivot table
-        $team->users()->attach($user, ['role' => 'admin']);
+        // Attach user to workspace via pivot table
+        $workspace->users()->attach($user, ['role' => 'admin']);
 
         // Refresh relationships
         $user->refresh();
-        $team->refresh();
+        $workspace->refresh();
 
-        expect($user->teams)->toHaveCount(1)
-            ->and($user->teams->first()->id)->toBe($team->id)
-            ->and($team->users)->toHaveCount(1)
-            ->and($team->users->first()->id)->toBe($user->id);
+        expect($user->workspaces)->toHaveCount(1)
+            ->and($user->workspaces->first()->id)->toBe($workspace->id)
+            ->and($workspace->users)->toHaveCount(1)
+            ->and($workspace->users->first()->id)->toBe($user->id);
     });
 
     it('maintains company foreign key relationships', function (): void {
-        $user = User::factory()->withTeam()->create();
-        $team = $user->currentTeam;
+        $user = User::factory()->withWorkspace()->create();
+        $workspace = $user->currentWorkspace;
         $company = Company::factory()->create([
-            'team_id' => $team->id,
+            'workspace_id' => $workspace->id,
             'creator_id' => $user->id,
             'account_owner_id' => $user->id,
         ]);
 
-        expect($company->team_id)->toBe($team->id)
+        expect($company->workspace_id)->toBe($workspace->id)
             ->and($company->creator_id)->toBe($user->id)
             ->and($company->account_owner_id)->toBe($user->id)
-            ->and($company->team->id)->toBe($team->id)
+            ->and($company->workspace->id)->toBe($workspace->id)
             ->and($company->creator->id)->toBe($user->id)
             ->and($company->accountOwner->id)->toBe($user->id);
     });
 
     it('maintains people-company relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $company = Company::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
         $person = People::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
             'company_id' => $company->id,
         ]);
@@ -155,18 +155,18 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains opportunity relationships', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $company = Company::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
         $person = People::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
             'company_id' => $company->id,
         ]);
         $opportunity = Opportunity::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
             'company_id' => $company->id,
             'contact_id' => $person->id,
@@ -179,9 +179,9 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains task-user pivot relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $task = Task::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -192,13 +192,13 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains taskables polymorphic relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $company = Company::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
         $task = Task::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -211,13 +211,13 @@ describe('ULID Migration', function (): void {
     });
 
     it('maintains noteables polymorphic relationship', function (): void {
-        $user = User::factory()->withTeam()->create();
+        $user = User::factory()->withWorkspace()->create();
         $company = Company::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
         $note = Note::factory()->create([
-            'team_id' => $user->currentTeam->id,
+            'workspace_id' => $user->currentWorkspace->id,
             'creator_id' => $user->id,
         ]);
 
@@ -230,7 +230,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('has correct column types for primary keys', function (): void {
-        $tables = ['users', 'teams', 'companies', 'people', 'opportunities', 'tasks', 'notes'];
+        $tables = ['users', 'workspaces', 'companies', 'people', 'opportunities', 'tasks', 'notes'];
 
         foreach ($tables as $table) {
             $columnType = Schema::getColumnType($table, 'id');
@@ -241,13 +241,13 @@ describe('ULID Migration', function (): void {
 
     it('has correct column types for foreign keys', function (): void {
         $foreignKeys = [
-            'companies' => ['team_id', 'creator_id', 'account_owner_id'],
-            'people' => ['team_id', 'creator_id', 'company_id'],
-            'opportunities' => ['team_id', 'creator_id', 'company_id', 'contact_id'],
-            'tasks' => ['team_id', 'creator_id'],
-            'notes' => ['team_id', 'creator_id'],
-            'users' => ['current_team_id'],
-            'teams' => ['user_id'],
+            'companies' => ['workspace_id', 'creator_id', 'account_owner_id'],
+            'people' => ['workspace_id', 'creator_id', 'company_id'],
+            'opportunities' => ['workspace_id', 'creator_id', 'company_id', 'contact_id'],
+            'tasks' => ['workspace_id', 'creator_id'],
+            'notes' => ['workspace_id', 'creator_id'],
+            'users' => ['current_workspace_id'],
+            'workspaces' => ['user_id'],
         ];
 
         foreach ($foreignKeys as $table => $columns) {
@@ -262,7 +262,7 @@ describe('ULID Migration', function (): void {
     });
 
     it('has integer primary key for pivot tables', function (): void {
-        $pivotTables = ['team_user', 'task_user', 'taskables', 'noteables'];
+        $pivotTables = ['workspace_user', 'task_user', 'taskables', 'noteables'];
 
         foreach ($pivotTables as $table) {
             if (Schema::hasTable($table) && Schema::hasColumn($table, 'id')) {

@@ -46,7 +46,7 @@
                     'REST API with full CRUD operations',
                     '22 custom field types with conditional visibility and encryption',
                     'Self-hosted with full data ownership',
-                    'Multi-team isolation with 5-layer authorization',
+                    'Multi-workspace isolation with 5-layer authorization',
                     '2,000+ automated tests',
                     'CSV import and export',
                 ])

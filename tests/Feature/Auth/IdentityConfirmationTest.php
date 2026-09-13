@@ -31,7 +31,7 @@ mutates(
 );
 
 test('the confirm-identity page renders for a user with a password', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $this->get(route('password.confirm'))
@@ -40,7 +40,7 @@ test('the confirm-identity page renders for a user with a password', function ()
 });
 
 test('the confirm-identity page offers the passkey alternative alongside the password form', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     Passkey::create([
         'user_id' => $user->getKey(),
         'name' => 'Chrome on macOS',
@@ -67,7 +67,7 @@ test('the confirm-identity page offers the passkey alternative alongside the pas
 });
 
 test('the confirm-identity page offers a linked provider for a passwordless user', function () {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     UserSocialAccount::factory()->create([
         'user_id' => $user->getKey(),
         'provider_name' => SocialiteProvider::GOOGLE->value,
@@ -81,7 +81,7 @@ test('the confirm-identity page offers a linked provider for a passwordless user
 });
 
 test('the confirm-identity mfa page renders', function () {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     IdentityConfirmation::markMfaPending($user, null);
 
@@ -97,7 +97,7 @@ test('the confirm-identity mfa page renders', function () {
 });
 
 test('redirecting to google for a fresh provider confirmation requests account selection', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $this->get(route('auth.socialite.confirm.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
@@ -106,7 +106,7 @@ test('redirecting to google for a fresh provider confirmation requests account s
 });
 
 test('redirecting to microsoft for a fresh provider confirmation forces re-authentication', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $this->get(route('auth.socialite.confirm.redirect', ['provider' => SocialiteProvider::MICROSOFT->value]))
@@ -115,9 +115,9 @@ test('redirecting to microsoft for a fresh provider confirmation forces re-authe
 });
 
 test('provider confirmation preserves the settings page for a scoped operation', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
-    $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
+    $settingsUrl = Security::getUrl(['tenant' => $user->currentWorkspace]);
     AuthenticationSession::startOperation($user, 'add_passkey', null);
 
     $this->from($settingsUrl)
@@ -127,9 +127,9 @@ test('provider confirmation preserves the settings page for a scoped operation',
 });
 
 test('provider confirmation preserves the settings page for an action with no scoped operation', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
-    $settingsUrl = Security::getUrl(['tenant' => $user->currentTeam]);
+    $settingsUrl = Security::getUrl(['tenant' => $user->currentWorkspace]);
 
     $this->from($settingsUrl)
         ->get(route('auth.socialite.confirm.redirect', ['provider' => 'google']))
@@ -138,7 +138,7 @@ test('provider confirmation preserves the settings page for an action with no sc
 });
 
 test('provider confirmation rejects an external return location', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     AuthenticationSession::startOperation($user, 'add_passkey', null);
 
@@ -149,7 +149,7 @@ test('provider confirmation rejects an external return location', function (): v
 });
 
 test('the confirmation page explains a cancelled provider confirmation', function (): void {
-    $this->actingAs(User::factory()->withTeam()->socialOnly()->create());
+    $this->actingAs(User::factory()->withWorkspace()->socialOnly()->create());
 
     $this->followingRedirects()
         ->get(route('auth.socialite.confirm.callback', ['provider' => 'google']))
@@ -157,7 +157,7 @@ test('the confirmation page explains a cancelled provider confirmation', functio
 });
 
 test('the mfa follow-up rejects a submission with no pending marker', function () {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
 
@@ -171,7 +171,7 @@ test('the mfa follow-up rejects a submission with no pending marker', function (
 });
 
 test('the mfa follow-up completes a pending password confirmation with the correct code', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $this->post(route('password.confirm.store'), ['password' => 'password'])
@@ -188,7 +188,7 @@ test('the mfa follow-up completes a pending password confirmation with the corre
 });
 
 test('the mfa follow-up accepts a recovery code for a pending password confirmation', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $this->post(route('password.confirm.store'), ['password' => 'password'])
@@ -202,7 +202,7 @@ test('the mfa follow-up accepts a recovery code for a pending password confirmat
 });
 
 test('the mfa follow-up rejects an incorrect code for a pending password confirmation', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $this->post(route('password.confirm.store'), ['password' => 'password'])
@@ -215,7 +215,7 @@ test('the mfa follow-up rejects an incorrect code for a pending password confirm
 });
 
 test('a session that never completed login MFA can still reach the identity-confirmation mfa page', function () {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
 
     $this->get(route('identity.confirm.mfa'))
@@ -225,7 +225,7 @@ test('a session that never completed login MFA can still reach the identity-conf
 });
 
 test('a session that never completed login MFA can still reach the provider re-authentication redirect', function () {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
 
     $this->get(route('auth.socialite.confirm.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
@@ -235,14 +235,14 @@ test('a session that never completed login MFA can still reach the provider re-a
 });
 
 test('cancelling identity MFA preserves authentication and revokes its operation', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $grant = AuthenticationSession::startOperation($user, 'manage_mfa', null);
     IdentityConfirmation::markMfaPending($user, $grant);
 
     $this->post(route('identity.confirm.mfa.cancel'))
-        ->assertRedirect(Security::getUrl(['tenant' => $user->currentTeam], panel: 'app'));
+        ->assertRedirect(Security::getUrl(['tenant' => $user->currentWorkspace], panel: 'app'));
 
     $this->assertAuthenticatedAs($user);
     expect(AuthenticationSession::pendingOperation())->toBe([])
@@ -253,7 +253,7 @@ test('cancelling identity MFA preserves authentication and revokes its operation
 });
 
 test('cancelling identity MFA does not revoke an operation started in another tab', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $grant = AuthenticationSession::startOperation($user, 'manage_mfa', null);
@@ -267,7 +267,7 @@ test('cancelling identity MFA does not revoke an operation started in another ta
 });
 
 test('identity confirmation waits for an in-flight login code verification before accepting the code', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $code = resolve(Google2FA::class)->getCurrentOtp($secret);

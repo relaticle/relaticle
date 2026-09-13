@@ -31,11 +31,11 @@ mutates(ChatInterface::class);
  * send.js's optimistic user bubble).
  */
 it('mints the assistant stub as the same reference the reactive messages array holds', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -57,11 +57,11 @@ it('mints the assistant stub as the same reference the reactive messages array h
 });
 
 it('paints a later mutation on the reference targetBubbleFor()\'s resume fallback returns', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

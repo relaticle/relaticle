@@ -378,7 +378,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
         $batch = Bus::batch([
             new ExecuteImportJob(
                 importId: $this->import()->id,
-                teamId: $this->import()->team_id,
+                workspaceId: $this->import()->workspace_id,
             ),
         ])->dispatch();
 

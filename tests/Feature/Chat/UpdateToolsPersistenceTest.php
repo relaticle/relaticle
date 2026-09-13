@@ -33,15 +33,15 @@ mutates(UpdatePersonTool::class);
 mutates(UpdatePeople::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-3333-7000-8000-000000000099',
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -49,7 +49,7 @@ beforeEach(function (): void {
 });
 
 it('UpdateCompanyTool proposes a name change and approval persists it', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Old Co']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Old Co']);
 
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -60,7 +60,7 @@ it('UpdateCompanyTool proposes a name change and approval persists it', function
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -72,7 +72,7 @@ it('UpdateCompanyTool proposes a name change and approval persists it', function
 });
 
 it('UpdateNoteTool proposes a title change and approval persists it', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Old title']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Old title']);
 
     $tool = resolve(UpdateNoteTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -83,7 +83,7 @@ it('UpdateNoteTool proposes a title change and approval persists it', function (
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -95,8 +95,8 @@ it('UpdateNoteTool proposes a title change and approval persists it', function (
 });
 
 it('UpdateNoteTool can resync linked people via people_ids', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Note']);
-    $alice = People::factory()->for($this->team)->create(['name' => 'Alice']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Note']);
+    $alice = People::factory()->for($this->workspace)->create(['name' => 'Alice']);
 
     $tool = resolve(UpdateNoteTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -107,7 +107,7 @@ it('UpdateNoteTool can resync linked people via people_ids', function (): void {
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -120,8 +120,8 @@ it('UpdateNoteTool can resync linked people via people_ids', function (): void {
 });
 
 it('coerces a scalar people id into a single-element list on note update', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Note']);
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Note']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Jane']);
 
     $tool = new UpdateNoteTool;
 
@@ -136,7 +136,7 @@ it('coerces a scalar people id into a single-element list on note update', funct
 });
 
 it('UpdateOpportunityTool proposes a name change and approval persists it', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Old deal']);
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Old deal']);
 
     $tool = resolve(UpdateOpportunityTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -147,7 +147,7 @@ it('UpdateOpportunityTool proposes a name change and approval persists it', func
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -159,8 +159,8 @@ it('UpdateOpportunityTool proposes a name change and approval persists it', func
 });
 
 it('UpdateOpportunityTool can repoint contact_id and persist it', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Deal']);
-    $contact = People::factory()->for($this->team)->create(['name' => 'Contact A']);
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Deal']);
+    $contact = People::factory()->for($this->workspace)->create(['name' => 'Contact A']);
 
     $tool = resolve(UpdateOpportunityTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -171,7 +171,7 @@ it('UpdateOpportunityTool can repoint contact_id and persist it', function (): v
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -183,7 +183,7 @@ it('UpdateOpportunityTool can repoint contact_id and persist it', function (): v
 });
 
 it('UpdatePersonTool proposes a name change and approval persists it', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Old name']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Old name']);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -194,7 +194,7 @@ it('UpdatePersonTool proposes a name change and approval persists it', function 
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -206,8 +206,8 @@ it('UpdatePersonTool proposes a name change and approval persists it', function 
 });
 
 it('UpdatePersonTool can repoint company_id and persist it', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Person']);
-    $newCompany = Company::factory()->for($this->team)->create(['name' => 'NewCo']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Person']);
+    $newCompany = Company::factory()->for($this->workspace)->create(['name' => 'NewCo']);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -218,7 +218,7 @@ it('UpdatePersonTool can repoint company_id and persist it', function (): void {
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -231,8 +231,8 @@ it('UpdatePersonTool can repoint company_id and persist it', function (): void {
 
 it('UpdateCompanyTool proposes an account owner change with names in the display and approval persists it', function (): void {
     $teammate = User::factory()->create(['name' => 'Alex Owner']);
-    $this->team->users()->attach($teammate, ['role' => 'editor']);
-    $company = Company::factory()->for($this->team)->create(['name' => 'Owned Co']);
+    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Owned Co']);
 
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -245,7 +245,7 @@ it('UpdateCompanyTool proposes an account owner change with names in the display
     expect($response)->toContain('pending_action');
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -261,8 +261,8 @@ it('UpdateCompanyTool proposes an account owner change with names in the display
 });
 
 it('UpdateCompanyTool rejects a non-member account_owner_id without creating a proposal', function (): void {
-    $stranger = User::factory()->withPersonalTeam()->create(['name' => 'Foreign Frank']);
-    $company = Company::factory()->for($this->team)->create(['name' => 'Guarded Co']);
+    $stranger = User::factory()->withPersonalWorkspace()->create(['name' => 'Foreign Frank']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Guarded Co']);
 
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -272,12 +272,12 @@ it('UpdateCompanyTool rejects a non-member account_owner_id without creating a p
         'account_owner_id' => (string) $stranger->getKey(),
     ]]]));
 
-    expect($response)->toContain('must be a workspace team member')
-        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect($response)->toContain('must be a workspace member')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('UpdateCompanyTool unassigns the account owner when an empty string is passed', function (): void {
-    $company = Company::factory()->for($this->team)->create([
+    $company = Company::factory()->for($this->workspace)->create([
         'name' => 'Unowned Co',
         'account_owner_id' => (string) $this->user->getKey(),
     ]);
@@ -291,7 +291,7 @@ it('UpdateCompanyTool unassigns the account owner when an empty string is passed
     ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -304,8 +304,8 @@ it('UpdateCompanyTool unassigns the account owner when an empty string is passed
 });
 
 it('UpdateCompany action rejects an account_owner_id outside the workspace', function (): void {
-    $stranger = User::factory()->withPersonalTeam()->create();
-    $company = Company::factory()->for($this->team)->create(['name' => 'Tenant Safe Co']);
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Tenant Safe Co']);
 
     expect(fn () => resolve(UpdateCompany::class)->execute($this->user, $company, [
         'account_owner_id' => (string) $stranger->getKey(),
@@ -313,8 +313,8 @@ it('UpdateCompany action rejects an account_owner_id outside the workspace', fun
 });
 
 it('UpdateTaskTool rejects a non-member assignee id before proposing', function (): void {
-    $stranger = User::factory()->withPersonalTeam()->create();
-    $task = Task::factory()->for($this->team)->create(['title' => 'Assignee Guard Task']);
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Assignee Guard Task']);
 
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');
@@ -324,14 +324,14 @@ it('UpdateTaskTool rejects a non-member assignee id before proposing', function 
         'assignee_ids' => [(string) $stranger->getKey()],
     ]]]));
 
-    expect($response)->toContain('assignee_ids must be a workspace team member')
-        ->and(PendingAction::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect($response)->toContain('assignee_ids must be a workspace member')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('UpdateTaskTool accepts a workspace member as assignee', function (): void {
     $teammate = User::factory()->create(['name' => 'Assignable Amy']);
-    $this->team->users()->attach($teammate, ['role' => 'editor']);
-    $task = Task::factory()->for($this->team)->create(['title' => 'Assignable Task']);
+    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Assignable Task']);
 
     $tool = resolve(UpdateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000099');

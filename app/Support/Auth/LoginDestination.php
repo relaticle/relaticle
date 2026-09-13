@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Support\Auth;
 
 use App\Filament\Pages\Dashboard;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -36,8 +36,8 @@ final readonly class LoginDestination
 
     private function fallback(User $user): string
     {
-        return $user->currentTeam
-            ? Dashboard::getUrl(['tenant' => $user->currentTeam])
+        return $user->currentWorkspace
+            ? Dashboard::getUrl(['tenant' => $user->currentWorkspace])
             : Filament::getPanel('app')->getUrl();
     }
 
@@ -63,9 +63,9 @@ final readonly class LoginDestination
             return false;
         }
 
-        $team = Team::query()->where('slug', $tenantSlug)->first();
+        $workspace = Workspace::query()->where('slug', $tenantSlug)->first();
 
-        return $team instanceof Team && $user->belongsToTeam($team);
+        return $workspace instanceof Workspace && $user->belongsToWorkspace($workspace);
     }
 
     // A relative URL is matched against the panel domain when one is configured,

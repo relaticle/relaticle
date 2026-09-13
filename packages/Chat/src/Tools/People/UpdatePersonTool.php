@@ -63,7 +63,7 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $fields = [];
 
@@ -79,8 +79,8 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
             $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
-                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $team),
-                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $team),
+                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $workspace),
+                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $workspace),
                 '_oldValue' => $model->getAttribute('company_id'),
                 '_newValue' => $newCompanyId,
             ];

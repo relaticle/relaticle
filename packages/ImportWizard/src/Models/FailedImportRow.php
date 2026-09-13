@@ -14,13 +14,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * @property string $id
  * @property string $import_id
- * @property string $team_id
+ * @property string $workspace_id
  * @property array<string, mixed> $data
  * @property string|null $validation_error
  */
 #[Fillable([
     'import_id',
-    'team_id',
+    'workspace_id',
     'data',
     'validation_error',
 ])]

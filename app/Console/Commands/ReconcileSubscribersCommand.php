@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * The convergence backstop: re-derives every verified user's subscriber
  * profile and syncs the ones that drifted, whatever the cause (a missed
- * event, a failed job, recency decay, a deleted team). The one exception is
+ * event, a failed job, recency decay, a deleted workspace). The one exception is
  * a profile Mailcoach already rejected, which waits until it changes.
  */
 #[Description('Sync Mailcoach subscriber profiles for verified users whose derived profile changed')]
@@ -39,7 +39,7 @@ final class ReconcileSubscribersCommand extends Command
 
         User::query()
             ->whereNotNull('email_verified_at')
-            ->with(['ownedTeams', 'teams'])
+            ->with(['ownedWorkspaces', 'workspaces'])
             ->chunkById(200, function (Collection $users) use ($deriver, $dryRun, $limit, &$changed, &$rejected): bool {
                 /** @var User $user */
                 foreach ($users as $user) {

@@ -19,12 +19,12 @@ mutates(ChatController::class);
 it('rejects an Opus request from a grandfathered Free user with a 403', function (): void {
     Feature::define(Billing::class, true);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
-    expect($team->plan)->toBe(Plan::Free);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+    expect($workspace->plan)->toBe(Plan::Free);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -36,7 +36,7 @@ it('rejects an Opus request from a grandfathered Free user with a 403', function
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -59,12 +59,12 @@ it('rejects an Opus request from a grandfathered Free user with a 403', function
 it('allows an Opus request from a Pro user', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Pro;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Pro;
+    $workspace->save();
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -76,7 +76,7 @@ it('allows an Opus request from a Pro user', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -93,11 +93,11 @@ it('allows an Opus request from a Pro user', function (): void {
 it('allows a Free user to send with no explicit model (defaults to Auto)', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    expect($team->plan)->toBe(Plan::Free);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    expect($workspace->plan)->toBe(Plan::Free);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -109,7 +109,7 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -126,11 +126,11 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
 it('allows a Free user to explicitly pick Sonnet', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    expect($team->plan)->toBe(Plan::Free);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    expect($workspace->plan)->toBe(Plan::Free);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -142,7 +142,7 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -157,10 +157,10 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
 });
 
 it('rejects a GPT-5 request from a Free user with a 403', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -172,7 +172,7 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -193,10 +193,10 @@ it('allows a Free user to pick Ollama when it is configured', function (): void 
     config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -208,7 +208,7 @@ it('allows a Free user to pick Ollama when it is configured', function (): void 
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -223,10 +223,10 @@ it('allows a Free user to pick Ollama when it is configured', function (): void 
 });
 
 it('rejects an unknown model id with a 422', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -238,7 +238,7 @@ it('rejects an unknown model id with a 422', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),

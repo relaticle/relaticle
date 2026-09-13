@@ -35,6 +35,7 @@
         "livewire-development",
         "echo-development",
         "tailwindcss-development",
+        "filament-development",
         "medialibrary-development",
         "laravel-query-builder",
         "spatie-javascript",

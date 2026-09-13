@@ -36,7 +36,7 @@ final readonly class ListNotes
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(
-            Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
             ->allowedFilters(

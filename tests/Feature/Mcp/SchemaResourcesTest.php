@@ -32,7 +32,7 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
 });
 
 it('returns valid company schema with correct fields', function (): void {
@@ -108,10 +108,10 @@ it('publishes complete task and note output contracts', function (string $entity
 ]);
 
 it('includes custom fields in schema when they exist', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
 
     $section = CustomFieldSection::factory()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Test Section',
         'code' => 'test_section',
@@ -121,7 +121,7 @@ it('includes custom fields in schema when they exist', function (): void {
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'test_field',
@@ -140,10 +140,10 @@ it('includes custom fields in schema when they exist', function (): void {
 });
 
 it('reports a required custom field as required in the schema', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
 
     $section = CustomFieldSection::factory()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Required Section',
         'code' => 'required_section',
@@ -153,7 +153,7 @@ it('reports a required custom field as required in the schema', function (): voi
     ]);
 
     CustomField::factory()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'must_have',
@@ -183,9 +183,9 @@ it('reports a required custom field as required in the schema', function (): voi
 });
 
 it('describes hyphenated choice and datetime field types correctly', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Advanced Fields',
         'code' => 'advanced_fields',
@@ -195,7 +195,7 @@ it('describes hyphenated choice and datetime field types correctly', function ()
     ]);
 
     $multiSelect = CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'markets',
@@ -207,7 +207,7 @@ it('describes hyphenated choice and datetime field types correctly', function ()
     ]);
 
     $toggleButtons = CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'priority',
@@ -219,7 +219,7 @@ it('describes hyphenated choice and datetime field types correctly', function ()
     ]);
 
     CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'renewal_at',
@@ -232,7 +232,7 @@ it('describes hyphenated choice and datetime field types correctly', function ()
 
     foreach ([$multiSelect, $toggleButtons] as $index => $field) {
         CustomFieldOption::query()->create([
-            'tenant_id' => $team->id,
+            'tenant_id' => $workspace->id,
             'custom_field_id' => $field->id,
             'name' => $index === 0 ? 'Enterprise' : 'High',
             'sort_order' => 1,
@@ -250,9 +250,9 @@ it('describes hyphenated choice and datetime field types correctly', function ()
 });
 
 it('describes tags-input values as arbitrary strings instead of option IDs', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Tag Fields',
         'code' => 'tag_fields',
@@ -262,7 +262,7 @@ it('describes tags-input values as arbitrary strings instead of option IDs', fun
     ]);
 
     CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'labels',
@@ -292,11 +292,11 @@ it('describes tags-input values as arbitrary strings instead of option IDs', fun
 });
 
 it('serializes empty custom-field maps as objects in resources and tools', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
 
     CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'company')
         ->update(['active' => false]);
 
@@ -314,9 +314,9 @@ it('serializes empty custom-field maps as objects in resources and tools', funct
 });
 
 it('invalidates the entity schema cache when an option changes', function (): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Cached Fields',
         'code' => 'cached_fields',
@@ -325,7 +325,7 @@ it('invalidates the entity schema cache when an option changes', function (): vo
         'active' => true,
     ]);
     $field = CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'segment',
@@ -342,7 +342,7 @@ it('invalidates the entity schema cache when an option changes', function (): vo
         ->assertDontSee('Enterprise Segment');
 
     CustomFieldOption::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_id' => $field->id,
         'name' => 'Enterprise Segment',
         'sort_order' => 1,
@@ -355,9 +355,9 @@ it('invalidates the entity schema cache when an option changes', function (): vo
 });
 
 it('publishes an input format for every custom field type', function (string $type, string $expectedFormat): void {
-    $team = $this->user->personalTeam();
+    $workspace = $this->user->personalWorkspace();
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'entity_type' => 'company',
         'name' => 'Types',
         'code' => 'types',
@@ -366,7 +366,7 @@ it('publishes an input format for every custom field type', function (string $ty
         'active' => true,
     ]);
     CustomField::query()->create([
-        'tenant_id' => $team->id,
+        'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'probe',

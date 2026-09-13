@@ -155,7 +155,7 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new team is created. Set to `false` to start with an empty workspace. |
+| `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, contacts, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. |
@@ -202,7 +202,7 @@ When prompted to pick a panel, choose `app`, then enter a name, email, and passw
 
 ### System Administrator Account
 
-The `sysadmin` panel at `{APP_URL}/sysadmin` is a separate, instance-wide admin surface for managing every team and user on your installation. To create a system administrator, you can either pick `sysadmin` from the `make:filament-user` panel prompt, or use the dedicated command:
+The `sysadmin` panel at `{APP_URL}/sysadmin` is a separate, instance-wide admin surface for managing every workspace and user on your installation. To create a system administrator, you can either pick `sysadmin` from the `make:filament-user` panel prompt, or use the dedicated command:
 
 ```bash
 docker compose exec app php artisan sysadmin:create

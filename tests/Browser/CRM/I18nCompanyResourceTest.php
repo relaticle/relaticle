@@ -11,12 +11,12 @@ it('renders CompanyResource list page with French labels when locale is fr', fun
     config(['app.locale' => 'fr']);
     app()->setLocale('fr');
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies")
         ->assertSee('Entreprises')
         ->assertSee('Importer / Exporter');
 });
@@ -25,12 +25,12 @@ it('renders CompanyResource list page with English labels when locale is en', fu
     config(['app.locale' => 'en']);
     app()->setLocale('en');
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies")
         ->assertSee('Companies')
         ->assertSee('Import / Export');
 });

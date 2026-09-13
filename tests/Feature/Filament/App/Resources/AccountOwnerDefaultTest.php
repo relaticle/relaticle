@@ -13,10 +13,10 @@ use Laravel\Sanctum\Sanctum;
 mutates(CompanyResource::class, PeopleResource::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('defaults the account owner to the acting user on the create form', function (): void {
@@ -35,7 +35,7 @@ it('defaults the account owner to the acting user on the create form', function 
  * leak was injected into the action, because the factory never reaches that layer.
  */
 it('leaves the account owner unset when a company is created through the API', function (): void {
-    $apiUser = User::factory()->withPersonalTeam()->create();
+    $apiUser = User::factory()->withPersonalWorkspace()->create();
     Sanctum::actingAs($apiUser);
 
     $this->postJson('/api/v1/companies', ['name' => 'Owner Leak Guard Co'])

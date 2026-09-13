@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -11,7 +12,6 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
@@ -25,13 +25,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -59,7 +59,7 @@ it('deduplicates Create rows with same matchable email value', function (): void
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $people = People::where('team_id', $this->team->id)->whereIn('name', ['Lay', 'Ray'])->get();
+    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['Lay', 'Ray'])->get();
     expect($people)->toHaveCount(1)
         ->and($people->first()->name)->toBe('Ray');
 
@@ -82,7 +82,7 @@ it('does not dedup Create rows with different matchable values', function (): vo
     expect($import->created_rows)->toBe(2)
         ->and($import->updated_rows)->toBe(0);
 
-    $people = People::where('team_id', $this->team->id)->whereIn('name', ['Alice', 'Bob'])->get();
+    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['Alice', 'Bob'])->get();
     expect($people)->toHaveCount(2);
 });
 
@@ -102,7 +102,7 @@ it('deduplicates Create rows with multi-value matchable field', function (): voi
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $people = People::where('team_id', $this->team->id)->whereIn('name', ['First', 'Second'])->get();
+    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['First', 'Second'])->get();
     expect($people)->toHaveCount(1)
         ->and($people->first()->name)->toBe('Second');
 });
@@ -123,7 +123,7 @@ it('deduplicates company Create rows by domain', function (): void {
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $companies = Company::where('team_id', $this->team->id)->whereIn('name', ['Acme Inc', 'Acme Corp'])->get();
+    $companies = Company::where('workspace_id', $this->workspace->id)->whereIn('name', ['Acme Inc', 'Acme Corp'])->get();
     expect($companies)->toHaveCount(1)
         ->and($companies->first()->name)->toBe('Acme Corp');
 });
@@ -135,14 +135,14 @@ it('merges multi-choice custom field values during update', function (): void {
 
     $person = People::factory()->create([
         'name' => 'Merge Test',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::factory()->withJsonValue(['old@work.com'])->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name', 'Email'], [
@@ -170,7 +170,7 @@ it('merges multi-choice custom field values during update', function (): void {
 it('merges multi-choice custom field values during dedup', function (): void {
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -193,7 +193,7 @@ it('merges multi-choice custom field values during dedup', function (): void {
     expect($import->created_rows)->toBe(1)
         ->and($import->updated_rows)->toBe(1);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'Dedup B')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Dedup B')->first();
     expect($person)->not->toBeNull();
 
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $emailField->id);
@@ -206,14 +206,14 @@ it('does not duplicate existing multi-choice values during merge', function (): 
 
     $person = People::factory()->create([
         'name' => 'Dedup Merge',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     CustomFieldValue::factory()->withJsonValue(['shared@work.com'])->create([
         'custom_field_id' => $cf->id,
         'entity_type' => 'people',
         'entity_id' => $person->id,
-        'tenant_id' => $this->team->id,
+        'tenant_id' => $this->workspace->id,
     ]);
 
     ImportExecutionFixture::readyStore($this, ['ID', 'Name', 'Email'], [
@@ -255,12 +255,12 @@ it('populates matching custom field when auto-creating person via email MatchOrC
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('team_id', $this->team->id)->where('name', 'john@example.com')->first();
+    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'john@example.com')->first();
     expect($person)->not->toBeNull();
 
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -290,12 +290,12 @@ it('populates matching custom field when auto-creating company via domain MatchO
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'example.com')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'example.com')->first();
     expect($company)->not->toBeNull();
 
     $domainField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'company')
         ->where('code', 'domains')
         ->first();
@@ -327,7 +327,7 @@ it('does not populate custom field when auto-creating via name matcher', functio
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'New Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'New Corp')->first();
     expect($company)->not->toBeNull();
 
     $cfCountAfter = DB::table(config('custom-fields.database.table_names.custom_field_values'))->count();
@@ -355,12 +355,12 @@ it('deduplicates auto-created records while still populating matching custom fie
 
     ImportExecutionFixture::run($this);
 
-    $people = People::where('team_id', $this->team->id)->where('name', 'jane@example.com')->get();
+    $people = People::where('workspace_id', $this->workspace->id)->where('name', 'jane@example.com')->get();
     expect($people)->toHaveCount(1);
 
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -373,7 +373,7 @@ it('deduplicates auto-created records while still populating matching custom fie
 it('does not auto-create record for custom field entity link', function (): void {
     $recordCf = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('type', 'record')
         ->first();
@@ -382,7 +382,7 @@ it('does not auto-create record for custom field entity link', function (): void
         $this->markTestSkipped('No record-type custom field configured for people');
     }
 
-    $companyCountBefore = Company::where('team_id', $this->team->id)->count();
+    $companyCountBefore = Company::where('workspace_id', $this->workspace->id)->count();
 
     $relationships = json_encode([
         ['relationship' => "cf_{$recordCf->code}", 'action' => 'create', 'id' => null, 'name' => 'Nonexistent Corp', 'behavior' => MatchBehavior::MatchOrCreate->value],
@@ -400,6 +400,6 @@ it('does not auto-create record for custom field entity link', function (): void
 
     ImportExecutionFixture::run($this);
 
-    $companyCountAfter = Company::where('team_id', $this->team->id)->count();
+    $companyCountAfter = Company::where('workspace_id', $this->workspace->id)->count();
     expect($companyCountAfter)->toBe($companyCountBefore);
 });

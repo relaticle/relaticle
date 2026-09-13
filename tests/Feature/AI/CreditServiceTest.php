@@ -15,44 +15,44 @@ use Tests\Helpers\ChatCatalog;
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->service = resolve(CreditService::class);
 });
 
 it('returns zero balance when no balance record exists', function (): void {
-    AiCreditBalance::query()->where('team_id', $this->team->getKey())->delete();
+    AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->delete();
 
-    expect($this->service->getBalance($this->team))->toBe(0);
+    expect($this->service->getBalance($this->workspace))->toBe(0);
 });
 
 it('reports has credits when balance is positive', function (): void {
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 50,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
         'period_ends_at' => now()->endOfMonth(),
     ]);
 
-    expect($this->service->hasCredits($this->team))->toBeTrue();
+    expect($this->service->hasCredits($this->workspace))->toBeTrue();
 });
 
 it('reports no credits when balance is zero', function (): void {
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => 100,
         'period_starts_at' => now()->startOfMonth(),
         'period_ends_at' => now()->endOfMonth(),
     ]);
 
-    expect($this->service->hasCredits($this->team))->toBeFalse();
+    expect($this->service->hasCredits($this->workspace))->toBeFalse();
 });
 
 it('deducts credits and logs a transaction', function (): void {
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -63,14 +63,14 @@ it('deducts credits and logs a transaction', function (): void {
         'id' => 'conv-123',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Deduct test',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $this->service->deduct(
-        team: $this->team,
+        workspace: $this->workspace,
         user: $this->user,
         type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6',
@@ -80,12 +80,12 @@ it('deducts credits and logs a transaction', function (): void {
         conversationId: 'conv-123',
     );
 
-    $balance = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
     expect($balance->credits_remaining)->toBe(98)
         ->and($balance->credits_used)->toBe(2);
 
     $this->assertDatabaseHas('ai_credit_transactions', [
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => 'conv-123',
         'type' => 'chat',
@@ -139,17 +139,17 @@ it('adds tool call bonus to credit calculation', function (): void {
 it('resets period credits', function (): void {
     $this->travelTo(Date::create(2026, 4, 1));
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 5,
         'credits_used' => 95,
         'period_starts_at' => now()->subMonth()->startOfMonth(),
         'period_ends_at' => now()->subMonth()->endOfMonth(),
     ]);
 
-    $this->service->resetPeriod($this->team);
+    $this->service->resetPeriod($this->workspace);
 
-    $balance = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
     expect($balance->credits_remaining)->toBe(Plan::Free->credits())
         ->and($balance->credits_used)->toBe(0)
         ->and($balance->period_starts_at->format('Y-m-d'))->toBe('2026-04-01');
@@ -164,15 +164,15 @@ it('uses default multiplier for unknown models', function (): void {
     expect($credits)->toBe(1);
 });
 
-it('auto-creates a zero balance when deduct is called on a missing team', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
+it('auto-creates a zero balance when deduct is called on a missing workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->exists())->toBeFalse();
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
 
     resolve(CreditService::class)->deduct(
-        team: $team,
+        workspace: $workspace,
         user: $user,
         type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6',
@@ -180,5 +180,5 @@ it('auto-creates a zero balance when deduct is called on a missing team', functi
         outputTokens: 50,
     );
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->exists())->toBeTrue();
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->exists())->toBeTrue();
 });

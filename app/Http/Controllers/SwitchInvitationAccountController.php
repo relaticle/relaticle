@@ -21,6 +21,6 @@ final readonly class SwitchInvitationAccountController
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return to_route('team-invitations.token.accept', ['token' => $token]);
+        return to_route('workspace-invitations.token.accept', ['token' => $token]);
     }
 }

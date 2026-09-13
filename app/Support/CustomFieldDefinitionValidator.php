@@ -42,7 +42,7 @@ final readonly class CustomFieldDefinitionValidator
     {
         $entityType = is_string($data['entity_type'] ?? null) ? $data['entity_type'] : '';
         $type = is_string($data['type'] ?? null) ? $data['type'] : '';
-        $tenantId = $user->currentTeam->getKey();
+        $tenantId = $user->currentWorkspace->getKey();
         $maxOptions = self::maxOptions();
 
         return Validator::make(self::normalize($data), [
@@ -84,7 +84,7 @@ final readonly class CustomFieldDefinitionValidator
             'name' => [
                 'required_without:active', 'string', 'max:50',
                 self::uniqueNameIgnoringCase(
-                    $user->currentTeam->getKey(),
+                    $user->currentWorkspace->getKey(),
                     $entityType,
                     fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name.",
                     $field->getKey(),
@@ -117,7 +117,7 @@ final readonly class CustomFieldDefinitionValidator
             'options' => ['nullable', 'required', 'array', "max:{$remaining}"],
             'options.*.name' => [
                 'required', 'string', 'max:255', 'distinct:ignore_case',
-                self::uniqueOptionIgnoringCase($user->currentTeam->getKey(), $field),
+                self::uniqueOptionIgnoringCase($user->currentWorkspace->getKey(), $field),
             ],
         ], [
             'options.required' => 'At least one option must be provided.',

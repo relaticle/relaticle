@@ -20,7 +20,7 @@ final class EntityLinkResolver
     private array $cache = [];
 
     public function __construct(
-        private readonly string $teamId,
+        private readonly string $workspaceId,
     ) {}
 
     public function resolve(EntityLink $link, MatchableField $matcher, mixed $value): int|string|null
@@ -89,7 +89,7 @@ final class EntityLinkResolver
         $cacheKey = $this->getCacheKey($link, $matcher);
 
         $results = match (true) {
-            $link->targetModelClass === User::class => $this->resolveViaTeamMember($field, $uniqueValues),
+            $link->targetModelClass === User::class => $this->resolveViaWorkspaceMember($field, $uniqueValues),
             $this->isCustomField($field) => $this->resolveViaCustomField($link, $field, $uniqueValues),
             default => $this->resolveViaColumn($link, $field, $uniqueValues),
         };
@@ -143,7 +143,7 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
-            ->where('team_id', $this->teamId)
+            ->where('workspace_id', $this->workspaceId)
             ->whereIn($field, $uniqueValues)
             ->pluck('id', $field)
             ->all();
@@ -153,13 +153,13 @@ final class EntityLinkResolver
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string>
      */
-    private function resolveViaTeamMember(string $field, array $uniqueValues): array
+    private function resolveViaWorkspaceMember(string $field, array $uniqueValues): array
     {
         return User::query()
             ->whereIn($field, $uniqueValues)
             ->where(function (Builder $query): void {
-                $query->whereHas('teams', fn (Builder $q) => $q->where('teams.id', $this->teamId))
-                    ->orWhereHas('ownedTeams', fn (Builder $q) => $q->where('teams.id', $this->teamId));
+                $query->whereHas('workspaces', fn (Builder $q) => $q->where('workspaces.id', $this->workspaceId))
+                    ->orWhereHas('ownedWorkspaces', fn (Builder $q) => $q->where('workspaces.id', $this->workspaceId));
             })
             ->pluck('id', $field)
             ->all();
@@ -175,7 +175,7 @@ final class EntityLinkResolver
 
         $customField = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
+            ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $link->targetEntity)
             ->where('code', $customFieldCode)
             ->first();
@@ -190,7 +190,7 @@ final class EntityLinkResolver
             ? $this->resolveViaJsonColumn($link->targetEntity, $customField->getKey(), $uniqueValues)
             : CustomFieldValue::query()
                 ->withoutGlobalScopes()
-                ->where('tenant_id', $this->teamId)
+                ->where('tenant_id', $this->workspaceId)
                 ->where('custom_field_id', $customField->id)
                 ->where('entity_type', $link->targetEntity)
                 ->whereIn($valueColumn, $uniqueValues)
@@ -202,7 +202,7 @@ final class EntityLinkResolver
 
     /**
      * Drop matches whose owning entity cannot be loaded for write (soft-deleted
-     * or belonging to another team). The matcher reads custom_field_values
+     * or belonging to another workspace). The matcher reads custom_field_values
      * directly, bypassing model scopes; the executor loads records through the
      * default-scoped model query, so an unfiltered match becomes a silently
      * skipped row. Filtering here keeps the two in sync.
@@ -220,7 +220,7 @@ final class EntityLinkResolver
         $keyName = (new $modelClass)->getKeyName();
 
         $accessibleIds = $modelClass::query()
-            ->where('team_id', $this->teamId)
+            ->where('workspace_id', $this->workspaceId)
             ->whereIn($keyName, array_values($valueToEntityId))
             ->pluck($keyName)
             ->map(fn (int|string $id): string => (string) $id)
@@ -289,7 +289,7 @@ final class EntityLinkResolver
                      AND LOWER(jt.val) IN ({$placeholders})",
             };
 
-            $bindings = array_merge([$this->teamId, $customFieldId, $entityType], $lowerChunk);
+            $bindings = array_merge([$this->workspaceId, $customFieldId, $entityType], $lowerChunk);
             $rows = $connection->select($sql, $bindings);
 
             foreach ($rows as $row) {

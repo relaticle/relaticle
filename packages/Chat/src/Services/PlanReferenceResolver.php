@@ -37,7 +37,7 @@ final readonly class PlanReferenceResolver
     {
         $referenced = PendingAction::query()
             ->whereKey(PlanReference::actionId($target))
-            ->where('team_id', $context->team_id)
+            ->where('workspace_id', $context->workspace_id)
             ->first();
 
         throw_unless(

@@ -32,8 +32,8 @@ final readonly class AiModelResolver
      */
     public function resolve(User $user, ?string $override = null): array
     {
-        $team = $user->currentTeam;
-        $plan = $team !== null ? $team->plan : Plan::default();
+        $workspace = $user->currentWorkspace;
+        $plan = $workspace !== null ? $workspace->plan : Plan::default();
         $requested = $override ?? ($user->ai_preferences['default_model'] ?? 'auto');
 
         if (is_string($requested) && $requested !== 'auto') {
@@ -56,8 +56,8 @@ final readonly class AiModelResolver
      */
     public function failoverNext(User $user, string $failedId): ?array
     {
-        $team = $user->currentTeam;
-        $plan = $team !== null ? $team->plan : Plan::default();
+        $workspace = $user->currentWorkspace;
+        $plan = $workspace !== null ? $workspace->plan : Plan::default();
         $passed = false;
 
         foreach ($this->registry->autoChain() as $descriptor) {

@@ -16,10 +16,10 @@ final readonly class TenantFkValidator
      */
     public static function assertOwned(User $user, array $data, array $fkToModelMap): void
     {
-        $teamId = $user->current_team_id;
+        $workspaceId = $user->current_workspace_id;
 
-        if ($teamId === null) {
-            throw ValidationException::withMessages(['team' => 'No active workspace.']);
+        if ($workspaceId === null) {
+            throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
         foreach ($fkToModelMap as $field => $modelClass) {
@@ -32,7 +32,7 @@ final readonly class TenantFkValidator
             }
 
             $owned = $modelClass::query()
-                ->where('team_id', $teamId)
+                ->where('workspace_id', $workspaceId)
                 ->whereKey($value)
                 ->exists();
 
@@ -50,10 +50,10 @@ final readonly class TenantFkValidator
      */
     public static function assertOwnedMany(User $user, array $data, array $fkArrayToModelMap): void
     {
-        $teamId = $user->current_team_id;
+        $workspaceId = $user->current_workspace_id;
 
-        if ($teamId === null) {
-            throw ValidationException::withMessages(['team' => 'No active workspace.']);
+        if ($workspaceId === null) {
+            throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
         foreach ($fkArrayToModelMap as $field => $modelClass) {
@@ -68,7 +68,7 @@ final readonly class TenantFkValidator
             $unique = array_values(array_unique(array_map(strval(...), $values)));
 
             $owned = $modelClass::query()
-                ->where('team_id', $teamId)
+                ->where('workspace_id', $workspaceId)
                 ->whereIn((new $modelClass)->getKeyName(), $unique)
                 ->count();
 
@@ -86,14 +86,14 @@ final readonly class TenantFkValidator
      */
     public static function assertUsersInWorkspace(User $user, array $data, array $fields): void
     {
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        if ($team === null) {
-            throw ValidationException::withMessages(['team' => 'No active workspace.']);
+        if ($workspace === null) {
+            throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
-        $memberIds = $team->users()->pluck('users.id')->all();
-        $memberIds[] = $team->user_id;
+        $memberIds = $workspace->users()->pluck('users.id')->all();
+        $memberIds[] = $workspace->user_id;
         $memberIds = array_map(strval(...), $memberIds);
 
         foreach ($fields as $field) {
@@ -127,14 +127,14 @@ final readonly class TenantFkValidator
             return;
         }
 
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        if ($team === null) {
-            throw ValidationException::withMessages(['team' => 'No active workspace.']);
+        if ($workspace === null) {
+            throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
-        $memberIds = $team->users()->pluck('users.id')->all();
-        $memberIds[] = $team->user_id;
+        $memberIds = $workspace->users()->pluck('users.id')->all();
+        $memberIds[] = $workspace->user_id;
         $memberIds = array_map(strval(...), $memberIds);
 
         foreach ($fields as $field) {

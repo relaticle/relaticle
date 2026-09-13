@@ -28,14 +28,14 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
     $this->status = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
 });
 
 afterEach(function (): void {
@@ -47,10 +47,10 @@ function statusOptionId(CustomField $field, string $label): string
     return (string) $field->options->firstWhere('name', $label)->getKey();
 }
 
-function teamScopedCompanyLookups(): Collection
+function workspaceScopedCompanyLookups(): Collection
 {
     return collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'team_id'),
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'workspace_id'),
     );
 }
 
@@ -84,7 +84,7 @@ it('rejects an unknown label and lists the valid ones', function (): void {
 
 it('rejects a label shared by two options and asks for the id', function (): void {
     CustomFieldOption::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_id' => $this->status->getKey(),
         'name' => 'DONE',
         'sort_order' => 99,
@@ -99,7 +99,7 @@ it('rejects a label shared by two options and asks for the id', function (): voi
 
 it('rejects a nested value in a multi-select field', function (): void {
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'markets',
         'name' => 'Markets',
@@ -119,7 +119,7 @@ it('rejects a nested value in a multi-select field', function (): void {
 
 it('updates a multi-select field from mixed labels and ids', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'markets',
         'name' => 'Markets',
@@ -129,9 +129,9 @@ it('updates a multi-select field from mixed labels and ids', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
-    $us = CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'US', 'sort_order' => 2]);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
+    $us = CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'US', 'sort_order' => 2]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['markets' => ['eu', (string) $us->getKey()]]])
@@ -141,7 +141,7 @@ it('updates a multi-select field from mixed labels and ids', function (): void {
 });
 
 it('clears a select field with null', function (): void {
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($this->status, statusOptionId($this->status, 'Done'));
 
     RelaticleServer::actingAs($this->user)
@@ -152,7 +152,7 @@ it('clears a select field with null', function (): void {
 });
 
 it('clears a select field sent a blank string', function (string $blank): void {
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($this->status, statusOptionId($this->status, 'Done'));
 
     RelaticleServer::actingAs($this->user)
@@ -164,7 +164,7 @@ it('clears a select field sent a blank string', function (string $blank): void {
 
 it('clears a multi-select field sent an empty string', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'markets',
         'name' => 'Markets',
@@ -174,8 +174,8 @@ it('clears a multi-select field sent an empty string', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [(string) $eu->getKey()]);
 
     RelaticleServer::actingAs($this->user)
@@ -191,7 +191,7 @@ it('stores markdown for a rich editor field as html', function (): void {
         ->assertOk();
 
     $description = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'description')
         ->firstOrFail();
@@ -206,7 +206,7 @@ it('passes html through untouched for a rich editor field', function (): void {
         ->assertOk();
 
     $description = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'description')
         ->firstOrFail();
@@ -220,7 +220,7 @@ it('escapes inline html inside markdown', function (): void {
         ->assertOk();
 
     $description = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'description')
         ->firstOrFail();
@@ -230,7 +230,7 @@ it('escapes inline html inside markdown', function (): void {
 
 it('rejects a record id from another workspace', function (): void {
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -241,8 +241,8 @@ it('rejects a record id from another workspace', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $otherTeam = User::factory()->withPersonalTeam()->create()->personalTeam();
-    $foreign = Company::factory()->create(['team_id' => $otherTeam->getKey()]);
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->personalWorkspace();
+    $foreign = Company::factory()->create(['workspace_id' => $otherWorkspace->getKey()]);
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Foreign', 'custom_fields' => ['related_company' => [$foreign->getKey()]]])
@@ -252,7 +252,7 @@ it('rejects a record id from another workspace', function (): void {
 
 it('accepts a record id from the caller workspace', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -263,7 +263,7 @@ it('accepts a record id from the caller workspace', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $own = Company::factory()->create(['team_id' => $this->team->getKey()]);
+    $own = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateTaskTool::class, ['title' => 'Own', 'custom_fields' => ['related_company' => [$own->getKey()]]])
@@ -274,7 +274,7 @@ it('accepts a record id from the caller workspace', function (): void {
 
 it('rejects a soft-deleted record id from the caller workspace', function (): void {
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -285,7 +285,7 @@ it('rejects a soft-deleted record id from the caller workspace', function (): vo
         'active' => true,
         'system_defined' => false,
     ]);
-    $trashed = Company::factory()->create(['team_id' => $this->team->getKey()]);
+    $trashed = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $trashed->delete();
 
     RelaticleServer::actingAs($this->user)
@@ -296,7 +296,7 @@ it('rejects a soft-deleted record id from the caller workspace', function (): vo
 
 it('rejects a nested value in a record field', function (): void {
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -316,7 +316,7 @@ it('rejects a nested value in a record field', function (): void {
 
 it('returns record values as id and name pairs', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -327,8 +327,8 @@ it('returns record values as id and name pairs', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $company = Company::factory()->create(['team_id' => $this->team->getKey(), 'name' => 'Globex']);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->getKey(), 'name' => 'Globex']);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
 
     RelaticleServer::actingAs($this->user)
@@ -337,9 +337,9 @@ it('returns record values as id and name pairs', function (): void {
         ->assertSee('Globex');
 });
 
-it('lists tasks with record names in one team-scoped query per lookup type', function (): void {
+it('lists tasks with record names in one workspace-scoped query per lookup type', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -350,9 +350,9 @@ it('lists tasks with record names in one team-scoped query per lookup type', fun
         'active' => true,
         'system_defined' => false,
     ]);
-    $companies = Company::factory()->count(5)->create(['team_id' => $this->team->getKey()]);
+    $companies = Company::factory()->count(5)->create(['workspace_id' => $this->workspace->getKey()]);
     foreach ($companies as $company) {
-        Task::factory()->create(['team_id' => $this->team->getKey()])->saveCustomFieldValue($field, [$company->getKey()]);
+        Task::factory()->create(['workspace_id' => $this->workspace->getKey()])->saveCustomFieldValue($field, [$company->getKey()]);
     }
 
     DB::enableQueryLog();
@@ -360,12 +360,12 @@ it('lists tasks with record names in one team-scoped query per lookup type', fun
 
     RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
 
-    expect(teamScopedCompanyLookups())->toHaveCount(1);
+    expect(workspaceScopedCompanyLookups())->toHaveCount(1);
 });
 
-it('reads a foreign-team record value as a null name', function (): void {
+it('reads a foreign-workspace record value as a null name', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -376,9 +376,9 @@ it('reads a foreign-team record value as a null name', function (): void {
         'active' => true,
         'system_defined' => false,
     ]);
-    $otherTeam = User::factory()->withPersonalTeam()->create()->personalTeam();
-    $foreign = Company::factory()->create(['team_id' => $otherTeam->getKey(), 'name' => 'Initech']);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->personalWorkspace();
+    $foreign = Company::factory()->create(['workspace_id' => $otherWorkspace->getKey(), 'name' => 'Initech']);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, [$foreign->getKey()]);
 
     $response = RelaticleServer::actingAs($this->user)
@@ -389,9 +389,9 @@ it('reads a foreign-team record value as a null name', function (): void {
     $response->assertSee('"name":null');
 });
 
-it('resolves a record field with several own-team ids in one team-scoped query', function (): void {
+it('resolves a record field with several own-workspace ids in one workspace-scoped query', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -402,8 +402,8 @@ it('resolves a record field with several own-team ids in one team-scoped query',
         'active' => true,
         'system_defined' => false,
     ]);
-    $companies = Company::factory()->count(3)->create(['team_id' => $this->team->getKey()]);
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $companies = Company::factory()->count(3)->create(['workspace_id' => $this->workspace->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $task->saveCustomFieldValue($field, $companies->pluck('id')->all());
 
     DB::enableQueryLog();
@@ -413,12 +413,12 @@ it('resolves a record field with several own-team ids in one team-scoped query',
         ->tool(GetTaskTool::class, ['id' => $task->getKey()])
         ->assertOk();
 
-    expect(teamScopedCompanyLookups())->toHaveCount(1);
+    expect(workspaceScopedCompanyLookups())->toHaveCount(1);
 });
 
 it('resolves a dangling record reference without one query per row', function (): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -429,10 +429,10 @@ it('resolves a dangling record reference without one query per row', function ()
         'active' => true,
         'system_defined' => false,
     ]);
-    $trashed = Company::factory()->create(['team_id' => $this->team->getKey()]);
+    $trashed = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
     $trashed->delete();
     foreach (range(1, 3) as $ignored) {
-        Task::factory()->create(['team_id' => $this->team->getKey()])->saveCustomFieldValue($field, [$trashed->getKey()]);
+        Task::factory()->create(['workspace_id' => $this->workspace->getKey()])->saveCustomFieldValue($field, [$trashed->getKey()]);
     }
 
     DB::enableQueryLog();
@@ -440,17 +440,17 @@ it('resolves a dangling record reference without one query per row', function ()
 
     RelaticleServer::actingAs($this->user)->tool(ListTasksTool::class, [])->assertOk();
 
-    expect(teamScopedCompanyLookups())->toHaveCount(1);
+    expect(workspaceScopedCompanyLookups())->toHaveCount(1);
 });
 
 it('rejects a record field whose lookup type is not a CRM entity', function (): void {
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
-        'code' => 'owning_team',
-        'name' => 'Owning Team',
+        'code' => 'owning_workspace',
+        'name' => 'Owning Workspace',
         'type' => 'record',
-        'lookup_type' => 'team',
+        'lookup_type' => 'workspace',
         'sort_order' => 60,
         'validation_rules' => [],
         'active' => true,
@@ -458,15 +458,15 @@ it('rejects a record field whose lookup type is not a CRM entity', function (): 
     ]);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(CreateTaskTool::class, ['title' => 'Bad lookup', 'custom_fields' => ['owning_team' => [$this->team->getKey()]]])
+        ->tool(CreateTaskTool::class, ['title' => 'Bad lookup', 'custom_fields' => ['owning_workspace' => [$this->workspace->getKey()]]])
         ->assertHasErrors()
-        ->assertSee('Owning Team')
+        ->assertSee('Owning Workspace')
         ->assertSee('cannot be written by API, MCP, or chat');
 });
 
 it('sets then clears a value for every writable custom field type', function (string $type, mixed $value, mixed $stored): void {
     $field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'probe',
         'name' => 'Probe',
@@ -479,11 +479,11 @@ it('sets then clears a value for every writable custom field type', function (st
     ]);
 
     if (in_array($type, ['select', 'radio', 'toggle-buttons', 'multi-select', 'checkbox-list'], true)) {
-        CustomFieldOption::query()->create(['tenant_id' => $this->team->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'Gold', 'sort_order' => 1]);
+        CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'Gold', 'sort_order' => 1]);
     }
 
     if ($type === 'record') {
-        $value = [Company::factory()->create(['team_id' => $this->team->getKey()])->getKey()];
+        $value = [Company::factory()->create(['workspace_id' => $this->workspace->getKey()])->getKey()];
         $stored = $value;
     }
 
@@ -497,7 +497,7 @@ it('sets then clears a value for every writable custom field type', function (st
         $value = ['gold'];
     }
 
-    $task = Task::factory()->create(['team_id' => $this->team->getKey()]);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['probe' => $value]])

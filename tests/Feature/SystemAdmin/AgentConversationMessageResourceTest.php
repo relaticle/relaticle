@@ -21,7 +21,7 @@ beforeEach(function (): void {
 
 function seedAdminMessage(string $role = 'user', ?string $supersededAt = null): AgentConversationMessage
 {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $conversationId = (string) Str::uuid7();
     $messageId = (string) Str::uuid7();
 
@@ -29,7 +29,7 @@ function seedAdminMessage(string $role = 'user', ?string $supersededAt = null): 
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'msg test',
         'created_at' => now(),
         'updated_at' => now(),

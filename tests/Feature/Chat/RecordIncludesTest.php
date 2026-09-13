@@ -24,13 +24,13 @@ mutates(ListPeopleTool::class);
 mutates(ListOpportunitiesTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 });
 
 it('returns no included key when include is omitted', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
         'id' => (string) $acme->getKey(),
@@ -40,9 +40,9 @@ it('returns no included key when include is omitted', function (): void {
 });
 
 it('returns related notes and tasks with totals when requested', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $acme->notes()->attach(Note::factory()->for($this->team)->create(['title' => 'Discovery call']));
-    $acme->tasks()->attach(Task::factory()->for($this->team)->create(['title' => 'Send proposal']));
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $acme->notes()->attach(Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']));
+    $acme->tasks()->attach(Task::factory()->for($this->workspace)->create(['title' => 'Send proposal']));
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
         'id' => (string) $acme->getKey(),
@@ -56,10 +56,10 @@ it('returns related notes and tasks with totals when requested', function (): vo
 });
 
 it('caps included items at ten while reporting the true total', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     foreach (range(1, 14) as $i) {
-        $acme->notes()->attach(Note::factory()->for($this->team)->create(['title' => "Note {$i}"]));
+        $acme->notes()->attach(Note::factory()->for($this->workspace)->create(['title' => "Note {$i}"]));
     }
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
@@ -73,7 +73,7 @@ it('caps included items at ten while reporting the true total', function (): voi
 });
 
 it('clamps the page size at 25 whether or not includes are requested', function (): void {
-    Company::factory()->count(30)->for($this->team)->create();
+    Company::factory()->count(30)->for($this->workspace)->create();
 
     $withIncludes = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
         'per_page' => 50,
@@ -90,7 +90,7 @@ it('clamps the page size at 25 whether or not includes are requested', function 
 });
 
 it('returns an error naming the valid includes when given an unknown one', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
         'id' => (string) $acme->getKey(),
@@ -103,15 +103,15 @@ it('returns an error naming the valid includes when given an unknown one', funct
 });
 
 it('returns custom field values on included items, not just native columns', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    $note = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
     $acme->notes()->attach($note);
     resolve(UpdateNote::class)->execute($this->user, $note, [
         'custom_fields' => ['body' => 'They churn because onboarding takes six weeks.'],
     ]);
 
-    $task = Task::factory()->for($this->team)->create(['title' => 'Send proposal']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Send proposal']);
     $acme->tasks()->attach($task);
     resolve(UpdateTask::class)->execute($this->user, $task, [
         'custom_fields' => ['description' => 'Include the six-week onboarding fix.'],
@@ -128,10 +128,10 @@ it('returns custom field values on included items, not just native columns', fun
         ->toContain('six-week onboarding fix');
 });
 
-it('does not include records from another team', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Theirs']);
-    $theirs->notes()->attach(Note::factory()->for($otherUser->currentTeam)->create(['title' => 'Their note']));
+it('does not include records from another workspace', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = Company::factory()->for($otherUser->currentWorkspace)->create(['name' => 'Theirs']);
+    $theirs->notes()->attach(Note::factory()->for($otherUser->currentWorkspace)->create(['title' => 'Their note']));
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
         'id' => (string) $theirs->getKey(),
@@ -141,14 +141,14 @@ it('does not include records from another team', function (): void {
     expect($payload)->toHaveKey('error');
 });
 
-it('excludes a related record that belongs to another team, even when attached via pivot', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+it('excludes a related record that belongs to another workspace, even when attached via pivot', function (): void {
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $crossTeamNote = Note::factory()->for($otherUser->currentTeam)->create(['title' => 'Not yours']);
-    $acme->notes()->attach($crossTeamNote);
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $crossWorkspaceNote = Note::factory()->for($otherUser->currentWorkspace)->create(['title' => 'Not yours']);
+    $acme->notes()->attach($crossWorkspaceNote);
 
-    $ownNote = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $ownNote = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
     $acme->notes()->attach($ownNote);
 
     $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
@@ -157,7 +157,7 @@ it('excludes a related record that belongs to another team, even when attached v
     ])), true);
 
     // `total` as well as `showing`: an unscoped loadCount would report the
-    // cross-team note the items list omits, so one relation would state two
+    // cross-workspace note the items list omits, so one relation would state two
     // different totals here and in the list tool's row.
     expect($payload['included']['notes']['showing'])->toBe(1)
         ->and($payload['included']['notes']['total'])->toBe(1)
@@ -166,9 +166,9 @@ it('excludes a related record that belongs to another team, even when attached v
 });
 
 it('strips HTML and truncates a long free-text custom field value on an included item', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    $note = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
     $acme->notes()->attach($note);
 
     $longBody = '<p>'.str_repeat('Onboarding takes six weeks and churn follows. ', 40).'</p>';
@@ -190,13 +190,13 @@ it('strips HTML and truncates a long free-text custom field value on an included
 });
 
 it('does not strip or truncate a non-text custom field value on an included item', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    $task = Task::factory()->for($this->team)->create(['title' => 'Send proposal']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Send proposal']);
     $acme->tasks()->attach($task);
 
     $priorityField = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'priority')
         ->with('options')
@@ -222,15 +222,15 @@ it('does not strip or truncate a non-text custom field value on an included item
 // --- list tool: `include` attaches related records per row and a chip column ---
 
 it('lists companies with included opportunities and a chip column', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    Opportunity::factory()->count(4)->for($this->team)->create(['company_id' => $acme->getKey()]);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    Opportunity::factory()->count(4)->for($this->workspace)->create(['company_id' => $acme->getKey()]);
 
     // A second row with its own, smaller set of opportunities: proves the
     // per-row cap is applied per row, not once across the whole page (an
     // eager-load `->limit()` spanning every row in the page would starve
     // whichever row's related records did not sort first).
-    $globex = Company::factory()->for($this->team)->create(['name' => 'Globex']);
-    Opportunity::factory()->count(1)->for($this->team)->create(['company_id' => $globex->getKey()]);
+    $globex = Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
+    Opportunity::factory()->count(1)->for($this->workspace)->create(['company_id' => $globex->getKey()]);
 
     $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['opportunities']])), true);
 
@@ -254,7 +254,7 @@ it('lists companies with included opportunities and a chip column', function ():
 });
 
 it('rejects an unknown include on a list tool with the standard error envelope', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['bogus']])), true);
 
@@ -264,21 +264,21 @@ it('rejects an unknown include on a list tool with the standard error envelope',
 });
 
 it('returns no included key on a list row when include is omitted', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([])), true);
 
     expect($payload['data'][0])->not->toHaveKey('included');
 });
 
-it('excludes an included note that belongs to another team from a list row', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+it('excludes an included note that belongs to another workspace from a list row', function (): void {
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    $otherTeam = User::factory()->withPersonalTeam()->create()->currentTeam;
-    $crossTeamNote = Note::factory()->for($otherTeam)->create(['title' => 'Not yours']);
-    $acme->notes()->attach($crossTeamNote);
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $crossWorkspaceNote = Note::factory()->for($otherWorkspace)->create(['title' => 'Not yours']);
+    $acme->notes()->attach($crossWorkspaceNote);
 
-    $ownNote = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $ownNote = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
     $acme->notes()->attach($ownNote);
 
     $payload = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['include' => ['notes']])), true);
@@ -291,8 +291,8 @@ it('excludes an included note that belongs to another team from a list row', fun
 });
 
 it('lists people with included tasks, truncated past the per-row limit', function (): void {
-    $jane = People::factory()->for($this->team)->create(['name' => 'Jane']);
-    $jane->tasks()->attach(Task::factory()->count(5)->for($this->team)->create());
+    $jane = People::factory()->for($this->workspace)->create(['name' => 'Jane']);
+    $jane->tasks()->attach(Task::factory()->count(5)->for($this->workspace)->create());
 
     $payload = json_decode(resolve(ListPeopleTool::class)->handle(new Request(['include' => ['tasks']])), true);
 
@@ -305,8 +305,8 @@ it('lists people with included tasks, truncated past the per-row limit', functio
 });
 
 it('lists opportunities with included notes', function (): void {
-    $opportunity = Opportunity::factory()->for($this->team)->create(['name' => 'Big deal']);
-    $opportunity->notes()->attach(Note::factory()->count(2)->for($this->team)->create());
+    $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => 'Big deal']);
+    $opportunity->notes()->attach(Note::factory()->count(2)->for($this->workspace)->create());
 
     $payload = json_decode(resolve(ListOpportunitiesTool::class)->handle(new Request(['include' => ['notes']])), true);
 

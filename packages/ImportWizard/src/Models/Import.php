@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Models;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Database\Factories\ImportFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -25,7 +25,7 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
 
 /**
  * @property string $id
- * @property string $team_id
+ * @property string $workspace_id
  * @property string $user_id
  * @property ImportEntityType $entity_type
  * @property string $file_name
@@ -40,7 +40,7 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
  * @property int $failed_rows
  */
 #[Fillable([
-    'team_id',
+    'workspace_id',
     'user_id',
     'entity_type',
     'file_name',
@@ -90,10 +90,10 @@ final class Import extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** @return BelongsTo<Team, $this> */
-    public function team(): BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Workspace::class);
     }
 
     /** @return HasMany<FailedImportRow, $this> */
@@ -118,9 +118,9 @@ final class Import extends Model
 
     /** @param Builder<Import> $query */
     #[Scope]
-    protected function forTeam(Builder $query, string $teamId): void
+    protected function forWorkspace(Builder $query, string $workspaceId): void
     {
-        $query->where('team_id', $teamId);
+        $query->where('workspace_id', $workspaceId);
     }
 
     public function storagePath(): string
@@ -130,7 +130,7 @@ final class Import extends Model
 
     public function getImporter(): BaseImporter
     {
-        return $this->importerCache ??= $this->entity_type->importer($this->team_id);
+        return $this->importerCache ??= $this->entity_type->importer($this->workspace_id);
     }
 
     /**
@@ -147,7 +147,7 @@ final class Import extends Model
         return ColumnData::collect($raw, Collection::class)
             ->each(function (ColumnData $col) use ($fields, $entityLinks): void {
                 if ($col->isFieldMapping()) {
-                    $col->importField = $fields->get($col->target);
+                    $col->importField = $fields->getByKey($col->target);
                 } else {
                     $col->entityLinkField = $entityLinks->get($col->entityLink);
                 }

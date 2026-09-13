@@ -55,7 +55,7 @@ final class UploadStep extends Component implements HasForms
         }
 
         $this->import = Import::query()
-            ->forTeam($this->getCurrentTeamId() ?? '')
+            ->forWorkspace($this->getCurrentWorkspaceId() ?? '')
             ->find($storeId);
 
         if (! $this->import instanceof Import) {
@@ -67,7 +67,7 @@ final class UploadStep extends Component implements HasForms
         $this->isParsed = true;
     }
 
-    private function getCurrentTeamId(): ?string
+    private function getCurrentWorkspaceId(): ?string
     {
         $tenant = filament()->getTenant();
 
@@ -145,9 +145,9 @@ final class UploadStep extends Component implements HasForms
             return;
         }
 
-        $teamId = $this->getCurrentTeamId();
+        $workspaceId = $this->getCurrentWorkspaceId();
 
-        if (blank($teamId)) {
+        if (blank($workspaceId)) {
             $this->addError('uploadedFile', 'Unable to determine your workspace. Please refresh and try again.');
 
             return;
@@ -155,7 +155,7 @@ final class UploadStep extends Component implements HasForms
 
         try {
             $this->import = Import::query()->create([
-                'team_id' => $teamId,
+                'workspace_id' => $workspaceId,
                 'user_id' => (string) auth()->id(),
                 'entity_type' => $this->entityType,
                 'file_name' => $this->uploadedFile->getClientOriginalName(),

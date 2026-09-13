@@ -129,7 +129,7 @@ final readonly class CustomFieldsFilterTranslator
     {
         return $this->optionMap->fromFields(
             CustomField::query()
-                ->where('tenant_id', $user->currentTeam->getKey())
+                ->where('tenant_id', $user->currentWorkspace->getKey())
                 ->where('entity_type', $entityType)
                 ->whereIn('code', $codes)
                 ->active()

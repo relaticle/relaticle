@@ -6,8 +6,8 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 
 /**
  * The read-path twin of {@see CustomFieldsSchemaDescriber}.
@@ -35,7 +35,7 @@ final readonly class CustomFieldsFilterDescriber
             return 'No filterable custom fields are defined for this entity type.';
         }
 
-        $optionLabels = $this->optionLabels($user->currentTeam, $entityType, array_keys($schema));
+        $optionLabels = $this->optionLabels($user->currentWorkspace, $entityType, array_keys($schema));
 
         $lines = [
             'Filter by custom field values. Keys MUST be one of the codes below; each value is an object of operator => operand.',
@@ -77,11 +77,11 @@ final readonly class CustomFieldsFilterDescriber
      * @param  list<string>  $codes
      * @return array<string, list<string>>
      */
-    private function optionLabels(Team $team, string $entityType, array $codes): array
+    private function optionLabels(Workspace $workspace, string $entityType, array $codes): array
     {
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('entity_type', $entityType)
             ->whereIn('code', $codes)
             ->active()

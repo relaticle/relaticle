@@ -14,10 +14,10 @@ use App\Http\Controllers\Auth\MfaChallengeController;
 use App\Http\Controllers\Auth\PasskeyConfirmationController;
 use App\Http\Controllers\Auth\PasskeySessionController;
 use App\Http\Controllers\Auth\PasswordSessionController;
-use App\Models\Team;
-use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use App\Notifications\Auth\VerifyEmail;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
@@ -137,15 +137,15 @@ test('login screen can be rendered', function () {
 });
 
 test('users can authenticate using the login screen', function () {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
         ->fillForm(['password' => 'password'])
         ->call('authenticate')
-        ->assertRedirect(url()->getAppUrl((string) $team->slug));
+        ->assertRedirect(url()->getAppUrl((string) $workspace->slug));
 
     $this->assertAuthenticated();
 });
@@ -165,20 +165,20 @@ test('password login waits for enrolled MFA before authenticating', function ():
 });
 
 test('the Fortify password route completes login without MFA', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
         'remember' => 'on',
-    ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+    ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 
     $this->assertAuthenticatedAs($user);
 });
 
 test('a recovery code completes pending password MFA', function (): void {
-    $user = User::factory()->withConfirmedMfa()->withTeam()->create();
-    $dashboard = Dashboard::getUrl(['tenant' => $user->currentTeam]);
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
 
     $this->post(route('login.store'), [
         'email' => $user->email,
@@ -196,7 +196,7 @@ test('a recovery code completes pending password MFA', function (): void {
 });
 
 test('the MFA challenge offers an autofillable code field and a recovery mode', function (): void {
-    $user = User::factory()->withConfirmedMfa()->withTeam()->create();
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
 
     $this->post(route('login.store'), [
         'email' => $user->email,
@@ -384,7 +384,7 @@ test('passkey login is allowed for users scheduled for deletion so they reach th
 });
 
 test('a well-formed passkey assertion completes login through the installed verifier', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $options = $this->getJson(route('passkey.login-options'))->json('options');
     $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
@@ -394,13 +394,13 @@ test('a well-formed passkey assertion completes login through the installed veri
 
     $this->postJson(route('passkey.login'), $assertion['payload'])
         ->assertOk()
-        ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentTeam])]);
+        ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentWorkspace])]);
 
     $this->assertAuthenticatedAs($user);
 });
 
 test('a verified passkey satisfies enrolled MFA at login', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
 
     $options = $this->getJson(route('passkey.login-options'))->json('options');
     $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
@@ -410,7 +410,7 @@ test('a verified passkey satisfies enrolled MFA at login', function (): void {
 
     $this->postJson(route('passkey.login'), $assertion['payload'])
         ->assertOk()
-        ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentTeam])])
+        ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentWorkspace])])
         ->assertSessionMissing('auth.pending');
 
     $this->assertAuthenticatedAs($user);
@@ -418,7 +418,7 @@ test('a verified passkey satisfies enrolled MFA at login', function (): void {
 });
 
 test('a malformed passkey signature is rejected without authenticating', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $options = $this->getJson(route('passkey.login-options'))->json('options');
     $challenge = base64_decode(strtr((string) $options['challenge'], '-_', '+/'), true);
     $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
@@ -434,7 +434,7 @@ test('a malformed passkey signature is rejected without authenticating', functio
 });
 
 test('a malformed passkey signature cannot prove a sensitive operation', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     AuthenticationSession::startOperation($user, 'set_password', null);
     $options = $this->getJson(route('passkey.confirm-options'))->json('options');
@@ -526,7 +526,7 @@ test('the passkey login endpoint rejects a submission with no prior options requ
 });
 
 test('a well-formed passkey assertion confirms identity through the installed verifier', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $options = $this->getJson(route('passkey.confirm-options'))->json('options');
@@ -543,7 +543,7 @@ test('a well-formed passkey assertion confirms identity through the installed ve
 });
 
 test('a verified passkey satisfies enrolled MFA for a sensitive operation', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     AuthenticationSession::startOperation($user, 'manage_mfa', null);
@@ -564,7 +564,7 @@ test('a verified passkey satisfies enrolled MFA for a sensitive operation', func
 });
 
 test('a passkey without user verification cannot confirm a sensitive operation', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     AuthenticationSession::startOperation($user, 'manage_mfa', null);
@@ -581,8 +581,8 @@ test('a passkey without user verification cannot confirm a sensitive operation',
 });
 
 test('a passkey confirmation rejects a credential registered to a different user', function (): void {
-    $owner = User::factory()->withTeam()->create();
-    $confirmingUser = User::factory()->withTeam()->create();
+    $owner = User::factory()->withWorkspace()->create();
+    $confirmingUser = User::factory()->withWorkspace()->create();
     $this->actingAs($confirmingUser);
 
     $options = $this->getJson(route('passkey.confirm-options'))->json('options');
@@ -599,7 +599,7 @@ test('a passkey confirmation rejects a credential registered to a different user
 });
 
 test('password confirmation still requires MFA when a passkey is registered', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     storePasskeyAssertionFor($user, buildRealPasskeyAssertion('relaticle.test', config('fortify.passkeys.allowed_origins')[0], 'registration-challenge'));
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
@@ -742,7 +742,7 @@ test('continue with a social-only account switches to the social method', functi
 });
 
 test('two step password login still authenticates', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
@@ -1025,17 +1025,17 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
     Event::fake([Verified::class]);
     Notification::fake();
 
-    $team = Team::factory()->create();
+    $workspace = Workspace::factory()->create();
     $email = 'Invited-Signup-'.uniqid().'@Gmail.com';
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $team->id,
+    $invitation = WorkspaceInvitation::factory()->create([
+        'workspace_id' => $workspace->id,
         'email' => $email,
     ]);
 
     $rawToken = $invitation->issueToken();
     $invitation->save();
 
-    session(['url.intended' => route('team-invitations.token.accept', ['token' => $rawToken])]);
+    session(['url.intended' => route('workspace-invitations.token.accept', ['token' => $rawToken])]);
 
     livewire(Login::class)
         ->fillForm(['email' => $email])
@@ -1053,20 +1053,20 @@ test('signup with a matching invitation auto-verifies the email and fires Verifi
     Notification::assertNotSentTo($user, VerifyEmail::class);
     Event::assertDispatched(Verified::class, fn (Verified $event): bool => $event->user->is($user));
 
-    $this->get(route('team-invitations.token.accept', ['token' => $rawToken]))->assertOk();
+    $this->get(route('workspace-invitations.token.accept', ['token' => $rawToken]))->assertOk();
 
-    $this->post(route('team-invitations.token.join', ['token' => $rawToken]))
-        ->assertRedirect(Dashboard::getUrl(['tenant' => $team]));
+    $this->post(route('workspace-invitations.token.join', ['token' => $rawToken]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 });
 
 test('signup with an expired invitation does not auto-verify the email', function (): void {
     Event::fake([Verified::class]);
     Notification::fake();
 
-    $team = Team::factory()->create();
+    $workspace = Workspace::factory()->create();
     $email = 'expired-signup-'.uniqid().'@gmail.com';
-    $invitation = TeamInvitation::factory()->create([
-        'team_id' => $team->id,
+    $invitation = WorkspaceInvitation::factory()->create([
+        'workspace_id' => $workspace->id,
         'email' => $email,
     ]);
 
@@ -1074,7 +1074,7 @@ test('signup with an expired invitation does not auto-verify the email', functio
     $invitation->save();
     $invitation->forceFill(['expires_at' => now()->subDay()])->save();
 
-    session(['url.intended' => route('team-invitations.token.accept', ['token' => $rawToken])]);
+    session(['url.intended' => route('workspace-invitations.token.accept', ['token' => $rawToken])]);
 
     livewire(Login::class)
         ->fillForm(['email' => $email])
@@ -1092,7 +1092,7 @@ test('signup with an expired invitation does not auto-verify the email', functio
     Event::assertNotDispatched(Verified::class);
 });
 
-test('a fresh teamless signup lands on tenant registration, not the login page', function (): void {
+test('a fresh workspaceless signup lands on tenant registration, not the login page', function (): void {
     $email = 'fresh-signup-'.uniqid().'@gmail.com';
 
     livewire(Login::class)
@@ -1266,7 +1266,7 @@ test('a mixed-case signup is stored lowercase and can log back in with any casin
 });
 
 test('a legacy mixed-case account can log in with a lowercase-typed email after normalization', function (): void {
-    User::factory()->withTeam()->create(['email' => 'Legacy-Mixed@Example.com', 'password' => 'password']);
+    User::factory()->withWorkspace()->create(['email' => 'Legacy-Mixed@Example.com', 'password' => 'password']);
 
     livewire(Login::class)
         ->fillForm(['email' => 'legacy-mixed@example.com'])
@@ -1299,7 +1299,7 @@ test('the remember me checkbox no longer renders on the login page', function ()
 });
 
 test('password login always remembers the session even without a checkbox', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
@@ -1313,7 +1313,7 @@ test('password login always remembers the session even without a checkbox', func
 });
 
 test('switching accounts cancels pending MFA without authenticating', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
 
     $this->post(route('two-factor.cancel'))
@@ -1329,7 +1329,7 @@ test('switching accounts cancels pending MFA without authenticating', function (
 });
 
 test('expired sign-in MFA shows a way to start again', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
     $this->travel(11)->minutes();
 

@@ -35,9 +35,9 @@ final readonly class IdentityConfirmationMfaController
         $user = $this->user($request);
         $cancelIdentityConfirmation->execute($user);
 
-        return $user->currentTeam === null
+        return $user->currentWorkspace === null
             ? to_route('dashboard')
-            : redirect()->to(Security::getUrl(['tenant' => $user->currentTeam], panel: 'app'));
+            : redirect()->to(Security::getUrl(['tenant' => $user->currentWorkspace], panel: 'app'));
     }
 
     public function store(Request $request): Response

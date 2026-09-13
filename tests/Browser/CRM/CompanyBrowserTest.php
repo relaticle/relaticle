@@ -10,29 +10,29 @@ use App\Models\User;
 mutates(CompanyResource::class, HasBoardViewSwitcher::class);
 
 it('can create a company through the browser', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies")
         ->press('New company')
         ->type('[id="mountedActionSchema0.name"]', 'Browser Test Corp')
         ->press('Create')
         ->assertSee('Browser Test Corp');
 
-    expect(Company::where('name', 'Browser Test Corp')->where('team_id', $team->id)->exists())->toBeTrue();
+    expect(Company::where('name', 'Browser Test Corp')->where('workspace_id', $workspace->id)->exists())->toBeTrue();
 });
 
 it('paints the header action dropdown above the table toolbar', function (): void {
     $this->withVite();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies")
         ->assertSee('Import / Export');
 
     $page->script(<<<'JS'
@@ -63,19 +63,19 @@ it('paints the header action dropdown above the table toolbar', function (): voi
 });
 
 it('keeps app page headings in the topbar across navigation and viewport sizes', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Companies')
         ->assertMissing('main h1')
         ->assertNoJavaScriptErrors();
 
-    $page->click("a.fi-sidebar-item-btn[href$='/app/{$team->slug}/people']")
-        ->assertPathIs("/app/{$team->slug}/people")
+    $page->click("a.fi-sidebar-item-btn[href$='/app/{$workspace->slug}/people']")
+        ->assertPathIs("/app/{$workspace->slug}/people")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'People')
         ->assertMissing('main h1')
@@ -112,9 +112,9 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
     ]);
 
     $page->resize(1440, 900)
-        ->navigate("/app/{$team->slug}/tasks")
-        ->click("a[href$='/app/{$team->slug}/tasks/board']")
-        ->assertPathIs("/app/{$team->slug}/tasks/board")
+        ->navigate("/app/{$workspace->slug}/tasks")
+        ->click("a[href$='/app/{$workspace->slug}/tasks/board']")
+        ->assertPathIs("/app/{$workspace->slug}/tasks/board")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Tasks')
         ->assertVisible('.fi-board-header .fi-ta-search-field')
@@ -123,15 +123,15 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->assertScript('(() => document.querySelector("[data-page-heading] h1")?.textContent.trim() === "Tasks")()')
         ->assertScript('(() => document.querySelector("[data-page-heading] nav")?.parentElement.matches("[data-page-heading]") === true)()')
         ->assertScript('(() => !document.querySelector("main .fi-header-heading").getClientRects().length)()')
-        ->click(".fi-topbar-start a[href$='/app/{$team->slug}/tasks']")
-        ->assertPathIs("/app/{$team->slug}/tasks")
+        ->click(".fi-topbar-start a[href$='/app/{$workspace->slug}/tasks']")
+        ->assertPathIs("/app/{$workspace->slug}/tasks")
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()');
 
     $page->resize(390, 844)
         ->assertVisible('.fi-view-switcher')
         ->assertScript('(() => { const label = document.querySelector(".fi-view-switcher-label"); return label !== null && label.getClientRects().length === 0; })()')
         ->assertScript('(() => document.querySelector(".fi-view-switcher a[aria-label]") !== null)()')
-        ->click(".fi-view-switcher a[href$='/app/{$team->slug}/tasks/board']")
-        ->assertPathIs("/app/{$team->slug}/tasks/board")
+        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks/board']")
+        ->assertPathIs("/app/{$workspace->slug}/tasks/board")
         ->assertNoJavaScriptErrors();
 });

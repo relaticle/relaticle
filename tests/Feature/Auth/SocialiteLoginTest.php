@@ -72,7 +72,7 @@ test('callback from socialite provider creates new user when user does not exist
 });
 
 test('callback from socialite provider logs in existing user when social account exists', function () {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'email' => 'existing@example.com',
         'name' => 'Existing User',
     ]);
@@ -93,7 +93,7 @@ test('callback from socialite provider logs in existing user when social account
     $this->assertAuthenticated();
     $this->assertAuthenticatedAs($user);
 
-    $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentTeam]));
+    $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 });
 
 test('linked Google login cannot bypass enrolled MFA', function (): void {
@@ -165,7 +165,7 @@ test('matching provider email cannot sign in to an unlinked account', function (
 });
 
 test('a mixed-case provider email match still cannot sign in to an unlinked account', function (): void {
-    $user = User::factory()->withTeam()->create(['email' => 'case-link-'.uniqid().'@example.com']);
+    $user = User::factory()->withWorkspace()->create(['email' => 'case-link-'.uniqid().'@example.com']);
 
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,
@@ -182,7 +182,7 @@ test('a mixed-case provider email match still cannot sign in to an unlinked acco
 });
 
 test('a matching-email link suggestion survives a subsequent password login', function (): void {
-    $user = User::factory()->withTeam()->create(['email' => 'maya@example.com']);
+    $user = User::factory()->withWorkspace()->create(['email' => 'maya@example.com']);
     Socialite::fake('google', makeSocialiteUser('new-provider-id', 'Maya', $user->email));
 
     $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
@@ -199,7 +199,7 @@ test('a matching-email link suggestion survives a subsequent password login', fu
 });
 
 test('an existing linked account still signs in when the provider now reports a different email', function (): void {
-    $user = User::factory()->withTeam()->create(['email' => 'old-address@example.com']);
+    $user = User::factory()->withWorkspace()->create(['email' => 'old-address@example.com']);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
         'provider_name' => SocialiteProvider::GOOGLE->value,
@@ -280,7 +280,7 @@ test('callback flags the signup event when the OAuth user is new', function () {
 });
 
 test('callback does not flag the signup event when the OAuth user already exists', function () {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'email' => 'returning@example.com',
         'name' => 'Returning User',
     ]);
@@ -332,7 +332,7 @@ test('callback rejects unknown providers', function () {
 });
 
 test('link redirect requires a fresh identity confirmation', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]))
@@ -342,7 +342,7 @@ test('link redirect requires a fresh identity confirmation', function (): void {
 });
 
 test('link redirect to google for a confirmed user requests account selection', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -352,7 +352,7 @@ test('link redirect to google for a confirmed user requests account selection', 
 });
 
 test('link redirect to microsoft for a confirmed user forces re-authentication', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -362,7 +362,7 @@ test('link redirect to microsoft for a confirmed user forces re-authentication',
 });
 
 test('link callback creates a new social account for a confirmed user', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -384,7 +384,7 @@ test('link callback creates a new social account for a confirmed user', function
 });
 
 test('hitting the link callback directly without first visiting the link redirect cannot link a provider', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -400,7 +400,7 @@ test('hitting the link callback directly without first visiting the link redirec
 });
 
 test('link callback handles a cancelled authorization', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -413,7 +413,7 @@ test('link callback handles a cancelled authorization', function (): void {
 });
 
 test('link callback treats an invalid oauth state as a failed link attempt', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -431,7 +431,7 @@ test('link callback treats an invalid oauth state as a failed link attempt', fun
 });
 
 test('link callback rejects an expired operation grant', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -451,7 +451,7 @@ test('link callback rejects an expired operation grant', function (): void {
 });
 
 test('link callback refuses a grant overwritten by another operation before the round trip returned', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -471,7 +471,7 @@ test('link callback refuses a grant overwritten by another operation before the 
 });
 
 test('link callback rejects a grant minted before the password was rotated', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -491,14 +491,14 @@ test('link callback rejects a grant minted before the password was rotated', fun
 });
 
 test('linking a provider identity already linked to another account does not reassign it', function (): void {
-    $owner = User::factory()->withTeam()->create();
+    $owner = User::factory()->withWorkspace()->create();
     UserSocialAccount::factory()->create([
         'user_id' => $owner->id,
         'provider_name' => SocialiteProvider::GOOGLE->value,
         'provider_id' => 'contested-google-id',
     ]);
 
-    $challenger = User::factory()->withTeam()->create();
+    $challenger = User::factory()->withWorkspace()->create();
     $this->actingAs($challenger);
     IdentityConfirmation::markConfirmed();
 
@@ -520,9 +520,9 @@ test('linking a provider identity already linked to another account does not rea
 });
 
 test('a link rejected by the unique index after its pre-check passes reports it as already linked', function (): void {
-    $racer = User::factory()->withTeam()->create();
+    $racer = User::factory()->withWorkspace()->create();
 
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     IdentityConfirmation::markConfirmed();
 
@@ -552,7 +552,7 @@ test('a link rejected by the unique index after its pre-check passes reports it 
 });
 
 test('linking a provider the user already has one linked for reports already linked without duplicating the row', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
         'provider_name' => SocialiteProvider::GOOGLE->value,

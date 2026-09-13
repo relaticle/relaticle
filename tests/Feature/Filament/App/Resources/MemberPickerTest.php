@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Task;
@@ -10,18 +10,18 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 
-mutates(TeamMemberSelect::class);
+mutates(WorkspaceMemberSelect::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('still saves task assignees through the pivot after the migration', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->team->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'editor']);
 
     livewire(ManageTasks::class)
         ->callAction('create', [
@@ -37,12 +37,12 @@ it('still saves task assignees through the pivot after the migration', function 
 
 it('keeps the assignee filter usable and bounded on the tasks list', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->team->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'editor']);
 
-    $assignedToMate = Task::factory()->recycle([$this->user, $this->team])->create();
+    $assignedToMate = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $assignedToMate->assignees()->attach($mate);
 
-    $assignedToUser = Task::factory()->recycle([$this->user, $this->team])->create();
+    $assignedToUser = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $assignedToUser->assignees()->attach($this->user);
 
     DB::enableQueryLog();
@@ -55,7 +55,7 @@ it('keeps the assignee filter usable and bounded on the tasks list', function ()
         ->assertCanNotSeeTableRecords([$assignedToUser]);
 
     $pinnedOrderQueries = collect(DB::getQueryLog())
-        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'team_member_select_is_current_user'));
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'workspace_member_select_is_current_user'));
 
     DB::disableQueryLog();
 
@@ -64,14 +64,14 @@ it('keeps the assignee filter usable and bounded on the tasks list', function ()
 
 it('runs the bounded assignee filter query on the tasks board without a Postgres distinct/order-by conflict', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->team->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'editor']);
 
     DB::enableQueryLog();
 
     livewire(TasksBoard::class)->assertOk();
 
     $pinnedOrderQueries = collect(DB::getQueryLog())
-        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'team_member_select_is_current_user'));
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'workspace_member_select_is_current_user'));
 
     DB::disableQueryLog();
 

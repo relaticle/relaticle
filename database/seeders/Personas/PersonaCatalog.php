@@ -7,7 +7,7 @@ namespace Database\Seeders\Personas;
 use App\Enums\BillingStatus;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
-use App\Enums\TeamRole;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
@@ -42,11 +42,11 @@ final class PersonaCatalog
                 // Grandfathered rather than trialing: a trial lapses and then
                 // every local login lands on /billing until someone re-seeds.
                 expect: BillingStatus::Grandfathered,
-                team: ['hosted_free_grandfathered_at' => '-1 year'],
+                workspaceAttributes: ['hosted_free_grandfathered_at' => '-1 year'],
                 useCase: OnboardingUseCase::Sales,
                 members: [
-                    ['email' => 'admin@'.self::DOMAIN, 'role' => TeamRole::Admin->value],
-                    ['email' => 'editor@'.self::DOMAIN, 'role' => TeamRole::Editor->value],
+                    ['email' => 'admin@'.self::DOMAIN, 'role' => WorkspaceRole::Admin->value],
+                    ['email' => 'editor@'.self::DOMAIN, 'role' => WorkspaceRole::Editor->value],
                 ],
             ),
 
@@ -59,7 +59,7 @@ final class PersonaCatalog
                 // The only way to see every empty state without deleting rows
                 // out of a populated workspace by hand.
                 expect: BillingStatus::Grandfathered,
-                team: ['hosted_free_grandfathered_at' => '-1 year'],
+                workspaceAttributes: ['hosted_free_grandfathered_at' => '-1 year'],
             ),
 
             new Persona(
@@ -80,7 +80,7 @@ final class PersonaCatalog
                 workspace: 'Trialing Workspace',
                 purpose: 'Nine days left on a Pro trial, with recruiting data.',
                 expect: BillingStatus::Trialing,
-                team: [
+                workspaceAttributes: [
                     'plan' => Plan::Pro,
                     'trial_ends_at' => '+9 days',
                     'pro_trial_used_at' => '-5 days',
@@ -95,7 +95,7 @@ final class PersonaCatalog
                 workspace: 'Northstar Operations',
                 purpose: 'Managed Enterprise access, usage, and support contact without self-service checkout.',
                 expect: BillingStatus::Enterprise,
-                team: ['plan' => Plan::Enterprise],
+                workspaceAttributes: ['plan' => Plan::Enterprise],
             ),
 
             new Persona(
@@ -107,7 +107,7 @@ final class PersonaCatalog
                 // A real Stripe subscription: the badge, the invoice list and
                 // "Open in Stripe" all resolve against the sandbox.
                 expect: BillingStatus::Subscribed,
-                team: ['plan' => Plan::Pro],
+                workspaceAttributes: ['plan' => Plan::Pro],
                 useCase: OnboardingUseCase::Marketing,
                 stripe: 'pm_card_visa',
             ),
@@ -121,7 +121,7 @@ final class PersonaCatalog
                 // Reached by advancing a Stripe test clock past a renewal that
                 // the card declines. There is no other way to see this state.
                 expect: BillingStatus::PastDue,
-                team: ['plan' => Plan::Pro],
+                workspaceAttributes: ['plan' => Plan::Pro],
                 stripe: 'pm_card_visa',
                 pastDue: true,
             ),

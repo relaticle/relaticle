@@ -45,7 +45,7 @@ final readonly class UnsubscribeController
 
     private function settingsUrl(User $user): string
     {
-        $tenant = $user->currentTeam ?? $user->allTeams()->first();
+        $tenant = $user->currentWorkspace ?? $user->allWorkspaces()->first();
 
         return $tenant === null
             ? url()->getAppUrl()

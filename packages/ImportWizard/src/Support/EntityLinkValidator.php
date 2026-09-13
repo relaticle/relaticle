@@ -23,9 +23,9 @@ final class EntityLinkValidator
     /** @var array<string, string> */
     private array $lastFormatErrors = [];
 
-    public function __construct(private readonly string $teamId)
+    public function __construct(private readonly string $workspaceId)
     {
-        $this->resolver = new EntityLinkResolver($this->teamId);
+        $this->resolver = new EntityLinkResolver($this->workspaceId);
     }
 
     public function validate(EntityLink $link, MatchableField $matcher, mixed $value): ?string
@@ -171,7 +171,7 @@ final class EntityLinkValidator
 
         $customField = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
+            ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $link->targetEntity)
             ->where('code', $code)
             ->first();

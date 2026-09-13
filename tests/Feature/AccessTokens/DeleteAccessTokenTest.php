@@ -10,7 +10,7 @@ use Laravel\Jetstream\Features;
 mutates(User::class);
 
 test('api tokens can be deleted', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $token = $user->tokens()->create([
         'name' => 'Test Token',

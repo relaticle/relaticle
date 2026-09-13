@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Company;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -16,12 +16,12 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatController::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -41,14 +41,14 @@ it('returns 404 when the supplied conversation_id does not exist', function (): 
 });
 
 it('rejects a client-supplied conversation_id that already belongs to another user', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $sharedId = '019dded5-bbbb-7bbb-8ccc-555500000000';
 
     DB::table('agent_conversations')->insert([
         'id' => $sharedId,
         'participant_type' => 'user',
         'participant_id' => $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => 'private',
         'created_at' => now(),
         'updated_at' => now(),
@@ -62,23 +62,23 @@ it('rejects a client-supplied conversation_id that already belongs to another us
     $response->assertStatus(403);
 });
 
-it('rejects a client-supplied conversation_id pinned to a different team', function (): void {
-    $otherTeam = Team::factory()->create();
-    $crossTeamId = '019dded5-cccc-7bbb-8ccc-666600000000';
+it('rejects a client-supplied conversation_id pinned to a different workspace', function (): void {
+    $otherWorkspace = Workspace::factory()->create();
+    $crossWorkspaceId = '019dded5-cccc-7bbb-8ccc-666600000000';
 
     DB::table('agent_conversations')->insert([
-        'id' => $crossTeamId,
+        'id' => $crossWorkspaceId,
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $otherTeam->getKey(),
-        'title' => 'cross-team',
+        'workspace_id' => $otherWorkspace->getKey(),
+        'title' => 'cross-workspace',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $response = $this->postJson(route('chat.send'), [
         'document' => ChatDocument::fromText('hi'),
-        'conversation_id' => $crossTeamId,
+        'conversation_id' => $crossWorkspaceId,
     ]);
 
     $response->assertStatus(403);
@@ -103,14 +103,14 @@ it('returns 422 when conversation_id is missing', function (): void {
 
 it('accepts a valid mentions array', function (): void {
     Queue::fake();
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme Corp']);
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'seed',
         'created_at' => now(),
         'updated_at' => now(),
@@ -132,17 +132,17 @@ it('accepts a valid mentions array', function (): void {
     });
 });
 
-it('silently drops mentions whose records do not belong to the current team', function (): void {
+it('silently drops mentions whose records do not belong to the current workspace', function (): void {
     Queue::fake();
-    $otherTeam = Team::factory()->create();
-    $foreignCompany = Company::factory()->for($otherTeam)->create(['name' => 'Foreign Co']);
+    $otherWorkspace = Workspace::factory()->create();
+    $foreignCompany = Company::factory()->for($otherWorkspace)->create(['name' => 'Foreign Co']);
 
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'seed',
         'created_at' => now(),
         'updated_at' => now(),

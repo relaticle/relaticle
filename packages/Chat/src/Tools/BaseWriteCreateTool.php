@@ -66,7 +66,7 @@ abstract class BaseWriteCreateTool implements Tool
         $user = auth()->user();
 
         $customFieldsDescription = $user instanceof User
-            ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, $this->entityType())
+            ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, $this->entityType())
             : 'Custom field values as key-value pairs.';
 
         $recordProperties = array_merge(

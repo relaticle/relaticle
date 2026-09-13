@@ -12,28 +12,28 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 
 it('renders the nudge naming the unfinished step', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed']);
 
-    $mail = new SetupNudgeMail($owner, $owner->currentTeam, ActivationStep::FirstRecord->value, 'https://example.test/chat');
+    $mail = new SetupNudgeMail($owner, $owner->currentWorkspace, ActivationStep::FirstRecord->value, 'https://example.test/chat');
 
     $mail->assertHasSubject(__('mail.setup_nudge.subject'));
-    $mail->assertSeeInHtml(__('mail.setup_nudge.heading', ['name' => 'Dana', 'team' => $owner->currentTeam->name]), escape: false);
+    $mail->assertSeeInHtml(__('mail.setup_nudge.heading', ['name' => 'Dana', 'workspace' => $owner->currentWorkspace->name]), escape: false);
     $mail->assertSeeInHtml('Add your first contact');
     $mail->assertSeeInHtml('Put one real person in the CRM and the rest follows');
     $mail->assertSeeInHtml(__('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]));
     $mail->assertSeeInHtml('https://example.test/chat');
     $mail->assertSeeInHtml(__('mail.footer.reason.onboarding', ['company' => config('relaticle.company.name')]));
-    $mail->assertSeeInHtml(__('mail.setup_nudge.preheader', ['team' => $owner->currentTeam->name, 'step' => 'Add your first contact']), escape: false);
+    $mail->assertSeeInHtml(__('mail.setup_nudge.preheader', ['workspace' => $owner->currentWorkspace->name, 'step' => 'Add your first contact']), escape: false);
     $mail->assertSeeInText(__('mail.setup_nudge.cta', ['assistant' => config('chat.assistant_name')]).': https://example.test/chat');
     $mail->assertDontSeeInHtml('filament/pages/dashboard.');
     $mail->assertDontSeeInHtml('mail.setup_nudge.');
 });
 
 it('never lets an unresolved step label reach the rendered body', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create(['name' => 'Dana Reed']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed']);
 
     foreach (ActivationStep::cases() as $step) {
-        $mail = new SetupNudgeMail($owner, $owner->currentTeam, $step->value, 'https://example.test/chat');
+        $mail = new SetupNudgeMail($owner, $owner->currentWorkspace, $step->value, 'https://example.test/chat');
 
         expect($mail->render())->not->toContain('filament/pages/dashboard.');
     }
@@ -42,29 +42,29 @@ it('never lets an unresolved step label reach the rendered body', function (): v
 it('sends once to an owner who has created nothing', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+    $owner->currentWorkspace->forceFill(['created_at' => now()->subDays(2)])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
     Mail::assertQueuedCount(1);
-    expect($owner->currentTeam->fresh()->setup_nudge_sent_at)->not->toBeNull();
+    expect($owner->currentWorkspace->fresh()->setup_nudge_sent_at)->not->toBeNull();
 });
 
 it('skips a workspace that already has its own record', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
+    $workspace = $owner->currentWorkspace;
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $team->forceFill(['created_at' => now()->subDays(2)])->save();
-    Company::factory()->for($team)->create(['creation_source' => CreationSource::WEB]);
+    $workspace->forceFill(['created_at' => now()->subDays(2)])->save();
+    Company::factory()->for($workspace)->create(['creation_source' => CreationSource::WEB]);
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
@@ -74,12 +74,12 @@ it('skips a workspace that already has its own record', function (): void {
 it('sends at 09:00 in the owner timezone, not the app timezone', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
     // 00:00 UTC is 09:00 in Tokyo: the band has to be read in the user's zone.
     $this->travelTo(now()->setTime(0, 0));
 
-    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+    $owner->currentWorkspace->forceFill(['created_at' => now()->subDays(2)])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
@@ -89,27 +89,27 @@ it('sends at 09:00 in the owner timezone, not the app timezone', function (): vo
 it('stays silent outside the owner local 09:00 hour', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
 
     // 09:00 UTC is 18:00 in Tokyo: right hour in the wrong zone must not fire.
     $this->travelTo(now()->setTime(9, 0));
 
-    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+    $owner->currentWorkspace->forceFill(['created_at' => now()->subDays(2)])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
     Mail::assertNothingQueued();
-    expect($owner->currentTeam->fresh()->setup_nudge_sent_at)->toBeNull();
+    expect($owner->currentWorkspace->fresh()->setup_nudge_sent_at)->toBeNull();
 });
 
 it('never nudges an owner who has not verified their email', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->unverified()->create(['timezone' => 'UTC']);
+    $owner = User::factory()->withPersonalWorkspace()->unverified()->create(['timezone' => 'UTC']);
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $owner->currentTeam->forceFill(['created_at' => now()->subDays(2)])->save();
+    $owner->currentWorkspace->forceFill(['created_at' => now()->subDays(2)])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
@@ -119,11 +119,11 @@ it('never nudges an owner who has not verified their email', function (): void {
 it('leaves a workspace younger than two days alone', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $owner->currentTeam->forceFill(['created_at' => now()->subDay()])->save();
+    $owner->currentWorkspace->forceFill(['created_at' => now()->subDay()])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
@@ -133,11 +133,11 @@ it('leaves a workspace younger than two days alone', function (): void {
 it('skips a workspace already scheduled for deletion', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     $this->travelTo(now()->setTime(9, 0));
 
-    $owner->currentTeam->forceFill([
+    $owner->currentWorkspace->forceFill([
         'created_at' => now()->subDays(2),
         'scheduled_deletion_at' => now()->addDays(7),
     ])->save();
@@ -150,18 +150,18 @@ it('skips a workspace already scheduled for deletion', function (): void {
 it('points the nudge at the dashboard, never at an id-less chat URL', function (): void {
     Mail::fake();
 
-    $owner = User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
+    $workspace = $owner->currentWorkspace;
 
     $this->travelTo(now()->setTime(9, 0));
-    $team->forceFill(['created_at' => now()->subDays(2)])->save();
+    $workspace->forceFill(['created_at' => now()->subDays(2)])->save();
 
     $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
 
     // An id-less chat URL redirects straight back to the dashboard, so the CTA
     // must not send the reader through that bounce.
-    Mail::assertQueued(SetupNudgeMail::class, function (SetupNudgeMail $mail) use ($team): bool {
-        return $mail->conversationUrl === Dashboard::getUrl(['tenant' => $team], panel: 'app')
-            && $mail->conversationUrl !== ChatConversation::getUrl(['tenant' => $team], panel: 'app');
+    Mail::assertQueued(SetupNudgeMail::class, function (SetupNudgeMail $mail) use ($workspace): bool {
+        return $mail->conversationUrl === Dashboard::getUrl(['tenant' => $workspace], panel: 'app')
+            && $mail->conversationUrl !== ChatConversation::getUrl(['tenant' => $workspace], panel: 'app');
     });
 });

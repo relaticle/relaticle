@@ -10,15 +10,15 @@ use PragmaRX\Google2FA\Google2FA;
 mutates(Login::class);
 
 it('user can log in and reach the dashboard', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}");
+        ->assertPathIs("/app/{$workspace->slug}");
 });
 
 it('reveals the password field only after continue', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->visit('/app/login')
         ->assertMissing('[id="form.password"]')
@@ -28,7 +28,7 @@ it('reveals the password field only after continue', function (): void {
 });
 
 it('waits for explicit verification after entering all six digits', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $code = resolve(Google2FA::class)->getCurrentOtp($secret);
 
@@ -40,6 +40,6 @@ it('waits for explicit verification after entering all six digits', function ():
     $page->type('input[autocomplete="one-time-code"]', $code)
         ->assertSee(__('auth.mfa.switch_account'))
         ->click('Verify')
-        ->assertPathIs('/app/'.$user->currentTeam->slug)
+        ->assertPathIs('/app/'.$user->currentWorkspace->slug)
         ->assertNoJavaScriptErrors();
 });

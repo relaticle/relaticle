@@ -35,19 +35,19 @@ final class ListCustomFieldsTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         $entityType = isset($request['entity_type']) && is_string($request['entity_type']) && $request['entity_type'] !== ''
             ? $request['entity_type']
             : null;
 
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
+        TenantContextService::setTenantId($workspaceId);
 
         try {
             $fields = CustomField::query()
                 ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->when($entityType !== null, fn (Builder $query) => $query->where('entity_type', $entityType))
                 ->with(['options:id,custom_field_id,name'])
                 ->orderBy('entity_type')

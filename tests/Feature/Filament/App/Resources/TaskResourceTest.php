@@ -22,10 +22,10 @@ use Illuminate\Support\Facades\Mail;
 mutates(ManageTasks::class, NotifyTaskAssignees::class, TaskResource::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('can render the index page', function (): void {
@@ -57,7 +57,7 @@ it('exposes the expected table columns', function (): void {
 });
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Task::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Task::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -71,7 +71,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Task::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Task::factory(3)->recycle([$this->user, $this->workspace])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ManageTasks::class)
@@ -81,8 +81,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['title', 'assignees.name', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Task::factory()->count(4)->recycle([$this->user, $this->team])->create();
-    $trashedRecords = Task::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
+    $records = Task::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
+    $trashedRecords = Task::factory()->trashed()->count(6)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records)
@@ -91,7 +91,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Task::factory(20)->recycle([$this->user, $this->team])->create();
+    $records = Task::factory(20)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -100,7 +100,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Task::factory(5)->recycle([$this->user, $this->team])->create();
+    $records = Task::factory(5)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
         ->assertCanSeeTableRecords($records)
@@ -123,7 +123,7 @@ it('can create a task', function (): void {
 
     $this->assertDatabaseHas(Task::class, [
         'title' => 'New Task',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 });
 
@@ -134,7 +134,7 @@ it('can create a task', function (): void {
 it('rejects a create payload naming an assignee outside the workspace', function (): void {
     $this->withoutDefer();
 
-    $outsider = User::factory()->withTeam()->create();
+    $outsider = User::factory()->withWorkspace()->create();
 
     livewire(ManageTasks::class)
         ->callAction('create', data: [
@@ -151,7 +151,7 @@ it('notifies a newly assigned member with a deep-link that opens the task edit m
     $this->withoutDefer();
 
     $assignee = User::factory()->create();
-    $this->team->users()->attach($assignee, ['role' => 'admin']);
+    $this->workspace->users()->attach($assignee, ['role' => 'admin']);
 
     livewire(ManageTasks::class)
         ->callAction('create', data: [
@@ -177,7 +177,7 @@ it('notifies only the assignees submitted through the create action', function (
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->team->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
 
     $concurrentAssignmentAdded = false;
     DB::listen(function (QueryExecuted $query) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -212,7 +212,7 @@ it('notifies only the assignees submitted through the create action', function (
 });
 
 it('can edit a task', function (): void {
-    $record = Task::factory()->recycle([$this->user, $this->team])->create();
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -224,7 +224,7 @@ it('can edit a task', function (): void {
 });
 
 it('can delete a task', function (): void {
-    $record = Task::factory()->recycle([$this->user, $this->team])->create();
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -245,7 +245,7 @@ it('has `:dataset` filter', function (string $filter): void {
         ->assertTableFilterExists($filter);
 })->with(['assigned_to_me', 'assignees', 'creation_source', 'trashed']);
 
-it('sets creator_id and team_id via observer when creating a task', function (): void {
+it('sets creator_id and workspace_id via observer when creating a task', function (): void {
     livewire(ManageTasks::class)
         ->callAction('create', data: [
             'title' => 'Observer Test Task',
@@ -255,23 +255,23 @@ it('sets creator_id and team_id via observer when creating a task', function ():
     $task = Task::query()->where('title', 'Observer Test Task')->first();
 
     expect($task->creator_id)->toBe($this->user->id)
-        ->and($task->team_id)->toBe($this->team->id);
+        ->and($task->workspace_id)->toBe($this->workspace->id);
 });
 
-it('authorizes team member to view and update own team task', function (): void {
-    $record = Task::factory()->recycle([$this->user, $this->team])->create();
+it('authorizes workspace member to view and update own workspace task', function (): void {
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()
         ->and($this->user->can('delete', $record))->toBeTrue();
 });
 
-it('denies non-team-member from viewing another team task', function (): void {
-    $otherUser = User::factory()->withTeam()->create();
-    $otherTeam = $otherUser->currentTeam;
+it('denies non-workspace-member from viewing another workspace task', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $otherWorkspace = $otherUser->currentWorkspace;
 
     $this->actingAs($otherUser);
-    $record = Task::factory()->for($otherTeam)->create();
+    $record = Task::factory()->for($otherWorkspace)->create();
     $this->actingAs($this->user);
 
     expect($this->user->can('view', $record))->toBeFalse()
@@ -292,7 +292,7 @@ it('stores a datetime typed in the user timezone as utc', function (): void {
     Filament::setCurrentPanel(Filament::getPanel('app'));
 
     $dueField = DB::table('custom_fields')
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'due_date')
         ->value('id');

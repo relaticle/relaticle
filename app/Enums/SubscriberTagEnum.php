@@ -17,7 +17,7 @@ enum SubscriberTagEnum: string
     case HasCrmData = 'has-crm-data';
     case HasApiToken = 'has-api-token';
     case HasAiUsage = 'has-ai-usage';
-    case HasTeamMembers = 'has-team-members';
+    case HasWorkspaceMembers = 'has-workspace-members';
 
     // Signup source tags (set once at registration)
     case SignupSourceOrganic = 'signup-source:organic';

@@ -1,0 +1,175 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\SystemAdmin\Filament\Widgets;
+
+use App\Enums\BillingStatus;
+use App\Models\User;
+use App\Models\Workspace;
+use Filament\Actions\Action;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Filament\Widgets\Concerns\InteractsWithPageFilters;
+use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Relaticle\SystemAdmin\Filament\Resources\ActivityResource;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
+
+/**
+ * Ranks workspaces by the distinct records they worked on in the selected period,
+ * read from the activity log so edits and deletes count as activity, not only
+ * record creation. Seeded demo data never appears here: OnboardSeed runs
+ * inside Model::withoutEvents(), so it writes no activity rows.
+ */
+final class TopWorkspacesTableWidget extends BaseWidget
+{
+    use InteractsWithPageFilters;
+
+    protected static ?string $heading = 'Top Workspaces';
+
+    protected static ?int $sort = 4;
+
+    protected int|string|array $columnSpan = 'full';
+
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(fn (): Builder => $this->buildQuery())
+            ->description(ViewerTime::freshnessCaption())
+            ->poll('60s')
+            ->columns([
+                TextColumn::make('name')
+                    ->label('Workspace')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('semibold')
+                    ->color('primary')
+                    ->url(fn (Workspace $record): string => WorkspaceResource::getUrl('view', ['record' => $record])),
+
+                TextColumn::make('owner.name')
+                    ->label('Owner')
+                    ->sortable()
+                    ->color('primary')
+                    ->url(fn (Workspace $record): ?string => $record->owner ? UserResource::getUrl('view', ['record' => $record->owner]) : null),
+
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                    ->badge(),
+
+                TextColumn::make('members_count')
+                    ->label('Members')
+                    ->state(fn (Workspace $record): string => "{$record->active_members} / {$record->members_count}")
+                    ->tooltip('Active in period / total members')
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('gray'),
+
+                TextColumn::make('records_touched')
+                    ->label('Records')
+                    ->tooltip('Distinct records with activity in the period')
+                    ->numeric()
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('info'),
+
+                TextColumn::make('active_days')
+                    ->label('Active Days')
+                    ->numeric()
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('success'),
+
+                TextColumn::make('custom_fields_count')
+                    ->label('Custom Fields')
+                    ->numeric()
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('warning'),
+
+                TextColumn::make('last_activity')
+                    ->label('Last Activity')
+                    ->since()
+                    ->sortable(),
+
+                /**
+                 * A date-only column resolves its zone to config('app.timezone'),
+                 * not FilamentTimezone, so it has to name the viewer's zone to
+                 * agree with the relative column above it.
+                 */
+                TextColumn::make('created_at')
+                    ->label('Created')
+                    ->date('M j, Y')
+                    ->timezone(fn (): string => ViewerTime::timezone())
+                    ->sortable(),
+            ])
+            ->recordActions([
+                Action::make('activity')
+                    ->label('Activity')
+                    ->icon('heroicon-o-clock')
+                    ->url(fn (Workspace $record): string => ActivityResource::getUrl('index', [
+                        'filters' => ['workspace_id' => ['value' => $record->id]],
+                    ])),
+            ])
+            ->defaultSort('records_touched', 'desc')
+            ->paginated([10, 25])
+            ->defaultPaginationPageOption(10)
+            ->striped()
+            ->emptyStateHeading('No Active Workspaces')
+            ->emptyStateDescription('Workspace activity will appear here once workspaces start working with records.')
+            ->emptyStateIcon('heroicon-o-user-group');
+    }
+
+    private function buildQuery(): Builder
+    {
+        $days = (int) ($this->pageFilters['period'] ?? 30);
+        [$start, $end] = ViewerTime::periodUtc($days);
+
+        $userMorphAlias = (new User)->getMorphClass();
+
+        /**
+         * `created_at` is a UTC-bearing `timestamp without time zone`, so it is
+         * relabelled as UTC before being shifted into the viewer's zone. Without
+         * that, two events either side of the viewer's midnight count as two
+         * active days for anyone who is not on UTC.
+         *
+         * Binding order follows the placeholders in the select list: the zone
+         * comes before the causer alias.
+         */
+        $activity = DB::table('activity_log')
+            ->selectRaw(<<<'SQL'
+                workspace_id,
+                COUNT(DISTINCT (subject_type, subject_id)) AS records_touched,
+                COUNT(DISTINCT (created_at AT TIME ZONE 'UTC' AT TIME ZONE ?)::date) AS active_days,
+                COUNT(DISTINCT causer_id) FILTER (WHERE causer_type = ?) AS active_members,
+                MAX(created_at) AS last_activity
+            SQL, [ViewerTime::timezone(), $userMorphAlias])
+            ->whereNotNull('workspace_id')
+            ->whereBetween('created_at', [$start->toDateTimeString(), $end->toDateTimeString()])
+            ->groupBy('workspace_id');
+
+        return Workspace::query()
+            // billingStatus() reads the subscriptions relation per row.
+            ->with('subscriptions')
+            ->select([
+                'workspaces.*',
+                'activity.records_touched',
+                'activity.active_days',
+                'activity.active_members',
+                'activity.last_activity',
+            ])
+            // Jetstream keeps the owner out of workspace_user, hence the +1.
+            ->selectRaw('(SELECT COUNT(*) + 1 FROM workspace_user WHERE workspace_user.workspace_id = workspaces.id) as members_count')
+            ->selectRaw('(SELECT COUNT(*) FROM custom_fields WHERE custom_fields.tenant_id = workspaces.id) as custom_fields_count')
+            ->joinSub($activity, 'activity', 'activity.workspace_id', '=', 'workspaces.id');
+    }
+}

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Note;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Str;
@@ -24,7 +24,7 @@ final class NoteFactory extends Factory
     {
         return [
             'title' => fake()->sentence(),
-            'team_id' => Team::factory(),
+            'workspace_id' => Workspace::factory(),
         ];
     }
 
@@ -37,7 +37,7 @@ final class NoteFactory extends Factory
         ]);
 
         if (config('scribe.generating')) {
-            return $factory->state(['team_id' => (string) Str::ulid()]);
+            return $factory->state(['workspace_id' => (string) Str::ulid()]);
         }
 
         return $factory;

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\OnboardSeed\Contracts;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Collection;
 
 interface ModelSeederInterface
 {
-    public function seed(Team $team, Authenticatable $user): void;
+    public function seed(Workspace $workspace, Authenticatable $user): void;
 
     /**
      * Get custom fields for this model

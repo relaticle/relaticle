@@ -179,16 +179,16 @@ it('swallows BroadcastException and does not rethrow', function (): void {
 });
 
 it('carries the proposal expiry to the client without writing it into the stored tool result', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     $convId = '019dfa00-5555-7000-8000-0000000000ee';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),

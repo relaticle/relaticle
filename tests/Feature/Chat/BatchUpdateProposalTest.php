@@ -28,18 +28,18 @@ mutates(BaseWriteUpdateTool::class, PendingActionService::class);
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
     Bus::fake();
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     $this->convId = '019df900-6666-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -56,11 +56,11 @@ function proposeNoteUpdates(string $convId, array $records): array
 
 function latestPending(User $user): PendingAction
 {
-    return PendingAction::query()->where('team_id', $user->currentTeam->getKey())->latest()->firstOrFail();
+    return PendingAction::query()->where('workspace_id', $user->currentWorkspace->getKey())->latest()->firstOrFail();
 }
 
 it('builds ONE per-item batch proposal with an old->new title diff for every note', function (): void {
-    $notes = Note::factory()->count(3)->for($this->team)->sequence(
+    $notes = Note::factory()->count(3)->for($this->workspace)->sequence(
         ['title' => 'Test Note 1'], ['title' => 'Test Note 2'], ['title' => 'Test Note 3'],
     )->create();
 
@@ -85,7 +85,7 @@ it('builds ONE per-item batch proposal with an old->new title diff for every not
 });
 
 it('keeps the flat single-record shape when one record is passed', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Solo']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Solo']);
 
     proposeNoteUpdates($this->convId, [['id' => (string) $note->getKey(), 'title' => 'Solo 🚀']]);
 
@@ -98,7 +98,7 @@ it('keeps the flat single-record shape when one record is passed', function (): 
 });
 
 it('updates each approved item and leaves skipped ones untouched, per item', function (): void {
-    $notes = Note::factory()->count(3)->for($this->team)->sequence(
+    $notes = Note::factory()->count(3)->for($this->workspace)->sequence(
         ['title' => 'A'], ['title' => 'B'], ['title' => 'C'],
     )->create();
 
@@ -123,7 +123,7 @@ it('updates each approved item and leaves skipped ones untouched, per item', fun
 });
 
 it('refuses a whole-batch approve so no update can bypass per-item review', function (): void {
-    $notes = Note::factory()->count(2)->for($this->team)->create();
+    $notes = Note::factory()->count(2)->for($this->workspace)->create();
 
     proposeNoteUpdates($this->convId, $notes->map(fn (Note $note): array => ['id' => (string) $note->getKey(), 'title' => 'X'])->all());
 
@@ -132,8 +132,8 @@ it('refuses a whole-batch approve so no update can bypass per-item review', func
 });
 
 it('fails the whole proposal when one record is missing, unowned, or empty', function (): void {
-    $mine = Note::factory()->for($this->team)->create(['title' => 'Mine']);
-    $other = Note::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+    $mine = Note::factory()->for($this->workspace)->create(['title' => 'Mine']);
+    $other = Note::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
 
     $missing = proposeNoteUpdates($this->convId, [
         ['id' => (string) $mine->getKey(), 'title' => 'Mine 2'],
@@ -151,9 +151,9 @@ it('fails the whole proposal when one record is missing, unowned, or empty', fun
 });
 
 it('shows what a re-linked set gives up: old linked names next to the new ones', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Call']);
-    $alice = People::factory()->for($this->team)->create(['name' => 'Alice']);
-    $bob = People::factory()->for($this->team)->create(['name' => 'Bob']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Call']);
+    $alice = People::factory()->for($this->workspace)->create(['name' => 'Alice']);
+    $bob = People::factory()->for($this->workspace)->create(['name' => 'Bob']);
     $task->people()->sync([$alice->getKey()]);
 
     $tool = resolve(UpdateTaskTool::class);
@@ -166,8 +166,8 @@ it('shows what a re-linked set gives up: old linked names next to the new ones',
 });
 
 it('clears a nullable link when null is passed and shows the clearing on the card', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane', 'company_id' => $company->getKey()]);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Jane', 'company_id' => $company->getKey()]);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId($this->convId);
@@ -184,8 +184,8 @@ it('clears a nullable link when null is passed and shows the clearing on the car
 });
 
 it('rejects a record reference from another workspace at proposal time, before any card exists', function (): void {
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane']);
-    $foreignCompany = Company::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Jane']);
+    $foreignCompany = Company::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId($this->convId);
@@ -196,7 +196,7 @@ it('rejects a record reference from another workspace at proposal time, before a
 });
 
 it('refuses a re-proposed update whose values already match the record', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Same']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Same']);
 
     $result = proposeNoteUpdates($this->convId, [['id' => (string) $note->getKey(), 'title' => 'Same']]);
 
@@ -206,9 +206,9 @@ it('refuses a re-proposed update whose values already match the record', functio
 });
 
 it('treats records with identical display labels as different when their ids differ', function (): void {
-    $acmeOne = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $acmeTwo = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $person = People::factory()->for($this->team)->create(['name' => 'Jane', 'company_id' => $acmeOne->getKey()]);
+    $acmeOne = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $acmeTwo = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Jane', 'company_id' => $acmeOne->getKey()]);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId($this->convId);
@@ -228,9 +228,9 @@ it('treats records with identical display labels as different when their ids dif
 });
 
 it('still refuses an update whose raw values already match, and ignores link order', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Call']);
-    $alice = People::factory()->for($this->team)->create(['name' => 'Alice']);
-    $bob = People::factory()->for($this->team)->create(['name' => 'Bob']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Call']);
+    $alice = People::factory()->for($this->workspace)->create(['name' => 'Alice']);
+    $bob = People::factory()->for($this->workspace)->create(['name' => 'Bob']);
     $task->people()->sync([$alice->getKey(), $bob->getKey()]);
 
     $tool = resolve(UpdateTaskTool::class);
@@ -246,8 +246,8 @@ it('still refuses an update whose raw values already match, and ignores link ord
 });
 
 it('skips a no-op record and proposes the rest', function (): void {
-    $keep = Company::factory()->for($this->team)->create(['name' => 'Unchanged']);
-    $change = Company::factory()->for($this->team)->create(['name' => 'Before']);
+    $keep = Company::factory()->for($this->workspace)->create(['name' => 'Unchanged']);
+    $change = Company::factory()->for($this->workspace)->create(['name' => 'Before']);
 
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId($this->convId);
@@ -268,8 +268,8 @@ it('skips a no-op record and proposes the rest', function (): void {
 });
 
 it('errors and proposes nothing when every record in the batch is a no-op', function (): void {
-    $first = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $second = Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    $first = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $second = Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
 
     $tool = resolve(UpdateCompanyTool::class);
     $tool->setConversationId($this->convId);

@@ -126,7 +126,7 @@ trait HasPeriodComparison
      * non-deleted row, applied across every entity table and unioned.
      *
      * $column selects the grain (e.g. `creator_id` for active users,
-     * `team_id` for active teams); it is only ever a trusted internal literal,
+     * `workspace_id` for active workspaces); it is only ever a trusted internal literal,
      * never user input, so it is safe to interpolate into the identifier
      * position.
      *

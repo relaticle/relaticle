@@ -28,10 +28,10 @@ it('flags relation access on the authorized record', function (): void {
     $expectedMessage = 'Policy resolves the `%s` relation on %s: authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row.';
 
     $this->analyse([__DIR__.'/data/relation-access-in-policy.php'], [
-        [sprintf($expectedMessage, 'team', 'Company'), 15],
+        [sprintf($expectedMessage, 'workspace', 'Company'), 15],
         [sprintf($expectedMessage, 'creator', 'Task'), 20],
-        [sprintf($expectedMessage, 'team', 'Task'), 25],
-        [sprintf($expectedMessage, 'team', 'Task'), 30],
+        [sprintf($expectedMessage, 'workspace', 'Task'), 25],
+        [sprintf($expectedMessage, 'workspace', 'Task'), 30],
     ]);
 });
 

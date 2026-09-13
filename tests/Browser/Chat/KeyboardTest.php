@@ -78,16 +78,16 @@ function keyboardTestInsertMessage(string $conversationId, User $user, string $r
 }
 
 it('opens the switcher on Cmd/Ctrl+O, filters as you type, and Enter navigates to the highlighted chat', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Alpha planning thread', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Bravo onboarding notes', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Alpha planning thread', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Bravo onboarding notes', $conversationB);
     keyboardTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
     keyboardTestInsertMessage($conversationB, $user, 'user', 'Bravo seed message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+o');
@@ -104,19 +104,19 @@ it('opens the switcher on Cmd/Ctrl+O, filters as you type, and Enter navigates t
 
     $page->keys(KEYBOARD_TEST_SWITCHER.' input[type="search"]', 'Enter');
 
-    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationB}")
+    $page->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}")
         ->assertSourceHas('Bravo seed message');
     $page->assertMissing(KEYBOARD_TEST_SWITCHER);
 });
 
 it('closes the switcher on Esc without navigating', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Alpha planning thread', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Alpha planning thread', $conversationA);
     keyboardTestInsertMessage($conversationA, $user, 'user', 'Alpha seed message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('Alpha seed message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+o');
@@ -125,18 +125,18 @@ it('closes the switcher on Esc without navigating', function (): void {
     $page->keys(KEYBOARD_TEST_SWITCHER.' input[type="search"]', 'Escape');
 
     $page->assertMissing(KEYBOARD_TEST_SWITCHER);
-    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationA}");
+    $page->assertPathIs("/app/{$workspace->slug}/chats/{$conversationA}");
 });
 
 it('enters edit mode on the last user message when ArrowUp is pressed in an empty composer', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Arrow up chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Arrow up chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'my original message');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'an assistant reply');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('my original message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'ArrowUp');
@@ -146,13 +146,13 @@ it('enters edit mode on the last user message when ArrowUp is pressed in an empt
 });
 
 it('does not enter edit mode when the composer has unsent text', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Arrow up guarded chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Arrow up guarded chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'my original message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('my original message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->type(KEYBOARD_TEST_EDITOR, 'a draft in progress');
@@ -170,15 +170,15 @@ it('does not enter edit mode when the composer has unsent text', function (): vo
  * from the keydown scope to the load-until-found loop fails it.
  */
 it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit below the first page', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Deep history chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Deep history chat', $conversationId);
 
     // 110 messages puts the target two full pages below the newest 50.
     keyboardTestSeedFiller($conversationId, $user, 'ks', 110, 'the Northwind renewal');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('filler line 110');
 
     $page->assertMissing('[data-message-id="ks-0002"]');
@@ -226,15 +226,15 @@ it('opens search on Cmd/Ctrl+F and pages back through history to reach a hit bel
  * given every chance to land mid-walk rather than after it.
  */
 it('cancels an in-flight search jump on Esc and stops the walk', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Very deep history chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Very deep history chat', $conversationId);
 
     $total = 300;
     keyboardTestSeedFiller($conversationId, $user, 'kc', $total, 'the zylophonic migration record');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas("filler line {$total}");
 
     $page->assertMissing('[data-message-id="kc-0002"]');
@@ -295,15 +295,15 @@ it('cancels an in-flight search jump on Esc and stops the walk', function (): vo
  * as a real untargeted keypress would land.
  */
 it('reaches Escape from the real post-Enter focus, not just a targeted keypress', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Untargeted escape chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Untargeted escape chat', $conversationId);
 
     $total = 300;
     keyboardTestSeedFiller($conversationId, $user, 'ke', $total, 'the flibbertigibbet quarterly digest');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas("filler line {$total}");
 
     $page->assertMissing('[data-message-id="ke-0002"]');
@@ -365,13 +365,13 @@ it('reaches Escape from the real post-Enter focus, not just a targeted keypress'
 });
 
 it('closes search on Esc without loading any history', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Escape search chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Escape search chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'the only message');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('the only message');
 
     $page->click(KEYBOARD_TEST_EDITOR)->keys(KEYBOARD_TEST_EDITOR, 'Control+f');
@@ -380,7 +380,7 @@ it('closes search on Esc without loading any history', function (): void {
     $page->keys(KEYBOARD_TEST_MESSAGE_SEARCH.' input[type="search"]', 'Escape');
 
     $page->assertMissing(KEYBOARD_TEST_MESSAGE_SEARCH);
-    $page->assertPathIs("/app/{$team->slug}/chats/{$conversationId}");
+    $page->assertPathIs("/app/{$workspace->slug}/chats/{$conversationId}");
 });
 
 /**
@@ -389,14 +389,14 @@ it('closes search on Esc without loading any history', function (): void {
  * thumbs-up has no detail to lose and must never prompt.
  */
 it('confirms before deleting a thumbs-down rating that has a saved category, and does nothing on cancel', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Feedback chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Feedback chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'a question');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'an unhelpful answer');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('an unhelpful answer');
 
     $page->click('button[aria-label="Bad response"]');
@@ -416,14 +416,14 @@ it('confirms before deleting a thumbs-down rating that has a saved category, and
 });
 
 it('does not ask for confirmation when toggling off a thumbs-up rating', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'Thumbs up chat', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'Thumbs up chat', $conversationId);
     keyboardTestInsertMessage($conversationId, $user, 'user', 'a question');
     keyboardTestInsertMessage($conversationId, $user, 'assistant', 'a helpful answer');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('a helpful answer');
 
     // Records every window.confirm() call instead of throwing on any call: Pest

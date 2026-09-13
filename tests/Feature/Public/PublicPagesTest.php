@@ -116,8 +116,8 @@ describe('Legal pages', function () {
         $response->assertSee('MCP write tools can change CRM records.');
         $response->assertSee('Task assignment operations can send transactional notifications.');
         $response->assertSee('User names, email addresses, and identifiers.');
-        $response->assertSee('Team names and identifiers.');
-        $response->assertSee('Team-member names, emails, and identifiers.');
+        $response->assertSee('Workspace names and identifiers.');
+        $response->assertSee('Workspace-member names, emails, and identifiers.');
         $response->assertSee('Token ability names.');
         $response->assertSee('Companies, people, opportunities, tasks, and notes.');
         $response->assertSee('Record identifiers and canonical record URLs.');
@@ -720,7 +720,7 @@ describe('Blog pages', function () {
         // used to throw RouteNotFoundException and 500 the page for any logged-in user.
         $post = Post::factory()->create();
 
-        $this->actingAs(User::factory()->withPersonalTeam()->create())
+        $this->actingAs(User::factory()->withPersonalWorkspace()->create())
             ->get(URL::temporarySignedRoute('blog.preview', now()->addHour(), ['post' => $post]))
             ->assertStatus(200)
             ->assertSee($post->title);

@@ -21,17 +21,17 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(UpdateCustomFieldTool::class, UpdateCustomField::class);
 
 beforeEach(function (): void {
-    $this->owner = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->owner->currentTeam;
+    $this->owner = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->owner->currentWorkspace;
 
     Auth::guard('web')->setUser($this->owner);
     $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-    TenantContextService::setTenantId($this->team->getKey());
+    Filament::setTenant($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $this->field = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Industry',
         'type' => 'text',
@@ -44,7 +44,7 @@ beforeEach(function (): void {
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->owner->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -95,8 +95,8 @@ it('proposes renaming a custom field and updates name on approval', function ():
 
 it('returns error and creates no proposal for non-owner', function (): void {
     $nonOwner = User::factory()->create();
-    $nonOwner->teams()->attach($this->team, ['role' => 'editor']);
-    $nonOwner->switchTeam($this->team);
+    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
+    $nonOwner->switchWorkspace($this->workspace);
 
     Auth::guard('web')->setUser($nonOwner);
     $this->actingAs($nonOwner);
@@ -117,7 +117,7 @@ it('returns error and creates no proposal for non-owner', function (): void {
 it('returns error when trying to update a system_defined field', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $systemField = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'System Field',
         'type' => 'text',
@@ -141,7 +141,7 @@ it('returns error when trying to update a system_defined field', function (): vo
 it('refuses to propose reactivating a system-defined field', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $priorityField = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'task',
         'name' => 'Priority',
         'type' => 'select',
@@ -163,7 +163,7 @@ it('refuses to propose reactivating a system-defined field', function (): void {
 it('rejects renaming to a name that already exists on the entity at proposal time', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Sector',
         'code' => 'sector',
@@ -207,7 +207,7 @@ it('rejects approval when the new name was taken after the proposal', function (
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Sector',
         'code' => 'sector',
@@ -253,7 +253,7 @@ it('proposes toggling active status and applies it on approval', function (): vo
     $service = resolve(PendingActionService::class);
     $service->approve($pending, $this->owner);
 
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
     $refreshed = CustomField::query()
         ->withoutGlobalScope(CustomFieldsActivableScope::class)
         ->find($this->field->getKey());
@@ -263,7 +263,7 @@ it('proposes toggling active status and applies it on approval', function (): vo
 
 it('batches several field definitions into one per-item proposal', function (): void {
     $second = CustomField::factory()->create([
-        config('custom-fields.database.column_names.tenant_foreign_key') => $this->team->getKey(), 'entity_type' => 'company', 'name' => 'Region', 'code' => 'region', 'type' => 'text', 'active' => true,
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(), 'entity_type' => 'company', 'name' => 'Region', 'code' => 'region', 'type' => 'text', 'active' => true,
     ]);
 
     $tool = makeUpdateFieldTool($this->convId);

@@ -35,7 +35,7 @@ final readonly class ChatContextService
      * Livewire XHRs, where request()->route() is Livewire's own update
      * endpoint and never the record page the user is looking at.
      *
-     * The URL is client-supplied, so the resolved record is team-scoped and
+     * The URL is client-supplied, so the resolved record is workspace-scoped and
      * policy-checked here. The send path re-validates independently.
      *
      * @return array{record_type: string|null, record_id: string|null, record_name: string|null}
@@ -51,7 +51,7 @@ final readonly class ChatContextService
         /** @var User|null $user */
         $user = auth()->user();
 
-        if (! $user instanceof User || $user->currentTeam === null) {
+        if (! $user instanceof User || $user->currentWorkspace === null) {
             return $context;
         }
 
@@ -86,7 +86,7 @@ final readonly class ChatContextService
             $modelClass = $info['class'];
 
             $model = $modelClass::query()
-                ->whereBelongsTo($user->currentTeam)
+                ->whereBelongsTo($user->currentWorkspace)
                 ->whereKey($recordId)
                 ->first();
 

@@ -17,31 +17,31 @@ beforeEach(function (): void {
     Mail::fake();
 });
 
-function digestCmdSetDue(Task $task, string $teamId, DateTimeInterface $dueAt): void
+function digestCmdSetDue(Task $task, string $workspaceId, DateTimeInterface $dueAt): void
 {
-    $field = DB::table('custom_fields')->where('tenant_id', $teamId)
+    $field = DB::table('custom_fields')->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')->where('code', 'due_date')->first();
     DB::table('custom_field_values')->insert([
         'id' => (string) Str::ulid(),
         'entity_type' => 'task',
         'entity_id' => $task->id,
         'custom_field_id' => trim((string) $field->id),
-        'tenant_id' => $teamId,
+        'tenant_id' => $workspaceId,
         'datetime_value' => $dueAt->format('Y-m-d H:i:s'),
     ]);
 }
 
 function userWithDueTask(string $timezone, bool $digestEmail = true): User
 {
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => $timezone]);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => $timezone]);
 
     if (! $digestEmail) {
         $user->update(['notification_preferences' => ['task_digest' => ['email' => false]]]);
     }
 
-    $task = Task::factory()->for($user->currentTeam)->create(['title' => 'Due task']);
+    $task = Task::factory()->for($user->currentWorkspace)->create(['title' => 'Due task']);
     $task->assignees()->attach($user);
-    digestCmdSetDue($task, $user->currentTeam->id, now()->subDay());
+    digestCmdSetDue($task, $user->currentWorkspace->id, now()->subDay());
 
     return $user;
 }
@@ -78,7 +78,7 @@ it('filters recipients by timezone so only users at their local 08:00 are queued
 
 it('suppresses the digest when the user has no due tasks', function (): void {
     $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
-    User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 

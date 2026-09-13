@@ -9,7 +9,7 @@
         "saas",
         "customer-relationship-management",
         "sales-pipeline",
-        "team-collaboration"
+        "workspace-collaboration"
     ],
     "license": "AGPL-3.0",
     "require": {

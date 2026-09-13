@@ -15,7 +15,7 @@ beforeEach(function (): void {
 });
 
 it('renders markdown into html for a rich editor field', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['description' => 'Hello']);
@@ -25,10 +25,10 @@ it('renders markdown into html for a rich editor field', function (): void {
 });
 
 it('translates single-choice labels into option IDs', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $statusField = CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
@@ -43,8 +43,8 @@ it('translates single-choice labels into option IDs', function (): void {
 });
 
 it('translates multi-choice labels into an array of option IDs', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
 
     $field = CustomField::query()
         ->create([
@@ -52,12 +52,12 @@ it('translates multi-choice labels into an array of option IDs', function (): vo
             'name' => 'Test Multi',
             'type' => 'multi-select',
             'entity_type' => 'task',
-            'tenant_id' => $teamId,
+            'tenant_id' => $workspaceId,
             'active' => true,
             'system_defined' => false,
         ]);
-    $optA = $field->options()->create(['name' => 'Alpha', 'tenant_id' => $teamId, 'sort_order' => 1]);
-    $optB = $field->options()->create(['name' => 'Beta', 'tenant_id' => $teamId, 'sort_order' => 2]);
+    $optA = $field->options()->create(['name' => 'Alpha', 'tenant_id' => $workspaceId, 'sort_order' => 1]);
+    $optB = $field->options()->create(['name' => 'Beta', 'tenant_id' => $workspaceId, 'sort_order' => 2]);
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['test_multi' => ['Alpha', 'Beta']]);
@@ -68,7 +68,7 @@ it('translates multi-choice labels into an array of option IDs', function (): vo
 });
 
 it('returns a descriptive error for an unknown field code', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['does_not_exist' => 'value']);
@@ -78,10 +78,10 @@ it('returns a descriptive error for an unknown field code', function (): void {
 });
 
 it('rejects a write naming a deactivated custom field code', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'priority')
         ->update(['active' => false]);
@@ -95,7 +95,7 @@ it('rejects a write naming a deactivated custom field code', function (): void {
 });
 
 it('returns a descriptive error for an unknown single-choice label', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['status' => 'Bananas']);
@@ -107,7 +107,7 @@ it('returns a descriptive error for an unknown single-choice label', function ()
 });
 
 it('returns an empty clean payload when input is null or empty array', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $validator = resolve(CustomFieldsRequestValidator::class);
 
     expect($validator->validate($user, 'task', null)->cleanFields)->toBe([])
@@ -115,10 +115,10 @@ it('returns an empty clean payload when input is null or empty array', function 
 });
 
 it('enforces required custom fields on create but not on update', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->update(['validation_rules' => json_encode(['required' => true])]);
@@ -133,7 +133,7 @@ it('enforces required custom fields on create but not on update', function (): v
 });
 
 it('passes null through for a single-choice field so the value can be cleared', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['priority' => null]);
@@ -143,7 +143,7 @@ it('passes null through for a single-choice field so the value can be cleared', 
 });
 
 it('clears a single-choice field sent a blank string', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $result = resolve(CustomFieldsRequestValidator::class)
         ->validate($user, 'task', ['priority' => '']);
@@ -153,10 +153,10 @@ it('clears a single-choice field sent a blank string', function (): void {
 });
 
 it('passes null through for a multi-choice field so the value can be cleared', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $multi = CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'company')
         ->whereIn('type', ['multi-select', 'tags-input'])
         ->first();
@@ -175,10 +175,10 @@ it('passes null through for a multi-choice field so the value can be cleared', f
 });
 
 it('rejects clearing a required choice field with a truthful validation error', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'priority')
         ->firstOrFail()
@@ -191,11 +191,11 @@ it('rejects clearing a required choice field with a truthful validation error', 
 });
 
 it('names the field code in a rule validation error, not only the field label', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $foreign = Company::factory()->for(User::factory()->withPersonalTeam()->create()->currentTeam)->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Company::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
 
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'entity_type' => 'task',
         'name' => 'Links',
         'code' => 'links',
@@ -205,7 +205,7 @@ it('names the field code in a rule validation error, not only the field label', 
     ]);
 
     $field = CustomField::query()->create([
-        'tenant_id' => $user->currentTeam->getKey(),
+        'tenant_id' => $user->currentWorkspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => 'task',
         'code' => 'linked_company',

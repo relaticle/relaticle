@@ -7,8 +7,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -20,43 +20,43 @@ use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\ListNotes;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\ListPeople;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\ListTasks;
-use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
-use Relaticle\SystemAdmin\Filament\Resources\TeamResource\Pages\ListTeams;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\ListWorkspaces;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(User::class, Team::class, Company::class, People::class, Task::class, Note::class, Opportunity::class);
+mutates(User::class, Workspace::class, Company::class, People::class, Task::class, Note::class, Opportunity::class);
 
 beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
 
-    $this->teamOwner = User::factory()->withTeam()->create();
-    $this->team = $this->teamOwner->currentTeam;
+    $this->workspaceOwner = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->workspaceOwner->currentWorkspace;
 });
 
 it('can render the users list page', function () {
-    $users = User::factory(3)->withTeam()->create();
+    $users = User::factory(3)->withWorkspace()->create();
 
     livewire(ListUsers::class)
         ->assertOk()
         ->assertCanSeeTableRecords($users);
 });
 
-it('can render the teams list page', function () {
-    $teams = Team::factory(3)->create();
+it('can render the workspaces list page', function () {
+    $workspaces = Workspace::factory(3)->create();
 
-    livewire(ListTeams::class)
+    livewire(ListWorkspaces::class)
         ->assertOk()
-        ->assertCanSeeTableRecords($teams);
+        ->assertCanSeeTableRecords($workspaces);
 });
 
 it('can render the companies list page', function () {
     $companies = Company::withoutEvents(fn () => Company::factory(3)
-        ->for($this->team)
-        ->create(['creator_id' => $this->teamOwner->id]));
+        ->for($this->workspace)
+        ->create(['creator_id' => $this->workspaceOwner->id]));
 
     livewire(ListCompanies::class)
         ->assertOk()
@@ -65,7 +65,7 @@ it('can render the companies list page', function () {
 
 it('can render the people list page', function () {
     $people = People::withoutEvents(fn () => People::factory(3)
-        ->for($this->team)
+        ->for($this->workspace)
         ->create());
 
     livewire(ListPeople::class)
@@ -75,8 +75,8 @@ it('can render the people list page', function () {
 
 it('can render the tasks list page', function () {
     $tasks = Task::withoutEvents(fn () => Task::factory(3)
-        ->for($this->team)
-        ->create(['creator_id' => $this->teamOwner->id]));
+        ->for($this->workspace)
+        ->create(['creator_id' => $this->workspaceOwner->id]));
 
     livewire(ListTasks::class)
         ->assertOk()
@@ -85,7 +85,7 @@ it('can render the tasks list page', function () {
 
 it('can render the notes list page', function () {
     $notes = Note::withoutEvents(fn () => Note::factory(3)
-        ->for($this->team)
+        ->for($this->workspace)
         ->create());
 
     livewire(ListNotes::class)
@@ -95,7 +95,7 @@ it('can render the notes list page', function () {
 
 it('can render the opportunities list page', function () {
     $opportunities = Opportunity::withoutEvents(fn () => Opportunity::factory(3)
-        ->for($this->team)
+        ->for($this->workspace)
         ->create());
 
     livewire(ListOpportunities::class)
@@ -105,8 +105,8 @@ it('can render the opportunities list page', function () {
 
 it('can render the imports list page', function () {
     $imports = collect(range(1, 3))->map(fn () => Import::factory()->create([
-        'team_id' => $this->team->id,
-        'user_id' => $this->teamOwner->id,
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->workspaceOwner->id,
         'entity_type' => ImportEntityType::Company,
         'file_name' => 'test.csv',
         'status' => ImportStatus::Completed,
@@ -135,8 +135,8 @@ it('has trashed filter on soft-deletable resources', function (string $listPageC
 
 it('can open the view page of a soft deleted company', function () {
     $company = Company::withoutEvents(fn (): Company => Company::factory()
-        ->for($this->team)
-        ->create(['creator_id' => $this->teamOwner->id]));
+        ->for($this->workspace)
+        ->create(['creator_id' => $this->workspaceOwner->id]));
 
     $company->delete();
 
@@ -146,21 +146,21 @@ it('can open the view page of a soft deleted company', function () {
 
 it('links relation columns to the related record', function () {
     Company::withoutEvents(fn (): Company => Company::factory()
-        ->for($this->team)
-        ->create(['creator_id' => $this->teamOwner->id]));
+        ->for($this->workspace)
+        ->create(['creator_id' => $this->workspaceOwner->id]));
 
     livewire(ListCompanies::class)
         ->assertOk()
-        ->assertSee(TeamResource::getUrl('view', ['record' => $this->team->id]), escape: false)
-        ->assertSee(UserResource::getUrl('view', ['record' => $this->teamOwner->id]), escape: false);
+        ->assertSee(WorkspaceResource::getUrl('view', ['record' => $this->workspace->id]), escape: false)
+        ->assertSee(UserResource::getUrl('view', ['record' => $this->workspaceOwner->id]), escape: false);
 });
 
 it('does not link a relation column when the related record is missing', function () {
     Company::withoutEvents(fn (): Company => Company::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create(['creator_id' => null]));
 
     livewire(ListCompanies::class)
         ->assertOk()
-        ->assertDontSee(UserResource::getUrl('view', ['record' => $this->teamOwner->id]), escape: false);
+        ->assertDontSee(UserResource::getUrl('view', ['record' => $this->workspaceOwner->id]), escape: false);
 });

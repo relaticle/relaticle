@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
-use App\Enums\TeamRole;
+use App\Enums\WorkspaceRole;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -24,8 +24,8 @@ it('can render the funnel widget', function (): void {
         ->assertOk();
 });
 
-it('counts an organic team owner as a sign-up', function (): void {
-    User::factory()->withTeam()->create([
+it('counts an organic workspace owner as a sign-up', function (): void {
+    User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(5),
     ]);
 
@@ -34,8 +34,8 @@ it('counts an organic team owner as a sign-up', function (): void {
         ->assertSee('1');
 });
 
-it('excludes an invited member attached to another team within 24h of registering', function (): void {
-    $owner = User::factory()->withTeam()->create([
+it('excludes an invited member attached to another workspace within 24h of registering', function (): void {
+    $owner = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(10),
     ]);
 
@@ -43,10 +43,10 @@ it('excludes an invited member attached to another team within 24h of registerin
         'created_at' => now()->subDays(5),
     ]);
 
-    DB::table('team_user')->insert([
-        'team_id' => $owner->currentTeam->id,
+    DB::table('workspace_user')->insert([
+        'workspace_id' => $owner->currentWorkspace->id,
         'user_id' => $invited->id,
-        'role' => TeamRole::Editor->value,
+        'role' => WorkspaceRole::Editor->value,
         'created_at' => $invited->created_at->addMinutes(3),
         'updated_at' => $invited->created_at->addMinutes(3),
     ]);
@@ -56,8 +56,8 @@ it('excludes an invited member attached to another team within 24h of registerin
         ->assertSee('1');
 });
 
-it('still counts a user joining another team long after registering as organic', function (): void {
-    $owner = User::factory()->withTeam()->create([
+it('still counts a user joining another workspace long after registering as organic', function (): void {
+    $owner = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(10),
     ]);
 
@@ -65,10 +65,10 @@ it('still counts a user joining another team long after registering as organic',
         'created_at' => now()->subDays(5),
     ]);
 
-    DB::table('team_user')->insert([
-        'team_id' => $owner->currentTeam->id,
+    DB::table('workspace_user')->insert([
+        'workspace_id' => $owner->currentWorkspace->id,
         'user_id' => $laterJoiner->id,
-        'role' => TeamRole::Editor->value,
+        'role' => WorkspaceRole::Editor->value,
         'created_at' => $laterJoiner->created_at->addDays(2),
         'updated_at' => $laterJoiner->created_at->addDays(2),
     ]);
@@ -78,14 +78,14 @@ it('still counts a user joining another team long after registering as organic',
         ->assertSee('2');
 });
 
-it('counts a team as activated once a non-system record is created within the period', function (): void {
-    $owner = User::factory()->withTeam()->create([
+it('counts a workspace as activated once a non-system record is created within the period', function (): void {
+    $owner = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(10),
     ]);
-    $team = $owner->currentTeam;
+    $workspace = $owner->currentWorkspace;
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($team)
+        ->for($workspace)
         ->create([
             'creator_id' => $owner->id,
             'creation_source' => CreationSource::WEB,
@@ -93,18 +93,18 @@ it('counts a team as activated once a non-system record is created within the pe
         ]));
 
     livewire(FunnelWidget::class)
-        ->assertSee('Activated Teams')
+        ->assertSee('Activated Workspaces')
         ->assertSee('1');
 });
 
-it('excludes system-created records from the activated teams count', function (): void {
-    $owner = User::factory()->withTeam()->create([
+it('excludes system-created records from the activated workspaces count', function (): void {
+    $owner = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(10),
     ]);
-    $team = $owner->currentTeam;
+    $workspace = $owner->currentWorkspace;
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($team)
+        ->for($workspace)
         ->create([
             'creator_id' => $owner->id,
             'creation_source' => CreationSource::SYSTEM,
@@ -112,15 +112,15 @@ it('excludes system-created records from the activated teams count', function ()
         ]));
 
     livewire(FunnelWidget::class)
-        ->assertSee('Activated Teams')
+        ->assertSee('Activated Workspaces')
         ->assertSee('0');
 });
 
-it('counts a team as subscribed once it holds an active subscription created within the period', function (): void {
-    $owner = User::factory()->withTeam()->create();
-    $team = $owner->currentTeam;
+it('counts a workspace as subscribed once it holds an active subscription created within the period', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
-    $team->subscriptions()->create([
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_funnel_active',
         'stripe_status' => 'active',
@@ -130,15 +130,15 @@ it('counts a team as subscribed once it holds an active subscription created wit
     ]);
 
     livewire(FunnelWidget::class)
-        ->assertSee('Subscribed Teams')
+        ->assertSee('Subscribed Workspaces')
         ->assertSee('1');
 });
 
-it('excludes an unpaid subscription from the subscribed teams count', function (): void {
-    $owner = User::factory()->withTeam()->create();
-    $team = $owner->currentTeam;
+it('excludes an unpaid subscription from the subscribed workspaces count', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
-    $team->subscriptions()->create([
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_funnel_unpaid',
         'stripe_status' => 'unpaid',
@@ -148,21 +148,21 @@ it('excludes an unpaid subscription from the subscribed teams count', function (
     ]);
 
     livewire(FunnelWidget::class)
-        ->assertSee('Subscribed Teams')
+        ->assertSee('Subscribed Workspaces')
         ->assertSee('0');
 });
 
 it('shows stage conversion rates when the denominators are non-zero', function (): void {
-    $activatedOwner = User::factory()->withTeam()->create([
+    $activatedOwner = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(10),
     ]);
 
-    User::factory()->withTeam()->create([
+    User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(8),
     ]);
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($activatedOwner->currentTeam)
+        ->for($activatedOwner->currentWorkspace)
         ->create([
             'creator_id' => $activatedOwner->id,
             'account_owner_id' => $activatedOwner->id,
@@ -170,7 +170,7 @@ it('shows stage conversion rates when the denominators are non-zero', function (
             'created_at' => now()->subDays(4),
         ]));
 
-    $activatedOwner->currentTeam->subscriptions()->create([
+    $activatedOwner->currentWorkspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_funnel_rates',
         'stripe_status' => 'active',

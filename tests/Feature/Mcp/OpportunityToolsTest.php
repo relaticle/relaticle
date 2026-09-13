@@ -11,13 +11,13 @@ use App\Mcp\Tools\Opportunity\UpdateOpportunityTool;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\TeamScope;
-use App\Models\Team;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Models\Workspace;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 afterEach(function () {
@@ -25,7 +25,7 @@ afterEach(function () {
 });
 
 it('can get an opportunity by ID', function (): void {
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Big Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Big Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetOpportunityTool::class, ['id' => $opportunity->id])
@@ -34,7 +34,7 @@ it('can get an opportunity by ID', function (): void {
 });
 
 it('can update an opportunity via MCP tool', function (): void {
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateOpportunityTool::class, [
@@ -48,7 +48,7 @@ it('can update an opportunity via MCP tool', function (): void {
 });
 
 it('can delete an opportunity via MCP tool', function (): void {
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Closing Deal']);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Closing Deal']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteOpportunityTool::class, [
@@ -61,11 +61,11 @@ it('can delete an opportunity via MCP tool', function (): void {
 });
 
 it('can filter opportunities by contact_id', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
-    $matchingOpp = Opportunity::factory()->recycle([$this->user, $this->team])->create([
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $matchingOpp = Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
         'contact_id' => $person->id,
     ]);
-    $otherOpp = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $otherOpp = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
@@ -76,28 +76,28 @@ it('can filter opportunities by contact_id', function (): void {
         ->assertDontSee($otherOpp->name);
 });
 
-describe('team scoping', function () {
+describe('workspace scoping', function () {
     beforeEach(function () {
-        Opportunity::addGlobalScope(new TeamScope);
+        Opportunity::addGlobalScope(new WorkspaceScope);
     });
 
-    it('scopes opportunities to current team', function (): void {
+    it('scopes opportunities to current workspace', function (): void {
         $otherOpportunity = Opportunity::withoutEvents(fn () => Opportunity::factory()->create([
-            'team_id' => Team::factory()->create()->id,
-            'name' => 'Other Team Deal',
+            'workspace_id' => Workspace::factory()->create()->id,
+            'name' => 'Other Workspace Deal',
         ]));
-        $ownOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Deal']);
+        $ownOpportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Workspace Deal']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListOpportunitiesTool::class)
             ->assertOk()
-            ->assertSee('Own Team Deal')
-            ->assertDontSee('Other Team Deal');
+            ->assertSee('Own Workspace Deal')
+            ->assertDontSee('Other Workspace Deal');
     });
 
-    it('cannot update an opportunity from another team', function (): void {
+    it('cannot update an opportunity from another workspace', function (): void {
         $otherOpportunity = Opportunity::withoutEvents(fn () => Opportunity::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -108,9 +108,9 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot delete an opportunity from another team', function (): void {
+    it('cannot delete an opportunity from another workspace', function (): void {
         $otherOpportunity = Opportunity::withoutEvents(fn () => Opportunity::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -120,9 +120,9 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot get an opportunity from another team', function (): void {
+    it('cannot get an opportunity from another workspace', function (): void {
         $otherOpportunity = Opportunity::withoutEvents(fn () => Opportunity::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -132,10 +132,10 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('rejects company_id from another team when creating opportunity', function (): void {
-        $otherTeam = Team::factory()->create();
+    it('rejects company_id from another workspace when creating opportunity', function (): void {
+        $otherWorkspace = Workspace::factory()->create();
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -150,10 +150,10 @@ describe('team scoping', function () {
 describe('stale filtering', function () {
     it('filters opportunities by stale_days', function (): void {
         $this->travelTo(now()->subDays(40));
-        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Stale Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Stale Deal']);
 
         $this->travelBack();
-        Opportunity::factory()->recycle([$this->user, $this->team])->create(['name' => 'Active Deal']);
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Active Deal']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListOpportunitiesTool::class, ['stale_days' => 30])

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Forms;
 
 use App\Filament\Components\Forms\RecordSelect;
-use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -43,7 +43,7 @@ final class TaskForm
                 ->nullable();
         }
 
-        $components[] = TeamMemberSelect::make('assignees')
+        $components[] = WorkspaceMemberSelect::make('assignees')
             ->label(__('filament/resources/task.fields.assignees.label'))
             ->multiple()
             ->relationship('assignees', 'name')

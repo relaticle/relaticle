@@ -35,7 +35,7 @@ function seedChatConversation(User $user): string
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'T',
         'created_at' => now(),
         'updated_at' => now(),
@@ -50,7 +50,7 @@ beforeEach(function (): void {
 });
 
 test('sending the first chat message dispatches a profile sync', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = seedChatConversation($user);
@@ -61,7 +61,7 @@ test('sending the first chat message dispatches a profile sync', function (): vo
 });
 
 test('a second chat message does not dispatch a sync again', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = seedChatConversation($user);
@@ -76,7 +76,7 @@ test('a second chat message does not dispatch a sync again', function (): void {
 });
 
 test('a first message in a second conversation does not dispatch a sync again', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     storeChatUserMessage($user, seedChatConversation($user), 'first');
@@ -91,7 +91,7 @@ test('a first message in a second conversation does not dispatch a sync again', 
 test('sending a chat message when subscriber sync is disabled does not dispatch', function (): void {
     config()->set('mailcoach-sdk.enabled_subscribers_sync', false);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     storeChatUserMessage($user, seedChatConversation($user), 'hello');
@@ -100,7 +100,7 @@ test('sending a chat message when subscriber sync is disabled does not dispatch'
 });
 
 test('an assistant reply is not counted as the user having used chat', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = seedChatConversation($user);

@@ -18,11 +18,11 @@ mutates(SupportMenu::class);
 
 function visitDashboard(): TestResponse
 {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     test()->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
-    return test()->get(Dashboard::getUrl(tenant: $user->personalTeam()));
+    return test()->get(Dashboard::getUrl(tenant: $user->personalWorkspace()));
 }
 
 it('renders the help menu items for the configured support forms', function (): void {
@@ -97,24 +97,24 @@ it('hides a help menu item whose form url is not configured', function (): void 
         ->assertDontSee('Suggest a feature');
 });
 
-it('prefills the signed-in user and team context into the form url', function (): void {
+it('prefills the signed-in user and workspace context into the form url', function (): void {
     config(['support.forms.contact' => 'https://form.maxforms.com/relcontact']);
 
-    $user = User::factory()->withPersonalTeam()->create([
+    $user = User::factory()->withPersonalWorkspace()->create([
         'email' => 'jordan@example.com',
     ]);
     $this->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
     $url = resolve(SupportForms::class)->publicUrl(SupportFormType::Contact, [
         'user_email' => (string) $user->email,
-        'workspace_id' => (string) $user->personalTeam()->getKey(),
+        'workspace_id' => (string) $user->personalWorkspace()->getKey(),
     ]);
 
     expect($url)
         ->toContain('https://form.maxforms.com/relcontact?')
         ->toContain('user_email='.urlencode('jordan@example.com'))
-        ->toContain('workspace_id='.$user->personalTeam()->getKey());
+        ->toContain('workspace_id='.$user->personalWorkspace()->getKey());
 });
 
 it('returns null for an unconfigured support form so the item is hidden', function (): void {

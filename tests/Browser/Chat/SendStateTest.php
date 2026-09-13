@@ -15,7 +15,7 @@ mutates(ChatInterface::class);
 
 /**
  * Laravel 13's ThrottleRequests middleware hashes named-limiter cache keys by
- * default (`self::$shouldHashKeys` is true), so the literal `'chat-send:'.$team
+ * default (`self::$shouldHashKeys` is true), so the literal `'chat-send:'.$workspace
  * ->getKey()` string a PHP-side RateLimiter::hit() call would write to is NOT
  * the key the middleware actually checks (verified empirically against the real
  * app: only real fetch() calls made THROUGH the browser accumulate against it).
@@ -76,10 +76,10 @@ function chatWarmUpRateLimiter(AwaitableWebpage $page): void
 it('carries the optimistic bubble through sending then sent on a real send', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -123,11 +123,11 @@ it('carries the optimistic bubble through sending then sent on a real send', fun
  * gets a visible notice, and that one has to keep its Resend.
  */
 it('renders no delivery receipt on a sending or sent bubble', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'receipt-free transcript');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'receipt-free transcript');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -220,10 +220,10 @@ function chatTriggerRateLimitedFailure(AwaitableWebpage $page, string $resolveIn
 it('marks an optimistic bubble failed on rate limit, and a real click resend does not duplicate it', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -288,10 +288,10 @@ it('marks an optimistic bubble failed on rate limit, and a real click resend doe
 it('recovers a failed bubble to sent once the rate limit window clears, reusing the same clientKey', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -343,8 +343,8 @@ it('recovers a failed bubble to sent once the rate limit window clears, reusing 
 it('keeps the transcript non-empty when a regenerate resend hits the rate limit (issue #499)', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     // A real regenerate always happens inside an EXISTING conversation, so the
     // resend it triggers goes through /chat/{id} (deliverMessage's non-first-
@@ -352,9 +352,9 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
     // persisted yet, matching the client's still-optimistic turn) makes the
     // repro faithful: without conversationId set, regenerateMessage's resend
     // would take the wrong branch and 429 on conversation creation instead.
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -420,12 +420,12 @@ it('keeps the transcript non-empty when a regenerate resend hits the rate limit 
 it('leaves the transcript untouched when regenerate is triggered while an earlier send is still rate-limited (issue #499)', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     // Same reasoning as the fixture above: regenerate always happens inside
     // an EXISTING conversation.
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
     // A real persisted row for the turn regenerateMessage() targets. Without
     // one, supersedeServerTurns()'s anchor lookup finds nothing to match and
@@ -449,7 +449,7 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
         'updated_at' => now(),
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -517,12 +517,12 @@ it('leaves the transcript untouched when regenerate is triggered while an earlie
 it('leaves the transcript untouched when retryTurn is triggered while an earlier send is still rate-limited (issue #499 sibling)', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -584,10 +584,10 @@ it('leaves the transcript untouched when retryTurn is triggered while an earlier
 it('does not permanently supersede the edited turn when saveEdit is triggered while an earlier send is still rate-limited (issue #499 sibling: saveEdit)', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
     // A real persisted row for the turn being edited. saveEdit() supersedes
     // this row server-side BEFORE splicing local state (unlike retryTurn(),
@@ -612,7 +612,7 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
         'updated_at' => now(),
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -692,15 +692,15 @@ it('does not permanently supersede the edited turn when saveEdit is triggered wh
 it('does not soft-lock the composer when subscribeToConversation throws on a non-first message', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     // A real, already-existing conversation so deliverMessage() takes the
     // non-first-message branch (the one whose channel-subscribe await used to
     // sit outside the try/catch).
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -756,12 +756,12 @@ it('does not soft-lock the composer when subscribeToConversation throws on a non
 it('disables Regenerate/Edit and hides Retry while rate-limited, so the affordances are not dead clicks', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'test');
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'test');
 
-    $page = ChatBrowser::logIn($user, $team->slug)
+    $page = ChatBrowser::logIn($user, $workspace->slug)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

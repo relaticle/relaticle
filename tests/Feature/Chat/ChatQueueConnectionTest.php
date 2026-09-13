@@ -24,11 +24,11 @@ it('rides the chat connection whose retry_after clears the worker timeout', func
 
 it('dispatches the chat turn on the redis-chat connection', function (): void {
     Queue::fake();
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     dispatch(new ProcessChatMessage(
         user: $user,
-        team: $user->currentTeam,
+        workspace: $user->currentWorkspace,
         message: 'hello',
         conversationId: (string) Str::uuid7(),
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],

@@ -18,10 +18,10 @@ use Illuminate\Database\Eloquent\Model;
 mutates(NoteResource::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 it('can render the index page', function (): void {
@@ -53,7 +53,7 @@ it('exposes the expected table columns', function (): void {
 });
 
 it('can sort `:dataset` column', function (string $column): void {
-    $records = Note::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Note::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $sortingKey = data_get($records->first(), $column) instanceof BackedEnum
         ? fn (Model $record) => data_get($record, $column)->value
@@ -67,7 +67,7 @@ it('can sort `:dataset` column', function (string $column): void {
 })->with(['creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
 it('can search `:dataset` column', function (string $column): void {
-    $records = Note::factory(3)->recycle([$this->user, $this->team])->create();
+    $records = Note::factory(3)->recycle([$this->user, $this->workspace])->create();
     $search = data_get($records->first(), $column);
 
     livewire(ManageNotes::class)
@@ -77,8 +77,8 @@ it('can search `:dataset` column', function (string $column): void {
 })->with(['title', 'creator.name']);
 
 it('cannot display trashed records by default', function (): void {
-    $records = Note::factory()->count(4)->recycle([$this->user, $this->team])->create();
-    $trashedRecords = Note::factory()->trashed()->count(6)->recycle([$this->user, $this->team])->create();
+    $records = Note::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
+    $trashedRecords = Note::factory()->trashed()->count(6)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -87,7 +87,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Note::factory(20)->recycle([$this->user, $this->team])->create();
+    $records = Note::factory(20)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records->take(10), inOrder: true)
@@ -96,7 +96,7 @@ it('can paginate records', function (): void {
 });
 
 it('can bulk delete records', function (): void {
-    $records = Note::factory(5)->recycle([$this->user, $this->team])->create();
+    $records = Note::factory(5)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
         ->assertCanSeeTableRecords($records)
@@ -119,12 +119,12 @@ it('can create a note', function (): void {
 
     $this->assertDatabaseHas(Note::class, [
         'title' => 'New Note',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 });
 
 it('can edit a note', function (): void {
-    $record = Note::factory()->recycle([$this->user, $this->team])->create();
+    $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
         ->callAction(TestAction::make('edit')->table($record), data: [
@@ -136,7 +136,7 @@ it('can edit a note', function (): void {
 });
 
 it('can delete a note', function (): void {
-    $record = Note::factory()->recycle([$this->user, $this->team])->create();
+    $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageNotes::class)
         ->callAction(TestAction::make('delete')->table($record));
@@ -157,7 +157,7 @@ it('has `:dataset` filter', function (string $filter): void {
         ->assertTableFilterExists($filter);
 })->with(['creation_source', 'trashed']);
 
-it('sets creator_id and team_id via observer when creating a note', function (): void {
+it('sets creator_id and workspace_id via observer when creating a note', function (): void {
     livewire(ManageNotes::class)
         ->callAction('create', data: [
             'title' => 'Observer Test Note',
@@ -167,23 +167,23 @@ it('sets creator_id and team_id via observer when creating a note', function ():
     $note = Note::query()->where('title', 'Observer Test Note')->first();
 
     expect($note->creator_id)->toBe($this->user->id)
-        ->and($note->team_id)->toBe($this->team->id);
+        ->and($note->workspace_id)->toBe($this->workspace->id);
 });
 
-it('authorizes team member to view and update own team note', function (): void {
-    $record = Note::factory()->recycle([$this->user, $this->team])->create();
+it('authorizes workspace member to view and update own workspace note', function (): void {
+    $record = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
     expect($this->user->can('view', $record))->toBeTrue()
         ->and($this->user->can('update', $record))->toBeTrue()
         ->and($this->user->can('delete', $record))->toBeTrue();
 });
 
-it('denies non-team-member from viewing another team note', function (): void {
-    $otherUser = User::factory()->withTeam()->create();
-    $otherTeam = $otherUser->currentTeam;
+it('denies non-workspace-member from viewing another workspace note', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $otherWorkspace = $otherUser->currentWorkspace;
 
     $this->actingAs($otherUser);
-    $record = Note::factory()->for($otherTeam)->create();
+    $record = Note::factory()->for($otherWorkspace)->create();
     $this->actingAs($this->user);
 
     expect($this->user->can('view', $record))->toBeFalse()

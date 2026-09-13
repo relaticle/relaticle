@@ -32,7 +32,7 @@
 
 # About Relaticle
 
-Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any AI agent -- Claude, GPT, or open-source models -- with 37 tools for CRM operations and analysis. 22 custom field types, REST API, and multi-team isolation.
+Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any AI agent -- Claude, GPT, or open-source models -- with 37 tools for CRM operations and analysis. 22 custom field types, REST API, and multi-workspace isolation.
 
 **Perfect for:** Developer-led teams, AI-forward startups, and SMBs who want AI agent integration without vendor lock-in.
 
@@ -40,7 +40,7 @@ Relaticle is a self-hosted CRM with a production-grade MCP server. Connect any A
 
 - **Agent-Native Infrastructure** - MCP server with 37 tools, REST API with full CRUD, schema access, activity history, and pipeline analysis
 - **Customizable Data Model** - 22 field types including entity relationships, conditional visibility, and per-field encryption. No migrations needed.
-- **Multi-Team Isolation** - 5-layer authorization with team-scoped data and workspaces
+- **Multi-Workspace Isolation** - 5-layer authorization with workspace-scoped data
 - **Modern Tech Stack** - Laravel 13, Filament 5, PHP 8.5, 2,000+ automated tests
 - **Privacy-First** - Self-hosted, AGPL-3.0, your data stays on your server
 

@@ -58,8 +58,8 @@ final class CompanyResource extends Resource
     {
         return $schema
             ->components([
-                Select::make('team_id')
-                    ->relationship('team', 'name')
+                Select::make('workspace_id')
+                    ->relationship('workspace', 'name')
                     ->searchable()
                     ->required(),
                 TextInput::make('name')
@@ -83,12 +83,12 @@ final class CompanyResource extends Resource
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->sortable()
                     ->searchable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('creator.name')
                     ->label('Created by')
                     ->sortable()
@@ -118,8 +118,8 @@ final class CompanyResource extends Resource
             ])
             ->filters([
                 TrashedFilter::make(),
-                SelectFilter::make('team')
-                    ->relationship('team', 'name')
+                SelectFilter::make('workspace')
+                    ->relationship('workspace', 'name')
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('creation_source')

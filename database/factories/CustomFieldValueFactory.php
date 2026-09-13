@@ -7,7 +7,7 @@ namespace Database\Factories;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -25,10 +25,10 @@ final class CustomFieldValueFactory extends Factory
     public function definition(): array
     {
         return [
-            'tenant_id' => Team::factory(),
+            'tenant_id' => Workspace::factory(),
             'entity_type' => 'company',
             'entity_id' => static fn (array $attributes): string => (string) Company::factory()->create([
-                'team_id' => $attributes['tenant_id'],
+                'workspace_id' => $attributes['tenant_id'],
             ])->getKey(),
             'custom_field_id' => static fn (array $attributes): string => (string) CustomField::factory()->create([
                 'tenant_id' => $attributes['tenant_id'],

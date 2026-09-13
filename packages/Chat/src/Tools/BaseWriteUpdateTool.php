@@ -71,7 +71,7 @@ abstract class BaseWriteUpdateTool implements Tool
         $user = auth()->user();
 
         $customFieldsDescription = $user instanceof User
-            ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentTeam, $this->entityType())
+            ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, $this->entityType())
             : 'Custom field values as key-value pairs.';
 
         $label = strtolower($this->entityLabel());
@@ -138,7 +138,7 @@ abstract class BaseWriteUpdateTool implements Tool
             $id = $recordRequest->string('id');
 
             $model = $modelClass::query()
-                ->whereBelongsTo($user->currentTeam)
+                ->whereBelongsTo($user->currentWorkspace)
                 ->whereKey($id)
                 ->first();
 

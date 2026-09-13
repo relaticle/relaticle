@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 
 mutates(UserObserver::class);
 
-function seedChatParticipation(User $participant, string $teamId): string
+function seedChatParticipation(User $participant, string $workspaceId): string
 {
     $conversationId = (string) Str::uuid7();
 
@@ -17,7 +17,7 @@ function seedChatParticipation(User $participant, string $teamId): string
         'id' => $conversationId,
         'participant_type' => $participant->getMorphClass(),
         'participant_id' => (string) $participant->id,
-        'team_id' => $teamId,
+        'workspace_id' => $workspaceId,
         'title' => 'Member conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -44,13 +44,13 @@ function seedChatParticipation(User $participant, string $teamId): string
 }
 
 it('anonymises chat participation on a plain eloquent delete', function (): void {
-    $owner = User::factory()->withTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     $member = User::factory()->create();
-    $team->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'editor']);
 
-    $conversationId = seedChatParticipation($member, (string) $team->id);
+    $conversationId = seedChatParticipation($member, (string) $workspace->id);
 
     $member->delete();
 
@@ -63,14 +63,14 @@ it('anonymises chat participation on a plain eloquent delete', function (): void
 });
 
 it('leaves other participants untouched when a user is deleted', function (): void {
-    $owner = User::factory()->withTeam()->create();
-    $team = $owner->currentTeam;
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
 
     $member = User::factory()->create();
-    $team->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'editor']);
 
-    $survivorConversationId = seedChatParticipation($owner, (string) $team->id);
-    seedChatParticipation($member, (string) $team->id);
+    $survivorConversationId = seedChatParticipation($owner, (string) $workspace->id);
+    seedChatParticipation($member, (string) $workspace->id);
 
     $member->delete();
 

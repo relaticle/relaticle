@@ -11,9 +11,9 @@ use Livewire\Livewire;
 mutates(Appearance::class, AccentColor::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 it('renders every theme mode and accent swatch', function (): void {

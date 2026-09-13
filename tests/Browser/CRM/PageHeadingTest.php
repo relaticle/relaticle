@@ -12,12 +12,12 @@ use App\Models\User;
  * at all until a full navigation.
  */
 it('keeps the page heading in the topbar across a topbar re-render', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies");
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -70,12 +70,12 @@ it('keeps the page heading in the topbar across a topbar re-render', function ()
  * template instead, so there is nothing to go stale.
  */
 it('drops the previous page heading when the next page has none', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies");
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies");
 
     $page->wait(1);
 
@@ -87,9 +87,9 @@ it('drops the previous page heading when the next page has none', function (): v
 
     // The real sidebar link, so this is a wire:navigate and not a full reload:
     // a reload would rebuild the topbar and hide the bug.
-    $page->click('a.fi-sidebar-item-btn[href$="/app/'.$team->slug.'"]');
+    $page->click('a.fi-sidebar-item-btn[href$="/app/'.$workspace->slug.'"]');
     $page->wait(2);
 
-    expect($page->script('window.location.pathname'))->toBe("/app/{$team->slug}")
+    expect($page->script('window.location.pathname'))->toBe("/app/{$workspace->slug}")
         ->and($heading())->toBe('NONE', 'the dashboard inherited the previous page title');
 });

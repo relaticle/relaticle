@@ -8,7 +8,7 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use Relaticle\Chat\Support\ProposalCoreFields;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
@@ -63,7 +63,7 @@ final readonly class ProposalFieldSchemaDescriber
                 'value' => $owner === null ? null : (string) $owner,
                 'options' => array_map(
                     fn (array $member): array => ['id' => $member['id'], 'label' => $member['name']],
-                    TeamMembersContext::for($user),
+                    WorkspaceMembersContext::for($user),
                 ),
                 'required' => false,
             ];
@@ -81,7 +81,7 @@ final readonly class ProposalFieldSchemaDescriber
         $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
 
         $fields = CustomField::query()
-            ->where('tenant_id', $user->currentTeam->getKey())
+            ->where('tenant_id', $user->currentWorkspace->getKey())
             ->where('entity_type', $entityType)
             ->active()
             ->orderBy('code')

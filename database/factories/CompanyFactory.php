@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Company;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Str;
@@ -28,7 +28,7 @@ final class CompanyFactory extends Factory
         return [
             'name' => fake()->company(),
             'account_owner_id' => User::factory(),
-            'team_id' => Team::factory(),
+            'workspace_id' => Workspace::factory(),
         ];
     }
 
@@ -43,7 +43,7 @@ final class CompanyFactory extends Factory
         if (config('scribe.generating')) {
             return $factory->state([
                 'account_owner_id' => (string) Str::ulid(),
-                'team_id' => (string) Str::ulid(),
+                'workspace_id' => (string) Str::ulid(),
             ]);
         }
 

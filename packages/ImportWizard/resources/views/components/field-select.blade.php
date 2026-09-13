@@ -12,7 +12,7 @@
     $dropdownId = "fs-{$column}";
     $isFieldMapping = $selected?->isFieldMapping() ?? false;
     $isEntityLinkMapping = $selected?->isEntityLinkMapping() ?? false;
-    $selectedField = $isFieldMapping ? $fields->get($selected->target) : null;
+    $selectedField = $isFieldMapping ? $fields->getByKey($selected->target) : null;
     $selectedEntityLink = $isEntityLinkMapping ? ($entityLinks[$selected->entityLink] ?? null) : null;
     $selectedMatcher = $selectedEntityLink?->getMatcher($selected->target);
     $hasValue = $selectedField !== null || $selectedEntityLink !== null;

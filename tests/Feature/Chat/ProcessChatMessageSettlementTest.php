@@ -12,30 +12,30 @@ use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\AnthropicSse;
 
 it('refunds the reservation when a job fails without ever streaming', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    AiCreditBalance::query()->where('team_id', $team->getKey())
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-1',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
-    resolve(CreditService::class)->reserveCredit($team); // used 1
+    resolve(CreditService::class)->reserveCredit($workspace); // used 1
 
     $job = new ProcessChatMessage(
-        user: $user, team: $team, message: 'hi', conversationId: 'c-1',
+        user: $user, workspace: $workspace, message: 'hi', conversationId: 'c-1',
         resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'], turnId: '01TURNFAILAAAAAAAAAAAAAAAA',
     );
     $job->failed(new RuntimeException('timeout'));
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     // Nothing streamed, so no provider was ever called and the turn cost nothing.
     expect($balance->credits_used)->toBe(0)
@@ -43,17 +43,17 @@ it('refunds the reservation when a job fails without ever streaming', function (
 });
 
 it('settles the reserved minimum when the turn already streamed before failing', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro])->save();
-    AiCreditBalance::query()->where('team_id', $team->getKey())
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-2',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -61,7 +61,7 @@ it('settles the reserved minimum when the turn already streamed before failing',
 
     $turnId = '01TURNSTREAMEDAAAAAAAAAAAA';
     expect(resolve(CreditService::class)->reserveCredit(
-        $team,
+        $workspace,
         reservationKey: "reserve-{$turnId}",
         conversationId: 'c-2',
         userId: (string) $user->getKey(),
@@ -76,7 +76,7 @@ it('settles the reserved minimum when the turn already streamed before failing',
     Queue::fake();
 
     $job = new ProcessChatMessage(
-        user: $user, team: $team, message: 'hi', conversationId: 'c-2',
+        user: $user, workspace: $workspace, message: 'hi', conversationId: 'c-2',
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: $turnId,
     );
@@ -89,7 +89,7 @@ it('settles the reserved minimum when the turn already streamed before failing',
 
     $job->failed(new RuntimeException('died mid-stream'));
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
     expect($balance->credits_used)->toBe(1)
         ->and($balance->credits_remaining)->toBe(99);
 });
@@ -102,17 +102,17 @@ it('settles the reserved minimum when the turn already streamed before failing',
  * handle() and failed() therefore asserts a state production never reaches.
  */
 it('bills a turn that streamed even though the queue hands failed() a fresh instance', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro])->save();
-    AiCreditBalance::query()->where('team_id', $team->getKey())
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-3',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -120,7 +120,7 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
 
     $turnId = '01TURNFRESHINSTANCEAAAAAAA';
     expect(resolve(CreditService::class)->reserveCredit(
-        $team,
+        $workspace,
         reservationKey: "reserve-{$turnId}",
         conversationId: 'c-3',
         userId: (string) $user->getKey(),
@@ -130,7 +130,7 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
     Queue::fake();
 
     $job = new ProcessChatMessage(
-        user: $user, team: $team, message: 'hi', conversationId: 'c-3',
+        user: $user, workspace: $workspace, message: 'hi', conversationId: 'c-3',
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: $turnId,
     );
@@ -148,7 +148,7 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
     $fromPayload = unserialize($queued);
     $fromPayload->failed(new RuntimeException('died mid-stream'));
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     expect($balance->credits_used)->toBe(1, 'a turn the provider already billed was refunded')
         ->and($balance->credits_remaining)->toBe(99);

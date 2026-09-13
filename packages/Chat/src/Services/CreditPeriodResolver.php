@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Actions\Billing\StartProTrial;
-use App\Models\Team;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use RuntimeException;
 
@@ -20,20 +20,20 @@ final readonly class CreditPeriodResolver
     private const int MAX_CYCLE_ADJUSTMENTS = 6;
 
     /**
-     * Credit-period bounds for a team, per the billing spec's policy table:
+     * Credit-period bounds for a workspace, per the billing spec's policy table:
      * subscription anniversary cycle > trial span > calendar month.
      *
      * @return array{start: CarbonImmutable, end: CarbonImmutable}
      */
-    public function boundsFor(Team $team): array
+    public function boundsFor(Workspace $workspace): array
     {
         // Load explicitly rather than relying on the caller: strict lazy loading
         // arms only on multi-row hydrations, so a bulk caller that forgets to
         // eager-load would otherwise fail in tests and silently N+1 in production.
         // Callers that do eager-load pay nothing here.
-        $team->loadMissing('subscriptions');
+        $workspace->loadMissing('subscriptions');
 
-        $subscription = $team->subscription();
+        $subscription = $workspace->subscription();
 
         if ($subscription?->valid() === true) {
             /** @var CarbonImmutable $anchor */
@@ -42,10 +42,10 @@ final readonly class CreditPeriodResolver
             return $this->anniversaryCycle($anchor);
         }
 
-        if ($team->onGenericTrial() && $team->trial_ends_at !== null) {
+        if ($workspace->onGenericTrial() && $workspace->trial_ends_at !== null) {
             return [
-                'start' => $team->trial_ends_at->copy()->subDays(StartProTrial::TRIAL_DAYS),
-                'end' => $team->trial_ends_at->copy(),
+                'start' => $workspace->trial_ends_at->copy()->subDays(StartProTrial::TRIAL_DAYS),
+                'end' => $workspace->trial_ends_at->copy(),
             ];
         }
 

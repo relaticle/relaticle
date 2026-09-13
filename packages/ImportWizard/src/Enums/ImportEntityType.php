@@ -68,10 +68,10 @@ enum ImportEntityType: string
         };
     }
 
-    public function importer(string $teamId): BaseImporter
+    public function importer(string $workspaceId): BaseImporter
     {
         $class = $this->importerClass();
 
-        return new $class($teamId);
+        return new $class($workspaceId);
     }
 }

@@ -18,11 +18,11 @@ use Relaticle\Flowforge\Board;
 mutates(TasksBoard::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
 
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 
     $this->statusField = CustomField::query()
         ->forEntity(Task::class)
@@ -46,10 +46,10 @@ it('displays tasks in the correct board columns', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $done = $this->statusField->options->firstWhere('name', 'Done');
 
-    $todoTask = Task::factory()->recycle([$this->user, $this->team])->create();
+    $todoTask = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $todoTask->saveCustomFieldValue($this->statusField, $todo->getKey());
 
-    $doneTask = Task::factory()->recycle([$this->user, $this->team])->create();
+    $doneTask = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $doneTask->saveCustomFieldValue($this->statusField, $done->getKey());
 
     $board = getTaskBoard();
@@ -60,9 +60,9 @@ it('displays tasks in the correct board columns', function (): void {
         ->toContain($doneTask->id);
 });
 
-it('does not show tasks from other teams', function (): void {
-    $otherUser = User::factory()->withTeam()->create();
-    $otherTask = Task::factory()->for($otherUser->currentTeam)->create();
+it('does not show tasks from other workspaces', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $otherTask = Task::factory()->for($otherUser->currentWorkspace)->create();
 
     $board = getTaskBoard();
     $allRecordIds = collect($this->statusField->options)
@@ -75,11 +75,11 @@ it('does not show tasks from other teams', function (): void {
 it('renders the board when a task has multiple assignees', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $task->saveCustomFieldValue($this->statusField, $todo->getKey());
 
     $secondMember = User::factory()->create();
-    $this->team->users()->attach($secondMember);
+    $this->workspace->users()->attach($secondMember);
     $task->assignees()->attach([$this->user->id, $secondMember->id]);
 
     livewire(TasksBoard::class)->assertOk();
@@ -94,7 +94,7 @@ it('shows the view switcher linking list and board views', function (): void {
 });
 
 it('redirects the legacy board url to the resource board page', function (): void {
-    $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->workspace->slug]))
         ->assertRedirect(TaskResource::getUrl('board'));
 });
 
@@ -126,7 +126,7 @@ it('moves a card between columns via moveCard', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $task->saveCustomFieldValue($this->statusField, $todo->getKey());
 
     livewire(TasksBoard::class)
@@ -143,7 +143,7 @@ it('moves a card between columns via moveCard', function (): void {
 it('opens the edit action when a card is clicked', function (): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $task->saveCustomFieldValue($this->statusField, $todo->getKey());
 
     $component = livewire(TasksBoard::class);
@@ -172,7 +172,7 @@ it('buckets the due-date badge against the user calendar, not the server clock',
         ->where('code', TaskField::DUE_DATE)
         ->first();
 
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $task->saveCustomFieldValue($this->statusField, $this->statusField->options->firstWhere('name', 'To do')->getKey());
 
     // 23:30 UTC on the 18th is 08:30 on the 19th in Tokyo. At the moment above the

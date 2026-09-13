@@ -10,7 +10,7 @@ use Laravel\Mcp\Facades\Mcp;
 use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
 });
 
 describe('API routing - default path mode', function () {

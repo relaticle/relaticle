@@ -26,9 +26,9 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
-use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
@@ -71,16 +71,16 @@ it('clears reviewer leftovers and restores credits without touching another work
     $this->artisan('demo:reset', ['--password' => 'runtime-secret-four'])->assertSuccessful();
 
     $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
-    $team = $reviewer->personalTeam();
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $otherTeam = $otherUser->personalTeam();
+    $workspace = $reviewer->personalWorkspace();
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $otherWorkspace = $otherUser->personalWorkspace();
 
-    $leaveLeftovers = function (Team $team, User $user): string {
+    $leaveLeftovers = function (Workspace $workspace, User $user): string {
         $conversationId = (string) Str::ulid();
 
         DB::table('agent_conversations')->insert([
             'id' => $conversationId,
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'participant_id' => $user->getKey(),
             'participant_type' => $user->getMorphClass(),
             'title' => 'Reviewer conversation',
@@ -107,7 +107,7 @@ it('clears reviewer leftovers and restores credits without touching another work
 
         DB::table('pending_actions')->insert([
             'id' => (string) Str::ulid(),
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'conversation_id' => $conversationId,
             'action_class' => 'CreateCompany',
@@ -122,7 +122,7 @@ it('clears reviewer leftovers and restores credits without touching another work
 
         DB::table('exports')->insert([
             'id' => (string) Str::ulid(),
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'user_id' => $user->getKey(),
             'file_disk' => 'local',
             'exporter' => 'CompanyExporter',
@@ -131,31 +131,31 @@ it('clears reviewer leftovers and restores credits without touching another work
             'updated_at' => now(),
         ]);
 
-        Import::factory()->create(['team_id' => $team->getKey(), 'user_id' => $user->getKey()]);
-        TeamInvitation::factory()->create(['team_id' => $team->getKey()]);
+        Import::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
+        WorkspaceInvitation::factory()->create(['workspace_id' => $workspace->getKey()]);
 
         return $conversationId;
     };
 
-    $reviewerConversationId = $leaveLeftovers($team, $reviewer);
-    $otherConversationId = $leaveLeftovers($otherTeam, $otherUser);
+    $reviewerConversationId = $leaveLeftovers($workspace, $reviewer);
+    $otherConversationId = $leaveLeftovers($otherWorkspace, $otherUser);
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update(['credits_remaining' => 0, 'credits_used' => 500]);
 
     $this->artisan('demo:reset')->assertSuccessful();
 
-    $leftoverTables = ['agent_conversations', 'pending_actions', 'exports', 'imports', 'team_invitations'];
+    $leftoverTables = ['agent_conversations', 'pending_actions', 'exports', 'imports', 'workspace_invitations'];
 
     foreach ($leftoverTables as $table) {
-        expect(DB::table($table)->where('team_id', $team->getKey())->count())->toBe(0, $table)
-            ->and(DB::table($table)->where('team_id', $otherTeam->getKey())->count())->toBe(1, $table);
+        expect(DB::table($table)->where('workspace_id', $workspace->getKey())->count())->toBe(0, $table)
+            ->and(DB::table($table)->where('workspace_id', $otherWorkspace->getKey())->count())->toBe(1, $table);
     }
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->firstOrFail();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->firstOrFail();
     $rebuiltOpportunity = Opportunity::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('name', 'Stripe Billing Rollout')
         ->firstOrFail();
     $rebuiltContact = People::query()->whereKey($rebuiltOpportunity->contact_id)->firstOrFail();
@@ -171,55 +171,55 @@ it('resets the workspace without a password once the account exists', function (
     $this->artisan('demo:reset', ['--password' => 'established-secret'])->assertSuccessful();
 
     $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
-    $team = $reviewer->personalTeam();
-    $reviewerCompany = Company::query()->where('team_id', $team->getKey())->firstOrFail();
+    $workspace = $reviewer->personalWorkspace();
+    $reviewerCompany = Company::query()->where('workspace_id', $workspace->getKey())->firstOrFail();
     $reviewerCompany->update(['name' => 'Renamed By A Reviewer']);
 
     $this->artisan('demo:reset')->assertSuccessful();
 
     expect(Hash::check('established-secret', (string) $reviewer->refresh()->password))->toBeTrue()
-        ->and(Company::query()->where('team_id', $team->getKey())->where('name', 'Renamed By A Reviewer')->exists())->toBeFalse()
-        ->and(Company::query()->where('team_id', $team->getKey())->where('name', 'Notion')->exists())->toBeTrue();
+        ->and(Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Renamed By A Reviewer')->exists())->toBeFalse()
+        ->and(Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion')->exists())->toBeTrue();
 });
 
 it('creates a deterministic reviewer workspace and safely refreshes it', function (): void {
     $this->travelTo(Date::parse('2026-08-26 12:00:00 UTC'));
     $password = 'runtime-secret-one';
 
-    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
     $otherCompany = Company::factory()
-        ->recycle([$otherUser, $otherUser->currentTeam])
+        ->recycle([$otherUser, $otherUser->currentWorkspace])
         ->create(['name' => 'Untouched Workspace Company']);
 
     $this->artisan('demo:reset', ['--password' => $password])->assertSuccessful();
 
     $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
-    $team = $reviewer->currentTeam;
+    $workspace = $reviewer->currentWorkspace;
 
     expect($reviewer->email_verified_at)->not->toBeNull()
         ->and($reviewer->two_factor_secret)->toBeNull()
         ->and($reviewer->two_factor_recovery_codes)->toBeNull()
         ->and($reviewer->getAttribute('two_factor_confirmed_at'))->toBeNull()
         ->and(Hash::check($password, (string) $reviewer->password))->toBeTrue()
-        ->and($team)->not->toBeNull()
-        ->and($team->name)->toBe(ResetDemoAccountCommand::TEAM_NAME)
-        ->and($team->slug)->toBe(ResetDemoAccountCommand::TEAM_SLUG)
-        ->and($team->hosted_free_grandfathered_at)->not->toBeNull()
-        ->and(resolve(HostedWorkspaceAccess::class)->allows($team))->toBeTrue();
+        ->and($workspace)->not->toBeNull()
+        ->and($workspace->name)->toBe(ResetDemoAccountCommand::WORKSPACE_NAME)
+        ->and($workspace->slug)->toBe(ResetDemoAccountCommand::WORKSPACE_SLUG)
+        ->and($workspace->hosted_free_grandfathered_at)->not->toBeNull()
+        ->and(resolve(HostedWorkspaceAccess::class)->allows($workspace))->toBeTrue();
 
-    $notion = Company::query()->where('team_id', $team->getKey())->where('name', 'Notion')->firstOrFail();
-    $ivan = People::query()->where('team_id', $team->getKey())->where('name', 'Ivan Zhao')->firstOrFail();
-    $notionOpportunity = Opportunity::query()->where('team_id', $team->getKey())->where('name', 'Notion API Integration')->firstOrFail();
-    $notionTask = Task::query()->where('team_id', $team->getKey())->where('title', 'Integration meeting with Ivan')->firstOrFail();
-    $notionNote = Note::query()->where('team_id', $team->getKey())->where('title', 'API integration possibilities')->firstOrFail();
+    $notion = Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion')->firstOrFail();
+    $ivan = People::query()->where('workspace_id', $workspace->getKey())->where('name', 'Ivan Zhao')->firstOrFail();
+    $notionOpportunity = Opportunity::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion API Integration')->firstOrFail();
+    $notionTask = Task::query()->where('workspace_id', $workspace->getKey())->where('title', 'Integration meeting with Ivan')->firstOrFail();
+    $notionNote = Note::query()->where('workspace_id', $workspace->getKey())->where('title', 'API integration possibilities')->firstOrFail();
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->firstOrFail();
     $executiveEmails = People::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->whereIn('name', ['Brian Chesky', 'Dylan Field', 'Ivan Zhao', 'Tim Cook'])
         ->withCustomFieldValues()
         ->get()
@@ -239,38 +239,38 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
 
     $statusField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->with('options')
         ->firstOrFail();
     $doneOptionId = $statusField->options->firstWhere('name', 'Done')?->getKey();
     $completedTask = Task::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('title', 'Send proposal to Tim')
         ->with('customFieldValues.customField.options')
         ->firstOrFail();
     $unassignedTask = Task::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('title', 'Discovery call with Brian')
         ->firstOrFail();
 
     expect($completedTask->getCustomFieldValue($statusField))->toBe($doneOptionId)
         ->and($unassignedTask->assignees()->exists())->toBeFalse()
         ->and(CustomField::query()->withoutGlobalScopes()
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('code', ResetDemoAccountCommand::INACTIVE_FIELD_CODE)
             ->where('active', false)
             ->exists())->toBeTrue()
-        ->and(Activity::query()->withoutGlobalScopes()->where('team_id', $team->getKey())->count())->toBeGreaterThanOrEqual(5);
+        ->and(Activity::query()->withoutGlobalScopes()->where('workspace_id', $workspace->getKey())->count())->toBeGreaterThanOrEqual(5);
 
     $baseUrl = rtrim((string) config('app.url'), '/');
-    $notionUrl = "{$baseUrl}/app/{$team->slug}/companies/{$notion->getKey()}";
+    $notionUrl = "{$baseUrl}/app/{$workspace->slug}/companies/{$notion->getKey()}";
 
     RelaticleServer::actingAs($reviewer)
         ->tool(WhoAmiTool::class)
         ->assertOk()
-        ->assertSee(ResetDemoAccountCommand::TEAM_NAME)
+        ->assertSee(ResetDemoAccountCommand::WORKSPACE_NAME)
         ->assertDontSee($password);
 
     RelaticleServer::actingAs($reviewer)
@@ -319,11 +319,11 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
         ->assertDontSee($password);
 
     $entityCounts = [
-        Company::query()->where('team_id', $team->getKey())->count(),
-        People::query()->where('team_id', $team->getKey())->count(),
-        Opportunity::query()->where('team_id', $team->getKey())->count(),
-        Task::query()->where('team_id', $team->getKey())->count(),
-        Note::query()->where('team_id', $team->getKey())->count(),
+        Company::query()->where('workspace_id', $workspace->getKey())->count(),
+        People::query()->where('workspace_id', $workspace->getKey())->count(),
+        Opportunity::query()->where('workspace_id', $workspace->getKey())->count(),
+        Task::query()->where('workspace_id', $workspace->getKey())->count(),
+        Note::query()->where('workspace_id', $workspace->getKey())->count(),
     ];
 
     expect($entityCounts)->toBe([20, 30, 18, 20, 12]);
@@ -334,11 +334,11 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
     $reviewer->refresh();
 
     expect([
-        Company::query()->where('team_id', $team->getKey())->count(),
-        People::query()->where('team_id', $team->getKey())->count(),
-        Opportunity::query()->where('team_id', $team->getKey())->count(),
-        Task::query()->where('team_id', $team->getKey())->count(),
-        Note::query()->where('team_id', $team->getKey())->count(),
+        Company::query()->where('workspace_id', $workspace->getKey())->count(),
+        People::query()->where('workspace_id', $workspace->getKey())->count(),
+        Opportunity::query()->where('workspace_id', $workspace->getKey())->count(),
+        Task::query()->where('workspace_id', $workspace->getKey())->count(),
+        Note::query()->where('workspace_id', $workspace->getKey())->count(),
     ])->toBe($entityCounts)
         ->and(Hash::check($replacementPassword, (string) $reviewer->password))->toBeTrue()
         ->and(Company::query()->withoutGlobalScopes()->whereKey($otherCompany->getKey())->exists())->toBeTrue();
@@ -358,8 +358,8 @@ it('removes stored logos before rebuilding the workspace', function (): void {
 
     $this->artisan('demo:reset', ['--password' => 'runtime-secret-six'])->assertSuccessful();
 
-    $team = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalTeam();
-    $company = Company::query()->where('team_id', $team->getKey())->where('name', 'Notion')->firstOrFail();
+    $workspace = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalWorkspace();
+    $company = Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion')->firstOrFail();
     $company->addMediaFromString('logo-bytes')
         ->usingFileName('logo.png')
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
@@ -371,16 +371,16 @@ it('removes stored logos before rebuilding the workspace', function (): void {
     expect(DB::table('media')->where('model_id', $company->getKey())->count())->toBe(0);
 });
 
-it('keeps the existing workspace slug when another team already holds the reviewer slug', function (): void {
-    $incumbent = Team::factory()->create(['slug' => ResetDemoAccountCommand::TEAM_SLUG]);
+it('keeps the existing workspace slug when another workspace already holds the reviewer slug', function (): void {
+    $incumbent = Workspace::factory()->create(['slug' => ResetDemoAccountCommand::WORKSPACE_SLUG]);
 
     $this->artisan('demo:reset', ['--password' => 'runtime-secret-three'])->assertSuccessful();
 
-    $team = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalTeam();
+    $workspace = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalWorkspace();
 
-    expect($team)->not->toBeNull()
-        ->and($team->name)->toBe(ResetDemoAccountCommand::TEAM_NAME)
-        ->and($team->slug)->not->toBe(ResetDemoAccountCommand::TEAM_SLUG)
-        ->and($team->slug)->not->toBeEmpty()
-        ->and($incumbent->refresh()->slug)->toBe(ResetDemoAccountCommand::TEAM_SLUG);
+    expect($workspace)->not->toBeNull()
+        ->and($workspace->name)->toBe(ResetDemoAccountCommand::WORKSPACE_NAME)
+        ->and($workspace->slug)->not->toBe(ResetDemoAccountCommand::WORKSPACE_SLUG)
+        ->and($workspace->slug)->not->toBeEmpty()
+        ->and($incumbent->refresh()->slug)->toBe(ResetDemoAccountCommand::WORKSPACE_SLUG);
 });

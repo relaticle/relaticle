@@ -33,9 +33,9 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
@@ -81,9 +81,9 @@ final class UserResource extends Resource
                     ->maxLength(255)
                     ->dehydrated(fn (?string $state): bool => filled($state))
                     ->required(fn (string $operation): bool => $operation === 'create'),
-                Select::make('current_team_id')
+                Select::make('current_workspace_id')
                     ->searchable()
-                    ->relationship('currentTeam', 'name'),
+                    ->relationship('currentWorkspace', 'name'),
                 Section::make('Notifications')
                     ->description('Overrides what this user receives. Mirrors their own notification settings page.')
                     ->schema(self::notificationPreferenceFields())
@@ -124,10 +124,10 @@ final class UserResource extends Resource
                     IconEntry::make('email_verified_at')
                         ->label('Verified')
                         ->boolean(),
-                    TextEntry::make('currentTeam.name')
-                        ->label('Current Team')
+                    TextEntry::make('currentWorkspace.name')
+                        ->label('Current Workspace')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'currentWorkspace')),
                     TextEntry::make('last_login_at')
                         ->label('Last Login')
                         ->dateTime()
@@ -163,11 +163,11 @@ final class UserResource extends Resource
                     ->boolean()
                     ->trueIcon('heroicon-o-check-badge')
                     ->falseIcon('heroicon-o-x-mark'),
-                TextColumn::make('currentTeam.name')
-                    ->label('Current Team')
+                TextColumn::make('currentWorkspace.name')
+                    ->label('Current Workspace')
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'currentWorkspace')),
                 TextColumn::make('last_login_at')
                     ->label('Last Login')
                     ->dateTime()
@@ -243,15 +243,15 @@ final class UserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['currentTeam', 'ownedTeams']);
+            ->with(['currentWorkspace', 'ownedWorkspaces']);
     }
 
     #[Override]
     public static function getRelations(): array
     {
         return [
-            OwnedTeamsRelationManager::class,
-            TeamsRelationManager::class,
+            OwnedWorkspacesRelationManager::class,
+            WorkspacesRelationManager::class,
             SocialAccountsRelationManager::class,
         ];
     }

@@ -7,12 +7,12 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Tests\Helpers\ChatBrowser;
 
 it('renders a single shimmer indicator with default label when streaming starts and no tool is running', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -44,12 +44,12 @@ it('renders a single shimmer indicator with default label when streaming starts 
 });
 
 it('updates the shimmer label when a tool call is in progress', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -83,12 +83,12 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
 });
 
 it('removes the shimmer once content arrives in the latest assistant message', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -125,11 +125,11 @@ it('renders a human label for every tool the assistant can call', function (): v
         app(CrmAssistant::class)->tools(),
     );
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -169,11 +169,11 @@ it('renders a human label for every tool the assistant can call', function (): v
  * fallback reads it back as words.
  */
 it('reads an unmapped tool name back as words instead of an identifier', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $page = ChatBrowser::logIn($user, $team->slug)
-        ->navigate("/app/{$team->slug}/chats")
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

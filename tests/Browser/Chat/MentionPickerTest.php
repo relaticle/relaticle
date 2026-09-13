@@ -43,13 +43,13 @@ const WAIT_FOR_OPTIONS = <<<'JS'
 JS;
 
 it('opens a picker when @ is typed and inserts a chip on selection', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'AcmeQA']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'AcmeQA']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);
@@ -84,13 +84,13 @@ it('opens a picker when @ is typed and inserts a chip on selection', function ()
 });
 
 it('does not open the picker for queries shorter than 2 chars', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'AcmeQA']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'AcmeQA']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click(EDITOR)->keys(EDITOR, ['@', 'a']);
@@ -106,13 +106,13 @@ it('does not open the picker for queries shorter than 2 chars', function (): voi
 });
 
 it('closes the picker when Escape is pressed', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'EscapeCo']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'EscapeCo']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click(EDITOR)->keys(EDITOR, ['@', 'E', 's']);
@@ -133,13 +133,13 @@ it('closes the picker when Escape is pressed', function (): void {
 });
 
 it('closes the picker when the query drops below the 2-char minimum', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'AcmeQA']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'AcmeQA']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);
@@ -161,14 +161,14 @@ it('closes the picker when the query drops below the 2-char minimum', function (
 });
 
 it('searches across a multi-word company name', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'Acme Corp']);
-    Company::factory()->for($team)->create(['name' => 'Globex']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'Acme Corp']);
+    Company::factory()->for($workspace)->create(['name' => 'Globex']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // allowSpaces is enabled, so "@Acme C" stays a single mention query.
@@ -181,13 +181,13 @@ it('searches across a multi-word company name', function (): void {
 });
 
 it('removes a selected mention chip with backspace', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    Company::factory()->for($team)->create(['name' => 'AcmeQA']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->for($workspace)->create(['name' => 'AcmeQA']);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click(EDITOR)->keys(EDITOR, ['@', 'A', 'c']);

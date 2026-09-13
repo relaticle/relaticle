@@ -19,8 +19,8 @@ mutates(ListTasksTool::class, GetTaskTool::class);
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 
-    $this->user = User::factory()->withPersonalTeam()->create(['timezone' => 'Asia/Tokyo']);
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Tokyo']);
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
@@ -33,7 +33,7 @@ beforeEach(function (): void {
  * model that ignores the suffix still cannot be actively misled by it.
  */
 it('emits chat list datetimes with the user offset rather than bare utc', function (): void {
-    $task = Task::factory()->for($this->user->currentTeam)->create([
+    $task = Task::factory()->for($this->user->currentWorkspace)->create([
         'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
         'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
@@ -49,7 +49,7 @@ it('emits chat list datetimes with the user offset rather than bare utc', functi
 });
 
 it('emits chat show datetimes with the user offset too, so both tools agree', function (): void {
-    $task = Task::factory()->for($this->user->currentTeam)->create([
+    $task = Task::factory()->for($this->user->currentWorkspace)->create([
         'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
         'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);
@@ -67,19 +67,19 @@ it('emits chat show datetimes with the user offset too, so both tools agree', fu
  * what the model buckets as overdue/today/upcoming.
  */
 it('converts custom-field datetimes in chat tool output', function (): void {
-    $team = $this->user->currentTeam;
+    $workspace = $this->user->currentWorkspace;
 
     $dueFieldId = DB::table('custom_fields')
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'due_date')
         ->value('id');
 
-    $task = Task::factory()->for($team)->create(['title' => 'due at the boundary']);
+    $task = Task::factory()->for($workspace)->create(['title' => 'due at the boundary']);
 
     DB::table('custom_field_values')->insert([
         'id' => (string) Str::ulid(),
-        'tenant_id' => $team->getKey(),
+        'tenant_id' => $workspace->getKey(),
         'entity_type' => 'task',
         'entity_id' => $task->getKey(),
         'custom_field_id' => $dueFieldId,
@@ -101,7 +101,7 @@ it('converts custom-field datetimes in chat tool output', function (): void {
  * that keeps a future refactor from "simplifying" it down into the resource.
  */
 it('leaves the rest api on utc, because the conversion belongs to the chat layer', function (): void {
-    $task = Task::factory()->for($this->user->currentTeam)->create([
+    $task = Task::factory()->for($this->user->currentWorkspace)->create([
         'created_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
         'updated_at' => Date::parse('2026-08-18 23:30:00', 'UTC'),
     ]);

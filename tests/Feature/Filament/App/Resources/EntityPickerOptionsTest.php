@@ -18,10 +18,10 @@ use Filament\Schemas\Schema;
 mutates(TaskForm::class, NoteForm::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 /**
@@ -64,10 +64,10 @@ function pickerOptionText(array $options): array
 }
 
 it('shows companies and people without typing on the task form', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zeta Industries']);
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zoe Baker']);
-    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Adam Clark']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zeta Industries']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zoe Baker']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
 
     $livewire = app(ManageTasks::class);
     $pickers = entityPickers(TaskForm::get(Schema::make($livewire)->model(Task::class)));
@@ -85,8 +85,8 @@ it('shows companies and people without typing on the task form', function (): vo
 });
 
 it('shows companies and people without typing on the note form', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Adam Clark']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
 
     $livewire = app(ManageTasks::class);
     $pickers = entityPickers(NoteForm::get(Schema::make($livewire)->model(Note::class)));
@@ -100,14 +100,14 @@ it('shows companies and people without typing on the note form', function (): vo
 });
 
 it('scopes the preloaded options to the acting tenant', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Mine Co']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Mine Co']);
 
-    $otherUser = User::factory()->withTeam()->create();
-    Company::factory()->recycle([$otherUser, $otherUser->currentTeam])->create(['name' => 'Theirs Co']);
+    $otherUser = User::factory()->withWorkspace()->create();
+    Company::factory()->recycle([$otherUser, $otherUser->currentWorkspace])->create(['name' => 'Theirs Co']);
 
-    // TeamScope is installed by ApplyTenantScopes, which is panel middleware:
+    // WorkspaceScope is installed by ApplyTenantScopes, which is panel middleware:
     // building the schema without a panel request would read every tenant's rows.
-    $this->get(TaskResource::getUrl('index', tenant: $this->team));
+    $this->get(TaskResource::getUrl('index', tenant: $this->workspace));
 
     $pickers = entityPickers(TaskForm::get(Schema::make(app(ManageTasks::class))->model(Task::class)));
     $options = pickerOptionText($pickers['companies']->getOptionsFromRelationship());

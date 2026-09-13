@@ -39,13 +39,13 @@ function regenerateAffordanceInsertMessage(string $conversationId, User $user, s
 }
 
 it('hides the regenerate button on a reply that no user message precedes', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'Getting started');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'Getting started');
 
     regenerateAffordanceInsertMessage($conversationId, $user, 'assistant', 'Here is what I found.');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Here is what I found.');
 
     $state = $page->script(<<<'JS'
@@ -64,14 +64,14 @@ it('hides the regenerate button on a reply that no user message precedes', funct
 });
 
 it('still offers regenerate on a reply that a user message produced', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $conversationId = ChatBrowser::seedConversation($user, $team->getKey(), 'Normal chat');
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'Normal chat');
 
     regenerateAffordanceInsertMessage($conversationId, $user, 'user', 'How many companies do I have?');
     regenerateAffordanceInsertMessage($conversationId, $user, 'assistant', 'You have four companies.');
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('You have four companies.');
 
     $state = $page->script(<<<'JS'

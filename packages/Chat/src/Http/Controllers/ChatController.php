@@ -12,8 +12,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Model;
@@ -69,13 +69,13 @@ final readonly class ChatController
      * Resolved through the panel route so it stays correct whether the app panel
      * is served from a path prefix or its own subdomain.
      */
-    private function billingUrl(Team $team): ?string
+    private function billingUrl(Workspace $workspace): ?string
     {
         if (! Feature::active(Billing::class)) {
             return null;
         }
 
-        return BillingPage::getUrl(panel: 'app', tenant: $team);
+        return BillingPage::getUrl(panel: 'app', tenant: $workspace);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -91,9 +91,9 @@ final readonly class ChatController
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        $parsed = $this->documentParser->parse($validated['document'], $team);
+        $parsed = $this->documentParser->parse($validated['document'], $workspace);
 
         if ($parsed['text'] === '') {
             throw ValidationException::withMessages([
@@ -118,56 +118,56 @@ final readonly class ChatController
         abort_if(
             $existing->participant_type !== $user->getMorphClass()
                 || $existing->participant_id !== (string) $user->getKey()
-                || ($existing->team_id !== null && $existing->team_id !== $team->getKey()),
+                || ($existing->workspace_id !== null && $existing->workspace_id !== $workspace->getKey()),
             403
         );
 
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($team->plan)) {
-                $isFree = $team->plan === Plan::Free;
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($workspace->plan)) {
+                $isFree = $workspace->plan === Plan::Free;
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->getLabel()]),
-                    'plan' => $team->plan->value,
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
+                    'plan' => $workspace->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
+                    'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
                 ], 403);
             }
         }
 
         $turnId = (string) Str::ulid();
 
-        if (! $this->creditService->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
+        if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             $balance = AiCreditBalance::query()
-                ->where('team_id', $team->getKey())
+                ->where('workspace_id', $workspace->getKey())
                 ->first();
 
-            $isFree = $team->plan === Plan::Free;
+            $isFree = $workspace->plan === Plan::Free;
             $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
-            // Not $team->plan->credits(): a past-due workspace refills at the
+            // Not $workspace->plan->credits(): a past-due workspace refills at the
             // Free allowance, so the plan's figure would name credits it never got.
-            $allowance = $this->creditService->allowanceFor($team);
+            $allowance = $this->creditService->allowanceFor($workspace);
 
             return response()->json([
                 'error' => 'credits_exhausted',
-                'message' => "You have used all {$allowance} credits for this {$team->plan->getLabel()} plan period.",
-                'plan' => $team->plan->value,
+                'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
+                'plan' => $workspace->plan->value,
                 'allowance' => $allowance,
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
+                'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
                 // A top-up is only offered when a pack can actually be bought;
                 // otherwise the CTA lands on a billing page with nothing to buy.
                 'top_up_available' => $canTopUp,
-                'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
+                'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
             ], 402);
         }
 
-        DB::transaction(function () use ($conversation, $user, $team): void {
+        DB::transaction(function () use ($conversation, $user, $workspace): void {
             $row = DB::table('agent_conversations')
                 ->where('id', $conversation)
                 ->lockForUpdate()
@@ -183,13 +183,13 @@ final readonly class ChatController
                 403
             );
 
-            if ($row->team_id !== null) {
+            if ($row->workspace_id !== null) {
                 return;
             }
 
             DB::table('agent_conversations')
                 ->where('id', $conversation)
-                ->update(['team_id' => $team->getKey(), 'updated_at' => now()]);
+                ->update(['workspace_id' => $workspace->getKey(), 'updated_at' => now()]);
         });
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
@@ -208,7 +208,7 @@ final readonly class ChatController
 
         dispatch(new ProcessChatMessage(
             user: $user,
-            team: $team,
+            workspace: $workspace,
             message: $parsed['text'],
             conversationId: $conversation,
             resolved: $resolved,
@@ -260,8 +260,8 @@ final readonly class ChatController
      * Resolve the record the user was viewing when they sent the message.
      *
      * The client payload is untrusted: it names a type and id, and nothing
-     * more. Both are re-resolved here under team scope and the view policy,
-     * exactly as BaseReadShowTool does, so a forged id for another team's
+     * more. Both are re-resolved here under workspace scope and the view policy,
+     * exactly as BaseReadShowTool does, so a forged id for another workspace's
      * record yields null rather than leaking a label.
      *
      * @param  array<string, mixed>|null  $payload
@@ -290,7 +290,7 @@ final readonly class ChatController
         }
 
         $record = $modelClass::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($id)
             ->first();
 
@@ -316,11 +316,11 @@ final readonly class ChatController
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        abort_if($team === null, 403);
+        abort_if($workspace === null, 403);
 
-        $parsed = $this->documentParser->parse($validated['document'], $team);
+        $parsed = $this->documentParser->parse($validated['document'], $workspace);
 
         if ($parsed['text'] === '') {
             throw ValidationException::withMessages([
@@ -340,7 +340,7 @@ final readonly class ChatController
             'id' => $conversationId,
             'participant_type' => $user->getMorphClass(),
             'participant_id' => (string) $user->getKey(),
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'title' => TitleSanitizer::clean($parsed['text']),
             'created_at' => now(),
             'updated_at' => now(),
@@ -353,7 +353,7 @@ final readonly class ChatController
     {
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $row = DB::table('agent_conversations')->where('id', $conversationId)->first();
 
@@ -361,7 +361,7 @@ final readonly class ChatController
         abort_if(
             $row->participant_type !== $user->getMorphClass()
                 || $row->participant_id !== (string) $user->getKey()
-                || ($row->team_id !== null && $row->team_id !== $team->getKey()),
+                || ($row->workspace_id !== null && $row->workspace_id !== $workspace->getKey()),
             404,
         );
 
@@ -401,7 +401,7 @@ final readonly class ChatController
             $conversation === null
                 || $conversation->participant_type !== $user->getMorphClass()
                 || $conversation->participant_id !== (string) $user->getKey()
-                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+                || ($conversation->workspace_id !== null && $conversation->workspace_id !== $user->currentWorkspace->getKey()),
             404,
         );
 
@@ -470,7 +470,7 @@ final readonly class ChatController
             $conversation === null
                 || $conversation->participant_type !== $user->getMorphClass()
                 || $conversation->participant_id !== (string) $user->getKey()
-                || ($conversation->team_id !== null && $conversation->team_id !== $user->current_team_id),
+                || ($conversation->workspace_id !== null && $conversation->workspace_id !== $user->current_workspace_id),
             404,
         );
 
@@ -524,7 +524,7 @@ final readonly class ChatController
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $results = collect();
 
@@ -537,13 +537,13 @@ final readonly class ChatController
         ] as [$modelClass, $column, $type]) {
             $results = $results->merge(
                 $modelClass::query()
-                    ->whereBelongsTo($team)
+                    ->whereBelongsTo($workspace)
                     ->where($column, 'ilike', "%{$search}%")
                     ->orderByRaw("CASE WHEN {$column} ilike ? THEN 0 ELSE 1 END", ["{$search}%"])
                     ->orderByRaw("LENGTH({$column}) ASC")
                     ->orderBy($column)
                     ->limit($limit)
-                    ->get(['id', $column, 'team_id'])
+                    ->get(['id', $column, 'workspace_id'])
                     ->filter(fn (Model $r): bool => $user->can('view', $r))
                     ->values()
                     ->map(fn (Model $r): array => ['id' => $r->getKey(), 'name' => $r->getAttribute($column), 'type' => $type, 'url' => $resolver->urlFor($type, (string) $r->getKey())])

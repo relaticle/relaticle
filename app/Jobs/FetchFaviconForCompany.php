@@ -33,8 +33,10 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         try {
+            // The custom-fields package registers the tenant relation under the name
+            // `team`, so the relation has to be named rather than guessed.
             $customFieldDomain = $this->company->customFields()
-                ->whereBelongsTo($this->company->team)
+                ->whereBelongsTo($this->company->workspace, 'team')
                 ->where('code', CompanyField::DOMAINS->value)
                 ->first();
 

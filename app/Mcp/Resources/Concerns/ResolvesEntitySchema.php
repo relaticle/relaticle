@@ -21,14 +21,14 @@ trait ResolvesEntitySchema
 
     protected function resolveCustomFields(User $user): object
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
         $entityType = $this->entity()->value;
-        $cacheKey = McpSchemaCache::entitySchemaKey($teamId, $entityType);
+        $cacheKey = McpSchemaCache::entitySchemaKey($workspaceId, $entityType);
 
-        return (object) Cache::remember($cacheKey, McpSchemaCache::TTL, function () use ($teamId, $entityType): array {
+        return (object) Cache::remember($cacheKey, McpSchemaCache::TTL, function () use ($workspaceId, $entityType): array {
             $fields = CustomField::query()
                 ->withoutGlobalScopes()
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->where('entity_type', $entityType)
                 ->active()
                 ->select('id', 'code', 'name', 'type', 'validation_rules')

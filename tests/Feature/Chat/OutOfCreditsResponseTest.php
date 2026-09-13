@@ -16,11 +16,11 @@ beforeEach(function (): void {
 });
 
 it('returns plan-aware copy when a Free user is out of credits', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Free->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -32,7 +32,7 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -60,13 +60,13 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
 });
 
 it('marks upgrade_available false for Pro users', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Pro;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Pro;
+    $workspace->save();
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Pro->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -78,7 +78,7 @@ it('marks upgrade_available false for Pro users', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -97,13 +97,13 @@ it('marks upgrade_available false for Pro users', function (): void {
 });
 
 it('marks upgrade_available false for Enterprise users', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Enterprise;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Enterprise;
+    $workspace->save();
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Enterprise->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -115,7 +115,7 @@ it('marks upgrade_available false for Enterprise users', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -133,11 +133,11 @@ it('marks upgrade_available false for Enterprise users', function (): void {
 });
 
 it('mentions the plan name in the message', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Free->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -149,7 +149,7 @@ it('mentions the plan name in the message', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -170,17 +170,17 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
     Feature::define(Billing::class, true);
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Pro;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Pro;
+    $workspace->save();
 
     // A valid Cashier subscription is how a real paying customer reaches this
-    // plan/state (SyncTeamPlanFromSubscription only sets Plan::Pro when the
+    // plan/state (SyncWorkspacePlanFromSubscription only sets Plan::Pro when the
     // subscription is valid()); it also satisfies HostedWorkspaceAccess::allows()
     // via subscription()?->valid(), so the request isn't paused before reaching
     // ChatController.
-    $team->subscriptions()->create([
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_test_top_up',
         'stripe_status' => 'active',
@@ -188,8 +188,8 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
         'quantity' => 1,
     ]);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Pro->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -201,7 +201,7 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -215,19 +215,19 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
 
     $response->assertStatus(402);
     expect($response->json('top_up_available'))->toBeTrue();
-    expect($response->json('top_up_url'))->toBe(url("/app/{$team->slug}/billing"));
+    expect($response->json('top_up_url'))->toBe(url("/app/{$workspace->slug}/billing"));
     expect($response->json('upgrade_available'))->toBeFalse();
 });
 
 it('gives free plans the upgrade shape and no top-up', function (): void {
     Feature::define(Billing::class, true);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Free->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -239,7 +239,7 @@ it('gives free plans the upgrade shape and no top-up', function (): void {
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -264,12 +264,12 @@ it('withholds the top-up url when no credit pack has a configured price', functi
         'large' => ['price' => null, 'credits' => 5000],
     ]);
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Pro;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Pro;
+    $workspace->save();
 
-    $team->subscriptions()->create([
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_test_no_packs',
         'stripe_status' => 'active',
@@ -277,8 +277,8 @@ it('withholds the top-up url when no credit pack has a configured price', functi
         'quantity' => 1,
     ]);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Pro->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -290,7 +290,7 @@ it('withholds the top-up url when no credit pack has a configured price', functi
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -308,12 +308,12 @@ it('withholds the top-up url when no credit pack has a configured price', functi
 });
 
 it('names the Free allowance, not the Pro one, when a past-due workspace runs out', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->plan = Plan::Pro;
-    $team->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = Plan::Pro;
+    $workspace->save();
 
-    $team->subscriptions()->create([
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_test_past_due_exhausted',
         'stripe_status' => 'past_due',
@@ -321,8 +321,8 @@ it('names the Free allowance, not the Pro one, when a past-due workspace runs ou
         'quantity' => 1,
     ]);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 0,
         'credits_used' => Plan::Free->credits(),
         'period_starts_at' => now()->startOfMonth(),
@@ -334,7 +334,7 @@ it('names the Free allowance, not the Pro one, when a past-due workspace runs ou
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'test',
         'created_at' => now(),
         'updated_at' => now(),

@@ -18,8 +18,8 @@ beforeEach(function () {
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
 
-    $this->teamOwner = User::factory()->withTeam()->create();
-    $this->team = $this->teamOwner->currentTeam;
+    $this->workspaceOwner = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->workspaceOwner->currentWorkspace;
 });
 
 it('can render the activation rate widget', function () {
@@ -28,12 +28,12 @@ it('can render the activation rate widget', function () {
 });
 
 it('counts activated users who created records manually', function () {
-    $users = User::factory(3)->withTeam()->create([
+    $users = User::factory(3)->withWorkspace()->create([
         'created_at' => now()->subDays(5),
     ]);
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create([
             'creator_id' => $users[0]->id,
             'creation_source' => CreationSource::WEB,
@@ -41,7 +41,7 @@ it('counts activated users who created records manually', function () {
         ]));
 
     Note::withoutEvents(fn () => Note::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create([
             'creator_id' => $users[1]->id,
             'created_at' => now()->subDays(3),
@@ -53,12 +53,12 @@ it('counts activated users who created records manually', function () {
 });
 
 it('excludes system-created records from activation count', function () {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(5),
     ]);
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create([
             'creator_id' => $user->id,
             'creation_source' => CreationSource::SYSTEM,
@@ -80,7 +80,7 @@ it('opens the window at midnight on the administrator calendar, not a rolling se
     $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
     actAsActivationAdminInZone('Asia/Yerevan');
 
-    // beforeEach seeds a team owner at the frozen instant, which would otherwise
+    // beforeEach seeds a workspace owner at the frozen instant, which would otherwise
     // land inside the window under test.
     User::query()->update(['created_at' => Date::parse('2026-01-01 00:00:00', 'UTC')]);
 

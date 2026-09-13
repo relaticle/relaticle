@@ -18,12 +18,12 @@ use function Pest\Laravel\postJson;
 mutates(ChatController::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -86,7 +86,7 @@ it('returns 402 on send when credit balance is insufficient', function (): void 
     ])->assertOk();
     $conversationId = $createRes->json('conversation_id');
 
-    AiCreditBalance::query()->where('team_id', $this->team->getKey())->update([
+    AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->update([
         'credits_remaining' => 0,
     ]);
 
@@ -101,8 +101,8 @@ it('returns 402 on send when credit balance is insufficient', function (): void 
 
 it('filters cross-tenant mention IDs from the document before persisting on chat.send', function (): void {
     Queue::fake();
-    $otherTeam = User::factory()->withPersonalTeam()->create()->currentTeam;
-    $foreignCompany = Company::factory()->for($otherTeam)->create(['name' => 'Foreign']);
+    $otherWorkspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $foreignCompany = Company::factory()->for($otherWorkspace)->create(['name' => 'Foreign']);
 
     $document = ChatDocument::fromText('Hi ', [
         ['type' => 'company', 'id' => $foreignCompany->getKey(), 'label' => 'Foreign'],
@@ -143,13 +143,13 @@ it('does not consume a credit on send when the document is empty', function (): 
     ])->assertOk();
     $conversationId = $createRes->json('conversation_id');
 
-    $balanceBefore = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balanceBefore = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => ['type' => 'doc', 'content' => []],
     ])->assertStatus(422);
 
-    $balanceAfter = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balanceAfter = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
     expect($balanceAfter->credits_remaining)->toBe($balanceBefore->credits_remaining);
 });
 
@@ -161,19 +161,19 @@ it('does not consume a credit on send when the document text is too long', funct
     ])->assertOk();
     $conversationId = $createRes->json('conversation_id');
 
-    $balanceBefore = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balanceBefore = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => ChatDocument::fromText(str_repeat('a', 5001)),
     ])->assertStatus(422);
 
-    $balanceAfter = AiCreditBalance::query()->where('team_id', $this->team->getKey())->first();
+    $balanceAfter = AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->first();
     expect($balanceAfter->credits_remaining)->toBe($balanceBefore->credits_remaining);
 });
 
 it('does not duplicate mention labels when text already contains @Tokens on chat.send', function (): void {
     Queue::fake();
-    Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Corp']);
 
     $document = [
         'type' => 'doc',
@@ -199,28 +199,28 @@ it('does not duplicate mention labels when text already contains @Tokens on chat
     Queue::assertPushed(ProcessChatMessage::class, fn ($job): bool => $job->message === 'Hi @Acme_Corp please');
 });
 
-it('returns 403 when the user has no current team', function (): void {
-    $teamlessUser = User::factory()->create(['current_team_id' => null]);
-    $this->actingAs($teamlessUser);
+it('returns 403 when the user has no current workspace', function (): void {
+    $workspacelessUser = User::factory()->create(['current_workspace_id' => null]);
+    $this->actingAs($workspacelessUser);
 
     $this->postJson(route('chat.conversations.create'), [
         'document' => ChatDocument::fromText('Hi'),
     ])->assertStatus(403);
 });
 
-it('rate-limits createConversation per team plan', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+it('rate-limits createConversation per workspace plan', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
     actingAs($user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $user->currentTeam->getKey()], [
-        'team_id' => $user->currentTeam->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'credits_remaining' => 1000,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
         'period_ends_at' => now()->endOfMonth(),
     ]);
 
-    $limit = $user->currentTeam->plan->rateLimit();
+    $limit = $user->currentWorkspace->plan->rateLimit();
 
     for ($i = 0; $i < $limit; $i++) {
         postJson(route('chat.conversations.create'), [

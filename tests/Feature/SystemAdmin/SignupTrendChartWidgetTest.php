@@ -102,14 +102,14 @@ it('starts the weekly series on a whole week and ends on the current one', funct
         ->and($series['Aug 24'])->toBe(1);
 });
 
-it('counts only non-personal teams in the teams series', function (): void {
+it('counts only non-personal workspaces in the workspaces series', function (): void {
     $this->travelTo(Date::parse('2026-08-27 10:31:00', 'UTC'));
     actAsSignupTrendAdmin();
 
-    $owner = User::factory()->withTeam()->create();
-    $owner->currentTeam->forceFill(['created_at' => Date::parse('2026-08-27 09:00:00', 'UTC')])->save();
+    $owner = User::factory()->withWorkspace()->create();
+    $owner->currentWorkspace->forceFill(['created_at' => Date::parse('2026-08-27 09:00:00', 'UTC')])->save();
 
-    expect(signupTrendSeries('New Teams')['Aug 27'])->toBe(1);
+    expect(signupTrendSeries('New Workspaces')['Aug 27'])->toBe(1);
 });
 
 it('stamps the chart with the read time in the administrator zone', function (): void {

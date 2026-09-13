@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\User;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 
 /**
  * Rebuilds a proposal item's display_data from a clean action_data record.
@@ -28,7 +28,7 @@ final readonly class ProposalDisplayBuilder
         'opportunity' => ['title' => 'Create Opportunity', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create opportunity'],
         'task' => ['title' => 'Create Task', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create task'],
         'note' => ['title' => 'Create Note', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create note'],
-        'team_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
+        'workspace_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
     ];
 
     public function __construct(
@@ -92,7 +92,7 @@ final readonly class ProposalDisplayBuilder
                 $rows[] = [
                     'label' => 'Account Owner',
                     'code' => 'account_owner_id',
-                    'value' => TeamMembersContext::nameOf($ownerId) ?? $ownerId,
+                    'value' => WorkspaceMembersContext::nameOf($ownerId) ?? $ownerId,
                 ];
             }
         }

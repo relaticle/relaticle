@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Personas;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -27,26 +27,26 @@ final readonly class PersonaSeeder
     ) {}
 
     /**
-     * @return array{persona: Persona, team: Team, billing: string, note: string}
+     * @return array{persona: Persona, workspace: Workspace, billing: string, note: string}
      */
     public function seed(Persona $persona): array
     {
         $user = $this->account($persona->email, $persona->name);
-        $team = $this->workspace($user, $persona);
+        $workspace = $this->workspace($user, $persona);
 
-        $this->members($team, $persona);
+        $this->members($workspace, $persona);
 
         // Billing first: the allowance depends on the subscription Stripe just
         // wrote, and a past-due workspace refills at the Free tier.
-        $note = $persona->needsStripe() ? $this->bill($team, $persona) : '';
+        $note = $persona->needsStripe() ? $this->bill($workspace, $persona) : '';
 
-        $this->allowance($team);
+        $this->allowance($workspace);
 
         return [
             'persona' => $persona,
-            'team' => $team,
+            'workspace' => $workspace,
             'note' => $note,
-            'billing' => Team::query()->with('subscriptions')->findOrFail($team->getKey())->billingStatus()->value,
+            'billing' => Workspace::query()->with('subscriptions')->findOrFail($workspace->getKey())->billingStatus()->value,
         ];
     }
 
@@ -58,14 +58,14 @@ final readonly class PersonaSeeder
      * still produce the four workspaces that need neither. A failure anywhere
      * else is a real defect and is left to surface.
      */
-    private function bill(Team $team, Persona $persona): string
+    private function bill(Workspace $workspace, Persona $persona): string
     {
         if (! $this->stripe->available()) {
             return 'no test-mode STRIPE_SECRET, billed nothing';
         }
 
         try {
-            $this->stripe->subscribe($team, $persona);
+            $this->stripe->subscribe($workspace, $persona);
 
             return '';
         } catch (Throwable $e) {
@@ -76,15 +76,15 @@ final readonly class PersonaSeeder
     /**
      * Give the workspace the credit allowance its plan actually grants.
      *
-     * The balance is created when the team is, before the persona's plan is
+     * The balance is created when the workspace is, before the persona's plan is
      * force-filled, so it holds the Free allowance no matter which plan the
      * persona claims. Left alone, a Pro persona shows a Pro allowance on the
      * billing page while holding a Free one, which is the exact divergence
      * these fixtures exist to make visible rather than reproduce.
      */
-    private function allowance(Team $team): void
+    private function allowance(Workspace $workspace): void
     {
-        resolve(CreditService::class)->resetPeriod($team->refresh()->load('subscriptions'));
+        resolve(CreditService::class)->resetPeriod($workspace->refresh()->load('subscriptions'));
     }
 
     /**
@@ -113,20 +113,20 @@ final readonly class PersonaSeeder
      * persona exists to demonstrate. Relative dates in the catalog (`-1 year`)
      * are resolved here so the table stays declarative.
      */
-    private function workspace(User $user, Persona $persona): Team
+    private function workspace(User $user, Persona $persona): Workspace
     {
-        $team = $user->ownedTeams()->where('personal_team', true)->first()
+        $workspace = $user->ownedWorkspaces()->where('personal_workspace', true)->first()
             ?? $this->createWorkspace($user, $persona);
 
-        $team->forceFill([
+        $workspace->forceFill([
             'name' => $persona->workspace,
             'slug' => Str::slug($persona->workspace),
-            ...$this->resolveDates($persona->team),
+            ...$this->resolveDates($persona->workspaceAttributes),
         ])->save();
 
-        $user->forceFill(['current_team_id' => $team->getKey()])->save();
+        $user->forceFill(['current_workspace_id' => $workspace->getKey()])->save();
 
-        return $team;
+        return $workspace;
     }
 
     /**
@@ -134,17 +134,17 @@ final readonly class PersonaSeeder
      * `syncWithoutDetaching` keeps this idempotent without wiping a membership
      * someone added by hand while testing.
      */
-    private function members(Team $team, Persona $persona): void
+    private function members(Workspace $workspace, Persona $persona): void
     {
         foreach ($persona->members as $member) {
             $user = $this->account($member['email'], Str::headline(Str::before($member['email'], '@')));
 
-            $team->users()->syncWithoutDetaching([$user->getKey() => ['role' => $member['role']]]);
+            $workspace->users()->syncWithoutDetaching([$user->getKey() => ['role' => $member['role']]]);
         }
     }
 
     /**
-     * Creating a personal team fires TeamCreated, and the app's own listener
+     * Creating a personal workspace fires TeamCreated, and the app's own listener
      * seeds custom fields plus the CRM fixture set for the workspace's
      * onboarding use case. So the use case is set at creation time and the app
      * populates the workspace exactly as it would for a real signup.
@@ -152,20 +152,20 @@ final readonly class PersonaSeeder
      * A persona with no use case wants an empty workspace, which means
      * suppressing that listener rather than deleting rows after the fact.
      */
-    private function createWorkspace(User $user, Persona $persona): Team
+    private function createWorkspace(User $user, Persona $persona): Workspace
     {
         $attributes = [
             'user_id' => $user->getKey(),
-            'personal_team' => true,
+            'personal_workspace' => true,
             'name' => $persona->workspace,
             'onboarding_use_case' => $persona->useCase,
         ];
 
         if ($persona->wantsRecords()) {
-            return Team::factory()->create($attributes);
+            return Workspace::factory()->create($attributes);
         }
 
-        return $this->withoutOnboardSeed(fn (): Team => Team::factory()->create($attributes));
+        return $this->withoutOnboardSeed(fn (): Workspace => Workspace::factory()->create($attributes));
     }
 
     /**
@@ -173,9 +173,9 @@ final readonly class PersonaSeeder
      * value for the request, so the cache has to be flushed on both sides of the
      * change or the flip is silently ignored.
      *
-     * @param  callable(): Team  $callback
+     * @param  callable(): Workspace  $callback
      */
-    private function withoutOnboardSeed(callable $callback): Team
+    private function withoutOnboardSeed(callable $callback): Workspace
     {
         $key = 'relaticle.features.onboard_seed';
         $previous = config($key);

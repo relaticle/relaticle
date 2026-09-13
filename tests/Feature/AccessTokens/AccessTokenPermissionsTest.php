@@ -10,7 +10,7 @@ use Laravel\Jetstream\Features;
 mutates(User::class);
 
 test('api token permissions can be updated', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $token = $user->tokens()->create([
         'name' => 'Test Token',
@@ -28,22 +28,22 @@ test('api token permissions can be updated', function () {
     expect($freshToken->abilities)->toBe(['delete', 'update']);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('table shows team name column', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+test('table shows workspace name column', function () {
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $user->tokens()->create([
         'name' => 'Test Token',
         'token' => Str::random(40),
         'abilities' => ['read'],
-        'team_id' => $user->currentTeam->id,
+        'workspace_id' => $user->currentWorkspace->id,
     ]);
 
     livewire(ManageAccessTokens::class)
-        ->assertCanRenderTableColumn('team.name');
+        ->assertCanRenderTableColumn('workspace.name');
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('table shows expiration column', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $user->tokens()->create([
         'name' => 'Expiring Token',

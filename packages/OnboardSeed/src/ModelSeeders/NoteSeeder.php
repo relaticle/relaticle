@@ -6,7 +6,7 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 
 use App\Enums\CustomFields\NoteField as NoteCustomField;
 use App\Models\Note;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Log;
@@ -35,7 +35,7 @@ final class NoteSeeder extends BaseModelSeeder
         NoteCustomField::BODY->value,
     ];
 
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
+    protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
 
@@ -81,7 +81,7 @@ final class NoteSeeder extends BaseModelSeeder
         /** @var Note $note */
         $note = $noteable->notes()->create([
             'title' => $data['title'],
-            'team_id' => $this->teamId,
+            'workspace_id' => $this->workspaceId,
             'creator_id' => $user->getAuthIdentifier(),
             ...$this->getGlobalAttributes(),
         ]);

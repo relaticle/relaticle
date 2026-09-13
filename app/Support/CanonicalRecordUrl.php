@@ -10,7 +10,7 @@ use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
-use App\Models\Team;
+use App\Models\Workspace;
 use Filament\Actions\EditAction;
 use Filament\Resources\Resource as FilamentResource;
 use Throwable;
@@ -29,7 +29,7 @@ use Throwable;
  */
 final readonly class CanonicalRecordUrl
 {
-    public function build(CrmEntity $entity, string $recordId, Team $team): ?string
+    public function build(CrmEntity $entity, string $recordId, Workspace $workspace): ?string
     {
         // The match sits outside the try on purpose: catching Throwable there would
         // swallow the UnhandledMatchError a newly added entity raises, turning a
@@ -39,8 +39,8 @@ final readonly class CanonicalRecordUrl
 
         try {
             return $modalManaged
-                ? $resource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $team)
-                : $resource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $team);
+                ? $resource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $workspace)
+                : $resource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $workspace);
         } catch (Throwable) {
             return null;
         }

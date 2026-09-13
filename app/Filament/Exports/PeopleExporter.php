@@ -19,7 +19,7 @@ final class PeopleExporter extends BaseExporter
         return [
             ExportColumn::make('id')
                 ->label(__('filament/exports.columns.id')),
-            ExportColumn::make('team.name'),
+            ExportColumn::make('workspace.name'),
             ExportColumn::make('creator.name'),
             ExportColumn::make('creation_source')
                 ->label(__('filament/exports.columns.creation_source'))

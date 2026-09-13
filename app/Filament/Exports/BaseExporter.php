@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Exports;
 
 use App\Models\CustomField;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonInterface;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
@@ -31,11 +31,11 @@ abstract class BaseExporter extends Exporter
     ) {
         parent::__construct($export, $columnMap, $options);
 
-        // Set the team_id on the export record
-        if (Auth::guard('web')->check() && Auth::guard('web')->user()->currentTeam) {
-            /** @var Team $currentTeam */
-            $currentTeam = Auth::guard('web')->user()->currentTeam;
-            $export->team_id = $currentTeam->getKey();
+        // Set the workspace_id on the export record
+        if (Auth::guard('web')->check() && Auth::guard('web')->user()->currentWorkspace) {
+            /** @var Workspace $currentWorkspace */
+            $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
+            $export->workspace_id = $currentWorkspace->getKey();
         }
     }
 
@@ -139,18 +139,18 @@ abstract class BaseExporter extends Exporter
     }
 
     /**
-     * Make exports tenant-aware by scoping to the current team
+     * Make exports tenant-aware by scoping to the current workspace
      *
      * @param  Builder<Model>  $query
      * @return Builder<Model>
      */
     public static function modifyQuery(Builder $query): Builder
     {
-        if (Auth::guard('web')->check() && Auth::guard('web')->user()->currentTeam) {
-            /** @var Team $currentTeam */
-            $currentTeam = Auth::guard('web')->user()->currentTeam;
+        if (Auth::guard('web')->check() && Auth::guard('web')->user()->currentWorkspace) {
+            /** @var Workspace $currentWorkspace */
+            $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
 
-            return $query->where('team_id', $currentTeam->getKey());
+            return $query->where('workspace_id', $currentWorkspace->getKey());
         }
 
         return $query;

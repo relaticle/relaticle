@@ -18,13 +18,13 @@ mutates(PendingActionService::class);
 beforeEach(function (): void {
     Bus::fake();
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
 it('builds ONE per-item batch proposal holding every requested record id', function (): void {
-    $tasks = Task::factory()->count(3)->for($this->user->currentTeam)->create();
+    $tasks = Task::factory()->count(3)->for($this->user->currentWorkspace)->create();
     $ids = $tasks->pluck('id')->all();
 
     $json = app(DeleteTaskTool::class)->handle(new Request(['ids' => $ids]));
@@ -47,7 +47,7 @@ it('builds ONE per-item batch proposal holding every requested record id', funct
 });
 
 it('treats a single-element ids array as one record (_record_ids with one entry, Name field)', function (): void {
-    $task = Task::factory()->for($this->user->currentTeam)->create(['title' => 'Solo']);
+    $task = Task::factory()->for($this->user->currentWorkspace)->create(['title' => 'Solo']);
 
     app(DeleteTaskTool::class)->handle(new Request(['ids' => [$task->getKey()]]));
 
@@ -60,10 +60,10 @@ it('treats a single-element ids array as one record (_record_ids with one entry,
         ->and($pending->display_data['fields'][0]['label'])->toBe('Name');
 });
 
-it('skips ids that are missing or in another team and reports them, proposing the rest', function (): void {
-    $mine = Task::factory()->count(2)->for($this->user->currentTeam)->create();
-    $otherTeamUser = User::factory()->withPersonalTeam()->create();
-    $foreign = Task::factory()->for($otherTeamUser->currentTeam)->create();
+it('skips ids that are missing or in another workspace and reports them, proposing the rest', function (): void {
+    $mine = Task::factory()->count(2)->for($this->user->currentWorkspace)->create();
+    $otherWorkspaceUser = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Task::factory()->for($otherWorkspaceUser->currentWorkspace)->create();
 
     $ids = [...$mine->pluck('id')->all(), $foreign->getKey(), 'does-not-exist'];
 
@@ -90,7 +90,7 @@ it('returns an error when ids is empty or missing', function (): void {
 });
 
 it('deletes each approved item and leaves skipped ones, per-item', function (): void {
-    $tasks = Task::factory()->count(3)->for($this->user->currentTeam)->create();
+    $tasks = Task::factory()->count(3)->for($this->user->currentWorkspace)->create();
 
     app(DeleteTaskTool::class)->handle(new Request(['ids' => $tasks->pluck('id')->all()]));
     $pending = PendingAction::query()->firstOrFail();
@@ -108,7 +108,7 @@ it('deletes each approved item and leaves skipped ones, per-item', function (): 
 });
 
 it('fails only the item whose record vanished, leaving siblings deletable', function (): void {
-    $tasks = Task::factory()->count(3)->for($this->user->currentTeam)->create();
+    $tasks = Task::factory()->count(3)->for($this->user->currentWorkspace)->create();
 
     app(DeleteTaskTool::class)->handle(new Request(['ids' => $tasks->pluck('id')->all()]));
     $pending = PendingAction::query()->firstOrFail();

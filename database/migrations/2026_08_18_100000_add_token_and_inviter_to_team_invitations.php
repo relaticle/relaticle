@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\TeamRole;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -18,7 +17,7 @@ return new class extends Migration
         });
 
         Schema::table('teams', function (Blueprint $table): void {
-            $table->string('invite_link_default_role')->default(TeamRole::Editor->value);
+            $table->string('invite_link_default_role')->default('editor');
         });
     }
 };

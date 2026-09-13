@@ -10,11 +10,11 @@ use Relaticle\Chat\Models\AiCreditBalance;
 
 beforeEach(function (): void {
     Queue::fake();
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->user->currentTeam->getKey()], [
-        'team_id' => $this->user->currentTeam->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->user->currentWorkspace->getKey()], [
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),

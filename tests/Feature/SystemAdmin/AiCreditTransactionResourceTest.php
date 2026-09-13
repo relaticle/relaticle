@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -20,26 +20,26 @@ beforeEach(function (): void {
 });
 
 it('lists transactions across all tenants', function (): void {
-    $team1 = Team::factory()->create(['name' => 'Acme']);
-    $team2 = Team::factory()->create(['name' => 'Globex']);
-    $t1 = AiCreditTransaction::factory()->create(['team_id' => $team1->getKey()]);
-    $t2 = AiCreditTransaction::factory()->create(['team_id' => $team2->getKey()]);
+    $team1 = Workspace::factory()->create(['name' => 'Acme']);
+    $team2 = Workspace::factory()->create(['name' => 'Globex']);
+    $t1 = AiCreditTransaction::factory()->create(['workspace_id' => $team1->getKey()]);
+    $t2 = AiCreditTransaction::factory()->create(['workspace_id' => $team2->getKey()]);
 
     livewire(ListAiCreditTransactions::class)
         ->assertCanSeeTableRecords([$t1, $t2])
-        ->assertCanRenderTableColumn('team.name')
+        ->assertCanRenderTableColumn('workspace.name')
         ->assertCanRenderTableColumn('credits_charged')
         ->assertCanRenderTableColumn('type');
 });
 
 it('filters transactions by type', function (): void {
-    $team = Team::factory()->create();
+    $workspace = Workspace::factory()->create();
     $chat = AiCreditTransaction::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'type' => AiCreditType::Chat,
     ]);
     $adjustment = AiCreditTransaction::factory()->adjustment()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
     ]);
 
     livewire(ListAiCreditTransactions::class)

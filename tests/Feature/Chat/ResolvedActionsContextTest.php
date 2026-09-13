@@ -22,7 +22,7 @@ function seedResolvedConv(string $id, User $user): void
         'id' => $id,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'T',
         'created_at' => now(),
         'updated_at' => now(),
@@ -54,14 +54,14 @@ it('keeps actions resolved before the last assistant message in context', functi
     // out of the resolved window, leaving only the stale "pending approval"
     // tool result in the replayed transcript. The model then told the user the
     // proposal was still awaiting approval instead of proposing again.
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-1', $user);
 
     seedResolvedAssistantMsg('conv-1', $user, now()->subMinutes(5));
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Delete, 'entity_type' => 'task',
         'action_data' => ['title' => 'Rejected before last turn'], 'display_data' => [],
@@ -70,7 +70,7 @@ it('keeps actions resolved before the last assistant message in context', functi
     ]);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Fresh Task'], 'display_data' => [],
@@ -91,13 +91,13 @@ it('keeps actions resolved before the last assistant message in context', functi
 it('caps the context at the configured message window, oldest first', function (): void {
     config(['chat.max_conversation_messages' => 20]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-1', $user);
 
     foreach (range(1, 21) as $i) {
         PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
             'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
             'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
             'action_data' => ['title' => "Task {$i}"], 'display_data' => [],
@@ -123,13 +123,13 @@ it('derives the resolved and superseded context cap from chat.max_conversation_m
     // two are actually coupled through config, not coincidentally both "20".
     config(['chat.max_conversation_messages' => 3]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-cap', $user);
 
     foreach (range(1, 4) as $i) {
         PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
             'conversation_id' => 'conv-cap', 'action_class' => CreateTask::class,
             'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
             'action_data' => ['title' => "Approved {$i}"], 'display_data' => [],
@@ -138,7 +138,7 @@ it('derives the resolved and superseded context cap from chat.max_conversation_m
         ]);
 
         PendingAction::query()->create([
-            'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
             'conversation_id' => 'conv-cap', 'action_class' => CreateTask::class,
             'operation' => PendingActionOperation::Create, 'entity_type' => 'note',
             'action_data' => ['title' => "Superseded {$i}"], 'display_data' => [],
@@ -157,12 +157,12 @@ it('derives the resolved and superseded context cap from chat.max_conversation_m
 });
 
 it('returns an empty list for another conversation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-1', $user);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-1', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'X'], 'display_data' => [],
@@ -176,13 +176,13 @@ it('returns an empty list for another conversation', function (): void {
 it('surfaces an approval even when the continuation never journals it (Bug A)', function (): void {
     Bus::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-A', $user);
     seedResolvedAssistantMsg('conv-A', $user, now()->subMinutes(2));
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-A', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Review Q3 sales pipeline'], 'display_data' => [],
@@ -199,12 +199,12 @@ it('surfaces an approval even when the continuation never journals it (Bug A)', 
 });
 
 it('labels a task create and update by the record title, never by the card heading', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-L', $user);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-L', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Review Q3 sales pipeline'],
@@ -214,7 +214,7 @@ it('labels a task create and update by the record title, never by the card headi
     ]);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-L', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Update, 'entity_type' => 'note',
         'action_data' => ['title' => 'Test Note 1 🚀', '_record_id' => 'note-1'],
@@ -232,12 +232,12 @@ it('labels a task create and update by the record title, never by the card headi
 });
 
 it('labels a delete by the record name from the card fields', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-D', $user);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-D', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Delete, 'entity_type' => 'company',
         'action_data' => ['_record_ids' => ['co-1'], '_model_class' => 'App\\Models\\Company'],
@@ -253,12 +253,12 @@ it('labels a delete by the record name from the card fields', function (): void 
 });
 
 it('labels each record of an approved batch with its own title and url', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-B', $user);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-B', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'note',
         'action_data' => ['_batch' => true, 'records' => [['title' => 'Alpha'], ['title' => 'Beta'], ['title' => 'Gamma']]],
@@ -284,12 +284,12 @@ it('labels each record of an approved batch with its own title and url', functio
 });
 
 it('leaves superseded proposals to their own block instead of listing them as decided', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-S', $user);
 
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-S', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Prepare Q4 deck'], 'display_data' => [],
@@ -307,12 +307,12 @@ it('replays proposal tool results unmutated after a decision', function (): void
     // approval. Decided status now travels only via <resolved_actions> (see
     // CrmAssistant::resolvedBlock()), so replayed tool results must stay
     // byte-identical to what the tool actually returned.
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-R', $user);
 
     $approved = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-R', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Ship it'], 'display_data' => ['title' => 'Create Task', 'fields' => [['label' => 'Title', 'value' => 'Ship it']]],
@@ -320,7 +320,7 @@ it('replays proposal tool results unmutated after a decision', function (): void
         'resolved_at' => now(), 'result_data' => ['id' => 'task-1'],
     ]);
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-R', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Still open'], 'display_data' => [],
@@ -382,7 +382,7 @@ it('keeps a proposal superseded on an earlier turn visible when a later turn sup
     // proposal from turn 1 (auto-superseded on turn 2) still has a tool result
     // sitting in the replayed transcript claiming type pending_action. The
     // model would then have no context telling it the card is gone.
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-super', $user);
 
@@ -390,7 +390,7 @@ it('keeps a proposal superseded on an earlier turn visible when a later turn sup
 
     // Turn 1: the assistant proposes.
     PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(), 'user_id' => $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
         'conversation_id' => 'conv-super', 'action_class' => CreateTask::class,
         'operation' => PendingActionOperation::Create, 'entity_type' => 'task',
         'action_data' => ['title' => 'Draft the outreach email'], 'display_data' => [],

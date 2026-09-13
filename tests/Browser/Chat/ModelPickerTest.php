@@ -5,12 +5,12 @@ declare(strict_types=1);
 use App\Models\User;
 
 it('closes the model picker when the user presses Escape', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
         ->assertVisible('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]')
         ->keys('[data-chat-context="dashboard"] [aria-label="Select AI model"]', 'Escape')
@@ -18,12 +18,12 @@ it('closes the model picker when the user presses Escape', function (): void {
 });
 
 it('reopens the model picker after Escape closes it', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/chats")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
         ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
         ->keys('[data-chat-context="dashboard"] [aria-label="Select AI model"]', 'Escape')
         ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')

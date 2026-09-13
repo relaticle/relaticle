@@ -70,7 +70,7 @@ abstract class BaseWriteDeleteTool implements Tool
 
         /** @var Collection<int, Model> $models */
         $models = $this->modelClass()::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($requestedIds)
             ->get();
 

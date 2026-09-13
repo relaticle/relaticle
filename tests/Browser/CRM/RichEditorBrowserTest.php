@@ -11,12 +11,12 @@ use App\Models\User;
 mutates(RichEditorFieldType::class, SlashMenuPlugin::class);
 
 it('hides the heading toolbar when the caret has no text selection', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -48,12 +48,12 @@ it('hides the heading toolbar when the caret has no text selection', function ()
 });
 
 it('converts selected body text to a heading from the floating toolbar', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -78,12 +78,12 @@ it('converts selected body text to a heading from the floating toolbar', functio
 });
 
 it('changes a selected heading to another level from the floating toolbar', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -108,12 +108,12 @@ it('changes a selected heading to another level from the floating toolbar', func
 });
 
 it('returns a selected heading to body text from the floating toolbar', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
         ->assertNoJavaScriptErrors();
@@ -138,12 +138,12 @@ it('returns a selected heading to body text from the floating toolbar', function
 });
 
 it('persists a heading created from selected body text', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->type('[id="mountedActionSchema0.title"]', 'Quarterly plan')
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')
@@ -169,7 +169,7 @@ it('persists a heading created from selected body text', function (): void {
 
     $note = Note::query()->where('title', 'Quarterly plan')->firstOrFail();
     $bodyField = CustomField::query()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'note')
         ->where('code', 'body')
         ->firstOrFail();
@@ -178,12 +178,12 @@ it('persists a heading created from selected body text', function (): void {
 });
 
 it('fits the selection toolbar inside a mobile viewport in both themes', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/notes")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/notes")
         ->press('New note')
         ->resize(1440, 900)
         ->assertVisible('.fi-fo-rich-editor-seamless .ProseMirror')

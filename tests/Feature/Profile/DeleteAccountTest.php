@@ -27,19 +27,19 @@ beforeEach(function (): void {
 
 test('a direct deletion call cannot bypass the confirmation form after an unrelated identity proof', function (): void {
     Notification::fake();
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->put('auth.password_confirmed_at', time() - 60);
     $component = Livewire::test(DeleteAccount::class);
 
     expect(fn (): mixed => $component->call('deleteAccount'))->toThrow(MethodNotFoundException::class);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull()
-        ->and($user->personalTeam()->scheduled_deletion_at)->toBeNull();
+        ->and($user->personalWorkspace()->scheduled_deletion_at)->toBeNull();
     Notification::assertNothingSent();
 });
 
 test('account deletion cannot be opened when the feature is disabled', function (): void {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create());
     Feature::deactivate(AccountDeletion::class);
 
     Livewire::test(DeleteAccount::class)->assertForbidden();
@@ -47,7 +47,7 @@ test('account deletion cannot be opened when the feature is disabled', function 
 
 test('an open deletion form cannot submit after the feature is disabled', function (): void {
     Notification::fake();
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->put('auth.password_confirmed_at', time());
     $component = Livewire::test(DeleteAccount::class)
         ->mountAction('deleteAccount')
@@ -57,12 +57,12 @@ test('an open deletion form cannot submit after the feature is disabled', functi
     $component->callMountedAction()->assertForbidden();
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull()
-        ->and($user->personalTeam()->scheduled_deletion_at)->toBeNull();
+        ->and($user->personalWorkspace()->scheduled_deletion_at)->toBeNull();
     Notification::assertNothingSent();
 });
 
 test('the legacy deletion form cannot bypass the disabled feature', function (): void {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create());
     Feature::deactivate(AccountDeletion::class);
 
     Livewire::test('profile.delete-user-form')->assertForbidden();
@@ -70,7 +70,7 @@ test('the legacy deletion form cannot bypass the disabled feature', function ():
 
 test('the legacy deletion form uses the confirmed deletion schedule when enabled', function (): void {
     Notification::fake();
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test('profile.delete-user-form')
         ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])
@@ -83,7 +83,7 @@ test('the legacy deletion form uses the confirmed deletion schedule when enabled
 test('schedules deletion after confirming identity and the account email', function (): void {
     Notification::fake();
 
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->put('auth.password_confirmed_at', time());
 
     Livewire::test(DeleteAccount::class)
@@ -96,7 +96,7 @@ test('schedules deletion after confirming identity and the account email', funct
 });
 
 test('blocked without a fresh confirmation', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
@@ -107,7 +107,7 @@ test('blocked without a fresh confirmation', function (): void {
 });
 
 test('a passkey-only user (no password, no social account) can delete their account through the ceremony', function (): void {
-    $user = User::factory()->withPersonalTeam()->create(['password' => null]);
+    $user = User::factory()->withPersonalWorkspace()->create(['password' => null]);
     $this->actingAs($user);
 
     Passkey::create([
@@ -133,7 +133,7 @@ test('a passkey-only user (no password, no social account) can delete their acco
 });
 
 test('password user with a passkey triggers the ceremony', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Passkey::create([
@@ -152,7 +152,7 @@ test('password user with a passkey triggers the ceremony', function (): void {
 });
 
 test('a stale freshness window does not bypass the deletion ceremony', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->put('auth.password_confirmed_at', time() - 60);
 
     Passkey::create([
@@ -171,7 +171,7 @@ test('a stale freshness window does not bypass the deletion ceremony', function 
 });
 
 test('a stale freshness window still demands the password fallback', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->put('auth.password_confirmed_at', time() - 60);
 
     Livewire::test(DeleteAccount::class)
@@ -184,7 +184,7 @@ test('a stale freshness window still demands the password fallback', function ()
 test('password fallback deletes account', function (): void {
     Notification::fake();
 
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
@@ -196,7 +196,7 @@ test('password fallback deletes account', function (): void {
 });
 
 test('wrong password is rejected', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
@@ -207,7 +207,7 @@ test('wrong password is rejected', function (): void {
 });
 
 test('social user without a fresh confirmation is blocked from deleting', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->socialOnly()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->socialOnly()->create());
 
     Livewire::test(DeleteAccount::class)
         ->callAction('deleteAccount', ['confirm_email' => $user->email])
@@ -219,7 +219,7 @@ test('social user without a fresh confirmation is blocked from deleting', functi
 test('social user completes deletion after confirming through their linked provider', function (): void {
     Notification::fake();
 
-    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $user = User::factory()->withPersonalWorkspace()->socialOnly()->create();
     $this->actingAs($user);
 
     UserSocialAccount::factory()->create([
@@ -250,7 +250,7 @@ test('social user completes deletion after confirming through their linked provi
 });
 
 test('a provider-only user returns from confirmation with the delete-account modal already open', function (): void {
-    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $user = User::factory()->withPersonalWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -278,7 +278,7 @@ test('a provider-only user returns from confirmation with the delete-account mod
 });
 
 test('a provider identity mismatch does not confirm a pending deletion', function (): void {
-    $user = User::factory()->withPersonalTeam()->socialOnly()->create();
+    $user = User::factory()->withPersonalWorkspace()->socialOnly()->create();
     $this->actingAs($user);
 
     UserSocialAccount::factory()->create([
@@ -306,14 +306,14 @@ test('a provider identity mismatch does not confirm a pending deletion', functio
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });
 
-test('user cannot schedule deletion when owning team with members', function (): void {
+test('user cannot schedule deletion when owning workspace with members', function (): void {
     Notification::fake();
 
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
     session()->put('auth.password_confirmed_at', time());
 
-    $team = $user->currentTeam;
-    $team->users()->attach(User::factory()->create(), ['role' => 'editor']);
+    $workspace = $user->currentWorkspace;
+    $workspace->users()->attach(User::factory()->create(), ['role' => 'editor']);
 
     Livewire::test(DeleteAccount::class)
         ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])
@@ -325,7 +325,7 @@ test('user cannot schedule deletion when owning team with members', function ():
 });
 
 test('delete account component renders correctly', function (): void {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test(DeleteAccount::class)
         ->assertSuccessful()
@@ -336,7 +336,7 @@ test('delete account component renders correctly', function (): void {
 });
 
 test('the confirmation modal explains what deletion keeps and removes', function () {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test(DeleteAccount::class)
         ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
@@ -345,7 +345,7 @@ test('the confirmation modal explains what deletion keeps and removes', function
 });
 
 test('a social-only account sees the same deletion scope copy', function () {
-    $this->actingAs(User::factory()->withPersonalTeam()->socialOnly()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->socialOnly()->create());
 
     Livewire::test(DeleteAccount::class)
         ->mountAction(TestAction::make('deleteAccount')->schemaComponent())
@@ -354,7 +354,7 @@ test('a social-only account sees the same deletion scope copy', function () {
 });
 
 test('the delete modal copy does not instruct users to enter a password', function (): void {
-    $this->actingAs(User::factory()->withPersonalTeam()->create());
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create());
 
     $description = Livewire::test(DeleteAccount::class)
         ->instance()
@@ -365,7 +365,7 @@ test('the delete modal copy does not instruct users to enter a password', functi
 });
 
 test('deletion is blocked until the account email is typed', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test(DeleteAccount::class)
         ->callAction('deleteAccount', ['confirm_email' => 'wrong@example.com'])
@@ -376,7 +376,7 @@ test('deletion is blocked until the account email is typed', function (): void {
 
 test('typed email confirmation is case-insensitive and trimmed', function (): void {
     Notification::fake();
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create(['email' => 'owner@example.com']));
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create(['email' => 'owner@example.com']));
     session()->forget('auth.password_confirmed_at');
 
     Livewire::test(DeleteAccount::class)
@@ -388,7 +388,7 @@ test('typed email confirmation is case-insensitive and trimmed', function (): vo
 });
 
 test('the password fallback is rate limited after repeated failures', function (): void {
-    $this->actingAs($user = User::factory()->withPersonalTeam()->create());
+    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
     session()->forget('auth.password_confirmed_at');
 
     foreach (range(1, 5) as $ignored) {

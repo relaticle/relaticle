@@ -13,6 +13,7 @@ use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TranscriptScope;
+use stdClass;
 
 final readonly class ListConversationMessages
 {
@@ -76,10 +77,10 @@ final readonly class ListConversationMessages
             : DB::table('pending_actions')
                 ->whereIn('id', $pendingIds)
                 ->where('user_id', $user->getKey())
-                ->where('team_id', $user->current_team_id)
+                ->where('workspace_id', $user->current_workspace_id)
                 ->get(['id', 'status', 'entity_type', 'turn_id', 'result_data', 'expires_at'])
                 ->keyBy('id')
-                ->map(fn (object $row): array => [
+                ->map(fn (stdClass $row): array => [
                     'status' => (string) $row->status,
                     'expires_at' => $row->expires_at === null ? null : Date::parse((string) $row->expires_at)->toIso8601String(),
                     'entity_type' => $row->entity_type === null ? null : (string) $row->entity_type,
@@ -127,8 +128,8 @@ final readonly class ListConversationMessages
             ] : null,
             'mentions' => array_values(
                 ($mentionsByMessage[$msg->id] ?? collect())
-                    ->filter(fn (object $row): bool => (string) $row->source !== 'page_context')
-                    ->map(fn (object $row): array => [
+                    ->filter(fn (stdClass $row): bool => (string) $row->source !== 'page_context')
+                    ->map(fn (stdClass $row): array => [
                         'type' => (string) $row->type,
                         'id' => (string) $row->record_id,
                         'label' => (string) $row->label,
@@ -137,8 +138,8 @@ final readonly class ListConversationMessages
                     ->all()
             ),
             'page_context' => ($mentionsByMessage[$msg->id] ?? collect())
-                ->filter(fn (object $row): bool => (string) $row->source === 'page_context')
-                ->map(fn (object $row): array => [
+                ->filter(fn (stdClass $row): bool => (string) $row->source === 'page_context')
+                ->map(fn (stdClass $row): array => [
                     'type' => (string) $row->type,
                     'id' => (string) $row->record_id,
                     'label' => (string) $row->label,

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Enums\Plan;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Services\CreditService;
@@ -18,33 +18,33 @@ final readonly class StartProTrial
     public function __construct(private CreditService $credits) {}
 
     /** @throws AuthorizationException */
-    public function execute(User $user, Team $team): bool
+    public function execute(User $user, Workspace $workspace): bool
     {
-        throw_unless($user->ownsTeam($team), AuthorizationException::class, 'Only the workspace owner can start a trial.');
+        throw_unless($user->ownsWorkspace($workspace), AuthorizationException::class, 'Only the workspace owner can start a trial.');
 
-        $started = DB::transaction(function () use ($team): bool {
-            /** @var Team $lockedTeam */
-            $lockedTeam = Team::query()->whereKey($team)->lockForUpdate()->firstOrFail();
+        $started = DB::transaction(function () use ($workspace): bool {
+            /** @var Workspace $lockedWorkspace */
+            $lockedWorkspace = Workspace::query()->whereKey($workspace)->lockForUpdate()->firstOrFail();
 
-            if ($lockedTeam->pro_trial_used_at !== null
-                || $lockedTeam->plan !== Plan::Free
-                || $lockedTeam->subscriptions()->exists()) {
+            if ($lockedWorkspace->pro_trial_used_at !== null
+                || $lockedWorkspace->plan !== Plan::Free
+                || $lockedWorkspace->subscriptions()->exists()) {
                 return false;
             }
 
-            $lockedTeam->forceFill([
+            $lockedWorkspace->forceFill([
                 'plan' => Plan::Pro,
                 'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
                 'pro_trial_used_at' => now(),
             ])->save();
 
-            $this->credits->resetPeriod($lockedTeam);
+            $this->credits->resetPeriod($lockedWorkspace);
 
             return true;
         });
 
         if ($started) {
-            $team->refresh();
+            $workspace->refresh();
         }
 
         return $started;

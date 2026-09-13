@@ -17,7 +17,7 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Prompt;
 
-#[Description('Get an overview of the CRM data for the current team, including record counts and recent activity.')]
+#[Description('Get an overview of the CRM data for the current workspace, including record counts and recent activity.')]
 final class CrmOverviewPrompt extends Prompt
 {
     private const int CACHE_TTL = 60;
@@ -39,8 +39,8 @@ final class CrmOverviewPrompt extends Prompt
     {
         /** @var User $user */
         $user = $request->user();
-        $teamId = $user->currentTeam->getKey();
-        $cacheKey = "crm_overview_{$teamId}";
+        $workspaceId = $user->currentWorkspace->getKey();
+        $cacheKey = "crm_overview_{$workspaceId}";
 
         $overview = Cache::remember($cacheKey, self::CACHE_TTL, function (): string {
             $counts = [
@@ -63,7 +63,7 @@ final class CrmOverviewPrompt extends Prompt
                 ->pluck('name')
                 ->implode(', ');
 
-            $text = "CRM Overview for current team:\n\n";
+            $text = "CRM Overview for current workspace:\n\n";
             $text .= "Record Counts:\n";
 
             foreach ($counts as $entity => $count) {

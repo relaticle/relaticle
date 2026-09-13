@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Models\Team;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -24,11 +24,11 @@ beforeEach(function (): void {
 });
 
 it('resets the period using the chosen plan allowance and logs an audit transaction', function (): void {
-    $team = Team::factory()->create();
-    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
-    AiCreditTransaction::query()->where('team_id', $team->getKey())->delete();
+    $workspace = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
+    AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->delete();
     $balance = AiCreditBalance::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 12,
         'credits_used' => 488,
     ]);
@@ -43,10 +43,10 @@ it('resets the period using the chosen plan allowance and logs an audit transact
     expect($balance->credits_remaining)->toBe(Plan::Pro->credits())
         ->and($balance->credits_used)->toBe(0);
 
-    expect($team->fresh()->plan)->toBe(Plan::Pro);
+    expect($workspace->fresh()->plan)->toBe(Plan::Pro);
 
     $transaction = AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('type', AiCreditType::Adjustment)
         ->latest('id')
         ->first();
@@ -62,12 +62,12 @@ it('resets the period using the chosen plan allowance and logs an audit transact
 });
 
 it('resets multiple balances via the bulk action', function (): void {
-    $team1 = Team::factory()->create();
-    $team2 = Team::factory()->create();
-    AiCreditBalance::query()->where('team_id', $team1->getKey())->delete();
-    $b1 = AiCreditBalance::factory()->create(['team_id' => $team1->getKey(), 'credits_remaining' => 0, 'credits_used' => 100]);
-    AiCreditBalance::query()->where('team_id', $team2->getKey())->delete();
-    $b2 = AiCreditBalance::factory()->create(['team_id' => $team2->getKey(), 'credits_remaining' => 5, 'credits_used' => 200]);
+    $team1 = Workspace::factory()->create();
+    $team2 = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $team1->getKey())->delete();
+    $b1 = AiCreditBalance::factory()->create(['workspace_id' => $team1->getKey(), 'credits_remaining' => 0, 'credits_used' => 100]);
+    AiCreditBalance::query()->where('workspace_id', $team2->getKey())->delete();
+    $b2 = AiCreditBalance::factory()->create(['workspace_id' => $team2->getKey(), 'credits_remaining' => 5, 'credits_used' => 200]);
 
     livewire(ListAiCreditBalances::class)
         ->selectTableRecords([$b1->getKey(), $b2->getKey()])
@@ -82,9 +82,9 @@ it('resets multiple balances via the bulk action', function (): void {
 });
 
 it('renders all Plan enum cases as reset-action plan options', function (): void {
-    $team = Team::factory()->create();
-    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
-    $balance = AiCreditBalance::factory()->create(['team_id' => $team->getKey()]);
+    $workspace = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
+    $balance = AiCreditBalance::factory()->create(['workspace_id' => $workspace->getKey()]);
 
     livewire(ListAiCreditBalances::class)
         ->mountAction(TestAction::make('resetPeriod')->table($balance))

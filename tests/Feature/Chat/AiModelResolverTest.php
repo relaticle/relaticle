@@ -10,7 +10,7 @@ use Relaticle\Chat\Services\ModelRegistry;
 mutates(AiModelResolver::class, ModelRegistry::class);
 
 it('falls back to Sonnet when the users preference is not allowed by their plan', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
@@ -21,9 +21,9 @@ it('falls back to Sonnet when the users preference is not allowed by their plan'
 });
 
 it('honors the users preference when their plan allows it', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $user->currentTeam->plan = Plan::Pro;
-    $user->currentTeam->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $user->currentWorkspace->plan = Plan::Pro;
+    $user->currentWorkspace->save();
     $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
     $user->refresh();
@@ -34,7 +34,7 @@ it('honors the users preference when their plan allows it', function (): void {
 });
 
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5.5');
 
@@ -42,7 +42,7 @@ it('falls back to Sonnet when an override is disallowed by the plan', function (
 });
 
 it('resolves Auto to Sonnet for any plan', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
 
@@ -50,9 +50,9 @@ it('resolves Auto to Sonnet for any plan', function (): void {
 });
 
 it('falls back to ClaudeSonnet when a Gemini model is requested', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
-    $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gemini-3-flash');
     expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
@@ -62,7 +62,7 @@ it('resolves an explicit Ollama request when Ollama is configured', function ():
     config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
     expect($resolved)->toMatchArray(['provider' => 'ollama', 'model' => 'qwen3:14b']);
@@ -72,7 +72,7 @@ it('falls back to Sonnet when Ollama is requested but not configured', function 
     config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
     expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
@@ -84,7 +84,7 @@ it('resolves Auto to Ollama when no cloud provider is configured', function (): 
     config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
     expect($resolved)->toMatchArray(['provider' => 'ollama', 'model' => 'qwen3:14b']);
@@ -94,7 +94,7 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
     config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
     expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
@@ -105,7 +105,7 @@ it('falls back to an available plan-gated model when the plan allows no configur
     config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
     expect($resolved)->toMatchArray(['provider' => 'openai', 'model' => 'gpt-5.5']);
@@ -117,7 +117,7 @@ it('falls back to Sonnet when no provider is configured at all', function (): vo
     config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
     expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
@@ -127,7 +127,7 @@ it('honors an Ollama default-model preference when configured', function (): voi
     config()->set('chat.ollama.model', 'llama3.1:70b');
     app()->forgetInstance(ModelRegistry::class);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $user->ai_preferences = ['default_model' => 'ollama'];
     $user->save();
     $user->refresh();
@@ -137,7 +137,7 @@ it('honors an Ollama default-model preference when configured', function (): voi
 });
 
 it('labels explicit and auto resolutions', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $explicit = resolve(AiModelResolver::class)->resolve($user, 'claude-sonnet-5');
     $auto = resolve(AiModelResolver::class)->resolve($user, null);
@@ -149,8 +149,8 @@ it('labels explicit and auto resolutions', function (): void {
 });
 
 it('fails over to the next available chain entry', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $user->currentTeam->forceFill(['plan' => Plan::Pro])->save();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
 
     $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5');
 
@@ -161,7 +161,7 @@ it('fails over to the next available chain entry', function (): void {
 });
 
 it('returns null once the auto chain is exhausted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $next = resolve(AiModelResolver::class)->failoverNext($user, 'ollama');
 
@@ -176,7 +176,7 @@ it('throws a clear error when no chat model is configured', function (): void {
     ]);
 
     $resolver = new AiModelResolver(new ModelRegistry);
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     expect(fn (): array => $resolver->resolve($user))
         ->toThrow(RuntimeException::class, 'No chat model is configured');

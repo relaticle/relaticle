@@ -21,7 +21,7 @@ use PragmaRX\Google2FA\Google2FA;
 mutates(UpdatePasswordComponent::class, UpdateUserPassword::class, IdentityConfirmationController::class, ConfirmIdentity::class);
 
 test('password component renders correctly', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(UpdatePasswordComponent::class)
@@ -30,7 +30,7 @@ test('password component renders correctly', function () {
 });
 
 test('password can be updated', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -47,7 +47,7 @@ test('password can be updated', function () {
 });
 
 test('current password must be correct', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -63,7 +63,7 @@ test('current password must be correct', function () {
 });
 
 test('new passwords must match', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -77,7 +77,7 @@ test('new passwords must match', function () {
 });
 
 test('social user sees set password form without current password field', function () {
-    $this->actingAs(User::factory()->withTeam()->socialOnly()->create());
+    $this->actingAs(User::factory()->withWorkspace()->socialOnly()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->assertSuccessful()
@@ -86,7 +86,7 @@ test('social user sees set password form without current password field', functi
 });
 
 test('a passwordless session cannot set a password without identity confirmation', function (): void {
-    $this->actingAs($user = User::factory()->withTeam()->socialOnly()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->socialOnly()->create());
 
     Livewire::test(UpdatePasswordComponent::class)
         ->fillForm([
@@ -114,7 +114,7 @@ test('the password endpoint rejects a correct password without a scoped grant', 
 });
 
 test('social user who set a password then sees update password form', function () {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $user->forceFill(['password' => Hash::make('my-password')])->save();
 
     $this->actingAs($user);
@@ -132,7 +132,7 @@ test('social user who set a password then sees update password form', function (
 
 test('an enrolled account must provide MFA before saving a password', function (): void {
     $this->freezeTime();
-    $user = User::factory()->withTeam()->withConfirmedMfa()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $this->actingAs($user);
     $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
     $component = Livewire::test(UpdatePasswordComponent::class)
@@ -157,7 +157,7 @@ test('an enrolled account must provide MFA before saving a password', function (
 });
 
 test('a passwordless account can set a password after returning from its linked provider', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
         'provider_name' => SocialiteProvider::GOOGLE->value,
@@ -199,7 +199,7 @@ test('a passwordless account can set a password after returning from its linked 
 });
 
 test('the password endpoint consumes the confirmed password grant once', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     $exceptionHandler = Exceptions::handler();
     Livewire::test(UpdatePasswordComponent::class)

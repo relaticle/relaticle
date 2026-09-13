@@ -9,19 +9,19 @@ use Illuminate\Support\Str;
 mutates(ManageAccessTokens::class);
 
 it('scrolls a table wider than its card so the row actions stay reachable', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $user->tokens()->create([
         'name' => 'Deploy script',
         'token' => Str::random(40),
         'abilities' => ['create', 'read'],
-        'team_id' => $team->id,
+        'workspace_id' => $workspace->id,
     ]);
 
     $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/settings/access-tokens")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/settings/access-tokens")
         ->resize(1280, 900)
         ->assertSee('Deploy script');
 

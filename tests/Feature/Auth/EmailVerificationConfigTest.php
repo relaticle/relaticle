@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Company;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -38,9 +38,9 @@ it('reports every user as verified when the flag is off so framework, Filament, 
     expect($unverified->hasVerifiedEmail())->toBeTrue();
 
     // Spot-check that the override actually unblocks ordinary policy checks.
-    $team = Team::factory()->create(['user_id' => $unverified->id]);
-    $unverified->forceFill(['current_team_id' => $team->id])->save();
-    $unverified->refresh()->setRelation('currentTeam', $team);
+    $workspace = Workspace::factory()->create(['user_id' => $unverified->id]);
+    $unverified->forceFill(['current_workspace_id' => $workspace->id])->save();
+    $unverified->refresh()->setRelation('currentWorkspace', $workspace);
 
     expect($unverified->can('viewAny', Company::class))->toBeTrue();
 });

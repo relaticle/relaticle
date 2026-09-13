@@ -30,7 +30,7 @@ use PHPStan\Type\ObjectType;
  * authenticated user, which is hydrated on its own and therefore never carries
  * the guard.
  *
- * Nullsafe access (`$record?->team`) is covered too: PHPStan desugars it into a
+ * Nullsafe access (`$record?->workspace`) is covered too: PHPStan desugars it into a
  * plain property fetch on the non-null branch.
  *
  * @implements Rule<PropertyFetch>

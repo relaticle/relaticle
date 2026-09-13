@@ -7,7 +7,7 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 use App\Enums\CustomFields\PeopleField as PeopleCustomField;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Log;
 use Relaticle\OnboardSeed\Support\BaseModelSeeder;
@@ -26,7 +26,7 @@ final class PeopleSeeder extends BaseModelSeeder
         PeopleCustomField::LINKEDIN->value,
     ];
 
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
+    protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
 
@@ -47,12 +47,12 @@ final class PeopleSeeder extends BaseModelSeeder
                 continue;
             }
 
-            $this->createPersonFromFixture($company, $team, $user, $key, $data);
+            $this->createPersonFromFixture($company, $workspace, $user, $key, $data);
         }
     }
 
     /** @param  array<string, mixed>  $data */
-    private function createPersonFromFixture(Company $company, Team $team, Authenticatable $user, string $key, array $data): People
+    private function createPersonFromFixture(Company $company, Workspace $workspace, Authenticatable $user, string $key, array $data): People
     {
         $attributes = [
             'name' => $data['name'],
@@ -62,6 +62,6 @@ final class PeopleSeeder extends BaseModelSeeder
         $customFields = $data['custom_fields'] ?? [];
 
         /** @var People */
-        return $this->registerEntityFromFixture($key, $attributes, $customFields, $team, $user);
+        return $this->registerEntityFromFixture($key, $attributes, $customFields, $workspace, $user);
     }
 }

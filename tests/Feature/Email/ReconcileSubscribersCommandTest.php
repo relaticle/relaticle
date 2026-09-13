@@ -20,7 +20,7 @@ beforeEach(function (): void {
 
 function userWithCurrentProfileHash(): User
 {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'email_verified_at' => now(),
         'mailcoach_subscriber_uuid' => 'mc-uuid-current',
     ]);
@@ -34,7 +34,7 @@ function userWithCurrentProfileHash(): User
 test('dispatches sync jobs only for users whose derived profile drifted', function (): void {
     $current = userWithCurrentProfileHash();
 
-    $drifted = User::factory()->withTeam()->create([
+    $drifted = User::factory()->withWorkspace()->create([
         'email_verified_at' => now(),
         'mailcoach_subscriber_uuid' => 'mc-uuid-drifted',
         'subscriber_profile_hash' => 'stale-hash',
@@ -49,7 +49,7 @@ test('dispatches sync jobs only for users whose derived profile drifted', functi
 });
 
 test('dispatches for verified users who never received a subscriber uuid', function (): void {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'email_verified_at' => now(),
         'mailcoach_subscriber_uuid' => null,
     ]);
@@ -60,7 +60,7 @@ test('dispatches for verified users who never received a subscriber uuid', funct
 });
 
 test('does not re-dispatch a user whose unchanged profile Mailcoach already rejected', function (): void {
-    $rejected = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $rejected = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
     $rejected->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($rejected)->hash()])->save();
 
     $this->artisan('subscribers:reconcile')
@@ -72,7 +72,7 @@ test('does not re-dispatch a user whose unchanged profile Mailcoach already reje
 });
 
 test('reports the rejected skip count on a dry run too', function (): void {
-    $rejected = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $rejected = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
     $rejected->forceFill(['rejected_subscriber_profile_hash' => (new SubscriberProfileDeriver)->derive($rejected)->hash()])->save();
 
     $this->artisan('subscribers:reconcile', ['--dry-run' => true])
@@ -82,7 +82,7 @@ test('reports the rejected skip count on a dry run too', function (): void {
 });
 
 test('stays silent about rejected profiles when there are none', function (): void {
-    User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
 
     $this->artisan('subscribers:reconcile')
         ->doesntExpectOutputToContain('Mailcoach already rejected')
@@ -90,7 +90,7 @@ test('stays silent about rejected profiles when there are none', function (): vo
 });
 
 test('re-dispatches a rejected user once the derived profile differs from the rejected one', function (): void {
-    $user = User::factory()->withTeam()->create([
+    $user = User::factory()->withWorkspace()->create([
         'email_verified_at' => now(),
         'rejected_subscriber_profile_hash' => 'hash-of-the-old-dead-address',
     ]);
@@ -103,7 +103,7 @@ test('re-dispatches a rejected user once the derived profile differs from the re
 });
 
 test('skips unverified users', function (): void {
-    User::factory()->withTeam()->create(['email_verified_at' => null]);
+    User::factory()->withWorkspace()->create(['email_verified_at' => null]);
 
     $this->artisan('subscribers:reconcile')
         ->expectsOutputToContain('Dispatched 0 sync jobs.')
@@ -113,7 +113,7 @@ test('skips unverified users', function (): void {
 });
 
 test('dry-run lists drifted users without dispatching', function (): void {
-    $user = User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    $user = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
 
     $this->artisan('subscribers:reconcile --dry-run')
         ->expectsOutputToContain("Would sync {$user->email}")
@@ -124,7 +124,7 @@ test('dry-run lists drifted users without dispatching', function (): void {
 });
 
 test('limit caps the number of dispatched jobs', function (): void {
-    User::factory()->withTeam()->count(3)->create(['email_verified_at' => now()]);
+    User::factory()->withWorkspace()->count(3)->create(['email_verified_at' => now()]);
 
     $this->artisan('subscribers:reconcile --limit=2')
         ->expectsOutputToContain('Dispatched 2 sync jobs.')
@@ -136,7 +136,7 @@ test('limit caps the number of dispatched jobs', function (): void {
 test('does nothing when sync is disabled', function (): void {
     config(['mailcoach-sdk.enabled_subscribers_sync' => false]);
 
-    User::factory()->withTeam()->create(['email_verified_at' => now()]);
+    User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
 
     $this->artisan('subscribers:reconcile')
         ->expectsOutputToContain('Mailcoach subscriber sync is disabled.')

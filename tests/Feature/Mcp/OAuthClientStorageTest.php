@@ -6,7 +6,7 @@ use App\Models\User;
 use Laravel\Passport\Passport;
 
 it('persists an OAuth client owned by a ULID user', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $client = Passport::clientModel()::create([
         'name' => 'Test Directory Client',

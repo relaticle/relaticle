@@ -12,8 +12,8 @@ mutates(ProposalFieldSchemaDescriber::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
 });
 
 function describerFor(): ProposalFieldSchemaDescriber
@@ -63,7 +63,7 @@ it('describes company core name and account_owner_id select with member options'
 
 it('describes a company custom link field with kind link and a raw array value', function (): void {
     $linkedin = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'linkedin')
         ->first();
@@ -88,7 +88,7 @@ it('describes a company custom link field with kind link and a raw array value',
 
 it('describes a task single-choice status field with options and the raw id value', function (): void {
     $status = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->with('options')
@@ -152,7 +152,7 @@ it('omits deferred record-link and assignee core fields', function (): void {
 
 it('reports a custom field the tenant marked required as required', function (): void {
     $linkedin = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'linkedin')
         ->first();

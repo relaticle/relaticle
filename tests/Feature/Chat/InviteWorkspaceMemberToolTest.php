@@ -1,0 +1,349 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Actions\Workspace\CreateWorkspaceInvitation;
+use App\Enums\WorkspaceRole;
+use App\Filament\Pages\Workspace\Members;
+use App\Mail\WorkspaceInvitationMail;
+use App\Models\User;
+use App\Models\WorkspaceInvitation;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Laravel\Ai\Tools\Request;
+use Livewire\Livewire;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\DestinationResolver;
+use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
+use Symfony\Component\Mailer\Exception\TransportException;
+
+mutates(InviteWorkspaceMemberTool::class);
+
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
+    $this->actingAs($this->user);
+    Filament::setTenant($this->workspace);
+});
+
+function pendingActionForWorkspace(User $user): PendingAction
+{
+    return PendingAction::query()
+        ->where('workspace_id', $user->currentWorkspace->getKey())
+        ->latest()
+        ->firstOrFail();
+}
+
+it('creates one pending action for a batch of two invitations, carrying both emails', function (): void {
+    $tool = app(InviteWorkspaceMemberTool::class);
+
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => 'alex@example.com', 'role' => 'admin'],
+            ['email' => 'jamie@example.com', 'role' => 'editor'],
+        ],
+    ]));
+
+    expect(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(1);
+
+    $pending = pendingActionForWorkspace($this->user);
+
+    expect($pending->action_class)->toBe(CreateWorkspaceInvitation::class)
+        ->and($pending->entity_type)->toBe('workspace_invitations')
+        ->and($pending->action_data['_batch'])->toBeTrue()
+        ->and(collect($pending->action_data['records'])->pluck('email')->all())
+        ->toBe(['alex@example.com', 'jamie@example.com']);
+});
+
+it('approving a single invitation proposal writes the row and sends the invite mail', function (): void {
+    Mail::fake();
+    $tool = app(InviteWorkspaceMemberTool::class);
+
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => 'new-teammate@example.com', 'role' => 'editor'],
+        ],
+    ]));
+
+    $pending = pendingActionForWorkspace($this->user);
+
+    resolve(PendingActionService::class)->approve($pending, $this->user);
+
+    expect(WorkspaceInvitation::query()
+        ->where('workspace_id', $this->workspace->getKey())
+        ->where('email', 'new-teammate@example.com')
+        ->exists())->toBeTrue();
+
+    Mail::assertQueued(WorkspaceInvitationMail::class);
+});
+
+it('keeps the mail transport failure off the card when the invite email cannot be sent', function (): void {
+    $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
+
+    app(InviteWorkspaceMemberTool::class)->handle(new Request([
+        'records' => [['email' => 'undeliverable@example.com', 'role' => 'editor']],
+    ]));
+
+    $pending = pendingActionForWorkspace($this->user);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved')
+        ->assertHasErrors('resolve');
+
+    $shown = $component->errors()->first('resolve');
+
+    expect($shown)->toBe('The email could not be sent, so nothing was saved. Please try again in a moment.')
+        ->and($shown)->not->toContain('smtp.internal.test')
+        ->and($shown)->not->toContain('postmaster@relaticle');
+
+    expect(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('approving an email that already belongs to a workspace member surfaces the validation error and writes no row', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Editor->value]);
+
+    $tool = app(InviteWorkspaceMemberTool::class);
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => $member->email, 'role' => 'editor'],
+        ],
+    ]));
+
+    $pending = pendingActionForWorkspace($this->user);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->user))
+        ->toThrow(ValidationException::class);
+
+    expect(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('rejects a role outside editor|viewer|admin before proposing', function (): void {
+    $tool = app(InviteWorkspaceMemberTool::class);
+
+    $result = $tool->handle(new Request([
+        'records' => [
+            ['email' => 'owner-role@example.com', 'role' => 'owner'],
+        ],
+    ]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded['error'])->toContain('Role must be "editor", "viewer", or "admin"')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('proposes a viewer invitation, the role the members form also offers', function (): void {
+    $tool = app(InviteWorkspaceMemberTool::class);
+
+    $result = $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => WorkspaceRole::Viewer->value],
+        ],
+    ]));
+
+    expect(json_decode($result, true))->not->toHaveKey('error');
+
+    expect(pendingActionForWorkspace($this->user)->action_data['role'])->toBe(WorkspaceRole::Viewer->value);
+});
+
+it('creates a viewer membership when a viewer invitation is approved and accepted', function (): void {
+    $tool = app(InviteWorkspaceMemberTool::class);
+
+    $tool->handle(new Request([
+        'records' => [
+            ['email' => 'read-only@example.com', 'role' => WorkspaceRole::Viewer->value],
+        ],
+    ]));
+
+    resolve(PendingActionService::class)->approve(pendingActionForWorkspace($this->user), $this->user);
+
+    expect(WorkspaceInvitation::query()->where('email', 'read-only@example.com')->sole()->role)
+        ->toBe(WorkspaceRole::Viewer->value);
+});
+
+it('rejects a batch over the configured max batch size', function (): void {
+    $max = (int) config('chat.max_batch_size');
+    $records = array_map(
+        fn (int $i): array => ['email' => "person{$i}@example.com", 'role' => 'editor'],
+        range(1, $max + 1),
+    );
+
+    $tool = app(InviteWorkspaceMemberTool::class);
+    $result = $tool->handle(new Request(['records' => $records]));
+
+    $decoded = json_decode($result, true);
+
+    expect($decoded['error'])->toContain('Too many records')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('refuses to propose an invitation for a member who does not own the workspace', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $this->actingAs($member);
+    Filament::setTenant($this->workspace);
+
+    $result = (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+    ]));
+
+    expect($result)->toContain('Only workspace owners and administrators can invite teammates')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
+        ->and(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('never links the non-owner refusal to a page that would 403 for them', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $this->actingAs($member);
+    Filament::setTenant($this->workspace);
+
+    $result = (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+    ]));
+
+    $membersUrl = resolve(DestinationResolver::class)->resolve('workspace_members', $this->workspace);
+
+    expect(Members::canAccess())->toBeFalse()
+        ->and($result)->toContain('Only workspace owners and administrators can invite teammates')
+        ->and($result)->toContain('ask one')
+        ->and($result)->not->toContain($membersUrl)
+        ->and($result)->not->toContain('http');
+});
+
+it('does not render a name row on the invitation card', function (): void {
+    (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Admin->value]],
+    ]));
+
+    $display = pendingActionForWorkspace($this->user)->display_data;
+    $labels = array_column($display['fields'] ?? [], 'label');
+
+    expect($labels)->not->toContain('Name')
+        ->and($labels)->toContain('Email')
+        ->and(ProposalCoreFields::titleKey('workspace_invitations'))->toBe('email');
+});
+
+it('labels a resolved invitation by its email so the assistant can name it', function (): void {
+    Mail::fake();
+
+    (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Admin->value]],
+    ]));
+
+    $pending = pendingActionForWorkspace($this->user);
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $this->workspace->getKey(),
+        'participant_type' => $this->user->getMorphClass(),
+        'participant_id' => (string) $this->user->getKey(),
+        'title' => 'Invites',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $pending->forceFill(['conversation_id' => $conversationId])->save();
+
+    resolve(PendingActionService::class)->approve($pending->fresh(), $this->user);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null);
+
+    expect($resolved[0]['label'] ?? null)->toBe('alex@example.com');
+});
+
+it('names the entity in plain words on a batch card', function (): void {
+    (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [
+            ['email' => 'one@example.com', 'role' => WorkspaceRole::Editor->value],
+            ['email' => 'two@example.com', 'role' => WorkspaceRole::Editor->value],
+        ],
+    ]));
+
+    $display = pendingActionForWorkspace($this->user)->display_data;
+
+    expect($display['summary'] ?? '')->not->toContain('workspace_invitations')
+        ->and($display['summary'] ?? '')->toContain('workspace invitations');
+});
+
+it('keeps the mail transport failure off the card on the batch path too', function (): void {
+    $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
+
+    app(InviteWorkspaceMemberTool::class)->handle(new Request([
+        'records' => [
+            ['email' => 'first@example.com', 'role' => 'editor'],
+            ['email' => 'second@example.com', 'role' => 'editor'],
+        ],
+    ]));
+
+    $pending = pendingActionForWorkspace($this->user);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertHasErrors('resolve');
+
+    $shown = $component->errors()->first('resolve');
+
+    expect($shown)->not->toContain('smtp.internal.test')
+        ->and($shown)->not->toContain('postmaster@relaticle')
+        ->and($shown)->not->toContain('587');
+
+    expect(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('lets an administrator propose an invitation', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->workspace);
+
+    $result = (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+    ]));
+
+    expect($result)->not->toContain('Only the workspace owner can invite teammates')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(1);
+});
+
+it('refuses an administrator proposing another administrator', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->workspace);
+
+    $result = (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Admin->value]],
+    ]));
+
+    expect($result)->toContain('Only the workspace owner')
+        ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});

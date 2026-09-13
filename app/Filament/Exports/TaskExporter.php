@@ -19,7 +19,7 @@ final class TaskExporter extends BaseExporter
         return [
             ExportColumn::make('id')
                 ->label(__('filament/exports.columns.id')),
-            ExportColumn::make('team.name'),
+            ExportColumn::make('workspace.name'),
             ExportColumn::make('creator.name'),
             ExportColumn::make('creation_source')
                 ->formatStateUsing(fn (mixed $state): string => $state->value ?? (string) $state),

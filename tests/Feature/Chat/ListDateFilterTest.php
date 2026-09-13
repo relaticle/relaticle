@@ -21,17 +21,17 @@ mutates(ListOpportunities::class, ListCompanies::class, ListPeople::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 });
 
 it('filters opportunities by created_after', function (): void {
     $this->travelTo(now()->subDays(10));
-    Opportunity::factory()->for($this->team)->create(['name' => 'Old Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Old Deal']);
 
     $this->travelBack();
-    Opportunity::factory()->for($this->team)->create(['name' => 'New Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'New Deal']);
 
     $tool = new ListOpportunitiesTool;
     $response = $tool->handle(new Request([
@@ -47,10 +47,10 @@ it('filters opportunities by created_after', function (): void {
 
 it('filters opportunities by created_before', function (): void {
     $this->travelTo(now()->subDays(10));
-    Opportunity::factory()->for($this->team)->create(['name' => 'Old Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Old Deal']);
 
     $this->travelBack();
-    Opportunity::factory()->for($this->team)->create(['name' => 'New Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'New Deal']);
 
     $tool = new ListOpportunitiesTool;
     $response = $tool->handle(new Request([
@@ -68,13 +68,13 @@ it('filters opportunities by both created_after and created_before', function ()
     $now = now();
 
     $this->travelTo($now->copy()->subDays(20));
-    Opportunity::factory()->for($this->team)->create(['name' => 'Very Old']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Very Old']);
 
     $this->travelTo($now->copy()->subDays(7));
-    Opportunity::factory()->for($this->team)->create(['name' => 'Mid Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Mid Deal']);
 
     $this->travelTo($now);
-    Opportunity::factory()->for($this->team)->create(['name' => 'Fresh Deal']);
+    Opportunity::factory()->for($this->workspace)->create(['name' => 'Fresh Deal']);
 
     $tool = new ListOpportunitiesTool;
     $response = $tool->handle(new Request([
@@ -91,10 +91,10 @@ it('filters opportunities by both created_after and created_before', function ()
 
 it('filters companies by created_after', function (): void {
     $this->travelTo(now()->subDays(10));
-    Company::factory()->for($this->team)->create(['name' => 'Old Co']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Old Co']);
 
     $this->travelBack();
-    Company::factory()->for($this->team)->create(['name' => 'New Co']);
+    Company::factory()->for($this->workspace)->create(['name' => 'New Co']);
 
     $tool = new ListCompaniesTool;
     $response = $tool->handle(new Request([
@@ -110,10 +110,10 @@ it('filters companies by created_after', function (): void {
 
 it('filters people by created_after', function (): void {
     $this->travelTo(now()->subDays(10));
-    People::factory()->for($this->team)->create(['name' => 'Old Person']);
+    People::factory()->for($this->workspace)->create(['name' => 'Old Person']);
 
     $this->travelBack();
-    People::factory()->for($this->team)->create(['name' => 'New Person']);
+    People::factory()->for($this->workspace)->create(['name' => 'New Person']);
 
     $tool = new ListPeopleTool;
     $response = $tool->handle(new Request([

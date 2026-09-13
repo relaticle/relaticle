@@ -22,7 +22,7 @@ test('forgot password page can be rendered', function () {
 test('reset password link can be requested', function () {
     Notification::fake();
 
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     livewire(RequestPasswordReset::class)
         ->fillForm([
@@ -63,7 +63,7 @@ test('an unknown email answers with the same sent notification as a known one', 
 test('a mixed-case typed email still reaches the account that owns the mailbox', function () {
     Notification::fake();
 
-    $user = User::factory()->withTeam()->create(['email' => 'reset-case-'.uniqid().'@example.com']);
+    $user = User::factory()->withWorkspace()->create(['email' => 'reset-case-'.uniqid().'@example.com']);
 
     livewire(RequestPasswordReset::class)
         ->fillForm([
@@ -81,7 +81,7 @@ test('the fortify forgot-password endpoint is not exposed', function () {
 });
 
 test('password can be reset with valid token', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     livewire(ResetPassword::class, [
@@ -100,7 +100,7 @@ test('password can be reset with valid token', function () {
 });
 
 test('password cannot be reset with invalid token', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     livewire(ResetPassword::class, [
         'email' => $user->email,
@@ -117,7 +117,7 @@ test('password cannot be reset with invalid token', function () {
 });
 
 test('password reset requires confirmation to match', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     livewire(ResetPassword::class, [
@@ -135,7 +135,7 @@ test('password reset requires confirmation to match', function () {
 });
 
 test('signed password reset URL is accessible', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
@@ -144,7 +144,7 @@ test('signed password reset URL is accessible', function () {
 });
 
 test('password reset URL with decoded percent-encoding is accessible', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
@@ -153,7 +153,7 @@ test('password reset URL with decoded percent-encoding is accessible', function 
 });
 
 test('password reset URL with tampered email is rejected', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     $url = Filament::getPanel('app')->getResetPasswordUrl($token, $user);
@@ -165,7 +165,7 @@ test('password reset URL with tampered email is rejected', function () {
 });
 
 test('authenticated user is redirected from forgot password page', function () {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     livewire(RequestPasswordReset::class)

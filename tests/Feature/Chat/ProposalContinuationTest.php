@@ -34,24 +34,24 @@ mutates(TurnContinuationService::class);
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019df900-9999-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     AiCreditBalance::query()->updateOrCreate(
-        ['team_id' => $this->user->currentTeam->getKey()],
+        ['workspace_id' => $this->user->currentWorkspace->getKey()],
         ['credits_remaining' => 50, 'credits_used' => 0, 'purchased_credits' => 0],
     );
 });
@@ -59,7 +59,7 @@ beforeEach(function (): void {
 function continuationProposal(User $user, string $conversationId, string $turnId, string $name): PendingAction
 {
     return PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'turn_id' => $turnId,
@@ -152,7 +152,7 @@ it('hands the resume back when the queued turn finds a step still pending', func
 
     resolve(ProcessChatMessage::class, [
         'user' => $this->user,
-        'team' => $this->user->currentTeam,
+        'workspace' => $this->user->currentWorkspace,
         'message' => TurnContinuationService::PROMPT,
         'conversationId' => $this->convId,
         'resolved' => resolve(AiModelResolver::class)->resolve($this->user),
@@ -171,7 +171,7 @@ it('skips the resume when the workspace is out of credits', function (): void {
     Queue::fake();
 
     AiCreditBalance::query()
-        ->where('team_id', $this->user->currentTeam->getKey())
+        ->where('workspace_id', $this->user->currentWorkspace->getKey())
         ->update(['credits_remaining' => 0]);
 
     $queued = resolve(TurnContinuationService::class)
@@ -184,11 +184,11 @@ it('skips the resume when the workspace is out of credits', function (): void {
 it('charges one credit for the resumed turn', function (): void {
     Queue::fake();
 
-    $before = AiCreditBalance::query()->where('team_id', $this->user->currentTeam->getKey())->value('credits_remaining');
+    $before = AiCreditBalance::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->value('credits_remaining');
 
     resolve(TurnContinuationService::class)->resume($this->user, $this->convId, (string) Str::ulid());
 
-    $after = AiCreditBalance::query()->where('team_id', $this->user->currentTeam->getKey())->value('credits_remaining');
+    $after = AiCreditBalance::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->value('credits_remaining');
 
     expect($after)->toBe($before - 1);
 });
@@ -228,15 +228,15 @@ it('hides the resumed turn prompt from the transcript but keeps every other mess
 });
 
 it('clears the continuation flag when the resumed turn dies before it stores anything', function (): void {
-    $team = $this->user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro])->save();
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
 
     AnthropicSse::fake(AnthropicSse::TERMINAL_ERROR);
     Queue::fake();
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $team,
+        workspace: $workspace,
         message: TurnContinuationService::PROMPT,
         conversationId: $this->convId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -254,8 +254,8 @@ it('clears the continuation flag when the resumed turn dies before it stores any
 });
 
 it('leaves the next job on the worker to store its own question as the user typed it', function (): void {
-    $team = $this->user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro])->save();
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
 
     Http::fake([
         'api.anthropic.com/*' => Http::sequence()
@@ -273,7 +273,7 @@ it('leaves the next job on the worker to store its own question as the user type
     try {
         (new ProcessChatMessage(
             user: $this->user,
-            team: $team,
+            workspace: $workspace,
             message: TurnContinuationService::PROMPT,
             conversationId: $this->convId,
             resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -287,7 +287,7 @@ it('leaves the next job on the worker to store its own question as the user type
     // The very next job the worker picks up, with its own question.
     (new ProcessChatMessage(
         user: $this->user,
-        team: $team,
+        workspace: $workspace,
         message: 'What did we agree with Acme?',
         conversationId: $this->convId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],

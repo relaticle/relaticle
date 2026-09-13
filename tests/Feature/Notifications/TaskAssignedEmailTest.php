@@ -18,26 +18,26 @@ beforeEach(function (): void {
 });
 
 it('emails a newly assigned user when their email channel is on', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentTeam->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
     $assignee->update(['notification_preferences' => ['task_assigned' => ['email' => true]]]);
 
-    $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'Follow up']);
+    $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
 
     resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
     defer()->invoke();
 
-    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $m): bool => $m->hasTo($assignee->email) && $m->teamName === $owner->currentTeam->name);
+    Mail::assertQueued(TaskAssignedMail::class, fn (TaskAssignedMail $m): bool => $m->hasTo($assignee->email) && $m->workspaceName === $owner->currentWorkspace->name);
 });
 
 it('does not email when the email channel is off (default)', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentTeam->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
 
-    $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'Follow up']);
+    $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
 
     resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
@@ -47,12 +47,12 @@ it('does not email when the email channel is off (default)', function (): void {
 });
 
 it('skips the in-app notification when the in-app channel is off', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentTeam->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
     $assignee->update(['notification_preferences' => ['task_assigned' => ['in_app' => false]]]);
 
-    $task = Task::factory()->for($owner->currentTeam)->create(['title' => 'X']);
+    $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'X']);
     $task->assignees()->attach($assignee);
 
     resolve(NotifyTaskAssignees::class)->execute($task, [$assignee->id]);
@@ -65,9 +65,9 @@ it('renders the task title, workspace, and view link in html and text', function
     $mail = new TaskAssignedMail('Follow up', 'https://app.relaticle.test/tasks/1', 'Acme');
 
     $mail->assertHasSubject(__('mail.task_assigned.subject', ['title' => 'Follow up']));
-    $mail->assertSeeInHtml(__('mail.task_assigned.preheader', ['team' => 'Acme']));
+    $mail->assertSeeInHtml(__('mail.task_assigned.preheader', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.task_assigned.heading'));
     $mail->assertSeeInHtml('Follow up');
-    $mail->assertSeeInHtml(__('mail.footer.reason.assignee', ['team' => 'Acme']));
+    $mail->assertSeeInHtml(__('mail.footer.reason.assignee', ['workspace' => 'Acme']));
     $mail->assertSeeInText(__('mail.task_assigned.cta').': https://app.relaticle.test/tasks/1');
 });

@@ -18,11 +18,11 @@ final readonly class CompleteTask
         abort_unless($user->can('update', $task), 403);
 
         // The custom-fields tenant scope and saveCustomFieldValue() both resolve
-        // against the ambient tenant context, so pin it to the task's own team:
-        // a caller holding a task from another of the user's teams must not get
+        // against the ambient tenant context, so pin it to the task's own workspace:
+        // a caller holding a task from another of the user's workspaces must not get
         // a foreign status field id written onto it.
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($task->team_id);
+        TenantContextService::setTenantId($task->workspace_id);
 
         try {
             /** @var CustomField|null $status */

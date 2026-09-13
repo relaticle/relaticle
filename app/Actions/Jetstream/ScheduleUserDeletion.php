@@ -24,8 +24,8 @@ final readonly class ScheduleUserDeletion
 
             $user->forceFill(['scheduled_deletion_at' => $deletionDate])->save();
 
-            $user->ownedTeams()
-                ->where('personal_team', true)
+            $user->ownedWorkspaces()
+                ->where('personal_workspace', true)
                 ->update(['scheduled_deletion_at' => $deletionDate]);
         });
 
@@ -34,15 +34,15 @@ final readonly class ScheduleUserDeletion
 
     private function ensureUserCanBeDeleted(User $user): void
     {
-        $teamsWithMembers = $user->ownedTeams()
-            ->where('personal_team', false)
+        $workspacesWithMembers = $user->ownedWorkspaces()
+            ->where('personal_workspace', false)
             ->whereHas('users')
             ->pluck('name');
 
-        if ($teamsWithMembers->isNotEmpty()) {
+        if ($workspacesWithMembers->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'team' => [__('teams.validation.remove_members_before_deleting', [
-                    'teams' => $teamsWithMembers->implode(', '),
+                'workspace' => [__('workspaces.validation.remove_members_before_deleting', [
+                    'workspaces' => $workspacesWithMembers->implode(', '),
                 ])],
             ]);
         }

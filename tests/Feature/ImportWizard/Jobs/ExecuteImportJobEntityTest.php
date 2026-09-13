@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -11,7 +12,6 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
@@ -23,13 +23,13 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -43,7 +43,7 @@ afterEach(function (): void {
 
 it('imports company with account_owner resolved by email via entity link', function (): void {
     $owner = User::factory()->create();
-    $this->team->users()->attach($owner, ['role' => 'editor']);
+    $this->workspace->users()->attach($owner, ['role' => 'editor']);
 
     $relationships = json_encode([
         ['relationship' => 'account_owner', 'action' => 'update', 'id' => (string) $owner->id, 'name' => null],
@@ -61,7 +61,7 @@ it('imports company with account_owner resolved by email via entity link', funct
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Test Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Test Corp')->first();
     expect($company)->not->toBeNull()
         ->and((string) $company->account_owner_id)->toBe((string) $owner->id);
 });
@@ -78,12 +78,12 @@ it('imports company with unmatched account_owner email skipping silently', funct
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Test Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Test Corp')->first();
     expect($company)->not->toBeNull()
         ->and($company->account_owner_id)->toBeNull();
 });
 
-it('imports company with account_owner resolved for team owner', function (): void {
+it('imports company with account_owner resolved for workspace owner', function (): void {
     $relationships = json_encode([
         ['relationship' => 'account_owner', 'action' => 'update', 'id' => (string) $this->user->id, 'name' => null],
     ]);
@@ -100,14 +100,14 @@ it('imports company with account_owner resolved for team owner', function (): vo
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Owner Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Owner Corp')->first();
     expect($company)->not->toBeNull()
         ->and((string) $company->account_owner_id)->toBe((string) $this->user->id);
 });
 
 it('imports task with assignee resolved by email via entity link', function (): void {
     $assignee = User::factory()->create();
-    $this->team->users()->attach($assignee, ['role' => 'editor']);
+    $this->workspace->users()->attach($assignee, ['role' => 'editor']);
 
     $relationships = json_encode([
         ['relationship' => 'assignees', 'action' => 'update', 'id' => (string) $assignee->id, 'name' => null],
@@ -125,7 +125,7 @@ it('imports task with assignee resolved by email via entity link', function (): 
 
     ImportExecutionFixture::run($this);
 
-    $task = Task::where('team_id', $this->team->id)->where('title', 'Test Task')->first();
+    $task = Task::where('workspace_id', $this->workspace->id)->where('title', 'Test Task')->first();
     expect($task)->not->toBeNull();
 
     $assigneeIds = $task->assignees()->pluck('users.id')->map(fn ($id) => (string) $id)->all();
@@ -144,14 +144,14 @@ it('imports task with unmatched assignee email skipping silently', function (): 
 
     ImportExecutionFixture::run($this);
 
-    $task = Task::where('team_id', $this->team->id)->where('title', 'Orphan Task')->first();
+    $task = Task::where('workspace_id', $this->workspace->id)->where('title', 'Orphan Task')->first();
     expect($task)->not->toBeNull()
         ->and($task->assignees()->count())->toBe(0);
 });
 
 it('imports opportunity with company and contact entity links', function (): void {
-    $company = Company::factory()->create(['name' => 'Deal Corp', 'team_id' => $this->team->id]);
-    $contact = People::factory()->create(['name' => 'Deal Contact', 'team_id' => $this->team->id]);
+    $company = Company::factory()->create(['name' => 'Deal Corp', 'workspace_id' => $this->workspace->id]);
+    $contact = People::factory()->create(['name' => 'Deal Contact', 'workspace_id' => $this->workspace->id]);
 
     $relationships = json_encode([
         ['relationship' => 'company', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
@@ -171,15 +171,15 @@ it('imports opportunity with company and contact entity links', function (): voi
 
     ImportExecutionFixture::run($this);
 
-    $opportunity = Opportunity::where('team_id', $this->team->id)->where('name', 'Big Deal')->first();
+    $opportunity = Opportunity::where('workspace_id', $this->workspace->id)->where('name', 'Big Deal')->first();
     expect($opportunity)->not->toBeNull()
         ->and((string) $opportunity->company_id)->toBe((string) $company->id)
         ->and((string) $opportunity->contact_id)->toBe((string) $contact->id);
 });
 
 it('imports note with polymorphic entity links to company and person', function (): void {
-    $company = Company::factory()->create(['name' => 'Note Corp', 'team_id' => $this->team->id]);
-    $person = People::factory()->create(['name' => 'Note Person', 'team_id' => $this->team->id]);
+    $company = Company::factory()->create(['name' => 'Note Corp', 'workspace_id' => $this->workspace->id]);
+    $person = People::factory()->create(['name' => 'Note Person', 'workspace_id' => $this->workspace->id]);
 
     $relationships = json_encode([
         ['relationship' => 'companies', 'action' => 'update', 'id' => (string) $company->id, 'name' => null],
@@ -199,7 +199,7 @@ it('imports note with polymorphic entity links to company and person', function 
 
     ImportExecutionFixture::run($this);
 
-    $note = Note::where('team_id', $this->team->id)->where('title', 'Meeting Notes')->first();
+    $note = Note::where('workspace_id', $this->workspace->id)->where('title', 'Meeting Notes')->first();
     expect($note)->not->toBeNull();
 
     expect($note->companies()->pluck('companies.id')->map(fn ($id) => (string) $id)->all())
@@ -218,7 +218,7 @@ it('imports note with title field only', function (): void {
 
     ImportExecutionFixture::run($this);
 
-    $note = Note::where('team_id', $this->team->id)->where('title', 'Quick note')->first();
+    $note = Note::where('workspace_id', $this->workspace->id)->where('title', 'Quick note')->first();
     expect($note)->not->toBeNull()
         ->and($note->creation_source)->toBe(CreationSource::IMPORT);
 });
@@ -239,7 +239,7 @@ it('imports task with custom field values for select fields', function (): void 
 
     ImportExecutionFixture::run($this);
 
-    $task = Task::where('team_id', $this->team->id)->where('title', 'Urgent Task')->first();
+    $task = Task::where('workspace_id', $this->workspace->id)->where('title', 'Urgent Task')->first();
     expect($task)->not->toBeNull();
 
     $statusCfv = ImportExecutionFixture::customFieldValue($this, (string) $task->id, (string) $statusCf->id);
@@ -265,7 +265,7 @@ it('imports company with custom field values for toggle and link', function (): 
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('team_id', $this->team->id)->where('name', 'Great Corp')->first();
+    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'Great Corp')->first();
     expect($company)->not->toBeNull();
 
     $icpCfv = ImportExecutionFixture::customFieldValue($this, (string) $company->id, (string) $icpCf->id);

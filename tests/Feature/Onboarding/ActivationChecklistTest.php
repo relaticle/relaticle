@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Enums\CreationSource;
-use App\Enums\TeamRole;
+use App\Enums\WorkspaceRole;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PeopleResource;
 use App\Livewire\App\Onboarding\ActivationChecklist;
 use App\Models\People;
-use App\Models\Team;
-use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -21,12 +21,12 @@ use Illuminate\Support\Str;
 mutates(ActivationChecklist::class, DismissActivationChecklist::class);
 
 beforeEach(function (): void {
-    $this->owner = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->owner->currentTeam;
+    $this->owner = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->owner->currentWorkspace;
 
     $this->actingAs($this->owner);
     Filament::setCurrentPanel(Filament::getPanel('app'));
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 /**
@@ -54,9 +54,9 @@ it('starts every step incomplete in a fresh workspace', function (): void {
         ->assertSee('0/4 steps completed');
 });
 
-it('completes the first-record step once the workspace holds a record the team made', function (): void {
+it('completes the first-record step once the workspace holds a record the workspace made', function (): void {
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creator_id' => $this->owner->getKey(),
         'creation_source' => CreationSource::WEB,
     ]);
@@ -68,7 +68,7 @@ it('completes the first-record step once the workspace holds a record the team m
 
 it('leaves the first-record step incomplete while only seeded demo records exist', function (): void {
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
 
@@ -79,7 +79,7 @@ it('leaves the first-record step incomplete while only seeded demo records exist
 
 it('completes the import step for an imported record', function (): void {
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creation_source' => CreationSource::IMPORT,
     ]);
 
@@ -89,10 +89,10 @@ it('completes the import step for an imported record', function (): void {
 });
 
 it('completes the invite step while an invitation is pending', function (): void {
-    TeamInvitation::query()->create([
-        'team_id' => $this->team->getKey(),
+    WorkspaceInvitation::query()->create([
+        'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => TeamRole::Editor->value,
+        'role' => WorkspaceRole::Editor->value,
     ]);
 
     livewire(ActivationChecklist::class)
@@ -104,7 +104,7 @@ it('completes the assistant step once the user has sent a chat message', functio
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => $this->owner->getKey(),
         'title' => 'Pipeline check',
@@ -134,16 +134,16 @@ it('completes the assistant step once the user has sent a chat message', functio
 });
 
 it('ignores records and conversations belonging to another workspace', function (): void {
-    $otherTeam = Team::factory()->create();
+    $otherWorkspace = Workspace::factory()->create();
 
     People::factory()->create([
-        'team_id' => $otherTeam->getKey(),
+        'workspace_id' => $otherWorkspace->getKey(),
         'creation_source' => CreationSource::WEB,
     ]);
 
     DB::table('agent_conversations')->insert([
         'id' => (string) Str::ulid(),
-        'team_id' => $otherTeam->getKey(),
+        'workspace_id' => $otherWorkspace->getKey(),
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => $this->owner->getKey(),
         'title' => 'Elsewhere',
@@ -158,21 +158,21 @@ it('ignores records and conversations belonging to another workspace', function 
 
 it('disappears once every step is done', function (): void {
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creation_source' => CreationSource::IMPORT,
     ]);
 
-    TeamInvitation::query()->create([
-        'team_id' => $this->team->getKey(),
+    WorkspaceInvitation::query()->create([
+        'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => TeamRole::Editor->value,
+        'role' => WorkspaceRole::Editor->value,
     ]);
 
     $conversationId = (string) Str::ulid();
 
     DB::table('agent_conversations')->insert([
         'id' => $conversationId,
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'participant_type' => $this->owner->getMorphClass(),
         'participant_id' => $this->owner->getKey(),
         'title' => 'Pipeline check',
@@ -206,7 +206,7 @@ it('stays hidden after the owner dismisses it', function (): void {
         ->call('dismiss')
         ->assertDontSeeHtml('data-testid="activation-step"');
 
-    expect($this->team->refresh()->activation_checklist_dismissed_at)->not->toBeNull();
+    expect($this->workspace->refresh()->activation_checklist_dismissed_at)->not->toBeNull();
 
     livewire(ActivationChecklist::class)
         ->assertDontSeeHtml('data-testid="activation-step"');
@@ -214,10 +214,10 @@ it('stays hidden after the owner dismisses it', function (): void {
 
 it('stays hidden for a member who cannot manage the workspace', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
 
     $this->actingAs($member);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     livewire(ActivationChecklist::class)
         ->assertDontSeeHtml('data-testid="activation-step"');
@@ -228,11 +228,11 @@ it('mentions sample data only while seeded records remain', function (): void {
         ->assertDontSee(__('filament/pages/dashboard.activation.sample_data'));
 
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
 
-    resolve(WorkspaceActivationFacts::class)->forget($this->team);
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
 
     livewire(ActivationChecklist::class)
         ->assertSee(__('filament/pages/dashboard.activation.sample_data'));
@@ -249,7 +249,7 @@ it('answers all four steps without repeating a query', function (): void {
     // ask_rela fact (hasUserChatMessage), and it does not repeat.
     expect($log->filter(fn (string $sql): bool => str_contains($sql, 'creation_source')))->toHaveCount(1)
         ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'agent_conversations')))->toHaveCount(1)
-        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'team_invitations')))->toHaveCount(1);
+        ->and($log->filter(fn (string $sql): bool => str_contains($sql, 'workspace_invitations')))->toHaveCount(1);
 });
 
 /**
@@ -292,17 +292,17 @@ it('asks what the assistant can do while the workspace holds no records', functi
 });
 
 /**
- * Seeded demo records are not the team's own, but they are a pipeline the
+ * Seeded demo records are not the workspace's own, but they are a pipeline the
  * assistant can report on -- so the empty-workspace branch must not key off
  * `hasOwnRecord()`, which is false here too.
  */
 it('asks about the pipeline once the workspace holds records, seeded ones included', function (): void {
     People::factory()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'creation_source' => CreationSource::SYSTEM,
     ]);
 
-    resolve(WorkspaceActivationFacts::class)->forget($this->team);
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(composePromptUrl('prompt'))
@@ -316,10 +316,10 @@ it('shows the invite row to a workspace admin and hides it from an editor', func
         ->assertSee(__('filament/pages/dashboard.activation.invite_members'));
 
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => TeamRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
 
     $this->actingAs($member);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     // Members::canAccess() is can('update', $tenant), so this row would link an
     // editor straight to a 403.

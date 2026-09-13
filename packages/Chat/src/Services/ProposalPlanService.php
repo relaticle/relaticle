@@ -40,7 +40,7 @@ final readonly class ProposalPlanService
         }
 
         $steps = PendingAction::query()
-            ->where('team_id', $action->team_id)
+            ->where('workspace_id', $action->workspace_id)
             ->where('user_id', $action->user_id)
             ->where('conversation_id', $action->conversation_id)
             ->where('turn_id', $action->turn_id)

@@ -23,12 +23,12 @@ use App\Models\People;
 use App\Models\User;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('can list companies via MCP tool', function (): void {
-    Company::factory(3)->recycle([$this->user, $this->team])->create();
+    Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(ListCompaniesTool::class);
@@ -47,12 +47,12 @@ it('can create a company via MCP tool', function (): void {
 
     $this->assertDatabaseHas('companies', [
         'name' => 'MCP Test Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 });
 
 it('can update a company via MCP tool', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Name']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old Name']);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(UpdateCompanyTool::class, [
@@ -67,7 +67,7 @@ it('can update a company via MCP tool', function (): void {
 });
 
 it('can delete a company via MCP tool', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(DeleteCompanyTool::class, [
@@ -168,7 +168,7 @@ it('validates company_id exists when creating a person via MCP', function (): vo
 });
 
 it('validates company_id exists when updating a person via MCP', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(UpdatePeopleTool::class, [
@@ -191,8 +191,8 @@ it('validates company_id and contact_id exist when creating opportunity via MCP'
 });
 
 it('can filter companies by name via MCP search param', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Beta Inc']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta Inc']);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(ListCompaniesTool::class, [

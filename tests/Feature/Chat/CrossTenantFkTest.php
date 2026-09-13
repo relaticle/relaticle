@@ -6,17 +6,17 @@ use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\People\CreatePeople;
 use App\Models\Company;
 use App\Models\Opportunity;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Validation\ValidationException;
 
-it('rejects updating opportunity with company_id from another team', function (): void {
-    $userA = User::factory()->withPersonalTeam()->create();
-    $teamA = $userA->currentTeam;
-    $teamB = Team::factory()->create();
+it('rejects updating opportunity with company_id from another workspace', function (): void {
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $workspaceA = $userA->currentWorkspace;
+    $workspaceB = Workspace::factory()->create();
 
-    $opp = Opportunity::factory()->for($teamA)->create();
-    $foreignCompany = Company::factory()->for($teamB)->create();
+    $opp = Opportunity::factory()->for($workspaceA)->create();
+    $foreignCompany = Company::factory()->for($workspaceB)->create();
 
     $this->actingAs($userA);
 
@@ -29,11 +29,11 @@ it('rejects updating opportunity with company_id from another team', function ()
     expect($opp->refresh()->company_id)->not->toBe($foreignCompany->id);
 });
 
-it('rejects creating person with company_id from another team', function (): void {
-    $userA = User::factory()->withPersonalTeam()->create();
-    $teamB = Team::factory()->create();
+it('rejects creating person with company_id from another workspace', function (): void {
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $workspaceB = Workspace::factory()->create();
 
-    $foreignCompany = Company::factory()->for($teamB)->create();
+    $foreignCompany = Company::factory()->for($workspaceB)->create();
 
     $this->actingAs($userA);
 

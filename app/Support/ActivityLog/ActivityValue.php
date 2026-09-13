@@ -31,7 +31,7 @@ final readonly class ActivityValue
         }
 
         if (is_bool($value)) {
-            return $value ? __('teams.activity.yes') : __('teams.activity.no');
+            return $value ? __('workspaces.activity.yes') : __('workspaces.activity.no');
         }
 
         if (! is_scalar($value)) {

@@ -9,7 +9,7 @@ This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, a
 ### Cloud Users (app.relaticle.com)
 
 - **Account information:** Name, email address, and password (hashed)
-- **Profile data:** Avatar, team name, and role
+- **Profile data:** Avatar, workspace name, and role
 - **CRM data:** Companies, people, opportunities, tasks, notes, and custom fields you create
 - **Usage data:** Login timestamps, feature usage, and error reports
 - **Technical data:** IP address, browser type, and device information
@@ -28,8 +28,8 @@ Data from a self-hosted installation stays on your servers unless you configure 
 We use your data to:
 
 - Provide and maintain the CRM service
-- Authenticate your account and enforce team-level access controls
-- Send transactional emails (password resets, team invitations)
+- Authenticate your account and enforce workspace-level access controls
+- Send transactional emails (password resets, workspace invitations)
 - Improve the service based on aggregated, anonymized usage patterns
 - Respond to support inquiries
 
@@ -56,7 +56,7 @@ We protect your data with:
 
 - Encrypted connections (TLS/HTTPS) for all data in transit
 - Encrypted database storage for sensitive fields
-- Team-based access isolation (multi-tenancy)
+- Workspace-based access isolation (multi-tenancy)
 - API token authentication with scoped permissions
 - Regular security updates and dependency audits
 
@@ -104,8 +104,8 @@ Relaticle enforces workspace and token scope on every tool request.
 **Data tool responses can include:**
 
 - User names, email addresses, and identifiers.
-- Team names and identifiers.
-- Team-member names, emails, and identifiers.
+- Workspace names and identifiers.
+- Workspace-member names, emails, and identifiers.
 - Token ability names.
 - Companies, people, opportunities, tasks, and notes.
 - Record identifiers and canonical record URLs.

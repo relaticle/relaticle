@@ -19,10 +19,10 @@ use Tests\Helpers\ChatDocument;
  * small link at the end of the title, so reaching the record stays one click but
  * is never what an imprecise click on the row does.
  */
-function seedDecidedProposal(User $user, int|string $teamId, string $conversationId, People $person): void
+function seedDecidedProposal(User $user, int|string $workspaceId, string $conversationId, People $person): void
 {
     $pending = PendingAction::query()->create([
-        'team_id' => $teamId,
+        'workspace_id' => $workspaceId,
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -72,15 +72,15 @@ function seedDecidedProposal(User $user, int|string $teamId, string $conversatio
 }
 
 it('opens the fields from anywhere on the row and reaches the record only from the title link', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $person = People::factory()->for($team)->create(['name' => 'Sam']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->for($workspace)->create(['name' => 'Sam']);
 
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'decided proposal', $conversationId);
-    seedDecidedProposal($user, $team->getKey(), $conversationId, $person);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided proposal', $conversationId);
+    seedDecidedProposal($user, $workspace->getKey(), $conversationId, $person);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSee('Sam')
         ->assertSee('Create')
         ->assertMissing('[data-proposal-details]')
@@ -136,26 +136,26 @@ it('opens the fields from anywhere on the row and reaches the record only from t
         ->assertVisible('[data-proposal-details]')
         ->assertAriaAttribute('[data-proposal-row]', 'expanded', 'true')
         ->assertSeeIn('[data-proposal-details]', 'Sam')
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationId}");
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationId}");
 
     $page->click('[data-proposal-row]')
         ->assertMissing('[data-proposal-details]');
 
     // The link, and only the link, leaves for the record.
     $page->click('[data-proposal-record-link]')
-        ->assertPathIs("/app/{$team->slug}/people/{$person->id}");
+        ->assertPathIs("/app/{$workspace->slug}/people/{$person->id}");
 });
 
 it('leads each decided batch item with the record pill, beside its outcome chip', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $task = Task::factory()->for($team)->create(['title' => 'Send proposal to Meridian']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $task = Task::factory()->for($workspace)->create(['title' => 'Send proposal to Meridian']);
 
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'decided batch', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided batch', $conversationId);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -212,7 +212,7 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
         'updated_at' => now(),
     ]);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSee('Create 2 tasks');
 
     $page->click('[data-proposal-row]')
@@ -244,10 +244,10 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
  *
  * @param  list<array<string, mixed>>  $resultItems
  */
-function seedResolvedBatch(User $user, int|string $teamId, string $conversationId, PendingActionStatus $status, array $resultItems): void
+function seedResolvedBatch(User $user, int|string $workspaceId, string $conversationId, PendingActionStatus $status, array $resultItems): void
 {
     $pending = PendingAction::query()->create([
-        'team_id' => $teamId,
+        'workspace_id' => $workspaceId,
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'action_class' => 'App\\Actions\\Task\\CreateTask',
@@ -303,18 +303,18 @@ function seedResolvedBatch(User $user, int|string $teamId, string $conversationI
 }
 
 it('heads a part-skipped batch with per-item counts rather than its Approved status', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
-    $task = Task::factory()->for($team)->create(['title' => 'Draft the renewal note']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $task = Task::factory()->for($workspace)->create(['title' => 'Draft the renewal note']);
 
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'part-skipped batch', $conversationId);
-    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Approved, [
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'part-skipped batch', $conversationId);
+    seedResolvedBatch($user, $workspace->getKey(), $conversationId, PendingActionStatus::Approved, [
         ['status' => 'approved', 'id' => (string) $task->id],
         ['status' => 'rejected'],
     ]);
 
-    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $header = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSee('Create 2 tasks')
         ->script(<<<'JS'
             (() => {
@@ -330,17 +330,17 @@ it('heads a part-skipped batch with per-item counts rather than its Approved sta
 });
 
 it('heads a fully-skipped batch with Rejected, since it wrote nothing', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'fully-skipped batch', $conversationId);
-    seedResolvedBatch($user, $team->getKey(), $conversationId, PendingActionStatus::Rejected, [
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'fully-skipped batch', $conversationId);
+    seedResolvedBatch($user, $workspace->getKey(), $conversationId, PendingActionStatus::Rejected, [
         ['status' => 'rejected'],
         ['status' => 'rejected'],
     ]);
 
-    $header = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $header = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSee('Create 2 tasks')
         ->script(<<<'JS'
             (() => {

@@ -16,9 +16,9 @@ mutates(ModelRegistry::class);
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 it('shows the Ollama model in the chat picker when configured', function (): void {

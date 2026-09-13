@@ -44,7 +44,7 @@ mutates(ListConversationMessages::class);
 mutates(SupersededAwareConversationStore::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
 });
 
@@ -148,7 +148,7 @@ function blockFieldValues(array $block, string $label): ?array
 }
 
 /**
- * Force the display settings of a field the team already has, which no action
+ * Force the display settings of a field the workspace already has, which no action
  * exposes. Sibling of seedDisplayField() for the system-defined fields.
  *
  * @param  array<string, mixed>  $settings
@@ -156,7 +156,7 @@ function blockFieldValues(array $block, string $label): ?array
 function forceDisplaySettings(User $user, string $entityType, string $code, array $settings = []): CustomField
 {
     $field = CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', $entityType)
         ->where('code', $code)
         ->firstOrFail();
@@ -208,7 +208,7 @@ function seedBlockConversation(User $user, array $toolResults, bool $withToolCal
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Blocks',
         'created_at' => now(),
         'updated_at' => now(),
@@ -303,7 +303,7 @@ it('keeps the model-facing rows under data alongside the block', function (): vo
 it('carries every row of the page in the block, never a slice of it, in the same order as data', function (): void {
     $user = $this->user;
 
-    Company::factory()->count(15)->for($user->currentTeam)->create();
+    Company::factory()->count(15)->for($user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 15])), true);
 
@@ -318,7 +318,7 @@ it('carries every row of the page in the block, never a slice of it, in the same
 it('reports has_more true and next_page set on a first page with a remainder', function (): void {
     $user = $this->user;
 
-    Company::factory()->count(15)->for($user->currentTeam)->create();
+    Company::factory()->count(15)->for($user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
 
@@ -329,7 +329,7 @@ it('reports has_more true and next_page set on a first page with a remainder', f
 it('reports has_more true and next_page 3 on a middle page', function (): void {
     $user = $this->user;
 
-    Company::factory()->count(25)->for($user->currentTeam)->create();
+    Company::factory()->count(25)->for($user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
 
@@ -340,7 +340,7 @@ it('reports has_more true and next_page 3 on a middle page', function (): void {
 it('reports has_more false and next_page null on the last page', function (): void {
     $user = $this->user;
 
-    Company::factory()->count(15)->for($user->currentTeam)->create();
+    Company::factory()->count(15)->for($user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
 
@@ -350,22 +350,22 @@ it('reports has_more false and next_page null on the last page', function (): vo
 
 it('carries open_url on the block only when has_more is true', function (): void {
     $user = $this->user;
-    $team = $user->currentTeam;
+    $workspace = $user->currentWorkspace;
 
-    Company::factory()->count(15)->for($team)->create();
+    Company::factory()->count(15)->for($workspace)->create();
 
     $firstPage = json_decode(app(ListCompaniesTool::class)->handle(new Request([])), true);
     $lastPage = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
 
     expect($firstPage['display_block'])->toHaveKey('open_url')
-        ->and($firstPage['display_block']['open_url'])->toBe(CompanyResource::getUrl('index', panel: 'app', tenant: $team))
+        ->and($firstPage['display_block']['open_url'])->toBe(CompanyResource::getUrl('index', panel: 'app', tenant: $workspace))
         ->and($lastPage['display_block'])->not->toHaveKey('open_url');
 });
 
 it('reports the paginator offset in from on page 2', function (): void {
     $user = $this->user;
 
-    Company::factory()->count(15)->for($user->currentTeam)->create();
+    Company::factory()->count(15)->for($user->currentWorkspace)->create();
 
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['page' => 2])), true);
 
@@ -482,7 +482,7 @@ it('names the core column even when a promoted field leads the table', function 
 it('names title as the core column on an entity that has no name', function (): void {
     $user = $this->user;
 
-    Task::factory()->for($user->currentTeam)->create(['title' => 'Call Acme']);
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Call Acme']);
 
     $block = displayBlockOf(app(ListTasksTool::class)->handle(new Request([])));
 
@@ -540,10 +540,10 @@ it('carries choice option names as a values list so the card renders chips', fun
 
 it('names record custom fields in a list table with one lookup per page, not per row', function (int $rows): void {
     $user = $this->user;
-    $teamId = $user->currentTeam->getKey();
+    $workspaceId = $user->currentWorkspace->getKey();
 
     $field = CustomField::query()->create([
-        'tenant_id' => $teamId,
+        'tenant_id' => $workspaceId,
         'entity_type' => 'task',
         'code' => 'linked_company',
         'name' => 'Linked Company',
@@ -557,11 +557,11 @@ it('names record custom fields in a list table with one lookup per page, not per
     $field->settings = CustomFieldSettingsData::from(['visible_in_list' => true, 'list_toggleable_hidden' => false, 'visible_in_view' => true]);
     $field->save();
 
-    TenantContextService::setTenantId($teamId);
+    TenantContextService::setTenantId($workspaceId);
 
     foreach (range(1, $rows) as $index) {
-        $company = Company::factory()->for($user->currentTeam)->create(['name' => "Linked {$index}"]);
-        Task::factory()->for($user->currentTeam)->create()->saveCustomFieldValue($field, [$company->getKey()]);
+        $company = Company::factory()->for($user->currentWorkspace)->create(['name' => "Linked {$index}"]);
+        Task::factory()->for($user->currentWorkspace)->create()->saveCustomFieldValue($field, [$company->getKey()]);
     }
 
     DB::enableQueryLog();
@@ -570,7 +570,7 @@ it('names record custom fields in a list table with one lookup per page, not per
     $block = displayBlockOf(app(ListTasksTool::class)->handle(new Request(['per_page' => 25])));
 
     $companyLookups = collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], '"team_id"'),
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], '"workspace_id"'),
     );
 
     expect(collect($block['rows'])->pluck('cells.linked_company')->filter()->sort()->values()->all())
@@ -626,9 +626,9 @@ it('returns display_blocks on the latest assistant message for stream-end reconc
         ->and($latest['display_blocks'][0]['block'])->toBe('records_table');
 });
 
-// --- (d) selection derives from the team's own visibility settings ---
+// --- (d) selection derives from the workspace's own visibility settings ---
 
-it('applies the team visibility settings to the table and the card', function (array $settings, bool $inTable, bool $onCard): void {
+it('applies the workspace visibility settings to the table and the card', function (array $settings, bool $inTable, bool $onCard): void {
     $user = $this->user;
 
     seedDisplayField($user, 'company', 'hq', 'HQ', $settings);
@@ -650,9 +650,9 @@ it('applies the team visibility settings to the table and the card', function (a
     'hidden from both: dropped' => [['visible_in_list' => false, 'visible_in_view' => false], false, false],
 ]);
 
-it('never selects another team display fields', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $other = User::factory()->withPersonalTeam()->create();
+it('never selects another workspace display fields', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($other);
     seedDisplayField($other, 'company', 'their_field', 'Their Field');
@@ -666,11 +666,11 @@ it('never selects another team display fields', function (): void {
     $selector = resolve(DisplayFieldSelector::class);
     $listCodes = array_map(
         static fn (CustomField $field): string => $field->code,
-        $selector->listFields($owner->currentTeam, 'company'),
+        $selector->listFields($owner->currentWorkspace, 'company'),
     );
     $cardCodes = array_map(
         static fn (CustomField $field): string => $field->code,
-        $selector->cardFields($owner->currentTeam, 'company'),
+        $selector->cardFields($owner->currentWorkspace, 'company'),
     );
 
     $table = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
@@ -680,7 +680,7 @@ it('never selects another team display fields', function (): void {
         ->and(blockColumnKeys($table))->toContain('our_field')->not->toContain('their_field');
 });
 
-// --- (e) query-aware promotion overrides the team's list settings ---
+// --- (e) query-aware promotion overrides the workspace's list settings ---
 
 it('promotes a filtered hidden field to the first column', function (): void {
     $user = $this->user;
@@ -721,9 +721,9 @@ it('promotes a sorted field to the first column', function (): void {
     expect(blockColumnKeys($block)[0])->toBe('deal_source');
 });
 
-it('promotes this team field when both teams share the code', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $other = User::factory()->withPersonalTeam()->create();
+it('promotes this workspace field when both workspaces share the code', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($other);
     seedDisplayField($other, 'opportunity', 'deal_source', 'Their Source', ['visible_in_list' => false]);

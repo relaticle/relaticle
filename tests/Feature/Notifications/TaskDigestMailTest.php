@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
-use App\Data\DigestTeamSection;
+use App\Data\DigestWorkspaceSection;
 use App\Mail\TaskDigestMail;
 use App\Models\User;
 
-it('renders the digest with subject, preheader, team sections, footer, and settings link', function (): void {
+it('renders the digest with subject, preheader, workspace sections, footer, and settings link', function (): void {
     config(['relaticle.company.address' => '123 Test St, Testville']);
 
-    $user = User::factory()->withPersonalTeam()->create(['name' => 'Ada Lovelace', 'timezone' => 'UTC']);
+    $user = User::factory()->withPersonalWorkspace()->create(['name' => 'Ada Lovelace', 'timezone' => 'UTC']);
 
     $payload = new DigestPayload([
-        new DigestTeamSection(
-            teamName: 'Acme',
+        new DigestWorkspaceSection(
+            workspaceName: 'Acme',
             overdue: [new DigestTaskItem('Call client', now()->subDay(), 'https://app.test/tasks?a')],
             upcoming: [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')],
         ),
@@ -38,19 +38,19 @@ it('renders the digest with subject, preheader, team sections, footer, and setti
 });
 
 it('never leaks a lang key into the rendered digest', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $payload = new DigestPayload([
-        new DigestTeamSection('Acme', [], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]),
+        new DigestWorkspaceSection('Acme', [], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]),
     ]);
 
     expect((new TaskDigestMail($user, $payload))->render())->not->toContain('mail.');
 });
 
 it('carries rfc 8058 one-click unsubscribe headers pointing at the app host', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $payload = new DigestPayload([
-        new DigestTeamSection('Acme', [], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]),
+        new DigestWorkspaceSection('Acme', [], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]),
     ]);
 
     $mail = new TaskDigestMail($user, $payload);

@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Billing;
 use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\RestoreWorkspaceTrial;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
 use Symfony\Component\HttpFoundation\Response;
@@ -57,13 +57,13 @@ final class StripeWebhookController extends CashierWebhookController
         }
 
         $stripeId = $object['customer'] ?? null;
-        $team = is_string($stripeId) ? Team::query()->where('stripe_id', $stripeId)->first() : null;
-        $trialEndsAt = $team?->trial_ends_at;
+        $workspace = is_string($stripeId) ? Workspace::query()->where('stripe_id', $stripeId)->first() : null;
+        $trialEndsAt = $workspace?->trial_ends_at;
 
         $response = parent::handleCustomerSubscriptionCreated($payload);
 
-        if ($team instanceof Team && $trialEndsAt !== null) {
-            $this->restoreTrial->execute($team, $trialEndsAt);
+        if ($workspace instanceof Workspace && $trialEndsAt !== null) {
+            $this->restoreTrial->execute($workspace, $trialEndsAt);
         }
 
         return $response;
@@ -109,10 +109,10 @@ final class StripeWebhookController extends CashierWebhookController
             return $this->successMethod();
         }
 
-        $team = Team::query()->where('stripe_id', $customer)->first();
+        $workspace = Workspace::query()->where('stripe_id', $customer)->first();
 
-        if ($team instanceof Team) {
-            $this->notifyPaymentFailure->execute($team);
+        if ($workspace instanceof Workspace) {
+            $this->notifyPaymentFailure->execute($workspace);
         }
 
         return $this->successMethod();
@@ -170,15 +170,15 @@ final class StripeWebhookController extends CashierWebhookController
 
         $metadata = is_array($session['metadata'] ?? null) ? $session['metadata'] : [];
         $priceId = $metadata['credit_pack_price'] ?? null;
-        $teamId = $metadata['team_id'] ?? null;
+        $workspaceId = $metadata['team_id'] ?? null;
         $sessionId = $session['id'] ?? null;
         $customerId = $session['customer'] ?? null;
 
-        if (! is_string($priceId) || ! is_string($teamId) || ! is_string($sessionId)) {
+        if (! is_string($priceId) || ! is_string($workspaceId) || ! is_string($sessionId)) {
             Log::warning('Credit pack checkout ignored: missing or malformed metadata', [
                 'session_id' => is_string($sessionId) ? $sessionId : null,
                 'missing_fields' => array_keys(array_filter([
-                    'metadata.team_id' => ! is_string($teamId),
+                    'metadata.team_id' => ! is_string($workspaceId),
                     'metadata.credit_pack_price' => ! is_string($priceId),
                     'session.id' => ! is_string($sessionId),
                 ])),
@@ -187,20 +187,20 @@ final class StripeWebhookController extends CashierWebhookController
             return $this->successMethod();
         }
 
-        $team = Team::query()->find($teamId);
+        $workspace = Workspace::query()->find($workspaceId);
 
-        if (! $team instanceof Team || ! is_string($customerId) || $team->stripe_id !== $customerId) {
-            Log::warning('Credit pack checkout ignored: team/customer mismatch', [
-                'team_id' => $teamId,
+        if (! $workspace instanceof Workspace || ! is_string($customerId) || $workspace->stripe_id !== $customerId) {
+            Log::warning('Credit pack checkout ignored: workspace/customer mismatch', [
+                'workspace_id' => $workspaceId,
                 'customer' => $customerId,
-                'expected_customer' => $team?->stripe_id,
+                'expected_customer' => $workspace?->stripe_id,
                 'session_id' => $sessionId,
             ]);
 
             return $this->successMethod();
         }
 
-        $this->grantCredits->execute($team, $priceId, $sessionId);
+        $this->grantCredits->execute($workspace, $priceId, $sessionId);
 
         return $this->successMethod();
     }

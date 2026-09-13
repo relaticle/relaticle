@@ -7,13 +7,13 @@ use Relaticle\Chat\Models\AiCreditBalance;
 
 mutates(AiCreditBalance::class);
 
-it('produces balances whose used + remaining equal the team plan allowance', function (): void {
+it('produces balances whose used + remaining equal the workspace plan allowance', function (): void {
     foreach (range(1, 5) as $_) {
         $balance = AiCreditBalance::factory()->create();
-        $team = $balance->team;
+        $workspace = $balance->workspace;
 
         expect($balance->credits_remaining + $balance->credits_used)
-            ->toBe($team->plan->credits());
+            ->toBe($workspace->plan->credits());
     }
 });
 

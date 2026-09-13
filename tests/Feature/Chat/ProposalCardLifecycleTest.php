@@ -19,10 +19,10 @@ mutates(ProposalCard::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 it('renders nothing when no active proposal id is set', function (): void {
@@ -46,7 +46,7 @@ it('loads and renders the active pending action summary', function (): void {
 });
 
 it('refuses a pending action from another tenant', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
     $foreign = ProposalCardFixture::proposal($other, ['name' => 'Foreign'], ['title' => 'x', 'summary' => 'x', 'fields' => []]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -107,14 +107,14 @@ it('creates only the active batch record and advances to the next', function ():
         ->assertDispatched('proposal:resolved');
 
     // Only the record on screen was committed; the card advanced to Beta.
-    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toBe(['Alpha']);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->pluck('name')->all())->toBe(['Alpha']);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     $component->assertSet('cursor', 1);
 
     $component->call('createCurrent')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->orderBy('name')->pluck('name')->all())
         ->toBe(['Alpha', 'Beta']);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
@@ -132,7 +132,7 @@ it('creates the single proposal record and collapses the dock', function (): voi
         ->assertDispatched('proposal:resolved')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->where('name', 'Acme Corp')->exists())->toBeTrue();
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->where('name', 'Acme Corp')->exists())->toBeTrue();
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
 
@@ -166,7 +166,7 @@ it('discards only the active batch record and advances to the next', function ()
     $component->call('discardCurrent')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
 });
 
@@ -181,7 +181,7 @@ it('finalizes after a skip plus create-all without dispatching a continuation', 
         ->assertSet('pendingActionId', null);
     expect($action->fresh()->status)->not->toBe(PendingActionStatus::Pending);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->pluck('name')->all())
         ->toBe(['Alpha']);
 });
 
@@ -195,7 +195,7 @@ it('marks a fully-discarded batch as rejected', function (): void {
         ->call('discardCurrent');
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Rejected);
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('emits proposal:resolve-failed and does not advance when the service rejects the resolution', function (): void {
@@ -215,7 +215,7 @@ it('emits proposal:resolve-failed and does not advance when the service rejects 
         ->assertSet('pendingActionId', $action->getKey()); // not cleared
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('drops a skipped item from the dock queue and cannot re-decide it', function (): void {
@@ -238,7 +238,7 @@ it('drops a skipped item from the dock queue and cannot re-decide it', function 
     $component->call('createCurrent')
         ->call('createCurrent');
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->orderBy('name')->pluck('name')->all())
         ->toBe(['Beta', 'Gamma']);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Approved);
 });
@@ -253,7 +253,7 @@ it('does nothing when createCurrent is called while a field edit is open', funct
         ->call('createCurrent')
         ->assertNotDispatched('proposal:resolved');
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('routes the create-current shortcut to the active batch record for the matching context', function (): void {
@@ -264,12 +264,12 @@ it('routes the create-current shortcut to the active batch record for the matchi
         ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
         ->dispatch('proposal:create-current', context: 'conversation');
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->pluck('name')->all())->toBe(['Alpha']);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->pluck('name')->all())->toBe(['Alpha']);
 
     $component->dispatch('proposal:create-current', context: 'conversation')
         ->assertSet('pendingActionId', null);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->orderBy('name')->pluck('name')->all())
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->orderBy('name')->pluck('name')->all())
         ->toBe(['Alpha', 'Beta']);
 });
 
@@ -282,7 +282,7 @@ it('ignores the create-current shortcut for a different context', function (): v
         ->dispatch('proposal:create-current', context: 'side-panel')
         ->assertSet('cursor', 0);
 
-    expect(Company::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('paginates a batch one record at a time with a per-record footer', function (): void {
@@ -335,7 +335,7 @@ it('excludes an unchecked field from the write and records it in result_data', f
         ->call('createCurrent')
         ->assertDispatched('proposal:resolved');
 
-    $company = Company::query()->where('team_id', $this->team->getKey())->where('name', 'Acme Corp')->first();
+    $company = Company::query()->where('workspace_id', $this->workspace->getKey())->where('name', 'Acme Corp')->first();
 
     expect($company)->not->toBeNull()
         ->and($company->account_owner_id)->toBeNull()
@@ -391,7 +391,7 @@ it('applies exclusions per batch record and resets them on every navigation', fu
         ->call('createCurrent');
 
     $owners = Company::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->orderBy('name')
         ->pluck('account_owner_id', 'name')
         ->all();
@@ -421,10 +421,10 @@ it('unchecks and rechecks everything through the master toggle', function (): vo
 
 it('refuses to approve an update whose every change is unchecked', function (): void {
     Bus::fake();
-    $company = Company::factory()->for($this->team)->create(['name' => 'Stable Inc', 'account_owner_id' => null]);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Stable Inc', 'account_owner_id' => null]);
 
     $action = PendingAction::query()->create([
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'conversation_id' => null,
         'action_class' => 'App\\Actions\\Company\\UpdateCompany',

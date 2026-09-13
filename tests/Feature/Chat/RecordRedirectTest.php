@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\Team\CustomFields;
-use App\Filament\Pages\Team\Members;
+use App\Filament\Pages\Workspace\CustomFields;
+use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\OpportunityResource;
@@ -15,8 +15,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\EditAction;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
@@ -33,22 +33,22 @@ dataset('mapped record types', [
 ]);
 
 it('redirects to the exact panel url for each mapped type', function (string $type, string $modelClass): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $record = $modelClass::factory()->for($team)->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $record = $modelClass::factory()->for($workspace)->create();
 
     $expectedUrl = match ($type) {
-        'company' => CompanyResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $team),
-        'people' => PeopleResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $team),
-        'opportunity' => OpportunityResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $team),
+        'company' => CompanyResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
+        'people' => PeopleResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
+        'opportunity' => OpportunityResource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace),
         'task' => TaskResource::getUrl('index', [
             'tableAction' => EditAction::getDefaultName(),
             'tableActionRecord' => $record->getKey(),
-        ], panel: 'app', tenant: $team),
+        ], panel: 'app', tenant: $workspace),
         'note' => NoteResource::getUrl('index', [
             'tableAction' => EditAction::getDefaultName(),
             'tableActionRecord' => $record->getKey(),
-        ], panel: 'app', tenant: $team),
+        ], panel: 'app', tenant: $workspace),
     };
 
     $this->actingAs($user)
@@ -56,29 +56,29 @@ it('redirects to the exact panel url for each mapped type', function (string $ty
         ->assertRedirect($expectedUrl);
 })->with('mapped record types');
 
-it("redirects to the record's own team panel when the record belongs to a non-current team", function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $currentTeam = $user->currentTeam;
+it("redirects to the record's own workspace panel when the record belongs to a non-current workspace", function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $currentWorkspace = $user->currentWorkspace;
 
-    $otherTeam = Team::factory()->create(['user_id' => $user->getKey()]);
-    $user->teams()->attach($otherTeam, ['role' => 'admin']);
+    $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $user->workspaces()->attach($otherWorkspace, ['role' => 'admin']);
 
-    $company = Company::factory()->for($otherTeam)->create();
+    $company = Company::factory()->for($otherWorkspace)->create();
 
-    $expectedUrl = CompanyResource::getUrl('view', ['record' => $company->getKey()], panel: 'app', tenant: $otherTeam);
+    $expectedUrl = CompanyResource::getUrl('view', ['record' => $company->getKey()], panel: 'app', tenant: $otherWorkspace);
 
     $this->actingAs($user)
         ->get("/r/company/{$company->getKey()}")
         ->assertRedirect($expectedUrl);
 
-    expect($expectedUrl)->toContain($otherTeam->slug)
-        ->and($expectedUrl)->not->toContain($currentTeam->slug);
+    expect($expectedUrl)->toContain($otherWorkspace->slug)
+        ->and($expectedUrl)->not->toContain($currentWorkspace->slug);
 });
 
-it('shows a gone page for a soft deleted record in the user team', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $company = Company::factory()->for($team)->create();
+it('shows a gone page for a soft deleted record in the user workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $company = Company::factory()->for($workspace)->create();
     $company->delete();
 
     $this->actingAs($user)
@@ -87,29 +87,29 @@ it('shows a gone page for a soft deleted record in the user team', function (): 
         ->assertSee(__('This record no longer exists'));
 });
 
-it('404s for a record outside every team the user belongs to', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $other = Company::factory()->create(); // unrelated team
+it('404s for a record outside every workspace the user belongs to', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $other = Company::factory()->create(); // unrelated workspace
 
     $this->actingAs($user)->get("/r/company/{$other->getKey()}")->assertNotFound();
 });
 
-it('still 404s a soft deleted record outside every team the user belongs to', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $other = Company::factory()->create(); // unrelated team
+it('still 404s a soft deleted record outside every workspace the user belongs to', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $other = Company::factory()->create(); // unrelated workspace
     $other->delete();
 
     $this->actingAs($user)->get("/r/company/{$other->getKey()}")->assertNotFound();
 });
 
 it('404s for an unknown type', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->actingAs($user)->get('/r/wormhole/123')->assertNotFound();
 });
 
 it('404s for an authenticated request to a well-formed but nonexistent record id', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->actingAs($user)->get('/r/company/'.(string) Str::ulid())->assertNotFound();
 });
@@ -119,17 +119,17 @@ it('requires auth', function (): void {
 });
 
 it('redirects to the management page for an own custom field', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    TenantContextService::setTenantId($user->currentTeam->getKey());
+    $user = User::factory()->withPersonalWorkspace()->create();
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     $field = CustomField::factory()->create([
-        config('custom-fields.database.column_names.tenant_foreign_key') => $user->currentTeam->getKey(),
+        config('custom-fields.database.column_names.tenant_foreign_key') => $user->currentWorkspace->getKey(),
         'entity_type' => 'people',
     ]);
 
     TenantContextService::setTenantId(null);
 
-    $expectedUrl = CustomFields::getUrl(panel: 'app', tenant: $user->currentTeam).'?'.http_build_query([
+    $expectedUrl = CustomFields::getUrl(panel: 'app', tenant: $user->currentWorkspace).'?'.http_build_query([
         'currentEntityType' => 'people',
     ]);
 
@@ -138,29 +138,29 @@ it('redirects to the management page for an own custom field', function (): void
         ->assertRedirect($expectedUrl);
 });
 
-it('redirects a team invitation reference straight to the Members page', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+it('redirects a workspace invitation reference straight to the Members page', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
-    $expectedUrl = Members::getUrl(panel: 'app', tenant: $team);
+    $expectedUrl = Members::getUrl(panel: 'app', tenant: $workspace);
 
     $this->actingAs($user)
-        ->get('/r/team_invitations/'.(string) Str::ulid())
+        ->get('/r/workspace_invitations/'.(string) Str::ulid())
         ->assertRedirect($expectedUrl);
 });
 
-it('404s for a custom field belonging to another team', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    TenantContextService::setTenantId($owner->currentTeam->getKey());
+it('404s for a custom field belonging to another workspace', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    TenantContextService::setTenantId($owner->currentWorkspace->getKey());
 
     $field = CustomField::factory()->create([
-        config('custom-fields.database.column_names.tenant_foreign_key') => $owner->currentTeam->getKey(),
+        config('custom-fields.database.column_names.tenant_foreign_key') => $owner->currentWorkspace->getKey(),
         'entity_type' => 'people',
     ]);
 
     TenantContextService::setTenantId(null);
 
-    $stranger = User::factory()->withPersonalTeam()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($stranger)->get("/r/custom_field/{$field->getKey()}")->assertNotFound();
 });

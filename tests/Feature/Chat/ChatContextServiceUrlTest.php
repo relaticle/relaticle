@@ -11,8 +11,8 @@ use Relaticle\Chat\Services\ChatContextService;
 mutates(ChatContextService::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 });
 
@@ -22,10 +22,10 @@ function recordUrl(string $tenantSlug, string $segment, string $id): string
 }
 
 it('resolves a record from a view-page url', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        recordUrl($this->team->slug, 'companies', (string) $company->getKey()),
+        recordUrl($this->workspace->slug, 'companies', (string) $company->getKey()),
     );
 
     expect($context['record_type'])->toBe('company')
@@ -35,19 +35,19 @@ it('resolves a record from a view-page url', function (): void {
 
 it('returns empty context for a list page with no record', function (): void {
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/companies",
+        "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/companies",
     );
 
     expect($context['record_type'])->toBeNull()
         ->and($context['record_id'])->toBeNull();
 });
 
-it('refuses a record belonging to another team', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Theirs']);
+it('refuses a record belonging to another workspace', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = Company::factory()->for($otherUser->currentWorkspace)->create(['name' => 'Theirs']);
 
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        recordUrl($this->team->slug, 'companies', (string) $theirs->getKey()),
+        recordUrl($this->workspace->slug, 'companies', (string) $theirs->getKey()),
     );
 
     expect($context['record_type'])->toBeNull()
@@ -68,10 +68,10 @@ it('returns empty context for a malformed url without throwing', function (): vo
 });
 
 it('resolves a task opened as a modal via tableActionRecord', function (): void {
-    $task = Task::factory()->for($this->team)->create(['title' => 'Send proposal']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Send proposal']);
 
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/tasks?tableAction=edit&tableActionRecord=".$task->getKey(),
+        "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/tasks?tableAction=edit&tableActionRecord=".$task->getKey(),
     );
 
     expect($context['record_type'])->toBe('task')
@@ -80,22 +80,22 @@ it('resolves a task opened as a modal via tableActionRecord', function (): void 
 });
 
 it('resolves a note opened as a modal via tableActionRecord', function (): void {
-    $note = Note::factory()->for($this->team)->create(['title' => 'Discovery call']);
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
 
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/notes?tableAction=edit&tableActionRecord=".$note->getKey(),
+        "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/notes?tableAction=edit&tableActionRecord=".$note->getKey(),
     );
 
     expect($context['record_type'])->toBe('note')
         ->and($context['record_name'])->toBe('Discovery call');
 });
 
-it('does not bind another team record supplied via tableActionRecord', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = Task::factory()->for($otherUser->currentTeam)->create(['title' => 'Secret task']);
+it('does not bind another workspace record supplied via tableActionRecord', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = Task::factory()->for($otherUser->currentWorkspace)->create(['title' => 'Secret task']);
 
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/tasks?tableAction=edit&tableActionRecord=".$theirs->getKey(),
+        "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/tasks?tableAction=edit&tableActionRecord=".$theirs->getKey(),
     );
 
     expect($context['record_type'])->toBeNull()
@@ -104,7 +104,7 @@ it('does not bind another team record supplied via tableActionRecord', function 
 
 it('leaves an index page with no modal param unbound', function (): void {
     $context = resolve(ChatContextService::class)->getContextForUrl(
-        "https://consolidate-ask-relaticle.test/app/{$this->team->slug}/tasks",
+        "https://consolidate-ask-relaticle.test/app/{$this->workspace->slug}/tasks",
     );
 
     expect($context['record_type'])->toBeNull();

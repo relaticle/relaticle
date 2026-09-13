@@ -6,7 +6,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
-use App\Models\Team;
+use App\Models\Workspace;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -88,10 +88,10 @@ final class SubscriptionResource extends Resource
             ->components([
                 Section::make([
                     TextEntry::make('owner.name')
-                        ->label('Team')
+                        ->label('Workspace')
                         ->placeholder('—')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'owner')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'owner')),
                     TextEntry::make('type')
                         ->label('Type'),
                     TextEntry::make('stripe_price')
@@ -129,11 +129,11 @@ final class SubscriptionResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('owner.name')
-                    ->label('Team')
+                    ->label('Workspace')
                     ->searchable()
                     ->placeholder('—')
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'owner')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'owner')),
                 TextColumn::make('stripe_price')
                     ->label('Plan')
                     ->formatStateUsing(self::planLabel(...)),
@@ -186,7 +186,7 @@ final class SubscriptionResource extends Resource
             ->modalDescription('Moves the Stripe customer and every subscription on it to the chosen workspace. The subscription is not touched in Stripe: the same card is charged on the same date, and invoice history follows the customer. The customer is renamed to the target workspace so future invoices name the right one. Only workspaces with the same owner, no Stripe customer of their own, and not scheduled for deletion are listed.')
             ->modalSubmitActionLabel('Transfer')
             ->schema([
-                Select::make('target_team_id')
+                Select::make('target_workspace_id')
                     ->label('Target workspace')
                     ->options(fn (Subscription $record): array => self::transferTargets($record))
                     ->required()
@@ -200,11 +200,11 @@ final class SubscriptionResource extends Resource
                     ]),
             ])
             ->action(function (array $data, Subscription $record, TransferWorkspaceBilling $transfer, Action $action): void {
-                /** @var Team $source */
+                /** @var Workspace $source */
                 $source = $record->owner;
 
-                /** @var Team $target */
-                $target = Team::query()->findOrFail((string) $data['target_team_id']);
+                /** @var Workspace $target */
+                $target = Workspace::query()->findOrFail((string) $data['target_workspace_id']);
 
                 try {
                     $transfer->execute($source, $target, (string) auth('sysadmin')->id());
@@ -235,10 +235,10 @@ final class SubscriptionResource extends Resource
      */
     public static function transferTargets(Subscription $record): array
     {
-        /** @var Team $source */
+        /** @var Workspace $source */
         $source = $record->owner;
 
-        return Team::query()
+        return Workspace::query()
             ->where('user_id', $source->user_id)
             ->whereKeyNot($source->getKey())
             ->whereNull('stripe_id')

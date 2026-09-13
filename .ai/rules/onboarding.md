@@ -6,8 +6,8 @@
 The package binds it as a singleton, so every model shares one `OnboardingStep`
 instance. `OnboardingStep::complete()` memoizes via Laravel's `once()`, keyed on
 that shared object and the call site. The model is not part of the key. With the
-package's own binding, the first team evaluated in a process decides the answer
-for every later team: wrong onboarding state in any request or Horizon worker
+package's own binding, the first workspace evaluated in a process decides the answer
+for every later workspace: wrong onboarding state in any request or Horizon worker
 that touches two workspaces. Verified against 2.6.3; unreported upstream.
 
 Because a fresh registry starts empty, step registration lives inside that
@@ -15,12 +15,12 @@ binding (`ActivationSteps::registerOn($steps)`), not in `boot()`.
 
 **Never register steps through the `Spatie\Onboard\Facades\Onboard` facade**
 (what the package README shows). A facade caches its resolved instance, so with
-a non-singleton binding it holds an orphan registry no `$team->onboarding()`
+a non-singleton binding it holds an orphan registry no `$workspace->onboarding()`
 call ever reads: `Onboard::addStep()` would silently register a step that never
 appears. Add steps in `ActivationSteps::registerOn()` only.
 
 Completion truth comes from `App\Services\WorkspaceActivationFacts`, which caches
-per team id and is `scoped` (reset per request/job). Call `forget($team)` after
+per workspace id and is `scoped` (reset per request/job). Call `forget($workspace)` after
 writing records inside one request/test before re-reading a step.
 
 `tests/Feature/Onboarding/ActivationStepsTest.php` has a leak regression test:

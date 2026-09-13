@@ -81,7 +81,7 @@ final class UpdateNoteTool extends BaseWriteUpdateTool
 
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $fields = [];
         if (array_key_exists('title', $request->all())) {
@@ -102,7 +102,7 @@ final class UpdateNoteTool extends BaseWriteUpdateTool
             $fields[] = [
                 'label' => $label,
                 'old' => $this->joinNames(array_values($model->{$relation}()->pluck('name')->all())),
-                'new' => $ids === [] ? __('(none)') : $this->recordNames()->names($ids, $modelClass, $team),
+                'new' => $ids === [] ? __('(none)') : $this->recordNames()->names($ids, $modelClass, $workspace),
                 '_oldValue' => array_map(strval(...), $model->{$relation}()->pluck($model->{$relation}()->getRelated()->getQualifiedKeyName())->all()),
                 '_newValue' => $ids,
             ];

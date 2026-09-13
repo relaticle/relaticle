@@ -12,7 +12,7 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 
 it('passes disable_parallel_tool_use to Anthropic via tool_choice', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Http::fake([
@@ -31,7 +31,7 @@ it('passes disable_parallel_tool_use to Anthropic via tool_choice', function ():
         'id' => '019df800-0000-7000-8000-000000000001',
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -65,7 +65,7 @@ it('caches both the static prefix and the growing transcript on Anthropic', func
 });
 
 it('sends both cache breakpoints in the Anthropic request body', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Http::fake([
@@ -84,7 +84,7 @@ it('sends both cache breakpoints in the Anthropic request body', function (): vo
         'id' => '019df800-0000-7000-8000-000000000002',
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -113,14 +113,14 @@ it('omits every cache breakpoint when prompt caching is disabled', function (): 
 });
 
 it('write tool result includes agent_should_stop=true in meta', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($user);
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-0000-7000-8000-000000000010',
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),

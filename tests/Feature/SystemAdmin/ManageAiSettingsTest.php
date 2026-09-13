@@ -173,7 +173,7 @@ it('records who changed which dial, and to what', function (): void {
         ->call('save')
         ->assertHasNoFormErrors();
 
-    // TeamScope hides tenant-less rows; the sysadmin ActivityResource drops it too.
+    // WorkspaceScope hides tenant-less rows; the sysadmin ActivityResource drops it too.
     $activity = Activity::query()->withoutGlobalScopes()->where('event', 'chat_settings_updated')->sole();
 
     expect($activity->properties['changed'])->toContain('chat.anthropic_effort')

@@ -17,18 +17,18 @@ final class ChatQaSeeder extends Seeder
     public function run(): void
     {
         User::query()->where('email', 'chat-qa@relaticle.test')->delete();
-        User::query()->where('email', 'other-team@relaticle.test')->delete();
+        User::query()->where('email', 'other-workspace@relaticle.test')->delete();
 
-        $user = User::factory()->withPersonalTeam()->create([
+        $user = User::factory()->withPersonalWorkspace()->create([
             'email' => 'chat-qa@relaticle.test',
             'password' => bcrypt('password'),
             'name' => 'Chat QA',
         ]);
 
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         AiCreditBalance::query()->updateOrCreate(
-            ['team_id' => $team->getKey()],
+            ['workspace_id' => $workspace->getKey()],
             [
                 'credits_remaining' => 500,
                 'credits_used' => 0,
@@ -37,20 +37,20 @@ final class ChatQaSeeder extends Seeder
             ],
         );
 
-        Company::factory()->count(12)->for($team)->create([
+        Company::factory()->count(12)->for($workspace)->create([
             'account_owner_id' => $user->getKey(),
         ]);
-        People::factory()->count(20)->for($team)->create();
-        Opportunity::factory()->count(8)->for($team)->create();
-        Task::factory()->count(15)->for($team)->create();
+        People::factory()->count(20)->for($workspace)->create();
+        Opportunity::factory()->count(8)->for($workspace)->create();
+        Task::factory()->count(15)->for($workspace)->create();
 
         // Cross-tenant isolation fixtures
-        $otherUser = User::factory()->withPersonalTeam()->create([
-            'email' => 'other-team@relaticle.test',
+        $otherUser = User::factory()->withPersonalWorkspace()->create([
+            'email' => 'other-workspace@relaticle.test',
             'password' => bcrypt('password'),
         ]);
-        Company::factory()->count(3)->for($otherUser->currentTeam)->create([
-            'name' => 'OTHER-TEAM-ACME',
+        Company::factory()->count(3)->for($otherUser->currentWorkspace)->create([
+            'name' => 'OTHER-WORKSPACE-ACME',
             'account_owner_id' => $otherUser->getKey(),
         ]);
     }

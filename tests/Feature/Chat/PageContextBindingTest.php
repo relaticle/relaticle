@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\Company;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -18,8 +18,8 @@ use Relaticle\Chat\Services\CreditService;
 mutates(ProcessChatMessage::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
 
     $this->conversationId = '019df800-5555-7000-8000-000000000001';
 
@@ -27,7 +27,7 @@ beforeEach(function (): void {
         'id' => $this->conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -49,7 +49,7 @@ function sendWithPageContext(string $conversationId, ?array $pageContext): TestR
 }
 
 it('binds the record the user is viewing to the turn', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $this->actingAs($this->user);
 
@@ -66,9 +66,9 @@ it('binds the record the user is viewing to the turn', function (): void {
     });
 });
 
-it('drops a page context pointing at another team record', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $theirs = Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Theirs']);
+it('drops a page context pointing at another workspace record', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $theirs = Company::factory()->for($otherUser->currentWorkspace)->create(['name' => 'Theirs']);
 
     $this->actingAs($this->user);
 
@@ -95,7 +95,7 @@ it('carries no page context when none is sent', function (): void {
 });
 
 it('drops a page context with an unsupported type', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $this->actingAs($this->user);
 
@@ -129,10 +129,10 @@ it('renders nothing when no record is bound', function (): void {
     expect($agent->dynamicInstructions())->not->toContain('currently viewing');
 });
 
-function seedCreditBalance(Team $team): void
+function seedCreditBalance(Workspace $workspace): void
 {
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -141,14 +141,14 @@ function seedCreditBalance(Team $team): void
 }
 
 it('persists the bound record as a page_context row on the user message', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'summarize this',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -180,14 +180,14 @@ it('persists the bound record as a page_context row on the user message', functi
  * behalf, so a second turn that (correctly) omits page_context persists none.
  */
 it('carries no page_context row on a second message in the same conversation once the pill is consumed', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok', 'ok']);
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'summarize this',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -201,7 +201,7 @@ it('carries no page_context row on a second message in the same conversation onc
     // does after `pageContextConsumed` flips true.
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'and what else can you tell me',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -242,15 +242,15 @@ it('carries no page_context row on a second message in the same conversation onc
  * test that actually fails against the old code.
  */
 it('writes both a mention row and a page_context row when a message has each', function (): void {
-    $mentioned = Company::factory()->for($this->team)->create(['name' => 'Widgets Inc']);
-    $viewed = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $mentioned = Company::factory()->for($this->workspace)->create(['name' => 'Widgets Inc']);
+    $viewed = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'Tell me about @Widgets_Inc',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -274,8 +274,8 @@ it('writes both a mention row and a page_context row when a message has each', f
         ->and($rows['page_context']->label)->toBe('Acme');
 });
 
-it('binds the job\'s team onto the agent so the workspace_state block can resolve it', function (): void {
-    seedCreditBalance($this->team);
+it('binds the job\'s workspace onto the agent so the workspace_state block can resolve it', function (): void {
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     $captured = null;
@@ -285,7 +285,7 @@ it('binds the job\'s team onto the agent so the workspace_state block can resolv
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'hello',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -294,16 +294,16 @@ it('binds the job\'s team onto the agent so the workspace_state block can resolv
     ))->handle(resolve(CreditService::class));
 
     expect($captured)->not->toBeNull()
-        ->and($captured->team?->getKey())->toBe($this->team->getKey());
+        ->and($captured->workspace?->getKey())->toBe($this->workspace->getKey());
 });
 
 it('writes no page_context row when no record is bound', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     (new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'hello',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -415,10 +415,10 @@ function runAndCaptureLedger(ProcessChatMessage $job): array
 }
 
 it('collapses a record referenced across multiple prior turns into a single ledger slot', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
     $userId = (string) $this->user->getKey();
 
     $firstTurn = seedConversationMessage($this->conversationId, $userId);
@@ -429,7 +429,7 @@ it('collapses a record referenced across multiple prior turns into a single ledg
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'what else can you tell me',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -442,7 +442,7 @@ it('collapses a record referenced across multiple prior turns into a single ledg
 });
 
 it('caps the ledger at 10 distinct records without duplicate rows wasting a slot', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     $userId = (string) $this->user->getKey();
@@ -468,7 +468,7 @@ it('caps the ledger at 10 distinct records without duplicate rows wasting a slot
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'anything',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -493,7 +493,7 @@ it('caps the ledger at 10 distinct records without duplicate rows wasting a slot
  * its slot instead of A).
  */
 it('exempts the conversation\'s oldest page_context record from ledger eviction', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     $userId = (string) $this->user->getKey();
@@ -513,7 +513,7 @@ it('exempts the conversation\'s oldest page_context record from ledger eviction'
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'anything',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -530,17 +530,17 @@ it('exempts the conversation\'s oldest page_context record from ledger eviction'
 });
 
 it('includes a record that was only ever bound as page context, never a typed mention', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 
     $message = seedConversationMessage($this->conversationId, (string) $this->user->getKey());
     seedMentionRow($message, 'company', (string) $company->getKey(), 'Acme', 'page_context', now()->subMinutes(5));
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'anything',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -554,12 +554,12 @@ it('includes a record that was only ever bound as page context, never a typed me
 });
 
 it('scopes the ledger to its own conversation and excludes records referenced in another one', function (): void {
-    seedCreditBalance($this->team);
+    seedCreditBalance($this->workspace);
     CrmAssistant::fake(['ok']);
 
     $userId = (string) $this->user->getKey();
 
-    $ownRecord = Company::factory()->for($this->team)->create(['name' => 'Own Co']);
+    $ownRecord = Company::factory()->for($this->workspace)->create(['name' => 'Own Co']);
     $ownMessage = seedConversationMessage($this->conversationId, $userId);
     seedMentionRow($ownMessage, 'company', (string) $ownRecord->getKey(), 'Own Co', 'mention', now()->subMinutes(5));
 
@@ -568,19 +568,19 @@ it('scopes the ledger to its own conversation and excludes records referenced in
         'id' => $otherConversationId,
         'participant_type' => 'user',
         'participant_id' => $userId,
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
-    $leakedRecord = Company::factory()->for($this->team)->create(['name' => 'Other Conversation Co']);
+    $leakedRecord = Company::factory()->for($this->workspace)->create(['name' => 'Other Conversation Co']);
     $otherMessage = seedConversationMessage($otherConversationId, $userId);
     seedMentionRow($otherMessage, 'company', (string) $leakedRecord->getKey(), 'Other Conversation Co', 'mention', now()->subMinutes(1));
 
     $job = new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'anything',
         conversationId: $this->conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],

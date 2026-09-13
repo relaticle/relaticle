@@ -1,6 +1,6 @@
-<x-mail::message :reason="__('mail.footer.reason.owner', ['team' => $team->name])">
+<x-mail::message :reason="__('mail.footer.reason.owner', ['workspace' => $workspace->name])">
 <x-slot:preheader>{{ __('mail.trial_ending.preheader') }}</x-slot:preheader>
-# {{ __('mail.trial_ending.heading', ['team' => $team->name]) }}
+# {{ __('mail.trial_ending.heading', ['workspace' => $workspace->name]) }}
 
 {{ __('mail.trial_ending.ends_on', ['date' => $endsOn]) }}
 
@@ -11,7 +11,7 @@
 </x-mail::button>
 
 @if($grandfathered)
-{{ __('mail.trial_ending.grandfathered', ['team' => $team->name]) }}
+{{ __('mail.trial_ending.grandfathered', ['workspace' => $workspace->name]) }}
 @else
 {{ __('mail.trial_ending.paused') }}
 @endif

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Actions;
 
 use App\Enums\Plan;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Subscription;
@@ -24,19 +24,19 @@ final readonly class TransferWorkspaceBilling
      * The subscription itself is never sent to Stripe. It cannot change
      * customer there, and it does not need to: the customer itself changes
      * hands, so the same card keeps being charged on the same date.
-     * `subscription_items` has no team column, so items follow their parent
+     * `subscription_items` has no workspace column, so items follow their parent
      * row. The only Stripe write is the customer rename below.
      *
      * @throws TransferRefused when the pair fails a transfer precondition
      */
-    public function execute(Team $source, Team $target, string $sysadminId): void
+    public function execute(Workspace $source, Workspace $target, string $sysadminId): void
     {
         DB::transaction(function () use ($source, $target, $sysadminId): void {
-            /** @var Team $lockedSource */
-            $lockedSource = Team::query()->whereKey($source->getKey())->lockForUpdate()->firstOrFail();
+            /** @var Workspace $lockedSource */
+            $lockedSource = Workspace::query()->whereKey($source->getKey())->lockForUpdate()->firstOrFail();
 
-            /** @var Team $lockedTarget */
-            $lockedTarget = Team::query()->whereKey($target->getKey())->lockForUpdate()->firstOrFail();
+            /** @var Workspace $lockedTarget */
+            $lockedTarget = Workspace::query()->whereKey($target->getKey())->lockForUpdate()->firstOrFail();
 
             $plan = $this->assertTransferable($lockedSource, $lockedTarget);
 
@@ -61,8 +61,8 @@ final readonly class TransferWorkspaceBilling
             ])->save();
 
             Subscription::query()
-                ->where('team_id', $lockedSource->getKey())
-                ->update(['team_id' => $lockedTarget->getKey()]);
+                ->where('workspace_id', $lockedSource->getKey())
+                ->update(['workspace_id' => $lockedTarget->getKey()]);
 
             // CreditPeriodResolver reads the subscriptions relation to pick the
             // billing anchor, and loadMissing() would keep the pre-move copy.
@@ -87,13 +87,13 @@ final readonly class TransferWorkspaceBilling
      * has already moved correctly, and a Stripe outage must not undo that or
      * show the operator a refusal for a transfer that succeeded.
      */
-    private function renameStripeCustomer(Team $target): void
+    private function renameStripeCustomer(Workspace $target): void
     {
         try {
             $target->updateStripeCustomer(['name' => $target->stripeName()]);
         } catch (Throwable $exception) {
             Log::warning('Workspace billing transferred, but the Stripe customer kept its previous name', [
-                'team_id' => $target->getKey(),
+                'workspace_id' => $target->getKey(),
                 'stripe_customer' => $target->stripe_id,
                 'exception' => $exception->getMessage(),
             ]);
@@ -101,7 +101,7 @@ final readonly class TransferWorkspaceBilling
     }
 
     /** @throws TransferRefused */
-    private function assertTransferable(Team $source, Team $target): Plan
+    private function assertTransferable(Workspace $source, Workspace $target): Plan
     {
         throw_if($source->is($target), TransferRefused::class, 'Source and target are the same workspace.');
         throw_if($source->stripe_id === null, TransferRefused::class, 'The source workspace has no Stripe customer.');

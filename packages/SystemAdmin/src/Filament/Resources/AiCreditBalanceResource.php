@@ -81,10 +81,10 @@ final class AiCreditBalanceResource extends Resource
         return $schema
             ->components([
                 Section::make([
-                    TextEntry::make('team.name')
-                        ->label('Team')
+                    TextEntry::make('workspace.name')
+                        ->label('Workspace')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                     TextEntry::make('credits_remaining')->numeric(),
                     TextEntry::make('credits_used')->numeric(),
                     TextEntry::make('purchased_credits')
@@ -104,15 +104,15 @@ final class AiCreditBalanceResource extends Resource
         return $table
             ->defaultSort('credits_remaining', 'asc')
             ->columns([
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->searchable()
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('billing_status')
                     ->label('Billing')
-                    ->state(fn (AiCreditBalance $record): BillingStatus => $record->team->billingStatus())
+                    ->state(fn (AiCreditBalance $record): BillingStatus => $record->workspace->billingStatus())
                     ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
                     ->badge(),
                 TextColumn::make('credits_remaining')
@@ -160,8 +160,8 @@ final class AiCreditBalanceResource extends Resource
                 Filter::make('period_expired')
                     ->label('Period expired')
                     ->query(fn (Builder $query): Builder => $query->where('period_ends_at', '<', now())),
-                SelectFilter::make('team')
-                    ->relationship('team', 'name')
+                SelectFilter::make('workspace')
+                    ->relationship('workspace', 'name')
                     ->searchable(),
             ])
             ->recordActions([
@@ -193,7 +193,7 @@ final class AiCreditBalanceResource extends Resource
     #[Override]
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with('team.subscriptions');
+        return parent::getEloquentQuery()->with('workspace.subscriptions');
     }
 
     private static function adjustAction(): Action
@@ -220,7 +220,7 @@ final class AiCreditBalanceResource extends Resource
                 $sysadminId = (string) auth('sysadmin')->id();
 
                 $service->adjust(
-                    team: $record->team,
+                    workspace: $record->workspace,
                     delta: (int) $data['delta'],
                     reason: (string) $data['reason'],
                     sysadminId: $sysadminId,
@@ -243,8 +243,8 @@ final class AiCreditBalanceResource extends Resource
             ->requiresConfirmation()
             ->modalHeading('Reset billing period')
             ->modalDescription(fn (AiCreditBalance $record): string => 'Wipes credits_used and grants the allowance for the chosen plan. Starts a fresh monthly period.'
-                .(($record->team->subscription()?->valid() ?? false)
-                    ? ' WARNING: this team has an active Stripe subscription, so webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
+                .(($record->workspace->subscription()?->valid() ?? false)
+                    ? ' WARNING: this workspace has an active Stripe subscription, so webhook sync will re-assert the subscribed plan. Cancel the subscription in Stripe first.'
                     : ''))
             ->schema([
                 Select::make('plan')
@@ -253,18 +253,18 @@ final class AiCreditBalanceResource extends Resource
             ])
             ->action(function (array $data, AiCreditBalance $record, CreditService $service): void {
                 $planString = (string) $data['plan'];
-                $team = $record->team;
+                $workspace = $record->workspace;
                 $sysadminId = (string) auth('sysadmin')->id();
 
-                DB::transaction(function () use ($team, $planString, $service, $sysadminId): void {
-                    $team->plan = Plan::from($planString);
-                    $team->save();
-                    $service->resetPeriod($team, $sysadminId);
+                DB::transaction(function () use ($workspace, $planString, $service, $sysadminId): void {
+                    $workspace->plan = Plan::from($planString);
+                    $workspace->save();
+                    $service->resetPeriod($workspace, $sysadminId);
                 });
 
                 Notification::make()
                     ->title('Billing period reset')
-                    ->body("Granted {$team->plan->credits()} credits.")
+                    ->body("Granted {$workspace->plan->credits()} credits.")
                     ->success()
                     ->send();
             });
@@ -278,7 +278,7 @@ final class AiCreditBalanceResource extends Resource
             ->color('danger')
             ->authorize('update')
             ->requiresConfirmation()
-            ->modalHeading('Reset billing period for selected teams')
+            ->modalHeading('Reset billing period for selected workspaces')
             ->schema([
                 Select::make('plan')
                     ->options(self::planOptions())
@@ -293,16 +293,16 @@ final class AiCreditBalanceResource extends Resource
                 DB::transaction(function () use ($records, $plan, $service, $sysadminId): void {
                     foreach ($records as $record) {
                         /** @var AiCreditBalance $record */
-                        $team = $record->team;
-                        $team->plan = $plan;
-                        $team->save();
-                        $service->resetPeriod($team, $sysadminId);
+                        $workspace = $record->workspace;
+                        $workspace->plan = $plan;
+                        $workspace->save();
+                        $service->resetPeriod($workspace, $sysadminId);
                     }
                 });
 
                 Notification::make()
                     ->title('Billing periods reset')
-                    ->body("Granted {$plan->credits()} credits to {$count} teams.")
+                    ->body("Granted {$plan->credits()} credits to {$count} workspaces.")
                     ->success()
                     ->send();
             })

@@ -61,7 +61,7 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $user = User::query()->with(['ownedTeams', 'teams'])->find($this->userId);
+        $user = User::query()->with(['ownedWorkspaces', 'workspaces'])->find($this->userId);
 
         if (! $user || $user->email_verified_at === null) {
             return;

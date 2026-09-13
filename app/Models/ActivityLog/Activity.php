@@ -4,39 +4,39 @@ declare(strict_types=1);
 
 namespace App\Models\ActivityLog;
 
-use App\Models\ActivityLog\Scopes\TeamScope;
-use App\Models\Team;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity as SpatieActivity;
 
 /**
- * @property string|null $team_id
+ * @property string|null $workspace_id
  */
 final class Activity extends SpatieActivity
 {
     /**
-     * @return BelongsTo<Team, $this>
+     * @return BelongsTo<Workspace, $this>
      */
-    public function team(): BelongsTo
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Workspace::class);
     }
 
     protected static function booted(): void
     {
-        self::addGlobalScope(new TeamScope);
+        self::addGlobalScope(new WorkspaceScope);
 
         self::creating(function (self $activity): void {
-            if ($activity->team_id !== null) {
+            if ($activity->workspace_id !== null) {
                 return;
             }
 
-            $teamId = $activity->subject?->getAttribute('team_id')
+            $workspaceId = $activity->subject?->getAttribute('workspace_id')
                 ?? Filament::getTenant()?->getKey();
 
-            if ($teamId !== null) {
-                $activity->team_id = $teamId;
+            if ($workspaceId !== null) {
+                $activity->workspace_id = $workspaceId;
             }
         });
     }

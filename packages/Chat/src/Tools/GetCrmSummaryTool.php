@@ -31,7 +31,7 @@ final class GetCrmSummaryTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         /**
          * "This week" is the user's week, not the server's. Bounded on UTC, the counts
@@ -43,16 +43,16 @@ final class GetCrmSummaryTool implements Tool
 
         $summary = [
             'record_counts' => [
-                'companies' => Company::query()->whereBelongsTo($team)->count(),
-                'people' => People::query()->whereBelongsTo($team)->count(),
-                'opportunities' => Opportunity::query()->whereBelongsTo($team)->count(),
-                'tasks' => Task::query()->whereBelongsTo($team)->count(),
-                'notes' => Note::query()->whereBelongsTo($team)->count(),
+                'companies' => Company::query()->whereBelongsTo($workspace)->count(),
+                'people' => People::query()->whereBelongsTo($workspace)->count(),
+                'opportunities' => Opportunity::query()->whereBelongsTo($workspace)->count(),
+                'tasks' => Task::query()->whereBelongsTo($workspace)->count(),
+                'notes' => Note::query()->whereBelongsTo($workspace)->count(),
             ],
             'recent_activity' => [
-                'companies_this_week' => Company::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
-                'tasks_this_week' => Task::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
-                'opportunities_this_week' => Opportunity::query()->whereBelongsTo($team)->where('created_at', '>=', $startOfWeek)->count(),
+                'companies_this_week' => Company::query()->whereBelongsTo($workspace)->where('created_at', '>=', $startOfWeek)->count(),
+                'tasks_this_week' => Task::query()->whereBelongsTo($workspace)->where('created_at', '>=', $startOfWeek)->count(),
+                'opportunities_this_week' => Opportunity::query()->whereBelongsTo($workspace)->where('created_at', '>=', $startOfWeek)->count(),
             ],
         ];
 

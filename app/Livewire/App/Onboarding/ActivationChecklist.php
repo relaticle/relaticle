@@ -7,10 +7,10 @@ namespace App\Livewire\App\Onboarding;
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Data\ActivationStepData;
 use App\Enums\ActivationStep;
-use App\Filament\Pages\Team\Members;
+use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\PeopleResource;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
@@ -31,13 +31,13 @@ final class ActivationChecklist extends Component
 {
     public function dismiss(): void
     {
-        $team = $this->team();
+        $workspace = $this->workspace();
 
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             return;
         }
 
-        resolve(DismissActivationChecklist::class)->execute($this->user(), $team);
+        resolve(DismissActivationChecklist::class)->execute($this->user(), $workspace);
 
         unset($this->steps);
     }
@@ -54,19 +54,19 @@ final class ActivationChecklist extends Component
     #[Computed]
     public function visible(): bool
     {
-        $team = $this->team();
+        $workspace = $this->workspace();
 
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             return false;
         }
 
-        if ($team->activation_checklist_dismissed_at !== null) {
+        if ($workspace->activation_checklist_dismissed_at !== null) {
             return false;
         }
 
         // Every step links somewhere only a workspace admin can act on, so showing
         // this to an editor would be a checklist of 403s.
-        if (! $this->user()->can('update', $team)) {
+        if (! $this->user()->can('update', $workspace)) {
             return false;
         }
 
@@ -79,13 +79,13 @@ final class ActivationChecklist extends Component
     #[Computed]
     public function steps(): array
     {
-        $team = $this->team();
+        $workspace = $this->workspace();
 
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             return [];
         }
 
-        return array_values($team->onboarding()->steps()
+        return array_values($workspace->onboarding()->steps()
             ->map(fn (OnboardingStep $step): ActivationStepData => new ActivationStepData(
                 key: $this->stepKey($step)->value,
                 label: $this->stepLabel($this->stepKey($step), $step),
@@ -163,9 +163,9 @@ final class ActivationChecklist extends Component
 
     private function hasAnyRecord(): bool
     {
-        $team = $this->team();
+        $workspace = $this->workspace();
 
-        return $team instanceof Team && resolve(WorkspaceActivationFacts::class)->hasAnyRecord($team);
+        return $workspace instanceof Workspace && resolve(WorkspaceActivationFacts::class)->hasAnyRecord($workspace);
     }
 
     #[Computed]
@@ -184,16 +184,16 @@ final class ActivationChecklist extends Component
     #[Computed]
     public function hasSampleData(): bool
     {
-        $team = $this->team();
+        $workspace = $this->workspace();
 
-        return $team instanceof Team && resolve(WorkspaceActivationFacts::class)->hasSampleData($team);
+        return $workspace instanceof Workspace && resolve(WorkspaceActivationFacts::class)->hasSampleData($workspace);
     }
 
-    private function team(): ?Team
+    private function workspace(): ?Workspace
     {
         $tenant = Filament::getTenant();
 
-        return $tenant instanceof Team ? $tenant : null;
+        return $tenant instanceof Workspace ? $tenant : null;
     }
 
     private function user(): User

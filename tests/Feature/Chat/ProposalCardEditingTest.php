@@ -25,14 +25,14 @@ mutates(ProposalCard::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 it('builds the real custom-field component for the edited field, prefilled from action_data', function (): void {
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'Edit me', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
     $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -50,7 +50,7 @@ it('builds the real custom-field component for the edited field, prefilled from 
 });
 
 it('does not throw building a field with a cross-field visibility condition (fails open under ->only())', function (): void {
-    $dependent = ProposalCardFixture::taskFieldWithVisibilityCondition($this->team);
+    $dependent = ProposalCardFixture::taskFieldWithVisibilityCondition($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => []]);
 
     $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -68,7 +68,7 @@ it('does not throw building a field with a cross-field visibility condition (fai
 
 it('saves an edited custom field through ProposalEditor without executing', function (): void {
     Bus::fake();
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -82,15 +82,15 @@ it('saves an edited custom field through ProposalEditor without executing', func
     $fresh = $action->fresh();
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['custom_fields'][$field->code])->toBe($optionIds[1]);
-    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Task::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('accepts an option id when another option shares its label case-insensitively', function (): void {
     Bus::fake();
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $doneId = $field->options->firstWhere('name', 'Done')->id;
     CustomFieldOption::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_id' => $field->getKey(),
         'name' => 'DONE',
         'sort_order' => 99,
@@ -112,10 +112,10 @@ it('accepts an option id when another option shares its label case-insensitively
 
 it('preserves other custom fields when only one is edited', function (): void {
     Bus::fake();
-    [$status, $statusOptionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$status, $statusOptionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
 
     $priority = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'priority')
         ->with('options')
@@ -145,7 +145,7 @@ it('preserves other custom fields when only one is edited', function (): void {
 });
 
 it('cancels an inline edit without persisting and leaves action_data untouched', function (): void {
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'Keep me', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -175,12 +175,12 @@ it('edits a core text field (title) in place and persists it via applyEdit witho
     $fresh = $action->fresh();
     expect($fresh->status)->toBe(PendingActionStatus::Pending)
         ->and($fresh->action_data['title'])->toBe('New Title');
-    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Task::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('rejects an out-of-options choice value at the form layer without persisting', function (): void {
     Bus::fake();
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -216,7 +216,7 @@ it('rejects an empty required core name at the form layer and keeps the proposal
 });
 
 it('exposes editable codes for the entity (core keys + non-deferred custom fields)', function (): void {
-    [$field] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => [$field->code => null]]);
 
     $codes = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -229,7 +229,7 @@ it('exposes editable codes for the entity (core keys + non-deferred custom field
 
 it('omits deferred custom fields (file upload, record lookup) from the editable codes', function (): void {
     $fileField = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'attachment',
         'name' => 'Attachment',
@@ -246,7 +246,7 @@ it('omits deferred custom fields (file upload, record lookup) from the editable 
     // load-bearing (the file-upload type is disabled in config, so it is excluded
     // by the kindFor() fallback regardless).
     $recordField = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'task',
         'code' => 'related_company',
         'name' => 'Related Company',
@@ -270,7 +270,7 @@ it('omits deferred custom fields (file upload, record lookup) from the editable 
 });
 
 it('rebuilds the current record fields with codes on editable rows and no divergence from stored display', function (): void {
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $optionLabel = (string) $field->options->firstWhere('id', $optionIds[0])->name;
 
     $tool = resolve(CreateTaskTool::class);
@@ -298,7 +298,7 @@ it('rebuilds the current record fields with codes on editable rows and no diverg
 
 it('edits a custom field on a batch item without touching sibling records', function (): void {
     Bus::fake();
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::batchTask($this->user, [
         ['title' => 'Task A', 'custom_fields' => [$field->code => $optionIds[0]]],
         ['title' => 'Task B', 'custom_fields' => [$field->code => $optionIds[0]]],
@@ -319,11 +319,11 @@ it('edits a custom field on a batch item without touching sibling records', func
     expect($records[1]['custom_fields'][$field->code])->toBe($optionIds[1])
         ->and($records[0]['custom_fields'][$field->code])->toBe($optionIds[0]);
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
-    expect(Task::query()->where('team_id', $this->team->getKey())->count())->toBe(0);
+    expect(Task::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
 it('shows an edit affordance for an editable field and renders the inline editor when editing', function (): void {
-    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->team);
+    [$field, $optionIds] = ProposalCardFixture::seededTaskChoice($this->workspace);
     $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => [$field->code => $optionIds[0]]]);
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
@@ -336,7 +336,7 @@ it('shows an edit affordance for an editable field and renders the inline editor
 
 it('rebuilds a company record (with account owner + custom field) without diverging from stored display', function (): void {
     $linkedin = CustomField::query()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'linkedin')
         ->first();

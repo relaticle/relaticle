@@ -20,7 +20,7 @@ function seedConversation(User $user, string $conversationId): void
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -30,13 +30,13 @@ function seedConversation(User $user, string $conversationId): void
 it('broadcasts a stream.failed event when the job fails', function (): void {
     Event::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     seedConversation($user, 'conv-123');
 
     $job = new ProcessChatMessage(
         user: $user,
-        team: $team,
+        workspace: $workspace,
         message: 'hello',
         conversationId: 'conv-123',
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -50,12 +50,12 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
 });
 
 it('refunds the reservation when the job fails without ever streaming', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     seedConversation($user, 'conv-123');
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 99,
         'credits_used' => 1,
         'period_starts_at' => now()->startOfMonth(),
@@ -64,7 +64,7 @@ it('refunds the reservation when the job fails without ever streaming', function
 
     $job = new ProcessChatMessage(
         user: $user,
-        team: $team,
+        workspace: $workspace,
         message: 'hello',
         conversationId: 'conv-123',
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -72,7 +72,7 @@ it('refunds the reservation when the job fails without ever streaming', function
 
     $job->failed(new RuntimeException('boom'));
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->first();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     // handle() never ran, so the reservation goes back rather than being charged.
     expect($balance->credits_used)->toBe(0)
@@ -80,7 +80,7 @@ it('refunds the reservation when the job fails without ever streaming', function
 });
 
 it('binds auth context so tool classes can resolve the current user', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     Auth::guard('web')->setUser($user);
     expect(Auth::guard('web')->user()?->getKey())->toBe($user->getKey());
@@ -90,12 +90,12 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
     Feature::define(BillingFeature::class, true);
     Event::fake();
 
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     seedConversation($user, 'conv-paused');
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $team->getKey()], [
-        'team_id' => $team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -104,7 +104,7 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
 
     $credits = resolve(CreditService::class);
     expect($credits->reserveCredit(
-        $team,
+        $workspace,
         reservationKey: 'reserve-turn-paused',
         conversationId: 'conv-paused',
         userId: (string) $user->getKey(),
@@ -112,7 +112,7 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
 
     $job = new ProcessChatMessage(
         user: $user,
-        team: $team,
+        workspace: $workspace,
         message: 'hello',
         conversationId: 'conv-paused',
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
@@ -128,7 +128,7 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
     Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-paused'
         && $event->message === __('billing.access.paused_chat'));
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
     expect($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);

@@ -14,7 +14,7 @@ use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
@@ -41,12 +41,12 @@ final readonly class ProposalEditor
     public function applyEdit(PendingAction $pendingAction, User $user, array $input, ?int $index = null): PendingAction
     {
         // Before the pin below, not after: this method validates core fields
-        // against the actor's team while writing custom fields under the
+        // against the actor's workspace while writing custom fields under the
         // proposal's, so a cross-tenant caller would split one record in two.
         ProposalOwnership::assert($pendingAction, $user);
 
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->team_id);
+        TenantContextService::setTenantId($pendingAction->workspace_id);
 
         try {
             return DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
@@ -122,7 +122,7 @@ final readonly class ProposalEditor
         }
 
         if ($entityType === 'company' && array_key_exists('account_owner_id', $editedCore)) {
-            $error = TeamMembersContext::memberFieldError($user, 'account_owner_id', $editedCore['account_owner_id']);
+            $error = WorkspaceMembersContext::memberFieldError($user, 'account_owner_id', $editedCore['account_owner_id']);
 
             throw_if($error !== null, RuntimeException::class, (string) $error);
         }

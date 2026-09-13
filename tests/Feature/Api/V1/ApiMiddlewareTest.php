@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\ForceJsonResponse;
-use App\Http\Middleware\SetApiTeamContext;
+use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -14,12 +14,12 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(
     ForceJsonResponse::class,
-    SetApiTeamContext::class,
+    SetApiWorkspaceContext::class,
 );
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 describe('ForceJsonResponse', function (): void {
@@ -64,7 +64,7 @@ describe('rate limiting', function (): void {
     it('enforces separate write rate limit', function (): void {
         RateLimiter::for('api', function () {
             return [
-                Limit::perMinute(100)->by('team:test'),
+                Limit::perMinute(100)->by('workspace:test'),
                 Limit::perMinute(2)->by('token:test:write'),
             ];
         });
@@ -87,14 +87,14 @@ describe('rate limiting', function (): void {
 
 describe('real-token middleware chain', function (): void {
     it('authenticates and scopes via real bearer token through full middleware stack', function (): void {
-        $companies = Company::factory()->recycle([$this->user, $this->team])->count(2)->create();
+        $companies = Company::factory()->recycle([$this->user, $this->workspace])->count(2)->create();
 
         $raw = Str::random(40);
         $token = $this->user->tokens()->create([
             'name' => 'full-stack-test',
             'token' => hash('sha256', $raw),
             'abilities' => ['*'],
-            'team_id' => $this->team->id,
+            'workspace_id' => $this->workspace->id,
         ]);
 
         $plainToken = "{$token->id}|{$raw}";

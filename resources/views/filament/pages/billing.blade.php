@@ -4,14 +4,14 @@
         $used = (int) ($balance?->credits_used ?? 0);
         $monthlyUsed = min($used, $allowance);
         $remaining = (int) ($balance?->credits_remaining ?? 0);
-        $isEnterprise = $team->plan === \App\Enums\Plan::Enterprise;
+        $isEnterprise = $workspace->plan === \App\Enums\Plan::Enterprise;
         $usedPercent = $allowance > 0 ? min(100, (int) round($used / $allowance * 100)) : 0;
 
         $isSubscribed = $subscription?->valid() ?? false;
         $canManageSubscription = $subscription && ($subscription->valid() || $pastDue);
-        $onTrial = ! $isEnterprise && $team->onGenericTrial();
+        $onTrial = ! $isEnterprise && $workspace->onGenericTrial();
         $onLegacyFree = $isGrandfathered
-            && $team->plan === \App\Enums\Plan::Free
+            && $workspace->plan === \App\Enums\Plan::Free
             && ! $onTrial
             && ! $isSubscribed;
         $isPaused = ! $hasHostedAccess;
@@ -19,14 +19,14 @@
             && ! $onTrial
             && ! $isPaused
             && ! $onLegacyFree
-            && $team->plan !== \App\Enums\Plan::Free);
+            && $workspace->plan !== \App\Enums\Plan::Free);
         $showEnterpriseOffer = $isOwner && ! $isEnterprise && ! $pastDue && ! $onGrace && ! $activating;
-        $trialDaysLeft = $onTrial ? max(0, (int) ceil(now()->floatDiffInDays($team->trial_ends_at))) : 0;
+        $trialDaysLeft = $onTrial ? max(0, (int) ceil(now()->floatDiffInDays($workspace->trial_ends_at))) : 0;
 
         $planLabel = match (true) {
             $isPaused => __('billing.plans.cloud_pro'),
             $onLegacyFree => __('billing.plans.legacy_free'),
-            $team->plan === \App\Enums\Plan::Enterprise => __('billing.plans.enterprise'),
+            $workspace->plan === \App\Enums\Plan::Enterprise => __('billing.plans.enterprise'),
             default => __('billing.plans.cloud_pro'),
         };
 
@@ -220,7 +220,7 @@
         @if(! $isOwner)
             <div class="{{ $card }} flex items-start gap-3 p-6">
                 <x-ri-information-line class="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
-                <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('billing.member.ask_owner', ['owner' => $team->owner->name]) }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('billing.member.ask_owner', ['owner' => $workspace->owner->name]) }}</p>
             </div>
         @elseif($isManagedPlan)
             <div class="{{ $card }} p-6">
@@ -329,7 +329,7 @@
 
                         <div x-show="confirming" x-cloak class="rounded-xl border border-primary/25 bg-primary/[0.03] p-4 dark:border-primary/20">
                             <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.confirm_title') }}</p>
-                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $team->name]) }}</p>
+                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $workspace->name]) }}</p>
                             <p class="mt-2 text-sm font-medium text-gray-900 dark:text-white"
                                 x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
                                 {{ __('billing.pro_plan.billed_yearly') }}
@@ -337,7 +337,7 @@
                             <div class="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
                                 <x-filament::button type="button" class="justify-center"
                                     wire:loading.attr="disabled" wire:target="upgrade" x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
-                                    {{ __('billing.upgrade.confirm_button', ['workspace' => $team->name]) }}
+                                    {{ __('billing.upgrade.confirm_button', ['workspace' => $workspace->name]) }}
                                 </x-filament::button>
                                 <x-filament::button type="button" color="gray" class="justify-center"
                                     x-on:click="confirming = false">

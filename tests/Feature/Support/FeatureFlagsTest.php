@@ -8,7 +8,7 @@ use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
-use App\Filament\Pages\CreateTeam;
+use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\EditProfile;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\Company;
@@ -25,8 +25,8 @@ mutates(AccountDeletion::class, OnboardSeed::class, SocialAuth::class, Documenta
 
 describe('AccountDeletion', function (): void {
     it('hides account deletion from Profile by default', function (): void {
-        $this->actingAs($user = User::factory()->withTeam()->create());
-        Filament::setTenant($user->currentTeam);
+        $this->actingAs($user = User::factory()->withWorkspace()->create());
+        Filament::setTenant($user->currentWorkspace);
 
         livewire(EditProfile::class)->assertDontSeeLivewire(DeleteAccount::class);
 
@@ -35,8 +35,8 @@ describe('AccountDeletion', function (): void {
 
     it('shows account deletion when enabled through config', function (): void {
         config()->set('relaticle.features.account_deletion', true);
-        $this->actingAs($user = User::factory()->withTeam()->create());
-        Filament::setTenant($user->currentTeam);
+        $this->actingAs($user = User::factory()->withWorkspace()->create());
+        Filament::setTenant($user->currentWorkspace);
 
         livewire(EditProfile::class)->assertSeeLivewire(DeleteAccount::class);
     });
@@ -63,17 +63,17 @@ describe('OnboardSeed', function (): void {
 
         $this->actingAs($user);
 
-        livewire(CreateTeam::class)
+        livewire(CreateWorkspace::class)
             ->fillForm([
-                'name' => 'Seed Enabled Team',
+                'name' => 'Seed Enabled Workspace',
                 'onboarding_use_case' => 'other',
             ])
             ->call('register')
             ->assertHasNoFormErrors();
 
-        $team = $user->fresh()->personalTeam();
+        $workspace = $user->fresh()->personalWorkspace();
 
-        expect(Company::where('team_id', $team->id)->count())->toBeGreaterThan(0);
+        expect(Company::where('workspace_id', $workspace->id)->count())->toBeGreaterThan(0);
     });
 
     it('skips demo data when feature is inactive', function (): void {
@@ -83,17 +83,17 @@ describe('OnboardSeed', function (): void {
 
         $this->actingAs($user);
 
-        livewire(CreateTeam::class)
+        livewire(CreateWorkspace::class)
             ->fillForm([
-                'name' => 'Seed Disabled Team',
+                'name' => 'Seed Disabled Workspace',
                 'onboarding_use_case' => 'other',
             ])
             ->call('register')
             ->assertHasNoFormErrors();
 
-        $team = $user->fresh()->personalTeam();
+        $workspace = $user->fresh()->personalWorkspace();
 
-        expect(Company::where('team_id', $team->id)->count())->toBe(0);
+        expect(Company::where('workspace_id', $workspace->id)->count())->toBe(0);
     });
 });
 

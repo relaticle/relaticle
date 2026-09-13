@@ -21,14 +21,14 @@ beforeEach(function (): void {
 
 function seedAdminConversation(string $title = 'Probe chat', int $messages = 0): AgentConversation
 {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $id = (string) Str::uuid7();
 
     DB::table('agent_conversations')->insert([
         'id' => $id,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => $title,
         'created_at' => now(),
         'updated_at' => now(),
@@ -63,7 +63,7 @@ it('lists conversations across all tenants with a message count', function (): v
     livewire(ListAgentConversations::class)
         ->assertSuccessful()
         ->assertCanSeeTableRecords([$a, $b])
-        ->assertCanRenderTableColumn('team.name')
+        ->assertCanRenderTableColumn('workspace.name')
         ->assertCanRenderTableColumn('messages_count');
 });
 

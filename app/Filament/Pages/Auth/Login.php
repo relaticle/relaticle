@@ -6,11 +6,11 @@ namespace App\Filament\Pages\Auth;
 
 use App\Actions\Auth\AuthenticatePassword;
 use App\Actions\Fortify\CreateNewUser;
-use App\Concerns\DetectsTeamInvitation;
+use App\Concerns\DetectsWorkspaceInvitation;
 use App\Enums\SocialiteProvider;
 use App\Features\SocialAuth;
-use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\WorkspaceInvitation;
 use App\Rules\RegistrableEmail;
 use App\Rules\TurnstileChallenge;
 use App\Support\EmailAddress;
@@ -47,7 +47,7 @@ use Spatie\Honeypot\Http\Livewire\Concerns\UsesSpamProtection;
 
 final class Login extends \Filament\Auth\Pages\Login
 {
-    use DetectsTeamInvitation;
+    use DetectsWorkspaceInvitation;
     use UsesSpamProtection;
 
     #[Locked]
@@ -213,9 +213,9 @@ final class Login extends \Filament\Auth\Pages\Login
             ]);
         }
 
-        $invitation = $this->getTeamInvitationFromSession();
+        $invitation = $this->getWorkspaceInvitationFromSession();
 
-        if ($invitation instanceof TeamInvitation && ! $invitation->isExpired() && $invitation->email === $email && $user->markEmailAsVerified()) {
+        if ($invitation instanceof WorkspaceInvitation && ! $invitation->isExpired() && $invitation->email === $email && $user->markEmailAsVerified()) {
             event(new Verified($user));
         }
 
@@ -405,7 +405,7 @@ final class Login extends \Filament\Auth\Pages\Login
             ->autocomplete('username webauthn')
             ->autofocus()
             ->dehydrateStateUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
-            ->default(fn (): ?string => $this->getTeamInvitationFromSession()?->email)
+            ->default(fn (): ?string => $this->getWorkspaceInvitationFromSession()?->email)
             ->rules(RegistrableEmail::rules(), condition: fn (): bool => $this->authMethod === 'signup')
             ->unique(table: fn (): ?string => $this->authMethod === 'signup' ? 'users' : null)
             ->live(onBlur: true)

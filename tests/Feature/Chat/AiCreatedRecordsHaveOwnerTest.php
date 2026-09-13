@@ -22,10 +22,10 @@ mutates(CreateCompanyTool::class);
 beforeEach(function (): void {
     Bus::fake();
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 it('persists account_owner_id when CreateCompany action receives it', function (): void {
@@ -45,7 +45,7 @@ it('CreateCompanyTool persists authenticated user id as account_owner_id in pend
     $tool->handle(new Request(['records' => [['name' => 'AI Co']]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->user->currentTeam->getKey())
+        ->where('workspace_id', $this->user->currentWorkspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -58,7 +58,7 @@ it('AI-created company through pending-action approval gets owner set', function
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),

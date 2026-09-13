@@ -144,7 +144,7 @@ final readonly class ValidCustomFields implements ValidationRule
 
     /**
      * @param  array<int, string>  $submittedCodes
-     * @return EloquentCollection<int, BaseCustomField>
+     * @return EloquentCollection<int, CustomField>
      */
     private function resolveCustomFields(array $submittedCodes): EloquentCollection
     {

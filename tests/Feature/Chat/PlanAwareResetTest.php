@@ -11,13 +11,13 @@ use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
-it('resets a Free team to 300 credits via the scheduled reset', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    expect($team->plan)->toBe(Plan::Free);
+it('resets a Free workspace to 300 credits via the scheduled reset', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    expect($workspace->plan)->toBe(Plan::Free);
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 5,
             'credits_used' => 295,
@@ -27,17 +27,17 @@ it('resets a Free team to 300 credits via the scheduled reset', function (): voi
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Free->credits());
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
-it('resets a Pro team to 2000 credits when the scheduled reset runs', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro->value])->save();
-    $team->refresh();
+it('resets a Pro workspace to 2000 credits when the scheduled reset runs', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro->value])->save();
+    $workspace->refresh();
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 0,
             'credits_used' => 2_000,
@@ -47,17 +47,17 @@ it('resets a Pro team to 2000 credits when the scheduled reset runs', function (
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Pro->credits());
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Pro->credits());
 });
 
-it('resets an Enterprise team to 10000 credits when the scheduled reset runs', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Enterprise->value])->save();
-    $team->refresh();
+it('resets an Enterprise workspace to 10000 credits when the scheduled reset runs', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Enterprise->value])->save();
+    $workspace->refresh();
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 0,
             'credits_used' => 10_000,
@@ -67,14 +67,14 @@ it('resets an Enterprise team to 10000 credits when the scheduled reset runs', f
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Enterprise->credits());
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Enterprise->credits());
 });
 
-it('refills a past-due Pro team at the Free allowance, not the one it stopped paying for', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro->value])->save();
-    $team->subscriptions()->create([
+it('refills a past-due Pro workspace at the Free allowance, not the one it stopped paying for', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro->value])->save();
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_reset_past_due',
         'stripe_status' => 'past_due',
@@ -83,7 +83,7 @@ it('refills a past-due Pro team at the Free allowance, not the one it stopped pa
     ]);
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 0,
             'credits_used' => 2_000,
@@ -93,14 +93,14 @@ it('refills a past-due Pro team at the Free allowance, not the one it stopped pa
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Free->credits());
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
-it('leaves purchased packs intact when a past-due team refills', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro->value])->save();
-    $team->subscriptions()->create([
+it('leaves purchased packs intact when a past-due workspace refills', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro->value])->save();
+    $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_reset_past_due_packs',
         'stripe_status' => 'past_due',
@@ -109,7 +109,7 @@ it('leaves purchased packs intact when a past-due team refills', function (): vo
     ]);
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 500,
             'credits_used' => 2_000,
@@ -120,17 +120,17 @@ it('leaves purchased packs intact when a past-due team refills', function (): vo
 
     Artisan::call('chat:reset-credits');
 
-    $balance = $team->fresh()->aiCreditBalance;
+    $balance = $workspace->fresh()->aiCreditBalance;
 
     expect($balance->purchased_credits)->toBe(500)
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits() + 500);
 });
 
 it('restores the Pro allowance once the past-due charge clears', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro->value])->save();
-    $subscription = $team->subscriptions()->create([
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro->value])->save();
+    $subscription = $workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_reset_recovered',
         'stripe_status' => 'past_due',
@@ -141,7 +141,7 @@ it('restores the Pro allowance once the past-due charge clears', function (): vo
     $subscription->forceFill(['stripe_status' => 'active'])->save();
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 0,
             'credits_used' => 300,
@@ -151,15 +151,15 @@ it('restores the Pro allowance once the past-due charge clears', function (): vo
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Pro->credits());
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(Plan::Pro->credits());
 });
 
-it('skips teams whose period has not yet expired', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+it('skips workspaces whose period has not yet expired', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
     AiCreditBalance::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->update([
             'credits_remaining' => 42,
             'credits_used' => 258,
@@ -169,19 +169,19 @@ it('skips teams whose period has not yet expired', function (): void {
 
     Artisan::call('chat:reset-credits');
 
-    expect($team->fresh()->aiCreditBalance->credits_remaining)->toBe(42);
+    expect($workspace->fresh()->aiCreditBalance->credits_remaining)->toBe(42);
 });
 
 it('writes plan metadata in the audit transaction', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $team->forceFill(['plan' => Plan::Pro->value])->save();
-    $team->refresh();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro->value])->save();
+    $workspace->refresh();
 
-    resolve(CreditService::class)->resetPeriod($team, 'sysadmin-test');
+    resolve(CreditService::class)->resetPeriod($workspace, 'sysadmin-test');
 
     $audit = AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('idempotency_key', 'like', 'sysadmin-reset-%')
         ->latest('id')
         ->first();

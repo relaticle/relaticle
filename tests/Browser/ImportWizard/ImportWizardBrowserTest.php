@@ -8,12 +8,12 @@ use Relaticle\ImportWizard\Livewire\ImportWizard;
 mutates(ImportWizard::class);
 
 it('can navigate the import wizard and upload a CSV file', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
     loginViaBrowser($user)
-        ->assertPathIs("/app/{$team->slug}")
-        ->navigate("/app/{$team->slug}/companies/import")
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/companies/import")
         ->assertSee('Import Companies')
         ->assertSee('Drop your .CSV file onto this area to upload');
 

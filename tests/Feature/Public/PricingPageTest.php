@@ -36,7 +36,7 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start for free')
         ->assertSee('14-day trial. No card required.')
-        ->assertDontSee('One workspace price as your team grows')
+        ->assertDontSee('One workspace price as your workspace grows')
         ->assertDontSee('300 AI credits')
         ->assertDontSee('Generous free tier');
 });

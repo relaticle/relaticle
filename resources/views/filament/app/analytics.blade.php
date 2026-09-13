@@ -16,7 +16,7 @@ window.addEventListener('load', function() {
             }
         }
 
-        // Remove tenant slug: /my-team/people → /people
+        // Remove tenant slug: /my-workspace/people → /people
         pathname = pathname.replace(/^\/[^\/]+/, '');
 
         // Normalize record IDs (numeric or ULID) out of paths:
@@ -50,7 +50,7 @@ window.addEventListener('load', function() {
 
     @if(session()->pull('fathom.track_workspace_created'))
     // One-time conversion event, flagged when the onboarding wizard finishes.
-    // The teams table already records that a workspace exists; what this adds
+    // The workspaces table already records that a workspace exists; what this adds
     // is the referrer still attached to the session, so a channel can be
     // credited with an activated workspace and not just a signup.
     setTimeout(function () {

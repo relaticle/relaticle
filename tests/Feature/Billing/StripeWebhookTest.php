@@ -5,12 +5,12 @@ declare(strict_types=1);
 use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\StartProTrial;
-use App\Actions\Billing\SyncTeamPlanFromSubscription;
+use App\Actions\Billing\SyncWorkspacePlanFromSubscription;
 use App\Enums\Plan;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
@@ -21,7 +21,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(SyncTeamPlanFromSubscription::class);
+mutates(SyncWorkspacePlanFromSubscription::class);
 mutates(SyncPlanOnStripeSubscriptionChange::class);
 mutates(GrantPurchasedCredits::class);
 mutates(NotifyWorkspaceOfPaymentFailure::class);
@@ -48,14 +48,14 @@ function sendStripeWebhook(array $payload, string $secret = 'whsec_test_secret')
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function stripeSubscriptionEvent(Team $team, string $event, array $overrides = []): array
+function stripeSubscriptionEvent(Workspace $workspace, string $event, array $overrides = []): array
 {
     $price = $overrides['price'] ?? 'price_pro_monthly_test';
 
     $object = array_merge([
         'id' => 'sub_test_1',
         'object' => 'subscription',
-        'customer' => $team->stripe_id,
+        'customer' => $workspace->stripe_id,
         'status' => 'active',
         'cancel_at_period_end' => false,
         'current_period_end' => now()->addMonth()->getTimestamp(),
@@ -89,140 +89,140 @@ function stripeSubscriptionEvent(Team $team, string $event, array $overrides = [
     ];
 }
 
-function stripeBillingTeam(): Team
+function stripeBillingWorkspace(): Workspace
 {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
-    $team->forceFill(['stripe_id' => 'cus_'.Str::ulid()])->save();
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['stripe_id' => 'cus_'.Str::ulid()])->save();
 
-    return $team;
+    return $workspace;
 }
 
-it('keeps the team on Free while the subscription is incomplete', function (): void {
-    $team = stripeBillingTeam();
+it('keeps the workspace on Free while the subscription is incomplete', function (): void {
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created', ['status' => 'incomplete']))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
 
-    expect($team->refresh()->plan)->toBe(Plan::Free)
+    expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->exists())->toBeTrue();
 });
 
-it('upgrades the team to Pro and grants the allowance when the subscription activates', function (): void {
-    $team = stripeBillingTeam();
+it('upgrades the workspace to Pro and grants the allowance when the subscription activates', function (): void {
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created', ['status' => 'incomplete']))->assertSuccessful();
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'updated'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated'))->assertSuccessful();
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
-    expect($team->refresh()->plan)->toBe(Plan::Pro)
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits())
         ->and($balance->credits_used)->toBe(0);
 });
 
 it('does not re-reset usage when the same webhook is replayed', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
 
-    AiCreditBalance::query()->where('team_id', $team->getKey())->update([
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update([
         'credits_remaining' => Plan::Pro->credits() - 5,
         'credits_used' => 5,
     ]);
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'updated'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated'))->assertSuccessful();
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
-    expect($team->refresh()->plan)->toBe(Plan::Pro)
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits() - 5)
         ->and($balance->credits_used)->toBe(5);
 });
 
 it('keeps Pro pricing when the subscription switches between pro prices', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'updated', ['price' => 'price_pro_yearly_test']))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['price' => 'price_pro_yearly_test']))->assertSuccessful();
 
-    expect($team->refresh()->plan)->toBe(Plan::Pro)
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->value('stripe_price'))->toBe('price_pro_yearly_test');
 });
 
-it('downgrades the team to Free when the subscription is deleted', function (): void {
-    $team = stripeBillingTeam();
+it('downgrades the workspace to Free when the subscription is deleted', function (): void {
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'deleted', [
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
         'status' => 'canceled',
         'ended_at' => now()->getTimestamp(),
     ]))->assertSuccessful();
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
-    expect($team->refresh()->plan)->toBe(Plan::Free)
+    expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
 });
 
 it('preserves a sysadmin-granted plan when an unrelated subscription ends', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
 
-    $team->refresh();
-    $team->plan = Plan::Enterprise;
-    $team->save();
-    app(CreditService::class)->resetPeriod($team);
+    $workspace->refresh();
+    $workspace->plan = Plan::Enterprise;
+    $workspace->save();
+    app(CreditService::class)->resetPeriod($workspace);
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'deleted', [
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
         'status' => 'canceled',
         'ended_at' => now()->getTimestamp(),
     ]))->assertSuccessful();
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
-    expect($team->refresh()->plan)->toBe(Plan::Enterprise)
+    expect($workspace->refresh()->plan)->toBe(Plan::Enterprise)
         ->and($balance->credits_remaining)->toBe(Plan::Enterprise->credits());
 });
 
 it('preserves an Enterprise grant when an older Pro subscription sends an update', function (string $status): void {
-    $team = stripeBillingTeam();
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created'))->assertSuccessful();
-    $team->refresh()->forceFill(['plan' => Plan::Enterprise])->save();
-    app(CreditService::class)->resetPeriod($team);
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    $workspace->refresh()->forceFill(['plan' => Plan::Enterprise])->save();
+    app(CreditService::class)->resetPeriod($workspace);
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'updated', ['status' => $status]))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['status' => $status]))->assertSuccessful();
 
-    expect($team->refresh()->plan)->toBe(Plan::Enterprise);
+    expect($workspace->refresh()->plan)->toBe(Plan::Enterprise);
 
-    app(CreditService::class)->resetPeriod($team);
+    app(CreditService::class)->resetPeriod($workspace);
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->sole()->credits_remaining)->toBe(10_000);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole()->credits_remaining)->toBe(10_000);
 })->with(['active', 'past_due']);
 
 it('leaves the plan untouched for a price that maps to no plan', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created', ['price' => 'price_unknown']))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['price' => 'price_unknown']))->assertSuccessful();
 
-    expect($team->refresh()->plan)->toBe(Plan::Free);
+    expect($workspace->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('rejects a webhook with an invalid signature', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    $response = sendStripeWebhook(stripeSubscriptionEvent($team, 'created'), secret: 'whsec_wrong');
+    $response = sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'), secret: 'whsec_wrong');
 
     expect($response->status())->toBeGreaterThanOrEqual(400)
         ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->exists())->toBeFalse()
-        ->and($team->refresh()->plan)->toBe(Plan::Free);
+        ->and($workspace->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('rejects an unsigned webhook when no webhook secret is configured', function (): void {
     config()->set('cashier.webhook.secret', null);
 
-    $team = stripeBillingTeam();
-    $body = json_encode(stripeSubscriptionEvent($team, 'created'), JSON_THROW_ON_ERROR);
+    $workspace = stripeBillingWorkspace();
+    $body = json_encode(stripeSubscriptionEvent($workspace, 'created'), JSON_THROW_ON_ERROR);
 
     $response = test()->call('POST', '/stripe/webhook', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
@@ -230,39 +230,39 @@ it('rejects an unsigned webhook when no webhook secret is configured', function 
 
     expect($response->getStatusCode())->toBeGreaterThanOrEqual(400)
         ->and(Subscription::query()->where('stripe_id', 'sub_test_1')->exists())->toBeFalse()
-        ->and($team->refresh()->plan)->toBe(Plan::Free);
+        ->and($workspace->refresh()->plan)->toBe(Plan::Free);
 });
 
 it('does not consume the generic trial when a checkout is abandoned as incomplete', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
     $trialEndsAt = now()->addDays(10)->startOfSecond();
-    $team->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => $trialEndsAt])->save();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => $trialEndsAt])->save();
 
-    sendStripeWebhook(stripeSubscriptionEvent($team, 'created', ['status' => 'incomplete']))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created', ['status' => 'incomplete']))->assertSuccessful();
 
-    $team->refresh();
+    $workspace->refresh();
 
-    expect($team->plan)->toBe(Plan::Pro)
-        ->and($team->trial_ends_at?->timestamp)->toBe($trialEndsAt->timestamp)
-        ->and($team->onGenericTrial())->toBeTrue();
+    expect($workspace->plan)->toBe(Plan::Pro)
+        ->and($workspace->trial_ends_at?->timestamp)->toBe($trialEndsAt->timestamp)
+        ->and($workspace->onGenericTrial())->toBeTrue();
 });
 
 it('never double-grants across a mid-trial conversion', function (): void {
     test()->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
 
-    $team = stripeBillingTeam();
-    app(StartProTrial::class)->execute($team->owner, $team);
+    $workspace = stripeBillingWorkspace();
+    app(StartProTrial::class)->execute($workspace->owner, $workspace);
 
-    // Convert mid-trial. The plan is already Pro, so SyncTeamPlanFromSubscription
+    // Convert mid-trial. The plan is already Pro, so SyncWorkspacePlanFromSubscription
     // short-circuits: NO new grant at conversion, and the trial allowance keeps running.
     test()->travelTo(new DateTimeImmutable('2026-07-01 12:00:00', new DateTimeZone('UTC')));
-    sendStripeWebhook(stripeSubscriptionEvent($team->refresh(), 'created'))->assertSuccessful();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace->refresh(), 'created'))->assertSuccessful();
 
     $grantsQuery = AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('metadata->action', 'reset_period');
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->period_ends_at->toDateTimeString())->toBe('2026-07-09 12:00:00')
         ->and($grantsQuery->count())->toBe(1);
 
@@ -277,7 +277,7 @@ it('never double-grants across a mid-trial conversion', function (): void {
 });
 
 /** @return array<string, mixed> */
-function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
+function checkoutSessionCompletedEvent(Workspace $workspace, array $overrides = []): array
 {
     return [
         'id' => 'evt_checkout_test',
@@ -287,9 +287,9 @@ function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
             'object' => 'checkout.session',
             'mode' => 'payment',
             'payment_status' => 'paid',
-            'customer' => $team->stripe_id,
+            'customer' => $workspace->stripe_id,
             'metadata' => [
-                'team_id' => (string) $team->getKey(),
+                'team_id' => (string) $workspace->getKey(),
                 'credit_pack_price' => 'price_credits_1k_test',
             ],
         ], $overrides)],
@@ -297,9 +297,9 @@ function checkoutSessionCompletedEvent(Team $team, array $overrides = []): array
 }
 
 /** @return array<string, mixed> */
-function checkoutSessionAsyncPaymentSucceededEvent(Team $team, array $overrides = []): array
+function checkoutSessionAsyncPaymentSucceededEvent(Workspace $workspace, array $overrides = []): array
 {
-    $event = checkoutSessionCompletedEvent($team, $overrides);
+    $event = checkoutSessionCompletedEvent($workspace, $overrides);
     $event['type'] = 'checkout.session.async_payment_succeeded';
     $event['data']['object']['payment_status'] = 'paid';
 
@@ -309,50 +309,50 @@ function checkoutSessionAsyncPaymentSucceededEvent(Team $team, array $overrides 
 it('grants pack credits exactly once on checkout session completed', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk();
-    sendStripeWebhook(checkoutSessionCompletedEvent($team))->assertOk(); // replay
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace))->assertOk();
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace))->assertOk(); // replay
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->purchased_credits)->toBe(1000);
 });
 
 it('grants nothing for an unpaid checkout session completed event', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, ['payment_status' => 'unpaid']))->assertOk();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('purchased_credits') ?? 0)->toBe(0);
 });
 
 it('grants pack credits once the delayed payment confirms asynchronously', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($workspace))->assertOk();
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->purchased_credits)->toBe(1000);
 });
 
 it('grants exactly once when an unpaid checkout later confirms asynchronously', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['payment_status' => 'unpaid']))->assertOk();
-    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk();
-    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($team))->assertOk(); // replay
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, ['payment_status' => 'unpaid']))->assertOk();
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($workspace))->assertOk();
+    sendStripeWebhook(checkoutSessionAsyncPaymentSucceededEvent($workspace))->assertOk(); // replay
 
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->purchased_credits)->toBe(1000);
 
     $grantsQuery = AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('idempotency_key', 'pack-cs_test_pack_1');
 
     expect($grantsQuery->count())->toBe(1);
@@ -361,49 +361,49 @@ it('grants exactly once when an unpaid checkout later confirms asynchronously', 
 it('ignores subscription-mode checkout sessions', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['mode' => 'subscription']))->assertOk();
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, ['mode' => 'subscription']))->assertOk();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('purchased_credits') ?? 0)->toBe(0);
 });
 
-it('grants nothing when the session customer does not match the team', function (): void {
+it('grants nothing when the session customer does not match the workspace', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, ['customer' => 'cus_attacker']))->assertOk();
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, ['customer' => 'cus_attacker']))->assertOk();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('purchased_credits') ?? 0)->toBe(0);
 });
 
 it('grants nothing for an unknown pack price', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, [
-        'metadata' => ['team_id' => (string) $team->getKey(), 'credit_pack_price' => 'price_nonexistent'],
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, [
+        'metadata' => ['team_id' => (string) $workspace->getKey(), 'credit_pack_price' => 'price_nonexistent'],
     ]))->assertOk();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('purchased_credits') ?? 0)->toBe(0);
 });
 
 it('logs and grants nothing when a payment-mode session is missing pack metadata', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
     Log::spy();
 
-    // credit_pack_price is well-formed and configured; team_id is missing. This
+    // credit_pack_price is well-formed and configured; workspace_id is missing. This
     // must trip the metadata guard specifically, not the unknown-price branch
     // (which is never reached) or the customer-mismatch branch (which requires
-    // a resolved team, and this metadata never resolves one).
-    sendStripeWebhook(checkoutSessionCompletedEvent($team, [
+    // a resolved workspace, and this metadata never resolves one).
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, [
         'metadata' => ['credit_pack_price' => 'price_credits_1k_test'],
     ]))->assertOk();
 
-    expect(AiCreditBalance::query()->where('team_id', $team->getKey())->value('purchased_credits') ?? 0)->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('purchased_credits') ?? 0)->toBe(0);
 
     Log::shouldHaveReceived('warning')
         ->once()
@@ -422,7 +422,7 @@ it('logs and grants nothing when a payment-mode session is missing pack metadata
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function invoicePaymentFailedEvent(Team $team, array $overrides = []): array
+function invoicePaymentFailedEvent(Workspace $workspace, array $overrides = []): array
 {
     return [
         'type' => 'invoice.payment_failed',
@@ -430,7 +430,7 @@ function invoicePaymentFailedEvent(Team $team, array $overrides = []): array
             'object' => array_merge([
                 'id' => 'in_'.Str::ulid(),
                 'object' => 'invoice',
-                'customer' => $team->stripe_id,
+                'customer' => $workspace->stripe_id,
                 'billing_reason' => 'subscription_cycle',
                 'attempt_count' => 1,
                 'parent' => [
@@ -443,78 +443,78 @@ function invoicePaymentFailedEvent(Team $team, array $overrides = []): array
 }
 
 it('notifies the workspace owner when a renewal charge fails', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team))->assertOk();
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace))->assertOk();
 
-    $notification = $team->owner->notifications()->sole();
+    $notification = $workspace->owner->notifications()->sole();
 
-    expect($notification->data['title'])->toContain($team->name)
+    expect($notification->data['title'])->toContain($workspace->name)
         ->and($notification->data['body'])->toBe(__('billing.payment_failed.notification_body'));
 });
 
 it('keeps Enterprise access clear in an older subscription payment notification', function (): void {
-    $team = stripeBillingTeam();
-    $team->forceFill(['plan' => Plan::Enterprise])->save();
+    $workspace = stripeBillingWorkspace();
+    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team))->assertOk();
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace))->assertOk();
 
-    $notification = $team->owner->notifications()->sole();
+    $notification = $workspace->owner->notifications()->sole();
 
     expect($notification->data['body'])->toContain('Your Enterprise access is unchanged.')
         ->not->toContain('to keep Pro');
 });
 
 it('notifies once per invoice, not once per Stripe retry attempt', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
     foreach ([1, 2, 3] as $attempt) {
-        sendStripeWebhook(invoicePaymentFailedEvent($team, [
+        sendStripeWebhook(invoicePaymentFailedEvent($workspace, [
             'id' => 'in_test_retried',
             'attempt_count' => $attempt,
         ]))->assertOk();
     }
 
-    expect($team->owner->notifications()->count())->toBe(1);
+    expect($workspace->owner->notifications()->count())->toBe(1);
 });
 
 it('alarms on a plan change that failed to bill', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace, [
         'billing_reason' => 'subscription_update',
     ]))->assertOk();
 
-    expect($team->owner->notifications()->count())->toBe(1);
+    expect($workspace->owner->notifications()->count())->toBe(1);
 });
 
 it('stays quiet when the very first subscription charge fails', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace, [
         'billing_reason' => 'subscription_create',
     ]))->assertOk();
 
-    expect($team->owner->notifications()->count())->toBe(0);
+    expect($workspace->owner->notifications()->count())->toBe(0);
 });
 
 it('raises no subscription alarm for a one-off invoice', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team, [
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace, [
         'billing_reason' => 'manual',
         'parent' => null,
     ]))->assertOk();
 
-    expect($team->owner->notifications()->count())->toBe(0);
+    expect($workspace->owner->notifications()->count())->toBe(0);
 });
 
 it('notifies nobody for a customer that belongs to no workspace', function (): void {
-    $team = stripeBillingTeam();
+    $workspace = stripeBillingWorkspace();
 
-    sendStripeWebhook(invoicePaymentFailedEvent($team, ['customer' => 'cus_unknown']))->assertOk();
+    sendStripeWebhook(invoicePaymentFailedEvent($workspace, ['customer' => 'cus_unknown']))->assertOk();
 
-    expect($team->owner->notifications()->count())->toBe(0);
+    expect($workspace->owner->notifications()->count())->toBe(0);
 });
 
 it('subscribes the Stripe endpoint to the failed-payment event', function (): void {
@@ -543,15 +543,15 @@ it('subscribes the Stripe endpoint to every checkout event the controller handle
 it('syncs later stripe events to the workspace that received a transferred subscription', function (): void {
     $owner = User::factory()->create();
 
-    /** @var Team $source */
-    $source = Team::factory()->create([
+    /** @var Workspace $source */
+    $source = Workspace::factory()->create([
         'user_id' => $owner->getKey(),
         'plan' => Plan::Pro,
         'stripe_id' => 'cus_webhook_transfer',
     ]);
 
-    /** @var Team $target */
-    $target = Team::factory()->create([
+    /** @var Workspace $target */
+    $target = Workspace::factory()->create([
         'user_id' => $owner->getKey(),
         'plan' => Plan::Free,
     ]);
@@ -576,7 +576,7 @@ it('syncs later stripe events to the workspace that received a transferred subsc
     sendStripeWebhook($payload)->assertOk();
 
     expect(Subscription::query()->where('stripe_id', 'sub_webhook_transfer')->count())->toBe(1)
-        ->and(Subscription::query()->where('stripe_id', 'sub_webhook_transfer')->sole()->team_id)->toBe($target->getKey())
+        ->and(Subscription::query()->where('stripe_id', 'sub_webhook_transfer')->sole()->workspace_id)->toBe($target->getKey())
         ->and($target->refresh()->plan)->toBe(Plan::Pro)
         ->and($source->refresh()->plan)->toBe(Plan::Free);
 });

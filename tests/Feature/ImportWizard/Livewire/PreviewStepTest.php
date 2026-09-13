@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -11,7 +12,6 @@ use Filament\Facades\Filament;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -28,13 +28,13 @@ use Relaticle\ImportWizard\Support\MatchResolver;
 mutates(PreviewStep::class, MatchResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -54,7 +54,7 @@ function createPreviewReadyStore(
     ImportEntityType $entityType = ImportEntityType::People,
 ): ImportStore {
     $import = Import::factory()->create([
-        'team_id' => (string) $context->team->id,
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
         'file_name' => 'test.csv',
@@ -131,12 +131,12 @@ it('resolves all rows as Create when only name is mapped', function (): void {
 it('resolves rows as Update when email matches existing record', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing Person',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
@@ -146,7 +146,7 @@ it('resolves rows as Update when email matches existing record', function (): vo
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
         ]);
     }
 
@@ -200,7 +200,7 @@ it('resolves rows as Skip when id does not match existing record', function (): 
 it('resolves rows as Update when id matches existing record', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing Person',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     createPreviewReadyStore($this, ['ID', 'Name'], [
@@ -256,7 +256,7 @@ it('handles rows with no entity link relationships', function (): void {
 it('renders existing entity link relationships from pre-populated data', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $companyMatch = RelationshipMatch::existing('company', (string) $company->id);
@@ -310,7 +310,7 @@ it('createCount returns correct count', function (): void {
 it('updateCount returns correct count', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     createPreviewReadyStore($this, ['ID', 'Name'], [

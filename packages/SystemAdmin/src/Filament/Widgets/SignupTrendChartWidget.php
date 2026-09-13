@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Filament\Widgets;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
@@ -41,7 +41,7 @@ final class SignupTrendChartWidget extends ChartWidget
 
     public function getDescription(): string
     {
-        return 'New users and teams over time, by '.ViewerTime::timezone().' calendar days. The last point is today so far. '.ViewerTime::freshnessCaption();
+        return 'New users and workspaces over time, by '.ViewerTime::timezone().' calendar days. The last point is today so far. '.ViewerTime::freshnessCaption();
     }
 
     protected function getType(): string
@@ -69,8 +69,8 @@ final class SignupTrendChartWidget extends ChartWidget
         $end = ViewerTime::now()->setTimezone('UTC');
 
         $userCountsByBucket = $this->getCountsByBucket(User::query(), $start, $end, $groupFormat, $timezone);
-        $teamCountsByBucket = $this->getCountsByBucket(
-            Team::query()->where('personal_team', false),
+        $workspaceCountsByBucket = $this->getCountsByBucket(
+            Workspace::query()->where('personal_workspace', false),
             $start,
             $end,
             $groupFormat,
@@ -81,8 +81,8 @@ final class SignupTrendChartWidget extends ChartWidget
             fn (array $interval): int => $userCountsByBucket->get($interval['bucket'], 0)
         )->all();
 
-        $teamCounts = $intervals->map(
-            fn (array $interval): int => $teamCountsByBucket->get($interval['bucket'], 0)
+        $workspaceCounts = $intervals->map(
+            fn (array $interval): int => $workspaceCountsByBucket->get($interval['bucket'], 0)
         )->all();
 
         return [
@@ -98,8 +98,8 @@ final class SignupTrendChartWidget extends ChartWidget
                     'pointRadius' => 3,
                 ],
                 [
-                    'label' => 'New Teams',
-                    'data' => $teamCounts,
+                    'label' => 'New Workspaces',
+                    'data' => $workspaceCounts,
                     'borderColor' => '#10b981',
                     'backgroundColor' => 'rgba(16, 185, 129, 0.1)',
                     'borderWidth' => 2,

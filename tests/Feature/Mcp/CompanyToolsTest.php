@@ -17,10 +17,10 @@ use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Scopes\TeamScope;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Testing\Fluent\AssertableJson;
 
 mutates(
@@ -38,8 +38,8 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 afterEach(function (): void {
@@ -47,7 +47,7 @@ afterEach(function (): void {
 });
 
 it('can get a company by ID', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCompanyTool::class, ['id' => $company->id])
@@ -60,8 +60,8 @@ it('can get a company by ID', function (): void {
 });
 
 it('returns bounded related tasks with count and truncation metadata', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    $tasks = Task::factory()->count(27)->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $tasks = Task::factory()->count(27)->recycle([$this->user, $this->workspace])->create();
     $company->tasks()->attach($tasks);
 
     RelaticleServer::actingAs($this->user)
@@ -79,8 +79,8 @@ it('returns bounded related tasks with count and truncation metadata', function 
 });
 
 it('bounds every to-many relationship expanded by a show tool', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    People::factory()->count(27)->recycle([$this->user, $this->team])->create([
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    People::factory()->count(27)->recycle([$this->user, $this->workspace])->create([
         'company_id' => $company->getKey(),
     ]);
 
@@ -129,7 +129,7 @@ it('returns actionable MCP errors without successful structured content', functi
 
 it('can create, update, and clear a company account owner', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateCompanyTool::class, [
@@ -152,7 +152,7 @@ it('can create, update, and clear a company account owner', function (): void {
     expect($company->refresh()->account_owner_id)->toBeNull();
 });
 
-it('rejects a company account owner from another team', function (): void {
+it('rejects a company account owner from another workspace', function (): void {
     $outsider = User::factory()->create();
 
     RelaticleServer::actingAs($this->user)
@@ -165,29 +165,29 @@ it('rejects a company account owner from another team', function (): void {
     expect(Company::query()->where('name', 'Invalid Owner Company')->exists())->toBeFalse();
 });
 
-describe('team scoping', function (): void {
+describe('workspace scoping', function (): void {
     beforeEach(function (): void {
-        // Apply team scope as SetApiTeamContext middleware does in production
-        Company::addGlobalScope(new TeamScope);
+        // Apply workspace scope as SetApiWorkspaceContext middleware does in production
+        Company::addGlobalScope(new WorkspaceScope);
     });
 
-    it('scopes companies to current team', function (): void {
+    it('scopes companies to current workspace', function (): void {
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => Team::factory()->create()->id,
-            'name' => 'Other Team Corp',
+            'workspace_id' => Workspace::factory()->create()->id,
+            'name' => 'Other Workspace Corp',
         ]));
-        $ownCompany = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Corp']);
+        $ownCompany = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Workspace Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
             ->assertOk()
-            ->assertSee('Own Team Corp')
-            ->assertDontSee('Other Team Corp');
+            ->assertSee('Own Workspace Corp')
+            ->assertDontSee('Other Workspace Corp');
     });
 
-    it('cannot update a company from another team', function (): void {
+    it('cannot update a company from another workspace', function (): void {
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -198,9 +198,9 @@ describe('team scoping', function (): void {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot delete a company from another team', function (): void {
+    it('cannot delete a company from another workspace', function (): void {
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -210,9 +210,9 @@ describe('team scoping', function (): void {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot get a company from another team', function (): void {
+    it('cannot get a company from another workspace', function (): void {
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -223,10 +223,10 @@ describe('team scoping', function (): void {
     });
 
     it('excludes soft-deleted companies from list', function (): void {
-        $deleted = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deleted Corp']);
+        $deleted = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deleted Corp']);
         $deleted->delete();
 
-        $active = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Active Corp']);
+        $active = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Active Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class)
@@ -238,7 +238,7 @@ describe('team scoping', function (): void {
 
 describe('pagination', function (): void {
     it('can paginate companies via MCP tool', function (): void {
-        Company::factory(3)->recycle([$this->user, $this->team])->create();
+        Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
         $page1 = RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, [
@@ -258,7 +258,7 @@ describe('pagination', function (): void {
     });
 
     it('includes bounded pagination metadata in list responses', function (): void {
-        Company::factory(3)->recycle([$this->user, $this->team])->create();
+        Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, [
@@ -290,7 +290,7 @@ describe('pagination', function (): void {
 
 describe('custom fields serialization', function (): void {
     it('returns empty custom_fields as object not array', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(GetCompanyTool::class, ['id' => $company->id])
@@ -338,10 +338,10 @@ describe('validation', function (): void {
 
 describe('date filtering', function (): void {
     it('filters companies by created_after', function (): void {
-        $old = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Ancient Corp']);
+        $old = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ancient Corp']);
         $old->forceFill(['created_at' => now()->subMonth()])->saveQuietly();
 
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Recent Corp']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Recent Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, ['created_after' => now()->subWeek()->toDateString()])
@@ -351,10 +351,10 @@ describe('date filtering', function (): void {
     });
 
     it('filters companies by created_before', function (): void {
-        $old = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Ancient Corp']);
+        $old = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ancient Corp']);
         $old->forceFill(['created_at' => now()->subMonth()])->saveQuietly();
 
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Recent Corp']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Recent Corp']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListCompaniesTool::class, ['created_before' => now()->subWeek()->toDateString()])

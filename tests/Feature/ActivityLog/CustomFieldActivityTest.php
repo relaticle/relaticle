@@ -10,13 +10,13 @@ use App\Models\User;
 use Filament\Facades\Filament;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'company',
         'code' => 'general',
         'name' => 'General',
@@ -26,7 +26,7 @@ beforeEach(function (): void {
     ]);
 
     $this->field = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => 'company',
         'code' => 'lead_source',
@@ -39,7 +39,7 @@ beforeEach(function (): void {
 });
 
 it('logs a custom_field_changes activity when a value is created', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     Activity::withoutGlobalScopes()->delete();
 
     $company->saveCustomFields(['lead_source' => 'referral']);
@@ -54,7 +54,7 @@ it('logs a custom_field_changes activity when a value is created', function (): 
 });
 
 it('logs a custom_field_changes activity when a value is updated', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     $company->saveCustomFields(['lead_source' => 'referral']);
     Activity::withoutGlobalScopes()->delete();
 
@@ -70,7 +70,7 @@ it('logs a custom_field_changes activity when a value is updated', function (): 
 
 it('renders link-field values as plain URLs, not escaped JSON', function (): void {
     $linkField = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $this->field->custom_field_section_id,
         'entity_type' => 'company',
         'code' => 'website',
@@ -81,7 +81,7 @@ it('renders link-field values as plain URLs, not escaped JSON', function (): voi
         'validation_rules' => [],
     ]);
 
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     Activity::withoutGlobalScopes()->delete();
 
     $company->saveCustomFields(['website' => ['https://www.linkedin.com/company/airbnb']]);
@@ -96,7 +96,7 @@ it('renders link-field values as plain URLs, not escaped JSON', function (): voi
 });
 
 it('does not log when saving an empty value for a previously empty field', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     Activity::withoutGlobalScopes()->delete();
 
     $company->saveCustomFields(['lead_source' => null]);
@@ -106,7 +106,7 @@ it('does not log when saving an empty value for a previously empty field', funct
 
 it('does not log a link change that is only a URL-scheme normalization', function (): void {
     $linkField = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $this->field->custom_field_section_id,
         'entity_type' => 'company',
         'code' => 'website',
@@ -117,7 +117,7 @@ it('does not log a link change that is only a URL-scheme normalization', functio
         'validation_rules' => [],
     ]);
 
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     $company->saveCustomFields(['website' => ['https://airbnb.com']]);
     Activity::withoutGlobalScopes()->delete();
 
@@ -128,7 +128,7 @@ it('does not log a link change that is only a URL-scheme normalization', functio
 
 it('still logs a genuine link value change', function (): void {
     $linkField = CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $this->field->custom_field_section_id,
         'entity_type' => 'company',
         'code' => 'website',
@@ -139,7 +139,7 @@ it('still logs a genuine link value change', function (): void {
         'validation_rules' => [],
     ]);
 
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
     $company->saveCustomFields(['website' => ['airbnb.com']]);
     Activity::withoutGlobalScopes()->delete();
 

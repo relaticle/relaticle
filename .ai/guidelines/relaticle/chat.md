@@ -17,7 +17,7 @@ production: message ordering, approval races, duplicate proposals.
 
 ## Tool design
 
-- Prefer giving the agent a tool (e.g. `ListTeamMembersTool`) over injecting
+- Prefer giving the agent a tool (e.g. `ListWorkspaceMembersTool`) over injecting
   tenant data into the system prompt. Add prompt-context injection only when a
   tool round-trip is demonstrably too costly.
 - Every write tool takes batch input: `records[]` on create and update,

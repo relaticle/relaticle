@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\CrmEntity;
 use App\Enums\Plan;
+use App\Events\WorkspaceCreated;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
@@ -14,10 +15,10 @@ use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
-use App\Listeners\Email\TeamCreatedTagListener;
-use App\Listeners\Email\TeamMemberAddedListener;
-use App\Listeners\Mcp\CopyTeamIdToAccessToken;
-use App\Listeners\SeedTeamCreditBalanceListener;
+use App\Listeners\Email\WorkspaceCreatedTagListener;
+use App\Listeners\Email\WorkspaceMemberAddedListener;
+use App\Listeners\Mcp\CopyWorkspaceIdToAccessToken;
+use App\Listeners\SeedWorkspaceCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
 use App\Mcp\Schema\McpSchemaCache;
 use App\Models\ActivityLog\Activity as ActivityModel;
@@ -28,9 +29,9 @@ use App\Models\CustomFieldValue;
 use App\Models\Export;
 use App\Models\Passport\AuthCode as McpAuthCode;
 use App\Models\PersonalAccessToken;
-use App\Models\Team;
-use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use App\Onboarding\ActivationSteps;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\DockerHubService;
@@ -73,7 +74,6 @@ use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
-use Laravel\Jetstream\Events\TeamCreated;
 use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
@@ -117,7 +117,7 @@ final class AppServiceProvider extends ServiceProvider
         // bound this early. Same source of truth, so the flag stays the single switch.
         config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
 
-        Cashier::useCustomerModel(Team::class);
+        Cashier::useCustomerModel(Workspace::class);
         Cashier::keepPastDueSubscriptionsActive();
 
         // Cashier attaches signature verification only when the webhook secret
@@ -130,16 +130,16 @@ final class AppServiceProvider extends ServiceProvider
         // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
 
-        // Caches creation-source facts per team for the lifetime of a
+        // Caches creation-source facts per workspace for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
         $this->app->scoped(WorkspaceActivationFacts::class);
 
         $this->app->scoped(RecordNameResolver::class);
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
-        // makes every team share one OnboardingStep instance. Its complete()
+        // makes every workspace share one OnboardingStep instance. Its complete()
         // memoizes through once(), keyed on that shared object rather than the
-        // model, so the first team evaluated in a process poisons the answer for
+        // model, so the first workspace evaluated in a process poisons the answer for
         // every later one, giving wrong onboarding state in any request or Horizon
         // worker that touches two workspaces. Rebinding per resolve gives each
         // lookup its own step objects, so once() memoizes within one lookup as
@@ -194,9 +194,9 @@ final class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
-        Event::listen(TeamMemberAdded::class, TeamMemberAddedListener::class);
-        Event::listen(TeamCreated::class, TeamCreatedTagListener::class);
-        Event::listen(TeamCreated::class, SeedTeamCreditBalanceListener::class);
+        Event::listen(TeamMemberAdded::class, WorkspaceMemberAddedListener::class);
+        Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);
+        Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
@@ -204,7 +204,7 @@ final class AppServiceProvider extends ServiceProvider
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Passport::useAuthCodeModel(McpAuthCode::class);
-        Event::listen(AccessTokenCreated::class, CopyTeamIdToAccessToken::class);
+        Event::listen(AccessTokenCreated::class, CopyWorkspaceIdToAccessToken::class);
 
         // Connectors are long-lived but must not be immortal: a user who revokes one from
         // the Access Tokens page should not be outlived by a year-long bearer token.
@@ -214,32 +214,32 @@ final class AppServiceProvider extends ServiceProvider
         Passport::authorizationView(function (array $parameters) {
             $user = $parameters['user'] ?? null;
 
-            $teams = $user instanceof User ? $user->allTeams() : collect();
+            $workspaces = $user instanceof User ? $user->allWorkspaces() : collect();
             $access = resolve(HostedWorkspaceAccess::class);
 
-            // Re-read the teams with their subscriptions eager-loaded: isPaused() reaches
-            // for $team->subscription(), and allTeams() hydrates more than one row, which
+            // Re-read the workspaces with their subscriptions eager-loaded: isPaused() reaches
+            // for $workspace->subscription(), and allWorkspaces() hydrates more than one row, which
             // is exactly when strict lazy loading throws.
-            /** @var list<string> $pausedTeamIds */
-            $pausedTeamIds = Team::query()
-                ->whereIn('id', $teams->pluck('id')->all())
+            /** @var list<string> $pausedWorkspaceIds */
+            $pausedWorkspaceIds = Workspace::query()
+                ->whereIn('id', $workspaces->pluck('id')->all())
                 ->with('subscriptions')
                 ->get()
-                ->filter(fn (Team $team): bool => $access->isPaused($team))
-                ->map(fn (Team $team): string => (string) $team->getKey())
+                ->filter(fn (Workspace $workspace): bool => $access->isPaused($workspace))
+                ->map(fn (Workspace $workspace): string => (string) $workspace->getKey())
                 ->values()
                 ->all();
 
-            $parameters['teams'] = $teams;
-            $parameters['pausedTeamIds'] = $pausedTeamIds;
+            $parameters['workspaces'] = $workspaces;
+            $parameters['pausedWorkspaceIds'] = $pausedWorkspaceIds;
 
             // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
-            $currentTeamId = $user?->currentTeam?->getKey();
+            $currentWorkspaceId = $user?->currentWorkspace?->getKey();
 
-            $parameters['selectedTeamId'] = is_string($currentTeamId) && ! in_array($currentTeamId, $pausedTeamIds, true)
-                ? $currentTeamId
-                : $teams->first(fn (Team $team): bool => ! in_array((string) $team->getKey(), $pausedTeamIds, true))?->getKey();
+            $parameters['selectedWorkspaceId'] = is_string($currentWorkspaceId) && ! in_array($currentWorkspaceId, $pausedWorkspaceIds, true)
+                ? $currentWorkspaceId
+                : $workspaces->first(fn (Workspace $workspace): bool => ! in_array((string) $workspace->getKey(), $pausedWorkspaceIds, true))?->getKey();
 
             return response()->view('mcp.authorize', $parameters);
         });
@@ -382,11 +382,11 @@ final class AppServiceProvider extends ServiceProvider
             /** @var User|null $user */
             $user = $request->user();
             $tokenId = $user?->currentAccessToken()?->getKey();
-            $teamId = $user?->currentTeam?->getKey();
+            $workspaceId = $user?->currentWorkspace?->getKey();
             $key = $tokenId ?: $request->ip();
 
             $limits = [
-                Limit::perMinute(600)->by('team:'.($teamId ?? $request->ip())),
+                Limit::perMinute(600)->by('workspace:'.($workspaceId ?? $request->ip())),
             ];
 
             if ($request->isMethod('GET')) {
@@ -408,31 +408,31 @@ final class AppServiceProvider extends ServiceProvider
         // Transcription reserves no credit, so the limiters are the only ceiling on
         // provider spend. The per-minute and per-day buckets on the route are keyed
         // per user and stay that way; this one is the ACCOUNT ceiling that was
-        // missing, because billing and credits are per team and an N-seat workspace
+        // missing, because billing and credits are per workspace and an N-seat workspace
         // otherwise multiplied the daily allowance by N with nothing to notice.
-        RateLimiter::for('transcribe-team-daily', function (Request $request): Limit {
+        RateLimiter::for('transcribe-workspace-daily', function (Request $request): Limit {
             /** @var User|null $user */
             $user = $request->user();
-            $team = $user?->currentTeam;
+            $workspace = $user?->currentWorkspace;
 
-            return Limit::perMinutes(1440, 240)->by('transcribe-team:'.($team?->getKey() ?? $request->ip()));
+            return Limit::perMinutes(1440, 240)->by('transcribe-workspace:'.($workspace?->getKey() ?? $request->ip()));
         });
 
         RateLimiter::for('chat-send', function (Request $request) {
             /** @var User|null $user */
             $user = $request->user();
-            $team = $user?->currentTeam;
+            $workspace = $user?->currentWorkspace;
 
-            if ($team === null) {
+            if ($workspace === null) {
                 return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
             }
 
-            return Limit::perMinute($team->plan->rateLimit())
-                ->by($team->getKey())
-                ->response(function (Request $request, array $headers) use ($team) {
+            return Limit::perMinute($workspace->plan->rateLimit())
+                ->by($workspace->getKey())
+                ->response(function (Request $request, array $headers) use ($workspace) {
                     ChatTelemetry::rateLimited(
-                        teamId: (string) $team->getKey(),
-                        plan: $team->plan->value,
+                        workspaceId: (string) $workspace->getKey(),
+                        plan: $workspace->plan->value,
                     );
 
                     $seconds = (int) ($headers['Retry-After'] ?? 0);
@@ -441,7 +441,7 @@ final class AppServiceProvider extends ServiceProvider
                         'error' => 'rate_limited',
                         'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
                         'retry_after_seconds' => $seconds,
-                        'plan' => $team->plan->value,
+                        'plan' => $workspace->plan->value,
                     ], 429, $headers);
                 });
         });
@@ -457,13 +457,13 @@ final class AppServiceProvider extends ServiceProvider
             $user = new User;
             $user->forceFill(['id' => 'scribe-user-id', 'name' => 'Scribe User', 'email' => 'scribe@example.com']);
 
-            $team = new Team;
-            $team->forceFill(['id' => 'scribe-team-id', 'name' => 'Scribe Team', 'user_id' => $user->id, 'personal_team' => true]);
-            $team->setRelation('owner', $user);
-            $team->setRelation('users', collect());
+            $workspace = new Workspace;
+            $workspace->forceFill(['id' => 'scribe-workspace-id', 'name' => 'Scribe Workspace', 'user_id' => $user->id, 'personal_workspace' => true]);
+            $workspace->setRelation('owner', $user);
+            $workspace->setRelation('users', collect());
 
-            $user->forceFill(['current_team_id' => $team->id]);
-            $user->setRelation('currentTeam', $team);
+            $user->forceFill(['current_workspace_id' => $workspace->id]);
+            $user->setRelation('currentWorkspace', $workspace);
 
             return $user;
         };
@@ -491,14 +491,14 @@ final class AppServiceProvider extends ServiceProvider
         Model::preventLazyLoading(! $this->app->isProduction());
 
         Relation::enforceMorphMap([
-            'team' => Team::class,
+            'workspace' => Workspace::class,
             'user' => User::class,
             ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
-            'team_invitation' => TeamInvitation::class,
+            'workspace_invitation' => WorkspaceInvitation::class,
         ]);
 
         // Use custom models for custom-fields package
@@ -545,7 +545,7 @@ final class AppServiceProvider extends ServiceProvider
         CustomField::deleted($invalidate);
 
         // An option carries its own tenant_id, so clearing that tenant's five entity
-        // schemas beats one SELECT per option row: team creation seeds sixteen of
+        // schemas beats one SELECT per option row: workspace creation seeds sixteen of
         // them inside the registration transaction.
         $invalidateOption = static function (CustomFieldOption $option): void {
             $tenantId = $option->getAttribute('tenant_id');

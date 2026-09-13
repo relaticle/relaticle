@@ -76,7 +76,7 @@ final class ValidateColumnJob implements ShouldQueue
             return;
         }
 
-        $validator = new EntityLinkValidator($import->team_id);
+        $validator = new EntityLinkValidator($import->workspace_id);
         $errorMap = $validator->batchValidateFromColumn($this->column, $import->getImporter(), $uniqueValues);
 
         $results = [];
@@ -219,7 +219,7 @@ final class ValidateColumnJob implements ShouldQueue
         }
 
         $importer = $import->getImporter();
-        $this->column->importField = $importer->allFields()->get($this->column->target);
+        $this->column->importField = $importer->allFields()->getByKey($this->column->target);
     }
 
     /**

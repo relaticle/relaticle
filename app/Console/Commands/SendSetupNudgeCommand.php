@@ -7,8 +7,8 @@ namespace App\Console\Commands;
 use App\Enums\ActivationStep;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
 use DateTimeZone;
 use Illuminate\Console\Attributes\Description;
@@ -29,13 +29,13 @@ final class SendSetupNudgeCommand extends Command
         $sent = 0;
 
         $this->recipientsAtLocalHour(9)
-            ->whereHas('ownedTeams', fn (Builder $query): Builder => $query
-                ->where('personal_team', true)
+            ->whereHas('ownedWorkspaces', fn (Builder $query): Builder => $query
+                ->where('personal_workspace', true)
                 ->whereNull('setup_nudge_sent_at')
                 ->whereNull('scheduled_deletion_at')
                 ->whereBetween('created_at', [now()->subDays(3), now()->subDays(2)]))
             ->whereNotNull('email_verified_at')
-            ->with('ownedTeams')
+            ->with('ownedWorkspaces')
             ->chunkById(500, function (Collection $users) use ($facts, &$sent): void {
                 foreach ($users as $user) {
                     $this->info("Checking user id `{$user->getKey()}`...");
@@ -93,15 +93,15 @@ final class SendSetupNudgeCommand extends Command
 
         $sent = false;
 
-        foreach ($user->ownedTeams as $team) {
-            if (! $team->personal_team
-                || $team->setup_nudge_sent_at !== null
-                || $team->scheduled_deletion_at !== null
-                || ! $team->created_at?->between(now()->subDays(3), now()->subDays(2))) {
+        foreach ($user->ownedWorkspaces as $workspace) {
+            if (! $workspace->personal_workspace
+                || $workspace->setup_nudge_sent_at !== null
+                || $workspace->scheduled_deletion_at !== null
+                || ! $workspace->created_at?->between(now()->subDays(3), now()->subDays(2))) {
                 continue;
             }
 
-            if ($this->sendForTeam($user, $team, $facts)) {
+            if ($this->sendForWorkspace($user, $workspace, $facts)) {
                 $sent = true;
             }
         }
@@ -109,31 +109,31 @@ final class SendSetupNudgeCommand extends Command
         return $sent;
     }
 
-    private function sendForTeam(User $user, Team $team, WorkspaceActivationFacts $facts): bool
+    private function sendForWorkspace(User $user, Workspace $workspace, WorkspaceActivationFacts $facts): bool
     {
-        if ($facts->hasOwnRecord($team)) {
+        if ($facts->hasOwnRecord($workspace)) {
             return false;
         }
 
-        $stepKey = $this->topUnfinishedStep($team);
+        $stepKey = $this->topUnfinishedStep($workspace);
 
         if (! $stepKey instanceof ActivationStep) {
             return false;
         }
 
-        $conversationUrl = $this->continueUrl($team);
+        $conversationUrl = $this->continueUrl($workspace);
 
         Mail::to($user)
-            ->send(new SetupNudgeMail($user, $team, $stepKey->value, $conversationUrl));
+            ->send(new SetupNudgeMail($user, $workspace, $stepKey->value, $conversationUrl));
 
-        $team->forceFill(['setup_nudge_sent_at' => now()])->save();
+        $workspace->forceFill(['setup_nudge_sent_at' => now()])->save();
 
         return true;
     }
 
-    private function topUnfinishedStep(Team $team): ?ActivationStep
+    private function topUnfinishedStep(Workspace $workspace): ?ActivationStep
     {
-        $steps = $team->onboarding()->steps();
+        $steps = $workspace->onboarding()->steps();
 
         foreach ([ActivationStep::FirstRecord, ActivationStep::Import, ActivationStep::Invite] as $candidate) {
             $step = $steps->first(function (OnboardingStep $step) use ($candidate): bool {
@@ -155,8 +155,8 @@ final class SendSetupNudgeCommand extends Command
      * that page bounces straight back to the dashboard, so the nudge points at
      * the dashboard composer directly.
      */
-    private function continueUrl(Team $team): string
+    private function continueUrl(Workspace $workspace): string
     {
-        return Dashboard::getUrl(['tenant' => $team], panel: 'app');
+        return Dashboard::getUrl(['tenant' => $workspace], panel: 'app');
     }
 }

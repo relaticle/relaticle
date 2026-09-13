@@ -15,12 +15,12 @@ use Tests\Helpers\ChatBrowser;
  * depended on explains itself without waiting for a reload.
  */
 it('renders a part-decided plan without a phantom progress line, and explains a cascade cancel live', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'plan card', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'plan card', $conversationId);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();

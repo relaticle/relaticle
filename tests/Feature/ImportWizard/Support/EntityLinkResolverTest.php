@@ -10,15 +10,15 @@ use Relaticle\ImportWizard\Support\EntityLinkResolver;
 mutates(EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
 });
 
-it('resolves team member by email via pivot', function (): void {
+it('resolves workspace member by email via pivot', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
-    $resolver = new EntityLinkResolver($this->team->id);
+    $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
         ->matchableFields([MatchableField::email('email')])
         ->foreignKey('account_owner_id');
@@ -29,8 +29,8 @@ it('resolves team member by email via pivot', function (): void {
     expect($result[$member->email])->toBe($member->id);
 });
 
-it('resolves team owner by email', function (): void {
-    $resolver = new EntityLinkResolver($this->team->id);
+it('resolves workspace owner by email', function (): void {
+    $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
         ->matchableFields([MatchableField::email('email')])
         ->foreignKey('account_owner_id');
@@ -41,11 +41,11 @@ it('resolves team owner by email', function (): void {
     expect($result[$this->user->email])->toBe($this->user->id);
 });
 
-it('resolves team member by ID', function (): void {
+it('resolves workspace member by ID', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
 
-    $resolver = new EntityLinkResolver($this->team->id);
+    $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
         ->matchableFields([MatchableField::id()])
         ->foreignKey('account_owner_id');
@@ -56,10 +56,10 @@ it('resolves team member by ID', function (): void {
     expect($result[$member->id])->toBe($member->id);
 });
 
-it('returns null for non-team-member email', function (): void {
+it('returns null for non-workspace-member email', function (): void {
     $stranger = User::factory()->create();
 
-    $resolver = new EntityLinkResolver($this->team->id);
+    $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
         ->matchableFields([MatchableField::email('email')])
         ->foreignKey('account_owner_id');
@@ -70,13 +70,13 @@ it('returns null for non-team-member email', function (): void {
     expect($result[$stranger->email])->toBeNull();
 });
 
-it('resolves multiple team members in batch', function (): void {
+it('resolves multiple workspace members in batch', function (): void {
     $member1 = User::factory()->create();
     $member2 = User::factory()->create();
-    $this->team->users()->attach($member1, ['role' => 'editor']);
-    $this->team->users()->attach($member2, ['role' => 'editor']);
+    $this->workspace->users()->attach($member1, ['role' => 'editor']);
+    $this->workspace->users()->attach($member2, ['role' => 'editor']);
 
-    $resolver = new EntityLinkResolver($this->team->id);
+    $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
         ->matchableFields([MatchableField::email('email')])
         ->foreignKey('account_owner_id');

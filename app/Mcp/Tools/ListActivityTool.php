@@ -8,7 +8,7 @@ use App\Enums\CrmEntity;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\ActivityLog\Activity;
-use App\Models\ActivityLog\Scopes\TeamScope;
+use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Carbon\CarbonImmutable;
@@ -89,9 +89,11 @@ final class ListActivityTool extends Tool
         $days = (int) ($validated['days'] ?? 7);
         $page = (int) ($validated['page'] ?? 1);
 
-        $entities = $recordType instanceof CrmEntity ? [$recordType] : CrmEntity::cases();
+        foreach (CrmEntity::cases() as $entity) {
+            if ($recordType instanceof CrmEntity && $entity !== $recordType) {
+                continue;
+            }
 
-        foreach ($entities as $entity) {
             if ($user->cannot('viewAny', $entity->model())) {
                 return Response::error('You do not have permission to view CRM activity.');
             }
@@ -105,7 +107,7 @@ final class ListActivityTool extends Tool
             }
         }
 
-        $scope = $this->scopedQuery((string) $user->currentTeam->getKey(), $days, $recordType, $recordId);
+        $scope = $this->scopedQuery((string) $user->currentWorkspace->getKey(), $days, $recordType, $recordId);
         $keys = $this->saveKeysForPage($scope, $page);
         $hasMore = count($keys) > self::ENTRY_LIMIT;
         $keys = array_slice($keys, 0, self::ENTRY_LIMIT);
@@ -131,11 +133,11 @@ final class ListActivityTool extends Tool
     }
 
     /** @return Builder<Activity> */
-    private function scopedQuery(string $teamId, int $days, ?CrmEntity $recordType, ?string $recordId): Builder
+    private function scopedQuery(string $workspaceId, int $days, ?CrmEntity $recordType, ?string $recordId): Builder
     {
         $query = Activity::query()
-            ->withoutGlobalScope(TeamScope::class)
-            ->where('team_id', $teamId)
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $workspaceId)
             ->where('created_at', '>=', now()->subDays($days))
             ->whereHasMorph(
                 'subject',
@@ -255,7 +257,7 @@ final class ListActivityTool extends Tool
                 'id' => $subjectId,
                 'name' => $this->recordName($subject, $entity),
                 'url' => $entity instanceof CrmEntity
-                    ? $this->urls->build($entity, $subjectId, $user->currentTeam)
+                    ? $this->urls->build($entity, $subjectId, $user->currentWorkspace)
                     : null,
             ],
             'changes' => $this->changes($this->mergedProperties($group)),

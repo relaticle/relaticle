@@ -14,13 +14,13 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatController::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -45,7 +45,7 @@ it('returns 402 when credits are exhausted on send', function (): void {
     $conversationId = $createRes->json('conversation_id');
 
     AiCreditBalance::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->update(['credits_remaining' => 0]);
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
@@ -106,7 +106,7 @@ it('continues an existing conversation', function (): void {
         'id' => 'conv-existing',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Existing conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -126,7 +126,7 @@ it('lists conversations for current user', function (): void {
         'id' => 'conv-1',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test conversation',
         'created_at' => now(),
         'updated_at' => now(),
@@ -139,13 +139,13 @@ it('lists conversations for current user', function (): void {
 });
 
 it('does not list conversations of other users', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-other',
         'participant_type' => 'user',
         'participant_id' => $otherUser->getKey(),
-        'team_id' => $otherUser->currentTeam->getKey(),
+        'workspace_id' => $otherUser->currentWorkspace->getKey(),
         'title' => 'Not mine',
         'created_at' => now(),
         'updated_at' => now(),
@@ -161,7 +161,7 @@ it('deletes own conversation', function (): void {
         'id' => 'conv-to-delete',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Delete me',
         'created_at' => now(),
         'updated_at' => now(),
@@ -174,13 +174,13 @@ it('deletes own conversation', function (): void {
 });
 
 it('cannot delete another user conversation', function (): void {
-    $otherUser = User::factory()->withPersonalTeam()->create();
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-other',
         'participant_type' => 'user',
         'participant_id' => $otherUser->getKey(),
-        'team_id' => $otherUser->currentTeam->getKey(),
+        'workspace_id' => $otherUser->currentWorkspace->getKey(),
         'title' => 'Not yours',
         'created_at' => now(),
         'updated_at' => now(),
@@ -237,7 +237,7 @@ it('returns the conversation id so the client can subscribe', function (): void 
 
 it('atomically reserves a credit on send so concurrent sends cannot overspend', function (): void {
     AiCreditBalance::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->update(['credits_remaining' => 1, 'credits_used' => 99]);
 
     Queue::fake();
@@ -260,7 +260,7 @@ it('atomically reserves a credit on send so concurrent sends cannot overspend', 
     $first->assertOk();
     $second->assertStatus(402);
 
-    expect(AiCreditBalance::query()->where('team_id', $this->team->getKey())->value('credits_remaining'))->toBe(0);
+    expect(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(0);
 });
 
 it('does not reserve a credit on send when the request fails validation', function (): void {
@@ -275,7 +275,7 @@ it('does not reserve a credit on send when the request fails validation', functi
         'document' => ['type' => 'doc', 'content' => []],
     ])->assertUnprocessable();
 
-    expect(AiCreditBalance::query()->where('team_id', $this->team->getKey())->value('credits_remaining'))->toBe(100);
+    expect(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(100);
 });
 
 it('returns reset_at and upgrade_url on 402 from send', function (): void {
@@ -287,7 +287,7 @@ it('returns reset_at and upgrade_url on 402 from send', function (): void {
     $conversationId = $createRes->json('conversation_id');
 
     AiCreditBalance::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->update(['credits_remaining' => 0, 'period_ends_at' => now()->endOfMonth()]);
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
@@ -320,7 +320,7 @@ it('cleans up messages when deleting a conversation', function (): void {
         'id' => 'conv-cleanup',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Cleanup test',
         'created_at' => now(),
         'updated_at' => now(),

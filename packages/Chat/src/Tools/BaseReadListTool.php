@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools;
 
 use App\Models\CustomField;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\CustomFields\RecordNameResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
@@ -37,7 +37,7 @@ abstract class BaseReadListTool implements Tool
 
     /**
      * Columns carried by the block: the entity's core name/title column plus up
-     * to five custom-field columns, wide enough for the fields a team marks
+     * to five custom-field columns, wide enough for the fields a workspace marks
      * visible and narrow enough for a chat bubble.
      */
     private const int BLOCK_COLUMN_LIMIT = 6;
@@ -293,7 +293,7 @@ abstract class BaseReadListTool implements Tool
 
     /**
      * Eager-loads each requested relation across the whole result page in one
-     * query per relation, scoped to the user's team and ordered by recency.
+     * query per relation, scoped to the user's workspace and ordered by recency.
      *
      * The `->limit()` inside the closure is per PARENT, not per result set:
      * a *Many relation compiles it through Builder::groupLimit(), which emits
@@ -313,32 +313,32 @@ abstract class BaseReadListTool implements Tool
             return;
         }
 
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         foreach ($includes as $relation) {
-            $models->load([$relation => function (Relation $query) use ($team): void {
+            $models->load([$relation => function (Relation $query) use ($workspace): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
-                $query->whereBelongsTo($team)->latest($orderColumn)->limit(self::INCLUDE_ITEM_LIMIT);
+                $query->whereBelongsTo($workspace)->latest($orderColumn)->limit(self::INCLUDE_ITEM_LIMIT);
             }]);
 
-            // Counted with the same team scope as the load above: an unscoped
-            // count would describe a cross-team related record the items list
+            // Counted with the same workspace scope as the load above: an unscoped
+            // count would describe a cross-workspace related record the items list
             // omits, so one relation would report two different totals.
-            $models->loadCount([$relation => $this->scopeToTeam($team)]);
+            $models->loadCount([$relation => $this->scopeToWorkspace($workspace)]);
         }
     }
 
     /**
-     * Team-scoping constraint shared by the include load and its count.
+     * Workspace-scoping constraint shared by the include load and its count.
      *
      * Typed `mixed` deliberately: load() hands the callback a Relation and
      * loadCount() hands it an Eloquent Builder, and both accept whereBelongsTo.
      */
-    private function scopeToTeam(?Team $team): callable
+    private function scopeToWorkspace(?Workspace $workspace): callable
     {
-        return static function (mixed $query) use ($team): void {
-            $query->whereBelongsTo($team);
+        return static function (mixed $query) use ($workspace): void {
+            $query->whereBelongsTo($workspace);
         };
     }
 
@@ -426,21 +426,21 @@ abstract class BaseReadListTool implements Tool
             return null;
         }
 
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
         $entityType = $this->citationType();
         $coreKey = $this->searchFilterName();
 
-        // Nothing stops a team from coding a custom field `name` or `title`.
+        // Nothing stops a workspace from coding a custom field `name` or `title`.
         // Left in, it would emit the core column twice and its cell would
         // overwrite the record's own name, which is the cell the row links from.
         $promoted = array_values(array_filter(
-            $this->promotedFields($team, $entityType, $this->promotedCodes($request)),
+            $this->promotedFields($workspace, $entityType, $this->promotedCodes($request)),
             static fn (CustomField $field): bool => $field->code !== $coreKey,
         ));
         $promotedCodes = array_map(static fn (CustomField $field): string => $field->code, $promoted);
 
         $derived = array_values(array_filter(
-            resolve(DisplayFieldSelector::class)->listFields($team, $entityType),
+            resolve(DisplayFieldSelector::class)->listFields($workspace, $entityType),
             static fn (CustomField $field): bool => $field->code !== $coreKey
                 && ! in_array($field->code, $promotedCodes, true),
         ));
@@ -496,7 +496,7 @@ abstract class BaseReadListTool implements Tool
             return [];
         }
 
-        $url = resolve(RecordReferenceResolver::class)->indexUrlFor($this->citationType(), $user->currentTeam);
+        $url = resolve(RecordReferenceResolver::class)->indexUrlFor($this->citationType(), $user->currentWorkspace);
 
         return $url === null ? [] : ['open_url' => $url];
     }
@@ -593,9 +593,9 @@ abstract class BaseReadListTool implements Tool
     /**
      * Field codes this call filtered or sorted on, in the order the tool parsed
      * them. Relevance follows the question: ask for deals closing this month
-     * over $50k and close_date/amount lead the table, whatever the team marked
+     * over $50k and close_date/amount lead the table, whatever the workspace marked
      * visible. Native sorts and codes from another tenant drop out in
-     * promotedFields(), which only resolves this team's own fields.
+     * promotedFields(), which only resolves this workspace's own fields.
      *
      * @return list<string>
      */
@@ -616,19 +616,19 @@ abstract class BaseReadListTool implements Tool
 
     /**
      * Promoted fields are resolved without any visibility filter: a field the
-     * team hid from its table is exactly the field the user just asked about.
+     * workspace hid from its table is exactly the field the user just asked about.
      *
      * @param  list<string>  $codes
      * @return list<CustomField>
      */
-    private function promotedFields(Team $team, string $entityType, array $codes): array
+    private function promotedFields(Workspace $workspace, string $entityType, array $codes): array
     {
         if ($codes === []) {
             return [];
         }
 
         $fields = CustomField::query()
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('entity_type', $entityType)
             ->active()
             ->whereIn('code', $codes)

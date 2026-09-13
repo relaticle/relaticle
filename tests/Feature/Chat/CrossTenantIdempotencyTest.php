@@ -8,13 +8,13 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
-it('allows the same idempotency key in two different teams', function (): void {
-    $userA = User::factory()->withPersonalTeam()->create();
-    $userB = User::factory()->withPersonalTeam()->create();
+it('allows the same idempotency key in two different workspaces', function (): void {
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $userB = User::factory()->withPersonalWorkspace()->create();
 
     foreach ([$userA, $userB] as $user) {
-        AiCreditBalance::query()->updateOrCreate(['team_id' => $user->currentTeam->getKey()], [
-            'team_id' => $user->currentTeam->getKey(),
+        AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [
+            'workspace_id' => $user->currentWorkspace->getKey(),
             'credits_remaining' => 10,
             'credits_used' => 0,
             'period_starts_at' => now()->startOfMonth(),
@@ -25,12 +25,12 @@ it('allows the same idempotency key in two different teams', function (): void {
     $service = app(CreditService::class);
 
     $service->settleReservation(
-        team: $userA->currentTeam, user: $userA, type: AiCreditType::Chat,
+        workspace: $userA->currentWorkspace, user: $userA, type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
         resolutionKey: 'shared-key',
     );
     $service->settleReservation(
-        team: $userB->currentTeam, user: $userB, type: AiCreditType::Chat,
+        workspace: $userB->currentWorkspace, user: $userB, type: AiCreditType::Chat,
         model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
         resolutionKey: 'shared-key',
     );

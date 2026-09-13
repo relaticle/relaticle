@@ -43,8 +43,8 @@ mutates(
 );
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('returns the current active schema through a tool', function (): void {
@@ -62,7 +62,7 @@ it('returns the current active schema through a tool', function (): void {
 it('lists inactive custom fields and their option labels', function (): void {
     $field = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->with('options')
@@ -88,13 +88,13 @@ it('lists inactive custom fields and their option labels', function (): void {
 });
 
 it('aggregates opportunity counts and amount by company', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme']);
-    $opportunities = Opportunity::factory()->count(2)->recycle([$this->user, $this->team])->create([
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $opportunities = Opportunity::factory()->count(2)->recycle([$this->user, $this->workspace])->create([
         'company_id' => $company->id,
     ]);
     $amount = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'amount')
         ->firstOrFail();
@@ -116,11 +116,11 @@ it('aggregates opportunity counts and amount by company', function (): void {
 it('marks aggregates truncated only when more than one hundred groups exist', function (): void {
     $companies = Company::factory()
         ->count(100)
-        ->recycle([$this->user, $this->team])
+        ->recycle([$this->user, $this->workspace])
         ->create();
 
     foreach ($companies as $company) {
-        Opportunity::factory()->recycle([$this->user, $this->team])->create([
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
             'company_id' => $company->getKey(),
         ]);
     }
@@ -134,8 +134,8 @@ it('marks aggregates truncated only when more than one hundred groups exist', fu
             ->where('truncated', false)
             ->etc());
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
-    Opportunity::factory()->recycle([$this->user, $this->team])->create([
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
         'company_id' => $company->getKey(),
     ]);
 
@@ -152,7 +152,7 @@ it('marks aggregates truncated only when more than one hundred groups exist', fu
 it('returns activity with complete saves and caller-timezone timestamps', function (): void {
     $this->user->update(['timezone' => 'Asia/Yerevan']);
     $company = Company::withoutEvents(fn (): Company => Company::factory()
-        ->recycle([$this->user, $this->team])
+        ->recycle([$this->user, $this->workspace])
         ->create(['name' => 'Before']));
 
     $this->actingAs($this->user);
@@ -183,7 +183,7 @@ it('returns activity with complete saves and caller-timezone timestamps', functi
 });
 
 it('denies activity reads to an unverified user', function (): void {
-    $unverifiedUser = User::factory()->withPersonalTeam()->unverified()->create();
+    $unverifiedUser = User::factory()->withPersonalWorkspace()->unverified()->create();
 
     RelaticleServer::actingAs($unverifiedUser)
         ->tool(ListActivityTool::class)
@@ -245,10 +245,10 @@ it('rejects malformed list tool inputs before building the database query', func
 it('computes task due status in the caller timezone', function (): void {
     $this->travelTo(Date::parse('2026-08-26 06:30:00 UTC'));
     $this->user->update(['timezone' => 'America/Los_Angeles']);
-    $task = Task::factory()->recycle([$this->user, $this->team])->create();
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $dueDate = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'due_date')
         ->firstOrFail();
@@ -268,25 +268,25 @@ it('computes task due status in the caller timezone', function (): void {
 it('reports each stage separately so a caller can decide what counts as won', function (): void {
     $stage = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
         ->firstOrFail();
     $amount = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->getKey())
+        ->where('tenant_id', $this->workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'amount')
         ->firstOrFail();
     $closedWon = $stage->options()->withoutGlobalScopes()->where('name', 'Closed Won')->firstOrFail();
     $unwon = CustomFieldOption::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_id' => $stage->getKey(),
         'name' => 'Unwon',
         'sort_order' => 99,
     ]);
-    $wonOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
-    $unwonOpportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $wonOpportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $unwonOpportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     $wonOpportunity->saveCustomFieldValue($stage, $closedWon->getKey());
     $wonOpportunity->saveCustomFieldValue($amount, 100);
@@ -303,11 +303,11 @@ it('reports each stage separately so a caller can decide what counts as won', fu
             ->etc());
 });
 
-it('keeps custom-field definition reads scoped to the current team', function (): void {
-    $other = User::factory()->withPersonalTeam()->create();
+it('keeps custom-field definition reads scoped to the current workspace', function (): void {
+    $other = User::factory()->withPersonalWorkspace()->create();
     $otherField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $other->currentTeam->getKey())
+        ->where('tenant_id', $other->currentWorkspace->getKey())
         ->firstOrFail();
 
     RelaticleServer::actingAs($this->user)

@@ -57,7 +57,7 @@ final class CompanySchemaResource extends Resource implements ProvidesEntitySche
             'description' => 'Organizations and businesses tracked in the CRM.',
             'fields' => [
                 'name' => ['type' => 'string', 'required' => true],
-                'account_owner_id' => ['type' => 'string', 'required' => false, 'description' => 'Team member ID from whoami.'],
+                'account_owner_id' => ['type' => 'string', 'required' => false, 'description' => 'Workspace member ID from whoami.'],
             ],
             'custom_fields' => $this->resolveCustomFields($user),
             'filterable_fields' => $this->resolveFilterableFields($user),

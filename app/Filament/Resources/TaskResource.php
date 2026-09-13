@@ -7,7 +7,7 @@ namespace App\Filament\Resources;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
-use App\Filament\Components\Forms\TeamMemberSelect;
+use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
@@ -124,7 +124,7 @@ final class TaskResource extends Resource
                     ->toggle(),
                 RecordSelectFilter::make('assignees')
                     ->multiple()
-                    ->relationship('assignees', 'name', TeamMemberSelect::currentTeamMembers())
+                    ->relationship('assignees', 'name', WorkspaceMemberSelect::currentWorkspaceMembers())
                     ->searchable()
                     ->preload(),
                 SelectFilter::make('creation_source')

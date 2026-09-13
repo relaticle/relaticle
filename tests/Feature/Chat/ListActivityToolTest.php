@@ -15,7 +15,7 @@ use Relaticle\Chat\Tools\Activity\ListActivityTool;
 mutates(ListActivityTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
 });
 
@@ -105,9 +105,9 @@ it('reports a name change with its old and new value', function (): void {
         ->and($block['rows'][1]['cells']['what'])->toBe('Created');
 });
 
-it('never shows another team\'s activity', function (): void {
-    $intruder = User::factory()->withPersonalTeam()->create();
-    $owner = User::factory()->withPersonalTeam()->create();
+it('never shows another workspace\'s activity', function (): void {
+    $intruder = User::factory()->withPersonalWorkspace()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($owner);
     $secret = app(CreateCompany::class)->execute($owner, ['name' => 'Secret Co']);
@@ -127,12 +127,12 @@ it('never shows another team\'s activity', function (): void {
         ->and(json_encode($payload))->not->toContain('Secret');
 });
 
-it('rejects a record id belonging to another team', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
+it('rejects a record id belonging to another workspace', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($owner);
     $secret = app(CreateCompany::class)->execute($owner, ['name' => 'Secret Co']);
 
-    $intruder = User::factory()->withPersonalTeam()->create();
+    $intruder = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($intruder);
 
     $payload = activityPayload([

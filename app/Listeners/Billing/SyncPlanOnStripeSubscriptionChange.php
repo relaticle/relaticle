@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Listeners\Billing;
 
-use App\Actions\Billing\SyncTeamPlanFromSubscription;
-use App\Models\Team;
+use App\Actions\Billing\SyncWorkspacePlanFromSubscription;
+use App\Models\Workspace;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Cashier\Subscription;
 
 final readonly class SyncPlanOnStripeSubscriptionChange
 {
-    public function __construct(private SyncTeamPlanFromSubscription $syncTeamPlan) {}
+    public function __construct(private SyncWorkspacePlanFromSubscription $syncWorkspacePlan) {}
 
     public function handle(WebhookHandled $event): void
     {
@@ -33,12 +33,12 @@ final readonly class SyncPlanOnStripeSubscriptionChange
             return;
         }
 
-        $team = $subscription->owner()->first();
+        $workspace = $subscription->owner()->first();
 
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             return;
         }
 
-        $this->syncTeamPlan->execute($team, $subscription);
+        $this->syncWorkspacePlan->execute($workspace, $subscription);
     }
 }

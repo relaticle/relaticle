@@ -18,58 +18,58 @@ mutates(EnsureHostedWorkspaceAccess::class, HostedWorkspaceAccess::class);
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 });
 
 it('redirects a paused hosted workspace to billing', function (): void {
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
-        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->team->slug]));
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 
 it('keeps billing and workspace deletion controls available while paused', function (): void {
-    $this->get(route('filament.app.pages.billing', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 
-    $this->get(route('filament.app.tenant.profile', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.tenant.profile', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('keeps personal account controls available while paused', function (): void {
-    $this->get(route('filament.app.settings.pages.profile', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.settings.pages.profile', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 
-    $this->get(route('filament.app.settings.pages.access-tokens', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.settings.pages.access-tokens', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('allows a workspace during its active Cloud Pro trial', function (): void {
-    $this->team->forceFill([
+    $this->workspace->forceFill([
         'plan' => Plan::Pro,
         'trial_ends_at' => now()->addDays(14),
     ])->save();
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('allows a workspace with a manual Pro grant', function (): void {
-    $this->team->forceFill(['plan' => Plan::Pro])->save();
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('allows a workspace with a managed Enterprise grant', function (): void {
-    $this->team->forceFill(['plan' => Plan::Enterprise])->save();
+    $this->workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('allows a workspace with a valid subscription', function (): void {
-    $this->team->subscriptions()->create([
+    $this->workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_hosted_access',
         'stripe_status' => 'active',
@@ -77,31 +77,31 @@ it('allows a workspace with a valid subscription', function (): void {
         'quantity' => 1,
     ]);
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('pauses an expired trial before the daily cleanup command runs', function (): void {
-    $this->team->forceFill([
+    $this->workspace->forceFill([
         'plan' => Plan::Pro,
         'trial_ends_at' => now()->subMinute(),
     ])->save();
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
-        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->team->slug]));
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 
 it('preserves hosted access for a grandfathered Free workspace', function (): void {
-    $this->team->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
 it('does not require hosted billing on self-hosted installations', function (): void {
     Feature::define(BillingFeature::class, false);
 
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->team->slug]))
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 });
 
@@ -115,7 +115,7 @@ it('returns payment required from the REST API for a paused workspace', function
         ->assertJson([
             'error' => 'workspace_subscription_required',
             'message' => __('billing.access.paused_api'),
-            'upgrade_url' => route('filament.app.pages.billing', ['tenant' => $this->team->slug]),
+            'upgrade_url' => route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]),
         ]);
 });
 
@@ -134,10 +134,10 @@ it('returns payment required from the MCP transport for a paused workspace', fun
 });
 
 it('redirects a paused workspace to billing on the record-redirect route instead of returning raw json', function (): void {
-    $company = Company::factory()->for($this->team)->create();
+    $company = Company::factory()->for($this->workspace)->create();
 
     $this->get("/r/company/{$company->getKey()}")
-        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->team->slug]));
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 
 it('blocks chat before reserving credits or dispatching a queued turn', function (): void {

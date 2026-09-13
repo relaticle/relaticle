@@ -12,9 +12,9 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatAllChatsPanel::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 it('mounts closed by default', function (): void {
@@ -44,7 +44,7 @@ it('deletes a conversation via livewire action', function (): void {
         'id' => 'cap-del',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->current_team_id,
+        'workspace_id' => $this->user->current_workspace_id,
         'title' => 'Delete me',
         'created_at' => now(),
         'updated_at' => now(),
@@ -63,7 +63,7 @@ it('lists up to 50 conversations newest first when search is empty', function ()
             'id' => "c{$i}",
             'participant_type' => 'user',
             'participant_id' => $this->user->getKey(),
-            'team_id' => $this->user->current_team_id,
+            'workspace_id' => $this->user->current_workspace_id,
             'title' => "Chat {$i}",
             'created_at' => now()->subMinutes($i),
             'updated_at' => now()->subMinutes($i),
@@ -80,9 +80,9 @@ it('lists up to 50 conversations newest first when search is empty', function ()
 
 it('filters conversations by title when search is set', function (): void {
     DB::table('agent_conversations')->insert([
-        ['id' => 's1', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'team_id' => $this->user->current_team_id, 'title' => 'About Acme Corp', 'created_at' => now()->subMinutes(1), 'updated_at' => now()->subMinutes(1)],
-        ['id' => 's2', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'team_id' => $this->user->current_team_id, 'title' => 'Generic title', 'created_at' => now()->subMinutes(2), 'updated_at' => now()->subMinutes(2)],
-        ['id' => 's3', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'team_id' => $this->user->current_team_id, 'title' => 'Pipeline review', 'created_at' => now()->subMinutes(3), 'updated_at' => now()->subMinutes(3)],
+        ['id' => 's1', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'workspace_id' => $this->user->current_workspace_id, 'title' => 'About Acme Corp', 'created_at' => now()->subMinutes(1), 'updated_at' => now()->subMinutes(1)],
+        ['id' => 's2', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'workspace_id' => $this->user->current_workspace_id, 'title' => 'Generic title', 'created_at' => now()->subMinutes(2), 'updated_at' => now()->subMinutes(2)],
+        ['id' => 's3', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'workspace_id' => $this->user->current_workspace_id, 'title' => 'Pipeline review', 'created_at' => now()->subMinutes(3), 'updated_at' => now()->subMinutes(3)],
     ]);
 
     $component = Livewire::test(ChatAllChatsPanel::class)->set('search', 'Acme');
@@ -94,8 +94,8 @@ it('filters conversations by title when search is set', function (): void {
 
 it('falls back to the full list when search is whitespace', function (): void {
     DB::table('agent_conversations')->insert([
-        ['id' => 'w1', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'team_id' => $this->user->current_team_id, 'title' => 'First', 'created_at' => now()->subMinutes(1), 'updated_at' => now()->subMinutes(1)],
-        ['id' => 'w2', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'team_id' => $this->user->current_team_id, 'title' => 'Second', 'created_at' => now()->subMinutes(2), 'updated_at' => now()->subMinutes(2)],
+        ['id' => 'w1', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'workspace_id' => $this->user->current_workspace_id, 'title' => 'First', 'created_at' => now()->subMinutes(1), 'updated_at' => now()->subMinutes(1)],
+        ['id' => 'w2', 'participant_type' => 'user', 'participant_id' => $this->user->getKey(), 'workspace_id' => $this->user->current_workspace_id, 'title' => 'Second', 'created_at' => now()->subMinutes(2), 'updated_at' => now()->subMinutes(2)],
     ]);
 
     $component = Livewire::test(ChatAllChatsPanel::class)->set('search', '   ');
@@ -108,7 +108,7 @@ it('matches by message content via SearchConversations', function (): void {
         'id' => 'm1',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->current_team_id,
+        'workspace_id' => $this->user->current_workspace_id,
         'title' => 'Generic',
         'created_at' => now(),
         'updated_at' => now(),
@@ -149,7 +149,7 @@ it('renders a no-matches message when search returns empty', function (): void {
         'id' => 'e1',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->user->current_team_id,
+        'workspace_id' => $this->user->current_workspace_id,
         'title' => 'Hello world',
         'created_at' => now(),
         'updated_at' => now(),

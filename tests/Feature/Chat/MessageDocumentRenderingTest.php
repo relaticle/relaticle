@@ -10,15 +10,15 @@ use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Models\AgentConversation;
 
 it('returns the document column on each message from ListConversationMessages', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
     $conversationId = (string) Str::uuid7();
     AgentConversation::query()->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -62,18 +62,18 @@ it('returns the document column on each message from ListConversationMessages', 
 });
 
 it('attaches a server-resolved url to each mention', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $this->actingAs($user);
 
-    $company = Company::factory()->for($team)->create(['name' => 'Acme Corp']);
+    $company = Company::factory()->for($workspace)->create(['name' => 'Acme Corp']);
 
     $conversationId = (string) Str::uuid7();
     AgentConversation::query()->insert([
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),

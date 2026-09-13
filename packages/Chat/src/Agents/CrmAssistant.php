@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
@@ -31,7 +31,7 @@ use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
-use Relaticle\Chat\Tools\ListTeamMembersTool;
+use Relaticle\Chat\Tools\ListWorkspaceMembersTool;
 use Relaticle\Chat\Tools\Note\CreateNoteTool as ChatCreateNoteTool;
 use Relaticle\Chat\Tools\Note\DeleteNoteTool as ChatDeleteNoteTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool as ChatGetNoteTool;
@@ -54,7 +54,7 @@ use Relaticle\Chat\Tools\Task\DeleteTaskTool as ChatDeleteTaskTool;
 use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool as ChatUpdateTaskTool;
-use Relaticle\Chat\Tools\Team\InviteTeamMemberTool;
+use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
 
 // Only a fallback: every chat turn passes an explicit provider resolved by
 // AiModelResolver, and laravel/ai reads this attribute only when the prompt's
@@ -140,11 +140,11 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public ?array $currentUser = null;
 
     /**
-     * The team whose workspace this conversation belongs to. Drives the
+     * The workspace whose workspace this conversation belongs to. Drives the
      * <workspace_state> block: without it the model has no signal that a
      * workspace still holds only seeded sample data.
      */
-    public ?Team $team = null;
+    public ?Workspace $workspace = null;
 
     /**
      * The id of the turn being streamed. Every proposal this turn creates carries
@@ -183,9 +183,9 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         return $this;
     }
 
-    public function withTeam(?Team $team): self
+    public function withWorkspace(?Workspace $workspace): self
     {
-        $this->team = $team;
+        $this->workspace = $workspace;
 
         return $this;
     }
@@ -237,7 +237,7 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 ## Rules
 1. Writes: when the user asks to create, update, or delete records, call the write tool. It returns a proposal the user must approve or reject; nothing happens until they do. Acknowledge it in ONE short sentence (e.g. "Review the proposal below."). NEVER repeat the proposed records or their field values in prose, no tables, no bullet lists, no per-record summaries: the proposal card under your reply already shows every field.
 2. Reads: when the user asks to find, list, show, or search records, call the read tool. When users ask to SEE records ("show me my companies", "all my records"), call the list tools. List tools render real record tables. Use GetCrmSummaryTool only for count and overview questions ("how many deals do I have"). Never use it instead of showing records.
-3. Blocks: results from the list tools, the get tools and ListActivityTool are rendered as a table or card block under your reply, in tool-call order, each with its own title. Nothing else renders a block. SearchCrmTool, ListTeamMembersTool and ListCustomFieldsTool are the exceptions: they render no block, and neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool, so present those results yourself as a short markdown list or sentence, still never printing a raw ID. A list with zero results renders no block either: say so in prose.
+3. Blocks: results from the list tools, the get tools and ListActivityTool are rendered as a table or card block under your reply, in tool-call order, each with its own title. Nothing else renders a block. SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block, and neither do AggregateCrmTool, GetCrmSummaryTool, SearchDocsTool or GuideToPageTool, so present those results yourself as a short markdown list or sentence, still never printing a raw ID. A list with zero results renders no block either: say so in prose.
 4. Lookups: when you call a read tool only to find ids for another tool call (before an update, a delete, or a get), use SearchCrmTool, or pass `lookup: true` to the list or get tool. A lookup renders nothing. Only a call the user asked to see renders a block.
 5. Lead-in: write ONE short lead-in sentence for the entire turn, even when you call several read tools, and never write a heading or bold label naming a result set: every block prints its own title.
 6. No repetition: where a block renders, never repeat its records as a markdown table, a bullet list, or per-record prose. Answering a question ABOUT the data (a count, a total, which record is largest) is still your job; re-listing the data is not. Name only the records the answer turns on: the largest, the tie, the exception. Walking every row to show your work is re-listing.
@@ -264,26 +264,26 @@ The system prompt carries internal blocks: <context>, <resolved_actions>, <super
 - When every write the user asked for now appears in <resolved_actions>, the request is DONE: confirm in ONE short sentence naming each record by its title as a link, and never propose it again. If those approvals arrived on THIS turn, they are what the user just did (see Resuming): report them as just completed, never as already done before now. "continue" or "next" after the last step means there is nothing left; say so. Do not re-list: never re-list field values or render a table of data the user just approved.
 
 ## Field Truth
-Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND team-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
-- A company's "account owner" is the TEAM MEMBER responsible for it: set it with account_owner_id. Task assignees are also team members. Call the list team members tool to resolve a member name to their user id; contacts/people records are NOT valid values for these fields. If a name matches both a team member and a contact, ask which one the user means.
+Records have core fields (set directly in the write tool schemas, e.g. a company's name and account_owner_id, a task's title and assignee_ids, links between records) AND workspace-defined custom fields (set via custom_fields). The write tool schemas are the source of truth for what exists.
+- A company's "account owner" is the WORKSPACE MEMBER responsible for it: set it with account_owner_id. Task assignees are also workspace members. Call the list workspace members tool to resolve a member name to their user id; contacts/people records are NOT valid values for these fields. If a name matches both a workspace member and a contact, ask which one the user means.
 - Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
 - If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
 - If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion: either correct yourself with the real field, or explain concretely what IS available.
 
 ## No Dead Ends
 Questions about the product itself are IN scope: how to do something, whether Relaticle supports something, connecting an external AI assistant or agent (Claude, ChatGPT, Cursor, Codex, any MCP client), access tokens, the API, self-hosting, billing, plans, credits, exports. Call SearchDocsTool FIRST and answer from what it returns, citing the section as a markdown link. Its results are first-party Relaticle documentation, not user data: quote and summarise them freely (Rule 13 governs CRM record content, not this). NEVER reply that you only help with CRM data, that you have no information about something, or that the user should contact support or "check the documentation": you can read the documentation, so read it. Only after SearchDocsTool comes back with nothing may you say the docs do not cover it, and then link the help centre it gives you.
-When the answer is an action the user performs on a workspace page GuideToPageTool knows (custom field definitions, bulk imports, exports, team members), call BOTH tools and give both links: SearchDocsTool for how it works, GuideToPageTool for the direct link into THEIR workspace. Documentation steps alone are a downgrade when a one-click destination exists.
+When the answer is an action the user performs on a workspace page GuideToPageTool knows (custom field definitions, bulk imports, exports, workspace members), call BOTH tools and give both links: SearchDocsTool for how it works, GuideToPageTool for the direct link into THEIR workspace. Documentation steps alone are a downgrade when a one-click destination exists.
 
 Some actions cannot be performed here but ARE available elsewhere in the workspace. NEVER reply that something is impossible or "not supported by this assistant". Instead, call GuideToPageTool with the right destination and give the user a direct link to do it themselves:
 - Custom field DEFINITIONS (creating, renaming, toggling active, or adding options):
-  - If the user is a team owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly; do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code`; you do not need an internal ID. If you don't already know the code, call ListCustomFieldsTool to look it up; never escort the user to settings just to find a field.
-  - If the user is NOT a team owner: you CANNOT create or modify field definitions. Call GuideToPageTool with destination "custom_fields" so they can ask their team owner to do it.
+  - If the user is a workspace owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly; do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code`; you do not need an internal ID. If you don't already know the code, call ListCustomFieldsTool to look it up; never escort the user to settings just to find a field.
+  - If the user is NOT a workspace owner: you CANNOT create or modify field definitions. Call GuideToPageTool with destination "custom_fields" so they can ask their workspace owner to do it.
   - DELETING a custom field definition: you CANNOT delete field definitions from chat (for any user). Call GuideToPageTool with destination "custom_fields" to escort the user there.
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools); this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
 - Exporting records to a CSV or XLSX file -> the matching "export_*" destination.
-- Inviting a new team member by email -> you CAN propose it directly via InviteTeamMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
-- Managing existing team members (changing a role, removing someone) -> "team_members".
+- Inviting a new workspace member by email -> you CAN propose it directly via InviteWorkspaceMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
+- Managing existing workspace members (changing a role, removing someone) -> "workspace_members".
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)."
 
 ## Formatting
@@ -349,7 +349,7 @@ PROMPT;
         }
 
         $name = $this->sanitizeLabel($this->currentUser['name']);
-        $role = $this->currentUser['role'] === 'owner' ? 'team owner' : 'team member';
+        $role = $this->currentUser['role'] === 'owner' ? 'workspace owner' : 'workspace member';
 
         return "\n\n## Current user\n"
             ."{$name} (user id: {$this->currentUser['id']}, {$role}). "
@@ -363,18 +363,18 @@ PROMPT;
      */
     private function workspaceStateBlock(): string
     {
-        if (! $this->team instanceof Team) {
+        if (! $this->workspace instanceof Workspace) {
             return '';
         }
 
         $facts = resolve(WorkspaceActivationFacts::class);
 
-        if (! $facts->hasSampleData($this->team)) {
+        if (! $facts->hasSampleData($this->workspace)) {
             return '';
         }
 
-        $count = $facts->sampleRecordCount($this->team);
-        $qualifier = $facts->hasOwnRecord($this->team)
+        $count = $facts->sampleRecordCount($this->workspace);
+        $qualifier = $facts->hasOwnRecord($this->workspace)
             ? "alongside the user's own records"
             : 'and the workspace holds only sample records so far';
 
@@ -773,7 +773,7 @@ PROMPT;
             ChatGetNoteTool::class,
             SearchCrmTool::class,
             GetCrmSummaryTool::class,
-            ListTeamMembersTool::class,
+            ListWorkspaceMembersTool::class,
             ListCustomFieldsTool::class,
             ListActivityTool::class,
             GuideToPageTool::class,
@@ -796,7 +796,7 @@ PROMPT;
             ChatCreateNoteTool::class,
             ChatUpdateNoteTool::class,
             ChatDeleteNoteTool::class,
-            InviteTeamMemberTool::class,
+            InviteWorkspaceMemberTool::class,
 
             // Schema management tools (admin-only, proposal-gated)
             CreateCustomFieldTool::class,

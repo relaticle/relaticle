@@ -6,11 +6,11 @@ namespace App\Filament\Pages\Concerns;
 
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
-use App\Filament\Pages\EditTeam;
-use App\Filament\Pages\Team\ActivityLog;
-use App\Filament\Pages\Team\CustomFields;
-use App\Filament\Pages\Team\Members;
-use App\Models\Team;
+use App\Filament\Pages\EditWorkspace;
+use App\Filament\Pages\Workspace\ActivityLog;
+use App\Filament\Pages\Workspace\CustomFields;
+use App\Filament\Pages\Workspace\Members;
+use App\Models\Workspace;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
@@ -39,47 +39,47 @@ trait HasWorkspaceSettingsNavigation
      */
     public function getSubNavigation(): array
     {
-        /** @var Team $tenant */
+        /** @var Workspace $tenant */
         $tenant = Filament::getTenant();
 
         return [
             NavigationItem::make()
-                ->label(__('teams.tabs.general'))
+                ->label(__('workspaces.tabs.general'))
                 ->icon(Heroicon::OutlinedCog6Tooth)
-                ->url(fn (): string => EditTeam::getUrl())
-                ->isActiveWhen($this->isCurrentPage(EditTeam::class))
-                ->visible(fn (): bool => EditTeam::canView($tenant)),
+                ->url(fn (): string => EditWorkspace::getUrl())
+                ->isActiveWhen($this->isCurrentPage(EditWorkspace::class))
+                ->visible(fn (): bool => EditWorkspace::canView($tenant)),
 
             NavigationItem::make()
-                ->label(__('teams.tabs.members'))
+                ->label(__('workspaces.tabs.members'))
                 ->icon(Heroicon::OutlinedUsers)
                 ->url(fn (): string => Members::getUrl())
                 ->isActiveWhen($this->isCurrentPage(Members::class))
                 ->visible(fn (): bool => Members::canAccess()),
 
             NavigationItem::make()
-                ->label(__('teams.tabs.custom_fields'))
+                ->label(__('workspaces.tabs.custom_fields'))
                 ->icon(Heroicon::OutlinedCube)
                 ->url(fn (): string => CustomFields::getUrl())
                 ->isActiveWhen($this->isCurrentPage(CustomFields::class))
                 ->visible(fn (): bool => CustomFields::canAccess()),
 
             NavigationItem::make()
-                ->label(__('teams.tabs.import_history'))
+                ->label(__('workspaces.tabs.import_history'))
                 ->icon(Heroicon::OutlinedArrowUpTray)
                 ->url(fn (): string => ImportHistory::getUrl())
                 ->isActiveWhen($this->isCurrentPage(ImportHistory::class))
                 ->visible(fn (): bool => ImportHistory::canAccess()),
 
             NavigationItem::make()
-                ->label(__('teams.tabs.activity'))
+                ->label(__('workspaces.tabs.activity'))
                 ->icon(Heroicon::OutlinedClock)
                 ->url(fn (): string => ActivityLog::getUrl())
                 ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
 
             NavigationItem::make()
-                ->label(__('teams.tabs.billing'))
+                ->label(__('workspaces.tabs.billing'))
                 ->icon(Heroicon::OutlinedCreditCard)
                 ->url(fn (): string => Billing::getUrl())
                 ->isActiveWhen($this->isCurrentPage(Billing::class))

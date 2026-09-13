@@ -78,7 +78,7 @@ final class ReviewStep extends Component
 
     private function validateEntityLinkValue(ColumnData $column, string $value): ?string
     {
-        $validator = new EntityLinkValidator($this->import()->team_id);
+        $validator = new EntityLinkValidator($this->import()->workspace_id);
 
         return $validator->validateFromColumn($column, $this->import()->getImporter(), $value);
     }

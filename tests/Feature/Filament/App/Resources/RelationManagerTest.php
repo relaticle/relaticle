@@ -21,22 +21,22 @@ use App\Models\User;
 use Filament\Facades\Filament;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 });
 
 /**
  * Filament renders per-row Edit/Delete actions, which authorize each record
  * through its policy. Relation managers query the relationship directly, so
- * nothing eager-loads the record's `team`. Two or more rows arm Eloquent's
+ * nothing eager-loads the record's `workspace`. Two or more rows arm Eloquent's
  * strict lazy-loading guard (Builder::hydrate only sets it for multi-row
- * results), so a policy that resolves `$record->team` throws there while a
+ * results), so a policy that resolves `$record->workspace` throws there while a
  * single row silently passes.
  */
 it('renders the :dataset relation manager with multiple records', function (string $relationManager, Closure $setUp): void {
-    [$ownerRecord, $pageClass] = $setUp($this->user, $this->team);
+    [$ownerRecord, $pageClass] = $setUp($this->user, $this->workspace);
 
     livewire($relationManager, [
         'ownerRecord' => $ownerRecord,
@@ -45,63 +45,63 @@ it('renders the :dataset relation manager with multiple records', function (stri
 })->with([
     'company people' => [
         PeopleRelationManager::class,
-        function (User $user, $team): array {
-            $company = Company::factory()->recycle([$user, $team])->create();
-            People::factory(4)->recycle([$user, $team])->create(['company_id' => $company->getKey()]);
+        function (User $user, $workspace): array {
+            $company = Company::factory()->recycle([$user, $workspace])->create();
+            People::factory(4)->recycle([$user, $workspace])->create(['company_id' => $company->getKey()]);
 
             return [$company, ViewCompany::class];
         },
     ],
     'company notes' => [
         CompanyNotesRelationManager::class,
-        function (User $user, $team): array {
-            $company = Company::factory()->recycle([$user, $team])->create();
-            $company->notes()->saveMany(Note::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $company = Company::factory()->recycle([$user, $workspace])->create();
+            $company->notes()->saveMany(Note::factory(4)->recycle([$user, $workspace])->make());
 
             return [$company, ViewCompany::class];
         },
     ],
     'company tasks' => [
         CompanyTasksRelationManager::class,
-        function (User $user, $team): array {
-            $company = Company::factory()->recycle([$user, $team])->create();
-            $company->tasks()->saveMany(Task::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $company = Company::factory()->recycle([$user, $workspace])->create();
+            $company->tasks()->saveMany(Task::factory(4)->recycle([$user, $workspace])->make());
 
             return [$company, ViewCompany::class];
         },
     ],
     'opportunity notes' => [
         OpportunityNotesRelationManager::class,
-        function (User $user, $team): array {
-            $opportunity = Opportunity::factory()->recycle([$user, $team])->create();
-            $opportunity->notes()->saveMany(Note::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create();
+            $opportunity->notes()->saveMany(Note::factory(4)->recycle([$user, $workspace])->make());
 
             return [$opportunity, ViewOpportunity::class];
         },
     ],
     'opportunity tasks' => [
         OpportunityTasksRelationManager::class,
-        function (User $user, $team): array {
-            $opportunity = Opportunity::factory()->recycle([$user, $team])->create();
-            $opportunity->tasks()->saveMany(Task::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create();
+            $opportunity->tasks()->saveMany(Task::factory(4)->recycle([$user, $workspace])->make());
 
             return [$opportunity, ViewOpportunity::class];
         },
     ],
     'people notes' => [
         PeopleNotesRelationManager::class,
-        function (User $user, $team): array {
-            $people = People::factory()->recycle([$user, $team])->create();
-            $people->notes()->saveMany(Note::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $people = People::factory()->recycle([$user, $workspace])->create();
+            $people->notes()->saveMany(Note::factory(4)->recycle([$user, $workspace])->make());
 
             return [$people, ViewPeople::class];
         },
     ],
     'people tasks' => [
         PeopleTasksRelationManager::class,
-        function (User $user, $team): array {
-            $people = People::factory()->recycle([$user, $team])->create();
-            $people->tasks()->saveMany(Task::factory(4)->recycle([$user, $team])->make());
+        function (User $user, $workspace): array {
+            $people = People::factory()->recycle([$user, $workspace])->create();
+            $people->tasks()->saveMany(Task::factory(4)->recycle([$user, $workspace])->make());
 
             return [$people, ViewPeople::class];
         },

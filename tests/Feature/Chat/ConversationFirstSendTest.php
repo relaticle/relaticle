@@ -10,12 +10,12 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Tests\Helpers\ChatDocument;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -24,7 +24,7 @@ beforeEach(function (): void {
 });
 
 it('chat-interface view embeds the new chat.conversations.create route', function (): void {
-    $response = $this->get("/app/{$this->team->slug}/chats");
+    $response = $this->get("/app/{$this->workspace->slug}/chats");
     $response->assertOk();
 
     // The route is emitted via @js() inside @script @endscript, which Livewire
@@ -36,7 +36,7 @@ it('chat-interface view embeds the new chat.conversations.create route', functio
 });
 
 it('chat-interface view does not POST {message, mentions} on subsequent sends anymore', function (): void {
-    $response = $this->get("/app/{$this->team->slug}/chats");
+    $response = $this->get("/app/{$this->workspace->slug}/chats");
     $response->assertOk();
 
     $response->assertDontSee('message: text,', false);

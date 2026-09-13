@@ -58,9 +58,9 @@ final class AddCustomFieldOptionsTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsTeam($user->currentTeam)) {
+        if (! $user->ownsWorkspace($user->currentWorkspace)) {
             return (string) json_encode([
-                'error' => 'Only team owners can manage custom field options.',
+                'error' => 'Only workspace owners can manage custom field options.',
             ], JSON_UNESCAPED_SLASHES);
         }
 
@@ -71,8 +71,8 @@ final class AddCustomFieldOptionsTool implements Tool
             return (string) json_encode(['error' => 'Both entity_type and code are required to identify the field.'], JSON_UNESCAPED_SLASHES);
         }
 
-        $teamId = $user->currentTeam->getKey();
-        $field = $this->resolveOwnedCustomField($teamId, $entityType, $code);
+        $workspaceId = $user->currentWorkspace->getKey();
+        $field = $this->resolveOwnedCustomField($workspaceId, $entityType, $code);
 
         if (! $field instanceof CustomField) {
             return (string) json_encode(['error' => "No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);

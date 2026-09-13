@@ -22,7 +22,7 @@ final readonly class AttachTaskRelationships
     public function execute(User $user, Task $task, array $data): Task
     {
         abort_unless($user->can('update', $task), 403);
-        abort_unless($task->team_id === $user->current_team_id, 403);
+        abort_unless($task->workspace_id === $user->current_workspace_id, 403);
 
         TenantFkValidator::assertOwnedMany($user, $data, CrmRelationshipSync::OWNED_MODELS);
         TenantFkValidator::assertUsersInWorkspace($user, $data, ['assignee_ids']);

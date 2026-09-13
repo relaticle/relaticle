@@ -98,10 +98,10 @@ final class Dashboard extends Page
     {
         /** @var User $user */
         $user = Filament::auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        return $team
-            ? resolve(MyTasksService::class)->forUser($user, $team)
+        return $workspace
+            ? resolve(MyTasksService::class)->forUser($user, $workspace)
             : new Collection;
     }
 
@@ -110,9 +110,9 @@ final class Dashboard extends Page
     {
         /** @var User $user */
         $user = Filament::auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        return $team !== null && resolve(MyTasksService::class)->hasDoneOption($team);
+        return $workspace !== null && resolve(MyTasksService::class)->hasDoneOption($workspace);
     }
 
     public function completeTask(string $taskId): void
@@ -121,11 +121,11 @@ final class Dashboard extends Page
         $user = Filament::auth()->user();
 
         // Scoped to the current tenant: the status custom field resolves against
-        // it, so a task from another of the user's teams would get a foreign
+        // it, so a task from another of the user's workspaces would get a foreign
         // field id written onto it. A row that no longer resolves (completed in
         // another tab, deleted meanwhile) is not an error: the desired end state
         // is already true, so just refresh instead of throwing a 404 over Home.
-        $task = Task::query()->where('team_id', Filament::getTenant()?->getKey())->find($taskId);
+        $task = Task::query()->where('workspace_id', Filament::getTenant()?->getKey())->find($taskId);
 
         if ($task instanceof Task) {
             resolve(CompleteTask::class)->execute($user, $task);

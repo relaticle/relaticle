@@ -193,12 +193,12 @@
                         attributes: new \Illuminate\View\ComponentAttributeBag(['class' => 'h-3.5 w-3.5']),
                     ) }}
 
-                    {{ __('filament/pages/teams.create_team.actions.back') }}
+                    {{ __('filament/pages/workspaces.create_workspace.actions.back') }}
                 </button>
 
                 <p
                     class="ms-auto text-xs font-medium text-gray-500 dark:text-gray-400"
-                    x-text="@js(__('filament/pages/teams.create_team.step_indicator'))
+                    x-text="@js(__('filament/pages/workspaces.create_workspace.step_indicator'))
                         .replace(':current', getStepIndex(step) + 1)
                         .replace(':total', @js($stepCount))"
                 ></p>
@@ -257,7 +257,7 @@
                 type="button"
                 x-on:click="isLastStep() ? $wire.skipInvites() : goToNextStep()"
                 class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                x-text="isLastStep() ? @js(__('filament/pages/teams.create_team.actions.skip_for_now')) : @js(__('filament/pages/teams.create_team.actions.skip'))"
+                x-text="isLastStep() ? @js(__('filament/pages/workspaces.create_workspace.actions.skip_for_now')) : @js(__('filament/pages/workspaces.create_workspace.actions.skip'))"
             ></button>
         </div>
     </div>

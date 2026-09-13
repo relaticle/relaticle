@@ -66,7 +66,7 @@ return [
     | The list below is the guardrail for the weekly "disposable:update" run,
     | which pulls an unpinned community list from a third-party repository at
     | branch HEAD. A single bad upstream entry would otherwise lock a mainstream
-    | provider out of registration and team invitations product-wide.
+    | provider out of registration and workspace invitations product-wide.
     |
     */
 

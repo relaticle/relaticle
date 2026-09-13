@@ -44,11 +44,11 @@ final class AgentConversationResource extends Resource
             ->components([
                 Section::make([
                     TextEntry::make('title'),
-                    TextEntry::make('team.name')
-                        ->label('Team')
+                    TextEntry::make('workspace.name')
+                        ->label('Workspace')
                         ->placeholder('—')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'team')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                     TextEntry::make('user.name')
                         ->label('User')
                         ->placeholder('—')
@@ -73,13 +73,13 @@ final class AgentConversationResource extends Resource
                 TextColumn::make('title')
                     ->limit(50)
                     ->searchable(),
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->placeholder('—')
                     ->searchable()
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->placeholder('—')
@@ -93,8 +93,8 @@ final class AgentConversationResource extends Resource
                     ->sortable(),
             ])
             ->filters([
-                SelectFilter::make('team')
-                    ->relationship('team', 'name')
+                SelectFilter::make('workspace')
+                    ->relationship('workspace', 'name')
                     ->searchable(),
             ])
             ->recordActions([

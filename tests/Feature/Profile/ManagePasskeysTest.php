@@ -168,7 +168,7 @@ it('leaves the SPA for the provider round trip so the OAuth redirect is followed
 });
 
 it('resumes first passkey registration after returning from the linked provider', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     $account = UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -201,7 +201,7 @@ it('resumes first passkey registration after returning from the linked provider'
 });
 
 it('does not reopen the modal when the provider round trip was abandoned', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -217,7 +217,7 @@ it('does not reopen the modal when the provider round trip was abandoned', funct
 });
 
 it('does not reopen an action recorded for another user', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -229,13 +229,13 @@ it('does not reopen an action recorded for another user', function (): void {
         ->mountAction('confirmWithProvider');
     IdentityConfirmation::markConfirmed();
 
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     livewire(ManagePasskeys::class)->assertActionNotMounted();
 });
 
 it('does not reopen the modal once the descriptor has expired', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     $account = UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -260,7 +260,7 @@ it('does not reopen the modal once the descriptor has expired', function (): voi
 });
 
 it('does not reopen the action on a component it was not recorded for', function (): void {
-    $user = User::factory()->withTeam()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->socialOnly()->create();
     $this->actingAs($user);
     $account = UserSocialAccount::factory()->create([
         'user_id' => $user->id,
@@ -284,7 +284,7 @@ it('does not reopen the action on a component it was not recorded for', function
 });
 
 it('resumes the modal after the mfa follow-up that a provider confirmation triggers', function (): void {
-    $user = User::factory()->withTeam()->withConfirmedMfa()->socialOnly()->create();
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->socialOnly()->create();
     $this->actingAs($user);
     AuthenticationSession::markComplete($user);
     $account = UserSocialAccount::factory()->create([

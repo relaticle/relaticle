@@ -10,7 +10,7 @@ return [
         'collapse' => 'Collapse checklist',
         'more_actions' => 'More actions',
         'encouragement' => "Let's go!",
-        'invite_members' => 'Invite team members',
+        'invite_members' => 'Invite workspace members',
         'sample_data' => 'This workspace is preloaded with sample records so you can look around. Anything you add sits alongside them.',
         'steps' => [
             'first_record' => [

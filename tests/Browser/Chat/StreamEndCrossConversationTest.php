@@ -30,17 +30,17 @@ mutates(ChatInterface::class);
  * exist for that specific handler.
  */
 it('does not write a queued document from conversation A into conversation B\'s live composer', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv b', $conversationB);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Replace reconcileLatestAssistant() with a promise this test controls
@@ -72,7 +72,7 @@ it('does not write a queued document from conversation A into conversation B\'s 
     // unsubscribe() on A's instance while its handleStreamEnd() continuation
     // above is still suspended on the mocked await.
     $page->click("nav[aria-label=\"Sidebar navigation\"] a[href*=\"{$conversationB}\"]")
-        ->assertPathIs("/app/{$team->slug}/chats/{$conversationB}");
+        ->assertPathIs("/app/{$workspace->slug}/chats/{$conversationB}");
 
     $page->click($editor)->type($editor, 'B_OWN_TYPED_CONTENT');
 
@@ -116,14 +116,14 @@ it('does not write a queued document from conversation A into conversation B\'s 
 });
 
 it('still flushes a queued send into the editor when the instance was not torn down', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv single', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv single', $conversationId);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Same release-gate mock as the leak test above, but this time nothing
@@ -192,16 +192,16 @@ it('still flushes a queued send into the editor when the instance was not torn d
 it('does not touch the editor or send when destroy lands between flushQueuedSend scheduling its tick and the tick firing', function (): void {
     Queue::fake();
 
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationId = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv flush race', $conversationId);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv flush race', $conversationId);
 
     $editor = '[data-chat-context="conversation"] [contenteditable="true"]';
     $resolveInterface = ChatBrowser::resolveInterface();
     $conversationIdJson = json_encode($conversationId);
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationId)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->click($editor)->type($editor, 'OWN_TYPED_CONTENT');
@@ -264,16 +264,16 @@ it('does not touch the editor or send when destroy lands between flushQueuedSend
  * a stream start in that window without this tab having sent anything.
  */
 it('does not paint a stream still arriving for conversation A into the transcript of conversation B', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
     $conversationA = (string) Str::uuid7();
     $conversationB = (string) Str::uuid7();
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv a', $conversationA);
-    ChatBrowser::seedConversation($user, $team->getKey(), 'conv b', $conversationB);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv a', $conversationA);
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'conv b', $conversationB);
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
-    $page = ChatBrowser::logIn($user, $team->slug, $conversationA)
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationA)
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $leaked = $page->script(<<<JS

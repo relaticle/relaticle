@@ -107,7 +107,7 @@
         </div>
     </div>
 
-    {{-- Team invite preview (floating card, visible on invite step) --}}
+    {{-- Workspace invite preview (floating card, visible on invite step) --}}
     <div
         x-show="wizardStep === 3"
         x-transition:enter="transition ease-out duration-200"

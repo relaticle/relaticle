@@ -13,18 +13,18 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(ListCustomFieldsTool::class);
 
 beforeEach(function (): void {
-    $this->owner = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->owner->currentTeam;
+    $this->owner = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->owner->currentWorkspace;
 
     Auth::guard('web')->setUser($this->owner);
     $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-    TenantContextService::setTenantId($this->team->getKey());
+    Filament::setTenant($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
     $this->select = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Account Tier',
         'type' => 'select',
@@ -32,13 +32,13 @@ beforeEach(function (): void {
         'active' => true,
     ]);
     $this->select->options()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'name' => 'Gold',
         'sort_order' => 0,
     ]);
 
     $this->inactive = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'opportunity',
         'name' => 'Legacy',
         'type' => 'text',
@@ -79,11 +79,11 @@ it('filters by entity_type', function (): void {
     expect($entities)->toBe(['company']);
 });
 
-it('does not leak custom fields from another team', function (): void {
-    $otherOwner = User::factory()->withPersonalTeam()->create();
+it('does not leak custom fields from another workspace', function (): void {
+    $otherOwner = User::factory()->withPersonalWorkspace()->create();
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
-        $tenantKey => $otherOwner->currentTeam->getKey(),
+        $tenantKey => $otherOwner->currentWorkspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Secret Field',
         'type' => 'text',

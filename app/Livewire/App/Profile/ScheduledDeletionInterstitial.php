@@ -22,7 +22,7 @@ final class ScheduledDeletionInterstitial extends BaseLivewireComponent
         $user = auth()->user();
 
         if (! $user instanceof User || ! $user->isScheduledForDeletion()) {
-            $tenant = Filament::getTenant() ?? ($user instanceof User ? $user->currentTeam : null);
+            $tenant = Filament::getTenant() ?? ($user instanceof User ? $user->currentWorkspace : null);
 
             if ($tenant) {
                 Filament::setTenant($tenant);
@@ -45,7 +45,7 @@ final class ScheduledDeletionInterstitial extends BaseLivewireComponent
 
         $this->sendNotification('Account deletion cancelled');
 
-        $tenant = Filament::getTenant() ?? $user->currentTeam;
+        $tenant = Filament::getTenant() ?? $user->currentWorkspace;
 
         if ($tenant) {
             Filament::setTenant($tenant);

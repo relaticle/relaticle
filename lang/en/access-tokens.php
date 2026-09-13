@@ -18,7 +18,7 @@ return [
 
     'form' => [
         'name' => 'Token Name',
-        'team' => 'Workspace',
+        'workspace' => 'Workspace',
         'expiration' => 'Expiration',
         'expiration_placeholder' => 'Select expiration...',
         'permissions' => 'Permissions',
@@ -28,14 +28,14 @@ return [
     'table' => [
         'columns' => [
             'name' => 'Name',
-            'team' => 'Workspace',
+            'workspace' => 'Workspace',
             'abilities' => 'Permissions',
             'expires_at' => 'Expires',
             'last_used_at' => 'Last Used',
             'created_at' => 'Created',
         ],
         'placeholders' => [
-            'no_team' => '—',
+            'no_workspace' => '—',
             'never' => 'Never',
         ],
     ],
@@ -81,7 +81,7 @@ return [
         'description' => 'Assistants such as Claude and ChatGPT that you connected through the consent screen. Revoking one immediately invalidates its access.',
         'columns' => [
             'name' => 'Connector',
-            'team' => 'Workspace',
+            'workspace' => 'Workspace',
             'active_tokens' => 'Active tokens',
         ],
         'actions' => [

@@ -6,9 +6,9 @@ use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\SocialiteProvider;
 use App\Enums\SubscriberTagEnum;
-use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
@@ -18,9 +18,9 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(UserResource::class);
@@ -168,32 +168,32 @@ it('leaves other users untouched when one user is muted', function (): void {
         ->and($other->fresh()->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email))->toBeTrue();
 });
 
-describe('team relation managers', function (): void {
-    it('links member-of teams to the team view page using the team key, not the pivot key', function (): void {
-        $owner = User::factory()->withPersonalTeam()->create();
-        $team = $owner->ownedTeams()->first();
+describe('workspace relation managers', function (): void {
+    it('links member-of workspaces to the workspace view page using the workspace key, not the pivot key', function (): void {
+        $owner = User::factory()->withPersonalWorkspace()->create();
+        $workspace = $owner->ownedWorkspaces()->first();
 
-        $member = User::factory()->withPersonalTeam()->create();
-        $team->users()->attach($member, ['role' => 'admin']);
+        $member = User::factory()->withPersonalWorkspace()->create();
+        $workspace->users()->attach($member, ['role' => 'admin']);
 
-        livewire(TeamsRelationManager::class, [
+        livewire(WorkspacesRelationManager::class, [
             'ownerRecord' => $member,
             'pageClass' => ViewUser::class,
         ])
             ->assertSuccessful()
-            ->assertSeeHtml("teams/{$team->getKey()}");
+            ->assertSeeHtml("workspaces/{$workspace->getKey()}");
     });
 
-    it('links owned teams to the team view page', function (): void {
-        $owner = User::factory()->withPersonalTeam()->create();
-        $team = $owner->ownedTeams()->first();
+    it('links owned workspaces to the workspace view page', function (): void {
+        $owner = User::factory()->withPersonalWorkspace()->create();
+        $workspace = $owner->ownedWorkspaces()->first();
 
-        livewire(OwnedTeamsRelationManager::class, [
+        livewire(OwnedWorkspacesRelationManager::class, [
             'ownerRecord' => $owner,
             'pageClass' => ViewUser::class,
         ])
             ->assertSuccessful()
-            ->assertSeeHtml("teams/{$team->getKey()}");
+            ->assertSeeHtml("workspaces/{$workspace->getKey()}");
     });
 });
 
@@ -246,21 +246,21 @@ describe('social providers relation manager', function (): void {
 });
 
 it('deletes a user through the Jetstream deleter so their workspaces are not orphaned', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->ownedTeams()->firstOrFail();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->firstOrFail();
 
     livewire(EditUser::class, ['record' => $user->getKey()])
         ->callAction('delete')
         ->assertHasNoActionErrors();
 
     expect(User::query()->find($user->getKey()))->toBeNull()
-        ->and(Team::query()->find($team->getKey()))->toBeNull();
+        ->and(Workspace::query()->find($workspace->getKey()))->toBeNull();
 });
 
 it('deletes users in bulk through the Jetstream deleter so their workspaces are not orphaned', function (): void {
-    $first = User::factory()->withPersonalTeam()->create();
-    $second = User::factory()->withPersonalTeam()->create();
-    $teamIds = [$first->ownedTeams()->firstOrFail()->getKey(), $second->ownedTeams()->firstOrFail()->getKey()];
+    $first = User::factory()->withPersonalWorkspace()->create();
+    $second = User::factory()->withPersonalWorkspace()->create();
+    $workspaceIds = [$first->ownedWorkspaces()->firstOrFail()->getKey(), $second->ownedWorkspaces()->firstOrFail()->getKey()];
 
     livewire(ListUsers::class)
         ->selectTableRecords([$first->getKey(), $second->getKey()])
@@ -268,7 +268,7 @@ it('deletes users in bulk through the Jetstream deleter so their workspaces are 
         ->assertHasNoActionErrors();
 
     expect(User::query()->whereKey([$first->getKey(), $second->getKey()])->count())->toBe(0)
-        ->and(Team::query()->whereKey($teamIds)->count())->toBe(0);
+        ->and(Workspace::query()->whereKey($workspaceIds)->count())->toBe(0);
 });
 
 it('renders the engagement badge derived from the last login timestamp', function (): void {
