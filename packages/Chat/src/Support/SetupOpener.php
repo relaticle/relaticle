@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 final readonly class SetupOpener
 {
+    public function __construct(private DestinationResolver $destinations) {}
+
     /**
      * CommonMark punctuation escaped so user-authored text renders as literal
      * words instead of markdown syntax. Backslash comes first so escaping a
@@ -28,7 +30,7 @@ final readonly class SetupOpener
         ];
 
         if ($workspace->onboarding_referral_source === OnboardingReferralSource::AI) {
-            $connectAssistantUrl = $this->connectAssistantUrl();
+            $connectAssistantUrl = $this->connectAssistantUrl($workspace);
 
             if ($connectAssistantUrl !== null) {
                 $paragraphs[] = __('onboarding/setup.ai_attribution', [
@@ -100,13 +102,9 @@ final readonly class SetupOpener
         return url()->getPublicUrl(route('documentation.show', ['type' => 'self-hosting'], absolute: false));
     }
 
-    public function connectAssistantUrl(): ?string
+    public function connectAssistantUrl(Workspace $workspace): ?string
     {
-        if (! Route::has('help.show')) {
-            return null;
-        }
-
-        return url()->getPublicUrl(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt'], absolute: false));
+        return $this->destinations->resolve('connect_assistant', $workspace);
     }
 
     private function link(string $label, string $url): string

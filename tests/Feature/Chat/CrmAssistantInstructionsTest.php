@@ -8,10 +8,37 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\Company\DeleteCompanyTool;
+use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
+use Relaticle\Chat\Tools\CustomField\AddCustomFieldOptionsTool;
+use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
+use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\GuideToPageTool;
+use Relaticle\Chat\Tools\Note\DeleteNoteTool;
+use Relaticle\Chat\Tools\Note\UpdateNoteTool;
+use Relaticle\Chat\Tools\Opportunity\DeleteOpportunityTool;
+use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
+use Relaticle\Chat\Tools\People\CreatePersonTool;
+use Relaticle\Chat\Tools\People\DeletePersonTool;
+use Relaticle\Chat\Tools\People\ListPeopleTool;
+use Relaticle\Chat\Tools\People\UpdatePersonTool;
+use Relaticle\Chat\Tools\SearchDocsTool;
+use Relaticle\Chat\Tools\Task\DeleteTaskTool;
+use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 
 mutates(CrmAssistant::class);
+
+function onboardingWorkspace(OnboardingUseCase $useCase): Workspace
+{
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['onboarding_use_case' => $useCase])->save();
+
+    return $workspace->fresh();
+}
 
 /**
  * The system prompt is a shipped artifact: read results now render as a
@@ -461,4 +488,63 @@ it('bans the em dash in assistant prose', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)->toContain('Never use an em dash');
+});
+
+it('marks setup mode inside the onboarding block only when asked to', function (): void {
+    $agent = resolve(CrmAssistant::class)->withWorkspace(onboardingWorkspace(OnboardingUseCase::Recruiting));
+
+    expect($agent->dynamicInstructions())->not->toContain('setup_mode: true');
+
+    $agent->withSetupMode(true);
+
+    expect($agent->instructions())->toContain("<onboarding>\nuse_case: Recruiting")
+        ->and($agent->instructions())->toContain("setup_mode: true\n</onboarding>");
+});
+
+it('emits the onboarding block with setup_mode even when the workspace has no use case', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace)->withSetupMode(true);
+
+    expect($agent->instructions())->toContain("<onboarding>\nsetup_mode: true\n</onboarding>");
+});
+
+it('drops update, delete and field definition tools in setup mode and keeps the rest', function (): void {
+    $names = fn (CrmAssistant $agent): array => array_map(fn (object $tool): string => $tool::class, $agent->tools());
+
+    $normal = $names(resolve(CrmAssistant::class));
+    $setup = $names(resolve(CrmAssistant::class)->withSetupMode(true));
+
+    expect($setup)
+        ->not->toContain(UpdatePersonTool::class)
+        ->not->toContain(DeletePersonTool::class)
+        ->not->toContain(UpdateCompanyTool::class)
+        ->not->toContain(DeleteCompanyTool::class)
+        ->not->toContain(UpdateOpportunityTool::class)
+        ->not->toContain(DeleteOpportunityTool::class)
+        ->not->toContain(UpdateTaskTool::class)
+        ->not->toContain(DeleteTaskTool::class)
+        ->not->toContain(UpdateNoteTool::class)
+        ->not->toContain(DeleteNoteTool::class)
+        ->not->toContain(CreateCustomFieldTool::class)
+        ->not->toContain(UpdateCustomFieldTool::class)
+        ->toContain(CreatePersonTool::class)
+        ->toContain(CreateCompanyTool::class)
+        ->toContain(AddCustomFieldOptionsTool::class)
+        ->toContain(GuideToPageTool::class)
+        ->toContain(SearchDocsTool::class)
+        ->toContain(ListPeopleTool::class)
+        ->and($setup)->toHaveCount(count($normal) - 12);
+});
+
+it('carries the setup mode instructions in the cached static block', function (): void {
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('## Setup mode')
+        ->toContain('Do not ask a clarifying question first')
+        ->toContain('AddCustomFieldOptionsTool in the same turn, after the records')
+        ->toContain('propose the first 25 rows')
+        ->toContain('edits happen on the record page or in a new conversation')
+        ->toContain('Never answer that it is unsupported')
+        ->toContain('Attached file');
 });
