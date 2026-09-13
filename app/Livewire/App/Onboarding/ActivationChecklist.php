@@ -137,7 +137,7 @@ final class ActivationChecklist extends Component
 
     /**
      * Progress for the current user's mailbox import, shown inline on the
-     * sync_email row while the initial backfill or an incremental run is in flight.
+     * sync_email row while the initial history backfill is in flight.
      *
      * @return array{percent: int, showsPercent: bool}|null
      */
@@ -157,7 +157,7 @@ final class ActivationChecklist extends Component
         $syncingAccounts = ConnectedAccount::query()
             ->ownedBy($this->user(), $team)
             ->get()
-            ->filter(fn (ConnectedAccount $account): bool => $account->showsSyncProgress());
+            ->filter(fn (ConnectedAccount $account): bool => $account->isImportingHistory());
 
         if ($syncingAccounts->isEmpty()) {
             return null;

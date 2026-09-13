@@ -29,7 +29,6 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Services\ListMeetingsForDay;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
-use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
 use Relaticle\EmailIntegration\Services\MeetingTemporalState;
 
@@ -217,24 +216,18 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         $rows = [];
 
         foreach ($this->ownedAccounts() as $account) {
-            if (! $account->showsSyncProgress()) {
+            if (! $account->isImportingHistory()) {
                 continue;
             }
-
-            $isInitialImport = $account->isImportingHistory();
 
             $rows[] = [
                 'id' => (string) $account->getKey(),
                 'email' => $account->email_address,
-                'emailsImported' => $isInitialImport
-                    ? $account->syncEmailsProcessedCount()
-                    : ($account->isEmailSyncing() ? MailboxSyncTracker::emailProcessedCount($account) : 0),
-                'meetingsImported' => $isInitialImport
-                    ? $account->syncMeetingsProcessedCount()
-                    : ($account->isCalendarSyncing() ? MailboxSyncTracker::calendarProcessedCount($account) : 0),
+                'emailsImported' => $account->syncEmailsProcessedCount(),
+                'meetingsImported' => $account->syncMeetingsProcessedCount(),
                 'percent' => $account->syncDisplayPercent(),
                 'hasCalendar' => $account->hasCalendar(),
-                'isInitialImport' => $isInitialImport,
+                'isInitialImport' => true,
             ];
         }
 

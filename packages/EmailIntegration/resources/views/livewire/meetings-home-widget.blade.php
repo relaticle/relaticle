@@ -11,61 +11,63 @@
                 <span class="text-gray-400 dark:text-gray-500">{{ $this->meetings->count() }}</span>
             @endif
         </h2>
-        <div class="flex shrink-0 items-center gap-1">
-            {{-- The prefix is server-rendered and the date comes from the picker's
-                 own state, so a click anywhere on "Today, Sep 10" opens the calendar. --}}
-            <div class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-                <span
-                    aria-hidden="true"
-                    class="cursor-pointer"
-                    x-on:click="$el.parentElement.querySelector('.fi-meetings-date-trigger')?.click()"
-                >{{ $this->datePrefix() }}</span>
-                {{ $this->getSchema('datePickerSchema') }}
+        @if (! $mailboxSyncing)
+            <div class="flex shrink-0 items-center gap-1">
+                {{-- The prefix is server-rendered and the date comes from the picker's
+                     own state, so a click anywhere on "Today, Sep 10" opens the calendar. --}}
+                <div class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                    <span
+                        aria-hidden="true"
+                        class="cursor-pointer"
+                        x-on:click="$el.parentElement.querySelector('.fi-meetings-date-trigger')?.click()"
+                    >{{ $this->datePrefix() }}</span>
+                    {{ $this->getSchema('datePickerSchema') }}
+                </div>
+
+                <x-filament::icon-button
+                    color="gray"
+                    size="xs"
+                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
+                    :label="__('filament/pages/dashboard.meetings.previous_day')"
+                    wire:click="previousDay"
+                />
+                <x-filament::icon-button
+                    color="gray"
+                    size="xs"
+                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
+                    :label="__('filament/pages/dashboard.meetings.next_day')"
+                    wire:click="nextDay"
+                />
+
+                <x-filament::dropdown placement="bottom-end" teleport>
+                    <x-slot name="trigger">
+                        <x-filament::icon-button
+                            color="gray"
+                            size="sm"
+                            :icon="\Filament\Support\Icons\Heroicon::OutlinedEllipsisVertical"
+                            :label="__('filament/pages/dashboard.meetings.more_actions')"
+                        />
+                    </x-slot>
+
+                    <x-filament::dropdown.list>
+                        <x-filament::dropdown.list.item
+                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
+                            wire:click="goToToday"
+                        >
+                            {{ __('filament/pages/dashboard.meetings.go_to_today') }}
+                        </x-filament::dropdown.list.item>
+
+                        <x-filament::dropdown.list.item
+                            tag="a"
+                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCog6Tooth"
+                            :href="\Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage::getUrl()"
+                        >
+                            {{ __('filament/pages/dashboard.meetings.calendar_settings') }}
+                        </x-filament::dropdown.list.item>
+                    </x-filament::dropdown.list>
+                </x-filament::dropdown>
             </div>
-
-            <x-filament::icon-button
-                color="gray"
-                size="xs"
-                :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
-                :label="__('filament/pages/dashboard.meetings.previous_day')"
-                wire:click="previousDay"
-            />
-            <x-filament::icon-button
-                color="gray"
-                size="xs"
-                :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
-                :label="__('filament/pages/dashboard.meetings.next_day')"
-                wire:click="nextDay"
-            />
-
-            <x-filament::dropdown placement="bottom-end" teleport>
-                <x-slot name="trigger">
-                    <x-filament::icon-button
-                        color="gray"
-                        size="sm"
-                        :icon="\Filament\Support\Icons\Heroicon::OutlinedEllipsisVertical"
-                        :label="__('filament/pages/dashboard.meetings.more_actions')"
-                    />
-                </x-slot>
-
-                <x-filament::dropdown.list>
-                    <x-filament::dropdown.list.item
-                        :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
-                        wire:click="goToToday"
-                    >
-                        {{ __('filament/pages/dashboard.meetings.go_to_today') }}
-                    </x-filament::dropdown.list.item>
-
-                    <x-filament::dropdown.list.item
-                        tag="a"
-                        :icon="\Filament\Support\Icons\Heroicon::OutlinedCog6Tooth"
-                        :href="\Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage::getUrl()"
-                    >
-                        {{ __('filament/pages/dashboard.meetings.calendar_settings') }}
-                    </x-filament::dropdown.list.item>
-                </x-filament::dropdown.list>
-            </x-filament::dropdown>
-        </div>
+        @endif
     </div>
 
     @if ($mailboxSyncing)

@@ -21,6 +21,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 mutates(ActivationChecklist::class, DismissActivationChecklist::class);
 
@@ -123,6 +124,22 @@ it('shows an inline syncing row while the mailbox import is in flight', function
         ->assertSeeHtml('data-testid="activation-email-sync-progress"')
         ->assertSee(__('filament/pages/dashboard.activation.steps.sync_email.syncing'))
         ->assertSee('12%');
+});
+
+it('does not treat background incremental sync as an in-flight mailbox import', function (): void {
+    $account = ConnectedAccount::factory()->create([
+        'team_id' => $this->team->getKey(),
+        'user_id' => $this->owner->getKey(),
+        'sync_cursor' => 'done',
+        'last_synced_at' => now(),
+    ]);
+
+    MailboxSyncTracker::markEmailStarted($account);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('sync_email', true))
+        ->assertDontSeeHtml('data-testid="activation-email-sync-progress"')
+        ->assertDontSee(__('filament/pages/dashboard.activation.steps.sync_email.syncing'));
 });
 
 it('completes the invite step while an invitation is pending', function (): void {

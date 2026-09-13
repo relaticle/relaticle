@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Controllers\CalendarPushWebhookController;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
@@ -22,6 +23,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 mutates(
     CalendarPushWebhookController::class,
     EnsureCalendarPushChannelJob::class,
+    IncrementalEmailSyncCommand::class,
     MailboxImportStatus::class,
 );
 
@@ -124,7 +126,7 @@ it('ignores microsoft notifications with a forged client state', function (): vo
     Bus::assertNothingDispatched();
 });
 
-it('marks email sync as started when the scheduled command dispatches incremental sync', function (): void {
+it('does not mark email sync as started until the incremental job runs', function (): void {
     Bus::fake([IncrementalEmailSyncJob::class]);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -133,7 +135,7 @@ it('marks email sync as started when the scheduled command dispatches incrementa
 
     $this->artisan('email:incremental-sync')->assertSuccessful();
 
-    expect(MailboxSyncTracker::isEmailSyncing($account))->toBeTrue();
+    expect(MailboxSyncTracker::isEmailSyncing($account))->toBeFalse();
 });
 
 it('retries microsoft push renewal failures instead of replacing the subscription', function (): void {
