@@ -74,6 +74,7 @@ trait HasConnectedAccountActions
         // into the mountAction() click handler, which reads getInvokedArguments().
         return ActionGroup::make([
             ...$settingsAction,
+            ($this->setDefaultAction())($arguments),
             ($this->reconnectAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
             ($this->disconnectAction())($arguments),

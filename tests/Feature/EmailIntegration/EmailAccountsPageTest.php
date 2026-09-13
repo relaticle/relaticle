@@ -179,6 +179,18 @@ it('promotes an account to default and demotes the previous default on setDefaul
         ->and($current->fresh()->is_default)->toBeFalse();
 });
 
+it('renders set as default in the account menu when the mailbox is not default', function (): void {
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.actions.set_default'));
+});
+
+it('does not render set as default in the account menu when the mailbox is already default', function (): void {
+    $this->account->update(['is_default' => true]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertDontSee(__('filament/pages/email-accounts.actions.set_default'));
+});
+
 it('hides setDefault for the account that is already default', function (): void {
     $default = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->default()->create([
         'team_id' => $this->team->id,
