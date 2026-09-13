@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
@@ -51,4 +52,27 @@ it('stores a conversation participant using the enforced morph alias', function 
     ]);
 
     expect(DB::table('agent_conversations')->value('participant_type'))->toBe('user');
+});
+
+it('allows one setup conversation per team and any number without a purpose', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $row = fn (?string $purpose): array => [
+        'id' => (string) Str::uuid7(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'x',
+        'purpose' => $purpose,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ];
+
+    DB::table('agent_conversations')->insert($row(null));
+    DB::table('agent_conversations')->insert($row(null));
+    DB::table('agent_conversations')->insert($row('setup'));
+
+    expect(fn () => DB::table('agent_conversations')->insert($row('setup')))
+        ->toThrow(UniqueConstraintViolationException::class);
 });
