@@ -53,6 +53,13 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
     public const string CONTINUATION_KIND = 'continuation';
 
     /**
+     * `meta->kind` of the templated assistant opener a setup conversation is
+     * seeded with. The transcript shows it; the provider must not see a
+     * leading assistant turn it never produced.
+     */
+    public const string SETUP_OPENER_KIND = 'setup_opener';
+
+    /**
      * Set by ProcessChatMessage for the single user message a continuation turn
      * is about to store, and consumed on write.
      *
@@ -115,7 +122,8 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
         $builder = parent::table($table);
 
         if ($table === $this->messagesTable()) {
-            $builder->whereNull('superseded_at');
+            $builder->whereNull('superseded_at')
+                ->whereRaw("coalesce(meta->>'kind', '') <> ?", [self::SETUP_OPENER_KIND]);
         }
 
         return $builder;
