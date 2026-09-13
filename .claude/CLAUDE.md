@@ -69,17 +69,30 @@ y en GitHub Codespaces.
    equipo, un solo workspace.
 5. **PSR-12** y las convenciones ya presentes en el repo (Pint + Rector).
 6. **UI en español:** usa la localización de Laravel/Filament (`lang/es`), no
-   textos hardcodeados. **Pendiente:** upstream solo trae `lang/en` y
-   `lang/fr`; hay que crear `es` (`php artisan lang:add es`, de
-   `laravel-lang/publisher`) y poner `APP_LOCALE=es`.
+   textos hardcodeados. **Pendiente:** upstream solo trae `lang/en` (y un
+   ejemplo parcial en `lang/fr`). Sigue `docs/i18n.md`: `cp -r lang/en lang/es`,
+   traducir, `php artisan lang:update`,
+   `php artisan locale:diff es --update-snapshot` (commitear
+   `lang/.snapshots/es.json`) y `APP_LOCALE=es`.
 
 ## Mantener el fork actualizable
 - `origin` = nuestro fork, `https://github.com/Guillermoj9/relaticle`
   (ahora público; **pasarlo a privado**). `upstream` = `Relaticle/relaticle`.
 - Personalizar vía config, Custom Fields y archivos propios siempre que se
   pueda, evitando editar el core, para poder hacer `git pull upstream main`.
+- Tras cada `git pull upstream main`: `php artisan locale:diff es` para ver
+  textos nuevos o cambiados que traducir.
 - Contexto personal o no versionado → `CLAUDE.local.md` (no commitear).
 - `.env` no se versiona: hay que recrearlo en cada máquina.
+
+## Despliegue (VPS)
+- El devcontainer es **solo para desarrollo**; no se usa en producción.
+- El `compose.yml` de la raíz usa la imagen de upstream
+  (`ghcr.io/relaticle/relaticle:latest`), **no nuestro código**. Para
+  desplegar el fork hay que construir nuestra imagen con el `Dockerfile` de la
+  raíz y apuntar `compose.yml` a ella.
+- En producción: `REQUIRE_EMAIL_VERIFICATION=true` y un SMTP real
+  (`MAIL_MAILER=smtp`); en local el correo solo va al log.
 
 ## Nuestro pipeline de ventas
 Etapas: **Nuevo → Cualificado → Propuesta enviada → Negociación → Ganado /
