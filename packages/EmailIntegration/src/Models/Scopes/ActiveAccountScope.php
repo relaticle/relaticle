@@ -27,6 +27,9 @@ final readonly class ActiveAccountScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $builder->whereHas('connectedAccount');
+        $builder->where(function (Builder $query): void {
+            $query->whereNull('connected_account_id')
+                ->orWhereHas('connectedAccount');
+        });
     }
 }

@@ -75,6 +75,10 @@ return [
             'heading' => 'Connected accounts',
             'description' => 'We take your privacy very seriously. Read our <a href=":url" target="_blank" class="underline">Privacy Policy</a>.',
         ],
+        'forwarding' => [
+            'heading' => 'Forwarding address',
+            'description' => 'Forward or BCC specific emails into your workspace without syncing your whole inbox.',
+        ],
     ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In Sync',
