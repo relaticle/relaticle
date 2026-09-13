@@ -29,7 +29,7 @@ return new class extends Migration
             $table->json('capabilities')->nullable();
 
             $table->string('sync_cursor')->nullable();
-            $table->string('calendar_sync_cursor')->nullable();
+            $table->text('calendar_sync_cursor')->nullable();
             $table->timestamp('last_synced_at')->nullable();
             $table->timestamp('last_calendar_synced_at')->nullable();
             $table->unsignedInteger('initial_sync_imported')->default(0);
