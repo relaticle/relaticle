@@ -91,6 +91,14 @@ Los Angeles day window starts at 07:00 UTC, so a September 10 all-day event
 would otherwise appear on the 9th. Timed meetings still use local-day UTC
 bounds.
 
+## Microsoft calendar delta windows
+
+Graph `calendarView/delta` tokens stay bound to the original start and end
+datetimes. Keep every 5-year window's `deltaLink` in `calendar_sync_cursor`
+as a JSON list, and replay all of them on incremental sync. Do not keep only
+the last future window. A raw Graph delta URL is expired so the account
+rebuilds full coverage.
+
 ## Microsoft sent mail must be adopted on import
 
 Graph `/me/sendMail` returns 202 with no body. A successful send stores

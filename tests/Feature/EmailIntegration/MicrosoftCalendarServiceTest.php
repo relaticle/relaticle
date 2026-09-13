@@ -42,6 +42,22 @@ function makeAzureCalendarAccount(): ConnectedAccount
         ]);
 }
 
+function microsoftCalendarSyncCursor(string ...$deltaLinks): string
+{
+    return json_encode(array_values($deltaLinks), JSON_THROW_ON_ERROR);
+}
+
+function drainMicrosoftInitialCalendarSync(MicrosoftCalendarService $service): CalendarSyncResult
+{
+    $result = $service->initialSync();
+
+    while (is_string($result->nextPageToken) && $result->nextPageToken !== '') {
+        $result = $service->initialSync($result->nextPageToken);
+    }
+
+    return $result;
+}
+
 it('parses Graph calendarView/delta into CalendarEventData', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => Http::response([
@@ -67,7 +83,7 @@ it('parses Graph calendarView/delta into CalendarEventData', function (): void {
     ]);
 
     $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
-        ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
+        ->fetchDelta(microsoftCalendarSyncCursor('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD'));
 
     expect($result->events)->toHaveCount(1)
         ->and($result->events[0]->title)->toBe('Standup')
@@ -100,7 +116,7 @@ it('maps Graph attendee response codes to the canonical vocabulary', function ()
     ]);
 
     $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
-        ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
+        ->fetchDelta(microsoftCalendarSyncCursor('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD'));
 
     // tentativelyAccepted -> tentative, notResponded -> needsAction (Google's vocab).
     // organizer is not an RSVP. Leave it empty so a host status chosen in Relaticle is kept.
@@ -129,7 +145,7 @@ it('maps Graph "personal" sensitivity to private so the event is treated as priv
     ]);
 
     $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
-        ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD');
+        ->fetchDelta(microsoftCalendarSyncCursor('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD'));
 
     expect($result->events[0]->visibility)->toBe('private');
 });
@@ -193,7 +209,7 @@ it('throws CalendarSyncTokenExpired on Graph 410', function (): void {
     ]);
 
     expect(fn (): CalendarSyncResult => new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
-        ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=EXPIRED'))
+        ->fetchDelta(microsoftCalendarSyncCursor('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=EXPIRED')))
         ->toThrow(CalendarSyncTokenExpired::class);
 });
 
@@ -234,7 +250,7 @@ it('does not fail when Graph rejects the host responding to their own meeting', 
         ], 400),
     ]);
 
-    (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+    new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->respondToEvent('evt-1', AttendeeResponseStatus::TENTATIVE);
 
     Http::assertSent(fn (Request $request): bool => str_ends_with($request->url(), '/me/events/evt-1/tentativelyAccept'));
@@ -251,7 +267,7 @@ it('still fails when Graph returns a server error that mentions organizer', func
         ], 500),
     ]);
 
-    expect(fn () => (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+    expect(fn () => new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->respondToEvent('evt-1', AttendeeResponseStatus::DECLINED))
         ->toThrow(MeetingResponseFailed::class);
 });
@@ -266,7 +282,7 @@ it('resolves this mailbox event id from a shared iCalendar UID', function (): vo
         ]),
     ]);
 
-    $eventId = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+    $eventId = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->findEventIdByICalUid("uid-with'-quote", now());
 
     expect($eventId)->toBe('evt-teammate-mailbox');
@@ -290,7 +306,7 @@ it('returns null when Graph has no event for the iCalendar UID', function (): vo
         ]),
     ]);
 
-    expect((new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+    expect(new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->findEventIdByICalUid('missing', now()))
         ->toBeNull();
 });
@@ -329,7 +345,7 @@ it('paginates listActiveProviderEventIds across nextLink pages and time windows'
         return Http::response(['value' => []]);
     });
 
-    $ids = (new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)))
+    $ids = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
         ->listActiveProviderEventIds();
 
     expect($ids)->toContain('evt-window-1', 'evt-window-1-page-2', 'evt-window-2');
@@ -378,4 +394,132 @@ it('persists the import boundary on nextLink page tokens during initial sync', f
     expect(urldecode((string) $result->nextPageToken))
         ->toContain('importBoundaryEndDateTime=')
         ->toContain(now()->addYears(5)->toIso8601String());
+});
+
+it('keeps a Graph cursor for every calendar window through the import boundary', function (): void {
+    $this->travelTo('2026-06-01 00:00:00');
+
+    Http::preventStrayRequests();
+    Http::fake(function (Request $request): mixed {
+        $url = urldecode($request->url());
+        preg_match('/startDateTime=([^&]+)/', $url, $matches);
+        $start = $matches[1] ?? 'unknown';
+
+        return Http::response([
+            'value' => [],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken='.rawurlencode($start),
+        ]);
+    });
+
+    $result = drainMicrosoftInitialCalendarSync(
+        new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class)),
+    );
+
+    $cursors = json_decode((string) $result->nextSyncToken, true);
+
+    expect($result->nextPageToken)->toBeNull()
+        ->and($cursors)->toBeArray()
+        ->and($cursors)->toHaveCount(9)
+        ->and($cursors[0])->toContain('1990-01-01')
+        ->and($cursors[7])->toContain('2025-01-01')
+        ->and($cursors[8])->toContain('2030-01-01');
+});
+
+it('carries earlier window cursors across a nextLink that omits the date range', function (): void {
+    $this->travelTo('2026-06-01 00:00:00');
+
+    Http::preventStrayRequests();
+    Http::fake(function (Request $request): mixed {
+        $url = urldecode($request->url());
+
+        if (str_contains($url, '$skiptoken=PAGE2')) {
+            return Http::response([
+                'value' => [],
+                '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W1',
+            ]);
+        }
+
+        if (str_contains($url, 'startDateTime=1990-01-01')) {
+            return Http::response([
+                'value' => [],
+                '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=PAGE2',
+            ]);
+        }
+
+        return Http::response([
+            'value' => [],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=LATER',
+        ]);
+    });
+
+    $service = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class));
+    $firstPage = $service->initialSync();
+
+    expect($firstPage->nextPageToken)->toBeString();
+
+    $windowOneDone = $service->initialSync($firstPage->nextPageToken);
+
+    expect($firstPage->nextSyncToken)->toBeNull()
+        ->and($windowOneDone->nextSyncToken)->toBeNull()
+        ->and($windowOneDone->nextPageToken)->toContain('startDateTime=1995-01-01')
+        ->and($windowOneDone->nextPageToken)->toContain('$deltatoken=W1');
+});
+
+it('fetches changes from every stored Graph window cursor', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => function (Request $request) {
+            $url = urldecode($request->url());
+
+            if (str_contains($url, '$deltatoken=W1')) {
+                return Http::response([
+                    'value' => [
+                        ['id' => 'evt-past', '@removed' => true],
+                    ],
+                    '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W1-NEW',
+                ]);
+            }
+
+            if (str_contains($url, '$deltatoken=W2')) {
+                return Http::response([
+                    'value' => [
+                        [
+                            'id' => 'evt-now',
+                            'subject' => 'Standup moved',
+                            'start' => ['dateTime' => '2026-06-01T09:00:00', 'timeZone' => 'UTC'],
+                            'end' => ['dateTime' => '2026-06-01T09:30:00', 'timeZone' => 'UTC'],
+                            'isCancelled' => false,
+                            'organizer' => ['emailAddress' => ['address' => 'org@example.com']],
+                            'attendees' => [],
+                        ],
+                    ],
+                    '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W2-NEW',
+                ]);
+            }
+
+            return Http::response(['error' => 'unexpected cursor'], 500);
+        },
+    ]);
+
+    $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->fetchDelta(microsoftCalendarSyncCursor(
+            'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W1',
+            'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W2',
+        ));
+
+    expect($result->events)->toHaveCount(2)
+        ->and($result->events[0]->providerEventId)->toBe('evt-past')
+        ->and($result->events[0]->status)->toBe('cancelled')
+        ->and($result->events[1]->providerEventId)->toBe('evt-now')
+        ->and($result->events[1]->title)->toBe('Standup moved')
+        ->and(json_decode((string) $result->nextSyncToken, true))->toBe([
+            'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W1-NEW',
+            'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=W2-NEW',
+        ]);
+});
+
+it('expires a raw Graph delta URL so earlier windows are rebuilt', function (): void {
+    expect(fn (): CalendarSyncResult => new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->fetchDelta('https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=OLD'))
+        ->toThrow(CalendarSyncTokenExpired::class);
 });
