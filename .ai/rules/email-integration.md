@@ -29,6 +29,10 @@ as `SYNCED` with the account's sharing default, so teammates could read unsent m
 through linked CRM records. Composer drafts (`EmailStatus::DRAFT`) are a different
 path and stay local.
 
+Graph mail folders must be identified by well-known path names
+(`/me/mailFolders/drafts`, `inbox`, `sentitems`). `displayName` is localized
+(German `Entwürfe` is not `Drafts`) and would classify unsent mail as archive.
+
 ## Privacy-aware email search
 
 Mailbox search (inbox and record email pages) must go through
