@@ -5,6 +5,13 @@ paths:
 
 # Email integration
 
+## Microsoft Graph replies
+
+`sendMail` always starts a new conversation. Reply with
+`POST /me/messages/{id}/reply` after resolving the original Graph message
+by `internetMessageId` (`in_reply_to`) or `conversationId` (`thread_id`).
+Fall back to `sendMail` only when this mailbox has no matching message.
+
 ## Bind mailbox OAuth to the initiating workspace
 
 `RedirectController` stores the current team id in the session before sending

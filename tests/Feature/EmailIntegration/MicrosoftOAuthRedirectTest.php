@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 mutates(RedirectController::class);
 
@@ -18,7 +19,7 @@ it('redirects to Microsoft with mail Graph scopes and prompt=consent', function 
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
-    $response = $this->get(route('email-accounts.redirect', ['provider' => 'azure']));
+    $response = $this->get(MailboxOAuthWorkspace::redirectUrl('azure', $user->currentTeam));
 
     $location = $response->headers->get('Location');
 
@@ -37,7 +38,7 @@ it('includes Calendars.Read even when the leftover capability query is sent', fu
     $user = User::factory()->withTeam()->create();
     $this->actingAs($user);
 
-    $response = $this->get(route('email-accounts.redirect', ['provider' => 'azure']).'?capability=calendar');
+    $response = $this->get(MailboxOAuthWorkspace::redirectUrl('azure', $user->currentTeam));
 
     expect($response->headers->get('Location'))
         ->toContain(urlencode('https://graph.microsoft.com/Calendars.ReadWrite'))

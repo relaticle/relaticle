@@ -9,6 +9,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 trait RedirectsToGrantSend
 {
@@ -42,9 +43,13 @@ trait RedirectsToGrantSend
             return;
         }
 
-        $this->redirect(route('email-accounts.redirect', [
-            'provider' => $account->provider->value,
-        ]));
+        $team = filament()->getTenant();
+
+        if (! $team instanceof Team) {
+            return;
+        }
+
+        $this->redirect(MailboxOAuthWorkspace::redirectUrl($account->provider->value, $team));
     }
 
     private function mailboxMissingSend(): ?ConnectedAccount
