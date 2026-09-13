@@ -181,7 +181,7 @@ it('returns one initial calendar page and does not follow nextLink', function ()
         ->initialSync();
 
     expect($result->events)->toHaveCount(1)
-        ->and($result->nextPageToken)->toContain('$skiptoken=NEXT')
+        ->and(urldecode((string) $result->nextPageToken))->toContain('$skiptoken=NEXT')
         ->and($result->nextSyncToken)->toBeNull();
 
     Http::assertSentCount(1);
@@ -333,4 +333,49 @@ it('paginates listActiveProviderEventIds across nextLink pages and time windows'
         ->listActiveProviderEventIds();
 
     expect($ids)->toContain('evt-window-1', 'evt-window-1-page-2', 'evt-window-2');
+});
+
+it('terminates initial calendar backfill at a fixed import boundary even when time passes between jobs', function (): void {
+    $this->travelTo('2026-09-13 00:00:00');
+
+    $importBoundary = now()->addYears(5);
+    $finalWindowUrl = 'https://graph.microsoft.com/v1.0/me/calendarView/delta'
+        .'?startDateTime='.rawurlencode('2021-09-13T00:00:00+00:00')
+        .'&endDateTime='.rawurlencode($importBoundary->toIso8601String())
+        .'&importBoundaryEndDateTime='.rawurlencode($importBoundary->toIso8601String());
+
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => Http::response([
+            'value' => [],
+            '@odata.deltaLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$deltatoken=NEW',
+        ]),
+    ]);
+
+    $this->travelTo('2026-09-13 00:05:00');
+
+    $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->initialSync($finalWindowUrl);
+
+    expect($result->nextPageToken)->toBeNull()
+        ->and($result->nextSyncToken)->toContain('$deltatoken=NEW');
+
+    Http::assertSentCount(1);
+});
+
+it('persists the import boundary on nextLink page tokens during initial sync', function (): void {
+    $this->travelTo('2026-09-13 00:00:00');
+
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/calendarView/delta*' => Http::response([
+            'value' => [],
+            '@odata.nextLink' => 'https://graph.microsoft.com/v1.0/me/calendarView/delta?$skiptoken=NEXT',
+        ]),
+    ]);
+
+    $result = new MicrosoftCalendarService(makeAzureCalendarAccount(), resolve(MicrosoftGraphClientFactory::class))
+        ->initialSync();
+
+    expect(urldecode((string) $result->nextPageToken))
+        ->toContain('importBoundaryEndDateTime=')
+        ->toContain(now()->addYears(5)->toIso8601String());
 });

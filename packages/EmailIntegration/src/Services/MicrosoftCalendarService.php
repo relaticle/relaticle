@@ -25,6 +25,8 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
 
     private const int WINDOW_YEARS = 5;
 
+    private const string IMPORT_BOUNDARY_PARAM = 'importBoundaryEndDateTime';
+
     public function __construct(
         private ConnectedAccount $account,
         private MicrosoftGraphClientFactory $clientFactory,
@@ -91,10 +93,10 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
     {
         $ids = [];
         $windowStart = $this->historyStart();
-        $horizon = $this->horizon();
+        $importBoundary = $this->importBoundary();
 
-        while ($windowStart->lt($horizon)) {
-            $url = $this->calendarWindowUrl($windowStart);
+        while ($windowStart->lt($importBoundary)) {
+            $url = $this->calendarWindowUrl($windowStart, $importBoundary);
 
             do {
                 $response = $this->clientFactory->make($this->account)
@@ -127,7 +129,7 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
 
             $windowEnd = $windowStart->copy()->addYears(self::WINDOW_YEARS);
 
-            if ($windowEnd->gte($horizon)) {
+            if ($windowEnd->gte($importBoundary)) {
                 break;
             }
 
@@ -244,7 +246,13 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         }
 
         if (is_string($nextLink) && $nextLink !== '') {
-            return new CalendarSyncResult(events: $events, nextSyncToken: null, nextPageToken: $nextLink);
+            $importBoundary = $this->importBoundaryFromUrl($url) ?? $this->importBoundary();
+
+            return new CalendarSyncResult(
+                events: $events,
+                nextSyncToken: null,
+                nextPageToken: $this->withImportBoundary($nextLink, $importBoundary),
+            );
         }
 
         $nextWindow = $this->nextWindowUrl($url);
@@ -264,23 +272,24 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
         return Date::parse('1990-01-01T00:00:00Z');
     }
 
-    private function horizon(): CarbonInterface
+    private function importBoundary(): CarbonInterface
     {
         return Date::now()->addYears(self::WINDOW_YEARS);
     }
 
-    private function calendarWindowUrl(CarbonInterface $start): string
+    private function calendarWindowUrl(CarbonInterface $start, ?CarbonInterface $importBoundary = null): string
     {
+        $importBoundary ??= $this->importBoundary();
         $end = $start->copy()->addYears(self::WINDOW_YEARS);
-        $horizon = $this->horizon();
 
-        if ($end->gt($horizon)) {
-            $end = $horizon;
+        if ($end->gt($importBoundary)) {
+            $end = $importBoundary;
         }
 
         return self::CALENDAR_DELTA
             .'?startDateTime='.rawurlencode($start->toIso8601String())
-            .'&endDateTime='.rawurlencode($end->toIso8601String());
+            .'&endDateTime='.rawurlencode($end->toIso8601String())
+            .'&'.self::IMPORT_BOUNDARY_PARAM.'='.rawurlencode($importBoundary->toIso8601String());
     }
 
     private function nextWindowUrl(string $currentUrl): ?string
@@ -291,14 +300,68 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
             return null;
         }
 
-        if ($end->gte($this->horizon())) {
+        $importBoundary = $this->importBoundaryFromUrl($currentUrl) ?? $this->importBoundary();
+
+        if ($end->gte($importBoundary)) {
             return null;
         }
 
-        return $this->calendarWindowUrl($end);
+        return $this->calendarWindowUrl($end, $importBoundary);
+    }
+
+    private function importBoundaryFromUrl(string $url): ?CarbonInterface
+    {
+        $boundary = $this->queryParamFromUrl($url, self::IMPORT_BOUNDARY_PARAM);
+
+        if (! is_string($boundary) || $boundary === '') {
+            return null;
+        }
+
+        return Date::parse($boundary);
+    }
+
+    private function withImportBoundary(string $url, CarbonInterface $importBoundary): string
+    {
+        $query = parse_url($url, PHP_URL_QUERY);
+
+        if (! is_string($query)) {
+            return $url;
+        }
+
+        parse_str($query, $params);
+        $params[self::IMPORT_BOUNDARY_PARAM] = $importBoundary->toIso8601String();
+
+        $path = parse_url($url, PHP_URL_PATH) ?? '';
+        $fragment = parse_url($url, PHP_URL_FRAGMENT);
+        $rebuilt = $path.'?'.http_build_query($params);
+
+        if (is_string($fragment) && $fragment !== '') {
+            $rebuilt .= '#'.$fragment;
+        }
+
+        $scheme = parse_url($url, PHP_URL_SCHEME);
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (is_string($scheme) && is_string($host)) {
+            $port = parse_url($url, PHP_URL_PORT);
+            $rebuilt = $scheme.'://'.$host.(is_int($port) ? ':'.$port : '').$rebuilt;
+        }
+
+        return $rebuilt;
     }
 
     private function endDateTimeFromUrl(string $url): ?CarbonInterface
+    {
+        $end = $this->queryParamFromUrl($url, 'endDateTime');
+
+        if (! is_string($end) || $end === '') {
+            return null;
+        }
+
+        return Date::parse($end);
+    }
+
+    private function queryParamFromUrl(string $url, string $param): ?string
     {
         $query = parse_url($url, PHP_URL_QUERY);
 
@@ -308,13 +371,9 @@ final readonly class MicrosoftCalendarService implements CalendarServiceInterfac
 
         parse_str($query, $params);
 
-        $end = $params['endDateTime'] ?? null;
+        $value = $params[$param] ?? null;
 
-        if (! is_string($end) || $end === '') {
-            return null;
-        }
-
-        return Date::parse($end);
+        return is_string($value) && $value !== '' ? $value : null;
     }
 
     private function tombstone(string $eventId): CalendarEventData
