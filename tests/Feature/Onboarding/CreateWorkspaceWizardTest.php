@@ -628,14 +628,16 @@ it('shows the free text only for the Other use case', function (): void {
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
+        ->goToWizardStep(3)
+        ->assertWizardCurrentStep(3)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
         ])
-        ->assertFormFieldHidden('onboarding_other_use_case')
+        ->assertFormFieldHidden('onboarding-use-case.onboarding_other_use_case')
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Other->value,
         ])
-        ->assertFormFieldVisible('onboarding_other_use_case');
+        ->assertFormFieldVisible('onboarding-use-case.onboarding_other_use_case');
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {

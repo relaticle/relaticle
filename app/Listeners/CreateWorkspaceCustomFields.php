@@ -52,8 +52,8 @@ final readonly class CreateWorkspaceCustomFields
 
         $this->migrator->setTenantId($workspace->id);
 
-        $stagePreset = $team->onboarding_use_case instanceof OnboardingUseCase
-            ? $team->onboarding_use_case->stagePreset()
+        $stagePreset = $workspace->onboarding_use_case instanceof OnboardingUseCase
+            ? $workspace->onboarding_use_case->stagePreset()
             : null;
 
         DB::transaction(function () use ($stagePreset): void {

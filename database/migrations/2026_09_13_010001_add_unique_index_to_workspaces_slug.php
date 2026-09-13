@@ -10,8 +10,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('teams', function (Blueprint $table): void {
-            $table->string('onboarding_other_use_case', 120)->nullable()->after('onboarding_use_case');
+        if (Schema::hasIndex('workspaces', ['slug'], 'unique')) {
+            return;
+        }
+
+        Schema::table('workspaces', function (Blueprint $table): void {
+            $table->unique('slug');
         });
     }
 };
