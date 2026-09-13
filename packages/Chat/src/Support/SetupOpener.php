@@ -7,9 +7,19 @@ namespace Relaticle\Chat\Support;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Route;
 
 final readonly class SetupOpener
 {
+    /**
+     * CommonMark punctuation escaped so user-authored text renders as literal
+     * words instead of markdown syntax. Backslash comes first so escaping a
+     * later character never re-escapes the backslash it just introduced.
+     *
+     * @var list<string>
+     */
+    private const array ESCAPED_CHARS = ['\\', '`', '*', '_', '[', ']', '(', ')', '#', '<', '>', '!', '|'];
+
     public function compose(Workspace $workspace): string
     {
         $paragraphs = [
@@ -18,14 +28,22 @@ final readonly class SetupOpener
         ];
 
         if ($workspace->onboarding_referral_source === OnboardingReferralSource::AI) {
-            $paragraphs[] = __('onboarding/setup.ai_attribution', [
-                'link' => $this->link(__('onboarding/setup.ai_attribution_link'), $this->connectAssistantUrl()),
-            ]);
+            $connectAssistantUrl = $this->connectAssistantUrl();
+
+            if ($connectAssistantUrl !== null) {
+                $paragraphs[] = __('onboarding/setup.ai_attribution', [
+                    'link' => $this->link(__('onboarding/setup.ai_attribution_link'), $connectAssistantUrl),
+                ]);
+            }
         }
 
-        $paragraphs[] = __('onboarding/setup.closing', [
-            'link' => $this->link(__('onboarding/setup.closing_link'), $this->selfHostingUrl()),
-        ]);
+        $selfHostingUrl = $this->selfHostingUrl();
+
+        if ($selfHostingUrl !== null) {
+            $paragraphs[] = __('onboarding/setup.closing', [
+                'link' => $this->link(__('onboarding/setup.closing_link'), $selfHostingUrl),
+            ]);
+        }
 
         return implode("\n\n", $paragraphs);
     }
@@ -50,23 +68,44 @@ final readonly class SetupOpener
     }
 
     /**
-     * The Other text is user input rendered inside markdown, so link and
-     * emphasis syntax is stripped rather than escaped.
+     * The Other text is user input rendered inside markdown, so its
+     * punctuation is escaped rather than deleted: "Series A (2026)" still
+     * reads as "Series A (2026)", it just cannot open a link or a code span.
      */
     public static function plainText(?string $text): string
     {
         $clean = PromptText::sanitize((string) $text, 120);
 
-        return trim((string) preg_replace('/[\[\]()*_`#<>\\\\]/u', '', $clean));
+        if ($clean === '') {
+            return '';
+        }
+
+        $escaped = str_replace(
+            self::ESCAPED_CHARS,
+            array_map(static fn (string $char): string => '\\'.$char, self::ESCAPED_CHARS),
+            $clean,
+        );
+
+        $escaped = (string) preg_replace('/^([-+])/u', '\\\\$1', $escaped);
+
+        return (string) preg_replace('/^(\d+)\./u', '$1\\\\.', $escaped);
     }
 
-    public function selfHostingUrl(): string
+    public function selfHostingUrl(): ?string
     {
+        if (! Route::has('documentation.show')) {
+            return null;
+        }
+
         return url()->getPublicUrl(route('documentation.show', ['type' => 'self-hosting'], absolute: false));
     }
 
-    public function connectAssistantUrl(): string
+    public function connectAssistantUrl(): ?string
     {
+        if (! Route::has('help.show')) {
+            return null;
+        }
+
         return url()->getPublicUrl(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt'], absolute: false));
     }
 

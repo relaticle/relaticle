@@ -10,13 +10,18 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Listeners\CreateSetupConversationListener;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Foundation\Bootstrap\LoadConfiguration;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\ConversationTitleGate;
+use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\SetupOpener;
 
 mutates(CreateSetupConversation::class, CreateSetupConversationListener::class, SetupOpener::class, SupersededAwareConversationStore::class);
@@ -136,7 +141,76 @@ it('adds the connect line only when the workspace was referred by an AI assistan
         ->toContain('/help/ai-assistant/connect-claude-or-chatgpt');
 });
 
-it('keeps markdown out of the Other text', function (): void {
+it('composes the opener without documentation links when the documentation routes are absent', function (): void {
+    $connection = config('database.default');
+    $database = config("database.connections.{$connection}.database");
+
+    putenv('RELATICLE_FEATURE_DOCUMENTATION=false');
+    CachedState::$cachedRoutes = null;
+    CachedState::$cachedConfig = null;
+    RouteServiceProvider::loadCachedRoutesUsing(null);
+    LoadConfiguration::alwaysUse(null);
+    $this->refreshApplication();
+
+    config(["database.connections.{$connection}.database" => $database]);
+    DB::purge($connection);
+    $this->beginDatabaseTransaction();
+
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, [
+        'onboarding_use_case' => OnboardingUseCase::Sales,
+        'onboarding_referral_source' => OnboardingReferralSource::AI,
+    ]);
+
+    $opener = resolve(SetupOpener::class)->compose($workspace);
+
+    expect(Route::has('documentation.show'))->toBeFalse()
+        ->and(Route::has('help.show'))->toBeFalse()
+        ->and($opener)->not->toContain('self-hosting guide')
+        ->and($opener)->not->toContain('/developers/self-hosting')
+        ->and($opener)->not->toContain('Claude or ChatGPT');
+
+    putenv('RELATICLE_FEATURE_DOCUMENTATION');
+    CachedState::$cachedRoutes = null;
+    CachedState::$cachedConfig = null;
+});
+
+it('seeds the setup conversation without documentation links when the documentation routes are absent', function (): void {
+    $connection = config('database.default');
+    $database = config("database.connections.{$connection}.database");
+
+    putenv('RELATICLE_FEATURE_DOCUMENTATION=false');
+    CachedState::$cachedRoutes = null;
+    CachedState::$cachedConfig = null;
+    RouteServiceProvider::loadCachedRoutesUsing(null);
+    LoadConfiguration::alwaysUse(null);
+    $this->refreshApplication();
+
+    config(["database.connections.{$connection}.database" => $database]);
+    DB::purge($connection);
+    $this->beginDatabaseTransaction();
+
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+
+    $conversation = $workspace->setupConversation;
+
+    expect($conversation)->toBeInstanceOf(AgentConversation::class);
+
+    $message = DB::table('agent_conversation_messages')->where('conversation_id', $conversation->id)->first();
+
+    expect((string) $message->content)->not->toContain('self-hosting guide');
+
+    putenv('RELATICLE_FEATURE_DOCUMENTATION');
+    CachedState::$cachedRoutes = null;
+    CachedState::$cachedConfig = null;
+});
+
+it('escapes markdown syntax in the Other text instead of deleting it', function (): void {
     $user = User::factory()->create();
     $workspace = personalWorkspaceFor($user, [
         'onboarding_use_case' => OnboardingUseCase::Other,
@@ -144,11 +218,32 @@ it('keeps markdown out of the Other text', function (): void {
     ]);
 
     $line = resolve(SetupOpener::class)->useCaseLine($workspace);
+    $html = resolve(MarkdownRenderer::class)->render($line);
 
-    expect($line)->toBe('Your workspace is ready for tracking evilhttps://evil.test bold code.')
-        ->and($line)->not->toContain('[')
-        ->and($line)->not->toContain('*');
+    expect($html)->toContain('[evil](https://evil.test) *bold* `code`')
+        ->and($html)->not->toContain('<a href')
+        ->and($html)->not->toContain('<strong>')
+        ->and($html)->not->toContain('<code>');
 });
+
+it('renders escaped Other text back to the original words', function (string $otherText): void {
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, [
+        'onboarding_use_case' => OnboardingUseCase::Other,
+        'onboarding_other_use_case' => $otherText,
+    ]);
+
+    $line = resolve(SetupOpener::class)->useCaseLine($workspace);
+    $html = resolve(MarkdownRenderer::class)->render($line);
+
+    expect($html)->toContain($otherText)
+        ->and($html)->not->toContain('\\');
+})->with([
+    'parentheses' => ['Series A (2026)'],
+    'hash' => ['C# hiring'],
+    'ordered list marker' => ['1. hiring'],
+    'bullet marker' => ['- hiring'],
+]);
 
 it('never seeds a second setup conversation for the same workspace', function (): void {
     $user = User::factory()->create();
