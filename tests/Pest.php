@@ -14,14 +14,19 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Models\Team;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -97,13 +102,58 @@ function userChannelAuth(User $user, string $id): bool
     return (bool) $callback($user, $id);
 }
 
-function bindMailboxOAuthWorkspace(User $user): void
+function bindMailboxOAuthWorkspace(User $user, ?Team $team = null): void
 {
-    $teamId = $user->current_team_id;
+    $team ??= $user->currentTeam;
 
-    throw_unless(is_string($teamId) && $teamId !== '', RuntimeException::class, 'bindMailboxOAuthWorkspace requires a current workspace.');
+    throw_unless($team instanceof Team, RuntimeException::class, 'bindMailboxOAuthWorkspace requires a workspace.');
 
-    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $teamId);
+    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $team->getKey());
+}
+
+function mailboxOAuthRedirectUrl(string $provider, Team $team): string
+{
+    return MailboxOAuthWorkspace::redirectUrl($provider, $team);
+}
+
+function assertMailboxOAuthRedirectUrl(string $url, string $provider, Team $team): void
+{
+    expect($url)->toContain("/email-accounts/redirect/{$provider}");
+
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+    expect($query['team'] ?? null)->toBe($team->getKey())
+        ->and(Request::create($url)->hasValidSignature())->toBeTrue();
+}
+
+function assertRedirectedToMailboxOAuth(Testable $component, string $provider, Team $team): void
+{
+    $component->assertRedirect();
+
+    /** @var string $redirect */
+    $redirect = $component->effects['redirect'];
+
+    assertMailboxOAuthRedirectUrl(url($redirect), $provider, $team);
+}
+
+function assertActionHasMailboxOAuthUrl(
+    Testable $component,
+    string|TestAction|array $action,
+    string $provider,
+    Team $team,
+): void {
+    $component->assertActionExists(
+        $action,
+        checkActionUsing: function (Action $resolvedAction) use ($provider, $team): bool {
+            try {
+                assertMailboxOAuthRedirectUrl((string) $resolvedAction->getUrl(), $provider, $team);
+
+                return true;
+            } catch (Throwable) {
+                return false;
+            }
+        },
+    );
 }
 
 /**

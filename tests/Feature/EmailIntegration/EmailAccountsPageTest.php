@@ -39,13 +39,17 @@ beforeEach(function (): void {
 it('links reconnect to the mailbox oauth redirect for the account provider', function (EmailProvider $provider): void {
     $this->account->update(['provider' => $provider]);
 
-    livewire(EmailAccountsPage::class)
-        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
-        ->assertActionHasUrl(
-            TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
-            route('email-accounts.redirect', ['provider' => $provider->value]),
-        )
-        ->assertActionDoesNotExist('reAuth');
+    $component = livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]));
+
+    assertActionHasMailboxOAuthUrl(
+        $component,
+        TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
+        $provider->value,
+        $this->team,
+    );
+
+    $component->assertActionDoesNotExist('reAuth');
 })->with([
     'gmail' => EmailProvider::GMAIL,
     'microsoft' => EmailProvider::AZURE,
@@ -65,13 +69,17 @@ it('keeps reconnect available when the mailbox has a sync error', function (): v
         ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
     );
 
-    livewire(EmailAccountsPage::class)
-        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
-        ->assertActionHasUrl(
-            TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
-            route('email-accounts.redirect', ['provider' => EmailProvider::GMAIL->value]),
-        )
-        ->assertActionDoesNotExist('reAuth');
+    $component = livewire(EmailAccountsPage::class)
+        ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]));
+
+    assertActionHasMailboxOAuthUrl(
+        $component,
+        TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
+        EmailProvider::GMAIL->value,
+        $this->team,
+    );
+
+    $component->assertActionDoesNotExist('reAuth');
 });
 
 it('keeps reconnect available when re-authentication is required', function (): void {

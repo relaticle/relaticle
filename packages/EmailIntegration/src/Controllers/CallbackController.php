@@ -15,6 +15,7 @@ use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
 use Throwable;
 
@@ -119,23 +120,12 @@ final readonly class CallbackController
 
     private function boundWorkspace(Request $request, User $user): ?Team
     {
-        return $this->workspaceIfMember($user, $request->session()->get(RedirectController::WORKSPACE_SESSION_KEY));
+        return MailboxOAuthWorkspace::forUser($user, $request->session()->get(RedirectController::WORKSPACE_SESSION_KEY));
     }
 
     private function consumeBoundWorkspace(Request $request, User $user): ?Team
     {
-        return $this->workspaceIfMember($user, $request->session()->pull(RedirectController::WORKSPACE_SESSION_KEY));
-    }
-
-    private function workspaceIfMember(User $user, mixed $teamId): ?Team
-    {
-        if (! is_string($teamId) || $teamId === '' || ! $user->belongsToTeamId($teamId)) {
-            return null;
-        }
-
-        $team = Team::query()->find($teamId);
-
-        return $team instanceof Team ? $team : null;
+        return MailboxOAuthWorkspace::forUser($user, $request->session()->pull(RedirectController::WORKSPACE_SESSION_KEY));
     }
 
     private function redirectWithError(User $user, string $message, ?Team $team = null): RedirectResponse

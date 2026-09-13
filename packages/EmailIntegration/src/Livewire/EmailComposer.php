@@ -62,6 +62,7 @@ use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Throwable;
@@ -1534,9 +1535,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     return;
                 }
 
-                $this->redirect(route('email-accounts.redirect', [
-                    'provider' => $account->provider->value,
-                ]));
+                $this->redirect(MailboxOAuthWorkspace::redirectUrl(
+                    $account->provider->value,
+                    $account->team,
+                ));
             });
     }
 
