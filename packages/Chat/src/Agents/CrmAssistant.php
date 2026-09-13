@@ -11,7 +11,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
-use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Attributes\Timeout;
@@ -446,7 +446,7 @@ PROMPT;
             ->forEntity(Opportunity::class)
             ->where('code', OpportunityField::STAGE->value)
             // The relation eager-loads its own parent, which is the row already in hand.
-            ->with(['options' => fn (HasMany $query) => $query->without('customField')])
+            ->with(['options' => fn (Relation $query): Relation => $query->without('customField')])
             ->first();
 
         return $this->stageNames = array_values(
