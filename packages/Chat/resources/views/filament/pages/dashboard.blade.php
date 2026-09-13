@@ -26,22 +26,20 @@
                 <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
                     {{ $this->getGreeting() }}
                 </h1>
-            </div>
-        @endif
 
-        @if($recentChatId)
-            <div class="text-center {{ $setupConversationId ? 'mt-4' : '' }}">
-                <a
-                    href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
-                    class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
-                >
-                    <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
-                    @if($recentChatIsSetup)
-                        <span>{{ $recentChatTitle }}</span>
-                    @else
-                        <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
-                    @endif
-                </a>
+                @if($recentChatId)
+                    <a
+                        href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
+                        class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
+                    >
+                        <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
+                        @if($recentChatIsSetup)
+                            <span>{{ $recentChatTitle }}</span>
+                        @else
+                            <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
+                        @endif
+                    </a>
+                @endif
             </div>
         @endif
 

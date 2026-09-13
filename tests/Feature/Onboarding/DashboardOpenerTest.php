@@ -68,10 +68,13 @@ it('shows the opener, the Not now link and the setup id for a fresh workspace', 
         ->assertSee('Not now')
         ->assertSeeHtml('data-setup-conversation-id="'.$conversation->id.'"')
         ->assertDontSee('Good morning')
-        ->assertDontSee('Welcome,');
+        ->assertDontSee('Welcome,')
+        ->assertDontSee('Continue setup');
 });
 
 it('labels the recent chat link Continue setup until the workspace has an own record', function (): void {
+    insertSetupUserMessage($this->workspace->setupConversation, $this->owner);
+
     livewire(Dashboard::class)
         ->assertSet('recentChatIsSetup', true)
         ->assertSee('Continue setup');
