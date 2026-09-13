@@ -6,9 +6,13 @@ use App\Models\User;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
+use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphServiceFactory;
 use Relaticle\EmailIntegration\Services\MicrosoftGraphMailService;
 
@@ -38,6 +42,53 @@ function makeAzureAccount(): ConnectedAccount
             'refresh_token' => 'refresh',
             'token_expires_at' => now()->addHour(),
         ]);
+}
+
+/**
+ * @param  array<string, array{id: string, displayName?: string}>  $overrides
+ * @return array<string, mixed>
+ */
+function graphWellKnownFolderFakes(array $overrides = []): array
+{
+    $folders = [
+        'inbox' => ['id' => 'inbox-folder-id', 'displayName' => 'Inbox'],
+        'drafts' => ['id' => 'drafts-folder-id', 'displayName' => 'Drafts'],
+        'sentitems' => ['id' => 'sent-folder-id', 'displayName' => 'Sent Items'],
+        ...$overrides,
+    ];
+
+    $fakes = [];
+
+    foreach ($folders as $wellKnownName => $folder) {
+        $fakes["https://graph.microsoft.com/v1.0/me/mailFolders/{$wellKnownName}*"] = Http::response($folder);
+    }
+
+    return $fakes;
+}
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function graphMessagePayload(array $overrides = []): array
+{
+    return [
+        'id' => 'MSG1',
+        'internetMessageId' => '<rfc-abc@example.com>',
+        'conversationId' => 'thread-1',
+        'subject' => 'Hello',
+        'bodyPreview' => 'Hi there',
+        'receivedDateTime' => '2026-01-15T10:00:00Z',
+        'isRead' => false,
+        'hasAttachments' => false,
+        'parentFolderId' => 'inbox-folder-id',
+        'from' => ['emailAddress' => ['address' => 'sender@example.com', 'name' => 'Sender']],
+        'toRecipients' => [['emailAddress' => ['address' => 'a@example.com', 'name' => 'Me']]],
+        'ccRecipients' => [],
+        'bccRecipients' => [],
+        'body' => ['contentType' => 'html', 'content' => '<p>Hi</p>'],
+        ...$overrides,
+    ];
 }
 
 it('backfills from the all-folder /me/messages/delta stream and returns the Graph deltaLink', function (): void {
@@ -130,25 +181,19 @@ it('paginates delta with @odata.nextLink and surfaces new + read ids + new curso
 
 it('maps a Graph drafts-folder message as an inbound draft', function (): void {
     Http::fake([
-        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
-            'value' => [['id' => 'drafts-folder-id', 'displayName' => 'Drafts']],
-        ]),
-        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response(graphMessagePayload([
             'id' => 'DRAFT1',
             'internetMessageId' => '<draft@example.com>',
             'conversationId' => 'thread-draft',
             'subject' => 'Unsent',
             'bodyPreview' => 'Still writing',
-            'receivedDateTime' => '2026-01-15T10:00:00Z',
             'isRead' => true,
-            'hasAttachments' => false,
             'parentFolderId' => 'drafts-folder-id',
             'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
             'toRecipients' => [['emailAddress' => ['address' => 'prospect@example.com', 'name' => 'Prospect']]],
-            'ccRecipients' => [],
-            'bccRecipients' => [],
             'body' => ['contentType' => 'html', 'content' => '<p>Still writing</p>'],
-        ]),
+        ])),
     ]);
 
     $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('DRAFT1');
@@ -157,11 +202,79 @@ it('maps a Graph drafts-folder message as an inbound draft', function (): void {
         ->and($email->folder)->toBe(EmailFolder::Drafts);
 });
 
+it('maps a localized Graph drafts folder as drafts so unsent mail is excluded', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes([
+            'drafts' => ['id' => 'drafts-folder-id', 'displayName' => 'Entwürfe'],
+            'inbox' => ['id' => 'inbox-folder-id', 'displayName' => 'Posteingang'],
+            'sentitems' => ['id' => 'sent-folder-id', 'displayName' => 'Gesendete Elemente'],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/DRAFT1*' => Http::response(graphMessagePayload([
+            'id' => 'DRAFT1',
+            'internetMessageId' => '<draft@example.com>',
+            'conversationId' => 'thread-draft',
+            'subject' => 'Unsent pitch',
+            'bodyPreview' => 'Still writing',
+            'isRead' => true,
+            'parentFolderId' => 'drafts-folder-id',
+            'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
+            'toRecipients' => [['emailAddress' => ['address' => 'prospect@example.com', 'name' => 'Prospect']]],
+            'body' => ['contentType' => 'html', 'content' => '<p>Still writing</p>'],
+        ])),
+    ]);
+
+    $account = makeAzureAccount();
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchMessage('DRAFT1');
+
+    expect($email->folder)->toBe(EmailFolder::Drafts)
+        ->and($email->direction)->toBe(EmailDirection::INBOUND);
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/mailFolders/drafts'));
+
+    (new StoreEmailJob($account, 'DRAFT1'))->handle(
+        resolve(MailServiceFactoryInterface::class),
+        resolve(StoreEmailAction::class),
+    );
+
+    expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(0);
+});
+
+it('maps a localized Graph sent items folder as sent', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes([
+            'sentitems' => ['id' => 'sent-folder-id', 'displayName' => 'Gesendete Elemente'],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/SENT1*' => Http::response(graphMessagePayload([
+            'id' => 'SENT1',
+            'parentFolderId' => 'sent-folder-id',
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('SENT1');
+
+    expect($email->folder)->toBe(EmailFolder::Sent)
+        ->and($email->direction)->toBe(EmailDirection::OUTBOUND);
+});
+
+it('does not treat a custom folder named Drafts as the well-known drafts folder', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/CUSTOM1*' => Http::response(graphMessagePayload([
+            'id' => 'CUSTOM1',
+            'parentFolderId' => 'custom-drafts-id',
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('CUSTOM1');
+
+    expect($email->folder)->toBe(EmailFolder::Archive)
+        ->and($email->direction)->toBe(EmailDirection::INBOUND);
+});
+
 it('maps a Graph message payload to FetchedEmailData', function (): void {
     Http::fake([
-        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
-            'value' => [['id' => 'inbox-folder-id', 'displayName' => 'Inbox']],
-        ]),
+        ...graphWellKnownFolderFakes(),
         'https://graph.microsoft.com/v1.0/me/messages/AAA1*' => Http::response([
             'id' => 'AAA1',
             'internetMessageId' => '<rfc-abc@example.com>',
@@ -309,9 +422,7 @@ it('marks cid images as inline file attachments on sendMail', function (): void 
 
 it('expands and maps inbound attachment metadata into FetchedEmailData', function (): void {
     Http::fake([
-        'https://graph.microsoft.com/v1.0/me/mailFolders*' => Http::response([
-            'value' => [['id' => 'inbox-folder-id', 'displayName' => 'Inbox']],
-        ]),
+        ...graphWellKnownFolderFakes(),
         'https://graph.microsoft.com/v1.0/me/messages/AAA2*' => Http::response([
             'id' => 'AAA2',
             'internetMessageId' => '<rfc-att@example.com>',

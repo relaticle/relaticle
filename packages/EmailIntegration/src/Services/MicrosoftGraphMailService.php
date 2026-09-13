@@ -26,7 +26,16 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     private const string RECONCILIATION_PROPERTY_ID = 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId';
 
     /**
-     * @var array<string, string>|null Cached folder id => lowercase displayName map per instance.
+     * @var array<string, EmailFolder>
+     */
+    private const array WELL_KNOWN_FOLDERS = [
+        'inbox' => EmailFolder::Inbox,
+        'drafts' => EmailFolder::Drafts,
+        'sentitems' => EmailFolder::Sent,
+    ];
+
+    /**
+     * @var array<string, EmailFolder>|null Cached parentFolderId => EmailFolder map per instance.
      */
     private ?array $folderCache = null;
 
@@ -330,25 +339,30 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     private function resolveFolder(string $parentFolderId): EmailFolder
     {
-        if ($this->folderCache === null) {
-            $cache = [];
-            $folders = $this->clientFactory->make($this->account)
-                ->get('/me/mailFolders', ['$select' => 'id,displayName'])
+        $this->folderCache ??= $this->wellKnownFolderIds();
+
+        return $this->folderCache[$parentFolderId] ?? EmailFolder::Archive;
+    }
+
+    /**
+     * @return array<string, EmailFolder>
+     */
+    private function wellKnownFolderIds(): array
+    {
+        // Graph displayName is localized (Entwürfe). Well-known path names are not.
+        $http = $this->clientFactory->make($this->account);
+        $ids = [];
+
+        foreach (self::WELL_KNOWN_FOLDERS as $wellKnownName => $folder) {
+            $id = $http->get("/me/mailFolders/{$wellKnownName}", ['$select' => 'id'])
                 ->throw()
-                ->json('value') ?? [];
+                ->json('id');
 
-            foreach ($folders as $folder) {
-                $cache[(string) $folder['id']] = strtolower((string) $folder['displayName']);
+            if (is_string($id) && $id !== '') {
+                $ids[$id] = $folder;
             }
-
-            $this->folderCache = $cache;
         }
 
-        return match ($this->folderCache[$parentFolderId] ?? '') {
-            'sent items', 'sent' => EmailFolder::Sent,
-            'drafts' => EmailFolder::Drafts,
-            'inbox' => EmailFolder::Inbox,
-            default => EmailFolder::Archive,
-        };
+        return $ids;
     }
 }
