@@ -392,6 +392,152 @@ it('maps a Graph message payload to FetchedEmailData', function (): void {
         ->and($email->isRead)->toBeFalse();
 });
 
+it('replies through Graph /reply when in_reply_to matches a mailbox message', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/*/reply' => Http::response('', 202),
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response([
+            'value' => [[
+                'id' => 'ORIG1',
+                'conversationId' => 'conv-1',
+            ]],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('should not sendMail', 500),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'in_reply_to' => '<orig@example.com>',
+        'thread_id' => 'conv-1',
+        'rfc_message_id' => '<reply@example.com>',
+    ]);
+
+    expect($result['thread_id'])->toBe('conv-1');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains(urldecode((string) $r->url()), "internetMessageId eq '<orig@example.com>'"));
+
+    Http::assertSent(function (Request $r): bool {
+        $message = $r->data()['message'] ?? [];
+
+        return $r->method() === 'POST'
+            && str_contains((string) $r->url(), '/me/messages/ORIG1/reply')
+            && ($message['body']['content'] ?? null) === '<p>Reply</p>'
+            && $message['singleValueExtendedProperties'] === [[
+                'id' => 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId',
+                'value' => '<reply@example.com>',
+            ]];
+    });
+
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+});
+
+it('falls back to the conversation when the in-reply-to message is not in this mailbox', function (): void {
+    Http::fake(function (Request $request) {
+        if ($request->method() === 'GET') {
+            if (str_contains(urldecode((string) $request->url()), 'internetMessageId')) {
+                return Http::response(['value' => []]);
+            }
+
+            return Http::response([
+                'value' => [[
+                    'id' => 'LATEST1',
+                    'conversationId' => 'conv-3',
+                ]],
+            ]);
+        }
+
+        if (str_contains((string) $request->url(), '/reply')) {
+            return Http::response('', 202);
+        }
+
+        return Http::response('unexpected', 500);
+    });
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'in_reply_to' => '<missing@example.com>',
+        'thread_id' => 'conv-3',
+    ]);
+
+    expect($result['thread_id'])->toBe('conv-3');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains(urldecode((string) $r->url()), "internetMessageId eq '<missing@example.com>'"));
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains(urldecode((string) $r->url()), "conversationId eq 'conv-3'"));
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST'
+        && str_contains((string) $r->url(), '/me/messages/LATEST1/reply'));
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+});
+
+it('replies through the conversation when only thread_id is in this mailbox', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/*/reply' => Http::response('', 202),
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response([
+            'value' => [[
+                'id' => 'LATEST1',
+                'conversationId' => 'conv-2',
+            ]],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('should not sendMail', 500),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'thread_id' => 'conv-2',
+    ]);
+
+    expect($result['thread_id'])->toBe('conv-2');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains(urldecode((string) $r->url()), "conversationId eq 'conv-2'"));
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST'
+        && str_contains((string) $r->url(), '/me/messages/LATEST1/reply'));
+});
+
+it('sends a new message when the in-reply-to original is not in this mailbox', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response(['value' => []]),
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+    ]);
+
+    $result = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->sendMessage([
+        'subject' => 'Re: Hello',
+        'body_html' => '<p>Reply from another mailbox</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'in_reply_to' => '<orig@example.com>',
+    ]);
+
+    expect($result['thread_id'])->toStartWith('ms-pending-thread-');
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/reply'));
+});
+
+it('does not treat a pending synthetic thread id as a Graph conversation', function (): void {
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),
+        'https://graph.microsoft.com/v1.0/me/messages*' => Http::response('should not look up', 500),
+    ]);
+
+    resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->sendMessage([
+        'subject' => 'Hi',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'b@example.com', 'name' => 'B']],
+        'thread_id' => 'ms-pending-thread-01JABC',
+    ]);
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/sendMail'));
+    Http::assertNotSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/messages'));
+});
+
 it('POSTs to /me/sendMail and returns provider ids', function (): void {
     Http::fake([
         'https://graph.microsoft.com/v1.0/me/sendMail' => Http::response('', 202),

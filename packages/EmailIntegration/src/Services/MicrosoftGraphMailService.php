@@ -234,7 +234,68 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         );
     }
 
+    /**
+     * Send a new email, or reply when `in_reply_to` / `thread_id` resolve to a
+     * message in this mailbox. Graph conversation ids are mailbox-local.
+     *
+     * @param array{
+     *     subject: string,
+     *     body_html: string,
+     *     body_text?: string,
+     *     to: array<int, array{email: string, name: ?string}>,
+     *     cc?: array<int, array{email: string, name: ?string}>,
+     *     bcc?: array<int, array{email: string, name: ?string}>,
+     *     from_name?: string,
+     *     in_reply_to?: string,
+     *     thread_id?: string,
+     *     rfc_message_id?: string,
+     *     attachments?: array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>,
+     * } $data
+     * @return array{provider_message_id: string, thread_id: string, rfc_message_id: string}
+     */
     public function sendMessage(array $data): array
+    {
+        $message = $this->graphMessagePayload($data);
+        $http = $this->clientFactory->make($this->account);
+        $replyTo = $this->resolveReplyTarget($data);
+        $synthetic = (string) Str::ulid();
+        $threadId = "ms-pending-thread-{$synthetic}";
+
+        if ($replyTo === null) {
+            $http->post('/me/sendMail', ['message' => $message, 'saveToSentItems' => true])
+                ->throw();
+        } else {
+            // /reply stamps In-Reply-To, References, and conversationId. sendMail cannot.
+            $http->post('/me/messages/'.rawurlencode($replyTo['id']).'/reply', ['message' => $message])
+                ->throw();
+
+            $threadId = $replyTo['conversationId'] !== ''
+                ? $replyTo['conversationId']
+                : $threadId;
+        }
+
+        // Graph send/reply returns 202 with no body. Synthesize the message id;
+        // the next delta sync picks up the canonical Graph id + internetMessageId.
+        return [
+            'provider_message_id' => "ms-pending-{$synthetic}",
+            'thread_id' => $threadId,
+            'rfc_message_id' => $data['rfc_message_id'] ?? "<{$synthetic}@graph.microsoft.com>",
+        ];
+    }
+
+    /**
+     * @param array{
+     *     subject: string,
+     *     body_html: string,
+     *     to: array<int, array{email: string, name: ?string}>,
+     *     cc?: array<int, array{email: string, name: ?string}>,
+     *     bcc?: array<int, array{email: string, name: ?string}>,
+     *     rfc_message_id?: string,
+     *     attachments?: array<int, array{filename: string, mime_type: string, content: string, is_inline?: bool, content_id?: ?string}>,
+     * } $data
+     * @return array<string, mixed>
+     */
+    private function graphMessagePayload(array $data): array
     {
         $message = [
             'subject' => $data['subject'],
@@ -275,24 +336,66 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ]];
         }
 
-        $this->clientFactory->make($this->account)
-            ->post('/me/sendMail', ['message' => $message, 'saveToSentItems' => true])
-            ->throw();
+        return $message;
+    }
 
-        // Graph /me/sendMail returns 202 with no body. Synthesize ids; the next
-        // delta sync will pick up the canonical Graph id + internetMessageId.
-        $synthetic = (string) Str::ulid();
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array{id: string, conversationId: string}|null
+     */
+    private function resolveReplyTarget(array $data): ?array
+    {
+        $inReplyTo = $data['in_reply_to'] ?? null;
+
+        if (is_string($inReplyTo) && $inReplyTo !== '') {
+            $match = $this->findMessageByFilter("internetMessageId eq '{$this->escapeODataString($inReplyTo)}'");
+
+            if ($match !== null) {
+                return $match;
+            }
+        }
+
+        $threadId = $data['thread_id'] ?? null;
+
+        if (! is_string($threadId) || $threadId === '' || str_starts_with($threadId, 'ms-pending-')) {
+            return null;
+        }
+
+        return $this->findMessageByFilter("conversationId eq '{$this->escapeODataString($threadId)}'");
+    }
+
+    /**
+     * @return array{id: string, conversationId: string}|null
+     */
+    private function findMessageByFilter(string $filter): ?array
+    {
+        $message = $this->clientFactory->make($this->account)
+            ->get('/me/messages', [
+                '$filter' => $filter,
+                '$select' => 'id,conversationId',
+                '$top' => 1,
+            ])
+            ->throw()
+            ->json('value.0');
+
+        if (! is_array($message) || ! isset($message['id'])) {
+            return null;
+        }
 
         return [
-            'provider_message_id' => "ms-pending-{$synthetic}",
-            'thread_id' => "ms-pending-thread-{$synthetic}",
-            'rfc_message_id' => $data['rfc_message_id'] ?? "<{$synthetic}@graph.microsoft.com>",
+            'id' => (string) $message['id'],
+            'conversationId' => (string) ($message['conversationId'] ?? ''),
         ];
+    }
+
+    private function escapeODataString(string $value): string
+    {
+        return str_replace("'", "''", $value);
     }
 
     public function findSentMessage(string $rfcMessageId): ?array
     {
-        $escaped = str_replace("'", "''", $rfcMessageId);
+        $escaped = $this->escapeODataString($rfcMessageId);
 
         $message = $this->clientFactory->make($this->account)
             ->get('/me/messages', [
