@@ -19,6 +19,7 @@ use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 mutates(AppServiceProvider::class);
 mutates(CallbackController::class);
@@ -226,7 +227,7 @@ it('connects the mailbox to the workspace where authorization started after the 
     config()->set('services.gmail.client_secret', 'gmail-client-secret');
     config()->set('services.gmail.redirect', 'http://localhost/email-accounts/callback/gmail');
 
-    $this->get(route('email-accounts.redirect', ['provider' => 'gmail']))
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $initiatingTeam))
         ->assertRedirect();
 
     $user->forceFill(['current_team_id' => $otherTeam->getKey()])->save();
@@ -276,7 +277,7 @@ it('does not connect a mailbox when the user left the authorizing workspace', fu
     config()->set('services.gmail.client_secret', 'gmail-client-secret');
     config()->set('services.gmail.redirect', 'http://localhost/email-accounts/callback/gmail');
 
-    $this->get(route('email-accounts.redirect', ['provider' => 'gmail']))
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $foreignTeam))
         ->assertRedirect();
 
     $user->teams()->detach($foreignTeam);

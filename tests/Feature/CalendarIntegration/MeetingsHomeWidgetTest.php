@@ -508,7 +508,7 @@ it('asks the user to sync a calendar when no mailbox is connected', function ():
         ->assertActionHidden('connectAzure')
         ->assertActionHasUrl(
             TestAction::make('connectGmail'),
-            route('email-accounts.redirect', ['provider' => 'gmail']),
+            mailboxOAuthRedirectUrl('gmail', $this->team),
         );
 });
 

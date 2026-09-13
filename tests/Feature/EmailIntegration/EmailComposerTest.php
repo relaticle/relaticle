@@ -148,7 +148,7 @@ it('redirects to oauth when grant permission is clicked on a mailbox that needs 
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->callAction('grantSendPermission')
-        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
 });
 
 it('does not queue mail from send when the mailbox has a sync error', function (): void {
@@ -179,7 +179,7 @@ it('redirects to oauth when grant permission is clicked', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->callAction('grantSendPermission')
-        ->assertRedirect(route('email-accounts.redirect', ['provider' => 'gmail']));
+        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
 });
 
 it('opens from a sendable mailbox when another connected account cannot send', function (): void {

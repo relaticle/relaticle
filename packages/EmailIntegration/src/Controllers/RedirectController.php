@@ -10,6 +10,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
 
 final readonly class RedirectController
@@ -44,7 +45,7 @@ final readonly class RedirectController
 
     private function startOAuth(Request $request, User $user, AbstractProvider $driver): RedirectResponse
     {
-        $team = $user->currentTeam;
+        $team = MailboxOAuthWorkspace::forUser($user, $request->query('team'));
 
         if (! $team instanceof Team) {
             return redirect('/')->with('error', 'Select a team before connecting an account.');

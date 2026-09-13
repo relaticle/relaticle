@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 use function Filament\Support\generate_icon_html;
 
@@ -104,9 +105,11 @@ trait HasConnectedAccountActions
             ->color('gray')
             ->size(Size::Small)
             ->visible(fn (array $arguments): bool => $this->findAccount($arguments) instanceof ConnectedAccount)
-            ->url(fn (array $arguments): string => route('email-accounts.redirect', [
-                'provider' => $this->findAccount($arguments)?->provider->value,
-            ]), true);
+            ->url(function (array $arguments): string {
+                $account = $this->findOwnedAccountOrFail($arguments);
+
+                return MailboxOAuthWorkspace::redirectUrl($account->provider->value, $account->team);
+            }, true);
     }
 
     public function syncCalendarAction(): Action
@@ -140,7 +143,7 @@ trait HasConnectedAccountActions
                 }
 
                 // Always re-run OAuth when enabling so the provider grants the calendar scope on the token.
-                $this->redirect(route('email-accounts.redirect', ['provider' => $account->provider->value]));
+                $this->redirect(MailboxOAuthWorkspace::redirectUrl($account->provider->value, $account->team));
             });
     }
 

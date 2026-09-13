@@ -14,6 +14,7 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -22,6 +23,7 @@ use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -97,13 +99,18 @@ function userChannelAuth(User $user, string $id): bool
     return (bool) $callback($user, $id);
 }
 
-function bindMailboxOAuthWorkspace(User $user): void
+function bindMailboxOAuthWorkspace(User $user, ?Team $team = null): void
 {
-    $teamId = $user->current_team_id;
+    $team ??= $user->currentTeam;
 
-    throw_unless(is_string($teamId) && $teamId !== '', RuntimeException::class, 'bindMailboxOAuthWorkspace requires a current workspace.');
+    throw_unless($team instanceof Team, RuntimeException::class, 'bindMailboxOAuthWorkspace requires a workspace.');
 
-    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $teamId);
+    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $team->getKey());
+}
+
+function mailboxOAuthRedirectUrl(string $provider, Team $team): string
+{
+    return MailboxOAuthWorkspace::redirectUrl($provider, $team);
 }
 
 /**

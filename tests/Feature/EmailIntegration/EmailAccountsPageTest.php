@@ -43,7 +43,7 @@ it('links reconnect to the mailbox oauth redirect for the account provider', fun
         ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
         ->assertActionHasUrl(
             TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
-            route('email-accounts.redirect', ['provider' => $provider->value]),
+            mailboxOAuthRedirectUrl($provider->value, $this->team),
         )
         ->assertActionDoesNotExist('reAuth');
 })->with([
@@ -69,7 +69,7 @@ it('keeps reconnect available when the mailbox has a sync error', function (): v
         ->assertActionVisible(TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]))
         ->assertActionHasUrl(
             TestAction::make('reconnect')->arguments(['account_id' => $this->account->id]),
-            route('email-accounts.redirect', ['provider' => EmailProvider::GMAIL->value]),
+            mailboxOAuthRedirectUrl(EmailProvider::GMAIL->value, $this->team),
         )
         ->assertActionDoesNotExist('reAuth');
 });
