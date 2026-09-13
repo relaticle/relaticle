@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Onboarding\DismissSetupOpener;
 use App\Actions\Task\CompleteTask;
 use App\Actions\Task\NotifyTaskAssignees;
+use App\Features\SetupConversation;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Services\WorkspaceActivationFacts;
 use BackedEnum;
 use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
@@ -18,10 +22,13 @@ use Filament\Panel;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Computed;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Services\MyTasksService;
+use Relaticle\Chat\Support\MarkdownRenderer;
 
 final class Dashboard extends Page
 {
@@ -56,10 +63,34 @@ final class Dashboard extends Page
 
     public ?string $recentChatId = null;
 
+    public bool $recentChatIsSetup = false;
+
+    public ?string $setupConversationId = null;
+
+    public ?string $setupOpenerHtml = null;
+
     public function mount(): void
     {
         /** @var User $user */
         $user = Filament::auth()->user();
+        $workspace = $user->currentWorkspace;
+        $setup = $workspace instanceof Workspace ? $workspace->setupConversation : null;
+
+        if ($setup instanceof AgentConversation && $this->shouldShowOpener($user, $workspace, $setup)) {
+            $this->setupConversationId = $setup->id;
+            $this->setupOpenerHtml = resolve(MarkdownRenderer::class)->render($this->openerMarkdown($setup));
+        }
+
+        if ($setup instanceof AgentConversation
+            && Feature::active(SetupConversation::class)
+            && $setup->participant_id === (string) $user->getKey()
+            && ! resolve(WorkspaceActivationFacts::class)->hasOwnRecord($workspace)) {
+            $this->recentChatId = $setup->id;
+            $this->recentChatTitle = __('onboarding/setup.continue');
+            $this->recentChatIsSetup = true;
+
+            return;
+        }
 
         $recentChat = (new ListConversations)->execute($user, 1)->first();
 
@@ -67,6 +98,46 @@ final class Dashboard extends Page
             $this->recentChatId = $recentChat->id;
             $this->recentChatTitle = $recentChat->title;
         }
+    }
+
+    public function dismissSetupOpener(): void
+    {
+        /** @var User $user */
+        $user = Filament::auth()->user();
+        $workspace = $user->currentWorkspace;
+
+        if (! $workspace instanceof Workspace) {
+            return;
+        }
+
+        resolve(DismissSetupOpener::class)->execute($user, $workspace);
+
+        $this->redirect(self::getUrl(), navigate: true);
+    }
+
+    private function shouldShowOpener(User $user, Workspace $workspace, AgentConversation $setup): bool
+    {
+        if (! Feature::active(SetupConversation::class)) {
+            return false;
+        }
+
+        if ($setup->participant_id !== (string) $user->getKey()) {
+            return false;
+        }
+
+        if ($workspace->onboarding_opener_dismissed_at !== null) {
+            return false;
+        }
+
+        return ! $setup->messages()->where('role', 'user')->exists();
+    }
+
+    private function openerMarkdown(AgentConversation $setup): string
+    {
+        return (string) $setup->messages()
+            ->where('role', 'assistant')
+            ->orderBy('id')
+            ->value('content');
     }
 
     public function getGreeting(): string
