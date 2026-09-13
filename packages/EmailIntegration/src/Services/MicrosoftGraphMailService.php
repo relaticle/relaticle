@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use JsonException;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
@@ -18,10 +22,8 @@ use RuntimeException;
 
 final class MicrosoftGraphMailService implements MailServiceInterface
 {
-    // All-folder delta stream. Unlike a per-folder endpoint (/me/mailFolders/Inbox/...),
-    // this spans Inbox, SentItems, etc. in a single cursor, so Sent mail syncs too.
-    // Folder/direction is derived per message from parentFolderId in fetchMessage().
-    private const string MESSAGES_DELTA = '/me/messages/delta';
+    /** Graph message delta is per-folder. These two cover inbound and outbound sync. */
+    private const array DELTA_FOLDERS = ['inbox', 'sentitems'];
 
     private const string RECONCILIATION_PROPERTY_ID = 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId';
 
@@ -46,6 +48,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     public function fetchDelta(string $cursor): MailDeltaResult
     {
+        $cursors = $this->decodeCursor($cursor);
         $http = $this->clientFactory->make($this->account);
 
         $messageIds = [];
@@ -54,30 +57,38 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         // lands in both the read and unread lists (which the sync job would then apply
         // in an order-dependent way).
         $readState = [];
-        $nextUrl = $cursor;
-        $deltaLink = $cursor;
+        $newCursors = [];
 
-        do {
-            $response = $http->get($nextUrl)->throw()->json();
+        foreach (self::DELTA_FOLDERS as $folder) {
+            $folderCursor = $cursors[$folder];
+            $url = $folderCursor;
+            $deltaLink = $folderCursor;
 
-            foreach ($response['value'] ?? [] as $message) {
-                // Graph delta includes tombstones for deleted messages; they carry no
-                // fetchable payload, so dispatching a StoreEmailJob would just 404.
-                if (isset($message['@removed'])) {
-                    continue;
+            do {
+                $response = $this->getDeltaPage($http, $url);
+
+                foreach ($response['value'] ?? [] as $message) {
+                    // Graph delta includes tombstones for deleted messages; they carry no
+                    // fetchable payload, so dispatching a StoreEmailJob would just 404.
+                    if (isset($message['@removed'])) {
+                        continue;
+                    }
+
+                    $id = (string) $message['id'];
+                    $messageIds[] = $id;
+
+                    if (array_key_exists('isRead', $message)) {
+                        $readState[$id] = $message['isRead'] === true;
+                    }
                 }
 
-                $id = (string) $message['id'];
-                $messageIds[] = $id;
+                $nextLink = $response['@odata.nextLink'] ?? null;
+                $deltaLink = $response['@odata.deltaLink'] ?? $deltaLink;
+                $url = is_string($nextLink) && $nextLink !== '' ? $nextLink : null;
+            } while ($url !== null);
 
-                if (array_key_exists('isRead', $message)) {
-                    $readState[$id] = $message['isRead'] === true;
-                }
-            }
-
-            $nextUrl = $response['@odata.nextLink'] ?? null;
-            $deltaLink = $response['@odata.deltaLink'] ?? $deltaLink;
-        } while ($nextUrl !== null);
+            $newCursors[$folder] = (string) $deltaLink;
+        }
 
         $readMessageIds = [];
         $unreadMessageIds = [];
@@ -92,7 +103,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         return new MailDeltaResult(
             messageIds: collect($messageIds)->unique()->values(),
             readMessageIds: collect($readMessageIds)->values(),
-            newCursor: (string) $deltaLink,
+            newCursor: $this->encodeCursor($newCursors),
             unreadMessageIds: collect($unreadMessageIds)->values(),
         );
     }
@@ -164,11 +175,9 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
     {
+        $state = $this->backfillState($pageToken, $daysBack);
         $http = $this->clientFactory->make($this->account);
-
-        $nextUrl = $pageToken ?? $this->initialDeltaUrl($daysBack);
-
-        $response = $http->get($nextUrl)->throw()->json();
+        $response = $this->getDeltaPage($http, $state['url']);
 
         $messageIds = [];
 
@@ -180,25 +189,49 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             $messageIds[] = (string) $message['id'];
         }
 
+        $ids = collect($messageIds)->unique()->values();
         $nextLink = $response['@odata.nextLink'] ?? null;
         $deltaLink = $response['@odata.deltaLink'] ?? null;
 
-        return new MailBackfillPage(
-            messageIds: collect($messageIds)->unique()->values(),
-            nextPageToken: is_string($nextLink) && $nextLink !== '' ? $nextLink : null,
-            cursor: is_string($deltaLink) && $deltaLink !== '' ? $deltaLink : null,
-        );
-    }
-
-    private function initialDeltaUrl(?int $daysBack): string
-    {
-        if ($daysBack === null || $daysBack <= 0) {
-            return self::MESSAGES_DELTA;
+        if (is_string($nextLink) && $nextLink !== '') {
+            return new MailBackfillPage(
+                messageIds: $ids,
+                nextPageToken: $this->encodeBackfillState([
+                    ...$state,
+                    'url' => $nextLink,
+                ]),
+                cursor: null,
+            );
         }
 
-        $afterIso = now()->subDays($daysBack)->toIso8601String();
+        throw_unless(
+            is_string($deltaLink) && $deltaLink !== '',
+            RuntimeException::class,
+            'Microsoft Graph delta page included neither nextLink nor deltaLink.',
+        );
 
-        return self::MESSAGES_DELTA.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
+        $cursors = $state['cursors'];
+        $cursors[$state['folder']] = $deltaLink;
+        $nextFolder = $this->nextDeltaFolder($state['folder']);
+
+        if ($nextFolder !== null) {
+            return new MailBackfillPage(
+                messageIds: $ids,
+                nextPageToken: $this->encodeBackfillState([
+                    'folder' => $nextFolder,
+                    'url' => $this->folderDeltaUrl($nextFolder, $state['daysBack']),
+                    'cursors' => $cursors,
+                    'daysBack' => $state['daysBack'],
+                ]),
+                cursor: null,
+            );
+        }
+
+        return new MailBackfillPage(
+            messageIds: $ids,
+            nextPageToken: null,
+            cursor: $this->encodeCursor($cursors),
+        );
     }
 
     public function sendMessage(array $data): array
@@ -364,5 +397,169 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         }
 
         return $ids;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function getDeltaPage(PendingRequest $http, string $url): array
+    {
+        try {
+            $response = $http->get($url)->throw()->json();
+        } catch (RequestException $e) {
+            if ($e->response->status() === 410) {
+                throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+            }
+
+            throw $e;
+        }
+
+        return is_array($response) ? $response : [];
+    }
+
+    /**
+     * @return array{folder: string, url: string, cursors: array<string, string>, daysBack: int|null}
+     */
+    private function backfillState(?string $pageToken, ?int $daysBack): array
+    {
+        if ($pageToken === null || $pageToken === '') {
+            $folder = self::DELTA_FOLDERS[0];
+
+            return [
+                'folder' => $folder,
+                'url' => $this->folderDeltaUrl($folder, $daysBack),
+                'cursors' => [],
+                'daysBack' => $daysBack,
+            ];
+        }
+
+        try {
+            $decoded = json_decode($pageToken, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw new RuntimeException('Microsoft Graph mail backfill page token is invalid.');
+        }
+
+        throw_unless(is_array($decoded), RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+
+        $folder = $decoded['folder'] ?? null;
+        $url = $decoded['url'] ?? null;
+        $cursors = $decoded['cursors'] ?? null;
+        $tokenDaysBack = $decoded['daysBack'] ?? null;
+
+        throw_if(! is_string($folder) || ! in_array($folder, self::DELTA_FOLDERS, true), RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+        throw_if(! is_string($url) || $url === '', RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+        throw_unless(is_array($cursors), RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+        throw_if($tokenDaysBack !== null && ! is_int($tokenDaysBack), RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+
+        $stringCursors = [];
+
+        foreach ($cursors as $key => $value) {
+            throw_if(! is_string($key) || ! is_string($value) || $value === '', RuntimeException::class, 'Microsoft Graph mail backfill page token is invalid.');
+
+            $stringCursors[$key] = $value;
+        }
+
+        return [
+            'folder' => $folder,
+            'url' => $url,
+            'cursors' => $stringCursors,
+            'daysBack' => $tokenDaysBack,
+        ];
+    }
+
+    /**
+     * @param  array{folder: string, url: string, cursors: array<string, string>, daysBack: int|null}  $state
+     */
+    private function encodeBackfillState(array $state): string
+    {
+        return json_encode([
+            'v' => 1,
+            ...$state,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param  array<string, string>  $cursors
+     */
+    private function encodeCursor(array $cursors): string
+    {
+        $ordered = [];
+
+        foreach (self::DELTA_FOLDERS as $folder) {
+            $folderCursor = $cursors[$folder] ?? null;
+
+            throw_unless(
+                is_string($folderCursor) && $folderCursor !== '',
+                RuntimeException::class,
+                'Microsoft Graph mail backfill finished without a delta cursor for every folder.',
+            );
+
+            $ordered[$folder] = $folderCursor;
+        }
+
+        return json_encode([
+            'v' => 1,
+            'cursors' => $ordered,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function decodeCursor(string $cursor): array
+    {
+        try {
+            $decoded = json_decode($cursor, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+        }
+
+        if (! is_array($decoded)) {
+            throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+        }
+
+        $cursors = $decoded['cursors'] ?? null;
+
+        if (! is_array($cursors)) {
+            throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+        }
+
+        $decodedCursors = [];
+
+        foreach (self::DELTA_FOLDERS as $folder) {
+            $folderCursor = $cursors[$folder] ?? null;
+
+            if (! is_string($folderCursor) || $folderCursor === '') {
+                throw MailHistoryExpired::forAccount((string) $this->account->getKey());
+            }
+
+            $decodedCursors[$folder] = $folderCursor;
+        }
+
+        return $decodedCursors;
+    }
+
+    private function folderDeltaUrl(string $folder, ?int $daysBack): string
+    {
+        $path = "/me/mailFolders/{$folder}/messages/delta";
+
+        if ($daysBack === null || $daysBack <= 0) {
+            return $path;
+        }
+
+        $afterIso = now()->subDays($daysBack)->toIso8601String();
+
+        return $path.'?$filter='.rawurlencode("receivedDateTime ge {$afterIso}");
+    }
+
+    private function nextDeltaFolder(string $current): ?string
+    {
+        $index = array_search($current, self::DELTA_FOLDERS, true);
+
+        if ($index === false) {
+            return null;
+        }
+
+        return self::DELTA_FOLDERS[$index + 1] ?? null;
     }
 }
