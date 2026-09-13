@@ -506,10 +506,12 @@ it('asks the user to sync a calendar when no mailbox is connected', function ():
         ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'))
         ->assertActionVisible('connectGmail')
         ->assertActionHidden('connectAzure')
-        ->assertActionHasUrl(
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl(
+            $component,
             TestAction::make('connectGmail'),
-            mailboxOAuthRedirectUrl('gmail', $this->team),
-        );
+            'gmail',
+            $this->team,
+        ));
 });
 
 it('still asks to sync when the only mailbox is disconnected', function (): void {

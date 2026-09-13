@@ -16,8 +16,11 @@ declare(strict_types=1);
 
 use App\Models\Team;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
@@ -111,6 +114,46 @@ function bindMailboxOAuthWorkspace(User $user, ?Team $team = null): void
 function mailboxOAuthRedirectUrl(string $provider, Team $team): string
 {
     return MailboxOAuthWorkspace::redirectUrl($provider, $team);
+}
+
+function assertMailboxOAuthRedirectUrl(string $url, string $provider, Team $team): void
+{
+    expect($url)->toContain("/email-accounts/redirect/{$provider}");
+
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+    expect($query['team'] ?? null)->toBe($team->getKey())
+        ->and(Request::create($url)->hasValidSignature())->toBeTrue();
+}
+
+function assertRedirectedToMailboxOAuth(Testable $component, string $provider, Team $team): void
+{
+    $component->assertRedirect();
+
+    /** @var string $redirect */
+    $redirect = $component->effects['redirect'];
+
+    assertMailboxOAuthRedirectUrl(url($redirect), $provider, $team);
+}
+
+function assertActionHasMailboxOAuthUrl(
+    Testable $component,
+    string|TestAction|array $action,
+    string $provider,
+    Team $team,
+): void {
+    $component->assertActionExists(
+        $action,
+        checkActionUsing: function (Action $resolvedAction) use ($provider, $team): bool {
+            try {
+                assertMailboxOAuthRedirectUrl((string) $resolvedAction->getUrl(), $provider, $team);
+
+                return true;
+            } catch (Throwable) {
+                return false;
+            }
+        },
+    );
 }
 
 /**

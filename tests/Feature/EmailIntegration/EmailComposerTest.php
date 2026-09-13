@@ -145,10 +145,11 @@ it('redirects to oauth when grant permission is clicked on a mailbox that needs 
         ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
     );
 
-    Livewire::test(EmailComposer::class)
+    $component = Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
-        ->callAction('grantSendPermission')
-        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
+        ->callAction('grantSendPermission');
+
+    assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->team);
 });
 
 it('does not queue mail from send when the mailbox has a sync error', function (): void {
@@ -176,10 +177,11 @@ it('redirects to oauth when grant permission is clicked', function (): void {
         ],
     ]);
 
-    Livewire::test(EmailComposer::class)
+    $component = Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
-        ->callAction('grantSendPermission')
-        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
+        ->callAction('grantSendPermission');
+
+    assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->team);
 });
 
 it('opens from a sendable mailbox when another connected account cannot send', function (): void {

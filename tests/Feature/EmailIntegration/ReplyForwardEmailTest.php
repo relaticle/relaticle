@@ -856,9 +856,10 @@ it('redirects to oauth when grant permission is confirmed from a record emails p
         ],
     ]);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->callAction('grantSendPermission')
-        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
+    $component = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('grantSendPermission');
+
+    assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->team);
 });
 
 it('opens the grant permission empty state when replying from a mailbox that cannot send', function (): void {
@@ -927,9 +928,10 @@ it('redirects to oauth when grant permission is confirmed for a mailbox that nee
         ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
     );
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->callAction('grantSendPermission')
-        ->assertRedirect(mailboxOAuthRedirectUrl('gmail', $this->account->team));
+    $component = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+        ->callAction('grantSendPermission');
+
+    assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->team);
 });
 
 function inboundStoredAttachment(Email $email, string $filename, string $contents, bool $inline = false, ?string $contentId = null): EmailAttachment
