@@ -25,6 +25,10 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     /** Graph message delta is per-folder. These two cover inbound and outbound sync. */
     private const array DELTA_FOLDERS = ['inbox', 'sentitems'];
 
+    public const string PENDING_MESSAGE_ID_PREFIX = 'ms-pending-';
+
+    public const string PENDING_THREAD_ID_PREFIX = 'ms-pending-thread-';
+
     private const string RECONCILIATION_PROPERTY_ID = 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId';
 
     /**
@@ -115,7 +119,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
                 '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
                 // Pull attachment metadata (not bytes) alongside the message so has-attachment
                 // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
-                '$expand' => 'attachments($select=id,name,contentType,size,isInline,contentId)',
+                '$expand' => 'attachments($select=id,name,contentType,size,isInline,contentId),'.$this->reconciliationPropertiesExpand(),
             ])
             ->throw()
             ->json();
@@ -150,7 +154,45 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             bodyHtml: $bodyHtml,
             participants: $participants,
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
+            reconciliationMessageId: $this->reconciliationMessageId($message),
         );
+    }
+
+    private function reconciliationPropertiesExpand(): string
+    {
+        return 'singleValueExtendedProperties($filter=id eq \''.self::RECONCILIATION_PROPERTY_ID.'\')';
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     */
+    private function reconciliationMessageId(array $message): ?string
+    {
+        $properties = $message['singleValueExtendedProperties'] ?? [];
+
+        if (! is_array($properties)) {
+            return null;
+        }
+
+        foreach ($properties as $property) {
+            if (! is_array($property)) {
+                continue;
+            }
+
+            if (($property['id'] ?? null) !== self::RECONCILIATION_PROPERTY_ID) {
+                continue;
+            }
+
+            $value = $property['value'] ?? null;
+
+            if (! is_string($value) || $value === '') {
+                return null;
+            }
+
+            return $value;
+        }
+
+        return null;
     }
 
     /**
@@ -280,12 +322,12 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ->throw();
 
         // Graph /me/sendMail returns 202 with no body. Synthesize ids; the next
-        // delta sync will pick up the canonical Graph id + internetMessageId.
+        // delta sync adopts the SENT row and writes the canonical Graph ids.
         $synthetic = (string) Str::ulid();
 
         return [
-            'provider_message_id' => "ms-pending-{$synthetic}",
-            'thread_id' => "ms-pending-thread-{$synthetic}",
+            'provider_message_id' => self::PENDING_MESSAGE_ID_PREFIX.$synthetic,
+            'thread_id' => self::PENDING_THREAD_ID_PREFIX.$synthetic,
             'rfc_message_id' => $data['rfc_message_id'] ?? "<{$synthetic}@graph.microsoft.com>",
         ];
     }

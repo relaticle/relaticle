@@ -357,6 +357,44 @@ it('does not treat a custom folder named Drafts as the well-known drafts folder'
         ->and($email->direction)->toBe(EmailDirection::INBOUND);
 });
 
+it('maps a Graph sent message reconciliation property onto FetchedEmailData', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/AAA1*' => Http::response([
+            'id' => 'AAA1',
+            'internetMessageId' => '<provider-id@example.com>',
+            'conversationId' => 'conversation-1',
+            'subject' => 'Hi',
+            'bodyPreview' => 'Hi',
+            'receivedDateTime' => '2026-01-15T10:00:00Z',
+            'isRead' => true,
+            'hasAttachments' => false,
+            'parentFolderId' => 'sent-folder-id',
+            'from' => ['emailAddress' => ['address' => 'owner@example.com', 'name' => 'Owner']],
+            'toRecipients' => [['emailAddress' => ['address' => 'b@example.com', 'name' => 'B']]],
+            'ccRecipients' => [],
+            'bccRecipients' => [],
+            'body' => ['contentType' => 'html', 'content' => '<p>Hi</p>'],
+            'singleValueExtendedProperties' => [[
+                'id' => 'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId',
+                'value' => '<local-id@example.com>',
+            ]],
+        ]),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('AAA1');
+
+    expect($email->providerMessageId)->toBe('AAA1')
+        ->and($email->rfcMessageId)->toBe('<provider-id@example.com>')
+        ->and($email->reconciliationMessageId)->toBe('<local-id@example.com>')
+        ->and($email->threadId)->toBe('conversation-1')
+        ->and($email->direction)->toBe(EmailDirection::OUTBOUND)
+        ->and($email->folder)->toBe(EmailFolder::Sent);
+
+    Http::assertSent(fn (Request $r): bool => str_contains((string) $r->url(), '/me/messages/AAA1')
+        && str_contains(urldecode((string) $r->url()), 'singleValueExtendedProperties($filter=id eq \'String {00020329-0000-0000-C000-000000000046} Name RelaticleMessageId\')'));
+});
+
 it('maps a Graph message payload to FetchedEmailData', function (): void {
     Http::fake([
         ...graphWellKnownFolderFakes(),
@@ -384,6 +422,7 @@ it('maps a Graph message payload to FetchedEmailData', function (): void {
 
     expect($email->providerMessageId)->toBe('AAA1')
         ->and($email->rfcMessageId)->toBe('<rfc-abc@example.com>')
+        ->and($email->reconciliationMessageId)->toBeNull()
         ->and($email->threadId)->toBe('thread-1')
         ->and($email->subject)->toBe('Hello')
         ->and($email->bodyHtml)->toBe('<p>Hi</p>')

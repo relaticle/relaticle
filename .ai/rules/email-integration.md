@@ -84,6 +84,13 @@ Los Angeles day window starts at 07:00 UTC, so a September 10 all-day event
 would otherwise appear on the 9th. Timed meetings still use local-day UTC
 bounds.
 
+## Microsoft sent mail must be adopted on import
+
+Graph `/me/sendMail` returns 202 with no body. A successful send stores
+`ms-pending-*` placeholders. The next delta delivers a different Graph id
+and `internetMessageId`. Match the RelaticleMessageId extended property
+and update that SENT row. Creating a new synced row duplicates the send.
+
 ## Authorize composer inline images
 
 `EmailInlineImageEmbedder` copies files named in composer HTML (`data-id` or
