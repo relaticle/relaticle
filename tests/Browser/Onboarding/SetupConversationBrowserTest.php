@@ -66,9 +66,11 @@ it('opens on the setup conversation and sends the first message into it', functi
         ->assertPathContains("/chats/{$conversationId}")
         ->assertSee('Your candidate pipeline is ready');
 
-    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId);
+    retry(50, function () use ($conversationId): void {
+        expect(TurnPresence::current($conversationId))->not->toBeNull();
+    }, 200);
 
-    expect(TurnPresence::current($conversationId))->not->toBeNull();
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId);
 });
 
 it('approves a seeded proposal in the setup thread and completes the first-record step', function (): void {
