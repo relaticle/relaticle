@@ -232,7 +232,7 @@ SystemAdmin is excluded from PHPStan. Every `match` over `OnboardingExitReason` 
 
 ### 5.11 Feature flag
 
-`App\Features\SetupConversation`, a Pennant class like the existing ones, read from `RELATICLE_FEATURE_SETUP_CONVERSATION`. Default true locally, false in production. It gates sections 5.3, 5.4, 5.5 setup mode, 5.6, 5.7, 5.8 expiry and nudge link, and 5.9. The `<onboarding>` prompt block without `setup_mode` and the wizard changes are not gated.
+`App\Features\SetupConversation`, a Pennant class like the existing ones, read from `RELATICLE_FEATURE_SETUP_CONVERSATION`, default true. It gates sections 5.3, 5.4, 5.5 setup mode, 5.6, 5.7, 5.8 expiry and nudge link, and 5.9. The `<onboarding>` prompt block without `setup_mode` and the wizard changes are not gated.
 
 ## 6. Data model
 

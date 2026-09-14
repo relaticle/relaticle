@@ -8,6 +8,6 @@ final readonly class SetupConversation
 {
     public function resolve(): bool
     {
-        return (bool) config('relaticle.features.setup_conversation', false);
+        return (bool) config('relaticle.features.setup_conversation', true);
     }
 }
