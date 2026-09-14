@@ -14,6 +14,7 @@ const jsonHeaders = () => ({
 export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     input: '',
     streamAbortController: null,
+    pendingAttachment: null,
 
     // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
     // same pattern voice.js uses); the defaults keep the module standalone.
@@ -246,7 +247,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
 
         const editor = this.localEditor();
         const text = (editor?.getText() ?? this.input).trim();
-        if (!text) return;
+        if (!text && !this.pendingAttachment) return;
         if (text.length > 5000) return;
 
         // The strip described what to do after the PREVIOUS answer. The moment
@@ -293,6 +294,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         // the SAME snapshot, re-reading activePageContext() after the consumed
         // flag flips would silently drop it from the outgoing request.
         const contextForSend = this.activePageContext();
+        const attachmentForSend = this.pendingAttachment;
         const nowIso = new Date().toISOString();
 
         this.messages.push(this.ensureClientKey({
@@ -303,11 +305,14 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             editText: '',
             created_at: nowIso,
             page_context: contextForSend,
+            attachment: attachmentForSend,
             sendState: 'sending',
         }));
         this.pageContextConsumed = true;
         this.localEditor()?.clear();
         this.input = '';
+        this.pendingAttachment = null;
+        window.dispatchEvent(new CustomEvent('chat:attachment-consumed', { detail: { context: this.context } }));
 
         // Re-read from the reactive array rather than mutating the object
         // literal above directly: Alpine (like Vue3 reactivity) only tracks
@@ -317,7 +322,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         // binding is never notified to re-render.
         const userMsg = this.messages[this.messages.length - 1];
 
-        await this.deliverMessage(userMsg, payload, contextForSend, draftConversationId);
+        await this.deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachmentForSend);
     },
 
     // Re-sends a FAILED optimistic bubble in place: same clientKey, same
@@ -345,7 +350,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         this.markPendingActionsSuperseded();
 
         const payload = this.plainDocument(msg.document) ?? this.documentFromInput(msg.content);
-        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId);
+        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId, msg.attachment ?? null);
     },
 
     // Shared failure path for a non-OK create/send response. Paints the
@@ -399,7 +404,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     // started (see the capture comments in sendMessage()/resendMessage()):
     // clearDraft() re-derives the storage key from it, and is called on every
     // path below that lands sendState at 'sent'.
-    async deliverMessage(userMsg, payload, contextForSend, draftConversationId) {
+    async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null) {
         const isFirstMessage = !this.conversationId;
 
         if (isFirstMessage) {
@@ -418,6 +423,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                     body: JSON.stringify({
                         document: payload,
                         model: this.selectedModel !== 'auto' ? this.selectedModel : undefined,
+                        attachment_id: attachment?.id ?? null,
                     }),
                 });
 
@@ -470,12 +476,21 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                         conversation_id: newId,
                         model: this.selectedModel,
                         page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
+                        attachment_id: attachment?.id ?? null,
                     }),
                     signal: this.streamAbortController.signal,
                 });
 
                 if (!sendRes.ok) {
                     await this.failSend(sendRes, userMsg);
+                    return;
+                }
+
+                const sendBody = await sendRes.json();
+                if (sendBody.status === 'stored') {
+                    this.finishStoredTurn(sendBody, userMsg);
+                    userMsg.sendState = 'sent';
+                    this.clearDraft(draftConversationId);
                     return;
                 }
 
@@ -534,6 +549,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                     conversation_id: this.conversationId,
                     model: this.selectedModel,
                     page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
+                    attachment_id: attachment?.id ?? null,
                 }),
                 signal: this.streamAbortController.signal,
             });
@@ -544,6 +560,14 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             }
 
             const body = await response.json();
+
+            if (body.status === 'stored') {
+                this.finishStoredTurn(body, userMsg);
+                userMsg.sendState = 'sent';
+                this.clearDraft(draftConversationId);
+                return;
+            }
+
             if (body.conversation_id && body.conversation_id !== this.conversationId) {
                 this.conversationId = body.conversation_id;
                 this.subscribeToConversation(body.conversation_id);
@@ -574,6 +598,26 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         }
 
         this.scrollToBottom(true);
+    },
+
+    // The server answered without a model turn (a large attachment): fill the
+    // stub with the stored reply and end the turn as a stream end would.
+    finishStoredTurn(body, userMsg) {
+        userMsg.id = body.user_message_id ?? userMsg.id;
+        const assistantMsg = this.lastAssistantBubble();
+        if (assistantMsg?.role === 'assistant') {
+            Object.assign(assistantMsg, {
+                id: body.assistant?.id ?? assistantMsg.id,
+                content: body.assistant?.content ?? '',
+                prerendered: true,
+                rendered: true,
+                created_at: body.assistant?.created_at ?? assistantMsg.created_at,
+            });
+        }
+        this.isStreaming = false;
+        this.clearStreamTimeout();
+        this.scrollToBottom(true);
+        this.restoreInputFocus();
     },
 
     async cancelStream() {

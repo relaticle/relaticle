@@ -754,7 +754,13 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     renderMessageContent(message) {
-        if (!message.document || (Array.isArray(message.document.content) && message.document.content.length === 0)) {
+        const emptyDocument = !message.document || (Array.isArray(message.document.content) && message.document.content.length === 0);
+
+        if (emptyDocument && message.role === 'user' && message.attachment) {
+            return '';
+        }
+
+        if (emptyDocument) {
             return this.escapeHtml(message.content ?? '');
         }
 

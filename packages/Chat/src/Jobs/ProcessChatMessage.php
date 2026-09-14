@@ -73,6 +73,7 @@ final class ProcessChatMessage implements ShouldQueue
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
      * @param  array{type: string, id: string, label: string}|null  $pageContext
+     * @param  array{id: string, name: string, row_count: int}|null  $attachment
      */
     public function __construct(
         private readonly User $user,
@@ -87,6 +88,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly int $failoverDepth = 0,
         public readonly bool $isContinuation = false,
         public readonly ?string $resumesTurnId = null,
+        public readonly ?array $attachment = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -348,6 +350,7 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions();
                 $this->persistUserDocument();
+                $this->persistUserAttachment();
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
                 $this->suggestNextSteps($streamedResponse);
@@ -424,6 +427,7 @@ final class ProcessChatMessage implements ShouldQueue
                         failoverDepth: $this->failoverDepth + 1,
                         isContinuation: $this->isContinuation,
                         resumesTurnId: $this->resumesTurnId,
+                        attachment: $this->attachment,
                     ));
 
                     return;
@@ -644,7 +648,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'tool_calls' => '[]',
                 'tool_results' => '[]',
                 'usage' => '[]',
-                'meta' => '[]',
+                'meta' => json_encode($this->attachment === null ? [] : ['attachment' => $this->attachment], JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -815,6 +819,27 @@ final class ProcessChatMessage implements ShouldQueue
         DB::table('agent_conversation_messages')
             ->where('id', $latestId)
             ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
+    }
+
+    private function persistUserAttachment(): void
+    {
+        if ($this->attachment === null) {
+            return;
+        }
+
+        $latestId = $this->latestMessageId('user');
+
+        if ($latestId === null) {
+            return;
+        }
+
+        $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $meta = is_array($existing) ? $existing : [];
+        $meta['attachment'] = $this->attachment;
+
+        DB::table('agent_conversation_messages')
+            ->where('id', $latestId)
+            ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
     }
 
     /**

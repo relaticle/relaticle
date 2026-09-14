@@ -64,7 +64,7 @@ final class ChatInterface extends BaseLivewireComponent
     private const int MAX_PROMPT_LENGTH = 5000;
 
     /**
-     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{label: string, prompt: string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null}>
+     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{label: string, prompt: string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null, attachment?: array{id: string, name: string, row_count: int}|null}>
      */
     public array $messages = [];
 

@@ -163,6 +163,17 @@
                                 </a>
                             </template>
 
+                            <template x-if="msg.attachment && !msg.editing">
+                                <span
+                                    data-user-attachment
+                                    class="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 ring-1 ring-gray-900/10 dark:bg-white/10 dark:text-gray-300 dark:ring-white/10"
+                                >
+                                    <x-heroicon-m-paper-clip class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                    <span class="truncate" x-text="msg.attachment.name"></span>
+                                    <span x-text="'(' + msg.attachment.row_count + ')'"></span>
+                                </span>
+                            </template>
+
                             {{-- Failure notice only. There is no delivery receipt on a
                                  sent message: the assistant's reply is the confirmation,
                                  so a clock or checkmark under every bubble was noise.

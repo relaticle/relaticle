@@ -23,7 +23,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, row_count: int}|null}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -146,7 +146,31 @@ final readonly class ListConversationMessages
                     'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
                 ])
                 ->first(),
+            'attachment' => $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta),
         ])->values()->all();
+    }
+
+    /**
+     * @return array{id: string, name: string, row_count: int}|null
+     */
+    private function attachmentFromMeta(?string $meta): ?array
+    {
+        if ($meta === null) {
+            return null;
+        }
+
+        $decoded = json_decode($meta, true);
+        $attachment = is_array($decoded) ? ($decoded['attachment'] ?? null) : null;
+
+        if (! is_array($attachment) || ! is_string($attachment['id'] ?? null)) {
+            return null;
+        }
+
+        return [
+            'id' => $attachment['id'],
+            'name' => (string) ($attachment['name'] ?? ''),
+            'row_count' => (int) ($attachment['row_count'] ?? 0),
+        ];
     }
 
     /**

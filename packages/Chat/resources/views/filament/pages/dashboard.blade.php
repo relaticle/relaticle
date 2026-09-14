@@ -65,11 +65,13 @@
                     },
                 })"
                 x-on:dashboard:editor-submit.window="submit()"
+                x-on:chat:attachment-changed.window="if ($event.detail?.context === 'dashboard') pendingAttachment = $event.detail.attachment"
                 data-chat-context="dashboard"
             >
                 @include('chat::livewire.chat.partials._composer-bar', [
+                    'context' => 'dashboard',
                     'showStopButton' => false,
-                    'sendDisabled' => 'text.trim().length === 0 || text.length > 5000 || submitting',
+                    'sendDisabled' => '(text.trim().length === 0 && !pendingAttachment) || text.length > 5000 || submitting',
                 ])
             </div>
 
@@ -91,6 +93,7 @@
         Alpine.data('dashboardChatInput', (chatUrl, defaultModel) => ({
             submitting: false,
             error: null,
+            pendingAttachment: null,
             @include('chat::livewire.chat.partials._model-state')
 
             init() {
@@ -115,7 +118,7 @@
 
             submit() {
                 const editor = this.localEditor();
-                if (!editor || editor.getText().trim().length === 0 || this.submitting) return;
+                if (!editor || (editor.getText().trim().length === 0 && !this.pendingAttachment) || this.submitting) return;
 
                 this.submitting = true;
                 this.error = null;
@@ -130,6 +133,7 @@
                         document: editor.getDocument(),
                         model: this.selectedModel,
                         conversationId: this.$root.dataset.setupConversationId || null,
+                        attachment: this.pendingAttachment,
                     }));
                 } catch (_) {
                     this.error = @js(__('Could not save message. Try again.'));
