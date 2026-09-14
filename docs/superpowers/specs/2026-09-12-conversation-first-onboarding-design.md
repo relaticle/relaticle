@@ -190,12 +190,12 @@ Nothing changes in the proposal machinery. Approve all on the plan card already 
 
 ### 5.6 File attachment in the composer
 
-The composer gains an attach button and drop target for one CSV or TXT file, 10 MB at most, the same limits as the import wizard. The file uploads first, through a new `POST /chat/attachments` route, to the team's private disk. `Relaticle\Chat\Actions\StoreChatAttachment` validates the mime type and size, parses the header row and counts rows, and returns an attachment id. The composer then sends the message with that id in the payload. A user can attach only to their own team's conversations, and an attachment id is single-use.
+The composer gains an attach button and drop target for one CSV or TXT file, 10 MB at most, the same limits as the import wizard. The file uploads first, through a new `POST /chat/attachments` route. `Relaticle\Chat\Actions\StoreChatAttachment` validates the mime type and size, parses the header row and counts rows, and stores the file as a medialibrary row in the workspace's `chat-attachments` collection on the `local` disk. No new table and no new model: `Workspace` already implements `HasMedia`, so ownership, mime, size, original name and file removal on delete come from the `media` row. The chat-only facts (uploader, conversation, row count, header, consumed flag, created imports) live in that row's `custom_properties`, and the attachment id the composer sends back in the message payload is the row's `uuid`. A user can attach only to their own team's conversations, and an attachment id is single-use.
 
 What happens next depends on the row count:
 
 - Twenty-five rows or fewer: the rows are appended to the user message as a fenced plain-text block before the model runs. The model sees a paste. No provider document attachment is used, so no gateway-specific behaviour is involved.
-- More than twenty-five rows: the model does not run. The chat stores a templated assistant reply: "That's {n} rows. The import wizard handles files this size, with your columns already mapped." followed by two links, Import as people and Import as companies. Each link opens that entity's import wizard with `?attachment={id}`. The wizard's mount creates the `Import` row and the import store from the stored file for that entity and resumes at the mapping step, the path the upload step already supports through `storeId`. The stored file is deleted once the import row exists or after 24 hours, whichever comes first.
+- More than twenty-five rows: the model does not run. The chat stores a templated assistant reply: "That's {n} rows. The import wizard handles files this size, with your columns already mapped." followed by two links, Import as people and Import as companies. Each link is a `GET /chat/attachments/{attachment}/import/{entity}` route. It creates the `Import` row and the import store from the stored file for that entity, records the import id on the media row so a second click reuses it, and redirects to the wizard at the mapping step, the path the upload step already supports through `storeId`. The stored file is deleted by the hourly `chat:prune-attachments` command 24 hours after upload.
 
 The attach button exists in every conversation, not only the setup one. Outside setup mode the same two rules apply.
 
@@ -251,7 +251,7 @@ Migration, up only, on `agent_conversations`:
 |---|---|---|
 | `purpose` | string, nullable, partial unique index on `team_id` where `purpose = 'setup'` | Section 5.3 |
 
-New table `chat_attachments` (section 5.6): id, team_id, user_id, conversation_id nullable, disk path, original name, mime, size, row_count, header jsonb, consumed_at nullable, timestamps. Rows and files are pruned by the existing hourly import cleanup command's schedule slot, 24 hours after creation.
+Chat attachments (section 5.6) add no table. They are `media` rows in the workspace's `chat-attachments` collection, pruned with their files by the hourly `chat:prune-attachments` command 24 hours after creation.
 
 `onboarding_context` keeps its column and cast and is written as before. Timestamps are written from PHP `now()`.
 
@@ -279,7 +279,7 @@ Feature suite, extending existing files where they cover the scope:
 - New `tests/Feature/Onboarding/SetupConversationTest.php`: conversation seeded for a personal team owner only, one per team, message composed per use case, with and without Other text, with and without the AI attribution line, mailbox line absent while the email flag is off, flag off seeds nothing, the opener row is absent from the messages the store replays to the provider.
 - New `tests/Feature/Onboarding/DashboardOpenerTest.php`: opener shown and hidden by each condition, Not now dismisses, bootstrap payload carries the conversation id, member and second workspace never see it.
 - `tests/Feature/Chat/`: `<onboarding>` block content and escaping of the Other text, setup mode tool list excludes update, delete, and custom-field create and update, setup mode persists after the first own record, setup expiry applied only to the setup conversation, the two new guide destinations resolve.
-- New `tests/Feature/Chat/ChatAttachmentTest.php`: upload accepts CSV and TXT within limits and rejects the rest, a 25-row file is inlined as text in the stored user message, a 26-row file stores the templated reply and no model run, the wizard link creates the import for the chosen entity and lands on mapping, cross-team and reused ids are rejected, pruning removes file and row after 24 hours.
+- New `tests/Feature/Chat/ChatAttachmentTest.php`: upload accepts CSV and TXT within limits and rejects the rest, a 25-row file is inlined as text in the stored user message, a 26-row file stores the templated reply and no model run, the wizard link creates the import for the chosen entity and lands on mapping, cross-team and reused ids are rejected, pruning removes file and media row after 24 hours.
 - `tests/Feature/Onboarding/` for the nudge and exit: link targets the setup conversation, subject per use case, the landing page renders without login, GET writes nothing, POST writes the reason, a bad signature is rejected, a second POST overwrites.
 - `tests/Feature/SystemAdmin/`: funnel page renders for a sysadmin and is invisible otherwise, matching the existing SystemAdmin test depth.
 - `tests/Browser/`: two critical paths. Sign up, answer Recruiting, see the opener, paste five rows, approve, see five own people and the checklist row complete. Then attach a 40-row CSV in the same conversation, follow Import as people, and land on the mapping step with the columns shown.
@@ -304,7 +304,7 @@ All on the analytics clone, provenance is this section.
 Four slices, each its own implementation plan and PR.
 
 1. Wizard and shaping. Sections 5.1, 5.2, the `<onboarding>` prompt block without setup mode, the migration column for Other text. Not flagged. Visible change: three-step wizard, use-case stages, Rela knows the use case.
-2. The setup conversation and the file door. Sections 5.3, 5.4, 5.5 setup mode and destinations, 5.6, 5.7, 5.8 expiry, the flag, the `purpose` column, `chat_attachments`, and `onboarding_opener_dismissed_at`. Flagged.
+2. The setup conversation and the file door. Sections 5.3, 5.4, 5.5 setup mode and destinations, 5.6, 5.7, 5.8 expiry, the flag, the `purpose` column, the `chat-attachments` media collection, and `onboarding_opener_dismissed_at`. Flagged.
 3. Resume and learning. Sections 5.8 nudge link and copy, 5.9, 5.10. Flagged.
 4. The mailbox path. After PR 237 merges: the opener's mailbox line, a `connect_mailbox` guide destination, and the accounts link. Gated on both flags. Not planned until PR 237 is merged.
 
