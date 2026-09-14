@@ -56,6 +56,7 @@ it('opens on the setup conversation and sends the first message into it', functi
 
     $page->script(<<<'JS'
         (() => {
+            window.Echo = null;
             const wrapper = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
             Alpine.$data(wrapper).setText('Jane Doe, Acme, jane@acme.test');
             document.querySelector('[data-chat-context="dashboard"]').closest('form').requestSubmit();
@@ -66,9 +67,16 @@ it('opens on the setup conversation and sends the first message into it', functi
         ->assertPathContains("/chats/{$conversationId}")
         ->assertSee('Your candidate pipeline is ready');
 
-    retry(50, function () use ($conversationId): void {
-        expect(TurnPresence::current($conversationId))->not->toBeNull();
-    }, 200);
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->assertScript(<<<JS
+        (() => {
+            {$resolveInterface}
+            return data.messages.find((m) => m.role === 'user')?.sendState ?? null;
+        })()
+    JS, 'sent');
+
+    expect(TurnPresence::current($conversationId))->not->toBeNull();
 
     Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId);
 });
