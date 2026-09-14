@@ -51,14 +51,14 @@ Code facts verified on 2026-09-12:
 
 ## 3. Decisions
 
-1. Conversation-first. Rela speaks first, inline on the dashboard, in one seeded conversation the composer continues. No auto-opened panel, no redirect (the August research argued against both).
-2. The opener is templated text rendered on page load. The model runs only after the user replies.
+1. Conversation-first. Signup ends on the setup conversation itself: the wizard redirects there, and Rela speaks first in that thread.
+2. The opener is a real model turn, not a template. Opening the thread starts it, so the user watches it being written; what it says comes from the <onboarding> block. A templated paragraph read as a form letter, which is the opposite of what the thread is asking them to do.
 3. The first reply to pasted contacts is a create proposal. No clarifying question comes first.
 4. Setup mode is create-only for the whole lifetime of the setup conversation. Update and delete tools are never offered there. Ending it at the first own record would reopen the hole on the second paste.
-5. "How did you hear about us" stays optional and unchanged in the wizard. The AI answer now routes a Connect Claude offer into the opener.
+5. "How did you hear about us" stays optional and unchanged in the wizard. The answer reaches the agent as a `referral` line in the <onboarding> block, so a user who came from Claude or ChatGPT can be offered the connect page once their data is in.
 6. "What will you be using Relaticle for" stays required. Its answer now picks the stage preset, the sample set, and the opener vocabulary. Other gets one free-text line.
 7. The sub-options question stays, reduced to one axis per use case so answers cannot contradict, multi-select, still required, still stored in `onboarding_context`, validated against the chosen use case, and read by Rela's prompt block. The wizard asks no question about where the user's contacts are.
-8. The opener offers every way in at once: paste, attach a file, describe a few people, or read the self-hosting guide. The user answers by acting. A wizard question that only varied one paragraph of copy did not earn a required step.
+8. The opener offers every way in at once: paste, attach a file, or describe a few people. The user answers by acting. A wizard question that only varied one paragraph of copy did not earn a required step. The app never pitches self-hosting: a user who is already inside the product does not need the alternative to it sold to them.
 9. The invite step is removed from the wizard. Invites stay in team settings, on the checklist, and in Rela's flow after data lands.
 10. Sample data stays. Once real data lands, a one-click Remove sample data action appears.
 11. Credits are charged normally in v1. Per-conversation cost is recorded and reviewed after two weeks.
@@ -117,49 +117,23 @@ Colours reuse the existing Stage palette. Stage stays an ordinary editable selec
 
 Sample fixtures must use the preset's stage names. Fixture sets after the change: `sales` (Sales, and the listener's fallback for a null use case), `marketing`, `general` (Other), `recruiting`, `fundraising` (Fundraising, Investing), and a new `customer_success` set with four accounts and four renewals. Marketing keeps its own directory with sales stage names, since it shares the Sales preset. `OnboardingUseCase::getFixtureSet()` maps Customer Success to the new set. The recruiting and fundraising opportunity fixtures change their `stage` values to preset names.
 
-Entity labels do not change. "Candidates" and "Investors" live in the opener copy and the agent's vocabulary, not in the sidebar.
+Entity labels do not change. "Candidates" and "Investors" live in the agent's vocabulary, not in the sidebar.
 
 ### 5.3 The setup conversation
 
 On `TeamCreated`, for a personal team whose owner is a user, and when the feature is on, a listener creates one `AgentConversation` for the owner titled from the lang file ("Set up your workspace") with `purpose = 'setup'`. A partial unique index on `agent_conversations (team_id) where purpose = 'setup'` guarantees one per team. The dashboard, the nudge, and the agent find it by that column. No foreign key on `teams`.
 
-The conversation holds a single assistant message: templated, built with no model call, stored with `meta.kind = 'setup_opener'`. The store's messages scope excludes that kind from provider replay, the same way it excludes superseded rows, so the model never receives a leading assistant turn. The chat page still renders the row from the database, so the opener reads as the first message of the thread. The `<onboarding>` block (section 5.5) carries the same facts to the model.
+The conversation is created empty. Nothing is stored until its owner opens it, which is what makes the assistant speak: `ChatInterface::mount()` calls `StartSetupGreeting`, and the greeting streams in while they watch.
 
-The message is composed from a use-case line, one fixed data paragraph, and optional lines. All copy lives in `lang/en/onboarding/setup.php` and passes the i18n rules.
+`StartSetupGreeting` is shaped like `TurnContinuationService::resume()`, and for the same reason. The provider needs a final user turn, so the prompt it runs on is stored as one and stamped `meta.kind = 'continuation'`, which keeps it out of the transcript. The prompt is a constant on the action: greet by first name, say what the workspace is ready for from the stages line, ask for their data (paste, attach, or describe), three paragraphs at most, no tools this turn. Everything it knows about the workspace comes from the `<onboarding>` block (section 5.5).
 
-Use-case line:
+Guards, in order: the feature is on, the thread is this user's own setup conversation, it holds no messages, a `Cache::add` lock (180 seconds, atomic, so two tabs greet once), and a reserved credit. The turn is charged like any other. A greeting that fails leaves the thread empty and no message behind, so the next open runs it again once the lock expires; the user can type in the meantime. There is no templated fallback.
 
-| Use case | Line |
-|---|---|
-| Sales, Marketing | Your pipeline is ready: Prospecting through Closed Won. |
-| Customer Success | Your accounts board is ready: Onboarding through Renewed. |
-| Recruiting | Your candidate pipeline is ready: Sourced through Hired. |
-| Fundraising | Your investor pipeline is ready: Target through Closed. |
-| Investing | Your deal flow is ready: Target through Closed. |
-| Other with text | Your workspace is ready for tracking {text}. |
-| Other without text, null | Your workspace is ready. |
+### 5.4 Where signup lands
 
-Data paragraph, the same for everyone:
+`CreateWorkspace::getRedirectUrl()` returns the setup conversation's chat page when the new workspace has one, and the dashboard otherwise (the feature is off, or the workspace is not the personal one). The listener that seeds the thread runs synchronously on `WorkspaceCreated`, so the id is there by the time the wizard redirects.
 
-"Paste your contacts here or attach the file, any columns, any order. I'll map them and show you what I'll create before anything is saved. Large files go straight to the import wizard with the mapping ready. No list yet? Tell me about three people you're talking to right now. Names and companies are enough."
-
-Closing line, the same for everyone: "Just evaluating, or self-hosting? The sample records show how a working pipeline looks, and the self-hosting guide is here: {docs link}."
-
-Mailbox line, only when `RELATICLE_FEATURE_EMAIL_INTEGRATION` is on (slice 4), placed after the data paragraph: "Or connect your Google or Microsoft mailbox and I'll create contacts from the people you already write to: {accounts link}."
-
-Optional line, when attribution is AI: "You can also work from Claude or ChatGPT directly: {connect link}." The link is the help page `help/ai-assistant/connect-claude-or-chatgpt`.
-
-The {text} value is user input. It is rendered escaped in the message and quoted as data in the prompt (section 5.5). It is never concatenated into an instruction.
-
-### 5.4 The dashboard opener
-
-When the team has a setup conversation, the viewer is its owner, the conversation has no user message, and `onboarding_opener_dismissed_at` is null, the dashboard shows the opener above the composer in place of the time-of-day greeting. The composer is focused. One secondary link, Not now, sets `onboarding_opener_dismissed_at` and returns the dashboard to its current layout.
-
-The composer's bootstrap payload gains `conversationId`. When set, the dashboard navigates to `chats/{conversationId}` and the chat page sends the bootstrapped message into that conversation. When absent, behaviour is unchanged.
-
-After the first user message the dashboard shows its current layout. The existing recent-chat link on the dashboard points at the setup conversation, labelled Continue setup, until the workspace has an own record.
-
-Invited members and additional workspaces never see the opener.
+The dashboard is unchanged by this work: the time-of-day greeting, the composer, and the recent-chat link. Its composer starts a new conversation on every send, as it always did. Invited members and additional workspaces never see a setup conversation.
 
 ### 5.5 Setup mode in the agent
 
@@ -171,11 +145,12 @@ use_case: Recruiting
 context: Applications, Sourcing
 stages: Sourced, Applied, Screen, Interview, Offer, Hired, Declined
 other_use_case: "<escaped user text>"
+referral: AI
 setup_mode: true
 </onboarding>
 ```
 
-The `context` line lists the labels of the stored sub-options and is absent when none are stored.
+The `context` line lists the labels of the stored sub-options and is absent when none are stored. The `referral` line carries the attribution answer and is absent when the user skipped it.
 
 `setup_mode` is true whenever the conversation is the team's setup conversation, for its whole lifetime. In setup mode:
 
@@ -232,7 +207,7 @@ SystemAdmin is excluded from PHPStan. Every `match` over `OnboardingExitReason` 
 
 ### 5.11 Feature flag
 
-`App\Features\SetupConversation`, a Pennant class like the existing ones, read from `RELATICLE_FEATURE_SETUP_CONVERSATION`, default true. It gates sections 5.3, 5.4, 5.5 setup mode, 5.6, 5.7, 5.8 expiry and nudge link, and 5.9. The `<onboarding>` prompt block without `setup_mode` and the wizard changes are not gated.
+`App\Features\SetupConversation`, a Pennant class like the existing ones, read from `RELATICLE_FEATURE_SETUP_CONVERSATION`, default true. It gates sections 5.3, 5.4, 5.5 setup mode, 5.6, 5.7, 5.8 expiry and nudge link, and 5.9. With it off, signup lands on the dashboard and no setup conversation exists. The `<onboarding>` prompt block without `setup_mode` and the wizard changes are not gated.
 
 ## 6. Data model
 
@@ -241,7 +216,6 @@ Migration, up only, on `teams`:
 | Column | Type | Purpose |
 |---|---|---|
 | `onboarding_other_use_case` | string 120, nullable | Section 5.1 |
-| `onboarding_opener_dismissed_at` | timestamp, nullable | Section 5.4 |
 | `onboarding_exit_reason` | string, nullable | Section 5.9 |
 | `onboarding_exit_answered_at` | timestamp, nullable | Section 5.9 |
 
@@ -276,13 +250,12 @@ Feature suite, extending existing files where they cover the scope:
 
 - `tests/Feature/Onboarding/CreateTeamWizardTest.php`: three steps, Other text saved and capped, sub-options on one axis (stored, required for use cases that have them, cleared on switch, foreign values rejected), workspace name default. `CreateTeamInvitationTest.php` cases that exercised the removed step are removed, and `CreateTeamPrecreationTest.php` goes with the precreation path; team-settings invite tests already cover invites.
 - `tests/Feature/Onboarding/CreateTeamSeedTest.php`: stage preset per use case, fixture stage names match the preset, customer_success set seeds.
-- New `tests/Feature/Onboarding/SetupConversationTest.php`: conversation seeded for a personal team owner only, one per team, message composed per use case, with and without Other text, with and without the AI attribution line, mailbox line absent while the email flag is off, flag off seeds nothing, the opener row is absent from the messages the store replays to the provider.
-- New `tests/Feature/Onboarding/DashboardOpenerTest.php`: opener shown and hidden by each condition, Not now dismisses, bootstrap payload carries the conversation id, member and second workspace never see it.
+- New `tests/Feature/Onboarding/SetupConversationTest.php`: conversation seeded empty for a personal team owner only, one per team, flag off seeds nothing, the wizard redirects to the thread (and to the dashboard with the flag off), opening it starts exactly one greeting turn, charges one credit, and greets neither twice, nor over an existing message, nor over a running turn, nor an ordinary conversation, nor without credits.
 - `tests/Feature/Chat/`: `<onboarding>` block content and escaping of the Other text, setup mode tool list excludes update, delete, and custom-field create and update, setup mode persists after the first own record, setup expiry applied only to the setup conversation, the two new guide destinations resolve.
 - New `tests/Feature/Chat/ChatAttachmentTest.php`: upload accepts CSV and TXT within limits and rejects the rest, a 25-row file is inlined as text in the stored user message, a 26-row file stores the templated reply and no model run, the wizard link creates the import for the chosen entity and lands on mapping, cross-team and reused ids are rejected, pruning removes file and media row after 24 hours.
 - `tests/Feature/Onboarding/` for the nudge and exit: link targets the setup conversation, subject per use case, the landing page renders without login, GET writes nothing, POST writes the reason, a bad signature is rejected, a second POST overwrites.
 - `tests/Feature/SystemAdmin/`: funnel page renders for a sysadmin and is invisible otherwise, matching the existing SystemAdmin test depth.
-- `tests/Browser/`: two critical paths. Sign up, answer Recruiting, see the opener, paste five rows, approve, see five own people and the checklist row complete. Then attach a 40-row CSV in the same conversation, follow Import as people, and land on the mapping step with the columns shown.
+- `tests/Browser/`: two critical paths. Sign up, answer Recruiting, land on the setup thread with the assistant already speaking, paste five rows, approve, see five own people and the checklist row complete. Then attach a 40-row CSV in the same conversation, follow Import as people, and land on the mapping step with the columns shown.
 
 Chat rules apply before anything is reported done: Horizon on, `QUEUE_CONNECTION=redis`, Reverb up, the full loop walked in a real browser, light and dark, mobile viewport for the opener.
 
@@ -304,7 +277,7 @@ All on the analytics clone, provenance is this section.
 Four slices, each its own implementation plan and PR.
 
 1. Wizard and shaping. Sections 5.1, 5.2, the `<onboarding>` prompt block without setup mode, the migration column for Other text. Not flagged. Visible change: three-step wizard, use-case stages, Rela knows the use case.
-2. The setup conversation and the file door. Sections 5.3, 5.4, 5.5 setup mode and destinations, 5.6, 5.7, 5.8 expiry, the flag, the `purpose` column, the `chat-attachments` media collection, and `onboarding_opener_dismissed_at`. Flagged.
+2. The setup conversation and the file door. Sections 5.3, 5.4, 5.5 setup mode and destinations, 5.6, 5.7, 5.8 expiry, the flag, the `purpose` column, and the `chat-attachments` media collection. Flagged.
 3. Resume and learning. Sections 5.8 nudge link and copy, 5.9, 5.10. Flagged.
 4. The mailbox path. After PR 237 merges: the opener's mailbox line, a `connect_mailbox` guide destination, and the accounts link. Gated on both flags. Not planned until PR 237 is merged.
 

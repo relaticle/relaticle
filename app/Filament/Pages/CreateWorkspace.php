@@ -360,10 +360,23 @@ final class CreateWorkspace extends RegisterTenant
             ->send();
     }
 
+    /**
+     * Signup ends on the setup conversation, where the assistant greets the
+     * owner and asks for their data. The listener that seeds it runs
+     * synchronously on WorkspaceCreated; a workspace without one (feature off,
+     * or an additional non-personal workspace) still lands on the dashboard.
+     */
     #[Override]
     protected function getRedirectUrl(): string
     {
-        return Dashboard::getUrl(['tenant' => $this->tenant]);
+        /** @var Workspace $tenant */
+        $tenant = $this->tenant;
+
+        $setupConversationId = $tenant->setupConversation()->value('id');
+
+        return is_string($setupConversationId)
+            ? ChatConversation::getUrl(['conversationId' => $setupConversationId, 'tenant' => $tenant])
+            : Dashboard::getUrl(['tenant' => $tenant]);
     }
 
     #[Override]

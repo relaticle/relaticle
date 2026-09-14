@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\Chat;
 
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Date;
@@ -100,7 +101,22 @@ final class ChatInterface extends BaseLivewireComponent
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
             $this->appendInFlightTurnState($this->conversationId);
+            $this->greetIfSetupConversation($this->conversationId);
         }
+    }
+
+    /**
+     * The setup conversation is seeded empty, so opening it is what makes the
+     * assistant speak. Arming turnInFlight here paints the thread as working
+     * from the first frame, the same as a reload mid-turn does.
+     */
+    private function greetIfSetupConversation(string $conversationId): void
+    {
+        if ($this->messages !== [] || $this->turnInFlight) {
+            return;
+        }
+
+        $this->turnInFlight = resolve(StartSetupGreeting::class)->execute($this->authUser(), $conversationId);
     }
 
     /**

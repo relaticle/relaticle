@@ -3,12 +3,18 @@
 declare(strict_types=1);
 
 use App\Enums\OnboardingUseCase;
+use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 
 mutates(CreateWorkspace::class);
 
 it('new user without workspaces is directed to onboarding wizard', function (): void {
+    Feature::define(SetupConversation::class, true);
+    Queue::fake();
+
     $user = User::factory()->create();
 
     loginViaBrowser($user)
@@ -27,15 +33,20 @@ it('new user without workspaces is directed to onboarding wizard', function (): 
         // Step 3: Use case (select "Other" which has no sub-options)
         ->click('[for$="onboarding_use_case-other"]')
         ->press('Get started')
-        ->assertPathContains('/my-first-workspace');
+        ->assertPathContains('/my-first-workspace/chats/');
 
     $user->refresh();
 
+    $workspace = $user->ownedWorkspaces->first();
+
     expect($user->ownedWorkspaces)->toHaveCount(1)
-        ->and($user->ownedWorkspaces->first()->name)->toBe('My First Workspace');
+        ->and($workspace->name)->toBe('My First Workspace')
+        ->and($workspace->setupConversation)->not->toBeNull();
 });
 
 it('stores the use case and its sub-option chosen in the browser', function (): void {
+    Queue::fake();
+
     $user = User::factory()->create();
 
     loginViaBrowser($user)

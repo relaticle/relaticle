@@ -11,19 +11,15 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
-use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Models\AgentConversation;
-use Relaticle\Chat\Services\TipTapDocumentParser;
-use Relaticle\Chat\Storage\SupersededAwareConversationStore;
-use Relaticle\Chat\Support\SetupOpener;
 
 final readonly class CreateSetupConversation
 {
-    public function __construct(
-        private SetupOpener $opener,
-        private TipTapDocumentParser $documents,
-    ) {}
-
+    /**
+     * The thread the owner lands on after signup. It is created empty: the
+     * first message is a real streamed turn the owner watches arrive, started
+     * by StartSetupGreeting when they open it.
+     */
     public function execute(Workspace $workspace): ?string
     {
         if (! Feature::active(SetupConversation::class)) {
@@ -45,40 +41,19 @@ final readonly class CreateSetupConversation
         }
 
         $conversationId = (string) Str::uuid7();
-        $content = $this->opener->compose($workspace);
         $now = now();
 
         try {
-            DB::transaction(function () use ($workspace, $owner, $conversationId, $content, $now): void {
-                DB::table('agent_conversations')->insert([
-                    'id' => $conversationId,
-                    'participant_type' => $owner->getMorphClass(),
-                    'participant_id' => (string) $owner->getKey(),
-                    'workspace_id' => $workspace->getKey(),
-                    'title' => __('onboarding/setup.title'),
-                    'purpose' => AgentConversation::PURPOSE_SETUP,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-
-                DB::table('agent_conversation_messages')->insert([
-                    'id' => (string) Str::uuid7(),
-                    'conversation_id' => $conversationId,
-                    'participant_type' => $owner->getMorphClass(),
-                    'participant_id' => (string) $owner->getKey(),
-                    'agent' => CrmAssistant::class,
-                    'role' => 'assistant',
-                    'content' => $content,
-                    'attachments' => '[]',
-                    'tool_calls' => '[]',
-                    'tool_results' => '[]',
-                    'usage' => '[]',
-                    'meta' => json_encode(['kind' => SupersededAwareConversationStore::SETUP_OPENER_KIND], JSON_THROW_ON_ERROR),
-                    'document' => json_encode($this->documents->buildFromText($content, [], $workspace), JSON_THROW_ON_ERROR),
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-            });
+            DB::table('agent_conversations')->insert([
+                'id' => $conversationId,
+                'participant_type' => $owner->getMorphClass(),
+                'participant_id' => (string) $owner->getKey(),
+                'workspace_id' => $workspace->getKey(),
+                'title' => __('onboarding/setup.title'),
+                'purpose' => AgentConversation::PURPOSE_SETUP,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
         } catch (UniqueConstraintViolationException) {
             $existingId = $workspace->setupConversation()->value('id');
 

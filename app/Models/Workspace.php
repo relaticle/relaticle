@@ -61,7 +61,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property CarbonImmutable|null $trial_ends_at
  * @property CarbonImmutable|null $pro_trial_used_at
  * @property CarbonImmutable|null $hosted_free_grandfathered_at
- * @property CarbonImmutable|null $onboarding_opener_dismissed_at
  * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `workspace_user` row, populated only when the workspace was
  *     loaded through `User::workspaces()`; null on a workspace reached any other way
@@ -205,7 +204,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
             'activation_checklist_dismissed_at' => 'datetime',
-            'onboarding_opener_dismissed_at' => 'datetime',
             'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Actions\People\CreatePeople;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingUseCase;
 use App\Features\SetupConversation;
-use App\Filament\Pages\Dashboard;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
@@ -20,7 +20,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\TurnPresence;
 use Tests\Helpers\ChatBrowser;
 
-mutates(Dashboard::class);
+mutates(StartSetupGreeting::class);
 
 /**
  * @return array{0: User, 1: Workspace}
@@ -42,46 +42,35 @@ function setupWorkspace(): array
     return [$user, $workspace->fresh()];
 }
 
-it('opens on the setup conversation and sends the first message into it', function (): void {
+it('opens the setup conversation with the assistant already speaking', function (): void {
     [$user, $workspace] = setupWorkspace();
     $conversationId = $workspace->setupConversation->id;
 
     Queue::fake();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->assertSee('Your candidate pipeline is ready: Sourced through Hired.')
-        ->assertSee('Not now')
-        ->assertDontSee('Good morning');
-
-    $page->script(<<<'JS'
-        (() => {
-            window.Echo = null;
-            const wrapper = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
-            Alpine.$data(wrapper).setText('Jane Doe, Acme, jane@acme.test');
-            document.querySelector('[data-chat-context="dashboard"]').closest('form').requestSubmit();
-        })();
-    JS);
-
-    $page->waitForText('Jane Doe, Acme, jane@acme.test')
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertPathContains("/chats/{$conversationId}")
-        ->assertSee('Your candidate pipeline is ready');
+        ->assertSee('Set up your workspace');
 
     $resolveInterface = ChatBrowser::resolveInterface();
 
     $page->assertScript(<<<JS
         (() => {
             {$resolveInterface}
-            return data.messages.find((m) => m.role === 'user')?.sendState ?? null;
+            return data.isStreaming && data.messages.length === 0;
         })()
-    JS, 'sent');
+    JS, true);
 
     expect(TurnPresence::current($conversationId))->not->toBeNull();
 
-    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId);
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId
+        && $job->message === StartSetupGreeting::PROMPT
+        && $job->isContinuation);
 });
 
 it('approves a seeded proposal in the setup thread and completes the first-record step', function (): void {
+    Queue::fake();
+
     [$user, $workspace] = setupWorkspace();
     $conversationId = $workspace->setupConversation->id;
     $names = ['Ada Lovelace', 'Grace Hopper', 'Linus Torvalds', 'Margaret Hamilton', 'Ken Thompson'];

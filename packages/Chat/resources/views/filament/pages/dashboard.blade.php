@@ -1,47 +1,23 @@
 <x-filament-panels::page>
     <div
         x-data="dashboardChatInput(@js(\App\Filament\Pages\ChatConversation::getUrl()), @js(auth()->user()?->ai_preferences['default_model'] ?? 'auto'))"
-        @if($setupConversationId) data-setup-conversation-id="{{ $setupConversationId }}" @endif
         class="mx-auto w-full max-w-3xl py-16"
     >
-        @if($setupConversationId)
-            <div class="mx-auto max-w-2xl" data-setup-opener>
-                <div class="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                    <x-heroicon-o-sparkles class="h-4 w-4" aria-hidden="true" />
-                    <span>{{ config('chat.assistant_name') }}</span>
-                </div>
+        <div class="text-center">
+            <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
+                {{ $this->getGreeting() }}
+            </h1>
 
-                <div class="{{ \Relaticle\Chat\Support\ChatProse::MESSAGE }} mt-3">{!! $setupOpenerHtml !!}</div>
-
-                <button
-                    type="button"
-                    wire:click="dismissSetupOpener"
-                    class="mt-4 text-sm text-gray-500 underline-offset-2 transition hover:text-gray-900 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
+            @if($recentChatId)
+                <a
+                    href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
+                    class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
                 >
-                    {{ __('onboarding/setup.not_now') }}
-                </button>
-            </div>
-        @else
-            <div class="text-center">
-                <h1 class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                    {{ $this->getGreeting() }}
-                </h1>
-
-                @if($recentChatId)
-                    <a
-                        href="{{ \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $recentChatId]) }}"
-                        class="mt-2 inline-flex items-center gap-1.5 rounded-md text-sm text-gray-500 transition hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-400 dark:hover:text-white"
-                    >
-                        <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
-                        @if($recentChatIsSetup)
-                            <span>{{ $recentChatTitle }}</span>
-                        @else
-                            <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
-                        @endif
-                    </a>
-                @endif
-            </div>
-        @endif
+                    <x-heroicon-o-chat-bubble-left class="h-3.5 w-3.5" />
+                    <span>{{ __('Recent chat') }} &middot; {{ \Illuminate\Support\Str::limit($recentChatTitle ?? __('Untitled chat'), 50) }}</span>
+                </a>
+            @endif
+        </div>
 
         {{-- Chat input --}}
         <form @submit.prevent="submit()" class="mt-10">
@@ -132,7 +108,6 @@
                     sessionStorage.setItem('chat:bootstrap', JSON.stringify({
                         document: editor.getDocument(),
                         model: this.selectedModel,
-                        conversationId: this.$root.dataset.setupConversationId || null,
                         attachment: this.pendingAttachment,
                     }));
                 } catch (_) {
@@ -144,9 +119,7 @@
                 // SPA navigation, mirroring openSwitcherItem in transcript.js:
                 // a full reload here repainted the whole Filament shell on
                 // every first message.
-                const setupId = this.$root.dataset.setupConversationId || null;
-                const target = setupId ? `${chatUrl.replace(/\/$/, '')}/${setupId}` : chatUrl;
-                window.Alpine?.navigate ? window.Alpine.navigate(target) : (window.location.href = target);
+                window.Alpine?.navigate ? window.Alpine.navigate(chatUrl) : (window.location.href = chatUrl);
             },
         }));
     </script>

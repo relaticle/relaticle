@@ -11,6 +11,8 @@ use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
 use App\Features\OnboardSeed;
+use App\Features\SetupConversation;
+use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
@@ -829,7 +831,34 @@ it('marks subsequent workspaces as non-personal', function (): void {
     expect($secondWorkspace->personal_workspace)->toBeFalse();
 });
 
-it('redirects first workspace to dashboard with notification', function (): void {
+it('redirects first workspace to the setup conversation with notification', function (): void {
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound'],
+            'name' => 'Redirect Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertNotified('Workspace created');
+
+    $workspace = $user->fresh()->currentWorkspace;
+
+    $component->assertRedirect(ChatConversation::getUrl([
+        'conversationId' => $workspace->setupConversation->id,
+        'tenant' => $workspace,
+    ]));
+});
+
+it('redirects first workspace to the dashboard when the setup conversation is off', function (): void {
+    Feature::define(SetupConversation::class, false);
+
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -842,7 +871,6 @@ it('redirects first workspace to dashboard with notification', function (): void
         ])
         ->call('register')
         ->assertHasNoFormErrors()
-        ->assertNotified('Workspace created')
         ->assertRedirect(Dashboard::getUrl(['tenant' => $user->fresh()->currentWorkspace]));
 });
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
@@ -330,6 +331,33 @@ it('renders the onboarding block with the use case and the stage names the works
         ->toContain('stages: Sourced, Applied, Screen, Interview, Offer, Hired, Declined')
         ->toContain('context: Sourcing')
         ->not->toContain('other_use_case:');
+});
+
+it('carries the referral source so the model can offer to connect their assistant', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->forceFill([
+        'onboarding_use_case' => OnboardingUseCase::Sales,
+        'onboarding_referral_source' => OnboardingReferralSource::AI,
+    ])->save();
+
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace->fresh());
+
+    expect($agent->dynamicInstructions())->toContain('referral: AI')
+        ->and($agent->instructions())->toContain('destination "connect_assistant"');
+});
+
+it('leaves the referral line out when the workspace never answered', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->forceFill([
+        'onboarding_use_case' => OnboardingUseCase::Sales,
+        'onboarding_referral_source' => null,
+    ])->save();
+
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace->fresh());
+
+    expect($agent->dynamicInstructions())->not->toContain('referral:');
 });
 
 it('names the stages a workspace created before the presets actually has, not its use case preset', function (): void {
