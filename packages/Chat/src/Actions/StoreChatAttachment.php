@@ -45,13 +45,15 @@ final readonly class StoreChatAttachment
             throw ValidationException::withMessages(['file' => $e->getMessage()]);
         }
 
+        $originalName = Str::limit($file->getClientOriginalName(), 255, '');
+
         try {
             $media = $workspace->addMedia($file)
                 ->usingFileName(Str::ulid().'.csv')
-                ->usingName(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME))
+                ->usingName(pathinfo($originalName, PATHINFO_FILENAME))
                 ->withCustomProperties([
                     'uploaded_by' => (string) $user->getKey(),
-                    'original_name' => Str::limit($file->getClientOriginalName(), 255, ''),
+                    'original_name' => $originalName,
                     'conversation_id' => $conversationId,
                     'row_count' => $inspection['row_count'],
                     'header' => $inspection['headers'],

@@ -83,6 +83,15 @@ it('accepts a txt file that holds csv rows', function (): void {
         ->assertJsonPath('row_count', 2);
 });
 
+it('caps a filename longer than the media name column', function (): void {
+    $longName = str_repeat('a', 296).'.csv';
+    $cappedName = Str::limit($longName, 255, '');
+
+    $this->postJson(route('chat.attachments.store'), ['file' => csvUpload(2, $longName)])
+        ->assertOk()
+        ->assertJsonPath('name', $cappedName);
+});
+
 it('rejects other file types and files over 10 MB', function (): void {
     $this->postJson(route('chat.attachments.store'), ['file' => UploadedFile::fake()->create('book.xlsx', 10, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')])
         ->assertStatus(422)
@@ -169,7 +178,7 @@ it('builds a second import for companies from the same kept file', function (): 
     $this->get(route('chat.attachments.import', ['attachment' => $id, 'entity' => 'people']));
     $response = $this->get(route('chat.attachments.import', ['attachment' => $id, 'entity' => 'company']));
 
-    $imports = Import::query()->where('workspace_id', $this->workspace->getKey())->orderBy('created_at')->get();
+    $imports = Import::query()->where('workspace_id', $this->workspace->getKey())->orderBy('id')->get();
     $this->createdStoreIds = $imports->pluck('id')->all();
 
     expect($imports)->toHaveCount(2)

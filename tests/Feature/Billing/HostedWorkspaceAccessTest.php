@@ -7,8 +7,12 @@ use App\Features\Billing as BillingFeature;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Models\Company;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Tests\Helpers\ChatDocument;
@@ -137,6 +141,24 @@ it('redirects a paused workspace to billing on the record-redirect route instead
     $company = Company::factory()->for($this->workspace)->create();
 
     $this->get("/r/company/{$company->getKey()}")
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('redirects a paused workspace to billing on the attachment import route instead of returning raw json', function (): void {
+    Storage::fake('local');
+
+    $csv = UploadedFile::fake()->createWithContent('contacts.csv', "Name\nJane\n");
+
+    $media = $this->workspace->addMedia($csv)
+        ->usingFileName(Str::ulid().'.csv')
+        ->withCustomProperties([
+            'uploaded_by' => (string) $this->user->getKey(),
+            'row_count' => 1,
+            'header' => ['Name'],
+        ])
+        ->toMediaCollection(Workspace::CHAT_ATTACHMENTS_MEDIA_COLLECTION);
+
+    $this->get(route('chat.attachments.import', ['attachment' => $media->uuid, 'entity' => 'people']))
         ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 

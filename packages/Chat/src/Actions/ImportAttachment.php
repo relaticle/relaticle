@@ -7,12 +7,13 @@ namespace Relaticle\Chat\Actions;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Exceptions\ImportFileException;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Support\ImportFileLoader;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class ImportAttachment
 {
@@ -37,32 +38,37 @@ final readonly class ImportAttachment
 
         abort_if(! $attachment instanceof ChatAttachment, 404);
 
-        $existingId = $attachment->importIdFor($entityType);
-
-        if ($existingId !== null) {
-            $existing = Import::query()->forWorkspace((string) $workspace->getKey())->find($existingId);
-
-            if ($existing instanceof Import) {
-                return $existing;
-            }
-        }
-
         abort_unless($attachment->fileExists(), 410);
 
-        try {
-            $import = $this->loader->load(
-                $attachment->absolutePath(),
-                $attachment->name(),
-                $entityType,
-                (string) $workspace->getKey(),
-                (string) $user->getKey(),
-            );
-        } catch (ImportFileException $e) {
-            throw ValidationException::withMessages(['attachment' => $e->getMessage()]);
-        }
+        return DB::transaction(function () use ($attachment, $entityType, $workspace, $user): Import {
+            $media = Media::query()->whereKey($attachment->media->getKey())->lockForUpdate()->firstOrFail();
+            $locked = new ChatAttachment($media);
 
-        $attachment->media->setCustomProperty("imports.{$entityType->value}", $import->id)->save();
+            $existingId = $locked->importIdFor($entityType);
 
-        return $import;
+            if ($existingId !== null) {
+                $existing = Import::query()->forWorkspace((string) $workspace->getKey())->find($existingId);
+
+                if ($existing instanceof Import) {
+                    return $existing;
+                }
+            }
+
+            try {
+                $import = $this->loader->load(
+                    $locked->absolutePath(),
+                    $locked->name(),
+                    $entityType,
+                    (string) $workspace->getKey(),
+                    (string) $user->getKey(),
+                );
+            } catch (ImportFileException $e) {
+                abort(422, $e->getMessage());
+            }
+
+            $media->setCustomProperty("imports.{$entityType->value}", $import->id)->save();
+
+            return $import;
+        });
     }
 }
