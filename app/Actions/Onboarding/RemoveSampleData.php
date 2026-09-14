@@ -30,6 +30,7 @@ final readonly class RemoveSampleData
     public function execute(User $user, Workspace $workspace): int
     {
         abort_unless($user->ownsWorkspace($workspace), 403);
+        abort_unless($this->facts->hasOwnRecord($workspace), 422);
 
         $removed = DB::transaction(function () use ($workspace): int {
             $removed = 0;

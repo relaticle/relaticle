@@ -376,7 +376,7 @@ it('removes every system record and keeps the workspace\'s own', function (): vo
     livewire(ActivationChecklist::class)
         ->call('removeSampleData')
         ->assertSet('canRemoveSampleData', false)
-        ->assertDontSee(__('filament/pages/dashboard.activation.sample_data'));
+        ->assertRedirect(Dashboard::getUrl());
 
     foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
         expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeFalse();
@@ -384,6 +384,67 @@ it('removes every system record and keeps the workspace\'s own', function (): vo
 
     expect(People::query()->whereKey($own->getKey())->exists())->toBeTrue()
         ->and(resolve(WorkspaceActivationFacts::class)->hasSampleData($this->workspace->fresh()))->toBeFalse();
+});
+
+it('refuses removal while the workspace has no own record', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+
+    livewire(ActivationChecklist::class)
+        ->call('removeSampleData')
+        ->assertStatus(422);
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
+});
+
+it('hides the checklist from a non-owner admin and refuses the call', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->workspace);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('visible', false)
+        ->assertSet('canRemoveSampleData', false)
+        ->assertDontSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+
+    try {
+        resolve(RemoveSampleData::class)->execute($admin, $this->workspace);
+
+        $this->fail('Expected an HttpException.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
+});
+
+it('refuses removal from the owner of a different workspace', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    $intruder = User::factory()->withPersonalWorkspace()->create();
+
+    try {
+        resolve(RemoveSampleData::class)->execute($intruder, $this->workspace);
+
+        $this->fail('Expected an HttpException.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
 });
 
 it('refuses sample removal from a member', function (): void {

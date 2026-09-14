@@ -8,6 +8,7 @@ use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\Data\ActivationStepData;
 use App\Enums\ActivationStep;
+use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\PeopleResource;
 use App\Models\User;
@@ -53,7 +54,7 @@ final class ActivationChecklist extends Component
 
         resolve(RemoveSampleData::class)->execute($this->user(), $workspace);
 
-        unset($this->steps, $this->hasSampleData, $this->canRemoveSampleData);
+        $this->redirect(request()->header('Referer') ?? Dashboard::getUrl(), navigate: true);
     }
 
     public function render(): View
