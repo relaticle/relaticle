@@ -3,13 +3,18 @@
 declare(strict_types=1);
 
 use App\Actions\Onboarding\DismissActivationChecklist;
+use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PeopleResource;
 use App\Livewire\App\Onboarding\ActivationChecklist;
+use App\Models\Company;
+use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
@@ -17,8 +22,9 @@ use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ActivationChecklist::class, DismissActivationChecklist::class);
+mutates(ActivationChecklist::class, DismissActivationChecklist::class, RemoveSampleData::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withPersonalWorkspace()->create();
@@ -43,6 +49,17 @@ function composePromptUrl(string $key = 'prompt_empty'): string
 function stepState(string $key, bool $complete): string
 {
     return sprintf('data-step="%s" data-complete="%s"', $key, $complete ? 'true' : 'false');
+}
+
+function seedSampleRecords(Workspace $workspace, User $owner): void
+{
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        $model::factory()->create([
+            'workspace_id' => $workspace->getKey(),
+            'creator_id' => $owner->getKey(),
+            'creation_source' => CreationSource::SYSTEM,
+        ]);
+    }
 }
 
 it('starts every step incomplete in a fresh workspace', function (): void {
@@ -327,3 +344,51 @@ it('shows the invite row to a workspace admin and hides it from an editor', func
         ->assertOk()
         ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));
 });
+
+it('offers to remove sample data only once the workspace has an own record', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('canRemoveSampleData', false)
+        ->assertDontSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('canRemoveSampleData', true)
+        ->assertSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+});
+
+it('removes every system record and keeps the workspace\'s own', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    $own = People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->call('removeSampleData')
+        ->assertSet('canRemoveSampleData', false)
+        ->assertDontSee(__('filament/pages/dashboard.activation.sample_data'));
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeFalse();
+    }
+
+    expect(People::query()->whereKey($own->getKey())->exists())->toBeTrue()
+        ->and(resolve(WorkspaceActivationFacts::class)->hasSampleData($this->workspace->fresh()))->toBeFalse();
+});
+
+it('refuses sample removal from a member', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+
+    resolve(RemoveSampleData::class)->execute($member, $this->workspace);
+})->throws(HttpException::class);
