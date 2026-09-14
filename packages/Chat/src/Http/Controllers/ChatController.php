@@ -154,6 +154,7 @@ final readonly class ChatController
             return response()->json([
                 'status' => 'stored',
                 'conversation_id' => $conversation,
+                'title' => $existing->title,
                 ...$stored,
             ]);
         }
@@ -234,10 +235,6 @@ final readonly class ChatController
             pageContext: $pageContext,
         );
 
-        if ($attachment instanceof ChatAttachment) {
-            $this->consumeAttachment->execute($attachment, $conversation);
-        }
-
         dispatch(new ProcessChatMessage(
             user: $user,
             workspace: $workspace,
@@ -250,6 +247,10 @@ final readonly class ChatController
             turnId: $turnId,
             attachment: $attachment?->meta(),
         ));
+
+        if ($attachment instanceof ChatAttachment) {
+            $this->consumeAttachment->execute($attachment, $conversation);
+        }
 
         return response()->json([
             'status' => 'processing',

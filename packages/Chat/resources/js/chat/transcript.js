@@ -756,10 +756,6 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     renderMessageContent(message) {
         const emptyDocument = !message.document || (Array.isArray(message.document.content) && message.document.content.length === 0);
 
-        if (emptyDocument && message.role === 'user' && message.attachment) {
-            return '';
-        }
-
         if (emptyDocument) {
             return this.escapeHtml(message.content ?? '');
         }
@@ -1249,16 +1245,32 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return this.messages.slice(0, index).some((m) => m.role === 'user');
     },
 
+    // A single-use attachment is consumed by the turn it was sent with, so
+    // regenerate/retry/edit have no file left to resend and would silently
+    // drop the CSV context the model saw the first time.
+    precedingPromptHasAttachment(index) {
+        const userIndex = this.messages.slice(0, index).findLastIndex((m) => m.role === 'user');
+        return userIndex !== -1 && !!this.messages[userIndex].attachment;
+    },
+
     canRegenerate(index) {
         const msg = this.messages[index];
         if (msg?.pending_actions?.some((a) => a.status === 'pending')) {
             return false;
         }
+        if (this.precedingPromptHasAttachment(index)) {
+            return false;
+        }
         return this.hasUserPrompt(index);
+    },
+
+    canRetryTurn(index) {
+        return !this.precedingPromptHasAttachment(index);
     },
 
     canEdit(index) {
         if (this.isStreaming) return false;
+        if (this.messages[index]?.attachment) return false;
 
         for (let i = index + 1; i < this.messages.length; i++) {
             const next = this.messages[i];

@@ -290,6 +290,7 @@
                                     <button
                                         type="button"
                                         data-edit-button
+                                        x-show="!msg.attachment"
                                         x-on:click="(canEdit(index) && rateLimit === null) && startEdit(msg, index)"
                                         :disabled="!canEdit(index) || rateLimit !== null"
                                         :title="editButtonLabel(index)"
@@ -374,7 +375,7 @@
                                 <button
                                     type="button"
                                     data-retry-button
-                                    x-show="msg.retryable && !isStreaming && !rateLimit"
+                                    x-show="msg.retryable && !isStreaming && !rateLimit && canRetryTurn(index)"
                                     x-on:click="retryTurn(msg)"
                                     class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                                 >
@@ -405,7 +406,7 @@
                                 <button
                                     type="button"
                                     data-regenerate-button
-                                    x-show="!isStreaming && hasUserPrompt(index)"
+                                    x-show="!isStreaming && hasUserPrompt(index) && !precedingPromptHasAttachment(index)"
                                     x-on:click="regenerateMessage(index)"
                                     :disabled="!canRegenerate(index) || rateLimit !== null"
                                     :aria-label="regenerateButtonLabel(index)"

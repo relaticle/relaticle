@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatAttachment;
 
@@ -18,6 +19,7 @@ final readonly class StoreImportHandoff
         private TipTapDocumentParser $documents,
         private ConsumeChatAttachment $consume,
         private ListConversationMessages $messages,
+        private PendingActionService $pendingActions,
     ) {}
 
     /**
@@ -32,6 +34,8 @@ final readonly class StoreImportHandoff
         $now = now();
 
         DB::transaction(function () use ($user, $workspace, $conversationId, $attachment, $text, $document, $userMessageId, $assistantMessageId, $reply, $now): void {
+            $this->pendingActions->supersedePendingForConversation($conversationId);
+
             DB::table('agent_conversation_messages')->insert([
                 [
                     'id' => $userMessageId,

@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
@@ -93,61 +94,67 @@ final readonly class ListConversationMessages
                 ])
                 ->all();
 
-        return $messages->map(fn (object $msg): array => [
-            'id' => (string) $msg->id,
-            'role' => (string) $msg->role,
-            'content' => $msg->role === 'assistant'
-                ? $this->markdown->render((string) ($msg->content ?? ''))
-                : (string) ($msg->content ?? ''),
-            'document' => (function (mixed $raw): array {
-                if ($raw === null) {
-                    return ['type' => 'doc', 'content' => []];
-                }
-                $decoded = json_decode((string) $raw, true);
+        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $envelopesByMessage, $records): array {
+            $attachment = $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta);
 
-                return is_array($decoded) ? $decoded : ['type' => 'doc', 'content' => []];
-            })($msg->document ?? null),
-            // Normalized to the same ISO 8601 UTC shape (`.toISOString()`) the
-            // client mints for optimistic/streamed messages, see send.js and
-            // stream.js. The raw DB column value is `Y-m-d H:i:s` with no
-            // timezone marker; browsers parse that non-ISO form as LOCAL time,
-            // not UTC (a real, silent divergence from the client-minted rows,
-            // which are true UTC), so leaving it as-is here would corrupt any
-            // client-side comparison across the two message shapes (grouping
-            // gaps, day separators, and the bubble tooltips, which were
-            // already reading the wrong time before this fix).
-            'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
-            'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
-            'display_blocks' => DisplayBlocks::collect(
-                $msg->tool_results === null ? null : (string) $msg->tool_results,
-            ),
-            'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
-            'feedback' => isset($feedbackByMessage[$msg->id]) ? [
-                'rating' => (string) $feedbackByMessage[$msg->id]->rating,
-                'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
-            ] : null,
-            'mentions' => array_values(
-                ($mentionsByMessage[$msg->id] ?? collect())
-                    ->filter(fn (stdClass $row): bool => (string) $row->source !== 'page_context')
+            return [
+                'id' => (string) $msg->id,
+                'role' => (string) $msg->role,
+                'content' => match (true) {
+                    $msg->role === 'assistant' => $this->markdown->render((string) ($msg->content ?? '')),
+                    $attachment !== null => AttachedRows::typedText((string) ($msg->content ?? '')),
+                    default => (string) ($msg->content ?? ''),
+                },
+                'document' => (function (mixed $raw): array {
+                    if ($raw === null) {
+                        return ['type' => 'doc', 'content' => []];
+                    }
+                    $decoded = json_decode((string) $raw, true);
+
+                    return is_array($decoded) ? $decoded : ['type' => 'doc', 'content' => []];
+                })($msg->document ?? null),
+                // Normalized to the same ISO 8601 UTC shape (`.toISOString()`) the
+                // client mints for optimistic/streamed messages, see send.js and
+                // stream.js. The raw DB column value is `Y-m-d H:i:s` with no
+                // timezone marker; browsers parse that non-ISO form as LOCAL time,
+                // not UTC (a real, silent divergence from the client-minted rows,
+                // which are true UTC), so leaving it as-is here would corrupt any
+                // client-side comparison across the two message shapes (grouping
+                // gaps, day separators, and the bubble tooltips, which were
+                // already reading the wrong time before this fix).
+                'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
+                'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
+                'display_blocks' => DisplayBlocks::collect(
+                    $msg->tool_results === null ? null : (string) $msg->tool_results,
+                ),
+                'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
+                'feedback' => isset($feedbackByMessage[$msg->id]) ? [
+                    'rating' => (string) $feedbackByMessage[$msg->id]->rating,
+                    'category' => $feedbackByMessage[$msg->id]->category === null ? null : (string) $feedbackByMessage[$msg->id]->category,
+                ] : null,
+                'mentions' => array_values(
+                    ($mentionsByMessage[$msg->id] ?? collect())
+                        ->filter(fn (stdClass $row): bool => (string) $row->source !== 'page_context')
+                        ->map(fn (stdClass $row): array => [
+                            'type' => (string) $row->type,
+                            'id' => (string) $row->record_id,
+                            'label' => (string) $row->label,
+                            'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
+                        ])
+                        ->all()
+                ),
+                'page_context' => ($mentionsByMessage[$msg->id] ?? collect())
+                    ->filter(fn (stdClass $row): bool => (string) $row->source === 'page_context')
                     ->map(fn (stdClass $row): array => [
                         'type' => (string) $row->type,
                         'id' => (string) $row->record_id,
                         'label' => (string) $row->label,
                         'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
                     ])
-                    ->all()
-            ),
-            'page_context' => ($mentionsByMessage[$msg->id] ?? collect())
-                ->filter(fn (stdClass $row): bool => (string) $row->source === 'page_context')
-                ->map(fn (stdClass $row): array => [
-                    'type' => (string) $row->type,
-                    'id' => (string) $row->record_id,
-                    'label' => (string) $row->label,
-                    'url' => $this->resolver->urlFor((string) $row->type, (string) $row->record_id),
-                ])
-                ->first(),
-            'attachment' => $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta),
-        ])->values()->all();
+                    ->first(),
+                'attachment' => $attachment,
+            ];
+        })->values()->all();
     }
 
     /**

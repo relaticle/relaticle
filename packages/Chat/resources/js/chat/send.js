@@ -618,6 +618,14 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         this.clearStreamTimeout();
         this.scrollToBottom(true);
         this.restoreInputFocus();
+        this.flushQueuedSend();
+        // No model turn ran, so no title broadcast fires; the server hands the
+        // conversation's current title back in the same response instead.
+        if (body.title && this.conversationId) {
+            this.applyTitle(this.conversationId, body.title);
+        } else {
+            this.maybeSyncTitle();
+        }
     },
 
     async cancelStream() {
