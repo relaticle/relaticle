@@ -278,6 +278,28 @@ it('rejects a reused, foreign or pruned attachment', function (): void {
     ])->assertStatus(422)->assertJsonValidationErrors(['attachment_id']);
 });
 
+it('keeps typed text that itself starts with the attached file lead', function (): void {
+    $attachmentId = attachCsv(2);
+    $attachment = ChatAttachment::find($this->workspace, $this->user, $attachmentId);
+    $typed = 'Attached file "notes" is what I call this list';
+    CrmAssistant::fake(['Review the proposal below.']);
+
+    $job = new ProcessChatMessage(
+        user: $this->user,
+        workspace: $this->workspace,
+        message: AttachedRows::append($typed, $attachment),
+        conversationId: $this->conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+        attachment: ['id' => $attachmentId, 'name' => 'contacts.csv', 'row_count' => 2],
+    );
+    $job->handle(resolve(CreditService::class));
+
+    $messages = resolve(ListConversationMessages::class)->execute($this->user, $this->conversationId);
+
+    expect(collect($messages)->firstWhere('role', 'user')['content'])->toBe($typed);
+});
+
 it('shows the attachment on the stored user message after the turn', function (): void {
     $attachmentId = attachCsv(2);
     $attachment = ChatAttachment::find($this->workspace, $this->user, $attachmentId);

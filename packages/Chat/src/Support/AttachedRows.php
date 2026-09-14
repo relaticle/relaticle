@@ -20,19 +20,18 @@ final readonly class AttachedRows
         return $text === '' ? $block : "{$text}\n\n{$block}";
     }
 
-    // The block always starts with this prefix, at position 0 (no text was
-    // typed) or right after append()'s "\n\n" separator.
+    // The block is the tail of the content and holds no blank line, so the
+    // last "\n\n" before the lead is append()'s separator, never typed text.
     public static function typedText(string $content): string
     {
         $marker = 'Attached file "';
+        $pos = strrpos($content, "\n\n{$marker}");
 
-        if (str_starts_with($content, $marker)) {
-            return '';
+        if ($pos !== false) {
+            return trim(substr($content, 0, $pos));
         }
 
-        $pos = strpos($content, "\n\n{$marker}");
-
-        return $pos === false ? $content : trim(substr($content, 0, $pos));
+        return str_starts_with($content, $marker) ? '' : $content;
     }
 
     public static function block(ChatAttachment $attachment): string
