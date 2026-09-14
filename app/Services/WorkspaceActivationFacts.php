@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Enums\CreationSource;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 
 /**
  * Request-scoped answers to "what has this workspace done so far".
@@ -68,12 +69,18 @@ final class WorkspaceActivationFacts
         return $workspace->users()->exists() || $workspace->workspaceInvitations()->exists();
     }
 
+    /**
+     * A user row the person actually typed. The setup greeting and every
+     * resumed turn store their own prompt as a user message, so the step would
+     * otherwise tick itself before the user had said anything.
+     */
     public function hasUserChatMessage(Workspace $workspace): bool
     {
         return DB::table('agent_conversation_messages as m')
             ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
             ->where('c.workspace_id', $workspace->getKey())
             ->where('m.role', 'user')
+            ->whereRaw("coalesce(m.meta->>'kind', '') <> ?", [SupersededAwareConversationStore::CONTINUATION_KIND])
             ->exists();
     }
 

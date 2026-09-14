@@ -46,6 +46,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ConversationTitleGate;
@@ -607,6 +608,22 @@ final class ProcessChatMessage implements ShouldQueue
      * behavior for that one edge case, never a duplicate or a false error
      * note, and are accepted rather than solved with more machinery.
      */
+    /**
+     * A turn whose prompt we wrote (a resume, the setup greeting) must carry
+     * the continuation mark here too, or a dead turn leaves that prompt in the
+     * transcript as words the user never typed.
+     *
+     * @return array<string, mixed>
+     */
+    private function failedTurnUserMeta(): array
+    {
+        if ($this->isContinuation) {
+            return ['kind' => SupersededAwareConversationStore::CONTINUATION_KIND];
+        }
+
+        return $this->attachment === null ? [] : ['attachment' => $this->attachment];
+    }
+
     private function persistFailedTurn(?Throwable $exception): void
     {
         $now = now();
@@ -648,7 +665,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'tool_calls' => '[]',
                 'tool_results' => '[]',
                 'usage' => '[]',
-                'meta' => json_encode($this->attachment === null ? [] : ['attachment' => $this->attachment], JSON_THROW_ON_ERROR),
+                'meta' => json_encode($this->failedTurnUserMeta(), JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
                 'created_at' => $now,
                 'updated_at' => $now,

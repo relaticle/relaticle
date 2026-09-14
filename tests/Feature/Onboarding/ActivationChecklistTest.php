@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Actions\Onboarding\RemoveSampleData;
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\ChatConversation;
@@ -24,7 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ActivationChecklist::class, DismissActivationChecklist::class, RemoveSampleData::class);
+mutates(ActivationChecklist::class, DismissActivationChecklist::class, RemoveSampleData::class, WorkspaceActivationFacts::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withPersonalWorkspace()->create();
@@ -148,6 +149,40 @@ it('completes the assistant step once the user has sent a chat message', functio
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('ask_rela', true));
+});
+
+it('leaves the assistant step open for a prompt the user never typed', function (): void {
+    $conversationId = (string) Str::ulid();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $this->workspace->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => $this->owner->getKey(),
+        'title' => 'Set up your workspace',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'user',
+        'content' => StartSetupGreeting::PROMPT,
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => json_encode(['kind' => 'continuation']),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('ask_rela', false));
 });
 
 it('ignores records and conversations belonging to another workspace', function (): void {
