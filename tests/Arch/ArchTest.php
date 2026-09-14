@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Filament\Exports\BaseExporter;
 use App\Filament\Imports\BaseImporter;
 use App\Filament\Pages\Import\ImportPage;
+use App\Filament\RelationManagers\BaseActivityTimelineRelationManager;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Http\Requests\Api\V1\IndexCustomFieldsRequest;
 use App\Http\Requests\Api\V1\IndexRequest;
@@ -22,6 +23,9 @@ use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager;
 
 arch()->preset()->php();
 
@@ -30,7 +34,10 @@ arch()->preset()->php();
 // provider hooks, base-tool templates), and pint already enforces final
 // classes + strict types repo-wide.
 
-arch()->preset()->security()->ignoring('assert');
+arch()->preset()->security()->ignoring([
+    'assert',
+    'Relaticle\EmailIntegration\Jobs\StoreMeetingJob',
+]);
 
 arch()->preset()
     ->laravel()
@@ -42,6 +49,7 @@ arch()->preset()
         'App\Enums\CustomFields\CustomFieldTrait',
         'App\Mcp',
         'App\Http\Controllers\Mcp',
+        'App\ActivityLog',
         'App\Models\ActivityLog\Scopes\WorkspaceScope',
         // Chat tools intentionally reuse App\Http\Resources (consistent
         // LLM-facing payloads); the preset forbids resources outside Http.
@@ -57,6 +65,10 @@ arch('avoid open for extension')
     ->classes()
     ->toBeFinal()
     ->ignoring([
+        BaseActivityTimelineRelationManager::class,
+        BaseEmailsRelationManager::class,
+        BaseMeetingsRelationManager::class,
+        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -79,6 +91,10 @@ arch('ensure no extends')
     ->not
     ->toBeAbstract()
     ->ignoring([
+        BaseActivityTimelineRelationManager::class,
+        BaseEmailsRelationManager::class,
+        BaseMeetingsRelationManager::class,
+        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -92,6 +108,7 @@ arch('ensure no extends')
         BaseRelationshipTool::class,
         BaseCrmEntityRequest::class,
         ImportPage::class,
+        BaseRecordEmailsPage::class,
     ]);
 
 arch('avoid mutation')
@@ -204,6 +221,8 @@ $packageServiceLayers = [
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
     'Relaticle\Documentation\Support',
+    'Relaticle\EmailIntegration\Actions',
+    'Relaticle\EmailIntegration\Services',
     'Relaticle\ImportWizard\Support',
     'Relaticle\OnboardSeed\Support',
     'Relaticle\SystemAdmin\Actions',
@@ -221,6 +240,12 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Support\PromptText',
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',
+        // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
+        'Relaticle\EmailIntegration\Services\EmailVisibilityService',
+        'Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory',
+        'Relaticle\EmailIntegration\Services\TeamMemberDirectory',
+        'Relaticle\EmailIntegration\Services\MicrosoftGraphMailService',
+        'Relaticle\EmailIntegration\Services\PrivacyService',
         'Relaticle\ImportWizard\Support\DataTypeInferencer',
         'Relaticle\ImportWizard\Support\EntityLinkResolver',
         'Relaticle\ImportWizard\Support\EntityLinkStorage\CustomFieldValueStorage',

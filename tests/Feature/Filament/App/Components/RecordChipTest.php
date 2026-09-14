@@ -78,7 +78,11 @@ function assigneesFilterField(ManageTasks $page): Select
 function pickerLabelText(array $options): array
 {
     return array_values(array_map(
-        fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
+        fn (string $label): string => trim((string) preg_replace(
+            '/\s+/',
+            ' ',
+            html_entity_decode(strip_tags($label), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+        )),
         $options,
     ));
 }

@@ -21,7 +21,6 @@ final readonly class ApplyTenantScopes
     public function handle(Request $request, Closure $next): mixed
     {
         $tenantId = Filament::getTenant()->getKey();
-
         User::addGlobalScope(
             filament()->getTenancyScopeName(),
             fn (Builder $query) => $query

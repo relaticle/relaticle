@@ -33,6 +33,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Onboarding\ActivationSteps;
+use App\Policies\EmailPolicy;
+use App\Policies\EmailTemplatePolicy;
+use App\Policies\MeetingPolicy;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
@@ -43,6 +46,7 @@ use App\Support\BrandColors;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
+use App\Support\Migrations\TenantMigration;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
@@ -62,6 +66,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades;
@@ -84,11 +90,18 @@ use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Facades\Activity as ActivityLogger;
@@ -198,6 +211,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);
         Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
+        Event::listen(SocialiteWasCalled::class, [AzureExtendSocialite::class, 'handle']);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
@@ -249,11 +263,13 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureFilament();
         $this->configureGitHubStars();
         $this->configureLivewire();
+        $this->configureMacros();
         $this->configureRateLimiting();
         $this->configureScribe();
 
         $this->configureActivityLog();
         $this->configureBlog();
+        $this->configureDevCommands();
     }
 
     /**
@@ -311,6 +327,10 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configurePolicies(): void
     {
+        Gate::policy(Email::class, EmailPolicy::class);
+        Gate::policy(EmailTemplate::class, EmailTemplatePolicy::class);
+        Gate::policy(Meeting::class, MeetingPolicy::class);
+
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {
                 $currentPanelId = Filament::getCurrentPanel()?->getId();
@@ -495,6 +515,11 @@ final class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
+            'email' => Email::class,
+            'connected_account' => ConnectedAccount::class,
+            'email_thread' => EmailThread::class,
+            'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
             'custom_field' => CustomField::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
@@ -638,5 +663,20 @@ final class AppServiceProvider extends ServiceProvider
         Facades\View::composer('home.partials.works-with', function (View $view): void {
             $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
+    }
+
+    private function configureMacros(): void
+    {
+        Blueprint::macro('teams', function (): void {
+            TenantMigration::addForeignKey($this);
+        });
+    }
+
+    private function configureDevCommands(): void
+    {
+        DevCommands::artisan(
+            'schedule:work',
+        );
+        DevCommands::except('reverb', 'queue');
     }
 }

@@ -10,14 +10,16 @@ use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
 use App\Models\User;
+use App\Providers\Filament\AppPanelProvider;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
-mutates(Members::class, CustomFields::class, ActivityLog::class, ImportHistory::class);
+mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -53,22 +55,27 @@ test('every workspace settings page renders the same tab strip', function (): vo
         __('workspaces.tabs.general'),
         __('workspaces.tabs.members'),
         __('workspaces.tabs.custom_fields'),
+        __('workspaces.tabs.email'),
         __('workspaces.tabs.import_history'),
         __('workspaces.tabs.activity'),
         __('workspaces.tabs.billing'),
     ];
 
-    foreach ([EditWorkspace::class, Members::class, CustomFields::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
+    foreach ([EditWorkspace::class, Members::class, CustomFields::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
         expect(workspaceTabLabels(app($page)))
             ->toBe($expected, "[{$page}] should render the full tab strip");
     }
 });
 
-test('the custom fields tab lives under the workspace url and the standalone route is gone', function (): void {
+test('workspace settings tabs live under the workspace url without duplicate standalone routes', function (): void {
     expect(CustomFields::getSlug())->toBe('workspace/custom-fields')
         ->and(Members::getSlug())->toBe('workspace/members')
+        ->and(EmailPrivacySettingsPage::getSlug())->toBe('workspace/email')
+        ->and(ActivityLog::getSlug())->toBe('workspace/activity')
         ->and(Route::has('filament.app.pages.custom-fields'))->toBeFalse()
-        ->and(Route::has('filament.app.pages.workspace.custom-fields'))->toBeTrue();
+        ->and(Route::has('filament.app.pages.workspace.custom-fields'))->toBeTrue()
+        ->and(Route::has('filament.app.email-settings.pages.privacy'))->toBeFalse()
+        ->and(Route::has('filament.app.pages.workspace.email'))->toBeTrue();
 });
 
 test('billing keeps its own url so the paywall allowlist keeps matching', function (): void {
@@ -81,6 +88,7 @@ test('a workspace admin can open every tab', function (): void {
         EditWorkspace::getUrl(tenant: $this->workspace),
         Members::getUrl(tenant: $this->workspace),
         CustomFields::getUrl(tenant: $this->workspace),
+        EmailPrivacySettingsPage::getUrl(tenant: $this->workspace),
         ImportHistory::getUrl(tenant: $this->workspace),
         ActivityLog::getUrl(tenant: $this->workspace),
     ] as $url) {
@@ -98,7 +106,7 @@ test('a user outside the workspace cannot open the members tab', function (): vo
         ->assertNotFound();
 });
 
-test('the tab strip hides activity from members without the admin role', function (): void {
+test('the tab strip hides admin-only tabs from members without the admin role', function (): void {
     Feature::define(BillingFeature::class, true);
 
     $editor = User::factory()->create();
@@ -108,10 +116,12 @@ test('the tab strip hides activity from members without the admin role', functio
 
     expect(workspaceTabLabels(app(EditWorkspace::class)))
         ->not->toContain(__('workspaces.tabs.activity'))
+        ->not->toContain(__('workspaces.tabs.email'))
         ->and(workspaceTabLabels(app(ImportHistory::class)))
         ->toContain(__('workspaces.tabs.import_history'))
         ->toContain(__('workspaces.tabs.billing'))
-        ->not->toContain(__('workspaces.tabs.activity'));
+        ->not->toContain(__('workspaces.tabs.activity'))
+        ->not->toContain(__('workspaces.tabs.email'));
 });
 
 test('a workspace admin can open the members tab', function (): void {
@@ -146,6 +156,7 @@ test('each page highlights its own tab even when no page route is current', func
         EditWorkspace::class => __('workspaces.tabs.general'),
         Members::class => __('workspaces.tabs.members'),
         CustomFields::class => __('workspaces.tabs.custom_fields'),
+        EmailPrivacySettingsPage::class => __('workspaces.tabs.email'),
         ImportHistory::class => __('workspaces.tabs.import_history'),
         ActivityLog::class => __('workspaces.tabs.activity'),
         Billing::class => __('workspaces.tabs.billing'),
@@ -168,7 +179,7 @@ test('the tenant menu lists billing directly under workspace settings', function
         ->keys()
         ->all();
 
-    expect($items)->toBe(['profile', 'billing', 'register'])
+    expect($items)->toBe(['profile', 'billing', 'email_settings', 'register'])
         ->and($panel->getTenantMenuItems()['billing']->getSort())->toBeLessThan(0);
 });
 

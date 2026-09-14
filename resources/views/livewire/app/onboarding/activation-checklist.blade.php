@@ -10,6 +10,7 @@
 
         <div
             x-data="activationChecklist()"
+            @if ($this->emailSyncProgress !== null) wire:poll.5s="refreshEmailSyncProgress" @endif
             class="relative px-4 pb-2"
         >
             {{-- The expanded card floats above the pill rather than pushing the
@@ -96,12 +97,27 @@
 
                 <ul class="mt-1.5 -mx-1.5">
                     @foreach($steps as $step)
-                        <li data-testid="activation-step" data-step="{{ $step->key }}" data-complete="{{ $step->complete ? 'true' : 'false' }}">
-                            @php
-                                $rowClasses = 'group flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition hover:bg-gray-50 dark:hover:bg-white/5';
-                            @endphp
+                        @php
+                            $rowClasses = 'group flex w-full items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition hover:bg-gray-50 dark:hover:bg-white/5';
+                            $emailSyncing = $step->key === \App\Enums\ActivationStep::SyncEmail->value
+                                && $this->emailSyncProgress !== null;
+                            $syncPercent = $emailSyncing && $this->emailSyncProgress['showsPercent']
+                                ? $this->emailSyncProgress['percent']
+                                : null;
+                        @endphp
 
-                            @if($step->url !== null)
+                        <li data-testid="activation-step" data-step="{{ $step->key }}" data-complete="{{ $step->complete ? 'true' : 'false' }}">
+                            @if ($emailSyncing)
+                                <div
+                                    data-testid="activation-email-sync-progress"
+                                    class="{{ $rowClasses }}"
+                                    aria-busy="true"
+                                    aria-live="polite"
+                                    aria-label="{{ __('filament/pages/dashboard.activation.steps.sync_email.syncing') }}"
+                                >
+                                    @include('livewire.app.onboarding.partials.step-body-syncing', ['syncPercent' => $syncPercent])
+                                </div>
+                            @elseif($step->url !== null)
                                 <a href="{{ $step->url }}" class="{{ $rowClasses }}">
                                     @include('livewire.app.onboarding.partials.step-body', ['step' => $step])
                                 </a>

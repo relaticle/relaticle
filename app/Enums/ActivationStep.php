@@ -14,6 +14,7 @@ namespace App\Enums;
 enum ActivationStep: string
 {
     case FirstRecord = 'first_record';
+    case SyncEmail = 'sync_email';
     case Import = 'import';
     case Invite = 'invite';
     case AskRela = 'ask_rela';

@@ -106,6 +106,7 @@ parameters:
             path: app/Livewire/App/AccessTokens/ManageAccessTokens.php
     stubFiles:
         - stubs/Mailcoach.stub
+        - stubs/Google.stub
 
     paths:
         - app
@@ -126,6 +127,7 @@ parameters:
         - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
+        - packages/EmailIntegration/config
 
 services:
     -

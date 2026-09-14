@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 
 /**
  * @extends Factory<Workspace>
@@ -28,6 +29,8 @@ final class WorkspaceFactory extends Factory
             'user_id' => User::factory(),
             'personal_workspace' => true,
             'plan' => Plan::default()->value,
+            'contact_creation_mode' => ContactCreationMode::Selective,
+            'auto_create_companies' => true,
         ];
     }
 

@@ -7,6 +7,9 @@ namespace App\Models\Concerns;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property string $workspace_id
+ */
 trait HasWorkspace
 {
     /**

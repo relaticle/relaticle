@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 use App\Providers\AppServiceProvider;
 use App\Providers\FaviconServiceProvider;
 use App\Providers\Filament\AppPanelProvider;
@@ -12,6 +13,7 @@ use App\Providers\LocaleServiceProvider;
 use App\Providers\MacroServiceProvider;
 use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\Documentation\DocumentationServiceProvider;
+use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\ImportWizard\ImportWizardNewServiceProvider;
 use Relaticle\SystemAdmin\SystemAdminPanelProvider;
 
@@ -27,6 +29,7 @@ return [
     MacroServiceProvider::class,
     ChatServiceProvider::class,
     DocumentationServiceProvider::class,
+    EmailIntegrationServiceProvider::class,
     ImportWizardNewServiceProvider::class,
     SystemAdminPanelProvider::class,
 ];

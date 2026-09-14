@@ -1,0 +1,477 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Models\User;
+use App\Models\Workspace;
+use App\Providers\AppServiceProvider;
+use Illuminate\Support\Facades\Bus;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\User as SocialiteUser;
+use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
+use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
+use Relaticle\EmailIntegration\Controllers\CallbackController;
+use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
+use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
+use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
+
+mutates(AppServiceProvider::class);
+mutates(CallbackController::class);
+mutates(ConnectAccountAction::class);
+mutates(DisconnectConnectedAccountAction::class);
+mutates(RedirectController::class);
+
+it('resolves the azure socialite driver', function (): void {
+    expect(fn () => Socialite::driver('azure'))->not->toThrow(Throwable::class);
+});
+
+it('stores an azure connected account and flips calendar capability when Graph calendar scope is granted', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $social = new SocialiteUser;
+    $social->id = 'azure-123';
+    $social->email = 'ms@example.com';
+    $social->name = 'MS Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://graph.microsoft.com/Mail.Read',
+        'https://graph.microsoft.com/Mail.Send',
+        'https://graph.microsoft.com/Calendars.Read',
+        'offline_access',
+    ];
+
+    Socialite::fake('azure', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'azure']))
+        ->assertRedirect();
+
+    $account = ConnectedAccount::query()
+        ->where('email_address', 'ms@example.com')
+        ->where('provider', EmailProvider::AZURE)
+        ->firstOrFail();
+
+    expect($account->hasCalendar())->toBeTrue()
+        ->and($account->capabilities['email'])->toBeTrue()
+        ->and($account->hasSend())->toBeTrue()
+        ->and($user->currentWorkspace->fresh()->contact_creation_mode)->toBe(ContactCreationMode::Selective);
+
+    Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('flips calendar capability when Graph grants Calendars.ReadWrite without Calendars.Read', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $social = new SocialiteUser;
+    $social->id = 'azure-write';
+    $social->email = 'ms-write@example.com';
+    $social->name = 'MS Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://graph.microsoft.com/Mail.Read',
+        'https://graph.microsoft.com/Calendars.ReadWrite',
+        'offline_access',
+    ];
+
+    Socialite::fake('azure', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'azure']))
+        ->assertRedirect();
+
+    $account = ConnectedAccount::query()
+        ->where('email_address', 'ms-write@example.com')
+        ->where('provider', EmailProvider::AZURE)
+        ->firstOrFail();
+
+    expect($account->hasCalendar())->toBeTrue();
+
+    Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('flips calendar and send capabilities when Graph returns unqualified scope names', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $social = new SocialiteUser;
+    $social->id = 'azure-unqualified';
+    $social->email = 'ms-unqualified@example.com';
+    $social->name = 'MS Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'Mail.Read',
+        'Mail.Send',
+        'Calendars.ReadWrite',
+        'offline_access',
+    ];
+
+    Socialite::fake('azure', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'azure']))
+        ->assertRedirect();
+
+    $account = ConnectedAccount::query()
+        ->where('email_address', 'ms-unqualified@example.com')
+        ->where('provider', EmailProvider::AZURE)
+        ->firstOrFail();
+
+    expect($account->hasCalendar())->toBeTrue()
+        ->and($account->hasSend())->toBeTrue()
+        ->and($account->hasEmail())->toBeTrue();
+
+    Bus::assertDispatched(InitialCalendarSyncJob::class, fn (InitialCalendarSyncJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('records send as missing when Graph does not grant Mail.Send', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $social = new SocialiteUser;
+    $social->id = 'azure-no-send';
+    $social->email = 'ms-no-send@example.com';
+    $social->name = 'MS Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://graph.microsoft.com/Mail.Read',
+        'https://graph.microsoft.com/Calendars.Read',
+        'offline_access',
+    ];
+
+    Socialite::fake('azure', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'azure']))
+        ->assertRedirect();
+
+    $account = ConnectedAccount::query()
+        ->where('email_address', 'ms-no-send@example.com')
+        ->where('provider', EmailProvider::AZURE)
+        ->firstOrFail();
+
+    expect($account->hasSend())->toBeFalse()
+        ->and($account->hasEmail())->toBeTrue();
+});
+
+it('preserves the stored refresh token when a reconnect returns none', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $connect = function (?string $refreshToken) use ($user): ConnectedAccount {
+        $social = new SocialiteUser;
+        $social->id = 'gmail-reconnect';
+        $social->email = 'reconnect@example.com';
+        $social->name = 'Demo';
+        $social->token = 'access-'.($refreshToken ?? 'none');
+        $social->refreshToken = $refreshToken;
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('gmail', $social);
+        bindMailboxOAuthWorkspace($user);
+
+        $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('email_address', 'reconnect@example.com')
+            ->firstOrFail();
+    };
+
+    $connect('original-refresh');   // first consent issues a refresh token
+    $account = $connect(null);      // re-consent returns none — must NOT clobber the stored token
+
+    expect($account->refresh()->refresh_token)->toBe('original-refresh');
+});
+
+it('dispatches history import when a disconnected account is reconnected', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->trashed()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $user->current_workspace_id,
+        'email_address' => 'again@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-reconnect-import',
+    ]));
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-reconnect-import';
+    $social->email = 'again@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    expect($account->refresh()->trashed())->toBeFalse();
+
+    Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
+    Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('connects the mailbox to the workspace where authorization started after the current workspace changes', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $initiatingTeam = $user->currentWorkspace;
+    $otherTeam = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $user->workspaces()->attach($otherTeam, ['role' => 'admin']);
+
+    $this->actingAs($user);
+
+    config()->set('services.gmail.client_id', 'gmail-client-id');
+    config()->set('services.gmail.client_secret', 'gmail-client-secret');
+    config()->set('services.gmail.redirect', 'http://localhost/email-accounts/callback/gmail');
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $initiatingTeam))
+        ->assertRedirect();
+
+    $user->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();
+    $user->unsetRelation('currentWorkspace');
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-workspace-bind';
+    $social->email = 'bind@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl([
+            'tenant' => $initiatingTeam->slug,
+        ], panel: 'app'));
+
+    $this->assertDatabaseHas(ConnectedAccount::class, [
+        'email_address' => 'bind@example.com',
+        'workspace_id' => $initiatingTeam->getKey(),
+    ]);
+    $this->assertDatabaseMissing(ConnectedAccount::class, [
+        'email_address' => 'bind@example.com',
+        'workspace_id' => $otherTeam->getKey(),
+    ]);
+});
+
+it('does not connect a mailbox when the user left the authorizing workspace', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $foreignTeam = Workspace::factory()->create();
+    $user->workspaces()->attach($foreignTeam, ['role' => 'admin']);
+    $user->forceFill(['current_workspace_id' => $foreignTeam->getKey()])->save();
+    $user->unsetRelation('currentWorkspace');
+
+    $this->actingAs($user);
+
+    config()->set('services.gmail.client_id', 'gmail-client-id');
+    config()->set('services.gmail.client_secret', 'gmail-client-secret');
+    config()->set('services.gmail.redirect', 'http://localhost/email-accounts/callback/gmail');
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $foreignTeam))
+        ->assertRedirect();
+
+    $user->workspaces()->detach($foreignTeam);
+    $user->forceFill(['current_workspace_id' => $user->ownedWorkspaces()->first()?->getKey()])->save();
+    $user->unsetRelation('currentWorkspace');
+    $user->unsetRelation('workspaces');
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-left-workspace';
+    $social->email = 'left@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect()
+        ->assertSessionHas('error', 'Your sign-in session expired. Please reconnect the account.');
+
+    $this->assertDatabaseMissing(ConnectedAccount::class, [
+        'email_address' => 'left@example.com',
+    ]);
+});
+
+it('stores a separate connected account when the same mailbox is connected in a second workspace', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $firstTeam = $user->currentWorkspace;
+    $secondTeam = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $user->workspaces()->attach($secondTeam, ['role' => 'admin']);
+
+    $connect = function () use ($user): void {
+        $social = new SocialiteUser;
+        $social->id = 'gmail-shared-mailbox';
+        $social->email = 'shared@example.com';
+        $social->name = 'Demo';
+        $social->token = 'access-token';
+        $social->refreshToken = 'refresh-token';
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('gmail', $social);
+        bindMailboxOAuthWorkspace($user);
+
+        $this->actingAs($user)
+            ->get(route('email-accounts.callback', ['provider' => 'gmail']))
+            ->assertRedirect();
+    };
+
+    $connect();
+
+    $user->forceFill(['current_workspace_id' => $secondTeam->getKey()])->save();
+    $user->unsetRelation('currentWorkspace');
+    $connect();
+
+    $accounts = ConnectedAccount::query()
+        ->where('user_id', $user->getKey())
+        ->where('email_address', 'shared@example.com')
+        ->get();
+
+    expect($accounts)->toHaveCount(2)
+        ->and($accounts->pluck('workspace_id')->all())->toEqualCanonicalizing([
+            $firstTeam->getKey(),
+            $secondTeam->getKey(),
+        ]);
+});
+
+it('reconnects a previously default mailbox without violating the live default constraint', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    $team = $user->currentWorkspace;
+
+    $default = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->default()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $team->getKey(),
+        'email_address' => 'default@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-default-reconnect',
+    ]));
+
+    $successor = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $team->getKey(),
+    ]));
+
+    app(DisconnectConnectedAccountAction::class)->execute($default);
+
+    expect($successor->fresh()->is_default)->toBeTrue();
+
+    $social = new SocialiteUser;
+    $social->id = 'gmail-default-reconnect';
+    $social->email = 'default@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = [
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+    ];
+
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    expect($default->refresh()->trashed())->toBeFalse()
+        ->and($default->is_default)->toBeFalse()
+        ->and($successor->fresh()->is_default)->toBeTrue();
+});
+
+it('makes the first connected account the default and leaves later connections non-default', function (): void {
+    Bus::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $connect = function (string $email) use ($user): ConnectedAccount {
+        $social = new SocialiteUser;
+        $social->id = "gmail-{$email}";
+        $social->email = $email;
+        $social->name = 'Demo';
+        $social->token = 'access-token';
+        $social->refreshToken = 'refresh-token';
+        $social->expiresIn = 3600;
+        $social->approvedScopes = [
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+        ];
+
+        Socialite::fake('gmail', $social);
+        bindMailboxOAuthWorkspace($user);
+
+        $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+        return ConnectedAccount::query()
+            ->where('user_id', $user->getKey())
+            ->where('email_address', $email)
+            ->firstOrFail();
+    };
+
+    $first = $connect('first@example.com');
+    $second = $connect('second@example.com');
+
+    expect($first->refresh()->is_default)->toBeTrue()
+        ->and($second->refresh()->is_default)->toBeFalse();
+});

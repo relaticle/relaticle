@@ -99,11 +99,11 @@ return new class extends Migration
             $table->renameColumn('personal_team', 'personal_workspace');
         });
 
+        $this->renameCatalogObjects();
+
         Schema::rename('teams', 'workspaces');
         Schema::rename('team_user', 'workspace_user');
         Schema::rename('team_invitations', 'workspace_invitations');
-
-        $this->renameCatalogObjects();
 
         DB::table('media')->where('model_type', 'team')->update(['model_type' => 'workspace']);
     }
@@ -122,12 +122,14 @@ return new class extends Migration
             DECLARE r record;
             BEGIN
                 FOR r IN
-                    SELECT conrelid::regclass::text AS table_name, conname
-                    FROM pg_constraint
-                    WHERE connamespace = 'public'::regnamespace AND conname LIKE '%team%'
+                    SELECT c.relname AS table_name, con.conname
+                    FROM pg_constraint con
+                    JOIN pg_class c ON c.oid = con.conrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = 'public' AND con.conname LIKE '%team%'
                 LOOP
                     EXECUTE format(
-                        'ALTER TABLE %s RENAME CONSTRAINT %I TO %I',
+                        'ALTER TABLE %I RENAME CONSTRAINT %I TO %I',
                         r.table_name, r.conname, replace(r.conname, 'team', 'workspace')
                     );
                 END LOOP;

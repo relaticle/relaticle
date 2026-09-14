@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\CreationSource;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 /**
  * Request-scoped answers to "what has this workspace done so far".
@@ -66,6 +68,11 @@ final class WorkspaceActivationFacts
     public function hasAnotherMember(Workspace $workspace): bool
     {
         return $workspace->users()->exists() || $workspace->workspaceInvitations()->exists();
+    }
+
+    public function hasConnectedMailbox(User $user, Workspace $workspace): bool
+    {
+        return ConnectedAccount::hasConnectedFor($user, $workspace);
     }
 
     public function hasUserChatMessage(Workspace $workspace): bool
