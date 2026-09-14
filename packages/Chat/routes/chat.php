@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use Illuminate\Support\Facades\Route;
+use Relaticle\Chat\Http\Controllers\ChatAttachmentController;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
@@ -60,6 +61,15 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     Route::delete('/chat/messages/{messageId}/feedback', [MessageFeedbackController::class, 'destroy'])
         ->middleware('throttle:60,1,chat-feedback')
         ->name('chat.messages.feedback.destroy');
+
+    Route::post('/chat/attachments', [ChatAttachmentController::class, 'store'])
+        ->middleware('throttle:30,1,chat-attachments')
+        ->name('chat.attachments.store');
+    Route::get('/chat/attachments/{attachment}/import/{entity}', [ChatAttachmentController::class, 'import'])
+        ->middleware('throttle:30,1,chat-attachment-import')
+        ->whereUuid('attachment')
+        ->where('entity', 'people|company')
+        ->name('chat.attachments.import');
 
     Route::post('/chat/{conversation?}', [ChatController::class, 'send'])
         ->middleware('throttle:chat-send')

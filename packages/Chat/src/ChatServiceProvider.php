@@ -28,6 +28,7 @@ use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
 use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
+use Relaticle\Chat\Commands\PruneChatAttachmentsCommand;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
 use Relaticle\Chat\Livewire\App\Chat\ChatAllChatsPanel;
@@ -101,6 +102,7 @@ final class ChatServiceProvider extends ServiceProvider
         $this->commands([
             ChatModelsCommand::class,
             ExpirePendingActionsCommand::class,
+            PruneChatAttachmentsCommand::class,
             ReleaseOrphanedReservationsCommand::class,
             ResetCreditsCommand::class,
         ]);

@@ -196,6 +196,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('activitylog:clean --force')->daily();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes();
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
+        $schedule->command('chat:prune-attachments')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
