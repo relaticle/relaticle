@@ -30,6 +30,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
@@ -848,6 +849,20 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
 it('excludes a teammate\'s private mail recipients from recipient suggestions', function (): void {
     $address = 'private-only@example.com';
     teammateSentEmail($this->user, EmailPrivacyTier::PRIVATE, $address, EmailParticipantRole::TO);
+
+    expect(composerRecipientSuggestions())->not->toContain($address);
+});
+
+it('excludes recipients from mail hidden by a private per-teammate share override', function (): void {
+    $address = 'hidden-by-private-share@example.com';
+    $email = teammateSentEmailReturningEmail($this->user, EmailPrivacyTier::FULL, $address, EmailParticipantRole::TO);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::PRIVATE)->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'email_id' => $email->id,
+        'shared_by' => $email->user_id,
+        'shared_with' => $this->user->id,
+    ]);
 
     expect(composerRecipientSuggestions())->not->toContain($address);
 });
@@ -1769,6 +1784,16 @@ function teammateSentEmail(
     EmailParticipantRole $role,
     bool $isInternal = false,
 ): void {
+    teammateSentEmailReturningEmail($viewer, $privacyTier, $address, $role, $isInternal);
+}
+
+function teammateSentEmailReturningEmail(
+    User $viewer,
+    EmailPrivacyTier $privacyTier,
+    string $address,
+    EmailParticipantRole $role,
+    bool $isInternal = false,
+): Email {
     $teammate = User::factory()->create(['current_workspace_id' => $viewer->current_workspace_id]);
 
     $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
@@ -1791,4 +1816,6 @@ function teammateSentEmail(
         'email_address' => $address,
         'role' => $role,
     ]);
+
+    return $email;
 }

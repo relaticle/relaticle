@@ -49,15 +49,91 @@ final readonly class VisibleEmailScope implements Scope
                 $visibilityQuery->where(function (Builder $ownerOrShared) use ($viewerId, $teamId): void {
                     $ownerOrShared->where('user_id', $viewerId)
                         ->orWhere(function (Builder $sharedQuery) use ($viewerId, $teamId): void {
-                            $sharedQuery->where(function (Builder $publicGate) use ($teamId): void {
-                                $publicGate->where('is_internal', false)
-                                    ->where('privacy_tier', '!=', EmailPrivacyTier::PRIVATE->value);
-
-                                $this->excludeTeammateHiddenEmails($publicGate, $teamId);
-                            })->orWhereHas('shares', fn (Builder $shareQuery) => $shareQuery->where('shared_with', $viewerId));
+                            $this->whereTeammateMaySeeMetadata($sharedQuery, $viewerId, $teamId);
                         });
                 });
             });
+    }
+
+    /**
+     * Match PrivacyService::effectiveTier(): per-viewer share overrides the email default.
+     * PRIVATE on either path hides the row entirely (including participant metadata).
+     *
+     * @param  Builder<covariant TModel>  $builder
+     * @return Builder<covariant TModel>
+     */
+    private function whereTeammateMaySeeMetadata(Builder $builder, string $viewerId, ?string $teamId): Builder
+    {
+        $visibleTiers = [
+            EmailPrivacyTier::METADATA_ONLY->value,
+            EmailPrivacyTier::SUBJECT->value,
+            EmailPrivacyTier::FULL->value,
+        ];
+
+        return $builder->where(function (Builder $access) use ($viewerId, $teamId, $visibleTiers): void {
+            $access
+                ->whereExists(fn (BaseBuilder $copyQuery): BaseBuilder => $this->syncedCopyExists($copyQuery, $viewerId))
+                ->orWhereHas('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                    ->where('shared_with', $viewerId)
+                    ->whereIn('tier', $visibleTiers))
+                ->orWhere(function (Builder $crossShare) use ($viewerId, $visibleTiers): void {
+                    $crossShare
+                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                            ->where('shared_with', $viewerId))
+                        ->whereExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                            $shareQuery,
+                            $viewerId,
+                            $visibleTiers,
+                        ));
+                })
+                ->orWhere(function (Builder $byDefault) use ($viewerId, $teamId, $visibleTiers): void {
+                    $byDefault
+                        ->where(function (Builder $publicGate) use ($teamId): void {
+                            $publicGate->where('is_internal', false);
+
+                            $this->excludeTeammateHiddenEmails($publicGate, $teamId);
+                        })
+                        ->whereIn('privacy_tier', $visibleTiers)
+                        ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
+                            ->where('shared_with', $viewerId))
+                        ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
+                            $shareQuery,
+                            $viewerId,
+                        ));
+                });
+        });
+    }
+
+    private function syncedCopyExists(BaseBuilder $query, string $viewerId): BaseBuilder
+    {
+        return $query->from('emails as viewer_copies')
+            ->join('connected_accounts as viewer_copy_accounts', 'viewer_copy_accounts.id', '=', 'viewer_copies.connected_account_id')
+            ->whereNull('viewer_copies.deleted_at')
+            ->whereNull('viewer_copy_accounts.deleted_at')
+            ->whereColumn('viewer_copies.workspace_id', 'emails.workspace_id')
+            ->whereColumn('viewer_copies.rfc_message_id', 'emails.rfc_message_id')
+            ->where('viewer_copies.user_id', $viewerId)
+            ->whereNotNull('emails.rfc_message_id');
+    }
+
+    /**
+     * @param  list<string>|null  $tiers
+     */
+    private function crossMessageShareExists(BaseBuilder $query, string $viewerId, ?array $tiers = null): BaseBuilder
+    {
+        $query
+            ->from('email_shares')
+            ->join('emails as share_source_emails', 'share_source_emails.id', '=', 'email_shares.email_id')
+            ->where('email_shares.shared_with', $viewerId)
+            ->whereColumn('share_source_emails.workspace_id', 'emails.workspace_id')
+            ->whereColumn('share_source_emails.rfc_message_id', 'emails.rfc_message_id')
+            ->whereNotNull('emails.rfc_message_id');
+
+        if ($tiers !== null) {
+            $query->whereIn('email_shares.tier', $tiers);
+        }
+
+        return $query;
     }
 
     /**

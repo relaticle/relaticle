@@ -11,6 +11,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
@@ -160,6 +161,45 @@ it('hides a mailbox-blocklisted email from teammates', function (): void {
     $blocked = ($this->makeCoworkerEmail)(['spam@badactor.com', 'normal@contact.com']);
 
     expect(visibleTo($this->viewer)->modelKeys())->not->toContain($blocked->id);
+});
+
+it('hides a coworker email when the viewer has a private per-teammate share', function (): void {
+    $shared = ($this->makeCoworkerEmail)(['hidden-by-share@contact.com']);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::PRIVATE)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $shared->id,
+        'shared_by' => $this->coworker->id,
+        'shared_with' => $this->viewer->id,
+    ]);
+
+    expect(visibleTo($this->viewer)->modelKeys())->not->toContain($shared->id);
+});
+
+it('shows a coworker email when the viewer has a non-private per-teammate share on a private email', function (): void {
+    $email = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->coworker->id,
+        'connected_account_id' => $this->account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'is_internal' => false,
+    ]);
+
+    EmailParticipant::query()->create([
+        'email_id' => $email->id,
+        'email_address' => 'shared-explicitly@contact.com',
+        'name' => null,
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    EmailShare::factory()->tier(EmailPrivacyTier::METADATA_ONLY)->create([
+        'workspace_id' => $this->workspace->id,
+        'email_id' => $email->id,
+        'shared_by' => $this->coworker->id,
+        'shared_with' => $this->viewer->id,
+    ]);
+
+    expect(visibleTo($this->viewer)->modelKeys())->toContain($email->id);
 });
 
 it('hides a coworker email when every participant is a connected mailbox address', function (): void {
