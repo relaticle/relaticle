@@ -76,6 +76,11 @@ return [
      * Outbox & deliverability defaults. Per-account values on
      * connected_accounts.{hourly,daily}_send_limit override these.
      */
+    'inbound' => [
+        'domain' => env('EMAIL_INBOUND_DOMAIN', 'inbound.relaticle.test'),
+        'webhook_secret' => env('POSTMARK_INBOUND_WEBHOOK_SECRET', ''),
+    ],
+
     'outbox' => [
         'defaults' => [
             'hourly_send_limit' => (int) env('EMAIL_DEFAULT_HOURLY_LIMIT', 12),

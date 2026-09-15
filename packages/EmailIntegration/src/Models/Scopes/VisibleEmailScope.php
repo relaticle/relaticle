@@ -99,6 +99,20 @@ final readonly class VisibleEmailScope implements Scope
                         ->whereColumn('email_blocklists.connected_account_id', 'emails.connected_account_id')
                         ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value)
                         ->whereRaw("lower(email_participants.email_address) like '%@' || lower(email_blocklists.value)");
+                })->orWhereExists(function (BaseBuilder $blockedEmail): void {
+                    $blockedEmail->from('user_forwarding_blocklists')
+                        ->whereNull('emails.connected_account_id')
+                        ->whereColumn('user_forwarding_blocklists.user_id', 'emails.user_id')
+                        ->whereColumn('user_forwarding_blocklists.team_id', 'emails.team_id')
+                        ->where('user_forwarding_blocklists.type', EmailBlocklistType::EMAIL->value)
+                        ->whereRaw('lower(user_forwarding_blocklists.value) = lower(email_participants.email_address)');
+                })->orWhereExists(function (BaseBuilder $blockedDomain): void {
+                    $blockedDomain->from('user_forwarding_blocklists')
+                        ->whereNull('emails.connected_account_id')
+                        ->whereColumn('user_forwarding_blocklists.user_id', 'emails.user_id')
+                        ->whereColumn('user_forwarding_blocklists.team_id', 'emails.team_id')
+                        ->where('user_forwarding_blocklists.type', EmailBlocklistType::DOMAIN->value)
+                        ->whereRaw("lower(email_participants.email_address) like '%@' || lower(user_forwarding_blocklists.value)");
                 });
             });
         });
