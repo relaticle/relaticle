@@ -120,6 +120,12 @@ return [
         'confirm_body' => 'You are subscribing :workspace. Switch workspaces first if that is not the one you meant.',
         'confirm_button' => 'Yes, subscribe :workspace',
         'confirm_cancel' => 'Cancel',
+        'modal_heading' => 'Upgrade plan',
+        'modal_plan_title' => 'Continue with Pro',
+        'billing_period' => 'Billing period',
+        'trial_notice' => 'Your card will not be charged until your trial ends on :date',
+        'paid_title' => 'Payment received',
+        'close' => 'Close',
     ],
     'subscribe' => [
         'button' => 'Subscribe now',
@@ -135,6 +141,7 @@ return [
         'cancel_scheduled_legacy_body' => 'Cloud Pro stays active until :date. Then this workspace returns to its grandfathered Free plan.',
         'past_due_title' => 'Payment issue',
         'past_due_body' => 'Your last payment failed. Update your payment method to keep Pro.',
+        'first_charge' => 'First charge on :date',
     ],
     'payment_failed' => [
         'notification_title' => 'Payment failed for :workspace',
