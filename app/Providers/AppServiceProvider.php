@@ -18,6 +18,7 @@ use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\WorkspaceCreatedTagListener;
 use App\Listeners\Email\WorkspaceMemberAddedListener;
 use App\Listeners\Mcp\CopyWorkspaceIdToAccessToken;
+use App\Listeners\SeedUserLocaleListener;
 use App\Listeners\SeedWorkspaceCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
 use App\Mcp\Schema\McpSchemaCache;
@@ -193,6 +194,7 @@ final class AppServiceProvider extends ServiceProvider
         FilamentColor::register(['primary' => BrandColors::primary()]);
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
+        Event::listen(Login::class, SeedUserLocaleListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
         Event::listen(TeamMemberAdded::class, WorkspaceMemberAddedListener::class);
         Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);

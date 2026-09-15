@@ -13,6 +13,7 @@ use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Livewire\Concerns\RendersInChatLocale;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\NextSteps;
@@ -23,6 +24,8 @@ use Relaticle\Chat\Support\TurnPresence;
 
 final class ChatInterface extends BaseLivewireComponent
 {
+    use RendersInChatLocale;
+
     public ?string $conversationId = null;
 
     public ?string $initialMessage = null;

@@ -13,9 +13,12 @@ use Illuminate\Support\Collection;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\SearchConversations;
+use Relaticle\Chat\Livewire\Concerns\RendersInChatLocale;
 
 final class ChatAllChatsPanel extends BaseLivewireComponent
 {
+    use RendersInChatLocale;
+
     public bool $isOpen = false;
 
     public string $search = '';

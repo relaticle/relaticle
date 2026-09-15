@@ -10,6 +10,7 @@ use App\Actions\Profile\RequestEmailChange;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\ChatLocales;
 use App\Support\EmailAddress;
 use App\Support\SameOriginUrl;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -39,6 +40,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
     public function mount(): void
     {
         $data = $this->authUser()->only(['name', 'email', 'timezone']);
+        $data['locale'] = $this->authUser()->chatLocale();
         $data['email'] = $this->confirmedEmailTarget() ?? $data['email'];
 
         $this->form->fill($data);
@@ -107,6 +109,13 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->options($this->timezoneOptions())
                             ->searchable()
                             ->native(false),
+                        Select::make('locale')
+                            ->label(__('profile.form.locale.label'))
+                            ->helperText(__('profile.form.locale.helper_text'))
+                            ->placeholder(__('profile.form.locale.placeholder'))
+                            ->options(ChatLocales::options())
+                            ->native(false)
+                            ->selectablePlaceholder(false),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
@@ -178,6 +187,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
         $this->form->fill([
             ...$this->authUser()->only(['name', 'email', 'timezone']),
+            'locale' => $this->authUser()->chatLocale(),
             'profile_photo_path' => null,
         ]);
 

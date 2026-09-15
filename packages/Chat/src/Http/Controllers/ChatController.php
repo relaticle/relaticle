@@ -36,6 +36,7 @@ use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\ChatLocale;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -128,14 +129,14 @@ final readonly class ChatController
             if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($workspace->plan)) {
                 $isFree = $workspace->plan === Plan::Free;
 
-                return response()->json([
+                return ChatLocale::within($user->chatLocale(), fn (): JsonResponse => response()->json([
                     'error' => 'model_not_allowed',
                     'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
                     'plan' => $workspace->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
                     'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
-                ], 403);
+                ], 403));
             }
         }
 
@@ -195,7 +196,7 @@ final readonly class ChatController
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
         $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
 
-        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext);
+        $this->maybeTitleConversation($conversation, $parsed['text'], $resolved['provider'], $pageContext, $user);
 
         TurnPresence::begin(
             $conversation,
@@ -239,7 +240,7 @@ final readonly class ChatController
      *
      * @param  array{type: string, id: string, label: string}|null  $pageContext
      */
-    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext): void
+    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext, User $user): void
     {
         $provisional = ConversationTitleGate::beforeTurn($conversationId, $message);
 
@@ -252,6 +253,7 @@ final readonly class ChatController
             provisionalTitle: $provisional,
             message: $message,
             provider: $provider,
+            languageName: $user->chatLanguageName(),
             pageContext: $pageContext,
         ));
     }

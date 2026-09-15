@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Support\ChatLocales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'profile_photo_path' => ['nullable', 'string', 'max:255'],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
+            'locale' => ['sometimes', 'required', 'string', Rule::in(ChatLocales::CODES)],
         ])->validateWithBag('updateProfileInformation');
 
         $this->assertEmailChangeIsVerified($user, (string) $input['email']);
@@ -39,7 +41,8 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             $user->forceFill([
                 'name' => $input['name'],
                 'email' => $input['email'],
-                ...$this->timezoneAttribute($input),
+                ...$this->clearableAttribute($input, 'timezone'),
+                ...$this->clearableAttribute($input, 'locale'),
             ])->save();
         }
     }
@@ -72,26 +75,26 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             'name' => $input['name'],
             'email' => $input['email'],
             'email_verified_at' => null,
-            ...$this->timezoneAttribute($input),
+            ...$this->clearableAttribute($input, 'timezone'),
+            ...$this->clearableAttribute($input, 'locale'),
         ])->save();
 
         $user->sendEmailVerificationNotification();
     }
 
     /**
-     * Clearing the select writes null, a deliberate "use the app default".
-     * An absent key means the caller is not managing the timezone at all, so the
-     * stored value is left alone.
+     * A present but empty value writes null, a deliberate "use the default". An
+     * absent key means the caller is not managing the attribute, so it is left alone.
      *
      * @param  array<string, mixed>  $input
      * @return array<string, string|null>
      */
-    private function timezoneAttribute(array $input): array
+    private function clearableAttribute(array $input, string $key): array
     {
-        if (! array_key_exists('timezone', $input)) {
+        if (! array_key_exists($key, $input)) {
             return [];
         }
 
-        return ['timezone' => blank($input['timezone']) ? null : (string) $input['timezone']];
+        return [$key => blank($input[$key]) ? null : (string) $input[$key]];
     }
 }

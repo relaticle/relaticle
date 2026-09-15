@@ -52,7 +52,8 @@ final class SuggestNextSteps implements ShouldQueue
         public readonly string $messageId,
         public readonly string $message,
         public readonly string $reply,
-        private readonly ?string $provider = null,
+        private readonly ?string $provider,
+        public readonly string $languageName,
         private readonly array $toolNames = [],
     ) {
         $this->afterCommit = true;
@@ -98,7 +99,7 @@ final class SuggestNextSteps implements ShouldQueue
     private function generate(): array
     {
         try {
-            $response = (new NextStepSuggester)->prompt(
+            $response = new NextStepSuggester($this->languageName)->prompt(
                 $this->buildPrompt(),
                 provider: $this->provider,
             );

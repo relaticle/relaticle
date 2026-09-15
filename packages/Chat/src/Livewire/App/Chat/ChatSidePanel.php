@@ -11,10 +11,13 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Relaticle\Chat\Actions\DeleteConversation;
+use Relaticle\Chat\Livewire\Concerns\RendersInChatLocale;
 use Relaticle\Chat\Services\ChatContextService;
 
 final class ChatSidePanel extends BaseLivewireComponent
 {
+    use RendersInChatLocale;
+
     /**
      * Stands in for the conversation id while building the full-page chat URL.
      * The panel only learns the id of a brand-new conversation client-side, so

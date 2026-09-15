@@ -18,6 +18,11 @@ return [
             'helper_text' => 'Dates and times across the app are shown in this timezone.',
             'placeholder' => 'Select a timezone',
         ],
+        'locale' => [
+            'label' => 'Language',
+            'helper_text' => 'The assistant answers in the language you write. The chat around it uses this language.',
+            'placeholder' => 'Select a language',
+        ],
         'current_password' => [
             'label' => 'Current Password',
         ],
