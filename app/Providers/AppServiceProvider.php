@@ -42,6 +42,7 @@ use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\Impersonation\Impersonator;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -64,6 +65,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
@@ -304,6 +306,15 @@ final class AppServiceProvider extends ServiceProvider
             if (blank($activity->getAttribute('batch_uuid'))) {
                 $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
             }
+
+            // Causer stays the impersonated user, because the record is theirs. Without
+            // this tag nothing distinguishes a support write from one they made.
+            $administratorId = $this->app->make(Impersonator::class)->administratorId(request());
+
+            if ($administratorId !== null) {
+                $activity->properties = ($activity->properties ?? new Collection)
+                    ->put('impersonated_by', $administratorId);
+            }
         });
 
         Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
@@ -311,6 +322,11 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configurePolicies(): void
     {
+        // The impersonation routes are plain web routes, so the panel-scoped policy
+        // discovery below never runs for them.
+        Gate::define('impersonate', fn (Authenticatable $account): bool => $account instanceof SystemAdministrator
+            && $account->role->canImpersonate());
+
         Gate::guessPolicyNamesUsing(function (string $modelClass): ?string {
             try {
                 $currentPanelId = Filament::getCurrentPanel()?->getId();

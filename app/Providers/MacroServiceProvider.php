@@ -58,6 +58,24 @@ final class MacroServiceProvider extends ServiceProvider
             return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
         });
 
+        URL::macro('getSysadminUrl', function (string $path = ''): string {
+            $trimmedPath = ltrim($path, '/');
+
+            if ($domain = config('app.sysadmin_domain')) {
+                $parsed = parse_url((string) config('app.url'));
+                $scheme = $parsed['scheme'] ?? 'https';
+                $port = isset($parsed['port']) ? ":{$parsed['port']}" : '';
+                $base = "{$scheme}://{$domain}{$port}";
+
+                return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
+            }
+
+            $panelPath = config('app.sysadmin_path', 'sysadmin');
+            $base = rtrim((string) config('app.url'), '/')."/{$panelPath}";
+
+            return $trimmedPath !== '' ? "{$base}/{$trimmedPath}" : $base;
+        });
+
         URL::macro('getPublicUrl', function (string $path = ''): string {
             $base = rtrim((string) config('app.url'), '/');
             $trimmedPath = ltrim($path, '/');

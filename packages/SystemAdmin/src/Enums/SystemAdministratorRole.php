@@ -53,4 +53,16 @@ enum SystemAdministratorRole: string implements HasColor, HasLabel
             self::Administrator => false,
         };
     }
+
+    /**
+     * Impersonation grants everything the customer can do, which includes the
+     * record edits canManageCustomerAccess() withholds from an Administrator.
+     */
+    public function canImpersonate(): bool
+    {
+        return match ($this) {
+            self::SuperAdministrator => true,
+            self::Administrator => false,
+        };
+    }
 }

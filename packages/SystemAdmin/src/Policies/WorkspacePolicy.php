@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Policies;
 
+use App\Models\Workspace;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class WorkspacePolicy
@@ -26,6 +27,11 @@ final class WorkspacePolicy
     public function update(): bool
     {
         return true;
+    }
+
+    public function impersonateOwner(SystemAdministrator $admin, Workspace $workspace): bool
+    {
+        return $admin->role->canImpersonate() && $workspace->owner !== null;
     }
 
     public function delete(SystemAdministrator $admin): bool

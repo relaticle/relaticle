@@ -112,7 +112,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'confirm-password', 'two-factor-challenge', 'passkeys', 'identity',
 
         // Administration
-        'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin',
+        'admin', 'administrator', 'dashboard', 'console', 'root', 'super', 'sysadmin', 'impersonate',
 
         // Account & billing
         'account', 'billing', 'checkout', 'invoices', 'plan', 'plans',

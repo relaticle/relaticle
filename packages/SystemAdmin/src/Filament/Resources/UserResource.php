@@ -36,6 +36,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
@@ -227,6 +228,7 @@ final class UserResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
+                Impersonate::user(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
