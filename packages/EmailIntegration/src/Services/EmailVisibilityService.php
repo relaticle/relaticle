@@ -31,6 +31,7 @@ use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
+use Relaticle\EmailIntegration\Support\BlocklistDomainMatcher;
 
 final class EmailVisibilityService
 {
@@ -379,6 +380,8 @@ final class EmailVisibilityService
                 return [
                     'key' => 'custom-'.$entry->getKey(),
                     'address' => $entry->value,
+                    'type' => $entry->type->value,
+                    'include_subdomains' => $entry->include_subdomains,
                     'enforcement' => $enforcement->getLabel(),
                     'enforcement_value' => $enforcement->value,
                     'source' => $entry->creator->name,
@@ -628,18 +631,23 @@ final class EmailVisibilityService
     private function matchesRows(string $address, Collection $rows): bool
     {
         $address = strtolower(trim($address));
-        $domain = $this->domainFromEmail($address) ?? '';
+        $matcher = resolve(BlocklistDomainMatcher::class);
 
-        $emails = $rows
-            ->filter(fn (TeamEmailBlocklist|EmailBlocklist $row): bool => $row->type === EmailBlocklistType::EMAIL)
-            ->pluck('value')
-            ->map(fn (mixed $value): string => strtolower((string) $value));
-        $domains = $rows
-            ->filter(fn (TeamEmailBlocklist|EmailBlocklist $row): bool => $row->type === EmailBlocklistType::DOMAIN)
-            ->pluck('value')
-            ->map(fn (mixed $value): string => strtolower((string) $value));
+        foreach ($rows as $row) {
+            if ($row->type === EmailBlocklistType::EMAIL && strtolower((string) $row->value) === $address) {
+                return true;
+            }
 
-        return $emails->contains($address) || ($domain !== '' && $domains->contains($domain));
+            if ($row->type === EmailBlocklistType::DOMAIN && $matcher->matchesEmailAddress(
+                $address,
+                (string) $row->value,
+                (bool) $row->include_subdomains,
+            )) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

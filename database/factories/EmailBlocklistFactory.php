@@ -44,4 +44,11 @@ final class EmailBlocklistFactory extends Factory
             'value' => $domain,
         ]);
     }
+
+    public function includeSubdomains(bool $includeSubdomains = true): static
+    {
+        return $this->state(fn (): array => [
+            'include_subdomains' => $includeSubdomains,
+        ]);
+    }
 }

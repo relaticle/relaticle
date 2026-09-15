@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
  * @property EmailBlocklistType $type
  * @property EmailVisibilityEnforcement $enforcement_level
  * @property string $value
+ * @property bool $include_subdomains
  * @property User|null $creator
  */
 final class TeamEmailBlocklist extends Model
@@ -39,6 +40,7 @@ final class TeamEmailBlocklist extends Model
         'type',
         'value',
         'enforcement_level',
+        'include_subdomains',
         'created_by',
     ];
 
@@ -47,6 +49,7 @@ final class TeamEmailBlocklist extends Model
         return [
             'type' => EmailBlocklistType::class,
             'enforcement_level' => EmailVisibilityEnforcement::class,
+            'include_subdomains' => 'boolean',
         ];
     }
 

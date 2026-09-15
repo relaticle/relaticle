@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Support\BlocklistDomainMatcher;
 
 /**
  * Excludes emails that are entirely private to another user.
@@ -97,8 +98,12 @@ final readonly class VisibleEmailScope implements Scope
                 })->orWhereExists(function (BaseBuilder $blockedDomain): void {
                     $blockedDomain->from('email_blocklists')
                         ->whereColumn('email_blocklists.connected_account_id', 'emails.connected_account_id')
-                        ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                        ->whereRaw("lower(email_participants.email_address) like '%@' || lower(email_blocklists.value)");
+                        ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                    resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                        $blockedDomain,
+                        'email_blocklists.value',
+                        'email_participants.email_address',
+                    );
                 });
             });
         });
@@ -121,8 +126,12 @@ final readonly class VisibleEmailScope implements Scope
                     $blockedDomain->from('workspace_email_blocklists')
                         ->where('workspace_email_blocklists.workspace_id', $teamId)
                         ->where('workspace_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Blocked->value)
-                        ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                        ->whereRaw("lower(email_participants.email_address) like '%@' || lower(workspace_email_blocklists.value)");
+                        ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                    resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                        $blockedDomain,
+                        'workspace_email_blocklists.value',
+                        'email_participants.email_address',
+                    );
                 });
             });
         });
@@ -167,8 +176,12 @@ final readonly class VisibleEmailScope implements Scope
                                 $protectedDomain->from('workspace_email_blocklists')
                                     ->where('workspace_email_blocklists.workspace_id', $teamId)
                                     ->where('workspace_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Protected->value)
-                                    ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                                    ->whereRaw("lower(email_participants.email_address) like '%@' || lower(workspace_email_blocklists.value)");
+                                    ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                                resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                                    $protectedDomain,
+                                    'workspace_email_blocklists.value',
+                                    'email_participants.email_address',
+                                );
                             });
                     });
                 });

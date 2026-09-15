@@ -21,6 +21,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityEntryAction;
+use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -37,6 +38,25 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
      */
     #[On('visibility-entries-updated')]
     public function refreshVisibilityEntries(): void {}
+
+    public function setVisibilityIncludeSubdomains(string $entryId, bool $include): void
+    {
+        $entry = TeamEmailBlocklist::query()
+            ->where('workspace_id', $this->currentWorkspace()->getKey())
+            ->whereKey($entryId)
+            ->firstOrFail();
+
+        if ($entry->type !== EmailBlocklistType::DOMAIN) {
+            return;
+        }
+
+        $entry->update(['include_subdomains' => $include]);
+
+        Notification::make()
+            ->success()
+            ->title(__('filament/pages/email-privacy-settings.visibility.notifications.updated'))
+            ->send();
+    }
 
     public function updateEnforcement(string $entryId, string $enforcement): void
     {

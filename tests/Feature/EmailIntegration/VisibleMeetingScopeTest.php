@@ -165,6 +165,28 @@ it('hides a coworker meeting when any attendee is blocked', function (): void {
     expect(visibleMeetingsTo($this->viewer)->modelKeys())->not->toContain($blocked->id);
 });
 
+it('shows a coworker meeting with a subdomain attendee when domain block has include subdomains off', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->domain('temuemail.com')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $visible = ($this->makeCoworkerMeeting)(['temu@commerce.temuemail.com']);
+
+    expect(visibleMeetingsTo($this->viewer)->modelKeys())->toContain($visible->id);
+});
+
+it('hides a coworker meeting with a subdomain attendee when domain block has include subdomains on', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->domain('temuemail.com')->includeSubdomains()->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $hidden = ($this->makeCoworkerMeeting)(['temu@commerce.temuemail.com']);
+
+    expect(visibleMeetingsTo($this->viewer)->modelKeys())->not->toContain($hidden->id);
+});
+
 it('still shows a protected meeting to its mailbox owner', function (): void {
     TeamEmailBlocklist::factory()->protected()->email('vip@contact.com')->create([
         'workspace_id' => $this->workspace->id,

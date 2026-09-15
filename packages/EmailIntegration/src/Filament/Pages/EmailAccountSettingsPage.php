@@ -300,6 +300,10 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 ->placeholder(__('filament/pages/email-account-settings.blocklist.domains_placeholder'))
                 ->afterLabel(__('filament/pages/email-account-settings.blocklist.domains_after_label'))
                 ->nestedRecursiveRules(['regex:/^[a-z0-9.-]+\.[a-z]{2,}$/i', 'max:255']),
+            Toggle::make('blocklist_include_subdomains')
+                ->label(__('filament/pages/email-account-settings.blocklist.include_subdomains_label'))
+                ->helperText(__('filament/pages/email-account-settings.blocklist.include_subdomains_hint'))
+                ->default(false),
         ];
     }
 
@@ -312,12 +316,11 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             ->modalHeading(__('filament/pages/email-account-settings.blocklist.add'))
             ->schema($this->blocklistFormSchema())
             ->action(function (array $data, UpdateConnectedAccountBlocklistAction $updateBlocklist): void {
-                [$emails, $domains] = $this->mergedBlocklistValues(
+                $updateBlocklist->execute($this->account(), $this->blocklistRowsForSave(
                     $data['blocklist_emails'] ?? [],
                     $data['blocklist_domains'] ?? [],
-                );
-
-                $updateBlocklist->execute($this->account(), $this->blocklistRowsFromValues($emails, $domains));
+                    (bool) ($data['blocklist_include_subdomains'] ?? false),
+                ));
 
                 unset($this->blocklistEntries);
 
@@ -353,52 +356,65 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             });
     }
 
-    /**
-     * @param  array<int, string>  $newEmails
-     * @param  array<int, string>  $newDomains
-     * @return array{0: array<int, string>, 1: array<int, string>}
-     */
-    private function mergedBlocklistValues(array $newEmails, array $newDomains): array
+    public function setBlocklistIncludeSubdomains(string $entryId, bool $include): void
     {
-        $emails = $this->blocklistEntries
-            ->where('type', EmailBlocklistType::EMAIL)
-            ->pluck('value')
-            ->merge($newEmails)
-            ->map(fn (mixed $value): string => strtolower(trim((string) $value)))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        $entry = EmailBlocklist::query()
+            ->where('connected_account_id', $this->account()->getKey())
+            ->whereKey($entryId)
+            ->firstOrFail();
 
-        $domains = $this->blocklistEntries
-            ->where('type', EmailBlocklistType::DOMAIN)
-            ->pluck('value')
-            ->merge($newDomains)
-            ->map(fn (mixed $value): string => strtolower(trim((string) $value)))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
+        if ($entry->type !== EmailBlocklistType::DOMAIN) {
+            return;
+        }
 
-        return [$emails, $domains];
+        $entry->update(['include_subdomains' => $include]);
+
+        unset($this->blocklistEntries);
     }
 
     /**
-     * @param  array<int, string>  $emails
-     * @param  array<int, string>  $domains
-     * @return list<array{type: string, value: string}>
+     * @param  array<int, string>  $newEmails
+     * @param  array<int, string>  $newDomains
+     * @return list<array{type: string, value: string, include_subdomains: bool}>
      */
-    private function blocklistRowsFromValues(array $emails, array $domains): array
+    private function blocklistRowsForSave(array $newEmails, array $newDomains, bool $includeSubdomainsForNewDomains): array
     {
-        return array_values(collect([
-            EmailBlocklistType::EMAIL->value => $emails,
-            EmailBlocklistType::DOMAIN->value => $domains,
-        ])
-            ->flatMap(fn (array $values, string $type): array => array_map(
-                fn (string $value): array => ['type' => $type, 'value' => $value],
-                $values,
-            ))
-            ->all());
+        $rows = $this->blocklistEntries
+            ->map(fn (EmailBlocklist $entry): array => [
+                'type' => $entry->type->value,
+                'value' => $entry->value,
+                'include_subdomains' => $entry->type === EmailBlocklistType::DOMAIN && $entry->include_subdomains,
+            ])
+            ->all();
+
+        foreach ($newEmails as $email) {
+            if (blank($email)) {
+                continue;
+            }
+
+            $rows[] = [
+                'type' => EmailBlocklistType::EMAIL->value,
+                'value' => strtolower(trim($email)),
+                'include_subdomains' => false,
+            ];
+        }
+
+        foreach ($newDomains as $domain) {
+            if (blank($domain)) {
+                continue;
+            }
+
+            $rows[] = [
+                'type' => EmailBlocklistType::DOMAIN->value,
+                'value' => strtolower(trim($domain)),
+                'include_subdomains' => $includeSubdomainsForNewDomains,
+            ];
+        }
+
+        return collect($rows)
+            ->unique(fn (array $row): string => $row['type'].'|'.$row['value'])
+            ->values()
+            ->all();
     }
 
     /**

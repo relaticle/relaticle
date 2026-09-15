@@ -90,6 +90,40 @@ it('returns true when participant matches a blocked domain', function (): void {
     expect($this->service->isBlockedForOwner($email))->toBeTrue();
 });
 
+it('does not block a subdomain when include subdomains is off', function (): void {
+    EmailBlocklist::factory()->domain('temuemail.com')->create([
+        'user_id' => $this->owner->id,
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makeBlocklistEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'temu@commerce.temuemail.com',
+    ]);
+
+    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+});
+
+it('blocks a subdomain when include subdomains is on', function (): void {
+    EmailBlocklist::factory()->domain('temuemail.com')->includeSubdomains()->create([
+        'user_id' => $this->owner->id,
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    $email = makeBlocklistEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'temu@commerce.temuemail.com',
+    ]);
+
+    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+});
+
 it('returns false when participant does not match any blocklist entry', function (): void {
     EmailBlocklist::factory()->email('spam@badactor.com')->create([
         'user_id' => $this->owner->id,

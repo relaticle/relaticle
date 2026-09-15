@@ -46,6 +46,7 @@ final readonly class UpdateTeamEmailBlocklistAction
                 'workspace_id' => $team->getKey(),
                 'type' => 'domain',
                 'value' => strtolower(trim($domain)),
+                'include_subdomains' => false,
                 'created_by' => $actor->getKey(),
             ]);
         }

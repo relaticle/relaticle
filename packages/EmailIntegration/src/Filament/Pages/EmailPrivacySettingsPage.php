@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -209,6 +210,10 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                     ->label(__('filament/pages/email-privacy-settings.visibility.domains_label'))
                     ->placeholder(__('filament/pages/email-privacy-settings.visibility.domains_placeholder'))
                     ->afterLabel(__('filament/pages/email-privacy-settings.visibility.domains_after_label')),
+                Toggle::make('visibility_include_subdomains')
+                    ->label(__('filament/pages/email-privacy-settings.visibility.include_subdomains_label'))
+                    ->helperText(__('filament/pages/email-privacy-settings.visibility.include_subdomains_hint'))
+                    ->default(false),
             ])
             ->action(function (array $data): void {
                 /** @var User $user */
@@ -222,6 +227,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                         $team,
                         $data['visibility_emails'] ?? [],
                         $data['visibility_domains'] ?? [],
+                        (bool) ($data['visibility_include_subdomains'] ?? false),
                     ),
                 );
 
@@ -320,10 +326,14 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     /**
      * @param  array<int, string>  $newEmails
      * @param  array<int, string>  $newDomains
-     * @return array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>
+     * @return array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement, include_subdomains: bool}>
      */
-    private function mergedVisibilityEntries(Workspace $team, array $newEmails, array $newDomains): array
-    {
+    private function mergedVisibilityEntries(
+        Workspace $team,
+        array $newEmails,
+        array $newDomains,
+        bool $includeSubdomainsForNewDomains,
+    ): array {
         $enforcement = EmailVisibilityEnforcement::Protected;
 
         $entries = TeamEmailBlocklist::query()
@@ -334,6 +344,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                 'type' => $entry->type->value,
                 'value' => $entry->value,
                 'enforcement_level' => $entry->enforcement_level,
+                'include_subdomains' => $entry->type === EmailBlocklistType::DOMAIN && $entry->include_subdomains,
             ])
             ->all();
 
@@ -346,6 +357,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                 'type' => EmailBlocklistType::EMAIL->value,
                 'value' => strtolower(trim($email)),
                 'enforcement_level' => $enforcement,
+                'include_subdomains' => false,
             ];
         }
 
@@ -364,6 +376,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                 'type' => EmailBlocklistType::DOMAIN->value,
                 'value' => $normalized,
                 'enforcement_level' => $enforcement,
+                'include_subdomains' => $includeSubdomainsForNewDomains,
             ];
         }
 

@@ -33,6 +33,9 @@ return [
         'domains_label' => 'Domains',
         'domains_placeholder' => 'e.g. acme.com',
         'domains_after_label' => 'Press Enter(⏎) to add each domain.',
+        'include_subdomains_label' => 'Include subdomains',
+        'include_subdomains_hint' => 'Also hide mail from addresses like user@mail.example.com when you add example.com.',
+        'include_subdomains_short' => 'Include subdomains',
         'enforcement' => [
             'protected' => [
                 'label' => 'Protected',
@@ -50,6 +53,7 @@ return [
         ],
         'table' => [
             'address' => 'Email / Domain',
+            'subdomains' => 'Subdomains',
             'enforcement' => 'Enforcement level',
             'updated' => 'Last update',
             'added_by' => 'Added by',

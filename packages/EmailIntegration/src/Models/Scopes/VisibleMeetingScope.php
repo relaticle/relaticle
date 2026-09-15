@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
+use Relaticle\EmailIntegration\Support\BlocklistDomainMatcher;
 
 /**
  * Hides calendar events that workspace or mailbox visibility rules exclude.
@@ -127,8 +128,12 @@ final readonly class VisibleMeetingScope implements Scope
                 })->orWhereExists(function (BaseBuilder $blockedDomain): void {
                     $blockedDomain->from('email_blocklists')
                         ->whereColumn('email_blocklists.connected_account_id', 'meetings.connected_account_id')
-                        ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                        ->whereRaw("lower(meeting_attendees.email_address) like '%@' || lower(email_blocklists.value)");
+                        ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                    resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                        $blockedDomain,
+                        'email_blocklists.value',
+                        'meeting_attendees.email_address',
+                    );
                 });
             });
         });
@@ -152,8 +157,12 @@ final readonly class VisibleMeetingScope implements Scope
                         ->whereNotExists(function (BaseBuilder $blockedDomain): void {
                             $blockedDomain->from('email_blocklists')
                                 ->whereColumn('email_blocklists.connected_account_id', 'meetings.connected_account_id')
-                                ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                                ->whereRaw("lower(meetings.organizer_email) like '%@' || lower(email_blocklists.value)");
+                                ->where('email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                            resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                                $blockedDomain,
+                                'email_blocklists.value',
+                                'meetings.organizer_email',
+                            );
                         });
                 });
         });
@@ -179,8 +188,12 @@ final readonly class VisibleMeetingScope implements Scope
                             $blockedDomain->from('workspace_email_blocklists')
                                 ->where('workspace_email_blocklists.workspace_id', $teamId)
                                 ->where('workspace_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Blocked->value)
-                                ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                                ->whereRaw("lower(meetings.organizer_email) like '%@' || lower(workspace_email_blocklists.value)");
+                                ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                            resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                                $blockedDomain,
+                                'workspace_email_blocklists.value',
+                                'meetings.organizer_email',
+                            );
                         });
                 });
         });
@@ -203,8 +216,12 @@ final readonly class VisibleMeetingScope implements Scope
                     $blockedDomain->from('workspace_email_blocklists')
                         ->where('workspace_email_blocklists.workspace_id', $teamId)
                         ->where('workspace_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Blocked->value)
-                        ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                        ->whereRaw("lower(meeting_attendees.email_address) like '%@' || lower(workspace_email_blocklists.value)");
+                        ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                    resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                        $blockedDomain,
+                        'workspace_email_blocklists.value',
+                        'meeting_attendees.email_address',
+                    );
                 });
             });
         });
@@ -249,8 +266,12 @@ final readonly class VisibleMeetingScope implements Scope
                                 $protectedDomain->from('workspace_email_blocklists')
                                     ->where('workspace_email_blocklists.workspace_id', $teamId)
                                     ->where('workspace_email_blocklists.enforcement_level', EmailVisibilityEnforcement::Protected->value)
-                                    ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value)
-                                    ->whereRaw("lower(meeting_attendees.email_address) like '%@' || lower(workspace_email_blocklists.value)");
+                                    ->where('workspace_email_blocklists.type', EmailBlocklistType::DOMAIN->value);
+                                resolve(BlocklistDomainMatcher::class)->constrainWhereExistsDomainMatch(
+                                    $protectedDomain,
+                                    'workspace_email_blocklists.value',
+                                    'meeting_attendees.email_address',
+                                );
                             });
                     });
                 });

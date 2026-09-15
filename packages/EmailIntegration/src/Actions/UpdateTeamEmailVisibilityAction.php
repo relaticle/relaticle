@@ -13,7 +13,7 @@ use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 final readonly class UpdateTeamEmailVisibilityAction
 {
     /**
-     * @param  array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement}>  $entries
+     * @param  array<int, array{type: string, value: string, enforcement_level: EmailVisibilityEnforcement, include_subdomains?: bool}>  $entries
      */
     public function execute(Workspace $team, User $actor, array $entries): void
     {
@@ -34,6 +34,7 @@ final readonly class UpdateTeamEmailVisibilityAction
                 'type' => $entry['type'],
                 'value' => strtolower(trim((string) $entry['value'])),
                 'enforcement_level' => $entry['enforcement_level']->value,
+                'include_subdomains' => (bool) ($entry['include_subdomains'] ?? false),
                 'created_by' => $actor->getKey(),
             ]);
         }

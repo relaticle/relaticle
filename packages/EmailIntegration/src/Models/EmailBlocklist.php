@@ -16,6 +16,7 @@ use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 /**
  * @property EmailBlocklistType $type
  * @property string $value
+ * @property bool $include_subdomains
  */
 final class EmailBlocklist extends Model
 {
@@ -35,12 +36,14 @@ final class EmailBlocklist extends Model
         'connected_account_id',
         'type',
         'value',
+        'include_subdomains',
     ];
 
     protected function casts(): array
     {
         return [
             'type' => EmailBlocklistType::class,
+            'include_subdomains' => 'boolean',
         ];
     }
 

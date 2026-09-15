@@ -108,6 +108,28 @@ it('hides a coworker email whose participant matches a protected domain', functi
     expect(visibleTo($this->viewer)->modelKeys())->not->toContain($protected->id);
 });
 
+it('shows a coworker email from a subdomain when domain block has include subdomains off', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->domain('temuemail.com')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $subdomainSender = ($this->makeCoworkerEmail)(['temu@commerce.temuemail.com']);
+
+    expect(visibleTo($this->viewer)->modelKeys())->toContain($subdomainSender->id);
+});
+
+it('hides a coworker email from a subdomain when domain block has include subdomains on', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->domain('temuemail.com')->includeSubdomains()->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    $subdomainSender = ($this->makeCoworkerEmail)(['temu@commerce.temuemail.com']);
+
+    expect(visibleTo($this->viewer)->modelKeys())->not->toContain($subdomainSender->id);
+});
+
 it('hides a coworker email whose participant matches an inferred workspace domain', function (): void {
     $this->coworker->update(['email' => 'coworker@thefireflytech.com']);
 

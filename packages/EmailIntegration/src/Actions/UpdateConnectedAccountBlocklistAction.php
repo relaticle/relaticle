@@ -10,7 +10,7 @@ use Relaticle\EmailIntegration\Models\EmailBlocklist;
 final readonly class UpdateConnectedAccountBlocklistAction
 {
     /**
-     * @param  list<array{type: string, value: string}>  $blocklist
+     * @param  list<array{type: string, value: string, include_subdomains?: bool}>  $blocklist
      */
     public function execute(ConnectedAccount $account, array $blocklist): void
     {
@@ -31,6 +31,7 @@ final readonly class UpdateConnectedAccountBlocklistAction
                 'connected_account_id' => $account->getKey(),
                 'type' => $entry['type'],
                 'value' => $value,
+                'include_subdomains' => (bool) ($entry['include_subdomains'] ?? false),
             ]);
         }
     }

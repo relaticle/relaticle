@@ -14,6 +14,9 @@
                         {{ __('filament/pages/email-privacy-settings.visibility.table.address') }}
                     </th>
                     <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
+                        {{ __('filament/pages/email-privacy-settings.visibility.table.subdomains') }}
+                    </th>
+                    <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
                         {{ __('filament/pages/email-privacy-settings.visibility.table.enforcement') }}
                     </th>
                     <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
@@ -38,6 +41,23 @@
                         <td class="px-4 py-3 font-medium text-gray-950 dark:text-white">
                             {{ $row['address'] }}
                         </td>
+                        <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            @if (! $row['is_system'] && ($row['type'] ?? '') === 'domain')
+                                <label class="inline-flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        class="rounded border-gray-300 text-primary-600 shadow-sm focus:ring-primary-500 dark:border-white/20 dark:bg-white/5"
+                                        @checked($row['include_subdomains'] ?? false)
+                                        wire:change="setVisibilityIncludeSubdomains('{{ $row['entry_id'] }}', $event.target.checked)"
+                                    />
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ __('filament/pages/email-privacy-settings.visibility.include_subdomains_short') }}
+                                    </span>
+                                </label>
+                            @else
+                                <span class="text-gray-400 dark:text-gray-500">—</span>
+                            @endif
+                        </td>
                         <td class="relative px-4 py-3">
                             <x-email-integration::enforcement-level-picker
                                 :value="$row['enforcement_value']"
@@ -59,7 +79,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                             {{ __('filament/pages/email-privacy-settings.visibility.empty_heading') }}
                         </td>
                     </tr>
