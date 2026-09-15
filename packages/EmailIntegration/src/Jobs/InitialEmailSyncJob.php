@@ -9,11 +9,11 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Facades\Config;
+use Relaticle\EmailIntegration\Actions\NotifyMailboxImportCompletedAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
-use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotification;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
@@ -136,6 +136,6 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
             'last_error' => null,
         ]);
 
-        $account->user?->notify(new MailboxHistoryImportCompletedNotification($account->fresh() ?? $account));
+        resolve(NotifyMailboxImportCompletedAction::class)->execute($account);
     }
 }

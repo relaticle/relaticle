@@ -228,7 +228,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->onOneServer();
 
             $schedule->command('email:dispatch-outbox')
-                ->everyMinute()
+                ->everyThirtySeconds()
                 ->name('email:dispatch-outbox')
                 ->withoutOverlapping()
                 ->onOneServer();

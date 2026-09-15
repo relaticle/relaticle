@@ -19,7 +19,23 @@ return [
             'contact' => 'You received this because someone submitted the contact form.',
             'account' => 'You received this because of a request on your :company account.',
             'onboarding' => 'You received this because you created a :company workspace.',
+            'mailbox_import' => 'You received this because you connected a mailbox to :team.',
         ],
+    ],
+
+    'mailbox_import_complete' => [
+        'subject' => ':team is synced to Relaticle',
+        'preheader' => ':email is connected to :team',
+        'greeting' => 'Hi :name,',
+        'synced_before_email' => 'We\'ve successfully synced ',
+        'synced_before_team' => ' to your ',
+        'synced_after_team' => ' Workspace.',
+        'found_before_counts' => 'Our sync engines found ',
+        'found_between_counts' => ' emails and ',
+        'found_after_counts' => ' calendar events.',
+        'stat_emails' => 'Emails',
+        'stat_calendar_events' => 'Calendar Events',
+        'cta' => 'Go to Workspace',
     ],
 
     'unsubscribe' => [

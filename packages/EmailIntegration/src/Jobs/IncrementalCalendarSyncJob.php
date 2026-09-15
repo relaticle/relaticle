@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Facades\Bus;
+use Relaticle\EmailIntegration\Actions\NotifyMailboxImportCompletedAction;
 use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -144,6 +145,8 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         MailboxSyncTracker::markCalendarFinished($account);
+
+        resolve(NotifyMailboxImportCompletedAction::class)->execute($account);
 
         dispatch(new EnsureCalendarPushChannelJob($account));
     }

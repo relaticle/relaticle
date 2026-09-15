@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
+use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
@@ -28,15 +29,20 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
 
     public function toMail(object $notifiable): MailMessage
     {
+        $workspace = $this->account->workspace;
+
         return (new MailMessage)
-            ->subject(__('filament/notifications/mailbox-import-complete.mail.subject'))
-            ->greeting(__('filament/notifications/mailbox-import-complete.mail.greeting', [
-                'name' => $notifiable instanceof User ? $notifiable->name : '',
+            ->subject(__('mail.mailbox_import_complete.subject', [
+                'team' => $workspace->name,
             ]))
-            ->line(__('filament/notifications/mailbox-import-complete.mail.line', [
-                'email' => $this->account->email_address,
-                'count' => $this->account->initial_sync_imported,
-            ]));
+            ->markdown('mail.notifications.mailbox-import-complete', [
+                'greetingName' => $notifiable instanceof User ? $notifiable->name : '',
+                'connectedEmail' => $this->account->email_address,
+                'teamName' => $workspace->name,
+                'emailCount' => $this->account->initial_sync_imported,
+                'calendarCount' => $this->account->initial_calendar_sync_imported,
+                'workspaceUrl' => Dashboard::getUrl(['tenant' => $workspace]),
+            ]);
     }
 
     /**
@@ -48,7 +54,9 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
             ->title(__('filament/notifications/mailbox-import-complete.title'))
             ->body(__('filament/notifications/mailbox-import-complete.body', [
                 'email' => $this->account->email_address,
-                'count' => $this->account->initial_sync_imported,
+                'team' => $this->account->workspace->name,
+                'emails' => $this->account->initial_sync_imported,
+                'events' => $this->account->initial_calendar_sync_imported,
             ]))
             ->success()
             ->icon('heroicon-o-check-circle')

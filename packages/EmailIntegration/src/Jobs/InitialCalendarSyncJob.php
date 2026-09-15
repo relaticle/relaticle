@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Relaticle\EmailIntegration\Actions\NotifyMailboxImportCompletedAction;
 use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Enums\CalendarEventStatus;
@@ -142,6 +143,8 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         MailboxSyncTracker::markCalendarFinished($account);
+
+        resolve(NotifyMailboxImportCompletedAction::class)->execute($account);
 
         dispatch(new EnsureCalendarPushChannelJob($account));
     }
