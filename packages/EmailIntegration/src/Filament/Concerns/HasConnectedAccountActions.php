@@ -17,12 +17,14 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
+use Relaticle\EmailIntegration\Actions\RetryFailedEmailImportsAction;
 use Relaticle\EmailIntegration\Actions\SetDefaultConnectedAccountAction;
 use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Actions\StopCalendarPushChannelAction;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\FailedStoreEmailImportService;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
@@ -76,6 +78,7 @@ trait HasConnectedAccountActions
             ...$settingsAction,
             ($this->setDefaultAction())($arguments),
             ($this->reconnectAction())($arguments),
+            ($this->retryFailedImportsAction())($arguments),
             ...array_map(fn (Action $action): Action => $action($arguments), $extraActions),
             ($this->disconnectAction())($arguments),
         ])
@@ -96,6 +99,46 @@ trait HasConnectedAccountActions
             ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
                 'account' => (string) $arguments['account_id'],
             ]));
+    }
+
+    public function retryFailedImportsAction(): Action
+    {
+        return Action::make('retryFailedImports')
+            ->label(__('filament/pages/email-accounts.actions.retry_failed_imports.label'))
+            ->icon('heroicon-o-arrow-path')
+            ->color('warning')
+            ->size(Size::Small)
+            ->visible(function (array $arguments): bool {
+                $account = $this->findAccount($arguments);
+
+                return $account instanceof ConnectedAccount
+                    && resolve(FailedStoreEmailImportService::class)->hasFailures($account);
+            })
+            ->requiresConfirmation()
+            ->modalHeading(__('filament/pages/email-accounts.actions.retry_failed_imports.heading'))
+            ->modalDescription(function (array $arguments): string {
+                $account = $this->findOwnedAccountOrFail($arguments);
+                $count = resolve(FailedStoreEmailImportService::class)->countFor($account);
+
+                return __('filament/pages/email-accounts.actions.retry_failed_imports.description', [
+                    'count' => $count,
+                ]);
+            })
+            ->action(function (array $arguments): void {
+                $account = $this->findOwnedAccountOrFail($arguments);
+
+                $count = resolve(RetryFailedEmailImportsAction::class)->execute($account);
+
+                $this->afterAccountChanged();
+
+                Notification::make()
+                    ->success()
+                    ->title(__('filament/pages/email-accounts.notifications.retry_failed_imports_queued.title'))
+                    ->body(__('filament/pages/email-accounts.notifications.retry_failed_imports_queued.body', [
+                        'count' => $count,
+                    ]))
+                    ->send();
+            });
     }
 
     public function reconnectAction(): Action

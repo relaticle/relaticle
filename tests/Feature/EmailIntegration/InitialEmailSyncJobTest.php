@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Str;
 use Illuminate\Support\Testing\Fakes\BatchFake;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
@@ -21,6 +23,27 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 
 mutates(InitialEmailSyncJob::class);
+
+function insertFailedStoreEmailJob(ConnectedAccount $account, string $messageId = 'M-failed'): string
+{
+    $uuid = (string) Str::uuid();
+
+    DB::table('failed_jobs')->insert([
+        'uuid' => $uuid,
+        'connection' => 'redis',
+        'queue' => 'emails-sync',
+        'payload' => json_encode([
+            'displayName' => StoreEmailJob::class,
+            'data' => [
+                'command' => serialize(new StoreEmailJob($account, $messageId)),
+            ],
+        ]),
+        'exception' => 'Illuminate\\Queue\\MaxAttemptsExceededException',
+        'failed_at' => now(),
+    ]);
+
+    return $uuid;
+}
 
 function invokeInitialEmailSyncBatchFinallyCallbacks(int $failedJobs = 0): void
 {
@@ -331,6 +354,42 @@ it('advances after a disabled direction skips every message in a page', function
         fn (InitialEmailSyncJob $job): bool => $job->pageToken === 'page-2',
     );
     expect(Email::query()->where('provider_message_id', 'M1')->exists())->toBeFalse();
+});
+
+it('finishes initial import in error when failed store jobs remain', function (): void {
+    Bus::fake();
+    Notification::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    insertFailedStoreEmailJob($account);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']),
+        nextPageToken: null,
+        cursor: 'history-1',
+    ));
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    (new InitialEmailSyncJob($account))->handle($factory);
+
+    Email::factory()->create([
+        'workspace_id' => $account->workspace_id,
+        'user_id' => $account->user_id,
+        'connected_account_id' => $account->getKey(),
+        'provider_message_id' => 'M1',
+    ]);
+
+    invokeInitialEmailSyncBatchFinallyCallbacks();
+
+    expect($account->fresh()?->sync_cursor)->toBe('history-1')
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
+        ->and($account->fresh()?->last_error)->toContain('email');
+
+    Notification::assertNothingSent();
 });
 
 it('does not advance the initial import while page messages are still missing', function (): void {

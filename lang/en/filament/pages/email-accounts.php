@@ -28,6 +28,11 @@ return [
             'heading' => 'Re-import mailbox history?',
             'description' => 'Already synced mail and events stay in Relaticle. We will create missing people and companies using the current workspace record-creation setting, and import any messages not stored yet. This can take a while on a large mailbox.',
         ],
+        'retry_failed_imports' => [
+            'label' => 'Retry failed imports',
+            'heading' => 'Retry failed email imports?',
+            'description' => 'We will queue :count email(s) that failed to import for another attempt.',
+        ],
     ],
     'settings' => [
         'sync_inbox' => [
@@ -68,6 +73,14 @@ return [
             'title' => 'History import queued.',
             'body' => 'People and companies will appear as the import runs. You can keep using Relaticle.',
         ],
+        'retry_failed_imports_queued' => [
+            'title' => 'Import retry queued.',
+            'body' => 'We queued :count email(s) for another import attempt.',
+        ],
+    ],
+    'errors' => [
+        'import_store_failed' => 'Some emails could not be imported during sync.',
+        'import_store_failed_with_count' => '{1}One email could not be imported during sync.|[2,*]:count emails could not be imported during sync.',
     ],
     'default_badge' => 'Default',
     'sections' => [

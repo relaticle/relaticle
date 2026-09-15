@@ -35,6 +35,7 @@
                             <p class="truncate text-xs text-gray-500 dark:text-gray-400">
                                 {{ $account->capabilitiesLabel() }}
                             </p>
+                            <x-email-integration::account-sync-error :account="$account" class="mt-1" />
                         </div>
                     </div>
 

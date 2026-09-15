@@ -6,7 +6,10 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
@@ -19,6 +22,7 @@ use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
+use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -240,6 +244,35 @@ it('lists the default account first', function (): void {
         ->all();
 
     expect($ids[0])->toBe($default->id);
+});
+
+it('retries failed email imports from the account menu', function (): void {
+    Artisan::spy();
+
+    $uuid = (string) Str::uuid();
+
+    DB::table('failed_jobs')->insert([
+        'uuid' => $uuid,
+        'connection' => 'redis',
+        'queue' => 'emails-sync',
+        'payload' => json_encode([
+            'displayName' => StoreEmailJob::class,
+            'data' => [
+                'command' => serialize(new StoreEmailJob($this->account, 'msg-failed')),
+            ],
+        ]),
+        'exception' => 'Illuminate\\Queue\\MaxAttemptsExceededException',
+        'failed_at' => now(),
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->callAction('retryFailedImports', arguments: ['account_id' => $this->account->id])
+        ->assertNotified();
+
+    Artisan::shouldHaveReceived('call')->with('queue:retry', ['id' => $uuid]);
+
+    expect($this->account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($this->account->fresh()?->last_error)->toBeNull();
 });
 
 it('queues mailbox history import from the account menu', function (): void {

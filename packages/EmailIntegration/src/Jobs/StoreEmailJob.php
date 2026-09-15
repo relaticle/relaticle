@@ -11,7 +11,9 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -21,9 +23,12 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 {
-    use Batchable, Queueable, ReleasesOnProviderRateLimit;
+    use Batchable, DetectsAuthErrors, Queueable, ReleasesOnProviderRateLimit;
 
     public int $tries = 5;
+
+    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider */
+    public array $backoff = [60, 300, 900];
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
@@ -101,6 +106,28 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
         }
 
         $action->execute($this->connectedAccount, $fetched);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        if ($this->isMissingProviderMessage($exception)) {
+            return;
+        }
+
+        $account = ConnectedAccount::query()->whereKey($this->connectedAccount->getKey())->first();
+
+        if (! $account instanceof ConnectedAccount || $account->status === EmailAccountStatus::DISCONNECTED) {
+            return;
+        }
+
+        $account->update([
+            'status' => $this->isAuthError($exception)
+                ? EmailAccountStatus::REAUTH_REQUIRED
+                : EmailAccountStatus::ERROR,
+            'last_error' => $this->isAuthError($exception)
+                ? $exception->getMessage()
+                : __('filament/pages/email-accounts.errors.import_store_failed'),
+        ]);
     }
 
     private function doesItAlreadyExists(): bool

@@ -31,14 +31,22 @@
                         <p class="mt-1 text-sm font-normal text-gray-500 dark:text-gray-400">
                             {{ __('filament/pages/email-account-settings.subheading') }}
                         </p>
+                        <x-email-integration::account-sync-error :account="$account" class="mt-2" />
                     </div>
                 </div>
             </x-slot>
 
             <x-slot name="afterHeader">
                 <div class="flex shrink-0 items-center gap-3">
-                    @if ($this->isImportingHistory())
+                    @if ($account->showsSyncProgress())
                         <x-email-integration::importing-badge :account="$account" :icon="$this->syncingIcon()" />
+                    @elseif (! $account->isActive())
+                        <x-filament::badge
+                            :color="$account->status->getColor()"
+                            icon="heroicon-m-exclamation-triangle"
+                        >
+                            {{ $account->status->getLabel() }}
+                        </x-filament::badge>
                     @endif
 
                     {{ $this->accountActions($account->getKey(), includeSettings: false) }}

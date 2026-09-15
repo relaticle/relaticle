@@ -9,6 +9,7 @@ use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -21,6 +22,21 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\ProviderRateLimit;
 
 mutates(StoreEmailJob::class, ProviderRateLimit::class, ReleasesOnProviderRateLimit::class);
+
+it('uses spaced backoff between retries', function (): void {
+    $job = new StoreEmailJob(ConnectedAccount::factory()->make(), 'msg-1');
+
+    expect($job->backoff)->toBe([60, 300, 900]);
+});
+
+it('marks the account in error when the job exhausts retries', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    (new StoreEmailJob($account, 'msg-1'))->failed(new RuntimeException('Provider timeout'));
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
+        ->and($account->fresh()?->last_error)->toBe(__('filament/pages/email-accounts.errors.import_store_failed'));
+});
 
 function gmailUserRateLimited(string $retryAfterIso): GoogleServiceException
 {

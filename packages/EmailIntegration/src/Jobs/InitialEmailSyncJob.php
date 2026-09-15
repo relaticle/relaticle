@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotification;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\FailedStoreEmailImportService;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -127,6 +128,26 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         $cursor = $historyCursor ?? $pageCursor;
+
+        $failedImports = resolve(FailedStoreEmailImportService::class);
+
+        $failedImportCount = $failedImports->countFor($account);
+
+        if ($failedImportCount > 0) {
+            $account->update([
+                'sync_cursor' => $cursor,
+                'last_synced_at' => now(),
+                'initial_sync_imported' => $imported,
+                'status' => EmailAccountStatus::ERROR,
+                'last_error' => trans_choice(
+                    'filament/pages/email-accounts.errors.import_store_failed_with_count',
+                    $failedImportCount,
+                    ['count' => $failedImportCount],
+                ),
+            ]);
+
+            return;
+        }
 
         $account->update([
             'sync_cursor' => $cursor,
