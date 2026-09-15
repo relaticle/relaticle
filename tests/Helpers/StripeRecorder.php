@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Helpers;
 
+use RuntimeException;
 use Stripe\ApiRequestor;
 use Stripe\HttpClient\ClientInterface;
 
@@ -74,6 +75,6 @@ final class StripeRecorder implements ClientInterface
             }
         }
 
-        return [];
+        throw new RuntimeException("No Stripe request matched url fragment [{$urlFragment}].");
     }
 }

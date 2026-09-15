@@ -12,7 +12,7 @@ use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Tests\Helpers\StripeRecorder;
 
-mutates(Billing::class);
+mutates(Billing::class, CreateProCheckout::class);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);

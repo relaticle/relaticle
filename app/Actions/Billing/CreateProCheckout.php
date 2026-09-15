@@ -16,13 +16,13 @@ final readonly class CreateProCheckout
 
     /**
      * Stripe renders the card fields, so these only colour the frame around
-     * them. Values track resources/css/theme.css.
+     * them. Backgrounds match --surface-block-bg in resources/css/theme.css.
      *
      * @var array<string, array<string, string>>
      */
     private const array BRANDING = [
         'light' => ['background_color' => '#ffffff', 'button_color' => '#7c3aed', 'border_style' => 'rounded'],
-        'dark' => ['background_color' => '#131318', 'button_color' => '#7c3aed', 'border_style' => 'rounded'],
+        'dark' => ['background_color' => '#111827', 'button_color' => '#7c3aed', 'border_style' => 'rounded'],
     ];
 
     /**
