@@ -24,6 +24,7 @@ use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
 use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\CreationSource;
+use App\Features\SetupConversation;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
@@ -33,9 +34,11 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\PendingActionResolved;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalOwnership;
@@ -97,7 +100,7 @@ final readonly class PendingActionService
         ?string $messageId = null,
         ?string $turnId = null,
     ): PendingAction {
-        $expiryMinutes = (int) config('chat.pending_action_expiry_minutes', 15);
+        $expiryMinutes = $this->expiryMinutesFor($conversationId);
 
         // Idempotency across job retries. A continuation creates its proposal mid-stream; if a
         // later chunk throws a transient error (429/529/503) the job is retried from the top and
@@ -134,6 +137,19 @@ final readonly class PendingActionService
             'status' => PendingActionStatus::Pending,
             'expires_at' => now()->addMinutes($expiryMinutes),
         ]);
+    }
+
+    private function expiryMinutesFor(?string $conversationId): int
+    {
+        $default = (int) config('chat.pending_action_expiry_minutes', 15);
+
+        if ($conversationId === null || ! Feature::active(SetupConversation::class)) {
+            return $default;
+        }
+
+        $isSetup = AgentConversation::query()->whereKey($conversationId)->setup()->exists();
+
+        return $isSetup ? (int) config('chat.setup_pending_action_expiry_minutes', $default) : $default;
     }
 
     /**

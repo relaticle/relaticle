@@ -97,11 +97,12 @@
                      draft debounce against the wrong conversation key. --}}
                 x-on:chat:editor-submit.window="if ($event.detail?.context === @js($context ?? 'conversation')) sendMessage()"
                 x-on:chat:editor-change.window="if ($event.detail?.context === @js($context ?? 'conversation')) { input = $event.detail.text; saveDraft() }"
+                x-on:chat:attachment-changed.window="if ($event.detail?.context === @js($context ?? 'conversation')) pendingAttachment = $event.detail.attachment"
                 {{-- No global setter needed, chatInterface uses localEditor() to scope-resolve. --}}
                 data-chat-context="{{ $context ?? 'conversation' }}"
             >
                 @include('chat::livewire.chat.partials._composer-bar', [
-                    'sendDisabled' => 'text.trim().length === 0 || text.length > 5000 || rateLimit !== null',
+                    'sendDisabled' => '(text.trim().length === 0 && !pendingAttachment) || text.length > 5000 || rateLimit !== null',
                 ])
             </div>
         </form>

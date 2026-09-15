@@ -32,11 +32,51 @@ enum OnboardingUseCase: string implements HasLabel
     public function getFixtureSet(): string
     {
         return match ($this) {
-            self::Sales, self::CustomerSuccess => 'sales',
+            self::Sales => 'sales',
+            self::CustomerSuccess => 'customer_success',
             self::Recruiting => 'recruiting',
             self::Marketing => 'marketing',
             self::Fundraising, self::Investing => 'fundraising',
             self::Other => 'general',
+        };
+    }
+
+    /**
+     * Pipeline stages this use case wants, mapped to their colour. Null keeps
+     * the opportunity field's own defaults.
+     *
+     * @return array<string, string>|null
+     */
+    public function stagePreset(): ?array
+    {
+        return match ($this) {
+            self::CustomerSuccess => [
+                'Onboarding' => '#a5b4fc',
+                'Active' => '#059669',
+                'Renewal due' => '#eab308',
+                'At risk' => '#f97316',
+                'Renewed' => '#0d9488',
+                'Churned' => '#6b7280',
+            ],
+            self::Recruiting => [
+                'Sourced' => '#a5b4fc',
+                'Applied' => '#1e40af',
+                'Screen' => '#0d9488',
+                'Interview' => '#eab308',
+                'Offer' => '#7c3aed',
+                'Hired' => '#059669',
+                'Declined' => '#6b7280',
+            ],
+            self::Fundraising, self::Investing => [
+                'Target' => '#a5b4fc',
+                'Intro' => '#1e40af',
+                'First meeting' => '#0d9488',
+                'Partner meeting' => '#eab308',
+                'Term sheet' => '#7c3aed',
+                'Closed' => '#059669',
+                'Passed' => '#6b7280',
+            ],
+            self::Sales, self::Marketing, self::Other => null,
         };
     }
 
@@ -78,20 +118,14 @@ enum OnboardingUseCase: string implements HasLabel
     {
         return match ($this) {
             self::Sales => [
-                'product_led' => 'Product-led',
-                'sales_led' => 'Sales-led',
-                'inbound' => 'Inbound',
                 'outbound' => 'Outbound',
-                'smb' => 'SMB',
-                'mid_market' => 'Mid-market',
-                'enterprise' => 'Enterprise',
+                'inbound' => 'Inbound',
+                'product_led' => 'Product-led',
+                'partner_led' => 'Partner-led',
             ],
             self::CustomerSuccess => [
-                'low_touch' => 'Low-touch',
                 'high_touch' => 'High-touch',
-                'smb' => 'SMB',
-                'mid_market' => 'Mid-market',
-                'enterprise' => 'Enterprise',
+                'low_touch' => 'Low-touch',
             ],
             self::Recruiting => [
                 'applications' => 'Applications',
@@ -103,12 +137,7 @@ enum OnboardingUseCase: string implements HasLabel
                 'events' => 'Events',
                 'partnerships' => 'Partnerships',
             ],
-            self::Fundraising => [
-                'early_stage' => 'Early-stage',
-                'growth_stage' => 'Growth-stage',
-                'late_stage' => 'Late-stage',
-            ],
-            self::Investing => [
+            self::Fundraising, self::Investing => [
                 'early_stage' => 'Early-stage',
                 'growth_stage' => 'Growth-stage',
                 'late_stage' => 'Late-stage',

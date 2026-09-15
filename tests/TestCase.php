@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests;
 
 use App\Features\OnboardSeed;
+use App\Features\SetupConversation;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\WithCachedConfig;
@@ -58,6 +59,11 @@ abstract class TestCase extends BaseTestCase
         // of every insert this suite performs. Tests that exercise onboarding or
         // read demo data re-enable it explicitly.
         Feature::define(OnboardSeed::class, false);
+
+        // Every personal workspace otherwise opens with a setup conversation,
+        // which lands in conversation lists, counts and titles across the chat
+        // suite. Onboarding tests re-enable it explicitly.
+        Feature::define(SetupConversation::class, false);
 
         // Browser tests drive a real browser and need the built front-end
         // assets (chat.js registers the `chatEditor` Alpine factory, etc.).

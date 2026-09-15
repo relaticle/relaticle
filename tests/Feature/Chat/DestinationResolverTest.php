@@ -54,3 +54,19 @@ it('resolves every export destination to its list page with the export action de
             ->and($url)->toContain('action=export');
     }
 });
+
+it('resolves access_tokens to the workspace access tokens page', function (): void {
+    $url = app(DestinationResolver::class)->resolve('access_tokens', $this->user->currentWorkspace);
+
+    expect($url)->toBeString()
+        ->and($url)->toContain((string) $this->user->currentWorkspace->slug)
+        ->and($url)->toContain('access-tokens');
+});
+
+it('resolves connect_assistant to the public help page on the primary host', function (): void {
+    config()->set('app.url', 'https://marketing.test');
+
+    $url = app(DestinationResolver::class)->resolve('connect_assistant', $this->user->currentWorkspace);
+
+    expect($url)->toBe('https://marketing.test/help/ai-assistant/connect-claude-or-chatgpt');
+});

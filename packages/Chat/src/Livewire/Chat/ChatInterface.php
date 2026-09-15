@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\Chat;
 
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Date;
@@ -64,7 +65,7 @@ final class ChatInterface extends BaseLivewireComponent
     private const int MAX_PROMPT_LENGTH = 5000;
 
     /**
-     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{label: string, prompt: string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null}>
+     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{label: string, prompt: string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null, attachment?: array{id: string, name: string, row_count: int}|null}>
      */
     public array $messages = [];
 
@@ -100,7 +101,22 @@ final class ChatInterface extends BaseLivewireComponent
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
             $this->appendInFlightTurnState($this->conversationId);
+            $this->greetIfSetupConversation($this->conversationId);
         }
+    }
+
+    /**
+     * The setup conversation is seeded empty, so opening it is what makes the
+     * assistant speak. Arming turnInFlight here paints the thread as working
+     * from the first frame, the same as a reload mid-turn does.
+     */
+    private function greetIfSetupConversation(string $conversationId): void
+    {
+        if ($this->messages !== [] || $this->turnInFlight) {
+            return;
+        }
+
+        $this->turnInFlight = resolve(StartSetupGreeting::class)->execute($this->authUser(), $conversationId);
     }
 
     /**

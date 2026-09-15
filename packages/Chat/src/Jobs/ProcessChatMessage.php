@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
@@ -30,6 +31,7 @@ use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -37,12 +39,14 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ConversationTitleGate;
@@ -70,6 +74,7 @@ final class ProcessChatMessage implements ShouldQueue
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
      * @param  array{type: string, id: string, label: string}|null  $pageContext
+     * @param  array{id: string, name: string, row_count: int}|null  $attachment
      */
     public function __construct(
         private readonly User $user,
@@ -84,6 +89,7 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly int $failoverDepth = 0,
         public readonly bool $isContinuation = false,
         public readonly ?string $resumesTurnId = null,
+        public readonly ?array $attachment = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -203,6 +209,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withWorkspace($this->workspace);
+            $agent->withSetupMode($this->isSetupConversation());
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
@@ -344,6 +351,7 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions();
                 $this->persistUserDocument();
+                $this->persistUserAttachment();
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
                 $this->suggestNextSteps($streamedResponse);
@@ -420,6 +428,7 @@ final class ProcessChatMessage implements ShouldQueue
                         failoverDepth: $this->failoverDepth + 1,
                         isContinuation: $this->isContinuation,
                         resumesTurnId: $this->resumesTurnId,
+                        attachment: $this->attachment,
                     ));
 
                     return;
@@ -599,6 +608,22 @@ final class ProcessChatMessage implements ShouldQueue
      * behavior for that one edge case, never a duplicate or a false error
      * note, and are accepted rather than solved with more machinery.
      */
+    /**
+     * A turn whose prompt we wrote (a resume, the setup greeting) must carry
+     * the continuation mark here too, or a dead turn leaves that prompt in the
+     * transcript as words the user never typed.
+     *
+     * @return array<string, mixed>
+     */
+    private function failedTurnUserMeta(): array
+    {
+        if ($this->isContinuation) {
+            return ['kind' => SupersededAwareConversationStore::CONTINUATION_KIND];
+        }
+
+        return $this->attachment === null ? [] : ['attachment' => $this->attachment];
+    }
+
     private function persistFailedTurn(?Throwable $exception): void
     {
         $now = now();
@@ -640,7 +665,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'tool_calls' => '[]',
                 'tool_results' => '[]',
                 'usage' => '[]',
-                'meta' => '[]',
+                'meta' => json_encode($this->failedTurnUserMeta(), JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -811,6 +836,27 @@ final class ProcessChatMessage implements ShouldQueue
         DB::table('agent_conversation_messages')
             ->where('id', $latestId)
             ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
+    }
+
+    private function persistUserAttachment(): void
+    {
+        if ($this->attachment === null) {
+            return;
+        }
+
+        $latestId = $this->latestMessageId('user');
+
+        if ($latestId === null) {
+            return;
+        }
+
+        $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $meta = is_array($existing) ? $existing : [];
+        $meta['attachment'] = $this->attachment;
+
+        DB::table('agent_conversation_messages')
+            ->where('id', $latestId)
+            ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
     }
 
     /**
@@ -996,5 +1042,17 @@ final class ProcessChatMessage implements ShouldQueue
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function isSetupConversation(): bool
+    {
+        if (! Feature::active(SetupConversation::class)) {
+            return false;
+        }
+
+        return AgentConversation::query()
+            ->whereKey($this->conversationId)
+            ->setup()
+            ->exists();
     }
 }

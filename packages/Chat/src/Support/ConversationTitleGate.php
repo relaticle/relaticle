@@ -67,7 +67,7 @@ final readonly class ConversationTitleGate
     }
 
     /**
-     * @param  Collection<int, string>|null  $typed
+     * @param  Collection<int, non-empty-string>|null  $typed
      */
     private static function provisional(string $conversationId, ?Collection $typed, ?string $fallbackMessage, int $maxTypedMessages): ?string
     {
@@ -119,7 +119,12 @@ final readonly class ConversationTitleGate
      * so skipping superseded rows would make the opener look like the edit and
      * the compare-and-swap would never match again.
      *
-     * @return Collection<int, string>
+     * A row carrying an attachment stores the composed prompt (typed text plus
+     * the fenced CSV block) as its content, so the block is stripped back off
+     * here. An attachment sent with no typed text has nothing to name the
+     * conversation from and is dropped rather than counted as an empty opener.
+     *
+     * @return Collection<int, non-empty-string>
      */
     private static function typedMessages(string $conversationId): Collection
     {
@@ -129,6 +134,14 @@ final readonly class ConversationTitleGate
             ->where('content', 'not like', '[approval]%')
             ->whereRaw("coalesce(meta->>'kind', '') = ''")
             ->orderBy('id')
-            ->pluck('content');
+            ->get(['content', 'meta'])
+            ->map(function (object $row): string {
+                $meta = $row->meta === null ? null : json_decode((string) $row->meta, true);
+                $content = (string) $row->content;
+
+                return is_array($meta) && isset($meta['attachment']) ? AttachedRows::typedText($content) : $content;
+            })
+            ->reject(fn (string $content): bool => trim($content) === '')
+            ->values();
     }
 }

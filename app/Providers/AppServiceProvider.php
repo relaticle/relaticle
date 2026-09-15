@@ -13,6 +13,7 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
+use App\Listeners\CreateSetupConversationListener;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\WorkspaceCreatedTagListener;
@@ -197,6 +198,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(TeamMemberAdded::class, WorkspaceMemberAddedListener::class);
         Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);
         Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
+        Event::listen(WorkspaceCreated::class, CreateSetupConversationListener::class);
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);

@@ -5,14 +5,19 @@ declare(strict_types=1);
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
+use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
 use App\Features\OnboardSeed;
+use App\Features\SetupConversation;
+use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -34,12 +39,62 @@ it('renders the create workspace page with wizard for workspaceless users', func
         ->assertSee('Create your workspace');
 });
 
+it('shows a step indicator and a back affordance in the wizard', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->assertSuccessful()
+        ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+        ->assertSee('Step :current of :total');
+});
+
+it('flags the workspace created event when the wizard finishes', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Tracked Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(session()->get('fathom.track_workspace_created'))->toBeTrue();
+});
+
+/**
+ * A second workspace is expansion, not acquisition. Its Fathom referrer is
+ * whatever brought the user back that day, so crediting a channel with it
+ * would be wrong, and counting it alongside first workspaces would push the
+ * signup-to-workspace rate past 100%.
+ */
+it('does not flag the workspace created event for an additional workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Second Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Workspace::query()->where('name', 'Second Corp')->exists())->toBeTrue()
+        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+});
+
 it('resolves every wizard heading from translations', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
-    // Every step's placeholders are in the DOM at once, so one render covers all four.
+    // Every step's placeholders are in the DOM at once, so one render covers all three.
     // A mistyped key would surface here as the raw dotted key instead of the copy.
     livewire(CreateWorkspace::class)
         ->assertSuccessful()
@@ -49,15 +104,10 @@ it('resolves every wizard heading from translations', function (): void {
         ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case_description'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case_hint'))
-        ->assertSee(__('filament/pages/workspaces.create_workspace.headings.invite'))
-        ->assertSee(__('filament/pages/workspaces.create_workspace.headings.invite_description'))
-        ->assertSee(__('filament/pages/workspaces.create_workspace.headings.invite_subheading'))
         ->assertDontSee('filament/pages/workspaces.create_workspace.headings')
         ->assertDontSee('Workspace heading')
         ->assertDontSee('Attribution heading')
         ->assertDontSee('Use case heading')
-        ->assertDontSee('Invite heading')
-        ->assertDontSee('Invite subheading')
         ->assertDontSee('Onboarding referral source');
 });
 
@@ -72,8 +122,6 @@ it('resolves every wizard form label from translations', function (): void {
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.workspace_name.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.workspace_handle.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.use_case_label'))
-        ->assertSee(__('filament/pages/workspaces.create_workspace.form.invite_email_label'))
-        ->assertSee(__('filament/pages/workspaces.create_workspace.form.invite_role_label'))
         ->assertDontSee('filament/pages/workspaces.create_workspace.form');
 });
 
@@ -84,6 +132,204 @@ it('prefills the workspace step with the current user name', function (): void {
 
     livewire(CreateWorkspace::class)
         ->assertFormSet(['user_name' => 'Ada Lovelace']);
+});
+
+it('hides your name for a user who already has a workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->assertFormFieldHidden('user_name');
+});
+
+it('hides your name for an invited member who owns no workspace yet', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $member = User::factory()->create();
+    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $member->forceFill(['current_workspace_id' => $owner->currentWorkspace->getKey()])->save();
+
+    $this->actingAs($member);
+
+    livewire(CreateWorkspace::class)
+        ->assertFormFieldHidden('user_name');
+});
+
+it('shows your name for a first-run user', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->assertFormFieldVisible('user_name');
+});
+
+it('starts the workspace step empty for the user to name it themselves', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->assertFormSet([
+            'name' => null,
+            'slug' => null,
+        ]);
+});
+
+it('derives the handle from the name as it is typed', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
+});
+
+it('picks the lowest free suffix, skipping the ones already in use', function (): void {
+    $other = User::factory()->create();
+    Workspace::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+    Workspace::factory()->create(['slug' => 'acme-corp-2', 'user_id' => $other->id]);
+    Workspace::factory()->create(['slug' => 'acme-corp-10', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp-3']);
+});
+
+it('creates both workspaces when two signups type the same name at once', function (): void {
+    $first = User::factory()->create();
+    $second = User::factory()->create();
+
+    $this->actingAs($first);
+    $firstWizard = livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
+
+    $this->actingAs($second);
+    $secondWizard = livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp']);
+
+    $this->actingAs($first);
+    $firstWizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $this->actingAs($second);
+    $secondWizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Workspace::query()->whereIn('user_id', [$first->id, $second->id])->pluck('slug')->sort()->values()->all())
+        ->toBe(['acme-corp', 'acme-corp-2']);
+});
+
+it('stores no context for a use case that offers no sub-options', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Blank Canvas',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Workspace::query()->where('name', 'Blank Canvas')->sole()->onboarding_context)->toBeNull();
+});
+
+it('saves the handle it previewed for a name that transliterates to nothing', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $wizard = livewire(CreateWorkspace::class)->fillForm(['name' => '株式会社テスト']);
+    $previewed = $wizard->get('data')['slug'];
+
+    $wizard
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->personalWorkspace()->slug)->toBe($previewed);
+});
+
+it('previews a handle that clears the reserved route segments, the way the save does', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Billing'])
+        ->assertFormSet(['slug' => 'billing-2']);
+});
+
+it('still rejects a handle the user typed themselves when it is taken', function (): void {
+    $other = User::factory()->create();
+    Workspace::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'slug' => 'acme-corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['slug']);
+});
+
+it('suffixes a typed name that slugs to a handle already in use', function (): void {
+    $other = User::factory()->create();
+    Workspace::factory()->create(['slug' => 'acme-corp', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Acme Corp'])
+        ->assertFormSet(['slug' => 'acme-corp-2']);
+});
+
+it('ignores a taken handle whose suffix is too long to be a number', function (): void {
+    $other = User::factory()->create();
+    Workspace::factory()->create(['slug' => 'globex', 'user_id' => $other->id]);
+    Workspace::factory()->create(['slug' => 'globex-99999999999', 'user_id' => $other->id]);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['name' => 'Globex'])
+        ->assertFormSet(['slug' => 'globex-2']);
+});
+
+it('requires both a workspace name and a handle when the user fills neither', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['name' => 'required', 'slug' => 'required']);
+
+    expect($user->fresh()->personalWorkspace())->toBeNull();
 });
 
 it('renders wizard for users who already have a workspace', function (): void {
@@ -129,7 +375,7 @@ it('creates a workspace with onboarding fields', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -140,6 +386,58 @@ it('creates a workspace with onboarding fields', function (): void {
     expect($workspace)->not->toBeNull()
         ->and($workspace->slug)->toBe('acme-corp')
         ->and($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Sales);
+});
+
+it('subsequent workspaces can skip optional referral source', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Second Workspace',
+            'slug' => 'second-workspace',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = $user->fresh()->ownedWorkspaces()->where('name', 'Second Workspace')->first();
+
+    expect($workspace)->not->toBeNull()
+        ->and($workspace->onboarding_referral_source)->toBeNull();
+});
+
+it('stores referral source', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound'],
+            'onboarding_referral_source' => OnboardingReferralSource::Google->value,
+            'name' => 'Referral Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Referral Workspace')->first();
+
+    expect($workspace->onboarding_referral_source)->toBe(OnboardingReferralSource::Google);
+});
+
+it('has exactly three steps', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->assertSuccessful()
+        ->assertSeeHtml('aria-valuemax="3"')
+        ->assertDontSee('Collaborate with your team')
+        ->assertDontSee('Copy invite link');
 });
 
 it('hides the account menu links while no workspace is bound, instead of sending them to the dashboard', function (): void {
@@ -164,7 +462,129 @@ it('shows the account menu links inside a workspace', function (): void {
         ->assertSee(__('access-tokens.user_menu'));
 });
 
-it('clears the sub-options when the use case changes, so a switch can never strand the wizard', function (): void {
+it('stores the free text a user gives for the Other use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Parish Office',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Parish Office')->sole();
+
+    expect($workspace->onboarding_other_use_case)->toBe('Church donors');
+});
+
+it('caps the Other use case text at 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => str_repeat('a', 121),
+            'name' => 'Long Text Co',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['onboarding_other_use_case' => 'max']);
+});
+
+it('drops the Other text once a named use case is chosen instead', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+            'onboarding_other_use_case' => 'Church donors',
+            'name' => 'Switched Co',
+        ])
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound'],
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Switched Co')->sole();
+
+    expect($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Sales)
+        ->and($workspace->onboarding_other_use_case)->toBeNull();
+});
+
+it('the action rejects Other text over 120 characters', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    expect(fn () => resolve(CreateWorkspaceAction::class)->create($user, [
+        'name' => 'Tampered Other Co',
+        'slug' => 'tampered-other-co',
+        'onboarding_use_case' => OnboardingUseCase::Other->value,
+        'onboarding_other_use_case' => str_repeat('a', 121),
+    ]))->toThrow(ValidationException::class);
+
+    expect(Workspace::query()->where('name', 'Tampered Other Co')->exists())->toBeFalse();
+});
+
+it('the action drops Other text when a named use case is chosen', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $workspace = resolve(CreateWorkspaceAction::class)->create($user, [
+        'name' => 'Direct Action Co',
+        'slug' => 'direct-action-co',
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+        'onboarding_other_use_case' => 'Church donors',
+    ]);
+
+    expect($workspace->onboarding_other_use_case)->toBeNull();
+});
+
+it('stores the sub-options picked for the use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound', 'inbound'],
+            'name' => 'Context Co',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Context Co')->sole();
+
+    expect($workspace->onboarding_context)->toBe(['outbound', 'inbound']);
+});
+
+it('requires a sub-option for use cases that have them', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'name' => 'No Context Co',
+        ])
+        ->call('register')
+        ->assertHasFormErrors(['onboarding_context' => 'required']);
+});
+
+it('clears the sub-options when the use case changes', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -180,16 +600,46 @@ it('clears the sub-options when the use case changes, so a switch can never stra
         ])
         ->assertFormSet(['onboarding_context' => []])
         ->fillForm([
-            'onboarding_context' => ['applications'],
+            'onboarding_context' => ['sourcing'],
         ])
         ->call('register')
         ->assertHasNoFormErrors();
 
-    $workspace = Workspace::query()->where('name', 'Switcher Co')->first();
+    $workspace = Workspace::query()->where('name', 'Switcher Co')->sole();
 
-    expect($workspace)->not->toBeNull()
-        ->and($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
-        ->and($workspace->onboarding_context)->toBe(['applications']);
+    expect($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
+        ->and($workspace->onboarding_context)->toBe(['sourcing']);
+});
+
+it('the action rejects sub-options that belong to another use case', function (): void {
+    $user = User::factory()->create();
+
+    expect(fn (): Workspace => resolve(CreateWorkspaceAction::class)->create($user, [
+        'name' => 'Foreign Context Co',
+        'slug' => 'foreign-context-co',
+        'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        'onboarding_context' => ['outbound'],
+    ]))->toThrow(ValidationException::class);
+
+    expect(Workspace::query()->where('name', 'Foreign Context Co')->exists())->toBeFalse();
+});
+
+it('shows the free text only for the Other use case', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->goToWizardStep(3)
+        ->assertWizardCurrentStep(3)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        ])
+        ->assertFormFieldHidden('onboarding-use-case.onboarding_other_use_case')
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->assertFormFieldVisible('onboarding-use-case.onboarding_other_use_case');
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
@@ -249,7 +699,7 @@ it('creates a workspace with a custom slug', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Acme Corp',
             'slug' => 'my-workspace',
         ])
@@ -318,7 +768,7 @@ it('updates the user name when corrected during onboarding', function (): void {
         ->fillForm([
             'user_name' => 'Corrected Name',
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Acme Corp',
         ])
         ->call('register')
@@ -352,7 +802,7 @@ it('marks first workspace as personal workspace', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'My First Workspace',
         ])
         ->call('register')
@@ -381,7 +831,34 @@ it('marks subsequent workspaces as non-personal', function (): void {
     expect($secondWorkspace->personal_workspace)->toBeFalse();
 });
 
-it('redirects first workspace to dashboard with notification', function (): void {
+it('redirects first workspace to the setup conversation with notification', function (): void {
+    Feature::define(SetupConversation::class, true);
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateWorkspace::class)
+        ->fillForm([
+            'onboarding_use_case' => OnboardingUseCase::Sales->value,
+            'onboarding_context' => ['outbound'],
+            'name' => 'Redirect Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors()
+        ->assertNotified('Workspace created');
+
+    $workspace = $user->fresh()->currentWorkspace;
+
+    $component->assertRedirect(ChatConversation::getUrl([
+        'conversationId' => $workspace->setupConversation->id,
+        'tenant' => $workspace,
+    ]));
+});
+
+it('redirects first workspace to the dashboard when the setup conversation is off', function (): void {
+    Feature::define(SetupConversation::class, false);
+
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -389,12 +866,11 @@ it('redirects first workspace to dashboard with notification', function (): void
     livewire(CreateWorkspace::class)
         ->fillForm([
             'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['product_led'],
+            'onboarding_context' => ['outbound'],
             'name' => 'Redirect Workspace',
         ])
         ->call('register')
         ->assertHasNoFormErrors()
-        ->assertNotified('Workspace created')
         ->assertRedirect(Dashboard::getUrl(['tenant' => $user->fresh()->currentWorkspace]));
 });
 

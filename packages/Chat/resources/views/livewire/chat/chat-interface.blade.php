@@ -300,10 +300,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                         this.selectedModel = bootstrapModel;
                     }
 
-                    if (bootstrapDoc) {
+                    if (bootstrapDoc || parsed?.attachment) {
                         ranBootstrapSend = true;
                         this.$nextTick(() => {
                             this.localEditor()?.setDocument?.(bootstrapDoc);
+                            this.pendingAttachment = parsed?.attachment ?? null;
                             this.sendMessage();
                         });
                     }

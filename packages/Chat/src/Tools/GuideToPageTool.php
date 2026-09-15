@@ -18,8 +18,9 @@ final readonly class GuideToPageTool implements Tool
     {
         return 'Get a direct link to the workspace page where the user can perform an action this assistant '
             .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
-            .'from a file; exporting records to a file; or managing workspace members. Call this instead of telling '
-            .'the user something is impossible.';
+            .'from a file; exporting records to a file; or managing workspace members; creating or revoking API '
+            .'access tokens and connectors; or connecting Claude, ChatGPT or another MCP client to the workspace. '
+            .'Call this instead of telling the user something is impossible.';
     }
 
     /**
@@ -37,7 +38,9 @@ final readonly class GuideToPageTool implements Tool
                     .'(bulk-import many records of that type from a file); '
                     .'"export_companies", "export_people", "export_opportunities", "export_tasks", "export_notes" '
                     .'(export records of that type to a CSV or XLSX file); '
-                    .'"workspace_members" (invite or manage workspace members).',
+                    .'"workspace_members" (invite or manage workspace members); '
+                    .'"access_tokens" (create or revoke API access tokens and connectors); '
+                    .'"connect_assistant" (the help page for connecting Claude, ChatGPT or another MCP client).',
                 ),
         ];
     }

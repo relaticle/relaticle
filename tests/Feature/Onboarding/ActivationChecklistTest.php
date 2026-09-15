@@ -3,13 +3,19 @@
 declare(strict_types=1);
 
 use App\Actions\Onboarding\DismissActivationChecklist;
+use App\Actions\Onboarding\RemoveSampleData;
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PeopleResource;
 use App\Livewire\App\Onboarding\ActivationChecklist;
+use App\Models\Company;
+use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
@@ -17,8 +23,9 @@ use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ActivationChecklist::class, DismissActivationChecklist::class);
+mutates(ActivationChecklist::class, DismissActivationChecklist::class, RemoveSampleData::class, WorkspaceActivationFacts::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withPersonalWorkspace()->create();
@@ -43,6 +50,17 @@ function composePromptUrl(string $key = 'prompt_empty'): string
 function stepState(string $key, bool $complete): string
 {
     return sprintf('data-step="%s" data-complete="%s"', $key, $complete ? 'true' : 'false');
+}
+
+function seedSampleRecords(Workspace $workspace, User $owner): void
+{
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        $model::factory()->create([
+            'workspace_id' => $workspace->getKey(),
+            'creator_id' => $owner->getKey(),
+            'creation_source' => CreationSource::SYSTEM,
+        ]);
+    }
 }
 
 it('starts every step incomplete in a fresh workspace', function (): void {
@@ -131,6 +149,40 @@ it('completes the assistant step once the user has sent a chat message', functio
 
     livewire(ActivationChecklist::class)
         ->assertSeeHtml(stepState('ask_rela', true));
+});
+
+it('leaves the assistant step open for a prompt the user never typed', function (): void {
+    $conversationId = (string) Str::ulid();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $this->workspace->getKey(),
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => $this->owner->getKey(),
+        'title' => 'Set up your workspace',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => $this->owner->getMorphClass(),
+        'participant_id' => (string) $this->owner->getKey(),
+        'role' => 'user',
+        'content' => StartSetupGreeting::PROMPT,
+        'agent' => 'crm',
+        'attachments' => '[]',
+        'tool_calls' => '[]',
+        'tool_results' => '[]',
+        'usage' => '{}',
+        'meta' => json_encode(['kind' => 'continuation']),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('ask_rela', false));
 });
 
 it('ignores records and conversations belonging to another workspace', function (): void {
@@ -327,3 +379,112 @@ it('shows the invite row to a workspace admin and hides it from an editor', func
         ->assertOk()
         ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));
 });
+
+it('offers to remove sample data only once the workspace has an own record', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('canRemoveSampleData', false)
+        ->assertDontSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('canRemoveSampleData', true)
+        ->assertSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+});
+
+it('removes every system record and keeps the workspace\'s own', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    $own = People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->call('removeSampleData')
+        ->assertSet('canRemoveSampleData', false)
+        ->assertRedirect(Dashboard::getUrl());
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeFalse();
+    }
+
+    expect(People::query()->whereKey($own->getKey())->exists())->toBeTrue()
+        ->and(resolve(WorkspaceActivationFacts::class)->hasSampleData($this->workspace->fresh()))->toBeFalse();
+});
+
+it('refuses removal while the workspace has no own record', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+
+    livewire(ActivationChecklist::class)
+        ->call('removeSampleData')
+        ->assertStatus(422);
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
+});
+
+it('hides the checklist from a non-owner admin and refuses the call', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+
+    $this->actingAs($admin);
+    Filament::setTenant($this->workspace);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('visible', false)
+        ->assertSet('canRemoveSampleData', false)
+        ->assertDontSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+
+    try {
+        resolve(RemoveSampleData::class)->execute($admin, $this->workspace);
+
+        $this->fail('Expected an HttpException.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
+});
+
+it('refuses removal from the owner of a different workspace', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    $intruder = User::factory()->withPersonalWorkspace()->create();
+
+    try {
+        resolve(RemoveSampleData::class)->execute($intruder, $this->workspace);
+
+        $this->fail('Expected an HttpException.');
+    } catch (HttpException $exception) {
+        expect($exception->getStatusCode())->toBe(403);
+    }
+
+    foreach ([Company::class, People::class, Opportunity::class, Task::class, Note::class] as $model) {
+        expect($model::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SYSTEM)->exists())->toBeTrue();
+    }
+});
+
+it('refuses sample removal from a member', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+
+    resolve(RemoveSampleData::class)->execute($member, $this->workspace);
+})->throws(HttpException::class);

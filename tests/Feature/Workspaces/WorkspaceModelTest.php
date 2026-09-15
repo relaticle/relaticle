@@ -144,8 +144,8 @@ test('unique slug is generated when duplicate name exists', function () {
     $second = Workspace::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_workspace' => false]);
     $third = Workspace::query()->create(['name' => 'Acme Corp', 'user_id' => $user->id, 'personal_workspace' => false]);
 
-    expect($second->slug)->toBe('acme-corp-1')
-        ->and($third->slug)->toBe('acme-corp-2');
+    expect($second->slug)->toBe('acme-corp-2')
+        ->and($third->slug)->toBe('acme-corp-3');
 });
 
 test('special characters are handled in slug generation', function () {

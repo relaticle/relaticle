@@ -129,6 +129,7 @@ import { streamModule } from './chat/stream';
 import { isKnownBlock } from './chat/blocks';
 import { modelPickerModule } from './chat/model-picker';
 import { voiceRecorder } from './chat/voice';
+import { chatAttachment } from './chat/attachment';
 
 const registerChatComponents = () => {
     if (!window.Alpine) {
@@ -136,6 +137,7 @@ const registerChatComponents = () => {
     }
     window.Alpine.data('chatEditor', chatEditor);
     window.Alpine.data('voiceRecorder', voiceRecorder);
+    window.Alpine.data('chatAttachment', chatAttachment);
     return true;
 };
 

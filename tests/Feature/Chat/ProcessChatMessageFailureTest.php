@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Onboarding\StartSetupGreeting;
 use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
 use App\Models\User;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamRetrying;
@@ -107,6 +109,44 @@ it('makes a failed turn coherent: user message, failure note, superseded proposa
         ->toBe(PendingActionStatus::Superseded)
         ->and(AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->sum('credits_charged'))
         ->toBe(1);
+});
+
+it('keeps a system-written prompt out of the transcript when its turn dies', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'BR greeting failure',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: StartSetupGreeting::PROMPT,
+        conversationId: $conversationId,
+        resolved: ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto'],
+        turnId: (string) Str::ulid(),
+        isContinuation: true,
+    )->failed(new RuntimeException('boom'));
+
+    $stored = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'user')
+        ->first();
+
+    expect(json_decode((string) $stored->meta, true))->toBe(['kind' => 'continuation'])
+        ->and(resolve(ListConversationMessages::class)->execute($user, $conversationId))
+        ->each->not->toHaveKey('content', StartSetupGreeting::PROMPT);
 });
 
 it('does not duplicate a completed turn or add an error note when a post-stream step fails', function (): void {

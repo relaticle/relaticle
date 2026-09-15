@@ -1,0 +1,6 @@
+name: Calendly seat expansion
+company: calendly
+custom_fields:
+  amount: 9600
+  close_date: '{{ +6w }}'
+  stage: Active

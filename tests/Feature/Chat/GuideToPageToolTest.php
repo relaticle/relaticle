@@ -56,3 +56,12 @@ it('advertises every resolvable destination in its schema description', function
         expect($destination['description'])->toContain($key);
     }
 });
+
+it('names the access tokens and connect assistant destinations in its schema description', function (): void {
+    $schema = app(GuideToPageTool::class)->schema(new JsonSchemaTypeFactory);
+    $destination = (new Serializer)->serialize($schema['destination']);
+
+    expect($destination['description'])
+        ->toContain('"access_tokens"')
+        ->toContain('"connect_assistant"');
+});

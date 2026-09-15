@@ -1,0 +1,5 @@
+title: Churn risk signals
+noteable_type: company
+noteable_key: intercom
+custom_fields:
+  body: <p>Usage dropped 40% over the last month. Tomas mentioned a competing tool in the last check-in.</p>

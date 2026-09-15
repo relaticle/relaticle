@@ -163,6 +163,17 @@
                                 </a>
                             </template>
 
+                            <template x-if="msg.attachment && !msg.editing">
+                                <span
+                                    data-user-attachment
+                                    class="inline-flex max-w-full items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 ring-1 ring-gray-900/10 dark:bg-white/10 dark:text-gray-300 dark:ring-white/10"
+                                >
+                                    <x-heroicon-m-paper-clip class="h-3 w-3 shrink-0" aria-hidden="true" />
+                                    <span class="truncate" x-text="msg.attachment.name"></span>
+                                    <span x-text="'(' + msg.attachment.row_count + ')'"></span>
+                                </span>
+                            </template>
+
                             {{-- Failure notice only. There is no delivery receipt on a
                                  sent message: the assistant's reply is the confirmation,
                                  so a clock or checkmark under every bubble was noise.
@@ -279,6 +290,7 @@
                                     <button
                                         type="button"
                                         data-edit-button
+                                        x-show="!msg.attachment"
                                         x-on:click="(canEdit(index) && rateLimit === null) && startEdit(msg, index)"
                                         :disabled="!canEdit(index) || rateLimit !== null"
                                         :title="editButtonLabel(index)"
@@ -363,7 +375,7 @@
                                 <button
                                     type="button"
                                     data-retry-button
-                                    x-show="msg.retryable && !isStreaming && !rateLimit"
+                                    x-show="msg.retryable && !isStreaming && !rateLimit && canRetryTurn(index)"
                                     x-on:click="retryTurn(msg)"
                                     class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                                 >
@@ -394,7 +406,7 @@
                                 <button
                                     type="button"
                                     data-regenerate-button
-                                    x-show="!isStreaming && hasUserPrompt(index)"
+                                    x-show="!isStreaming && hasUserPrompt(index) && !precedingPromptHasAttachment(index)"
                                     x-on:click="regenerateMessage(index)"
                                     :disabled="!canRegenerate(index) || rateLimit !== null"
                                     :aria-label="regenerateButtonLabel(index)"
