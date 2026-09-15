@@ -404,7 +404,16 @@ it('passes the requested theme to the session', function (): void {
     livewire(UpgradeModal::class)->call('createSession', 'yearly', 'dark');
 
     expect($recorder->paramsFor('/checkout/sessions')['branding_settings']['background_color'])
-        ->toBe('#131318');
+        ->toBe('#111827');
+});
+
+it('falls back to the light frame for an unknown theme', function (): void {
+    $recorder = StripeRecorder::install();
+
+    livewire(UpgradeModal::class)->call('createSession', 'yearly', 'sepia');
+
+    expect($recorder->paramsFor('/checkout/sessions')['branding_settings']['background_color'])
+        ->toBe('#ffffff');
 });
 
 it('refuses a member who does not own the workspace', function (): void {
