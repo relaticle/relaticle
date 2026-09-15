@@ -16,7 +16,7 @@
             <x-slot name="heading">{{ __('billing.upgrade.modal_heading') }}</x-slot>
 
             @if($paid)
-                <div class="space-y-4" wire:poll.3s>
+                <div class="space-y-4">
                     <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">
                         {{ __('billing.upgrade.paid_title') }}
                     </h3>
@@ -65,9 +65,8 @@
                         </div>
                     @endif
 
-                    {{-- x-on:...window is bound by Alpine and removed on teardown.
-                         A raw addEventListener in init() would outlive every
-                         wire:navigate and fan one open out to each dead instance. --}}
+                    {{-- Alpine removes x-on:...window on teardown; a raw
+                         addEventListener would outlive every wire:navigate. --}}
                     <div
                         wire:ignore
                         x-data="upgradeCheckout({
@@ -77,7 +76,7 @@
                         x-on:open-modal.window="opened($event)"
                         x-on:upgrade-interval-changed.window="intervalChanged($event)"
                     >
-                        <div id="upgrade-checkout" class="min-h-[420px]"></div>
+                        <div id="upgrade-checkout" class="min-h-96"></div>
                     </div>
                 </div>
             @endif
@@ -89,6 +88,7 @@
         Alpine.data('upgradeCheckout', (config) => ({
             checkout: null,
             mounting: false,
+            restartQueued: false,
 
             init() {
                 this.$watch('$store.theme', () => this.remount());
@@ -169,9 +169,23 @@
                 } finally {
                     this.mounting = false;
                 }
+
+                if (this.restartQueued) {
+                    this.restartQueued = false;
+
+                    await this.remount();
+                }
             },
 
             async remount() {
+                // A click landing mid-mount would otherwise be dropped, leaving the
+                // toggle showing one period and the mounted frame priced at another.
+                if (this.mounting) {
+                    this.restartQueued = true;
+
+                    return;
+                }
+
                 // Nothing to re-price until the modal has actually been opened.
                 if (! this.checkout) {
                     return;
