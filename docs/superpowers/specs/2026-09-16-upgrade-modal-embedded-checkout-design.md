@@ -61,13 +61,20 @@ session and therefore should keep Managed Payments. Stripe rejects the combinati
 option, and it works. Probed against the test API:
 
     ui_mode: embedded_page
-      + redirect_on_completion: never
+      + managed_payments: enabled
+      + redirect_on_completion: if_required
       + allow_promotion_codes: true
+      + branding_settings: {background_color, button_color, border_style}
       + subscription_data.trial_end
-    -> OK, client_secret returned, return_url null
+    -> OK, client_secret returned on every combination
 
-`redirect_on_completion: never` is the load-bearing part. The modal completes in place
-with no navigation, which was the original ask.
+`redirect_on_completion: if_required` is the load-bearing part. A card payment needs no
+redirect, so the modal completes in place with no navigation, which was the original ask.
+
+`never` was the first choice and is wrong. Stripe's embedded checkout reference defines
+`onComplete` as firing for `if_required`, and `never` additionally disables every
+redirect-based payment method. `if_required` keeps those methods available and falls back
+to `return_url` only when one is actually used.
 
 The cost is layout. Stripe renders the order summary and the card fields inside its
 frame. The modal chrome, the plan header and the billing-period toggle stay ours.
@@ -119,14 +126,16 @@ clamps any trial it is given to `now + 48h + 10s`. Passing the stale date uncond
 would grant a free two-day trial to exactly the workspaces that already used theirs.
 `onGenericTrial()` is the only predicate that distinguishes the two.
 
-Session options carry `ui_mode => 'embedded'`, `redirect_on_completion => 'never'`,
-`client_reference_id`, `branding_settings`, `managed_payments` when configured, and a
-`return_url`.
+Session options carry `ui_mode => 'embedded'`,
+`redirect_on_completion => 'if_required'`, `client_reference_id`, `branding_settings`,
+`managed_payments` when configured, and `return_url` set to
+`<billing page>?checkout=success`.
 
-The `return_url` is required even though it is never used. `Checkout::create()` defaults
-it to `route('home')` before discarding it on `redirect_on_completion: 'never'`, and this
-application has no `home` route, so omitting it throws `RouteNotFoundException` at
-session creation. The Billing page URL is the natural value.
+The `return_url` is mandatory for two reasons. It is where a redirect-based payment
+method lands, and `Checkout::create()` otherwise defaults it to `route('home')`, which
+this application does not define. Omitting it throws `RouteNotFoundException` at session
+creation. Cashier only discards `return_url` for `redirect_on_completion: 'never'`, so
+under `if_required` the value we pass survives.
 
 Cashier already handles this mode. `Checkout::create()` recognises embedded ui_modes,
 suppresses `success_url` and `cancel_url` (Stripe forbids both here), and drops
@@ -159,17 +168,19 @@ guarded against double-loading across navigations.
 
 ### Completion
 
-`redirect_on_completion: 'never'` means nothing navigates. `onComplete` fires, the modal
-switches to a success state, and it polls until `$workspace->subscribed()` becomes true.
+A card payment requires no redirect, so `onComplete` fires, the modal switches to a
+success state, and it polls until `$workspace->subscribed()` becomes true.
 
 The local `subscriptions` row is written by the `customer.subscription.created` webhook,
 not by session creation, so the modal can outrun it. The Billing page already solves
 this with its `activating` panel: a spinner, then a "taking longer than expected" notice
-after 60 seconds. That markup moves into a shared Blade component used by both surfaces.
+after 60 seconds. That markup moves into a shared Blade component.
 
-The page's `checkout` URL property and its `activating` branch are removed, because
-nothing redirects there for subscriptions any more. The `credits` property stays;
-credit packs keep hosted Checkout.
+Both surfaces keep it. Under `if_required` a redirect-based payment method still leaves
+the page and returns to `<billing page>?checkout=success`, so the page's `checkout` URL
+property and its `activating` branch stay exactly as they are. The modal renders the
+same component for the in-place path. The `credits` property is untouched; credit packs
+keep hosted Checkout.
 
 ### Billing period toggle
 
@@ -256,21 +267,20 @@ Two gaps block a production-shaped local walk. Both are Stripe test-mode data, n
 2. The test yearly price is $290/year. The app displays $228. Test fixtures have drifted
    from production pricing.
 
-## Open items
+## Settled open items
 
-Unverified at spec time. Each is settled by one probe or one fetch at the start of
-implementation, before any code depends on it.
+All three were probed against the test API on 2026-09-16, using a throwaway product
+carrying tax code `txcd_10103000`, archived afterwards.
 
-1. `branding_settings` alongside `managed_payments` on `embedded_page`. The probes that
-   carried `managed_payments` failed earlier, on the missing product tax code, so this
-   combination never reached validation. Managed Payments makes Stripe the merchant, and
-   Stripe may reserve branding for itself. The whole theme section rests on this holding.
-   `allow_promotion_codes` with `managed_payments` has the same gap.
-2. `onComplete` as an option on `createEmbeddedCheckoutPage`. The script URL, the method
-   name and `fetchClientSecret` come from Stripe's current quickstart. The completion
-   callback does not, and the embedded checkout JS reference settles it.
-3. Whether the Stripe dashboard's own branding settings override `branding_settings` per
-   session, which decides whether dark mode is reachable at all inside the frame.
+1. `branding_settings` alongside `managed_payments` on `embedded_page` is accepted, with
+   dark background, button colour and border style. Dark mode is reachable inside the
+   frame. `allow_promotion_codes` with `managed_payments` is accepted too.
+2. `onComplete` is an option on `createEmbeddedCheckoutPage`, documented as firing for
+   `redirect_on_completion: if_required`. This is what moved the design off `never`.
+3. `subscription_data.trial_end` rides alongside all of the above.
+
+The only remaining blocker is local data, not design: the real test-mode Pro product
+still carries `tax_code: NULL`.
 
 ## Out of scope
 
