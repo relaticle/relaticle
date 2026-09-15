@@ -192,6 +192,8 @@ return [
     ],
     'errors' => [
         'checkout_failed' => "We couldn't start checkout just now. Please try again in a moment.",
+        'frame_failed' => 'The payment form could not load. Check your connection or any ad blocker, then try again.',
+        'retry' => 'Try again',
     ],
     'access' => [
         'paused_api' => 'This workspace is paused. Subscribe to Cloud Pro to restore access.',

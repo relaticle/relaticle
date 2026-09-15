@@ -74,9 +74,17 @@
                             modalId: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID),
                         })"
                         x-on:open-modal.window="opened($event)"
+                        x-on:close-modal.window="closed($event)"
                         x-on:upgrade-interval-changed.window="intervalChanged($event)"
                     >
-                        <div id="upgrade-checkout" class="min-h-96"></div>
+                        <div x-ref="frame" class="min-h-96"></div>
+
+                        <div x-show="failed" x-cloak class="rounded-xl bg-danger-50 p-3 text-sm text-danger-700 dark:bg-danger-400/10 dark:text-danger-400">
+                            <p>{{ __('billing.errors.frame_failed') }}</p>
+                            <button type="button" x-on:click="retry()" class="mt-2 font-medium underline">
+                                {{ __('billing.errors.retry') }}
+                            </button>
+                        </div>
                     </div>
                 </div>
             @endif
@@ -87,11 +95,12 @@
     <script>
         Alpine.data('upgradeCheckout', (config) => ({
             checkout: null,
-            mounting: false,
+            busy: false,
             restartQueued: false,
+            failed: false,
 
             init() {
-                this.$watch('$store.theme', () => this.remount());
+                this.$watch('$store.theme', () => this.reprice());
             },
 
             opened(event) {
@@ -102,18 +111,41 @@
                 }
             },
 
+            closed(event) {
+                // A frame left mounted while closed would let a theme change, including
+                // an unattended OS dark-mode switch, silently buy another session.
+                if (event.detail?.id === config.modalId) {
+                    this.teardown();
+                }
+            },
+
             intervalChanged(event) {
                 this.$wire.interval = event.detail.interval;
-                this.remount();
+                this.reprice();
+            },
+
+            retry() {
+                this.failed = false;
+                this.boot();
             },
 
             async boot() {
-                if (this.checkout || this.mounting) {
+                if (this.checkout || this.busy) {
                     return;
                 }
 
-                await this.loadStripeJs();
-                await this.mount();
+                this.busy = true;
+
+                try {
+                    await this.loadStripeJs();
+                    await this.open(await this.secret());
+                } catch (error) {
+                    this.fail(error);
+                } finally {
+                    this.busy = false;
+                }
+
+                await this.drainQueued();
             },
 
             loadStripeJs() {
@@ -121,66 +153,56 @@
                     return Promise.resolve();
                 }
 
-                const existing = document.getElementById('stripe-js');
-
-                if (existing) {
-                    return new Promise((resolve) => existing.addEventListener('load', resolve, { once: true }));
-                }
-
                 return new Promise((resolve, reject) => {
                     const script = document.createElement('script');
                     script.id = 'stripe-js';
                     script.src = 'https://js.stripe.com/dahlia/stripe.js';
                     script.onload = resolve;
-                    script.onerror = reject;
+                    // Dropped on failure so a retry re-adds it. A dead tag left in
+                    // place would make every later load await a load event never fired.
+                    script.onerror = () => {
+                        script.remove();
+                        reject(new Error('Stripe.js failed to load.'));
+                    };
                     document.head.appendChild(script);
                 });
             },
 
-            async mount() {
-                if (this.mounting) {
+            async secret() {
+                const secret = await this.$wire.createSession(
+                    this.$wire.interval,
+                    Alpine.store('theme'),
+                );
+
+                if (! secret) {
+                    throw new Error('No checkout session.');
+                }
+
+                return secret;
+            },
+
+            async open(secret) {
+                const stripe = window.Stripe(config.publishableKey);
+
+                const checkout = await stripe.createEmbeddedCheckoutPage({
+                    fetchClientSecret: () => Promise.resolve(secret),
+                    onComplete: () => this.$wire.markPaid(),
+                });
+
+                // Back or wire:navigate during the round trip tears this component
+                // down; mounting here would strand an iframe on the next page.
+                if (! this.$el.isConnected) {
+                    checkout.destroy();
+
                     return;
                 }
 
-                this.mounting = true;
-
-                try {
-                    const stripe = window.Stripe(config.publishableKey);
-
-                    this.checkout = await stripe.createEmbeddedCheckoutPage({
-                        fetchClientSecret: async () => {
-                            const secret = await this.$wire.createSession(
-                                this.$wire.interval,
-                                Alpine.store('theme'),
-                            );
-
-                            if (! secret) {
-                                throw new Error('Could not start checkout.');
-                            }
-
-                            return secret;
-                        },
-                        onComplete: () => this.$wire.markPaid(),
-                    });
-
-                    this.checkout.mount('#upgrade-checkout');
-                } catch (error) {
-                    console.error(error);
-                } finally {
-                    this.mounting = false;
-                }
-
-                if (this.restartQueued) {
-                    this.restartQueued = false;
-
-                    await this.remount();
-                }
+                this.checkout = checkout;
+                this.checkout.mount(this.$refs.frame);
             },
 
-            async remount() {
-                // A click landing mid-mount would otherwise be dropped, leaving the
-                // toggle showing one period and the mounted frame priced at another.
-                if (this.mounting) {
+            async reprice() {
+                if (this.busy) {
                     this.restartQueued = true;
 
                     return;
@@ -191,16 +213,50 @@
                     return;
                 }
 
-                // A session is priced and themed at creation, so both the billing
-                // period and the colour scheme need a fresh one.
-                this.checkout.destroy();
-                this.checkout = null;
+                this.busy = true;
 
-                await this.mount();
+                try {
+                    // The new session is bought before the working frame is discarded,
+                    // so a refusal leaves the customer with the one they already had.
+                    const secret = await this.secret();
+
+                    this.checkout.destroy();
+                    this.checkout = null;
+
+                    await this.open(secret);
+                } catch (error) {
+                    this.fail(error);
+                } finally {
+                    this.busy = false;
+                }
+
+                await this.drainQueued();
+            },
+
+            async drainQueued() {
+                if (! this.restartQueued) {
+                    return;
+                }
+
+                this.restartQueued = false;
+
+                await (this.checkout ? this.reprice() : this.boot());
+            },
+
+            fail(error) {
+                console.error(error);
+                this.failed = this.checkout === null;
+            },
+
+            teardown() {
+                this.checkout?.destroy();
+                this.checkout = null;
+                this.restartQueued = false;
+                this.failed = false;
             },
 
             destroy() {
-                this.checkout?.destroy();
+                this.teardown();
             },
         }))
     </script>
