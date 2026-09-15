@@ -98,17 +98,35 @@ Only the owner ever opens the modal.
 redirect URL:
 
 ```php
-$checkout = $workspace
+$builder = $workspace
     ->newSubscription('default', $this->priceId($interval))
-    ->trialUntil($workspace->trial_ends_at)   // only while the trial runs
-    ->allowPromotionCodes()
-    ->checkout($this->sessionOptions($workspace, $theme));
+    ->allowPromotionCodes();
 
-return (string) $checkout->asStripeCheckoutSession()->client_secret;
+$builder = $workspace->onGenericTrial()
+    ? $builder->trialUntil($workspace->trial_ends_at)
+    : $builder->skipTrial();
+
+return (string) $builder
+    ->checkout($this->sessionOptions($workspace, $theme))
+    ->asStripeCheckoutSession()
+    ->client_secret;
 ```
 
+The branch is not cosmetic. `trial_ends_at` is nullable, so a workspace that never
+trialled would hand `trialUntil()` a null and raise a TypeError. A paused workspace is
+worse: it keeps a `trial_ends_at` in the past, and `SubscriptionBuilder::checkout()`
+clamps any trial it is given to `now + 48h + 10s`. Passing the stale date unconditionally
+would grant a free two-day trial to exactly the workspaces that already used theirs.
+`onGenericTrial()` is the only predicate that distinguishes the two.
+
 Session options carry `ui_mode => 'embedded'`, `redirect_on_completion => 'never'`,
-`client_reference_id`, `branding_settings`, and `managed_payments` when configured.
+`client_reference_id`, `branding_settings`, `managed_payments` when configured, and a
+`return_url`.
+
+The `return_url` is required even though it is never used. `Checkout::create()` defaults
+it to `route('home')` before discarding it on `redirect_on_completion: 'never'`, and this
+application has no `home` route, so omitting it throws `RouteNotFoundException` at
+session creation. The Billing page URL is the natural value.
 
 Cashier already handles this mode. `Checkout::create()` recognises embedded ui_modes,
 suppresses `success_url` and `cancel_url` (Stripe forbids both here), and drops
@@ -186,7 +204,7 @@ Enforced inside the action, not the component:
 - user owns the workspace
 - workspace is not already subscribed and is not Enterprise
 - interval pinned to `monthly` or `yearly` before any config lookup
-- rate limit on session creation per workspace
+- 10 session creations per workspace per 10 minutes
 
 Stripe hosts the card fields, so card-testing abuse stays on their surface with their
 protections. The rate limit covers session-creation looping only.
@@ -237,6 +255,22 @@ Two gaps block a production-shaped local walk. Both are Stripe test-mode data, n
    today. A tax code must be set on the test product.
 2. The test yearly price is $290/year. The app displays $228. Test fixtures have drifted
    from production pricing.
+
+## Open items
+
+Unverified at spec time. Each is settled by one probe or one fetch at the start of
+implementation, before any code depends on it.
+
+1. `branding_settings` alongside `managed_payments` on `embedded_page`. The probes that
+   carried `managed_payments` failed earlier, on the missing product tax code, so this
+   combination never reached validation. Managed Payments makes Stripe the merchant, and
+   Stripe may reserve branding for itself. The whole theme section rests on this holding.
+   `allow_promotion_codes` with `managed_payments` has the same gap.
+2. `onComplete` as an option on `createEmbeddedCheckoutPage`. The script URL, the method
+   name and `fetchClientSecret` come from Stripe's current quickstart. The completion
+   callback does not, and the embedded checkout JS reference settles it.
+3. Whether the Stripe dashboard's own branding settings override `branding_settings` per
+   session, which decides whether dark mode is reachable at all inside the frame.
 
 ## Out of scope
 
