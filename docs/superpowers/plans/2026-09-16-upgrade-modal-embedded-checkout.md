@@ -792,7 +792,13 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
                         </div>
                     @endif
 
-                    <div wire:ignore x-data="upgradeCheckout({ publishableKey: @js(config('cashier.key')) })">
+                    <div
+                        wire:ignore
+                        x-data="upgradeCheckout({
+                            publishableKey: @js(config('cashier.key')),
+                            modalId: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID),
+                        })"
+                    >
                         <div id="upgrade-checkout" class="min-h-[420px]"></div>
                     </div>
                 </div>
@@ -807,9 +813,13 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
             mounting: false,
 
             init() {
-                // The panel runs ->spa(), so livewire:initialized never fires on a
-                // wire:navigate. @script re-runs on every component boot instead.
-                this.boot();
+                // Filament renders modal content eagerly (x-show, not x-if), so
+                // booting here would open a Stripe session on every panel page load.
+                window.addEventListener('open-modal', (event) => {
+                    if (event.detail?.id === config.modalId) {
+                        this.boot();
+                    }
+                });
 
                 this.$watch('$store.theme', () => this.remount());
 
@@ -820,6 +830,10 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
             },
 
             async boot() {
+                if (this.checkout || this.mounting) {
+                    return;
+                }
+
                 await this.loadStripeJs();
                 await this.mount();
             },
@@ -880,12 +894,15 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
             },
 
             async remount() {
+                // Nothing to re-price until the modal has actually been opened.
+                if (! this.checkout) {
+                    return;
+                }
+
                 // A session is priced and themed at creation, so both the billing
                 // period and the colour scheme need a fresh one.
-                if (this.checkout) {
-                    this.checkout.destroy();
-                    this.checkout = null;
-                }
+                this.checkout.destroy();
+                this.checkout = null;
 
                 await this.mount();
             },
