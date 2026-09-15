@@ -112,6 +112,7 @@ return [
     'upgrade' => [
         'button' => 'Upgrade to Pro',
         'now' => 'Upgrade now instead',
+        'rate_limited' => 'Too many attempts. Please wait :seconds seconds before trying again.',
         'activating' => 'Payment received. Activating Pro…',
         'activation_delayed_title' => 'Activation is taking longer than usual',
         'activation_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if Pro still is not active.',

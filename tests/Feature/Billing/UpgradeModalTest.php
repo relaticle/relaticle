@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\Billing\CreateProCheckout;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Livewire\App\Billing\UpgradeModal;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Exceptions;
 use Laravel\Pennant\Feature;
 use Tests\Helpers\StripeRecorder;
 
@@ -111,24 +113,71 @@ it('refuses when billing is switched off', function (): void {
 });
 
 it('surfaces an error instead of throwing when the interval is unknown', function (): void {
+    Exceptions::fake();
     StripeRecorder::install();
 
     livewire(UpgradeModal::class)
         ->call('createSession', 'weekly', 'light')
         ->assertReturned(null)
         ->assertSet('error', __('billing.errors.checkout_failed'));
+
+    Exceptions::assertNotReported(InvalidArgumentException::class);
 });
 
-it('stops creating sessions after ten attempts', function (): void {
+it('reports an unexpected checkout failure instead of swallowing it', function (): void {
+    Exceptions::fake();
+
+    app()->bind(CreateProCheckout::class, function (): never {
+        throw new RuntimeException('stripe unreachable');
+    });
+
+    livewire(UpgradeModal::class)
+        ->call('createSession', 'yearly', 'light')
+        ->assertReturned(null)
+        ->assertSet('error', __('billing.errors.checkout_failed'));
+
+    Exceptions::assertReported(RuntimeException::class);
+});
+
+it('clears a previous error once a session is created successfully', function (): void {
     StripeRecorder::install();
+
+    $component = livewire(UpgradeModal::class)
+        ->call('createSession', 'weekly', 'light')
+        ->assertSet('error', __('billing.errors.checkout_failed'));
+
+    $component->call('createSession', 'yearly', 'light')
+        ->assertSet('error', null);
+});
+
+it('flips paid when the frame completes', function (): void {
+    livewire(UpgradeModal::class)
+        ->call('markPaid')
+        ->assertSet('paid', true);
+});
+
+it('keeps the successful interval on the component', function (): void {
+    StripeRecorder::install();
+
+    livewire(UpgradeModal::class)
+        ->call('createSession', 'monthly', 'light')
+        ->assertSet('interval', 'monthly');
+});
+
+it('creates sessions up to the limit then throttles with a wait message', function (): void {
+    StripeRecorder::install();
+    $this->travelTo(now());
 
     $component = livewire(UpgradeModal::class);
 
     foreach (range(1, 10) as $ignored) {
-        $component->call('createSession', 'yearly', 'light');
+        $component->call('createSession', 'yearly', 'light')
+            ->assertReturned('cs_test_fake_secret');
     }
 
-    $component->call('createSession', 'yearly', 'light')->assertReturned(null);
+    $component->call('createSession', 'yearly', 'light')
+        ->assertReturned(null)
+        ->assertSet('error', __('billing.upgrade.rate_limited', ['seconds' => 600]));
 });
 
 it('reports the workspace as activated once the subscription lands', function (): void {
