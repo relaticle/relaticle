@@ -98,6 +98,7 @@
             busy: false,
             restartQueued: false,
             failed: false,
+            generation: 0,
 
             init() {
                 this.$watch('$store.theme', () => this.reprice());
@@ -112,7 +113,7 @@
             },
 
             closed(event) {
-                // A frame left mounted while closed would let a theme change, including
+                // A frame left live while closed would let a theme change, including
                 // an unattended OS dark-mode switch, silently buy another session.
                 if (event.detail?.id === config.modalId) {
                     this.teardown();
@@ -134,13 +135,20 @@
                     return;
                 }
 
+                const era = this.generation;
+
                 this.busy = true;
 
                 try {
                     await this.loadStripeJs();
-                    await this.open(await this.secret());
+
+                    if (this.stale(era)) {
+                        return;
+                    }
+
+                    await this.open(await this.secret(), era);
                 } catch (error) {
-                    this.fail(error);
+                    this.fail(error, era);
                 } finally {
                     this.busy = false;
                 }
@@ -175,13 +183,19 @@
                 );
 
                 if (! secret) {
-                    throw new Error('No checkout session.');
+                    // The component already rendered why; a second banner would
+                    // give the same failure two different explanations.
+                    throw Object.assign(new Error('No checkout session.'), { reported: true });
                 }
 
                 return secret;
             },
 
-            async open(secret) {
+            async open(secret, era) {
+                if (this.stale(era)) {
+                    return;
+                }
+
                 const stripe = window.Stripe(config.publishableKey);
 
                 const checkout = await stripe.createEmbeddedCheckoutPage({
@@ -189,9 +203,9 @@
                     onComplete: () => this.$wire.markPaid(),
                 });
 
-                // Back or wire:navigate during the round trip tears this component
-                // down; mounting here would strand an iframe on the next page.
-                if (! this.$el.isConnected) {
+                // Closing the modal or navigating away during the round trip must not
+                // leave a frame mounted behind it, priced and billable.
+                if (this.stale(era) || ! this.$el.isConnected) {
                     checkout.destroy();
 
                     return;
@@ -199,6 +213,7 @@
 
                 this.checkout = checkout;
                 this.checkout.mount(this.$refs.frame);
+                this.failed = false;
             },
 
             async reprice() {
@@ -213,6 +228,8 @@
                     return;
                 }
 
+                const era = this.generation;
+
                 this.busy = true;
 
                 try {
@@ -220,12 +237,16 @@
                     // so a refusal leaves the customer with the one they already had.
                     const secret = await this.secret();
 
+                    if (this.stale(era)) {
+                        return;
+                    }
+
                     this.checkout.destroy();
                     this.checkout = null;
 
-                    await this.open(secret);
+                    await this.open(secret, era);
                 } catch (error) {
-                    this.fail(error);
+                    this.fail(error, era);
                 } finally {
                     this.busy = false;
                 }
@@ -243,16 +264,29 @@
                 await (this.checkout ? this.reprice() : this.boot());
             },
 
-            fail(error) {
+            stale(era) {
+                return era !== this.generation;
+            },
+
+            fail(error, era) {
                 console.error(error);
+
+                if (this.stale(era) || error?.reported) {
+                    return;
+                }
+
                 this.failed = this.checkout === null;
             },
 
             teardown() {
+                // Bumped so any in-flight request resolves into a no-op instead of
+                // mounting or reporting against a modal the user already closed.
+                this.generation++;
                 this.checkout?.destroy();
                 this.checkout = null;
                 this.restartQueued = false;
                 this.failed = false;
+                this.busy = false;
             },
 
             destroy() {
