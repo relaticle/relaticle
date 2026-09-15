@@ -139,6 +139,19 @@ it('reports an unexpected checkout failure instead of swallowing it', function (
     Exceptions::assertReported(RuntimeException::class);
 });
 
+it('reports a missing price configuration instead of blaming the browser', function (): void {
+    Exceptions::fake();
+    StripeRecorder::install();
+    config()->set('services.stripe.prices.pro_yearly', null);
+
+    livewire(UpgradeModal::class)
+        ->call('createSession', 'yearly', 'light')
+        ->assertReturned(null)
+        ->assertSet('error', __('billing.errors.checkout_failed'));
+
+    Exceptions::assertReported(InvalidArgumentException::class);
+});
+
 it('clears a previous error once a session is created successfully', function (): void {
     StripeRecorder::install();
 

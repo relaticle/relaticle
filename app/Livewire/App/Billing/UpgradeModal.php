@@ -12,7 +12,6 @@ use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\RateLimiter;
-use InvalidArgumentException;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
 use Throwable;
@@ -51,6 +50,14 @@ final class UpgradeModal extends Component
             return null;
         }
 
+        // Rejected here so any InvalidArgumentException escaping the action means
+        // a missing price config, which must still reach Flare.
+        if (! in_array($interval, CreateProCheckout::INTERVALS, true)) {
+            $this->error = __('billing.errors.checkout_failed');
+
+            return null;
+        }
+
         $key = "upgrade-session:{$workspace->getKey()}";
 
         if (RateLimiter::tooManyAttempts($key, self::MAX_SESSIONS)) {
@@ -65,11 +72,6 @@ final class UpgradeModal extends Component
 
         try {
             $secret = resolve(CreateProCheckout::class)->execute($workspace, $interval, $theme);
-        } catch (InvalidArgumentException) {
-            // $interval is client-supplied input, not an application fault.
-            $this->error = __('billing.errors.checkout_failed');
-
-            return null;
         } catch (Throwable $exception) {
             report($exception);
             $this->error = __('billing.errors.checkout_failed');

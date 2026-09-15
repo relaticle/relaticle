@@ -12,7 +12,7 @@ use InvalidArgumentException;
 final readonly class CreateProCheckout
 {
     /** @var list<string> */
-    private const array INTERVALS = ['monthly', 'yearly'];
+    public const array INTERVALS = ['monthly', 'yearly'];
 
     /**
      * Stripe renders the card fields, so these only colour the frame around

@@ -792,12 +792,17 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
                         </div>
                     @endif
 
+                    {{-- x-on:...window is bound by Alpine and removed on teardown.
+                         A raw addEventListener in init() would outlive every
+                         wire:navigate and fan one open out to each dead instance. --}}
                     <div
                         wire:ignore
                         x-data="upgradeCheckout({
                             publishableKey: @js(config('cashier.key')),
                             modalId: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID),
                         })"
+                        x-on:open-modal.window="opened($event)"
+                        x-on:upgrade-interval-changed.window="intervalChanged($event)"
                     >
                         <div id="upgrade-checkout" class="min-h-[420px]"></div>
                     </div>
@@ -813,20 +818,20 @@ Replace `resources/views/livewire/app/billing/upgrade-modal.blade.php`:
             mounting: false,
 
             init() {
-                // Filament renders modal content eagerly (x-show, not x-if), so
-                // booting here would open a Stripe session on every panel page load.
-                window.addEventListener('open-modal', (event) => {
-                    if (event.detail?.id === config.modalId) {
-                        this.boot();
-                    }
-                });
-
                 this.$watch('$store.theme', () => this.remount());
+            },
 
-                window.addEventListener('upgrade-interval-changed', (event) => {
-                    this.$wire.interval = event.detail.interval;
-                    this.remount();
-                });
+            opened(event) {
+                // Filament renders modal content eagerly (x-show, not x-if), so
+                // mounting on init would open a Stripe session per page load.
+                if (event.detail?.id === config.modalId) {
+                    this.boot();
+                }
+            },
+
+            intervalChanged(event) {
+                this.$wire.interval = event.detail.interval;
+                this.remount();
             },
 
             async boot() {
