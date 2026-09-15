@@ -25,10 +25,13 @@ use Illuminate\Support\Js;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewCompany extends ViewRecord
 {
+    use ProvidesComposerToAddress;
+
     protected static string $resource = CompanyResource::class;
 
     protected function getHeaderActions(): array

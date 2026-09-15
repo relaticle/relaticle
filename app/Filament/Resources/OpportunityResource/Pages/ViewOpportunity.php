@@ -22,10 +22,13 @@ use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewOpportunity extends ViewRecord
 {
+    use ProvidesComposerToAddress;
+
     protected static string $resource = OpportunityResource::class;
 
     protected function getHeaderActions(): array

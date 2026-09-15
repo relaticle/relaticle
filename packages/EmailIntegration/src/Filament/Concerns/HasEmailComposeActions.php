@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Services\ComposeRecordRecipientResolver;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
@@ -72,6 +73,7 @@ trait HasEmailComposeActions
                 $this->dispatch('composer:open', payload: [
                     'linkRecordType' => $record::class,
                     'linkRecordId' => (string) $record->getKey(),
+                    'to' => resolve(ComposeRecordRecipientResolver::class)->toAddressesFor($record),
                 ]);
             });
     }

@@ -20,10 +20,13 @@ use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
+use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 final class ViewPeople extends ViewRecord
 {
+    use ProvidesComposerToAddress;
+
     protected static string $resource = PeopleResource::class;
 
     protected function getHeaderActions(): array

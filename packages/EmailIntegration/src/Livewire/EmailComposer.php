@@ -61,6 +61,7 @@ use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\ComposerPageTo;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
@@ -162,6 +163,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public ?string $privacyTier = null;
 
+    #[Locked]
+    public ?string $pageTo = null;
+
+    public function mount(): void
+    {
+        $this->pageTo ??= ComposerPageTo::email();
+    }
+
     /**
      * Pending uploads: `TemporaryUploadedFile`s not yet written to the attachment
      * disk. They become {@see $savedAttachments} the moment the draft is saved.
@@ -234,7 +243,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->massRecipients = $this->isMassSend
             ? ($payload['recipients'] ?? [])
             : [];
-        $this->to = $this->isMassSend ? [] : ($payload['to'] ?? []);
+        $this->to = $this->isMassSend
+            ? []
+            : ($payload['to'] ?? ($this->pageTo !== null && $this->pageTo !== '' ? [$this->pageTo] : []));
         $this->linkRecordType = $payload['linkRecordType'] ?? null;
         $this->linkRecordId = $payload['linkRecordId'] ?? null;
         $this->privacyTier = resolve(PrivacyService::class)

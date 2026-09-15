@@ -76,6 +76,24 @@ it('opens via the composer:open event with the default account preselected', fun
         ->assertSet('accountId', $this->account->id);
 });
 
+it('prefills to from the current page when compose opens without a payload', function (): void {
+    Livewire::test(EmailComposer::class, ['pageTo' => 'jane@example.com'])
+        ->dispatch('composer:open')
+        ->assertSet('to', ['jane@example.com']);
+});
+
+it('uses the payload to instead of the page email', function (): void {
+    Livewire::test(EmailComposer::class, ['pageTo' => 'jane@example.com'])
+        ->dispatch('composer:open', payload: ['to' => ['other@example.com']])
+        ->assertSet('to', ['other@example.com']);
+});
+
+it('leaves to blank when the current page has no email', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('to', []);
+});
+
 it('puts merge tags last on the message toolbar instead of the footer', function (): void {
     $html = Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')

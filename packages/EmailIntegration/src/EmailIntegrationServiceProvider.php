@@ -38,6 +38,7 @@ use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
+use Relaticle\EmailIntegration\Support\ComposerPageTo;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
 final class EmailIntegrationServiceProvider extends ServiceProvider
@@ -110,8 +111,12 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                     return '';
                 }
 
-                return Blade::render('@livewire(\'email-integration.composer\')')
-                    .Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
+                $pageTo = ComposerPageTo::email();
+
+                return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo], key($composerKey))', [
+                    'pageTo' => $pageTo,
+                    'composerKey' => 'email-composer-'.($pageTo ?? ''),
+                ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
             },
         );
 

@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -38,6 +39,7 @@ abstract class BaseRecordEmailsPage extends Page
     use HasEmailFeatureFlag;
     use HasEmailReaderActions;
     use InteractsWithRecord;
+    use ProvidesComposerToAddress;
     use WithPagination;
 
     protected string $view = 'filament.pages.record-emails';
