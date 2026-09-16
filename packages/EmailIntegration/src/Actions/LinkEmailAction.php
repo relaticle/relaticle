@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
@@ -126,11 +127,14 @@ final readonly class LinkEmailAction
                 )
                 ->first();
 
+            $canAutoCreateRecords = $connectedAccount !== null
+                || $email->creation_source === EmailCreationSource::BCC_INBOUND;
+
             $wouldCreatePerson = ! $person
                 && ! $email->is_internal
                 && ! $isAutomatedSender
                 && ! $suppressCreate
-                && $connectedAccount
+                && $canAutoCreateRecords
                 && $team
                 && $this->shouldCreatePerson($team, $participant->email_address, $email);
 
