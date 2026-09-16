@@ -31,7 +31,7 @@
             $isEnterprise => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
             $pastDue => [__('billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
             $onGrace => [__('billing.status.canceling'), 'bg-warning-50 text-warning-700 dark:bg-warning-400/10 dark:text-warning-400'],
-            $onTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
+            $onTrial, $onStripeTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
             $isSubscribed => [__('billing.status.active'), 'bg-success-50 text-success-700 dark:bg-success-400/10 dark:text-success-400'],
             $onLegacyFree => [__('billing.status.grandfathered'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
             default => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
@@ -265,13 +265,13 @@
                                 {{ __('billing.trial.start_button') }}
                             </x-filament::button>
                             <button type="button"
-                                x-on:click="$dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })"
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })"
                                 class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
                                 {{ __('billing.upgrade.now') }}
                             </button>
                         @else
                             <x-filament::button type="button" size="lg" class="w-full justify-center"
-                                x-on:click="$dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })">
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })">
                                 {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button') }}
                             </x-filament::button>
                         @endif

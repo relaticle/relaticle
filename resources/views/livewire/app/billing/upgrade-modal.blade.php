@@ -22,7 +22,13 @@
                     </h3>
 
                     @if($this->activated())
-                        <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('billing.manage.auto_renews') }}</p>
+                        @php($subscription = $workspace?->subscription())
+                        @php($trialUntil = $subscription?->onTrial() === true ? $subscription->trial_ends_at : null)
+                        <p class="text-sm text-gray-600 dark:text-gray-300">
+                            {{ $trialUntil !== null
+                                ? __('billing.manage.first_charge', ['date' => $trialUntil->toFormattedDateString()])
+                                : __('billing.manage.auto_renews') }}
+                        </p>
                         <x-filament::button x-on:click="window.location.reload()">
                             {{ __('billing.upgrade.close') }}
                         </x-filament::button>

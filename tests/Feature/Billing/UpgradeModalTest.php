@@ -242,3 +242,19 @@ it('does not mount the modal anywhere in the panel when billing is switched off'
         ->assertOk()
         ->assertDontSeeLivewire(UpgradeModal::class);
 });
+
+it('tells a carried-trial customer when the first charge lands', function (): void {
+    $this->workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_trialing',
+        'stripe_status' => 'trialing',
+        'stripe_price' => 'price_pro_yearly_test',
+        'quantity' => 1,
+        'trial_ends_at' => now()->addDays(9),
+    ]);
+
+    livewire(UpgradeModal::class)
+        ->call('markPaid')
+        ->assertSee(__('billing.manage.first_charge', ['date' => now()->addDays(9)->toFormattedDateString()]))
+        ->assertDontSee(__('billing.manage.auto_renews'));
+});
