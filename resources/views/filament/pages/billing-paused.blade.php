@@ -122,7 +122,7 @@
                                 </dl>
 
                                 <x-filament::button size="lg" class="mt-6 w-full justify-center"
-                                    wire:loading.attr="disabled" wire:target="upgrade" x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
+                                    x-on:click="$dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })">
                                     {{ __('billing.paused.review.proceed') }}
                                 </x-filament::button>
 

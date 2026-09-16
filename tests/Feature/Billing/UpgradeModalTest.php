@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Billing\CreateProCheckout;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
+use App\Filament\Pages\Billing;
 use App\Livewire\App\Billing\UpgradeModal;
 use App\Models\User;
 use App\Models\Workspace;
@@ -211,4 +212,24 @@ it('reports the workspace as activated once the subscription lands', function ()
     $this->workspace->refresh();
 
     expect($component->instance()->activated())->toBeTrue();
+});
+
+it('no longer exposes the redirect upgrade method on the billing page', function (): void {
+    expect(method_exists(Billing::class, 'upgrade'))->toBeFalse();
+});
+
+it('mounts the modal for an owner who can upgrade', function (): void {
+    $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
+        ->assertOk()
+        ->assertSeeLivewire(UpgradeModal::class);
+});
+
+it('does not mount the modal for a member who cannot upgrade', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
+        ->assertOk()
+        ->assertDontSeeLivewire(UpgradeModal::class);
 });

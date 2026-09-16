@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Billing\CreateCreditPackCheckout;
-use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
@@ -115,22 +114,6 @@ final class Billing extends Page
 
         if ($wasPaused) {
             $this->reopenWhenActive();
-        }
-    }
-
-    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
-    {
-        $workspace = $this->workspace();
-
-        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
-            return;
-        }
-
-        try {
-            $this->redirect($createCheckout->execute($workspace, $interval));
-        } catch (Throwable $exception) {
-            report($exception);
-            $this->notifyCheckoutFailed();
         }
     }
 
