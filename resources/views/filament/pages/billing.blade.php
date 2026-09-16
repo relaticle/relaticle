@@ -89,6 +89,8 @@
                                         : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
                                 @elseif($pastDue)
                                     {{ __('billing.manage.past_due_tagline') }}
+                                @elseif($onStripeTrial)
+                                    {{ __('billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
                                 @elseif($isSubscribed)
                                     {{ __('billing.manage.auto_renews') }}
                                 @elseif($onLegacyFree)

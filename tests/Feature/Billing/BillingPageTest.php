@@ -309,6 +309,23 @@ it('shows manage state for an active subscription', function (): void {
         ->assertDontSee(__('billing.upgrade.button'));
 });
 
+it('says when the first charge lands instead of claiming the plan renews', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_trialing',
+        'stripe_status' => 'trialing',
+        'stripe_price' => 'price_pro_yearly_test',
+        'quantity' => 1,
+        'trial_ends_at' => now()->addDays(9),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.manage.first_charge', ['date' => now()->addDays(9)->toFormattedDateString()]))
+        ->assertDontSee(__('billing.manage.auto_renews'));
+});
+
 it('shows cancellation-scheduled state on grace period', function (): void {
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
