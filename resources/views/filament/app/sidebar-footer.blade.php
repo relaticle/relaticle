@@ -62,7 +62,7 @@
                 @if($opensModal)
                     <button
                         type="button"
-                        class="{{ $rowClasses }} group w-full text-left"
+                        class="{{ $rowClasses }} group w-[calc(100%-2rem)] text-left"
                         x-on:click="$dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })"
                     >
                         <x-heroicon-o-arrow-up-circle class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />

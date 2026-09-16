@@ -6,6 +6,7 @@ use App\Actions\Billing\CreateProCheckout;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
+use App\Filament\Pages\Dashboard;
 use App\Livewire\App\Billing\UpgradeModal;
 use App\Models\User;
 use App\Models\Workspace;
@@ -230,6 +231,14 @@ it('does not mount the modal for a member who cannot upgrade', function (): void
     $this->actingAs($member);
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
+        ->assertOk()
+        ->assertDontSeeLivewire(UpgradeModal::class);
+});
+
+it('does not mount the modal anywhere in the panel when billing is switched off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get(Dashboard::getUrl(panel: 'app', tenant: $this->workspace))
         ->assertOk()
         ->assertDontSeeLivewire(UpgradeModal::class);
 });
