@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Concerns\EditsRecordFieldsInline;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
@@ -18,12 +19,13 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Livewire\Partials\PartialsComponentHook;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
 {
+    use EditsRecordFieldsInline;
+
     protected static string $resource = OpportunityResource::class;
 
     protected function getHeaderActions(): array
@@ -33,11 +35,7 @@ final class ViewOpportunity extends ViewRecord
                 ->icon('heroicon-o-pencil-square')
                 ->label(__('filament/resources/opportunity.pages.view.actions.edit.label'))
                 ->after(function (): void {
-                    $this->getRecord()
-                        ->refresh()
-                        ->load(['company.media', 'contact', 'customFieldValues.customField.options']);
-
-                    resolve(PartialsComponentHook::class)->forceRender($this);
+                    $this->refreshInlineEditedRecord();
                 }),
             ActionGroup::make([
                 ActionGroup::make([
@@ -80,21 +78,47 @@ final class ViewOpportunity extends ViewRecord
         return $schema->schema([
             Section::make()->schema([
                 Flex::make([
-                    TextEntry::make('name')->grow(true),
-                    RecordChipEntry::make('company.name')
-                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
-                        ->color('primary')
-                        ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null)
-                        ->grow(false),
-                    RecordChipEntry::make('contact.name')
-                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
-                        ->color('primary')
-                        ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null)
-                        ->grow(false),
-                ]),
-                CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
+                    $this->makeInlineEditable(
+                        TextEntry::make('name')->grow(),
+                        'name',
+                    ),
+                    Flex::make([
+                        $this->makeInlineEditable(
+                            RecordChipEntry::make('company.name')
+                                ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
+                                ->color('primary')
+                                ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null)
+                                ->grow(false),
+                            'company_id',
+                        ),
+                        $this->makeInlineEditable(
+                            RecordChipEntry::make('contact.name')
+                                ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
+                                ->color('primary')
+                                ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null)
+                                ->grow(false),
+                            'contact_id',
+                        ),
+                    ])
+                        ->grow(false)
+                        ->extraAttributes(['class' => 'fi-inline-header-end']),
+                ])->extraAttributes(['class' => 'fi-inline-header']),
+                ...$this->inlineEditableCustomFieldEntries(),
+                CustomFields::infolist()
+                    ->forSchema($schema)
+                    ->except($this->inlineCustomFieldCodes())
+                    ->build()
+                    ->columnSpanFull(),
             ])
                 ->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function inlineEditEagerLoads(): array
+    {
+        return ['company.media', 'contact', 'customFieldValues.customField.options'];
     }
 }

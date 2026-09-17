@@ -55,7 +55,7 @@ return [
         'view' => [
             'actions' => [
                 'edit' => [
-                    'label' => 'Edit',
+                    'label' => 'Edit all',
                 ],
                 'copy_page_url' => [
                     'label' => 'Copy page URL',

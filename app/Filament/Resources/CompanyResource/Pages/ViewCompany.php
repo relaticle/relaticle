@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Concerns\EditsRecordFieldsInline;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
@@ -26,12 +27,19 @@ use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewCompany extends ViewRecord
 {
+    use EditsRecordFieldsInline;
+
     protected static string $resource = CompanyResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/company.pages.view.actions.edit.label')),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->label(__('filament/resources/company.pages.view.actions.edit.label'))
+                ->after(function (): void {
+                    $this->refreshInlineEditedRecord();
+                }),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
@@ -75,18 +83,35 @@ final class ViewCompany extends ViewRecord
                 Flex::make([
                     Section::make([
                         Flex::make([
-                            RecordChipEntry::make('name')
-                                ->chipSize('lg')
-                                ->size(TextSize::Large)
-                                ->label(__('filament/resources/company.pages.view.infolist.fields.name.label')),
-                            RecordChipEntry::make('creator.name')
-                                ->chipSize('sm')
-                                ->label(__('filament/resources/company.pages.view.infolist.fields.creator.label')),
-                            RecordChipEntry::make('accountOwner.name')
-                                ->chipSize('sm')
-                                ->label(__('filament/resources/company.pages.view.infolist.fields.account_owner.label')),
-                        ]),
-                        CustomFields::infolist()->forSchema($schema)->build(),
+                            $this->makeInlineEditable(
+                                RecordChipEntry::make('name')
+                                    ->chipSize('lg')
+                                    ->size(TextSize::Large)
+                                    ->grow()
+                                    ->label(__('filament/resources/company.pages.view.infolist.fields.name.label')),
+                                'name',
+                            ),
+                            Flex::make([
+                                RecordChipEntry::make('creator.name')
+                                    ->chipSize('sm')
+                                    ->grow(false)
+                                    ->label(__('filament/resources/company.pages.view.infolist.fields.creator.label')),
+                                $this->makeInlineEditable(
+                                    RecordChipEntry::make('accountOwner.name')
+                                        ->chipSize('sm')
+                                        ->grow(false)
+                                        ->label(__('filament/resources/company.pages.view.infolist.fields.account_owner.label')),
+                                    'account_owner_id',
+                                ),
+                            ])
+                                ->grow(false)
+                                ->extraAttributes(['class' => 'fi-inline-header-end']),
+                        ])->extraAttributes(['class' => 'fi-inline-header']),
+                        ...$this->inlineEditableCustomFieldEntries(),
+                        CustomFields::infolist()
+                            ->forSchema($schema)
+                            ->except($this->inlineCustomFieldCodes())
+                            ->build(),
                     ]),
                     Section::make([
                         TextEntry::make('created_at')
@@ -110,5 +135,13 @@ final class ViewCompany extends ViewRecord
             NotesRelationManager::class,
             ActivityLogRelationManager::class,
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function inlineEditEagerLoads(): array
+    {
+        return ['accountOwner', 'customFieldValues.customField.options'];
     }
 }

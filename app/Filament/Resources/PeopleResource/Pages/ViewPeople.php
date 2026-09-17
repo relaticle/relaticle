@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\PeopleResource\Pages;
 
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Concerns\EditsRecordFieldsInline;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
@@ -22,12 +23,19 @@ use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewPeople extends ViewRecord
 {
+    use EditsRecordFieldsInline;
+
     protected static string $resource = PeopleResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->label(__('filament/resources/person.pages.view.actions.edit.label'))
+                ->after(function (): void {
+                    $this->refreshInlineEditedRecord();
+                }),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
@@ -69,16 +77,37 @@ final class ViewPeople extends ViewRecord
         return $schema->schema([
             Section::make()->schema([
                 Flex::make([
-                    RecordChipEntry::make('name')
-                        ->label(__('filament/resources/person.pages.view.infolist.fields.name.label'))
-                        ->size(TextSize::Large),
-                    RecordChipEntry::make('company.name')
-                        ->label(__('filament/resources/person.pages.view.infolist.fields.company.label'))
-                        ->color('primary')
-                        ->url(fn (People $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
-                ]),
-                CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
+                    $this->makeInlineEditable(
+                        RecordChipEntry::make('name')
+                            ->label(__('filament/resources/person.pages.view.infolist.fields.name.label'))
+                            ->size(TextSize::Large)
+                            ->grow(),
+                        'name',
+                    ),
+                    $this->makeInlineEditable(
+                        RecordChipEntry::make('company.name')
+                            ->label(__('filament/resources/person.pages.view.infolist.fields.company.label'))
+                            ->color('primary')
+                            ->grow(false)
+                            ->url(fn (People $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
+                        'company_id',
+                    ),
+                ])->extraAttributes(['class' => 'fi-inline-header']),
+                ...$this->inlineEditableCustomFieldEntries(),
+                CustomFields::infolist()
+                    ->forSchema($schema)
+                    ->except($this->inlineCustomFieldCodes())
+                    ->build()
+                    ->columnSpanFull(),
             ])->columnSpanFull(),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function inlineEditEagerLoads(): array
+    {
+        return ['company', 'customFieldValues.customField.options'];
     }
 }

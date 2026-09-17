@@ -23,4 +23,4 @@
         'dark:bg-white/5 dark:text-gray-300 dark:ring-white/10',
         $box,
         $shape,
-    ])><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" @class([$glyph]) aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chip->iconPath }}" /></svg></span>@endif<span class="truncate">{{ $chip->name }}</span></span>
+    ])><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" @class([$glyph]) aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $chip->iconPath }}" /></svg></span>@endif<span @class(['truncate' => $chip->size !== 'lg'])>{{ $chip->name }}</span></span>
