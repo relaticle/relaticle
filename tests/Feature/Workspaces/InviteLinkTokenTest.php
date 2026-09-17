@@ -131,7 +131,7 @@ test('the join page counts the people already in the workspace', function (): vo
         ->assertOk()
         ->assertSee('1 person is already in this workspace');
 
-    $workspace->users()->attach(User::factory()->create(), ['role' => WorkspaceRole::Editor->value]);
+    $workspace->users()->attach(User::factory()->create(), ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($joiner)
         ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
@@ -201,7 +201,7 @@ test('a join request racing an identical concurrent request does not duplicate t
     $joiner = User::factory()->create(['email_verified_at' => now()]);
 
     Event::listen(AddingTeamMember::class, function (AddingTeamMember $event): void {
-        $event->team->users()->attach($event->user, ['role' => WorkspaceRole::Editor->value]);
+        $event->team->users()->attach($event->user, ['role' => WorkspaceRole::Member->value]);
     });
 
     $this->actingAs($joiner)
@@ -362,7 +362,7 @@ test('workspaces without a configured default still grant editor', function (): 
         ->assertRedirect();
 
     expect($joiner->fresh()->workspaceRole($workspace->fresh())->key)
-        ->toBe(WorkspaceRole::Editor->value);
+        ->toBe(WorkspaceRole::Member->value);
 });
 
 test('joining via the invite link consumes a pending email invitation for the same address', function (): void {
@@ -379,7 +379,7 @@ test('joining via the invite link consumes a pending email invitation for the sa
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => $joiner->email,
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     $this->actingAs($joiner)
@@ -403,7 +403,7 @@ test('joining a workspace leaves a pending invitation to a different workspace a
     $elsewhere = WorkspaceInvitation::factory()->create([
         'workspace_id' => Workspace::factory()->create()->id,
         'email' => $joiner->email,
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     $this->actingAs($joiner)

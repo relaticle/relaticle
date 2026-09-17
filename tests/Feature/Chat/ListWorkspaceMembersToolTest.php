@@ -14,7 +14,7 @@ mutates(WorkspaceMembersContext::class);
 it('lists only the current workspace members with id, name, and email', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Owner One']);
     $teammate = User::factory()->create(['name' => 'Mate Two', 'email' => 'mate@example.test']);
-    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
     User::factory()->withPersonalWorkspace()->create(['name' => 'Outsider Three']);
 
     Auth::guard('web')->setUser($owner);
@@ -31,7 +31,7 @@ it('lists only the current workspace members with id, name, and email', function
 it('filters members by name or email search', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Owner One']);
     $teammate = User::factory()->create(['name' => 'Searchable Sam', 'email' => 'sam@example.test']);
-    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
 
     Auth::guard('web')->setUser($owner);
 

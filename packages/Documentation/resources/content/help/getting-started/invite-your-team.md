@@ -1,8 +1,8 @@
 ---
 title: Invite your team
-description: Add teammates to your workspace as an Administrator, Editor, or Viewer.
+description: Add teammates to your workspace as an Administrator, Member, or Viewer.
 order: 6
-updated: "2026-09-01"
+updated: "2026-09-18"
 related: [help/getting-started/create-your-first-company, help/getting-started/find-anything-with-search-and-filters]
 ---
 
@@ -15,7 +15,7 @@ workspace, edit records, or just view them.
 2. Click the **Members** tab, then click **Invite team members**.
 3. Type the addresses into **Send invite to**, separated by a comma, a
    space, or a new line. You can send up to 10 in one go.
-4. Choose an **Invite as** role: **Administrator**, **Editor**, or
+4. Choose an **Invite as** role: **Administrator**, **Member**, or
    **Viewer**. Everyone in this batch joins with that role.
 5. Click **Send invitations**.
 

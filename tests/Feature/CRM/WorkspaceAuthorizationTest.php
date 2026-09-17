@@ -29,7 +29,7 @@ it('authorizes :dataset by workspace membership and role', function (string $mod
     $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
     $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     $outsider = User::factory()->withWorkspace()->create();
 

@@ -95,7 +95,7 @@ it('proposes renaming a custom field and updates name on approval', function ():
 
 it('returns error and creates no proposal for non-owner', function (): void {
     $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
+    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'member']);
     $nonOwner->switchWorkspace($this->workspace);
 
     Auth::guard('web')->setUser($nonOwner);

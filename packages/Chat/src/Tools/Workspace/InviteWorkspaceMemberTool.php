@@ -48,7 +48,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
         return [
             'email' => $schema->string()->description('Email address to invite.')->required(),
             'role' => $schema->string()
-                ->description('Workspace role: "editor" (default), "viewer", or "admin".'),
+                ->description('Workspace role: "member" (default), "viewer", or "admin".'),
         ];
     }
 
@@ -58,7 +58,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             'email' => (string) ($record['email'] ?? ''),
             'role' => is_string($record['role'] ?? null) && $record['role'] !== ''
                 ? $record['role']
-                : WorkspaceRole::Editor->value,
+                : WorkspaceRole::Member->value,
         ];
     }
 
@@ -83,10 +83,10 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             return "\"{$email}\" is not a valid email address.";
         }
 
-        $role = $record['role'] ?? WorkspaceRole::Editor->value;
+        $role = $record['role'] ?? WorkspaceRole::Member->value;
 
-        if (! in_array($role, [WorkspaceRole::Editor->value, WorkspaceRole::Viewer->value, WorkspaceRole::Admin->value], true)) {
-            return "Role must be \"editor\", \"viewer\", or \"admin\", got \"{$role}\".";
+        if (! in_array($role, [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value, WorkspaceRole::Admin->value], true)) {
+            return "Role must be \"member\", \"viewer\", or \"admin\", got \"{$role}\".";
         }
 
         if ($role === WorkspaceRole::Admin->value && ! Gate::forUser($user)->allows('promoteToAdmin', $workspace)) {
@@ -99,7 +99,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
     protected function buildRecordDisplay(array $record): array
     {
         $email = (string) ($record['email'] ?? '');
-        $role = (string) ($record['role'] ?? WorkspaceRole::Editor->value);
+        $role = (string) ($record['role'] ?? WorkspaceRole::Member->value);
 
         return [
             'title' => 'Invite Teammate',

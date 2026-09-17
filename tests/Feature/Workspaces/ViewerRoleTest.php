@@ -32,7 +32,7 @@ beforeEach(function (): void {
     $this->viewer->switchWorkspace($this->workspace);
 
     $this->editor = User::factory()->create();
-    $this->workspace->users()->attach($this->editor, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($this->editor, ['role' => WorkspaceRole::Member->value]);
     $this->editor->switchWorkspace($this->workspace);
 });
 

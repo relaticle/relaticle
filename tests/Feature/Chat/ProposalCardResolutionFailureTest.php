@@ -139,7 +139,7 @@ it('offers no inline-edit codes for a delete proposal', function (): void {
 
 it('surfaces a failure when the assignee left the workspace between proposal and approval', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $action = PendingAction::query()->create([
         'workspace_id' => $this->workspace->getKey(),

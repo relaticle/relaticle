@@ -184,7 +184,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      * @var array<string, string>
      */
     protected $attributes = [
-        'invite_link_default_role' => WorkspaceRole::Editor->value,
+        'invite_link_default_role' => WorkspaceRole::Member->value,
     ];
 
     /**

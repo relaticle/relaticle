@@ -228,7 +228,7 @@ it('renders read-only info for members', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     test()->actingAs($member);
     Filament::setTenant($workspace->refresh());
@@ -371,7 +371,7 @@ it('offers owners an Enterprise conversation without changing their plan', funct
 it('does not offer Enterprise purchases to workspace members', function (): void {
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
     test()->actingAs($member);
     Filament::setTenant($workspace->refresh());
 

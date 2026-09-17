@@ -167,7 +167,7 @@ it('bills that allowance to the workspace, not to each member of it', function (
     // A teammate with an untouched per-user allowance still finds the workspace
     // ceiling spent. Keyed per user instead, this request would go through.
     $teammate = User::factory()->create();
-    $this->user->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->user->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
     $teammate->forceFill(['current_workspace_id' => $this->user->currentWorkspace->getKey()])->save();
 
     $this->actingAs($teammate)

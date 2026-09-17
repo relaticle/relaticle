@@ -35,7 +35,7 @@ test('the owner appears in the members list even though they have no pivot row',
 test('a pending invitation shares the roster with the joined members', function (): void {
     $this->workspace->workspaceInvitations()->create([
         'email' => 'pending@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -62,7 +62,7 @@ test('the owner row offers no role change action', function (): void {
 
 test('a member can be removed', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction(TestAction::make('removeWorkspaceMember')->table($member->id));
@@ -75,7 +75,7 @@ test('an admin cannot promote another member to admin', function (): void {
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
 
@@ -83,7 +83,7 @@ test('an admin cannot promote another member to admin', function (): void {
         ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), ['role' => WorkspaceRole::Admin->value])
         ->assertHasActionErrors(['role']);
 
-    expect($member->fresh()->workspaceRole($this->workspace)->key)->toBe(WorkspaceRole::Editor->value);
+    expect($member->fresh()->workspaceRole($this->workspace)->key)->toBe(WorkspaceRole::Member->value);
 });
 
 test('an admin cannot demote a peer admin', function (): void {
@@ -103,7 +103,7 @@ test('an admin cannot demote a peer admin', function (): void {
 
 test('the owner can change a member role', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), ['role' => WorkspaceRole::Viewer->value])
@@ -118,7 +118,7 @@ test('multiple people can be invited in one submission', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => "one@example.test\ntwo@example.test",
-            'role' => WorkspaceRole::Editor->value,
+            'role' => WorkspaceRole::Member->value,
         ]);
 
     expect($this->workspace->fresh()->workspaceInvitations->pluck('email')->all())
@@ -149,8 +149,8 @@ test('the members list skips a membership row whose user no longer exists', func
     $deletedUser = User::factory()->create();
 
     $this->workspace->users()->attach([
-        $member->id => ['role' => WorkspaceRole::Editor->value],
-        $deletedUser->id => ['role' => WorkspaceRole::Editor->value],
+        $member->id => ['role' => WorkspaceRole::Member->value],
+        $deletedUser->id => ['role' => WorkspaceRole::Member->value],
     ]);
 
     $deletedEmail = $deletedUser->email;
@@ -165,7 +165,7 @@ test('a crafted payload above the batch cap is rejected server-side', function (
     $emails = collect(range(1, 11))->map(fn (int $i): string => "batch{$i}@example.test")->implode("\n");
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->callAction('invitePeople', ['emails' => $emails, 'role' => WorkspaceRole::Editor->value])
+        ->callAction('invitePeople', ['emails' => $emails, 'role' => WorkspaceRole::Member->value])
         ->assertHasActionErrors(['emails']);
 
     expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(0);
@@ -177,7 +177,7 @@ test('a submission exactly at the batch cap succeeds', function (): void {
     $emails = collect(range(1, 10))->map(fn (int $i): string => "atcap{$i}@example.test")->implode("\n");
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->callAction('invitePeople', ['emails' => $emails, 'role' => WorkspaceRole::Editor->value])
+        ->callAction('invitePeople', ['emails' => $emails, 'role' => WorkspaceRole::Member->value])
         ->assertHasNoActionErrors();
 
     expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(10);
@@ -190,17 +190,17 @@ test('cumulative invite volume beyond the window cap is throttled, not just the 
     $secondBatch = collect(range(1, 10))->map(fn (int $i): string => "second{$i}@example.test")->implode("\n");
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->callAction('invitePeople', ['emails' => $firstBatch, 'role' => WorkspaceRole::Editor->value]);
+        ->callAction('invitePeople', ['emails' => $firstBatch, 'role' => WorkspaceRole::Member->value]);
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->callAction('invitePeople', ['emails' => $secondBatch, 'role' => WorkspaceRole::Editor->value]);
+        ->callAction('invitePeople', ['emails' => $secondBatch, 'role' => WorkspaceRole::Member->value]);
 
     expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(20);
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'onemore@example.test',
-            'role' => WorkspaceRole::Editor->value,
+            'role' => WorkspaceRole::Member->value,
         ]);
 
     expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(20);
@@ -224,14 +224,14 @@ test('an admin cannot set the invite link default role to admin', function (): v
         ->mountAction('manageInviteLink')
         ->setActionData(['invite_link_default_role' => WorkspaceRole::Admin->value]);
 
-    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Editor->value);
+    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('not even the owner can point the invite link at the admin role', function (): void {
     expect(fn () => resolve(UpdateInviteLinkSettings::class)->update($this->owner, $this->workspace, WorkspaceRole::Admin->value))
         ->toThrow(ValidationException::class);
 
-    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Editor->value);
+    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('the owner setting the invite link to admin through the modal changes nothing', function (): void {
@@ -239,24 +239,24 @@ test('the owner setting the invite link to admin through the modal changes nothi
         ->mountAction('manageInviteLink')
         ->setActionData(['invite_link_default_role' => WorkspaceRole::Admin->value]);
 
-    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Editor->value);
+    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('the invite link default role must be a role the app actually registers', function (): void {
     expect(fn () => resolve(UpdateInviteLinkSettings::class)->update($this->owner, $this->workspace, 'superuser'))
         ->toThrow(ValidationException::class);
 
-    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Editor->value);
+    expect($this->workspace->fresh()->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('a member role must be a role the app actually registers', function (): void {
     $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     expect(fn () => resolve(UpdateWorkspaceMemberRole::class)->update($this->owner, $this->workspace, (string) $editor->getKey(), 'superuser'))
         ->toThrow(ValidationException::class);
 
-    expect($editor->fresh()->workspaceRole($this->workspace->fresh())?->key)->toBe(WorkspaceRole::Editor->value);
+    expect($editor->fresh()->workspaceRole($this->workspace->fresh())?->key)->toBe(WorkspaceRole::Member->value);
 });
 
 test('rotating the invite link changes the token', function (): void {
@@ -315,7 +315,7 @@ test('a workspace with the link off offers no rotate or disable action', functio
 
 test('the members list is searchable by name and by email', function (): void {
     $needle = User::factory()->create(['name' => 'Zoltan Searchme', 'email' => 'searchme@example.test']);
-    $this->workspace->users()->attach($needle, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($needle, ['role' => WorkspaceRole::Member->value]);
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->assertCanSeeTableRecords([$needle, $this->owner])
@@ -331,8 +331,8 @@ test('a search term containing SQL wildcards is matched literally', function ():
     $literal = User::factory()->create(['name' => 'Ann_Lee', 'email' => 'ann-underscore@example.test']);
     $decoy = User::factory()->create(['name' => 'AnnXLee', 'email' => 'ann-decoy@example.test']);
 
-    $this->workspace->users()->attach($literal, ['role' => WorkspaceRole::Editor->value]);
-    $this->workspace->users()->attach($decoy, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($literal, ['role' => WorkspaceRole::Member->value]);
+    $this->workspace->users()->attach($decoy, ['role' => WorkspaceRole::Member->value]);
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->searchTable('Ann_Lee')
@@ -351,7 +351,7 @@ test('the members list paginates rather than rendering every member at once', fu
     $members = User::factory()->count(12)->create();
 
     foreach ($members as $member) {
-        $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+        $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     }
 
     $page = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
@@ -378,7 +378,7 @@ test('an admin still manages a non admin member', function (): void {
     $admin = User::factory()->create();
     $editor = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
 

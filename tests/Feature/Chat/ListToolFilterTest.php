@@ -72,7 +72,7 @@ it('restricts tasks to the current user when assigned_to_me is set', function ()
     $workspace = $user->currentWorkspace;
 
     $colleague = User::factory()->create();
-    $colleague->workspaces()->attach($workspace, ['role' => 'editor']);
+    $colleague->workspaces()->attach($workspace, ['role' => 'member']);
 
     $mine = Task::factory()->for($workspace)->create(['title' => 'Mine']);
     $mine->assignees()->attach($user);
@@ -343,7 +343,7 @@ it('restricts tasks to a named colleague when assignee_ids is set', function ():
     $workspace = $user->currentWorkspace;
 
     $colleague = User::factory()->create();
-    $workspace->users()->attach($colleague, ['role' => 'editor']);
+    $workspace->users()->attach($colleague, ['role' => 'member']);
 
     $theirs = Task::factory()->for($workspace)->create(['title' => 'Colleague task']);
     $theirs->assignees()->attach($colleague);
@@ -368,8 +368,8 @@ it('matches tasks assigned to any of several people', function (): void {
 
     $one = User::factory()->create();
     $two = User::factory()->create();
-    $workspace->users()->attach($one, ['role' => 'editor']);
-    $workspace->users()->attach($two, ['role' => 'editor']);
+    $workspace->users()->attach($one, ['role' => 'member']);
+    $workspace->users()->attach($two, ['role' => 'member']);
 
     Task::factory()->for($workspace)->create(['title' => 'First'])->assignees()->attach($one);
     Task::factory()->for($workspace)->create(['title' => 'Second'])->assignees()->attach($two);

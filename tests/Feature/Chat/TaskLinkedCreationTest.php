@@ -107,7 +107,7 @@ it('renders linked names in the proposal display data', function (): void {
 
 it('coerces a scalar assignee_ids into a list instead of dropping it', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $tool = resolve(CreateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000001');
@@ -127,7 +127,7 @@ it('coerces a scalar assignee_ids into a list instead of dropping it', function 
 
 it('shows the assignee row on the card when assignee_ids arrives as a scalar', function (): void {
     $member = User::factory()->create(['name' => 'Dana Scully']);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $tool = resolve(CreateTaskTool::class);
     $tool->setConversationId('019df800-3333-7000-8000-000000000001');

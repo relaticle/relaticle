@@ -9,7 +9,7 @@ use Laravel\Jetstream\Jetstream;
 enum WorkspaceRole: string
 {
     case Admin = 'admin';
-    case Editor = 'editor';
+    case Member = 'member';
     case Viewer = 'viewer';
 
     /**

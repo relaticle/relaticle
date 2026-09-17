@@ -16,7 +16,7 @@ it('prevents an admin of workspace A from removing a member of workspace B', fun
     $victimWorkspace = $victimOwner->personalWorkspace();
 
     $victimMember = User::factory()->create();
-    $victimWorkspace->users()->attach($victimMember, ['role' => WorkspaceRole::Editor->value]);
+    $victimWorkspace->users()->attach($victimMember, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($attacker);
 
@@ -32,14 +32,14 @@ it('prevents an admin of workspace A from changing the role of a member of works
     $victimWorkspace = $victimOwner->personalWorkspace();
 
     $victimMember = User::factory()->create();
-    $victimWorkspace->users()->attach($victimMember, ['role' => WorkspaceRole::Editor->value]);
+    $victimWorkspace->users()->attach($victimMember, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($attacker);
 
     rescue(fn () => livewire(WorkspaceMembers::class, ['workspace' => $attacker->personalWorkspace()])
         ->callAction(TestAction::make('updateWorkspaceRole')->table($victimMember->id), ['role' => WorkspaceRole::Viewer->value]));
 
-    expect($victimMember->fresh()->workspaceRole($victimWorkspace)->key)->toBe(WorkspaceRole::Editor->value);
+    expect($victimMember->fresh()->workspaceRole($victimWorkspace)->key)->toBe(WorkspaceRole::Member->value);
 });
 
 it('does not list members of another workspace', function (): void {
@@ -47,7 +47,7 @@ it('does not list members of another workspace', function (): void {
 
     $victimOwner = User::factory()->withPersonalWorkspace()->create();
     $victimMember = User::factory()->create();
-    $victimOwner->personalWorkspace()->users()->attach($victimMember, ['role' => WorkspaceRole::Editor->value]);
+    $victimOwner->personalWorkspace()->users()->attach($victimMember, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($attacker);
 
@@ -65,7 +65,7 @@ it('prevents an admin of workspace A from revoking an invitation belonging to wo
 
     $victimInvitation = $victimWorkspace->workspaceInvitations()->create([
         'email' => 'bystander@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -91,7 +91,7 @@ it('prevents an admin of workspace A from resending an invitation belonging to w
     $victimOwner = User::factory()->withPersonalWorkspace()->create();
     $victimInvitation = $victimOwner->personalWorkspace()->workspaceInvitations()->create([
         'email' => 'bystander@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 

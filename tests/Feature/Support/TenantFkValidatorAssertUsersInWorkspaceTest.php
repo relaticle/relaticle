@@ -11,7 +11,7 @@ mutates(TenantFkValidator::class);
 it('assertUsersInWorkspace accepts ids belonging to the user workspace', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $teammate = User::factory()->create();
-    $user->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $user->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
 
     TenantFkValidator::assertUsersInWorkspace($user, [
         'assignee_ids' => [$teammate->getKey()],
