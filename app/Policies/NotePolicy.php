@@ -7,7 +7,6 @@ namespace App\Policies;
 use App\Models\Note;
 use App\Models\User;
 use App\Policies\Concerns\ChecksWorkspaceWriteAccess;
-use Filament\Facades\Filament;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class NotePolicy
@@ -17,12 +16,12 @@ final readonly class NotePolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentWorkspace !== null;
+        return $this->canViewAnyInCurrentWorkspace($user);
     }
 
     public function view(User $user, Note $note): bool
     {
-        return $user->belongsToWorkspaceId($note->workspace_id);
+        return $this->canViewInWorkspace($user, $note->workspace_id);
     }
 
     public function create(User $user): bool
@@ -37,31 +36,36 @@ final readonly class NotePolicy
 
     public function delete(User $user, Note $note): bool
     {
-        return $this->canWriteInWorkspace($user, $note->workspace_id);
+        return $this->canDeleteInWorkspace($user, $note->workspace_id);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $this->canCreateInCurrentWorkspace($user);
+        return $this->canDeleteInCurrentWorkspace($user);
     }
 
     public function restore(User $user, Note $note): bool
     {
-        return $this->canWriteInWorkspace($user, $note->workspace_id);
+        return $this->canDeleteInWorkspace($user, $note->workspace_id);
     }
 
     public function restoreAny(User $user): bool
     {
-        return $this->canCreateInCurrentWorkspace($user);
+        return $this->canDeleteInCurrentWorkspace($user);
     }
 
-    public function forceDelete(User $user): bool
+    public function forceDelete(User $user, Note $note): bool
     {
-        return $user->hasWorkspaceRole(Filament::getTenant(), 'admin');
+        return $this->canForceDeleteInWorkspace($user, $note->workspace_id);
     }
 
     public function forceDeleteAny(User $user): bool
     {
-        return $user->hasWorkspaceRole(Filament::getTenant(), 'admin');
+        return $this->canForceDeleteInWorkspace($user, $user->currentWorkspace?->getKey());
+    }
+
+    public function exportAny(User $user): bool
+    {
+        return $this->canExportInCurrentWorkspace($user);
     }
 }

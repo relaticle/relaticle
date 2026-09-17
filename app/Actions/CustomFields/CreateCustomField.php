@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\CustomFields;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
@@ -50,7 +51,11 @@ final readonly class CreateCustomField
      */
     public function execute(User $user, array $data): CustomField
     {
-        abort_unless($user->ownsWorkspace($user->currentWorkspace), 403, 'Only workspace owners can manage custom field definitions.');
+        abort_unless(
+            $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage),
+            403,
+            'Only workspace owners and admins can manage custom field definitions.',
+        );
 
         $workspaceId = $user->currentWorkspace->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();

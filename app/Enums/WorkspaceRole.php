@@ -12,19 +12,14 @@ enum WorkspaceRole: string
     case Member = 'member';
     case Viewer = 'viewer';
 
-    /**
-     * Falls back to the raw key for a legacy or unregistered role rather than
-     * throwing. findRole()'s untyped return makes PHPStan misjudge `?->` here.
-     */
-    public static function label(string $role): string
+    public function label(): string
     {
-        $registeredRole = Jetstream::findRole($role);
+        return __("workspaces.roles.{$this->value}.label");
+    }
 
-        if ($registeredRole === null) {
-            return $role;
-        }
-
-        return $registeredRole->name;
+    public static function keyIsAdmin(?string $key): bool
+    {
+        return self::tryFrom((string) $key) === self::Admin;
     }
 
     public static function description(string $role): ?string
@@ -36,5 +31,33 @@ enum WorkspaceRole: string
         }
 
         return $registeredRole->description;
+    }
+
+    /** @return array<int, WorkspaceCapability> */
+    public function capabilities(): array
+    {
+        return match ($this) {
+            self::Admin => [
+                WorkspaceCapability::RecordsView,
+                WorkspaceCapability::RecordsCreate,
+                WorkspaceCapability::RecordsUpdate,
+                WorkspaceCapability::RecordsDelete,
+                WorkspaceCapability::RecordsForceDelete,
+                WorkspaceCapability::DataImport,
+                WorkspaceCapability::DataExport,
+                WorkspaceCapability::MembersManage,
+                WorkspaceCapability::FieldsManage,
+                WorkspaceCapability::ActivityView,
+            ],
+            self::Member => [
+                WorkspaceCapability::RecordsView,
+                WorkspaceCapability::RecordsCreate,
+                WorkspaceCapability::RecordsUpdate,
+                WorkspaceCapability::RecordsDelete,
+                WorkspaceCapability::DataImport,
+                WorkspaceCapability::DataExport,
+            ],
+            self::Viewer => [WorkspaceCapability::RecordsView],
+        };
     }
 }

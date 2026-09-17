@@ -432,7 +432,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function hasUser(User $user): bool
     {
-        return $this->users->contains($user) || $user->ownsWorkspace($this);
+        return $user->belongsToWorkspace($this);
     }
 
     public function hasUserWithEmail(string $email): bool

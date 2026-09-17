@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilderContract;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilderContract;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -325,6 +326,88 @@ it('keeps the mutable Carbon class out of the codebase', function (): void {
         'class no longer matches what the date factory builds, so a type hint becomes a TypeError and an '.
         'instanceof check silently turns false. Use CarbonImmutable, or CarbonInterface where a vendor '.
         'may still hand you a mutable date. '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('reads workspace authorization only through the capability map', function (): void {
+    $root = dirname(__DIR__, 2);
+    $self = __FILE__;
+
+    $allowedFiles = [
+        'app/Models/User.php',
+        'app/Models/Concerns/HasWorkspaces.php',
+        'app/Enums/WorkspaceRole.php',
+    ];
+
+    $directories = [
+        $root.'/app',
+        $root.'/packages',
+        $root.'/database',
+        $root.'/tests',
+    ];
+
+    $roleKeys = implode('|', array_map(
+        fn (WorkspaceRole $role): string => preg_quote($role->value, '/'),
+        WorkspaceRole::cases(),
+    ));
+
+    $pattern = '/('
+        .'hasWorkspaceRole\(|hasWorkspaceRoleForWorkspaceId\(|isViewerOnWorkspaceId\(|ownsWorkspace\(|workspaceRole\('
+        .'|WorkspaceRole::[A-Za-z]+(?:->value)?\s*(?:===|!==)'
+        .'|(?:===|!==)\s*WorkspaceRole::[A-Za-z]+(?:->value)?'
+        .'|(?:->role\b|\[\'role\'\]|->key\b|\$\w+|\))\s*(?:===|!==)\s*\'(?:'.$roleKeys.')\''
+        .'|\'(?:'.$roleKeys.')\'\s*(?:===|!==)\s*(?:->role\b|\[\'role\'\]|->key\b|\$\w+)'
+        .')/';
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            if ($file->getPathname() === $self) {
+                continue;
+            }
+
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            if (in_array($relativePath, $allowedFiles, true)) {
+                continue;
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                $trimmed = mb_ltrim($line);
+
+                $isComment = str_starts_with($trimmed, '*')
+                    || str_starts_with($trimmed, '//')
+                    || str_starts_with($trimmed, '/*');
+
+                if ($isComment) {
+                    continue;
+                }
+
+                if (preg_match($pattern, $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = $relativePath.':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Workspace authorization is a role-string check outside the capability map '.
+        '(.ai/guidelines/relaticle/architecture.md). Only App\\Models\\User, HasWorkspaces and '.
+        'WorkspaceRole may resolve a role or ownership directly; every other caller reads '.
+        'User::hasWorkspaceCapability(). '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

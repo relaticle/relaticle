@@ -347,7 +347,7 @@ test('the join link grants the configured default role', function (): void {
         ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
         ->assertRedirect();
 
-    expect($joiner->fresh()->workspaceRole($workspace->fresh())->key)
+    expect($joiner->fresh()->membershipRole($workspace->fresh()))
         ->toBe(WorkspaceRole::Viewer->value);
 });
 
@@ -361,7 +361,7 @@ test('workspaces without a configured default still grant editor', function (): 
         ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
         ->assertRedirect();
 
-    expect($joiner->fresh()->workspaceRole($workspace->fresh())->key)
+    expect($joiner->fresh()->membershipRole($workspace->fresh()))
         ->toBe(WorkspaceRole::Member->value);
 });
 

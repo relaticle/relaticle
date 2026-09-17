@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\UpdateCustomField;
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
@@ -64,9 +65,9 @@ final class UpdateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsWorkspace($user->currentWorkspace)) {
+        if (! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage)) {
             return (string) json_encode([
-                'error' => 'Only workspace owners can update custom field definitions.',
+                'error' => 'Only workspace owners and admins can update custom field definitions.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

@@ -1,6 +1,6 @@
 <div>
     @foreach($this->invitations as $invitation)
-        @php($roleName = \App\Enums\WorkspaceRole::label($invitation->role))
+        @php($roleName = \App\Enums\WorkspaceRole::tryFrom($invitation->role)?->label() ?? $invitation->role)
 
         <x-filament::section class="mb-6">
             <x-slot name="heading">

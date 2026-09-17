@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Workspace;
 
 use App\Actions\Onboarding\RemoveSampleData;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -45,7 +46,7 @@ final class RemoveSampleDataTool implements Tool
             return $this->error($planLimitError);
         }
 
-        if (! $user->ownsWorkspace($workspace)) {
+        if (! $user->hasWorkspaceCapability($workspace?->getKey(), WorkspaceCapability::WorkspaceManage)) {
             return $this->error(__('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.'));
         }
 

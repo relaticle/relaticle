@@ -39,7 +39,7 @@ it('prevents an admin of workspace A from changing the role of a member of works
     rescue(fn () => livewire(WorkspaceMembers::class, ['workspace' => $attacker->personalWorkspace()])
         ->callAction(TestAction::make('updateWorkspaceRole')->table($victimMember->id), ['role' => WorkspaceRole::Viewer->value]));
 
-    expect($victimMember->fresh()->workspaceRole($victimWorkspace)->key)->toBe(WorkspaceRole::Member->value);
+    expect($victimMember->fresh()->membershipRole($victimWorkspace))->toBe(WorkspaceRole::Member->value);
 });
 
 it('does not list members of another workspace', function (): void {

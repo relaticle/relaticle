@@ -37,7 +37,7 @@ final readonly class JoinWorkspaceViaLinkController
             'workspace' => $workspace,
             'token' => $token,
             'user' => $user,
-            'roleName' => WorkspaceRole::label($workspace->invite_link_default_role),
+            'roleName' => WorkspaceRole::tryFrom($workspace->invite_link_default_role)?->label() ?? $workspace->invite_link_default_role,
             'roleDescription' => WorkspaceRole::description($workspace->invite_link_default_role),
             'memberCount' => $workspace->users()->count() + 1,
         ]);

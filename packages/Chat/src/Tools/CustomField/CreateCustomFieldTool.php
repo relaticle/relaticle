@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -28,7 +29,7 @@ final class CreateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for non-owners. Returns a proposal for user approval.';
+        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for members and viewers. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -60,9 +61,9 @@ final class CreateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsWorkspace($user->currentWorkspace)) {
+        if (! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage)) {
             return (string) json_encode([
-                'error' => 'Only workspace owners can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask your workspace owner to do this.',
+                'error' => 'Only workspace owners and admins can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask them to do this.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
@@ -58,9 +59,9 @@ final class AddCustomFieldOptionsTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsWorkspace($user->currentWorkspace)) {
+        if (! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage)) {
             return (string) json_encode([
-                'error' => 'Only workspace owners can manage custom field options.',
+                'error' => 'Only workspace owners and admins can manage custom field options.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

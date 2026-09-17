@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Notifications\WorkspaceMemberRemovedNotification;
 use Illuminate\Support\Facades\Event;
@@ -95,7 +96,7 @@ test('admin cannot remove a peer admin', function () {
         ->call('removeTeamMember');
 
     Event::assertNotDispatched(TeamMemberRemoved::class);
-    expect($adminB->fresh()->hasWorkspaceRole($workspace->fresh(), 'admin'))->toBeTrue();
+    expect(WorkspaceRole::keyIsAdmin($adminB->fresh()->membershipRole($workspace->fresh())))->toBeTrue();
 });
 
 test('admin can still remove an editor', function () {
