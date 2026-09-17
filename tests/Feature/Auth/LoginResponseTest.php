@@ -107,7 +107,7 @@ it('falls back to the dashboard for a panel url whose slug is not a workspace', 
 it('falls back to the dashboard for a workspace the user was removed from', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $revokedWorkspace = Workspace::factory()->create();
-    $revokedWorkspace->users()->attach($user, ['role' => 'editor']);
+    $revokedWorkspace->users()->attach($user, ['role' => 'member']);
     $revokedWorkspace->removeUser($user);
 
     $target = loginResponseFor($user, "/app/{$revokedWorkspace->slug}/companies");
@@ -225,7 +225,7 @@ describe('login destinations - domain-routed panel', function (): void {
     it('falls back to the dashboard for a workspace the user was removed from on the panel domain', function (): void {
         $user = User::factory()->withWorkspace()->create();
         $revokedWorkspace = Workspace::factory()->create();
-        $revokedWorkspace->users()->attach($user, ['role' => 'editor']);
+        $revokedWorkspace->users()->attach($user, ['role' => 'member']);
         $revokedWorkspace->removeUser($user);
 
         $target = loginResponseFor($user, url()->getAppUrl($revokedWorkspace->slug.'/companies'));

@@ -1,8 +1,8 @@
 ---
 title: Manage members and roles
-description: What Administrators, Editors, and Viewers can each do, plus invitations, join links, and removing members.
+description: What Administrators, Members, and Viewers can each do, plus invitations, join links, and removing members.
 order: 1
-updated: "2026-09-01"
+updated: "2026-09-18"
 related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -20,7 +20,7 @@ role earlier, because everyone holding it gained those abilities.
 
 ## The three roles
 
-| | Administrator | Editor | Viewer |
+| | Administrator | Member | Viewer |
 |---|---|---|---|
 | View records | Yes | Yes | Yes |
 | Create and update records | Yes | Yes | No |
@@ -59,8 +59,8 @@ An invite lasts 7 days. After that the row reads **Invite expired**, and
 
 **Invite link**, next to **Invite team members**, holds a single link anyone
 can join with. Copy it to share directly, and set the role people get when
-they join with it, Editor by default. The role saves as soon as you pick it.
-The link lasts 7 days and can grant Editor or Viewer. Administrators are
+they join with it, Member by default. The role saves as soon as you pick it.
+The link lasts 7 days and can grant Member or Viewer. Administrators are
 invited by email, so the person is always named.
 
 Two controls sit under it:
@@ -75,7 +75,7 @@ Two controls sit under it:
 
 Each person's role sits next to their name, and the actions menu at the end
 of the row changes it. **Change role** switches them between Administrator,
-Editor, and Viewer. **Remove** takes a member out of the workspace: their
+Member, and Viewer. **Remove** takes a member out of the workspace: their
 records stay, they lose access. Any member but the owner can **Leave** the
 workspace themselves; the owner has no **Leave** action.
 

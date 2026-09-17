@@ -102,7 +102,7 @@ test('the tab strip hides activity from members without the admin role', functio
     Feature::define(BillingFeature::class, true);
 
     $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($editor);
 
@@ -125,7 +125,7 @@ test('a workspace admin can open the members tab', function (): void {
 
 test('a workspace editor cannot open the members tab', function (): void {
     $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($editor)
         ->get(Members::getUrl(tenant: $this->workspace))

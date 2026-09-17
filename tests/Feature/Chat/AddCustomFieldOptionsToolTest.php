@@ -116,7 +116,7 @@ it('proposes adding options and creates them on approval', function (): void {
 
 it('returns error when non-owner tries to add options', function (): void {
     $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
+    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'member']);
     $nonOwner->switchWorkspace($this->workspace);
 
     Auth::guard('web')->setUser($nonOwner);

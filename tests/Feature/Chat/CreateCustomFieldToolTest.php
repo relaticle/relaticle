@@ -122,7 +122,7 @@ it('executes the approved proposal and creates the field + options in the databa
 
 it('returns error and creates no proposal when a non-owner invokes the tool', function (): void {
     $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
+    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'member']);
     $nonOwner->switchWorkspace($this->workspace);
 
     Auth::guard('web')->setUser($nonOwner);

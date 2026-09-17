@@ -209,7 +209,7 @@ return [
         'admin' => [
             'description' => 'Can create, edit, and delete anything in this workspace.',
         ],
-        'editor' => [
+        'member' => [
             'description' => 'Can create and edit records, but not delete them.',
         ],
         'viewer' => [

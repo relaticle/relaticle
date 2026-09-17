@@ -103,7 +103,7 @@ test('another workspace activity never leaks in', function (): void {
 
 test('a member without the admin role cannot open the audit log', function (): void {
     $editor = User::factory()->create(['name' => 'Eddie Editor']);
-    $this->workspace->users()->attach($editor, ['role' => 'editor']);
+    $this->workspace->users()->attach($editor, ['role' => 'member']);
 
     $this->actingAs($editor);
     Filament::setTenant($this->workspace);

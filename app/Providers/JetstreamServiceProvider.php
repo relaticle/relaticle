@@ -80,11 +80,11 @@ final class JetstreamServiceProvider extends ServiceProvider
             'delete',
         ])->description(__('workspaces.roles.admin.description'));
 
-        Jetstream::role(WorkspaceRole::Editor->value, 'Editor', [
+        Jetstream::role(WorkspaceRole::Member->value, 'Member', [
             'read',
             'create',
             'update',
-        ])->description(__('workspaces.roles.editor.description'));
+        ])->description(__('workspaces.roles.member.description'));
 
         Jetstream::role(WorkspaceRole::Viewer->value, 'Viewer', [
             'read',

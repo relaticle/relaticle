@@ -96,7 +96,7 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     ->label(__('workspaces.form.invite_as.label'))
                     ->options(fn (): array => $this->assignableRoles())
                     ->in(fn (): array => array_keys($this->assignableRoles()))
-                    ->default(WorkspaceRole::Editor->value)
+                    ->default(WorkspaceRole::Member->value)
                     ->selectablePlaceholder(false)
                     ->required(),
             ])

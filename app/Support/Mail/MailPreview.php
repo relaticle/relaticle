@@ -146,7 +146,7 @@ final readonly class MailPreview
             'id' => 1,
             'workspace_id' => $workspace->id,
             'email' => 'sam@acme-robotics.example',
-            'role' => 'editor',
+            'role' => 'member',
             'expires_at' => now()->addDays(7),
         ]);
 

@@ -103,7 +103,7 @@ it('only returns tasks assigned to the given user', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $workspace = $owner->currentWorkspace;
     $other = User::factory()->create();
-    $workspace->users()->attach($other, ['role' => 'editor']);
+    $workspace->users()->attach($other, ['role' => 'member']);
 
     $dueFieldId = resolveDueDateField($workspace->id);
 
@@ -220,7 +220,7 @@ it('does not leak tasks from another workspace where the user is also a member',
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspaceA = $user->currentWorkspace;
     $workspaceB = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $workspaceB->users()->attach($user, ['role' => 'editor']);
+    $workspaceB->users()->attach($user, ['role' => 'member']);
 
     $dueFieldB = resolveDueDateField($workspaceB->id);
 

@@ -46,7 +46,7 @@ test('editor cannot remove workspace members', function () {
     $user = User::factory()->withWorkspace()->create();
 
     $user->currentWorkspace->users()->attach(
-        $otherUser = User::factory()->create(), ['role' => 'editor']
+        $otherUser = User::factory()->create(), ['role' => 'member']
     );
 
     $this->actingAs($otherUser);
@@ -106,7 +106,7 @@ test('admin can still remove an editor', function () {
     $workspace->users()->attach($admin, ['role' => 'admin']);
 
     $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => 'editor']);
+    $workspace->users()->attach($editor, ['role' => 'member']);
 
     $this->actingAs($admin);
 

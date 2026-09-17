@@ -68,13 +68,13 @@ test('admin invites by email and the invitation appears in the roster', function
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'invitee@example.com',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->sole();
 
     expect($invitation->email)->toBe('invitee@example.com')
-        ->and($invitation->role)->toBe('editor');
+        ->and($invitation->role)->toBe('member');
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->assertSee('invitee@example.com');
@@ -88,7 +88,7 @@ test('inviting keeps the admin on the members tab and announces the new invitati
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'invitee@example.com',
-            'role' => 'editor',
+            'role' => 'member',
         ])
         ->assertNoRedirect()
         ->assertDispatched('workspaceInvitationSent');
@@ -107,7 +107,7 @@ test('the roster picks up an invitation announced by the invite form', function 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'invitee@example.com',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $roster->call('refreshRoster')

@@ -117,7 +117,7 @@ it('completes the invite step while an invitation is pending', function (): void
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     livewire(ActivationChecklist::class)
@@ -225,7 +225,7 @@ it('disappears once every step is done', function (): void {
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     $conversationId = (string) Str::ulid();
@@ -274,7 +274,7 @@ it('stays hidden after the owner dismisses it', function (): void {
 
 it('stays hidden for a member who cannot manage the workspace', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
@@ -376,7 +376,7 @@ it('shows the invite row to a workspace admin and hides it from an editor', func
         ->assertSee(__('filament/pages/dashboard.activation.invite_members'));
 
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
@@ -493,7 +493,7 @@ it('refuses the removeSampleData call from a member through the component', func
     ]);
 
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);

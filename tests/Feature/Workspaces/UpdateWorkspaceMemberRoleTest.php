@@ -21,18 +21,18 @@ test('workspace member roles can be updated', function () {
 
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->callAction(TestAction::make('updateWorkspaceRole')->table($otherUser->id), data: [
-            'role' => WorkspaceRole::Editor->value,
+            'role' => WorkspaceRole::Member->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'editor'))->toBeTrue();
+    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'member'))->toBeTrue();
 });
 
-test('editor cannot update workspace member roles', function () {
+test('member cannot update workspace member roles', function () {
     $user = User::factory()->withWorkspace()->create();
 
     $workspace = $user->currentWorkspace;
-    $workspace->users()->attach($otherUser = User::factory()->create(), ['role' => 'editor']);
+    $workspace->users()->attach($otherUser = User::factory()->create(), ['role' => 'member']);
 
     $this->actingAs($otherUser);
     Filament::setTenant($workspace);
@@ -40,7 +40,7 @@ test('editor cannot update workspace member roles', function () {
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $otherUser->id);
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'editor'))->toBeTrue();
+    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'member'))->toBeTrue();
 });
 
 test('admin cannot promote another member to admin', function (): void {
@@ -51,7 +51,7 @@ test('admin cannot promote another member to admin', function (): void {
     $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
     $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
     Filament::setTenant($workspace);
@@ -62,7 +62,7 @@ test('admin cannot promote another member to admin', function (): void {
         ])
         ->assertHasActionErrors(['role']);
 
-    expect($editor->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Editor->value))->toBeTrue();
+    expect($editor->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Member->value))->toBeTrue();
 });
 
 test('admin cannot demote another admin', function (): void {

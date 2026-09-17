@@ -26,7 +26,7 @@ function pendingInvitation(Workspace $workspace, string $email = 'pending@exampl
     /** @var WorkspaceInvitation $invitation */
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => $email,
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => $expiresAt ?? now()->addDays(5),
     ]);
 

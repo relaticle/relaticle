@@ -47,7 +47,7 @@ it('creates one pending action for a batch of two invitations, carrying both ema
     $tool->handle(new Request([
         'records' => [
             ['email' => 'alex@example.com', 'role' => 'admin'],
-            ['email' => 'jamie@example.com', 'role' => 'editor'],
+            ['email' => 'jamie@example.com', 'role' => 'member'],
         ],
     ]));
 
@@ -68,7 +68,7 @@ it('approving a single invitation proposal writes the row and sends the invite m
 
     $tool->handle(new Request([
         'records' => [
-            ['email' => 'new-teammate@example.com', 'role' => 'editor'],
+            ['email' => 'new-teammate@example.com', 'role' => 'member'],
         ],
     ]));
 
@@ -91,7 +91,7 @@ it('keeps the mail transport failure off the card when the invite email cannot b
     Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
 
     app(InviteWorkspaceMemberTool::class)->handle(new Request([
-        'records' => [['email' => 'undeliverable@example.com', 'role' => 'editor']],
+        'records' => [['email' => 'undeliverable@example.com', 'role' => 'member']],
     ]));
 
     $pending = pendingActionForWorkspace($this->user);
@@ -115,12 +115,12 @@ it('keeps the mail transport failure off the card when the invite email cannot b
 
 it('approving an email that already belongs to a workspace member surfaces the validation error and writes no row', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Member->value]);
 
     $tool = app(InviteWorkspaceMemberTool::class);
     $tool->handle(new Request([
         'records' => [
-            ['email' => $member->email, 'role' => 'editor'],
+            ['email' => $member->email, 'role' => 'member'],
         ],
     ]));
 
@@ -133,7 +133,7 @@ it('approving an email that already belongs to a workspace member surfaces the v
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
-it('rejects a role outside editor|viewer|admin before proposing', function (): void {
+it('rejects a role outside member|viewer|admin before proposing', function (): void {
     $tool = app(InviteWorkspaceMemberTool::class);
 
     $result = $tool->handle(new Request([
@@ -144,7 +144,7 @@ it('rejects a role outside editor|viewer|admin before proposing', function (): v
 
     $decoded = json_decode($result, true);
 
-    expect($decoded['error'])->toContain('Role must be "editor", "viewer", or "admin"')
+    expect($decoded['error'])->toContain('Role must be "member", "viewer", or "admin"')
         ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
@@ -180,7 +180,7 @@ it('creates a viewer membership when a viewer invitation is approved and accepte
 it('rejects a batch over the configured max batch size', function (): void {
     $max = (int) config('chat.max_batch_size');
     $records = array_map(
-        fn (int $i): array => ['email' => "person{$i}@example.com", 'role' => 'editor'],
+        fn (int $i): array => ['email' => "person{$i}@example.com", 'role' => 'member'],
         range(1, $max + 1),
     );
 
@@ -195,14 +195,14 @@ it('rejects a batch over the configured max batch size', function (): void {
 
 it('refuses to propose an invitation for a member who does not own the workspace', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
     $result = (new InviteWorkspaceMemberTool)->handle(new Request([
-        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Member->value]],
     ]));
 
     expect($result)->toContain('Only workspace owners and administrators can invite teammates')
@@ -212,14 +212,14 @@ it('refuses to propose an invitation for a member who does not own the workspace
 
 it('never links the non-owner refusal to a page that would 403 for them', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
     $result = (new InviteWorkspaceMemberTool)->handle(new Request([
-        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Member->value]],
     ]));
 
     $membersUrl = resolve(DestinationResolver::class)->resolve('workspace_members', $this->workspace);
@@ -276,8 +276,8 @@ it('labels a resolved invitation by its email so the assistant can name it', fun
 it('names the entity in plain words on a batch card', function (): void {
     (new InviteWorkspaceMemberTool)->handle(new Request([
         'records' => [
-            ['email' => 'one@example.com', 'role' => WorkspaceRole::Editor->value],
-            ['email' => 'two@example.com', 'role' => WorkspaceRole::Editor->value],
+            ['email' => 'one@example.com', 'role' => WorkspaceRole::Member->value],
+            ['email' => 'two@example.com', 'role' => WorkspaceRole::Member->value],
         ],
     ]));
 
@@ -295,8 +295,8 @@ it('keeps the mail transport failure off the card on the batch path too', functi
 
     app(InviteWorkspaceMemberTool::class)->handle(new Request([
         'records' => [
-            ['email' => 'first@example.com', 'role' => 'editor'],
-            ['email' => 'second@example.com', 'role' => 'editor'],
+            ['email' => 'first@example.com', 'role' => 'member'],
+            ['email' => 'second@example.com', 'role' => 'member'],
         ],
     ]));
 
@@ -325,7 +325,7 @@ it('lets an administrator propose an invitation', function (): void {
     Filament::setTenant($this->workspace);
 
     $result = (new InviteWorkspaceMemberTool)->handle(new Request([
-        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Editor->value]],
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Member->value]],
     ]));
 
     expect($result)->not->toContain('Only the workspace owner can invite teammates')

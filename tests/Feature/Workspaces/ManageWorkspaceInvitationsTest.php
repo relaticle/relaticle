@@ -127,7 +127,7 @@ test('resending re-issues the token and extends expiry', function (): void {
 
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'legacy@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDay(),
     ]);
 
@@ -150,7 +150,7 @@ test('resending delivers the new invitation mailable with a working raw token', 
 
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'legacy@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDay(),
     ]);
 
