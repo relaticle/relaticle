@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
@@ -17,7 +16,6 @@ use Relaticle\Chat\Models\AiCreditBalance;
 
 mutates(
     Billing::class,
-    CreateProCheckout::class,
     CreditPackCatalog::class,
     HostedWorkspaceAccess::class,
     StartProTrial::class,
@@ -108,20 +106,6 @@ it('refuses a second trial on a workspace even when called directly', function (
         ->and($workspace->onGenericTrial())->toBeFalse();
 });
 
-it('shows a graceful error instead of 500 when checkout cannot start', function (): void {
-    // No Stripe secret configured in tests → the checkout call throws; the page must
-    // catch it, notify, and stay put rather than surfacing a 500.
-    [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['plan' => Plan::Free])->save();
-
-    livewire(Billing::class)
-        ->call('upgrade', 'monthly')
-        ->assertNotified()
-        ->assertOk();
-
-    expect($workspace->refresh()->plan)->toBe(Plan::Free);
-});
-
 it('blocks the trial action for non-owners', function (): void {
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
@@ -158,6 +142,23 @@ it('shows manage state for an active subscription', function (): void {
     livewire(Billing::class)
         ->assertSee(__('billing.manage.button'))
         ->assertDontSee(__('billing.upgrade.button'));
+});
+
+it('says when the first charge lands instead of claiming the plan renews', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_trialing',
+        'stripe_status' => 'trialing',
+        'stripe_price' => 'price_pro_yearly_test',
+        'quantity' => 1,
+        'trial_ends_at' => now()->addDays(9),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.manage.first_charge', ['date' => now()->addDays(9)->toFormattedDateString()]))
+        ->assertDontSee(__('billing.manage.auto_renews'));
 });
 
 it('shows cancellation-scheduled state on grace period', function (): void {
@@ -348,15 +349,6 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
         ->assertDontSee('/ '.number_format(2050));
 });
 
-it('names the workspace in the upgrade confirmation step', function (): void {
-    [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['name' => 'Acme Manufacturing'])->save();
-
-    livewire(Billing::class)
-        ->assertSee(__('billing.upgrade.confirm_title'))
-        ->assertSee(__('billing.upgrade.confirm_button', ['workspace' => 'Acme Manufacturing']));
-});
-
 it('offers owners an Enterprise conversation without changing their plan', function (): void {
     config()->set('app.url', 'https://marketing.test');
     [, $workspace] = billingPageOwner();
@@ -398,18 +390,6 @@ it('keeps an Enterprise grant managed after an older subscription ended', functi
         ->assertSeeHtml('href="https://marketing.test/contact"')
         ->assertDontSee(__('billing.upgrade.button'))
         ->assertDontSee('From $20,000 / year');
-});
-
-it('does not send an Enterprise workspace through Pro checkout', function (): void {
-    [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
-
-    livewire(Billing::class)
-        ->call('upgrade', 'yearly')
-        ->assertNoRedirect()
-        ->assertNotNotified();
-
-    expect($workspace->refresh()->plan)->toBe(Plan::Enterprise);
 });
 
 it('keeps Enterprise access clear while an older Pro subscription is canceling', function (): void {

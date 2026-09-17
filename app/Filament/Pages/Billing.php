@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Billing\CreateCreditPackCheckout;
-use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
@@ -84,22 +83,6 @@ final class Billing extends Page
         Notification::make()->title(__('billing.trial.started'))->success()->send();
     }
 
-    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
-    {
-        $workspace = $this->workspace();
-
-        if (! $this->user()->ownsWorkspace($workspace) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
-            return;
-        }
-
-        try {
-            $this->redirect($createCheckout->execute($workspace, $interval));
-        } catch (Throwable $exception) {
-            report($exception);
-            $this->notifyCheckoutFailed();
-        }
-    }
-
     public function managePortal(): void
     {
         $workspace = $this->workspace();
@@ -158,6 +141,7 @@ final class Billing extends Page
             'pastDue' => $subscription?->pastDue() ?? false,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
+            'onStripeTrial' => $subscription?->onTrial() ?? false,
             'hasHostedAccess' => $hasHostedAccess,
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first(),

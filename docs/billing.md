@@ -41,13 +41,19 @@ Because Managed Payments is enabled per transaction on our own Stripe account, t
 payment methods, and subscriptions are ours. Disabling it later (own tax ops, lower fees) is a
 config flip on `services.stripe.managed_payments`, with no other code change.
 
+The upgrade flow mounts Stripe embedded Checkout inside a modal over the app instead of
+redirecting to a Stripe-hosted page. Managed Payments is a Checkout Session parameter, and
+Stripe accepts it only with `ui_mode: hosted_page` or `ui_mode: embedded_page`. A custom
+Payment Element cannot carry Managed Payments, so embedded Checkout is the only option that
+keeps both the in-app upgrade and the merchant-of-record posture.
+
 ```text
 Workspace onboarding (billing enabled)
   └─ Create workspace ─────► automatic StartProTrial (Cashier generic trial, no Stripe objects)
 
 Billing page (/app/{team}/billing, flag-gated)
   ├─ Legacy trial fallback ► StartProTrial (grandfathered eligible workspaces only)
-  ├─ Upgrade ──────────────► CreateProCheckout → hosted Stripe Checkout
+  ├─ Upgrade ──────────────► Upgrade modal → CreateProCheckout → embedded Stripe Checkout
   │                            └ managed_payments[enabled] = config('services.stripe.managed_payments')
   └─ Manage subscription ──► Stripe Billing Portal (redirectToBillingPortal)
 
