@@ -27,6 +27,7 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
+use League\OAuth2\Server\Exception\OAuthServerException;
 use Livewire\Exceptions\PayloadTooLargeException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
 use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
@@ -203,6 +204,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // They are user-state noise, not actionable errors, so keep them out of
         // Sentry (issue #125406836).
         $exceptions->dontReport(CorruptComponentPayloadException::class);
+
+        // Passport's TokenGuard report()s every bearer token league rejects
+        // (TokenGuard::getPsrRequestViaBearerToken). Since the v1 API accepts the
+        // `api` guard, each expired token or scanner probe would otherwise burn
+        // Sentry budget on a routine 401. Only the client-error side is muted:
+        // league wraps unexpected failures during token issuance in this same
+        // class as a 500 (OAuthServerException::serverError), and losing those
+        // would blind the /oauth/token path MCP connectors depend on.
+        $exceptions->dontReportWhen(
+            fn (Throwable $e): bool => $e instanceof OAuthServerException && $e->getHttpStatusCode() < 500,
+        );
 
         // Livewire rejects an oversized body before the component hydrates, so the panel
         // cannot notify from the server; payload-guard.js turns this into a notification

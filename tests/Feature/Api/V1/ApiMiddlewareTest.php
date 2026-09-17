@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\TransientToken;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -82,6 +83,16 @@ describe('rate limiting', function (): void {
         $this->withToken($token)
             ->postJson('/api/v1/companies', ['name' => 'C'])
             ->assertTooManyRequests();
+    });
+});
+
+describe('session credentials', function (): void {
+    it('rate limits a tokenless session by IP rather than crashing on a token id', function (): void {
+        $this->user->withAccessToken(new TransientToken);
+        auth()->guard('sanctum')->setUser($this->user);
+        auth()->shouldUse('sanctum');
+
+        $this->getJson('/api/v1/companies')->assertOk();
     });
 });
 

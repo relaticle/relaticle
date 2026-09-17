@@ -121,7 +121,11 @@
                             {{ __('mcp.consent.permissions.description') }}
                         </p>
 
+                        @php($requestedScopes = collect($scopes)->pluck('id'))
+                        @php($asksForRestScopes = $requestedScopes->intersect(['read', 'create', 'update', 'delete'])->isNotEmpty())
+
                         <ul class="mt-3 space-y-3">
+                            @if(! $asksForRestScopes || $requestedScopes->contains('read'))
                             <li class="flex items-start gap-3">
                                 <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                                     <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -133,6 +137,8 @@
                                     <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.read.description') }}</span>
                                 </span>
                             </li>
+                            @endif
+                            @if(! $asksForRestScopes || $requestedScopes->intersect(['create', 'update'])->isNotEmpty())
                             <li class="flex items-start gap-3">
                                 <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                                     <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -144,6 +150,8 @@
                                     <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.write.description') }}</span>
                                 </span>
                             </li>
+                            @endif
+                            @if(! $asksForRestScopes || $requestedScopes->contains('delete'))
                             <li class="flex items-start gap-3">
                                 <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">
                                     <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -155,6 +163,7 @@
                                     <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.delete.description') }}</span>
                                 </span>
                             </li>
+                            @endif
                         </ul>
 
                         <p class="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-500 dark:bg-gray-800/40 dark:text-gray-400">

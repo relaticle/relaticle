@@ -86,6 +86,39 @@ it('spells out what the connector will be able to do, including deletion', funct
     $response->assertSee('Companies, people, opportunities, tasks and notes.');
 });
 
+it('lists only the permissions a REST client asks for', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client, ['scope' => 'read create update']));
+
+    $response->assertOk();
+    $response->assertSee('Read and search your records');
+    $response->assertSee('Create and update them');
+    $response->assertDontSee('Delete them');
+});
+
+it('lists only the write permission for a create-only REST client', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client, ['scope' => 'create']));
+
+    $response->assertOk();
+    $response->assertDontSee('Read and search your records');
+    $response->assertSee('Create and update them');
+    $response->assertDontSee('Delete them');
+});
+
+it('lists every permission for an MCP client', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
+
+    $response->assertOk();
+    $response->assertSee('Read and search your records');
+    $response->assertSee('Create and update them');
+    $response->assertSee('Delete them');
+});
+
 it('rejects the approve POST without a workspace_id', function (): void {
     $this->actingAs($this->user);
 

@@ -26,7 +26,7 @@ abstract class BaseCrmEntityRequest extends FormRequest
     final public function rules(): array
     {
         $user = $this->authenticatedUser();
-        $record = $this->routeRecord();
+        $record = $this->existingRecord();
 
         return array_merge($this->entityRules($user), new ValidCustomFields(
             $user->currentWorkspace->getKey(),
@@ -53,15 +53,15 @@ abstract class BaseCrmEntityRequest extends FormRequest
         ]);
     }
 
+    protected function existingRecord(): ?Model
+    {
+        return collect($this->route()?->parameters() ?? [])
+            ->first(fn (mixed $parameter): bool => $parameter instanceof Model);
+    }
+
     private function authenticatedUser(): User
     {
         /** @var User */
         return $this->user();
-    }
-
-    private function routeRecord(): ?Model
-    {
-        return collect($this->route()?->parameters() ?? [])
-            ->first(fn (mixed $parameter): bool => $parameter instanceof Model);
     }
 }
