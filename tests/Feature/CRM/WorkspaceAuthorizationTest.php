@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\Company;
 use App\Models\Note;
@@ -27,48 +28,47 @@ it('authorizes :dataset by workspace membership and role', function (string $mod
 
     $admin = User::factory()->create();
     $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($workspace);
 
-    $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($workspace);
 
-    $outsider = User::factory()->withWorkspace()->create();
+    $viewer = User::factory()->create();
+    $workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($workspace);
+
+    $outsider = User::factory()->create();
 
     $record = $model::factory()->recycle([$owner, $workspace])->create();
 
     $matrix = [];
 
-    foreach (['owner' => $owner, 'admin' => $admin, 'editor' => $editor, 'outsider' => $outsider] as $label => $user) {
+    foreach (['owner' => $owner, 'admin' => $admin, 'member' => $member, 'viewer' => $viewer, 'outsider' => $outsider] as $label => $user) {
         $actor = User::query()->findOrFail($user->getKey());
 
         foreach (['view', 'update', 'delete', 'restore', 'forceDelete'] as $ability) {
             $matrix["{$label}.{$ability}"] = $actor->can($ability, $record);
         }
+
+        $matrix["{$label}.exportAny"] = $actor->can('exportAny', $model);
     }
 
     expect($matrix)->toBe([
-        'owner.view' => true,
-        'owner.update' => true,
-        'owner.delete' => true,
-        'owner.restore' => true,
-        'owner.forceDelete' => true,
+        'owner.view' => true, 'owner.update' => true, 'owner.delete' => true,
+        'owner.restore' => true, 'owner.forceDelete' => true, 'owner.exportAny' => true,
 
-        'admin.view' => true,
-        'admin.update' => true,
-        'admin.delete' => true,
-        'admin.restore' => true,
-        'admin.forceDelete' => true,
+        'admin.view' => true, 'admin.update' => true, 'admin.delete' => true,
+        'admin.restore' => true, 'admin.forceDelete' => true, 'admin.exportAny' => true,
 
-        'editor.view' => true,
-        'editor.update' => true,
-        'editor.delete' => true,
-        'editor.restore' => true,
-        'editor.forceDelete' => false,
+        'member.view' => true, 'member.update' => true, 'member.delete' => true,
+        'member.restore' => true, 'member.forceDelete' => false, 'member.exportAny' => true,
 
-        'outsider.view' => false,
-        'outsider.update' => false,
-        'outsider.delete' => false,
-        'outsider.restore' => false,
-        'outsider.forceDelete' => false,
+        'viewer.view' => true, 'viewer.update' => false, 'viewer.delete' => false,
+        'viewer.restore' => false, 'viewer.forceDelete' => false, 'viewer.exportAny' => false,
+
+        'outsider.view' => false, 'outsider.update' => false, 'outsider.delete' => false,
+        'outsider.restore' => false, 'outsider.forceDelete' => false, 'outsider.exportAny' => false,
     ]);
 })->with([
     'companies' => Company::class,
@@ -78,11 +78,11 @@ it('authorizes :dataset by workspace membership and role', function (string $mod
     'tasks' => Task::class,
 ]);
 
-it('holds no role on a missing workspace', function (): void {
+it('holds no capability on a missing workspace', function (): void {
     $owner = User::factory()->withWorkspace()->create();
 
-    expect($owner->hasWorkspaceRole(null, WorkspaceRole::Admin->value))->toBeFalse()
-        ->and($owner->workspaceRole(null))->toBeNull();
+    expect($owner->hasWorkspaceCapability(null, WorkspaceCapability::RecordsView))->toBeFalse()
+        ->and($owner->membershipRole(null))->toBeNull();
 });
 
 it('treats a membership carrying no role as not privileged', function (): void {
@@ -96,7 +96,7 @@ it('treats a membership carrying no role as not privileged', function (): void {
 
     $actor = User::query()->findOrFail($member->getKey());
 
-    expect($actor->can('view', $record))->toBeTrue()
+    expect($actor->can('view', $record))->toBeFalse()
         ->and($actor->can('forceDelete', $record))->toBeFalse();
 });
 
@@ -110,7 +110,9 @@ it('denies a record belonging to another workspace', function (): void {
 
     expect($actor->can('view', $foreignRecord))->toBeFalse()
         ->and($actor->can('update', $foreignRecord))->toBeFalse()
-        ->and($actor->can('delete', $foreignRecord))->toBeFalse();
+        ->and($actor->can('delete', $foreignRecord))->toBeFalse()
+        ->and($actor->can('restore', $foreignRecord))->toBeFalse()
+        ->and($actor->can('forceDelete', $foreignRecord))->toBeFalse();
 });
 
 it('denies a record pointing at a workspace that no longer exists', function (): void {

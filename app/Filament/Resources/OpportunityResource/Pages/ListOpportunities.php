@@ -7,6 +7,7 @@ namespace App\Filament\Resources\OpportunityResource\Pages;
 use App\Filament\Concerns\HasBoardViewSwitcher;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource;
+use App\Models\Opportunity;
 use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -37,7 +38,7 @@ final class ListOpportunities extends ListRecords
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportOpportunities::getUrl())
                     ->visible(ImportOpportunities::canAccess(...)),
-                ExportAction::make()->exporter(OpportunityExporter::class),
+                ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')

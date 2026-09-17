@@ -75,7 +75,7 @@ final readonly class RemoveWorkspaceMember implements RemovesTeamMembers
             return;
         }
 
-        if ($workspaceMember->workspaceRole($workspace)?->key !== WorkspaceRole::Admin->value) {
+        if (! WorkspaceRole::keyIsAdmin($workspaceMember->membershipRole($workspace))) {
             return;
         }
 

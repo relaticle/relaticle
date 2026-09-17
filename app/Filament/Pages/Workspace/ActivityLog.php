@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Workspace;
 
 use App\Enums\CrmEntity;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\ActivityLog\Activity;
 use App\Models\User;
@@ -108,7 +109,7 @@ final class ActivityLog extends Page implements HasTable
 
         $user = auth()->user();
 
-        return $user instanceof User && $user->hasWorkspaceRoleForWorkspaceId($tenant->getKey(), 'admin');
+        return $user instanceof User && $user->hasWorkspaceCapability($tenant->getKey(), WorkspaceCapability::ActivityView);
     }
 
     public function mount(): void

@@ -207,12 +207,15 @@ return [
             'label' => 'Owner',
         ],
         'admin' => [
+            'label' => 'Admin',
             'description' => 'Can create, edit, and delete anything in this workspace.',
         ],
         'member' => [
+            'label' => 'Member',
             'description' => 'Can create and edit records, but not delete them.',
         ],
         'viewer' => [
+            'label' => 'Viewer',
             'description' => 'Can view records, but not change them.',
         ],
     ],

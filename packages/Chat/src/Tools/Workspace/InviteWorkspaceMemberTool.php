@@ -89,7 +89,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             return "Role must be \"member\", \"viewer\", or \"admin\", got \"{$role}\".";
         }
 
-        if ($role === WorkspaceRole::Admin->value && ! Gate::forUser($user)->allows('promoteToAdmin', $workspace)) {
+        if (WorkspaceRole::keyIsAdmin($role) && ! Gate::forUser($user)->allows('promoteToAdmin', $workspace)) {
             return __('Only the workspace owner can grant the Administrator role. Tell the user to ask the owner, and do not link to any page.');
         }
 

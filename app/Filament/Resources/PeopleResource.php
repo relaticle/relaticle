@@ -154,6 +154,7 @@ final class PeopleResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     ExportBulkAction::make()
+                        ->authorize('exportAny', People::class)
                         ->exporter(PeopleExporter::class),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),

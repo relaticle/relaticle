@@ -11,6 +11,7 @@ use App\Actions\Jetstream\DeleteWorkspace;
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Jetstream\RemoveWorkspaceMember;
 use App\Actions\Jetstream\UpdateWorkspaceName;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\User;
@@ -73,21 +74,22 @@ final class JetstreamServiceProvider extends ServiceProvider
     {
         Jetstream::defaultApiTokenPermissions(['read']);
 
-        Jetstream::role(WorkspaceRole::Admin->value, 'Administrator', [
-            'create',
-            'read',
-            'update',
-            'delete',
-        ])->description(__('workspaces.roles.admin.description'));
+        foreach (WorkspaceRole::cases() as $role) {
+            Jetstream::role($role->value, $role->label(), $this->tokenPermissions($role))
+                ->description(__("workspaces.roles.{$role->value}.description"));
+        }
+    }
 
-        Jetstream::role(WorkspaceRole::Member->value, 'Member', [
-            'read',
-            'create',
-            'update',
-        ])->description(__('workspaces.roles.member.description'));
+    /** @return array<int, string> */
+    private function tokenPermissions(WorkspaceRole $role): array
+    {
+        $capabilities = $role->capabilities();
 
-        Jetstream::role(WorkspaceRole::Viewer->value, 'Viewer', [
+        return array_values(array_filter([
             'read',
-        ])->description(__('workspaces.roles.viewer.description'));
+            in_array(WorkspaceCapability::RecordsCreate, $capabilities, true) ? 'create' : null,
+            in_array(WorkspaceCapability::RecordsUpdate, $capabilities, true) ? 'update' : null,
+            in_array(WorkspaceCapability::RecordsDelete, $capabilities, true) ? 'delete' : null,
+        ]));
     }
 }

@@ -5,7 +5,7 @@
 
     // Every row below links somewhere only a workspace admin can act on:
     // Members::canAccess() is can('update', $tenant), and the billing page is
-    // the same. Showing them to an editor would be a footer of 403s.
+    // the same. Showing them to a member would be a footer of 403s.
     $canManage = $workspace instanceof \App\Models\Workspace
         && $user instanceof \App\Models\User
         && $user->can('update', $workspace);

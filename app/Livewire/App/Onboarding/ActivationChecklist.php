@@ -8,6 +8,7 @@ use App\Actions\Onboarding\DismissActivationChecklist;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\Data\ActivationStepData;
 use App\Enums\ActivationStep;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\PeopleResource;
@@ -80,7 +81,7 @@ final class ActivationChecklist extends Component
         }
 
         // Every step links somewhere only a workspace admin can act on, so showing
-        // this to an editor would be a checklist of 403s.
+        // this to a member would be a checklist of 403s.
         if (! $this->user()->can('update', $workspace)) {
             return false;
         }
@@ -212,7 +213,7 @@ final class ActivationChecklist extends Component
     {
         $workspace = $this->workspace();
 
-        if (! $workspace instanceof Workspace || ! $this->user()->ownsWorkspace($workspace)) {
+        if (! $workspace instanceof Workspace || ! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage)) {
             return false;
         }
 

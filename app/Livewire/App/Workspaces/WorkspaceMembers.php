@@ -287,7 +287,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             return __('workspaces.roles.owner.label');
         }
 
-        return WorkspaceRole::label((string) $record['role']);
+        return WorkspaceRole::tryFrom((string) $record['role'])?->label() ?? (string) $record['role'];
     }
 
     /**
@@ -368,7 +368,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
      */
     private function canActOnRole(array $record): bool
     {
-        if ((string) $record['role'] !== WorkspaceRole::Admin->value) {
+        if (! WorkspaceRole::keyIsAdmin((string) $record['role'])) {
             return true;
         }
 
@@ -399,8 +399,8 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                     ->default(fn (array $record): string => (string) $record['role'])
                     ->rules([
                         fn (array $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
-                            $touchesAdminStatus = $value === WorkspaceRole::Admin->value
-                                || $record['role'] === WorkspaceRole::Admin->value;
+                            $touchesAdminStatus = WorkspaceRole::keyIsAdmin(is_string($value) ? $value : null)
+                                || WorkspaceRole::keyIsAdmin((string) $record['role']);
 
                             if ($touchesAdminStatus && ! Gate::check('promoteToAdmin', $this->workspace)) {
                                 $fail(__('workspaces.validation.only_owner_promotes_admins'));

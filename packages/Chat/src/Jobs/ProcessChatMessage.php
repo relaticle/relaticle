@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Enums\WorkspaceCapability;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
@@ -214,7 +215,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
-                'role' => $this->user->ownsWorkspace($this->workspace) ? 'owner' : 'member',
+                'role' => $this->user->hasWorkspaceCapability($this->workspace->getKey(), WorkspaceCapability::WorkspaceManage) ? 'owner' : 'member',
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);

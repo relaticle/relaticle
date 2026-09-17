@@ -83,7 +83,7 @@ test('an admin cannot promote another member to admin', function (): void {
         ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), ['role' => WorkspaceRole::Admin->value])
         ->assertHasActionErrors(['role']);
 
-    expect($member->fresh()->workspaceRole($this->workspace)->key)->toBe(WorkspaceRole::Member->value);
+    expect($member->fresh()->membershipRole($this->workspace))->toBe(WorkspaceRole::Member->value);
 });
 
 test('an admin cannot demote a peer admin', function (): void {
@@ -98,7 +98,7 @@ test('an admin cannot demote a peer admin', function (): void {
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $adminB->id);
 
-    expect($adminB->fresh()->workspaceRole($this->workspace)->key)->toBe(WorkspaceRole::Admin->value);
+    expect($adminB->fresh()->membershipRole($this->workspace))->toBe(WorkspaceRole::Admin->value);
 });
 
 test('the owner can change a member role', function (): void {
@@ -109,7 +109,7 @@ test('the owner can change a member role', function (): void {
         ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), ['role' => WorkspaceRole::Viewer->value])
         ->assertHasNoActionErrors();
 
-    expect($member->fresh()->workspaceRole($this->workspace)->key)->toBe(WorkspaceRole::Viewer->value);
+    expect($member->fresh()->membershipRole($this->workspace))->toBe(WorkspaceRole::Viewer->value);
 });
 
 test('multiple people can be invited in one submission', function (): void {
@@ -256,7 +256,7 @@ test('a member role must be a role the app actually registers', function (): voi
     expect(fn () => resolve(UpdateWorkspaceMemberRole::class)->update($this->owner, $this->workspace, (string) $editor->getKey(), 'superuser'))
         ->toThrow(ValidationException::class);
 
-    expect($editor->fresh()->workspaceRole($this->workspace->fresh())?->key)->toBe(WorkspaceRole::Member->value);
+    expect($editor->fresh()->membershipRole($this->workspace->fresh()))->toBe(WorkspaceRole::Member->value);
 });
 
 test('rotating the invite link changes the token', function (): void {

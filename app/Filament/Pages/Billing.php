@@ -9,6 +9,7 @@ use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
@@ -121,7 +122,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
             return;
         }
 
@@ -137,7 +138,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace)) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
             return;
         }
 
@@ -153,7 +154,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace) || ! resolve(HostedWorkspaceAccess::class)->allows($workspace)) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || ! resolve(HostedWorkspaceAccess::class)->allows($workspace)) {
             return;
         }
 
@@ -186,7 +187,7 @@ final class Billing extends Page
             // Not $workspace->plan->credits(): a past-due workspace refills at the Free
             // allowance, so the plan's figure would name credits it never gets.
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
-            'isOwner' => $this->user()->ownsWorkspace($workspace),
+            'isOwner' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             'subscription' => $subscription,
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,

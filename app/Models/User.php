@@ -8,6 +8,7 @@ use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Models\Concerns\HasWorkspaces;
@@ -44,7 +45,6 @@ use Illuminate\Support\Facades\Date;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
@@ -107,6 +107,9 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use Notifiable;
     use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
+
+    /** @var array<string, bool> */
+    private array $ownershipByWorkspaceId = [];
 
     /**
      * Get the attributes that should be cast.
@@ -343,49 +346,49 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * Determine whether the user holds the given role on the workspace owning the
-     * given foreign key.
+     * Every capability the user holds on the workspace owning the given foreign
+     * key: every case for an owner, the role map's list otherwise.
+     *
+     * Ownership reads the row directly rather than the cached `ownedWorkspaces`
+     * relation, memoised per workspace id: a workspace never changes owner after
+     * creation, so an id resolved earlier this request stays correct, and a
+     * workspace created later in the same request is a new id that was never
+     * cached stale.
+     *
+     * @return array<int, WorkspaceCapability>
      */
-    public function hasWorkspaceRoleForWorkspaceId(?string $workspaceId, string $role): bool
+    public function workspaceCapabilities(?string $workspaceId): array
     {
         if ($workspaceId === null) {
-            return false;
+            return [];
         }
 
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return true;
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return WorkspaceCapability::cases();
         }
 
         $this->loadMissing('workspaces');
 
-        $membershipRole = $this->workspaces
+        $role = $this->workspaces
             ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
             ?->membership
             ?->role;
 
-        if ($membershipRole === null) {
-            return false;
-        }
-
-        return Jetstream::findRole($membershipRole)?->key === $role;
+        return WorkspaceRole::tryFrom((string) $role)?->capabilities() ?? [];
     }
 
-    // Ownership outranks the pivot role, so an owner row carrying a stale
-    // viewer value cannot lock them out of their own workspace.
-    public function isViewerOnWorkspaceId(?string $workspaceId): bool
+    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
     {
-        if ($workspaceId === null) {
-            return false;
-        }
+        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+    }
 
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return false;
-        }
-
-        return $this->hasWorkspaceRoleForWorkspaceId($workspaceId, WorkspaceRole::Viewer->value);
+    // Memoised per request. The sysadmin panel can reassign an owner, which is safe only
+    // because no User instance lives in that request; a user-facing transfer must clear this.
+    private function isWorkspaceOwner(string $workspaceId): bool
+    {
+        return $this->ownershipByWorkspaceId[$workspaceId] ??= Workspace::query()
+            ->whereKey($workspaceId)
+            ->where($this->getForeignKey(), $this->getKey())
+            ->exists();
     }
 }

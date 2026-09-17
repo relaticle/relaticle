@@ -25,7 +25,7 @@ test('workspace member roles can be updated', function () {
         ])
         ->assertHasNoActionErrors();
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'member'))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $otherUser->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('member cannot update workspace member roles', function () {
@@ -40,7 +40,7 @@ test('member cannot update workspace member roles', function () {
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $otherUser->id);
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'member'))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $otherUser->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('admin cannot promote another member to admin', function (): void {
@@ -62,7 +62,7 @@ test('admin cannot promote another member to admin', function (): void {
         ])
         ->assertHasActionErrors(['role']);
 
-    expect($editor->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Member->value))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $editor->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('admin cannot demote another admin', function (): void {
@@ -81,7 +81,7 @@ test('admin cannot demote another admin', function (): void {
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $adminB->id);
 
-    expect($adminB->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Admin->value))->toBeTrue();
+    expect(WorkspaceRole::keyIsAdmin($adminB->fresh()->membershipRole($workspace->fresh())))->toBeTrue();
 });
 
 test('viewer is a registered workspace role with only read ability', function (): void {
