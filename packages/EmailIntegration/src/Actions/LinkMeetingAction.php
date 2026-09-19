@@ -10,15 +10,14 @@ use App\Models\People;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
-use Illuminate\Support\Collection;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Models\Meeting;
-use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 use Relaticle\EmailIntegration\Support\AutomatedSenderMatcher;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PersonEmailMatcher;
+use Relaticle\EmailIntegration\Support\PublicDomainList;
 
 final readonly class LinkMeetingAction
 {
@@ -30,6 +29,7 @@ final readonly class LinkMeetingAction
         private AutomatedSenderMatcher $automatedSender,
         private EmailVisibilityService $visibility,
         private RecordCommunicationMetrics $metrics,
+        private PublicDomainList $publicDomainList,
     ) {}
 
     public function execute(Meeting $meeting): void
@@ -39,7 +39,7 @@ final readonly class LinkMeetingAction
         $teamId = $meeting->workspace_id;
         $team = $meeting->workspace;
         $account = $meeting->connectedAccount;
-        $skippedDomains = $this->buildSkippedDomains($teamId);
+        $skippedDomains = $this->publicDomainList->forWorkspace($teamId);
 
         foreach ($attendees as $attendee) {
             $isAutomatedSender = $this->automatedSender->matches($attendee->email_address);
@@ -139,19 +139,6 @@ final readonly class LinkMeetingAction
         $relation->attach($relatedId, ['link_source' => 'auto']);
 
         return true;
-    }
-
-    /** @return Collection<int, lowercase-string> */
-    private function buildSkippedDomains(string $teamId): Collection
-    {
-        $configDomains = collect((array) config('email-integration.public_domains', []))
-            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
-
-        $teamDomains = PublicEmailDomain::query()->where('workspace_id', $teamId)
-            ->pluck('domain')
-            ->map(fn (mixed $d): string => strtolower($this->domainMatcher->host((string) $d)));
-
-        return $configDomains->merge($teamDomains)->unique()->values();
     }
 
     private function extractDomain(string $email): ?string

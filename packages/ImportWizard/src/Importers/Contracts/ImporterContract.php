@@ -88,4 +88,9 @@ interface ImporterContract
      * @param  array<string, mixed>  $context  Additional context from prepareForSave
      */
     public function afterSave(Model $record, array $context): void;
+
+    /**
+     * Called after batched custom-field values have been flushed to the database.
+     */
+    public function afterCustomFieldsFlushed(): void;
 }

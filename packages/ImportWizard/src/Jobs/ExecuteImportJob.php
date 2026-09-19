@@ -155,6 +155,7 @@ final class ExecuteImportJob implements ShouldQueue
                         $this->flushProcessedRows($store);
                     }
                     $this->flushCustomFieldValues();
+                    $importer->afterCustomFieldsFlushed();
                     $this->flushTagOptions();
                     $this->flushFailedRows($import);
                     $this->persistResults($import, $results);

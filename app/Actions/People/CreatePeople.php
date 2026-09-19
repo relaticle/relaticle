@@ -11,9 +11,14 @@ use App\Models\User;
 use App\Support\TenantFkValidator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 
 final readonly class CreatePeople
 {
+    public function __construct(
+        private LinkPersonCompanyFromEmails $linkPersonCompanyFromEmails,
+    ) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
@@ -28,8 +33,12 @@ final readonly class CreatePeople
         $attributes = Arr::only($data, ['name', 'company_id', 'custom_fields']);
         $attributes['creation_source'] = $source;
 
-        $person = DB::transaction(fn (): People => People::query()->create($attributes));
+        return DB::transaction(function () use ($attributes): People {
+            $person = People::query()->create($attributes);
 
-        return $person->load('customFieldValues.customField.options');
+            $this->linkPersonCompanyFromEmails->execute($person);
+
+            return $person->refresh()->load('customFieldValues.customField.options');
+        });
     }
 }

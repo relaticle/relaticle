@@ -152,6 +152,8 @@ abstract class BaseImporter implements ImporterContract
         $this->saveCustomFieldValues($record);
     }
 
+    public function afterCustomFieldsFlushed(): void {}
+
     /**
      * Get custom fields for this entity as ImportField objects.
      *

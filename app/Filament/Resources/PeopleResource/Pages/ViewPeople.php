@@ -19,6 +19,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\TextSize;
 use Illuminate\Support\Js;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\EmailIntegration\Filament\Actions\ViewRecordEmailsAction;
 use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
@@ -35,7 +36,12 @@ final class ViewPeople extends ViewRecord
             ViewRecordEmailsAction::make()
                 ->label(__('filament/resources/person.pages.view.actions.view_emails.label'))
                 ->url(fn (): string => PeopleResource::getUrl('emails', ['record' => $this->getRecord()])),
-            EditAction::make()->icon('heroicon-o-pencil-square')->label(__('filament/resources/person.pages.view.actions.edit.label')),
+            EditAction::make()
+                ->icon('heroicon-o-pencil-square')
+                ->label(__('filament/resources/person.pages.view.actions.edit.label'))
+                ->after(function (People $record, LinkPersonCompanyFromEmails $linker): void {
+                    $linker->execute($record->fresh());
+                }),
             ActionGroup::make([
                 ActionGroup::make([
                     Action::make('copyPageUrl')
