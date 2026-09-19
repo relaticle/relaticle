@@ -244,7 +244,7 @@ final class ExecuteImportJob implements ShouldQueue
                             $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, $results, $existingRecords);
                             $this->flushProcessedRows($store);
                         }
-                        $this->flushCustomFieldValues();
+                        $this->flushCustomFieldValues($importer);
                         $this->flushTagOptions();
                         $this->flushFailedRows($import);
                         $this->rememberDedupMaps();
@@ -633,9 +633,11 @@ final class ExecuteImportJob implements ShouldQueue
         return array_values(array_unique([...$existingValues, ...$newValues]));
     }
 
-    private function flushCustomFieldValues(): void
+    private function flushCustomFieldValues(BaseImporter $importer): void
     {
         if ($this->pendingCustomFieldValues === []) {
+            $importer->afterCustomFieldsFlushed();
+
             return;
         }
 
@@ -677,6 +679,8 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $this->pendingCustomFieldChanges = [];
+
+        $importer->afterCustomFieldsFlushed();
     }
 
     /** @param array<int, mixed> $values */

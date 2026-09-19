@@ -17,6 +17,7 @@ use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\Size;
 use Livewire\Attributes\On;
 use Override;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 final class ListPeople extends ListRecords
@@ -43,7 +44,12 @@ final class ListPeople extends ListRecords
                 ->button()
                 ->label(__('filament/resources/person.pages.list.actions.import_export.label'))
                 ->size(Size::Small),
-            CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+            CreateAction::make()
+                ->icon('heroicon-o-plus')
+                ->size(Size::Small)
+                ->after(function (People $record, LinkPersonCompanyFromEmails $linker): void {
+                    $linker->execute($record);
+                }),
         ];
     }
 
