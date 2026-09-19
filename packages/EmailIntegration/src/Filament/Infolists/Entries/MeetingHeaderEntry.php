@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Filament\Infolists\Entries;
 
 use App\Models\User;
 use Filament\Infolists\Components\Entry;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\MeetingRespondentResolver;
@@ -38,11 +39,14 @@ final class MeetingHeaderEntry extends Entry
         $responseStatus = $user instanceof User
             ? resolve(MeetingRespondentResolver::class)->viewerResponseStatus($user, $record)
             : ($record->response_status ?? AttendeeResponseStatus::NEEDS_ACTION);
+        $start = $record->all_day
+            ? Date::parse($record->starts_at)
+            : Date::parse($record->starts_at)->timezone($timezone);
 
         return [
             'title' => $record->title,
-            'month' => strtoupper($record->starts_at->format('M')),
-            'day' => $record->starts_at->format('j'),
+            'month' => strtoupper($start->format('M')),
+            'day' => $start->format('j'),
             'response_status' => $responseStatus,
             'can_respond' => $user instanceof User && $user->can('respond', $record),
             'is_past' => resolve(MeetingTemporalState::class)->isPast($record, $timezone),

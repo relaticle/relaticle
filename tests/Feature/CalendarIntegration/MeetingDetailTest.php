@@ -16,7 +16,9 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
+use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingLinkedRecordsEntry;
+use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingTimeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -28,7 +30,7 @@ use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MeetingAttendeePresenter;
 use Relaticle\EmailIntegration\Services\TeamMemberDirectory;
 
-mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingLinkedRecordsEntry::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, MailboxDisplayNameDirectory::class);
+mutates(MeetingsRelationManager::class, MeetingDetailInfolist::class, MeetingAttendeeEntry::class, MeetingHeaderEntry::class, MeetingLinkedRecordsEntry::class, MeetingTimeEntry::class, MeetingAttendeePresenter::class, TeamMemberDirectory::class, MailboxDisplayNameDirectory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -109,13 +111,13 @@ it('shows title, time range, duration, and rsvp in the view modal', function ():
 });
 
 it('shows all-day meetings without a clock range', function (): void {
-    $starts = Date::parse('2026-09-30 00:00:00');
+    $starts = Date::parse('2026-09-30 00:00:00', 'UTC');
     $meeting = Meeting::factory()->create([
         'workspace_id' => $this->workspace->id,
         'connected_account_id' => $this->account->id,
         'title' => 'Offsite',
         'starts_at' => $starts,
-        'ends_at' => $starts->copy()->addDay(),
+        'ends_at' => $starts,
         'all_day' => true,
         'response_status' => AttendeeResponseStatus::TENTATIVE,
     ]);
@@ -125,6 +127,92 @@ it('shows all-day meetings without a clock range', function (): void {
         ->assertMountedActionModalSee('Offsite')
         ->assertMountedActionModalSee(__('filament/resources/meeting.time.all_day'))
         ->assertMountedActionModalDontSee('→');
+});
+
+it('shows the end date after a pipe when a timed meeting spans days', function (): void {
+    $starts = Date::parse('2026-09-10 05:45:00');
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Overnight sync',
+        'starts_at' => $starts,
+        'ends_at' => $starts->addDay(),
+        'all_day' => false,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Overnight sync')
+        ->assertMountedActionModalSee('Sep 10')
+        ->assertMountedActionModalSee('5:45 AM')
+        ->assertMountedActionModalSee('(1d)')
+        ->assertMountedActionModalSee('Sep 11')
+        ->assertMountedActionModalSee('→')
+        ->assertMountedActionModalDontSee('(24h)');
+});
+
+it('shows both dates for a multi-day all-day meeting', function (): void {
+    $starts = Date::parse('2026-09-10 00:00:00', 'UTC');
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Summit',
+        'starts_at' => $starts,
+        'ends_at' => Date::parse('2026-09-11 00:00:00', 'UTC'),
+        'all_day' => true,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Summit')
+        ->assertMountedActionModalSee('Sep 10')
+        ->assertMountedActionModalSee('Sep 11')
+        ->assertMountedActionModalSee('→')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.time.all_day'))
+        ->assertMountedActionModalDontSee('12:00 AM');
+});
+
+it('does not convert an all-day midnight into a clock time in Asia/Kathmandu', function (): void {
+    $this->user->forceFill(['timezone' => 'Asia/Kathmandu'])->save();
+    $starts = Date::parse('2026-09-10 00:00:00', 'UTC');
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Dashain holiday',
+        'starts_at' => $starts,
+        'ends_at' => $starts,
+        'all_day' => true,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Dashain holiday')
+        ->assertMountedActionModalSee('Sep 10')
+        ->assertMountedActionModalSee(__('filament/resources/meeting.time.all_day'))
+        ->assertMountedActionModalDontSee('5:45 AM')
+        ->assertMountedActionModalDontSee('12:00 AM')
+        ->assertMountedActionModalDontSee('→');
+});
+
+it('shows the timed meeting in the viewer timezone', function (): void {
+    $this->user->update(['timezone' => 'America/New_York']);
+    $starts = Date::parse('2026-09-30 05:30:00');
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'title' => 'Early standup',
+        'starts_at' => $starts,
+        'ends_at' => $starts->addHour(),
+        'all_day' => false,
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('Early standup')
+        ->assertMountedActionModalSee('1:30 AM')
+        ->assertMountedActionModalSee('2:30 AM')
+        ->assertMountedActionModalSee('(1h)')
+        ->assertMountedActionModalDontSee('5:30 AM');
 });
 
 it('hides the rsvp pill when response status is null', function (): void {

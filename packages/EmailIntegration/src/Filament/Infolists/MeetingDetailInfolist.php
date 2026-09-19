@@ -32,6 +32,7 @@ use Relaticle\EmailIntegration\Enums\MeetingLinkedRecordType;
 use Relaticle\EmailIntegration\Filament\Actions\MeetingRsvpActions;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingAttendeeEntry;
 use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingHeaderEntry;
+use Relaticle\EmailIntegration\Filament\Infolists\Entries\MeetingTimeEntry;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
@@ -42,6 +43,7 @@ final class MeetingDetailInfolist
     {
         return ViewAction::make()
             ->slideOver(false)
+            ->modalIcon(Heroicon::OutlinedCalendar)
             ->modalHeading(__('filament/resources/meeting.view.heading'))
             ->modalWidth(Width::FiveExtraLarge)
             ->modalCancelAction(false)
@@ -83,18 +85,11 @@ final class MeetingDetailInfolist
                         ->grow(),
                     $rsvpGroup,
                 ])->verticallyAlignCenter(),
-                TextEntry::make('time_row')
-                    ->hiddenLabel()
-                    ->icon(Heroicon::OutlinedClock)
-                    ->state(function (Meeting $record): string {
-                        if ($record->all_day) {
-                            return $record->starts_at->format('M j').' ('.__('filament/resources/meeting.time.all_day').')';
-                        }
-
-                        return $record->starts_at->format('M j').'  '.$record->starts_at->format('g:i A').' → '.$record->ends_at->format('g:i A').' ('.self::compactDuration($record).')';
-                    }),
+                MeetingTimeEntry::make('time_row')
+                    ->hiddenLabel(),
                 TextEntry::make('html_link')
                     ->hiddenLabel()
+                    ->wrap()
                     ->color('primary')
                     ->icon(Heroicon::OutlinedLink)
                     ->url(fn (Meeting $record): ?string => $record->html_link, shouldOpenInNewTab: true)
@@ -177,24 +172,6 @@ final class MeetingDetailInfolist
                     ->visible(fn (Meeting $record): bool => filled($record->description)),
             ];
         });
-    }
-
-    public static function compactDuration(Meeting $meeting): string
-    {
-        $minutes = (int) $meeting->starts_at->diffInMinutes($meeting->ends_at);
-
-        if ($minutes < 60) {
-            return $minutes.'m';
-        }
-
-        $hours = intdiv($minutes, 60);
-        $remainder = $minutes % 60;
-
-        if ($remainder === 0) {
-            return $hours.'h';
-        }
-
-        return $hours.'h '.$remainder.'m';
     }
 
     public static function linkedCount(Meeting $meeting): int
