@@ -13,12 +13,14 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailBatch;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class SendEmailBatchAction
 {
     public function __construct(
         private EmailTemplateRenderService $renderService,
         private SendEmailAction $sendEmail,
+        private PrivacyService $privacy,
     ) {}
 
     /**
@@ -39,11 +41,14 @@ final readonly class SendEmailBatchAction
      *     attachments?: array<int, string>,
      *     attachment_file_names?: array<string, string>,
      *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
+     *     privacy_tier?: EmailPrivacyTier,
      * }  $payload
      */
     public function execute(User $user, array $recipients, array $payload): EmailBatch
     {
         $accountId = $payload['connected_account_id'];
+        $privacyTier = $payload['privacy_tier']
+            ?? $this->privacy->defaultTierForUser($user, $user->currentWorkspace);
 
         // Authorize the sender owns the chosen account in the current team; the
         // per-recipient People records are this team's own selection from the
@@ -53,7 +58,7 @@ final readonly class SendEmailBatchAction
             ->whereKey($accountId)
             ->firstOrFail();
 
-        return DB::transaction(function () use ($user, $recipients, $payload, $accountId): EmailBatch {
+        return DB::transaction(function () use ($user, $recipients, $payload, $accountId, $privacyTier): EmailBatch {
             $batch = EmailBatch::query()->create([
                 'workspace_id' => $user->currentWorkspace?->getKey(),
                 'user_id' => $user->getKey(),
@@ -76,7 +81,7 @@ final readonly class SendEmailBatchAction
                         'bcc' => [],
                         'in_reply_to_email_id' => null,
                         'creation_source' => EmailCreationSource::MASS_SEND,
-                        'privacy_tier' => EmailPrivacyTier::FULL,
+                        'privacy_tier' => $privacyTier,
                         'batch_id' => $batch->getKey(),
                         'attachments' => $payload['attachments'] ?? [],
                         'attachment_file_names' => $payload['attachment_file_names'] ?? [],

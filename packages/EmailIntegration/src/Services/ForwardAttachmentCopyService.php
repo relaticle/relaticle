@@ -7,7 +7,10 @@ namespace Relaticle\EmailIntegration\Services;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -27,6 +30,77 @@ final readonly class ForwardAttachmentCopyService
      * Whole-message cap before base64 overhead pushes the outbound MIME past provider limits.
      */
     public const int MAX_ATTACHMENTS_TOTAL_BYTES = 15 * 1024 * 1024;
+
+    /**
+     * Graph JSON requests are capped at 4 MiB. File attachments sent as contentBytes
+     * must also stay under 3 MiB each; larger files need an upload session we do not use.
+     */
+    public const int GRAPH_MAX_JSON_BYTES = 4 * 1024 * 1024;
+
+    public const int GRAPH_JSON_RESERVE_BYTES = 256 * 1024;
+
+    public const int GRAPH_MAX_INLINE_FILE_BYTES = 3 * 1024 * 1024;
+
+    public static function base64EncodedSize(int $rawBytes): int
+    {
+        return intdiv($rawBytes + 2, 3) * 4;
+    }
+
+    /**
+     * @param  list<int>  $rawSizes
+     */
+    public function assertFitsProvider(EmailProvider $provider, array $rawSizes, int $bodyBytes = 0): void
+    {
+        $perFile = $this->maxFileBytes($provider);
+        $total = 0;
+
+        foreach ($rawSizes as $size) {
+            if ($size > $perFile || $total + $size > $this->maxTotalBytes($provider, $bodyBytes)) {
+                throw ValidationException::withMessages([
+                    'attachments' => __('filament/emails/composer.notifications.attachment_too_large_for_provider', [
+                        'max' => Number::fileSize($perFile),
+                        'total' => Number::fileSize($this->maxTotalBytes($provider, $bodyBytes)),
+                    ]),
+                ]);
+            }
+
+            $total += $size;
+        }
+
+        if ($provider !== EmailProvider::AZURE) {
+            return;
+        }
+
+        $encoded = array_sum(array_map(self::base64EncodedSize(...), $rawSizes));
+
+        if ($encoded + $bodyBytes > self::GRAPH_MAX_JSON_BYTES - self::GRAPH_JSON_RESERVE_BYTES) {
+            throw ValidationException::withMessages([
+                'attachments' => __('filament/emails/composer.notifications.attachment_too_large_for_provider', [
+                    'max' => Number::fileSize($perFile),
+                    'total' => Number::fileSize($this->maxTotalBytes($provider, $bodyBytes)),
+                ]),
+            ]);
+        }
+    }
+
+    public function maxFileBytes(EmailProvider $provider): int
+    {
+        return match ($provider) {
+            EmailProvider::AZURE => self::GRAPH_MAX_INLINE_FILE_BYTES,
+            EmailProvider::GMAIL => self::MAX_ATTACHMENT_BYTES,
+        };
+    }
+
+    public function maxTotalBytes(EmailProvider $provider, int $bodyBytes = 0): int
+    {
+        return match ($provider) {
+            EmailProvider::AZURE => max(
+                0,
+                intdiv((self::GRAPH_MAX_JSON_BYTES - self::GRAPH_JSON_RESERVE_BYTES - $bodyBytes) * 3, 4),
+            ),
+            EmailProvider::GMAIL => self::MAX_ATTACHMENTS_TOTAL_BYTES,
+        };
+    }
 
     /**
      * Non-inline files from the source email that fit the forward size limits.

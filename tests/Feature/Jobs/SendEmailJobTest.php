@@ -420,3 +420,109 @@ it('completes the batch when a job finds the email already cancelled', function 
         ->failed_count->toBe(0)
         ->status->toBe(EmailBatchStatus::Completed);
 });
+
+it('does not deliver the same email twice when a second attempt overlaps the first', function (): void {
+    $email = Email::factory()->outbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SENDING,
+        'sent_at' => null,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'rfc_message_id' => '<send-job-overlap@example.com>',
+        'provider_message_id' => null,
+        'thread_id' => null,
+        'attempts' => 0,
+    ]);
+
+    $email->body()->create(['body_text' => 'hi', 'body_html' => '<p>hi</p>']);
+
+    EmailParticipant::factory()->to()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'recipient@partner.com',
+    ]);
+
+    $mail = new class implements MailServiceInterface
+    {
+        public int $sendCount = 0;
+
+        public ?string $emailId = null;
+
+        public ?EmailSendingService $sendingService = null;
+
+        public ?LinkEmailAction $linkEmailAction = null;
+
+        public function fetchDelta(string $cursor): MailDeltaResult
+        {
+            throw new LogicException('unused');
+        }
+
+        public function fetchMessage(string $providerMessageId): FetchedEmailData
+        {
+            throw new LogicException('unused');
+        }
+
+        public function initialBackfill(?int $daysBack = null, ?string $pageToken = null): MailBackfillPage
+        {
+            throw new LogicException('unused');
+        }
+
+        public function sendMessage(array $data): array
+        {
+            $this->sendCount++;
+
+            $emailId = $this->emailId;
+            $sendingService = $this->sendingService;
+            $linkEmailAction = $this->linkEmailAction;
+
+            if ($emailId === null || $sendingService === null || $linkEmailAction === null) {
+                throw new LogicException('nested send is not arranged');
+            }
+
+            (new SendEmailJob($emailId))->handle($sendingService, $linkEmailAction);
+
+            return [
+                'provider_message_id' => 'sent-overlap-123',
+                'thread_id' => 'thread-overlap-123',
+                'rfc_message_id' => $data['rfc_message_id'] ?? '<derived-overlap@example.com>',
+            ];
+        }
+
+        public function findSentMessage(string $rfcMessageId): ?array
+        {
+            return null;
+        }
+
+        public function downloadAttachment(string $providerMessageId, string $providerAttachmentId): string
+        {
+            return '';
+        }
+    };
+
+    app()->bind(MailServiceFactoryInterface::class, fn (): MailServiceFactoryInterface => new class($mail) implements MailServiceFactoryInterface
+    {
+        public function __construct(private readonly MailServiceInterface $service) {}
+
+        public function make(ConnectedAccount $account): MailServiceInterface
+        {
+            return $this->service;
+        }
+    });
+
+    $mail->emailId = $email->getKey();
+    $mail->sendingService = app(EmailSendingService::class);
+    $mail->linkEmailAction = app(LinkEmailAction::class);
+
+    $job = new SendEmailJob($email->getKey());
+    $job->handle($mail->sendingService, $mail->linkEmailAction);
+
+    expect($mail->sendCount)->toBe(1)
+        ->and($email->fresh()->status)->toBe(EmailStatus::SENT)
+        ->and($email->fresh()->attempts)->toBe(1);
+
+    $job->handle($mail->sendingService, $mail->linkEmailAction);
+
+    expect($mail->sendCount)->toBe(1)
+        ->and($email->fresh()->attempts)->toBe(1);
+});

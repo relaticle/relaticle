@@ -16,6 +16,7 @@ final readonly class MicrosoftGraphClientFactory
         $this->refreshIfExpired($account);
 
         return Http::withToken((string) $account->access_token)
+            ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
             ->acceptJson()
             ->asJson()
             ->baseUrl('https://graph.microsoft.com/v1.0');

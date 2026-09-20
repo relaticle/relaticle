@@ -115,15 +115,12 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     public function fetchMessage(string $providerMessageId): FetchedEmailData
     {
-        $message = $this->clientFactory->make($this->account)
-            ->get("/me/messages/{$providerMessageId}", [
-                '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
-                // Pull attachment metadata (not bytes) alongside the message so has-attachment
-                // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
-                '$expand' => 'attachments($select=id,name,contentType,size,isInline,contentId),'.$this->reconciliationPropertiesExpand(),
-            ])
-            ->throw()
-            ->json();
+        $message = $this->getMessageJson($providerMessageId, [
+            '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
+            // Pull attachment metadata (not bytes) alongside the message so has-attachment
+            // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
+            '$expand' => 'attachments($select=id,name,contentType,size,isInline,contentId),'.$this->reconciliationPropertiesExpand(),
+        ]);
 
         $participants = [
             ...$this->mapAddresses('from', [$message['from']['emailAddress'] ?? null]),
@@ -157,6 +154,68 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
             reconciliationMessageId: $this->reconciliationMessageId($message),
         );
+    }
+
+    /**
+     * @param  array<string, string>  $query
+     * @return array<string, mixed>
+     */
+    private function getMessageJson(string $providerMessageId, array $query): array
+    {
+        $message = $this->withResolvedMessageId(
+            $providerMessageId,
+            fn (string $resolvedId): mixed => $this->clientFactory->make($this->account)
+                ->get('/me/messages/'.rawurlencode($resolvedId), $query)
+                ->throw()
+                ->json(),
+        );
+
+        throw_unless(is_array($message), RuntimeException::class, 'Microsoft Graph message payload was not an object.');
+
+        return $message;
+    }
+
+    /**
+     * @template TReturn
+     *
+     * @param  callable(string): TReturn  $callback
+     * @return TReturn
+     */
+    private function withResolvedMessageId(string $providerMessageId, callable $callback): mixed
+    {
+        try {
+            return $callback($providerMessageId);
+        } catch (RequestException $exception) {
+            throw_if($exception->response->status() !== 404, $exception);
+
+            $immutableId = $this->translateToImmutableId($providerMessageId);
+
+            throw_if($immutableId === null || $immutableId === $providerMessageId, $exception);
+
+            return $callback($immutableId);
+        }
+    }
+
+    private function translateToImmutableId(string $providerMessageId): ?string
+    {
+        $payload = $this->clientFactory->make($this->account)
+            ->post('/me/translateExchangeIds', [
+                'inputIds' => [$providerMessageId],
+                'sourceIdType' => 'restId',
+                'targetIdType' => 'restImmutableEntryId',
+            ]);
+
+        if (! $payload->successful()) {
+            return null;
+        }
+
+        $target = $payload->json('value.0.targetId');
+
+        if (! is_string($target) || $target === '') {
+            return null;
+        }
+
+        return $target;
     }
 
     private function reconciliationPropertiesExpand(): string
@@ -463,10 +522,15 @@ final class MicrosoftGraphMailService implements MailServiceInterface
 
     public function downloadAttachment(string $providerMessageId, string $providerAttachmentId): string
     {
-        $attachment = $this->clientFactory->make($this->account)
-            ->get("/me/messages/{$providerMessageId}/attachments/{$providerAttachmentId}")
-            ->throw()
-            ->json();
+        $attachment = $this->withResolvedMessageId(
+            $providerMessageId,
+            fn (string $resolvedId): mixed => $this->clientFactory->make($this->account)
+                ->get('/me/messages/'.rawurlencode($resolvedId).'/attachments/'.rawurlencode($providerAttachmentId))
+                ->throw()
+                ->json(),
+        );
+
+        throw_unless(is_array($attachment), RuntimeException::class, 'Attachment is not available for download.');
 
         // Only fileAttachment carries inline bytes; itemAttachment / referenceAttachment
         // have no contentBytes and cannot be streamed as a binary download.

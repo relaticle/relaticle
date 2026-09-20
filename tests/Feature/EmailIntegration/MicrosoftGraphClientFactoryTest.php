@@ -38,7 +38,29 @@ it('returns a pre-authorized PendingRequest with the access token', function ():
         ->make($account)
         ->get('https://graph.microsoft.com/v1.0/me');
 
-    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer still-valid-token'));
+    Http::assertSent(fn ($request) => $request->hasHeader('Authorization', 'Bearer still-valid-token')
+        && $request->hasHeader('Prefer', 'IdType="ImmutableId"'));
+});
+
+it('asks Graph for immutable message ids on every client request', function (): void {
+    Http::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $account = ConnectedAccount::factory()
+        ->azure()
+        ->for($user)
+        ->create([
+            'workspace_id' => $user->currentWorkspace->getKey(),
+            'access_token' => 'still-valid-token',
+            'refresh_token' => 'refresh-1',
+            'token_expires_at' => now()->addHour(),
+        ]);
+
+    resolve(MicrosoftGraphClientFactory::class)
+        ->make($account)
+        ->get('/me/messages/AAMkAGI1');
+
+    Http::assertSent(fn ($request) => $request->hasHeader('Prefer', 'IdType="ImmutableId"'));
 });
 
 it('refreshes and persists a new access token when expired', function (): void {

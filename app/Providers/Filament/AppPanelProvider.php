@@ -411,7 +411,7 @@ final class AppPanelProvider extends PanelProvider
                 ],
             );
 
-        if (Feature::active(EmailIntegration::class)) {
+        if (Feature::for(null)->active(EmailIntegration::class)) {
             $panel
                 ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
                 ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')

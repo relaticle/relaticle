@@ -8,12 +8,14 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -23,10 +25,11 @@ use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
+use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class, EmailAttachment::class);
+mutates(SendEmailAction::class, LinkEmailAction::class, EmailSendingService::class, ConnectedAccount::class, EmailInlineImageEmbedder::class, EmailAttachment::class, ForwardAttachmentCopyService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -659,4 +662,101 @@ it('does not follow path traversal in composer image data-id', function (): void
 
     expect($email->attachments)->toHaveCount(0)
         ->and(Storage::disk('local')->get('private.csv'))->toBe('secret,tenant,data');
+});
+
+it('rejects a Graph attachment that exceeds the inline JSON file cap', function (): void {
+    Storage::fake('local');
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->azure()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'outlook@example.com',
+        'display_name' => 'Outlook Sender',
+    ]));
+
+    $path = UploadedFile::fake()
+        ->createWithContent('huge.bin', str_repeat('a', (3 * 1024 * 1024) + 1))
+        ->store('email-attachments', 'local');
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $account->id,
+        'subject' => 'Too large for Graph',
+        'body_html' => '<p>See attached.</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$path],
+        'attachment_file_names' => [$path => 'huge.bin'],
+    ]))->toThrow(ValidationException::class);
+
+    expect(Email::query()->count())->toBe(0);
+});
+
+it('rejects Graph attachments whose combined encoded size exceeds the JSON request cap', function (): void {
+    Storage::fake('local');
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->azure()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'outlook@example.com',
+        'display_name' => 'Outlook Sender',
+    ]));
+
+    $first = UploadedFile::fake()
+        ->createWithContent('one.bin', str_repeat('a', 2_000_000))
+        ->store('email-attachments', 'local');
+    $second = UploadedFile::fake()
+        ->createWithContent('two.bin', str_repeat('b', 2_000_000))
+        ->store('email-attachments', 'local');
+
+    expect(fn () => app(SendEmailAction::class)->execute([
+        'connected_account_id' => $account->id,
+        'subject' => 'Too large together',
+        'body_html' => '<p>See attached.</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$first, $second],
+        'attachment_file_names' => [
+            $first => 'one.bin',
+            $second => 'two.bin',
+        ],
+    ]))->toThrow(ValidationException::class);
+
+    expect(Email::query()->count())->toBe(0);
+});
+
+it('still queues a Gmail attachment that would exceed Graph inline limits', function (): void {
+    Storage::fake('local');
+
+    $path = UploadedFile::fake()
+        ->createWithContent('report.bin', str_repeat('a', (3 * 1024 * 1024) + 1))
+        ->store('email-attachments', 'local');
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Gmail sized file',
+        'body_html' => '<p>See attached.</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'attachments' => [$path],
+        'attachment_file_names' => [$path => 'report.bin'],
+    ]);
+
+    expect($email->status)->toBe(EmailStatus::QUEUED)
+        ->and($email->has_attachments)->toBeTrue()
+        ->and($this->account->provider)->toBe(EmailProvider::GMAIL);
 });

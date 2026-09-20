@@ -27,12 +27,14 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
+use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use RuntimeException;
 
 final readonly class SendEmailAction
 {
     public function __construct(
         private EmailInlineImageEmbedder $inlineImageEmbedder,
+        private ForwardAttachmentCopyService $attachments,
     ) {}
 
     /**
@@ -97,6 +99,19 @@ final readonly class SendEmailAction
 
         $hasDownloadableAttachments = collect($attachmentPaths)
             ->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true);
+
+        $disk = Storage::disk(EmailAttachment::DISK);
+        $this->attachments->assertFitsProvider(
+            $account->provider,
+            array_values(array_filter(
+                array_map(
+                    fn (string $path): int => $disk->exists($path) ? $disk->size($path) : 0,
+                    $attachmentPaths,
+                ),
+                fn (int $size): bool => $size > 0,
+            )),
+            strlen((string) $data['body_html']),
+        );
 
         return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
             // Scope the reply lookup to the sender's team. in_reply_to_email_id arrives

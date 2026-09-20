@@ -239,7 +239,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('notifications:send-task-digest')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('notifications:send-setup-nudge')->hourly()->withoutOverlapping()->onOneServer();
 
-        if (Feature::active(EmailIntegration::class)) {
+        if (Feature::for(null)->active(EmailIntegration::class)) {
             $schedule->command('email:incremental-sync')
                 ->everyFiveMinutes()
                 ->name('email:incremental-sync')

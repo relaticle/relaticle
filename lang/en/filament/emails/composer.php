@@ -81,6 +81,7 @@ return [
             'title' => 'Some files were too large',
             'body' => 'Not attached: :files. Each file must be under :max, and all attachments together under :total.',
         ],
+        'attachment_too_large_for_provider' => 'Each file must be under :max, and all attachments together under :total after encoding.',
         'attachment_unavailable' => [
             'title' => 'Some attachments could not be included',
             'body' => 'Not attached: :files. Download them from the original email and add them here if you still need them.',

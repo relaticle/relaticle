@@ -797,3 +797,58 @@ it('stores Graph inline cid images so the reader can rewrite them', function ():
         ->toContain(route('email-attachments.inline', $attachment->getKey()))
         ->not->toContain('cid:logo@example.test');
 });
+
+it('fetches a stored rest id after a folder move by translating it to an immutable id', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/OLDREST*' => Http::response(['error' => ['code' => 'ErrorItemNotFound']], 404),
+        'https://graph.microsoft.com/v1.0/me/translateExchangeIds' => Http::response([
+            'value' => [[
+                'sourceId' => 'OLDREST',
+                'targetId' => 'IMMUTABLE1',
+                'targetIdType' => 'restImmutableEntryId',
+            ]],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/IMMUTABLE1*' => Http::response(graphMessagePayload([
+            'id' => 'IMMUTABLE1',
+            'parentFolderId' => 'inbox-folder-id',
+        ])),
+    ]);
+
+    $fetched = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('OLDREST');
+
+    expect($fetched->providerMessageId)->toBe('IMMUTABLE1');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'POST'
+        && str_contains((string) $r->url(), '/me/translateExchangeIds')
+        && $r['sourceIdType'] === 'restId'
+        && $r['targetIdType'] === 'restImmutableEntryId');
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains((string) $r->url(), '/me/messages/IMMUTABLE1'));
+});
+
+it('downloads an attachment after a folder move by translating a stored rest id', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://graph.microsoft.com/v1.0/me/messages/OLDREST*' => Http::response(['error' => ['code' => 'ErrorItemNotFound']], 404),
+        'https://graph.microsoft.com/v1.0/me/translateExchangeIds' => Http::response([
+            'value' => [[
+                'sourceId' => 'OLDREST',
+                'targetId' => 'IMMUTABLE1',
+                'targetIdType' => 'restImmutableEntryId',
+            ]],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/IMMUTABLE1*' => Http::response([
+            'id' => 'att-1',
+            'contentBytes' => base64_encode('file-bytes'),
+        ]),
+    ]);
+
+    $bytes = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->downloadAttachment('OLDREST', 'att-1');
+
+    expect($bytes)->toBe('file-bytes');
+
+    Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
+        && str_contains((string) $r->url(), '/me/messages/IMMUTABLE1/attachments/att-1'));
+});

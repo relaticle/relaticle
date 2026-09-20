@@ -625,6 +625,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'connected_account_id' => (string) $this->accountId,
                 'subject' => (string) $this->subject,
                 'body_html' => $bodyHtml,
+                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
                 'attachment_attributes' => $attachmentAttributes,

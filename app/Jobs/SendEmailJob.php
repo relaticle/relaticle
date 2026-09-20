@@ -6,6 +6,8 @@ namespace App\Jobs;
 
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
@@ -23,11 +25,45 @@ final class SendEmailJob implements ShouldQueue
 
     public int $backoff = 30;
 
+    public int $timeout = 120;
+
     public function __construct(
         public readonly string $emailId,
     ) {}
 
+    /**
+     * @return list<WithoutOverlapping>
+     */
+    public function middleware(): array
+    {
+        return [
+            new WithoutOverlapping($this->emailId)
+                ->releaseAfter($this->backoff)
+                ->expireAfter($this->timeout + 60),
+        ];
+    }
+
     public function handle(EmailSendingService $sendingService, LinkEmailAction $linkEmailAction): void
+    {
+        $lock = Cache::lock($this->deliveryLockKey(), $this->timeout + 60);
+
+        if (! $lock->get()) {
+            return;
+        }
+
+        try {
+            $this->deliver($sendingService, $linkEmailAction);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function deliveryLockKey(): string
+    {
+        return 'send-email:'.$this->emailId;
+    }
+
+    private function deliver(EmailSendingService $sendingService, LinkEmailAction $linkEmailAction): void
     {
         /** @var Email|null $email */
         $email = DB::transaction(function (): ?Email {

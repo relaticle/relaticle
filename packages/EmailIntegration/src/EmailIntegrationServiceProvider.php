@@ -62,7 +62,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        if (! Feature::active(EmailIntegration::class)) {
+        if (! Feature::for(null)->active(EmailIntegration::class)) {
             return;
         }
 
