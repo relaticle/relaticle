@@ -8,13 +8,16 @@ paths:
   - 'app/Http/Controllers/Media/**'
   - 'app/Observers/**'
   - 'app/Console/Commands/**'
+  - 'packages/EmailIntegration/src/Livewire/**'
+  - 'packages/EmailIntegration/src/Services/EmailTemplateRenderService.php'
 ---
 
 # File uploads
 
 Durable user files go through medialibrary with a named collection on the owning
-model (`App\Enums\MediaCollection`). Two exemptions: import CSVs under
-`storage/app/imports` (transient) and Jetstream profile photos (framework-owned).
+model (`App\Enums\MediaCollection`). Three exemptions: import CSVs under
+`storage/app/imports` (transient), Jetstream profile photos (framework-owned),
+and outbound email compose/template images on `EmailAttachment::DISK`.
 
 - `media.workspace_id` is a real column. Scope every media query on it, never on a
   `custom_properties` JSON path. There is deliberately no `media.custom_field_id`:
@@ -55,6 +58,8 @@ model (`App\Enums\MediaCollection`). Two exemptions: import CSVs under
   deletion sweeps it with everything else.
 - Do not add a `FileUpload::make(` or configure rich editor attachments with
   `fileAttachmentsDisk(` / `fileAttachmentsDirectory(` outside
-  `app/Filament/CustomFields/RichEditorFieldType.php` and
-  `app/Livewire/App/Profile/UpdateProfileInformation.php`.
+  `app/Filament/CustomFields/RichEditorFieldType.php`,
+  `app/Livewire/App/Profile/UpdateProfileInformation.php`,
+  `packages/EmailIntegration/src/Livewire/EmailComposer.php`, and
+  `packages/EmailIntegration/src/Services/EmailTemplateRenderService.php`.
   `tests/Arch/ConventionsTest.php` fails on it.

@@ -178,6 +178,10 @@ it('keeps reusable query predicates on their model as scopes', function (): void
 
     $allowed = [
         'Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery::apply',
+        'Relaticle\EmailIntegration\Services\PreferredEmailCopyService::restrictToPreferredCopies',
+        'Relaticle\EmailIntegration\Services\EmailSearchService::applyToQuery',
+        'Relaticle\EmailIntegration\Services\EmailSearchService::whereSubjectVisibleTo',
+        'Relaticle\EmailIntegration\Support\BlocklistDomainMatcher::constrainWhereExistsDomainMatch',
     ];
 
     $sources = ['App\\' => $root.'/app/'];
@@ -381,6 +385,8 @@ it('keeps new file uploads on medialibrary', function (): void {
     $allowed = [
         'app/Filament/CustomFields/RichEditorFieldType.php',
         'app/Livewire/App/Profile/UpdateProfileInformation.php',
+        'packages/EmailIntegration/src/Livewire/EmailComposer.php',
+        'packages/EmailIntegration/src/Services/EmailTemplateRenderService.php',
     ];
     $offenders = [];
 
