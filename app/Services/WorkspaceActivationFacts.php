@@ -84,17 +84,23 @@ final class WorkspaceActivationFacts
 
     public function sampleRecordCount(Workspace $workspace): int
     {
-        $total = 0;
+        return array_sum($this->sampleRecordCounts($workspace));
+    }
+
+    /** @return array<string, int> */
+    public function sampleRecordCounts(Workspace $workspace): array
+    {
+        $counts = [];
 
         foreach (self::ENTITY_TABLES as $table) {
-            $total += (int) DB::table($table)
+            $counts[$table] = DB::table($table)
                 ->where('workspace_id', $workspace->getKey())
                 ->where('creation_source', CreationSource::SYSTEM->value)
                 ->whereNull('deleted_at')
                 ->count();
         }
 
-        return $total;
+        return $counts;
     }
 
     public function forget(Workspace $workspace): void

@@ -242,6 +242,14 @@ it('tells the model to name sample data as sample data when the workspace state 
         ->toContain('must say plainly that these are seeded sample data');
 });
 
+it('removes all sample data in one approval but lets a partial removal use the creation source filter', function (): void {
+    $instructions = app(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('wants all the sample data gone, call RemoveSampleDataTool')
+        ->toContain('To remove only part of it ("just the sample contacts"), list those records with `creation_source: "system"`');
+});
+
 it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $workspace = $owner->currentWorkspace;

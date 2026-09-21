@@ -163,6 +163,21 @@ production: message ordering, approval races, duplicate proposals.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation
   to document.
+- Every tool registered on `CrmAssistant` needs a label in the `toolLabels` map
+  (`packages/Chat/resources/views/livewire/chat/chat-interface.blade.php`), or the
+  streaming shimmer falls back to "Running <tool name>…" and leaks the identifier.
+  `tests/Browser/Chat/LoadingShimmerTest.php` is the gate, and it lives in the
+  Browser suite, which `composer test:pest` EXCLUDES: run `php artisan test tests/Browser`
+  after registering a tool, or CI is the first thing that tells you.
+- A tool whose action works on the workspace rather than on records (`RemoveSampleDataTool`
+  is the precedent) does not fit the per-record proposal pipeline: `executeDelete()` resolves
+  models from `_record_ids`/`_model_class`. Such a tool carries neither marker, is branched
+  explicitly in `PendingActionService::executeDelete()`, and its action must be listed in
+  `ALLOWED_ACTION_CLASSES`. Re-check the actor's authority inside the action: `ProposalOwnership`
+  only proves the proposal belongs to the approver's workspace, not that they may run it.
+- Deleting a record never cascades to the records linked to it. An assistant that says it
+  does is wrong, and a removal that must span entities needs its own tool rather than one
+  entity's delete standing in for the rest.
 
 ## Chat tools + custom fields
 

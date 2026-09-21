@@ -336,6 +336,19 @@ describe('validation', function (): void {
     });
 });
 
+describe('creation source filtering', function (): void {
+    it('filters companies by creation source', function (): void {
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Sample Corp', 'creation_source' => CreationSource::SYSTEM]);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Real Corp', 'creation_source' => CreationSource::WEB]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, ['creation_source' => 'system'])
+            ->assertOk()
+            ->assertSee('Sample Corp')
+            ->assertDontSee('Real Corp');
+    });
+});
+
 describe('date filtering', function (): void {
     it('filters companies by created_after', function (): void {
         $old = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ancient Corp']);

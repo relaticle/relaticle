@@ -47,6 +47,7 @@ final readonly class ListOpportunities
                 CustomFieldFilter::allowedFilter('opportunity'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('opportunities.created_at', '<=', $value)),
+                AllowedFilter::exact('creation_source', 'opportunities.creation_source'),
                 AllowedFilter::callback('stale_days', function (Builder $query, string $value) use ($user): void {
                     $workspaceId = $user->currentWorkspace->getKey();
 

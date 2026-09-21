@@ -13,6 +13,7 @@ use App\Actions\CustomFields\UpdateCustomField;
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
 use App\Actions\Note\UpdateNote;
+use App\Actions\Onboarding\RemoveSampleData;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
 use App\Actions\Opportunity\UpdateOpportunity;
@@ -32,6 +33,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
@@ -83,6 +85,7 @@ final readonly class PendingActionService
         UpdateCustomField::class,
         AddCustomFieldOptions::class,
         CreateWorkspaceInvitation::class,
+        RemoveSampleData::class,
     ];
 
     /**
@@ -1058,6 +1061,10 @@ final readonly class PendingActionService
     {
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        if ($action instanceof RemoveSampleData) {
+            return $action->execute($user, Workspace::query()->findOrFail($pendingAction->workspace_id), allowEmptyWorkspace: true);
         }
 
         foreach ($this->resolveDeleteModels($pendingAction) as $model) {

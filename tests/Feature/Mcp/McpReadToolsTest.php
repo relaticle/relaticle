@@ -221,6 +221,7 @@ it('rejects malformed list tool inputs before building the database query', func
     'created after' => [ListCompaniesTool::class, ['created_after' => 'yesterday'], 'created after'],
     'created before' => [ListCompaniesTool::class, ['created_before' => '26-08-2026'], 'created before'],
     'date range' => [ListCompaniesTool::class, ['created_after' => '2026-08-27', 'created_before' => '2026-08-26'], 'created before'],
+    'creation source' => [ListCompaniesTool::class, ['creation_source' => 'sample'], 'creation source'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
     'filter operator object' => [ListCompaniesTool::class, ['filter' => ['industry' => 'software']], 'filter.industry'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],

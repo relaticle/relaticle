@@ -41,7 +41,7 @@ abstract class BaseWriteDeleteTool implements Tool
 
         return [
             'ids' => $schema->array()->items($schema->string())->required()
-                ->description("The {$label} IDs to delete. Pass one id to delete a single {$label}, or many to delete them all in one call."),
+                ->description("The {$label} IDs to delete. Pass one id to delete a single {$label}, or many to delete them all in one call. Deleting a {$label} never deletes the records linked to it."),
         ];
     }
 

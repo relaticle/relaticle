@@ -5,16 +5,21 @@ declare(strict_types=1);
 use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
+use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\BaseReadListTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\ListNotesTool;
+use Relaticle\Chat\Tools\Opportunity\ListOpportunitiesTool;
+use Relaticle\Chat\Tools\People\ListPeopleTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -472,4 +477,35 @@ it('clamps per_page at 25 even when a larger value is requested', function (): v
     $payload = json_decode(app(ListCompaniesTool::class)->handle(new Request(['per_page' => 50])), true);
 
     expect($payload['data'])->toHaveCount(25);
+});
+
+it('lists only the records of the requested creation source', function (string $modelClass, string $toolClass): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    $sample = $modelClass::factory()->for($workspace)->create(['creation_source' => CreationSource::SYSTEM]);
+    $modelClass::factory()->for($workspace)->create(['creation_source' => CreationSource::WEB]);
+
+    $rows = listToolRows(resolve($toolClass)->handle(new Request(['creation_source' => 'system'])));
+
+    expect(array_column($rows, 'id'))->toBe([$sample->getKey()]);
+})->with([
+    'companies' => [Company::class, ListCompaniesTool::class],
+    'people' => [People::class, ListPeopleTool::class],
+    'opportunities' => [Opportunity::class, ListOpportunitiesTool::class],
+    'tasks' => [Task::class, ListTasksTool::class],
+    'notes' => [Note::class, ListNotesTool::class],
+]);
+
+it('rejects an unknown creation source instead of returning an empty list', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    Company::factory()->for($user->currentWorkspace)->create();
+
+    $result = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['creation_source' => 'sample'])), true);
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('creation_source must be one of');
 });
