@@ -69,6 +69,7 @@ final readonly class StartMailboxHistoryImportAction
                 return;
             }
 
+            $account->update(['initial_calendar_sync_imported' => 0]);
             dispatch(new InitialCalendarSyncJob($account))->afterCommit();
         } finally {
             $lock->release();

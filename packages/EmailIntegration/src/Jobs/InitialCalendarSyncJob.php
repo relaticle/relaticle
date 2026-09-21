@@ -20,6 +20,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -69,6 +70,16 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         $eventsToStore = array_values($result->events);
 
         $reconcileAfter = $this->reconcileAfter;
+
+        if ($eventsToStore !== []) {
+            $batchId = $account->history_import_batch_id;
+
+            if (is_string($batchId) && $batchId !== '') {
+                $import->addCalendarDiscovered($batchId, count($eventsToStore));
+            }
+
+            MailboxSyncTracker::addCalendarRunTotal($account, count($eventsToStore));
+        }
 
         if ($eventsToStore === []) {
             self::continueOrFinish($account, $result->nextPageToken, $result->nextSyncToken, $reconcileAfter);

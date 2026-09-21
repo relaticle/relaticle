@@ -48,6 +48,28 @@ final readonly class MailboxSyncTracker
         Cache::put(self::calendarTotalKey($account), $total, now()->addMinutes(self::TTL_MINUTES));
     }
 
+    public static function addCalendarRunTotal(ConnectedAccount $account, int $count): void
+    {
+        if ($count <= 0) {
+            return;
+        }
+
+        $key = self::calendarTotalKey($account);
+
+        if (! Cache::has($key)) {
+            Cache::put($key, $count, now()->addMinutes(self::TTL_MINUTES));
+
+            return;
+        }
+
+        Cache::increment($key, $count);
+    }
+
+    public static function calendarRunTotal(ConnectedAccount $account): int
+    {
+        return max(0, (int) Cache::get(self::calendarTotalKey($account), 0));
+    }
+
     public static function bumpCalendarProcessed(ConnectedAccount $account): void
     {
         Cache::increment(self::calendarProcessedKey($account));
@@ -94,23 +116,32 @@ final readonly class MailboxSyncTracker
 
     public static function runProgressPercent(ConnectedAccount $account): int
     {
-        $percents = [];
+        $done = 0;
+        $total = 0;
 
         if (self::isEmailSyncing($account)) {
-            $percents[] = self::channelProgressPercent(
-                self::emailProcessedCount($account),
-                Cache::get(self::emailTotalKey($account)),
-            );
+            $emailTotal = Cache::get(self::emailTotalKey($account));
+
+            if (is_int($emailTotal) && $emailTotal > 0) {
+                $done += self::emailProcessedCount($account);
+                $total += $emailTotal;
+            }
         }
 
         if (self::isCalendarSyncing($account)) {
-            $percents[] = self::channelProgressPercent(
-                self::calendarProcessedCount($account),
-                Cache::get(self::calendarTotalKey($account)),
-            );
+            $calendarTotal = self::calendarRunTotal($account);
+
+            if ($calendarTotal > 0) {
+                $done += self::calendarProcessedCount($account);
+                $total += $calendarTotal;
+            }
         }
 
-        return $percents === [] ? 0 : max($percents);
+        if ($total <= 0) {
+            return 0;
+        }
+
+        return min(100, (int) round(($done / $total) * 100));
     }
 
     public static function isEmailSyncing(ConnectedAccount $account): bool
@@ -151,14 +182,5 @@ final readonly class MailboxSyncTracker
     private static function calendarGenerationKey(ConnectedAccount $account): string
     {
         return 'mailbox-sync:calendar:'.$account->getKey().':generation';
-    }
-
-    private static function channelProgressPercent(int $processed, mixed $total): int
-    {
-        if (! is_int($total) || $total <= 0) {
-            return 0;
-        }
-
-        return min(100, (int) round(($processed / $total) * 100));
     }
 }
