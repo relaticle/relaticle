@@ -34,7 +34,7 @@ it('stays in sync on the accounts page after history import store failures', fun
         ->type('[id="form.password"]', 'password')
         ->click('button[type="submit"]')
         ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email-settings/accounts")
+        ->navigate("/app/{$workspace->slug}/workspace/email")
         ->waitForText($account->email_address)
         ->assertSee(__('filament/pages/email-accounts.in_sync'))
         ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))

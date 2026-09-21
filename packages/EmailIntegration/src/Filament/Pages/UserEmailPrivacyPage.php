@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use Filament\Pages\Page;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 
 final class UserEmailPrivacyPage extends Page
 {
-    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
+    use HasEmailSettingsHeader;
+    use HasWorkspaceSettingsNavigation;
 
     protected string $view = 'email-integration::filament.pages.user-email-privacy';
 
-    protected static ?string $cluster = EmailSettings::class;
-
-    protected static ?string $slug = 'my-privacy';
+    protected static ?string $slug = 'workspace/email/my-privacy';
 
     protected static ?string $title = null;
 
@@ -28,7 +27,7 @@ final class UserEmailPrivacyPage extends Page
 
     /**
      * Blank so the stock full-width header is not rendered: the page view carries its
-     * own `<x-email-integration::cluster-header />` inside the content column.
+     * own `<x-email-integration::settings-header />` inside the content column.
      */
     protected ?string $heading = '';
 

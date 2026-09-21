@@ -17,7 +17,13 @@ use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
+use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
 /**
@@ -68,9 +74,17 @@ trait HasWorkspaceSettingsNavigation
             NavigationItem::make()
                 ->label(__('workspaces.tabs.email'))
                 ->icon(Heroicon::OutlinedEnvelope)
-                ->url(fn (): string => EmailPrivacySettingsPage::getUrl())
-                ->isActiveWhen($this->isCurrentPage(EmailPrivacySettingsPage::class))
-                ->visible(fn (): bool => EmailPrivacySettingsPage::canAccess()),
+                ->url(fn (): string => EmailAccountsPage::getUrl())
+                ->isActiveWhen($this->isCurrentPage(
+                    EmailAccountsPage::class,
+                    EmailAccountSettingsPage::class,
+                    ManageEmailTemplates::class,
+                    EmailPrivacySettingsPage::class,
+                    EmailSignaturesPage::class,
+                    UserEmailPrivacyPage::class,
+                    EmailAccessRequestsPage::class,
+                ))
+                ->visible(fn (): bool => EmailAccountsPage::canAccess()),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.import_history'))
@@ -101,11 +115,11 @@ trait HasWorkspaceSettingsNavigation
      * re-renders the strip inside a `livewire.update` request, where no page route
      * is current and every tab would come back unhighlighted.
      *
-     * @param  class-string  $page
+     * @param  class-string  ...$pages
      * @return Closure(): bool
      */
-    private function isCurrentPage(string $page): Closure
+    private function isCurrentPage(string ...$pages): Closure
     {
-        return fn (): bool => static::class === $page;
+        return fn (): bool => in_array(static::class, $pages, true);
     }
 }

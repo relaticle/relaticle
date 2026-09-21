@@ -96,8 +96,6 @@ use Livewire\Livewire;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Throwable;
 
 final class AppPanelProvider extends PanelProvider
@@ -414,8 +412,7 @@ final class AppPanelProvider extends PanelProvider
         if (Feature::for(null)->active(EmailIntegration::class)) {
             $panel
                 ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
-                ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages')
-                ->discoverClusters(in: base_path('packages/EmailIntegration/src/Filament/Clusters'), for: 'Relaticle\\EmailIntegration\\Filament\\Clusters');
+                ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages');
         }
 
         $panel
@@ -537,11 +534,6 @@ final class AppPanelProvider extends PanelProvider
             // workspace switcher, next to Workspace Settings (sort -2), instead
             // of stranding it below the workspace list.
             ->tenantMenuItems([
-                Action::make('email_settings')
-                    ->label(__('filament/panel.tenant_menu.email_settings'))
-                    ->icon(Heroicon::OutlinedEnvelope)
-                    ->visible(fn (): bool => EmailSettings::canAccess())
-                    ->url(fn (): string => EmailAccountsPage::getUrl()),
                 Action::make('billing')
                     ->label(__('billing.title'))
                     ->icon(Heroicon::OutlinedCreditCard)

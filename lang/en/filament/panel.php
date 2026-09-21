@@ -25,10 +25,6 @@ return [
         'tasks' => 'Tasks',
     ],
 
-    'tenant_menu' => [
-        'email_settings' => 'Email Settings',
-    ],
-
     'payload_too_large' => 'That change is too large to save. Shorten the content and try again.',
 
     'selects' => [

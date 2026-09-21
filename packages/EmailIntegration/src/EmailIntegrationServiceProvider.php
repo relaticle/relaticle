@@ -7,7 +7,6 @@ namespace Relaticle\EmailIntegration;
 use App\Features\EmailIntegration;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
@@ -78,11 +77,12 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
         // scheduled work lives there); do not re-register them here.
 
-        // The templates resource has no page view of its own, so its cluster header
-        // (see HasClusterBreadcrumbs) is rendered into the content column from here.
+        // The templates resource has no page view of its own, so its tabs and header
+        // (see HasEmailSettingsHeader) are rendered into the content column from here.
         FilamentView::registerRenderHook(
             PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
-            fn (): View => view('email-integration::components.cluster-header'),
+            fn (): string => view('email-integration::components.settings-tabs')->render()
+                .view('email-integration::components.settings-header')->render(),
             scopes: ManageEmailTemplates::class,
         );
 

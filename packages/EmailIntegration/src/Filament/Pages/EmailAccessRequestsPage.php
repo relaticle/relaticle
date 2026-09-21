@@ -4,21 +4,22 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 use Relaticle\EmailIntegration\Livewire\Concerns\InteractsWithEmailAccessRequests;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 
 final class EmailAccessRequestsPage extends Page implements HasTable
 {
-    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
+    use HasEmailSettingsHeader;
+    use HasWorkspaceSettingsNavigation;
     use InteractsWithEmailAccessRequests;
     use InteractsWithTable {
         InteractsWithEmailAccessRequests::table insteadof InteractsWithTable;
@@ -26,11 +27,11 @@ final class EmailAccessRequestsPage extends Page implements HasTable
 
     protected string $view = 'filament.pages.email-access-requests';
 
+    protected static ?string $slug = 'workspace/email/access-requests';
+
     protected static ?string $navigationLabel = null;
 
     protected static bool $shouldRegisterNavigation = false;
-
-    protected static ?string $cluster = EmailSettings::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
 

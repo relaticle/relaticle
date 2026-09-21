@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -11,7 +12,6 @@ use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\HtmlString;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -22,16 +22,13 @@ final class EmailAccountsPage extends Page
     use HasConnectedAccountActions;
     use HasConnectMailboxActions;
     use HasEmailFeatureFlag;
+    use HasWorkspaceSettingsNavigation;
 
     protected string $view = 'email-integration::filament.pages.email-accounts';
 
-    protected static ?string $cluster = EmailSettings::class;
+    protected static ?string $slug = 'workspace/email';
 
-    protected static ?string $slug = 'accounts';
-
-    protected static ?int $navigationSort = 1;
-
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-at-symbol';
+    protected static bool $shouldRegisterNavigation = false;
 
     public function getTitle(): string
     {
@@ -40,7 +37,7 @@ final class EmailAccountsPage extends Page
 
     /**
      * Heading and subheading are rendered inside the content column (see the page
-     * view) so they sit with the accounts panel under the cluster tabs. The page
+     * view) so they sit with the accounts panel under the workspace settings tabs. The page
      * header itself stays empty.
      */
     public function getHeading(): string
@@ -56,20 +53,6 @@ final class EmailAccountsPage extends Page
     public static function getNavigationLabel(): string
     {
         return __('filament/pages/email-accounts.navigation_label');
-    }
-
-    /**
-     * Keep the "Accounts" cluster item highlighted while a single account's
-     * settings page, a child of this one, is open.
-     *
-     * @return array<int, string>
-     */
-    public static function getNavigationItemActiveRoutePattern(): array
-    {
-        return [
-            self::getRouteName(),
-            EmailAccountSettingsPage::getRouteName(),
-        ];
     }
 
     /**

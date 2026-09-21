@@ -1,4 +1,6 @@
 <x-filament-panels::page>
+    <x-email-integration::settings-tabs />
+
     <div>
         <h2 class="text-2xl font-bold tracking-tight text-gray-950 dark:text-white">
             {{ __('filament/pages/email-accounts.title') }}

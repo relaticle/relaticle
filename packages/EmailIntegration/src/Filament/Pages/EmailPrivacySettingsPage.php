@@ -26,6 +26,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Laravel\Pennant\Feature;
+use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Actions\SaveTeamEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
@@ -73,7 +74,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     protected string $view = 'email-integration::filament.pages.workspace-email-settings';
 
-    protected static ?string $slug = 'workspace/email';
+    protected static ?string $slug = 'workspace/email/privacy';
 
     protected static ?string $title = null;
 
@@ -84,12 +85,12 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     public function getTitle(): string
     {
-        return __('teams.tabs.email');
+        return __('workspaces.tabs.email');
     }
 
     public static function getLabel(): string
     {
-        return __('teams.tabs.email');
+        return __('workspaces.tabs.email');
     }
 
     public string $default_email_sharing_tier = 'metadata_only';
@@ -98,6 +99,14 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     public bool $auto_create_companies = true;
 
+    /** @var array<string, Heroicon> */
+    public const array TABS = [
+        'visibility' => Heroicon::OutlinedNoSymbol,
+        'sharing' => Heroicon::OutlinedShieldCheck,
+        'record_creation' => Heroicon::OutlinedUserPlus,
+    ];
+
+    #[Url]
     public string $tab = 'visibility';
 
     public function mount(): void
@@ -110,11 +119,15 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
         $this->contact_creation_mode = ($team->contact_creation_mode ?? ContactCreationMode::Selective)->value;
         $this->auto_create_companies = $team->auto_create_companies;
+
+        if (! array_key_exists($this->tab, self::TABS)) {
+            $this->tab = 'visibility';
+        }
     }
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['visibility', 'sharing', 'record_creation'], true)) {
+        if (! array_key_exists($tab, self::TABS)) {
             return;
         }
 
