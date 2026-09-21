@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use App\Enums\CrmEntity;
+use App\Enums\OptionMatching;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
@@ -49,6 +50,7 @@ abstract class BaseCrmEntityRequest extends FormRequest
                 $this->authenticatedUser()->currentWorkspace->getKey(),
                 $this->entity()->value,
                 $customFields,
+                OptionMatching::Suggest,
             ),
         ]);
     }

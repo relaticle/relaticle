@@ -62,6 +62,7 @@ final class ImportExecutionFixture
     /**
      * @param  array<string, mixed>  $raw
      * @param  array{
+     *     validation?: string|null,
      *     corrections?: string|null,
      *     skipped?: string|null,
      *     match_action?: string|null,
@@ -71,7 +72,7 @@ final class ImportExecutionFixture
      * @return array{
      *     row_number: int,
      *     raw_data: string|false,
-     *     validation: null,
+     *     validation: string|null,
      *     corrections: string|null,
      *     skipped: string|null,
      *     match_action: string|null,

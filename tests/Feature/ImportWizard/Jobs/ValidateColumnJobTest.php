@@ -9,6 +9,9 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Prompts\ClassificationPrompt;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -18,10 +21,13 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\ChoiceSuggestions;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
+use Tests\Helpers\ClassificationFake;
+use Tests\Helpers\ImportExecutionFixture;
 
-mutates(ValidateColumnJob::class, ColumnValidator::class, EntityLinkValidator::class);
+mutates(ValidateColumnJob::class, ColumnValidator::class, EntityLinkValidator::class, ChoiceSuggestions::class, ImportStore::class);
 
 beforeEach(function (): void {
     Event::fake()->except([WorkspaceCreated::class]);
@@ -419,4 +425,165 @@ it('skips format validation for name matcher on entity link', function (): void 
     expect($row->hasValidationError('Company'))->toBeFalse()
         ->and($row->relationships)->not->toBeNull()
         ->and($row->relationships)->toHaveCount(1);
+});
+
+describe('choice suggestions', function (): void {
+    beforeEach(function (): void {
+        ImportExecutionFixture::customField($this, 'region', 'select', 'people', ['Europe', 'Asia']);
+        ImportExecutionFixture::customField($this, 'teams', 'multi-select', 'people', ['Sales', 'Support']);
+    });
+
+    it('stores a suggestion for an invalid single-choice value', function (): void {
+        ClassificationFake::choosing(['Europa' => 'Europe']);
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+            makeValidationRow(3, ['Name' => 'Jane', 'Region' => 'Asia']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe(['Europa' => 'Europe']);
+    });
+
+    it('suggests a corrected list when every invalid item of a multi-choice value matches', function (): void {
+        ClassificationFake::choosing(['Suport' => 'Support']);
+        $column = ColumnData::toField(source: 'Teams', target: 'custom_fields_teams');
+
+        createValidationStore($this, ['Name', 'Teams'], [
+            makeValidationRow(2, ['Name' => 'John', 'Teams' => 'Sales, Suport']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        expect($this->store->pendingSuggestionsFor('Teams'))->toBe(['Sales, Suport' => 'Sales, Support']);
+    });
+
+    it('stores no suggestion when the closest option is not confident', function (): void {
+        ClassificationFake::choosing(['Europa' => 'Europe'], confidence: 0.5);
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+    });
+
+    it('never classifies when matching is off', function (): void {
+        Classification::fake();
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+        Classification::assertNothingClassified();
+    });
+
+    it('completes and keeps validation errors when the classifier fails', function (): void {
+        ClassificationFake::failing();
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        $row = $this->store->query()->where('row_number', 2)->first();
+
+        expect($row->hasValidationError('Region'))->toBeTrue()
+            ->and($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+    });
+
+    it('clears stale suggestions when the source is remapped to a plain text field', function (): void {
+        ClassificationFake::choosing(['Europa' => 'Europe']);
+        $choiceColumn = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $choiceColumn]);
+
+        (new ValidateColumnJob($this->import->id, $choiceColumn))->handle();
+
+        expect($this->store->connection()->table('value_suggestions')->where('source', 'Region')->count())->toBe(1);
+
+        $textColumn = ColumnData::toField(source: 'Region', target: 'name');
+
+        (new ValidateColumnJob($this->import->id, $textColumn))->handle();
+
+        expect($this->store->connection()->table('value_suggestions')->where('source', 'Region')->count())->toBe(0);
+    });
+
+    it('clears stale suggestions when the source is remapped to an entity link', function (): void {
+        ClassificationFake::choosing(['Europa' => 'Europe']);
+        $choiceColumn = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $choiceColumn]);
+
+        (new ValidateColumnJob($this->import->id, $choiceColumn))->handle();
+
+        expect($this->store->connection()->table('value_suggestions')->where('source', 'Region')->count())->toBe(1);
+
+        $linkColumn = ColumnData::toEntityLink(source: 'Region', matcherKey: 'name', entityLinkKey: 'company');
+
+        (new ValidateColumnJob($this->import->id, $linkColumn))->handle();
+
+        expect($this->store->connection()->table('value_suggestions')->where('source', 'Region')->count())->toBe(0);
+    });
+
+    it('excludes a corrected value and a skipped value from pending suggestions', function (): void {
+        ClassificationFake::choosing(['Europa' => 'Europe', 'Asien' => 'Asia']);
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+            makeValidationRow(3, ['Name' => 'Jane', 'Region' => 'Asien']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe(['Asien' => 'Asia', 'Europa' => 'Europe']);
+
+        $this->store->connection()->statement(
+            "UPDATE import_rows SET corrections = json_set(COALESCE(corrections, '{}'), ?, ?) WHERE row_number = ?",
+            ['$.Region', 'Europe', 2],
+        );
+
+        $this->store->connection()->statement(
+            "UPDATE import_rows SET skipped = json_set(COALESCE(skipped, '{}'), ?, json('true')) WHERE row_number = ?",
+            ['$.Region', 3],
+        );
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+    });
+
+    it('does not save suggestions when its batch is cancelled during classification', function (): void {
+        $column = ColumnData::toField(source: 'Region', target: 'custom_fields_region');
+
+        createValidationStore($this, ['Name', 'Region'], [
+            makeValidationRow(2, ['Name' => 'John', 'Region' => 'Europa']),
+        ], [ColumnData::toField(source: 'Name', target: 'name'), $column]);
+
+        [$job, $batch] = (new ValidateColumnJob($this->import->id, $column))->withFakeBatch();
+
+        ClassificationFake::respondingWith(function (ClassificationPrompt $prompt) use ($batch): array {
+            $batch->cancel();
+
+            return ['value_0' => new ChoiceAnswer('o0', [], 0.97)];
+        });
+
+        $job->handle();
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+    });
 });

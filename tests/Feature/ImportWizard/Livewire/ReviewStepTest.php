@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Js;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -20,6 +21,8 @@ use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Livewire\Steps\ReviewStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\Validation\ValidationError;
+use Tests\Helpers\ImportExecutionFixture;
 
 mutates(ReviewStep::class);
 
@@ -343,4 +346,128 @@ it('dispatches new batches when mappings hash changes', function (): void {
     mountReviewStep($this);
 
     Bus::assertBatched(fn () => true);
+});
+
+describe('choice suggestions', function (): void {
+    beforeEach(function (): void {
+        ImportExecutionFixture::customField($this, 'region', 'select', 'people', ['Europe', 'Asia']);
+
+        $this->import->update([
+            'headers' => ['Name', 'Emails', 'Region'],
+            'column_mappings' => collect([
+                ColumnData::toField(source: 'Name', target: 'name'),
+                ColumnData::toField(source: 'Emails', target: 'custom_fields_emails'),
+                ColumnData::toField(source: 'Region', target: 'custom_fields_region'),
+            ])->map(fn (ColumnData $mapping): array => $mapping->toArray())->all(),
+        ]);
+
+        $invalid = json_encode(['Region' => ValidationError::message('Invalid choice. Must be one of: Europe, Asia')->toStorageFormat()]);
+
+        $this->store->query()->insert([
+            ImportExecutionFixture::row(4, ['Name' => 'Ann', 'Emails' => 'ann@test.com', 'Region' => 'Europa'], ['validation' => $invalid]),
+            ImportExecutionFixture::row(5, ['Name' => 'Bob', 'Emails' => 'bob@test.com', 'Region' => 'Asien'], ['validation' => $invalid]),
+        ]);
+
+        $this->store->saveSuggestions('Region', ['Europa' => 'Europe', 'Asien' => 'Asia']);
+    });
+
+    it('renders each pending suggestion and the accept-all action', function (): void {
+        mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->set('batchIds', [])
+            ->assertSee('Use "Europe"')
+            ->assertSee('Accept 2 suggestions');
+    });
+
+    it('accepts one suggestion as a correction', function (): void {
+        mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->call('acceptSuggestion', 'Europa');
+
+        $row = $this->store->query()->where('row_number', 4)->first();
+
+        expect($row->corrections->get('Region'))->toBe('Europe')
+            ->and($row->hasValidationError('Region'))->toBeFalse()
+            ->and($this->store->pendingSuggestionsFor('Region'))->toBe(['Asien' => 'Asia']);
+    });
+
+    it('accepts every pending suggestion in the column', function (): void {
+        mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->call('acceptAllSuggestions');
+
+        expect($this->store->query()->where('row_number', 4)->first()->corrections->get('Region'))->toBe('Europe')
+            ->and($this->store->query()->where('row_number', 5)->first()->corrections->get('Region'))->toBe('Asia')
+            ->and($this->store->pendingSuggestionsFor('Region'))->toBe([]);
+    });
+
+    it('never overwrites a manual correction when accepting all', function (): void {
+        mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->call('updateMappedValue', 'Europa', 'Asia')
+            ->call('acceptAllSuggestions');
+
+        expect($this->store->query()->where('row_number', 4)->first()->corrections->get('Region'))->toBe('Asia');
+    });
+
+    it('offers a suggestion again after its correction is undone', function (): void {
+        mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->call('acceptSuggestion', 'Europa')
+            ->call('undoCorrection', 'Europa');
+
+        expect($this->store->pendingSuggestionsFor('Region'))->toHaveKey('Europa');
+    });
+});
+
+describe('case-insensitive choice matching', function (): void {
+    it('does not list a case-different valid value as an invalid multi-choice option', function (): void {
+        ImportExecutionFixture::customField($this, 'stage', 'multi-select', 'people', ['Sales', 'Support']);
+
+        $this->import->update([
+            'headers' => ['Name', 'Emails', 'Stage'],
+            'column_mappings' => collect([
+                ColumnData::toField(source: 'Name', target: 'name'),
+                ColumnData::toField(source: 'Emails', target: 'custom_fields_emails'),
+                ColumnData::toField(source: 'Stage', target: 'custom_fields_stage'),
+            ])->map(fn (ColumnData $mapping): array => $mapping->toArray())->all(),
+        ]);
+
+        $this->store->query()->insert([
+            ImportExecutionFixture::row(4, ['Name' => 'Cara', 'Emails' => 'cara@test.com', 'Stage' => 'sales']),
+        ]);
+
+        $html = mountReviewStep($this)
+            ->call('selectColumn', 'Stage')
+            ->set('batchIds', [])
+            ->html();
+
+        expect($html)->toContain('selected: '.Js::from(['Sales']))
+            ->and($html)->not->toContain('selected: '.Js::from(['sales']));
+    });
+
+    it('selects the canonical option case for a case-different valid single-choice value', function (): void {
+        ImportExecutionFixture::customField($this, 'region', 'select', 'people', ['Europe', 'Asia']);
+
+        $this->import->update([
+            'headers' => ['Name', 'Emails', 'Region'],
+            'column_mappings' => collect([
+                ColumnData::toField(source: 'Name', target: 'name'),
+                ColumnData::toField(source: 'Emails', target: 'custom_fields_emails'),
+                ColumnData::toField(source: 'Region', target: 'custom_fields_region'),
+            ])->map(fn (ColumnData $mapping): array => $mapping->toArray())->all(),
+        ]);
+
+        $this->store->query()->insert([
+            ImportExecutionFixture::row(4, ['Name' => 'Cara', 'Emails' => 'cara@test.com', 'Region' => 'europe']),
+        ]);
+
+        $html = mountReviewStep($this)
+            ->call('selectColumn', 'Region')
+            ->set('batchIds', [])
+            ->html();
+
+        expect($html)->toContain('selected: '.Js::from('Europe'))
+            ->and($html)->not->toContain('selected: '.Js::from('europe'));
+    });
 });

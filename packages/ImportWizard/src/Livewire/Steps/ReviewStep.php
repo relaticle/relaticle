@@ -202,11 +202,39 @@ final class ReviewStep extends Component
     #[Computed]
     public function choiceOptions(): array
     {
-        if (! $this->selectedColumn->isMultiChoicePredefined()) {
+        if (! $this->selectedColumn->isMultiChoicePredefined() && ! $this->selectedColumn->isSingleChoicePredefined()) {
             return [];
         }
 
         return $this->selectedColumn->importField->options ?? [];
+    }
+
+    /** @return array<array-key, string> */
+    #[Computed]
+    public function suggestions(): array
+    {
+        return $this->store()->pendingSuggestionsFor($this->selectedColumn->source);
+    }
+
+    public function acceptSuggestion(string $rawValue): void
+    {
+        $suggestion = $this->suggestions()[$rawValue] ?? null;
+
+        if ($suggestion === null) {
+            return;
+        }
+
+        $this->updateMappedValue($rawValue, $suggestion);
+        unset($this->suggestions);
+    }
+
+    public function acceptAllSuggestions(): void
+    {
+        foreach ($this->suggestions() as $rawValue => $suggestion) {
+            $this->updateMappedValue((string) $rawValue, $suggestion);
+        }
+
+        unset($this->suggestions);
     }
 
     public function setFilter(string $filter): void

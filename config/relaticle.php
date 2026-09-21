@@ -55,6 +55,10 @@ return [
         ))),
     ],
 
+    'classification' => [
+        'min_confidence' => 0.8,
+    ],
+
     'features' => [
         'account_deletion' => (bool) env('RELATICLE_FEATURE_ACCOUNT_DELETION', false),
         'onboard_seed' => (bool) env('RELATICLE_FEATURE_ONBOARD_SEED', true),

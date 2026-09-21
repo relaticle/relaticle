@@ -16,6 +16,7 @@ use Relaticle\ImportWizard\Data\RelationshipMatch;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\ChoiceSuggestions;
 use Relaticle\ImportWizard\Support\EntityLinkValidator;
 use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 
@@ -46,6 +47,8 @@ final class ValidateColumnJob implements ShouldQueue
             return;
         }
 
+        $store->saveSuggestions($this->column->source, []);
+
         $connection = $store->connection();
         $jsonPath = '$.'.$this->column->source;
 
@@ -66,6 +69,14 @@ final class ValidateColumnJob implements ShouldQueue
         $results = $this->validateValues($import, $uniqueValues);
 
         $this->updateValidationErrors($connection, $jsonPath, $results);
+
+        $suggestions = resolve(ChoiceSuggestions::class)->forColumn($this->column, $results);
+
+        if ($this->batch()?->cancelled()) {
+            return;
+        }
+
+        $store->saveSuggestions($this->column->source, $suggestions);
     }
 
     private function validateEntityLink(Import $import, ImportStore $store, Connection $connection, string $jsonPath): void

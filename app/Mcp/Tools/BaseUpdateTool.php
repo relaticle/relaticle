@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\OptionMatching;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
@@ -84,7 +85,7 @@ abstract class BaseUpdateTool extends Tool
         $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
-            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields);
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields, OptionMatching::Suggest);
             $request->merge(['custom_fields' => $customFields]);
         }
 

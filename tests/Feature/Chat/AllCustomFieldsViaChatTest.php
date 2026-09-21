@@ -10,6 +10,7 @@ use App\Actions\Task\UpdateTask;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -30,6 +31,7 @@ use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
+use Tests\Helpers\ClassificationFake;
 
 mutates(CustomFieldInput::class);
 
@@ -318,3 +320,65 @@ it('resolves an option label identically whether filtering or writing', function
     'uppercased' => ['IN PROGRESS', true],
     'not an option' => ['Bananas', false],
 ]);
+
+it('applies the closest option for a near-miss label on a choice field', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
+    $doneId = CustomField::query()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail()
+        ->options->firstWhere('name', 'Done')->getKey();
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => 'Completed']);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(rawValueForCustomFieldsTest($task, 'status', 'string_value'))->toBe((string) $doneId);
+});
+
+it('returns a tool error when the closest option is not confident', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done'], confidence: 0.5);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
+
+    $response = runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => 'Completed']);
+
+    expect($response)->toContain('Completed')
+        ->and(PendingAction::query()->exists())->toBeFalse();
+});
+
+it('returns the same tool error when the classifier fails', function (): void {
+    ClassificationFake::failing();
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
+
+    $response = runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['status' => 'Completed']);
+
+    expect($response)->toContain('Completed')
+        ->and(PendingAction::query()->exists())->toBeFalse();
+});
+
+it('resolves every near-miss item of a multi-select value in one classification call', function (): void {
+    $field = CustomField::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'task',
+        'code' => 'markets',
+        'name' => 'Markets',
+        'type' => 'multi-select',
+        'sort_order' => 50,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $eu = CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'EU', 'sort_order' => 1]);
+    $us = CustomFieldOption::query()->create(['tenant_id' => $this->workspace->getKey(), 'custom_field_id' => $field->getKey(), 'name' => 'US', 'sort_order' => 2]);
+
+    ClassificationFake::choosing(['Europe' => 'EU', 'United States' => 'US']);
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'T']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['markets' => ['Europe', 'United States']]);
+    resolve(UpdateTask::class)->execute($this->user, $task, latestPendingForCustomFieldsTest()->action_data);
+
+    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($field))
+        ->toEqualCanonicalizing([(string) $eu->getKey(), (string) $us->getKey()])
+        ->and(ClassificationFake::calls())->toBe(1);
+});

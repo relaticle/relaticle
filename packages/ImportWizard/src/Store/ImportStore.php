@@ -8,6 +8,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Connectors\ConnectionFactory;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -145,6 +146,68 @@ final class ImportStore
     {
         $this->connection = null;
         File::deleteDirectory($this->path());
+    }
+
+    /**
+     * @param  array<array-key, string>  $suggestions
+     */
+    public function saveSuggestions(string $source, array $suggestions): void
+    {
+        $this->ensureSuggestionsTable();
+
+        $rows = collect($suggestions)
+            ->map(fn (string $suggestion, int|string $rawValue): array => [
+                'source' => $source,
+                'raw_value' => (string) $rawValue,
+                'suggestion' => $suggestion,
+            ])
+            ->values();
+
+        $this->connection()->transaction(function () use ($source, $rows): void {
+            $this->connection()->table('value_suggestions')->where('source', $source)->delete();
+
+            foreach ($rows->chunk(300) as $chunk) {
+                $this->connection()->table('value_suggestions')->insert($chunk->all());
+            }
+        });
+    }
+
+    /**
+     * @return array<array-key, string>
+     */
+    public function pendingSuggestionsFor(string $source): array
+    {
+        if (! $this->connection()->getSchemaBuilder()->hasTable('value_suggestions')) {
+            return [];
+        }
+
+        $jsonPath = '$.'.$source;
+
+        /** @var array<array-key, string> */
+        return $this->connection()->table('value_suggestions')
+            ->where('source', $source)
+            ->whereIn('raw_value', function (Builder $query) use ($jsonPath): void {
+                $query->selectRaw('DISTINCT json_extract(raw_data, ?)', [$jsonPath])
+                    ->from('import_rows')
+                    ->whereRaw('json_extract(validation, ?) IS NOT NULL', [$jsonPath])
+                    ->whereRaw('json_extract(corrections, ?) IS NULL', [$jsonPath])
+                    ->whereRaw('json_extract(skipped, ?) IS NULL', [$jsonPath]);
+            })
+            ->orderBy('raw_value')
+            ->pluck('suggestion', 'raw_value')
+            ->all();
+    }
+
+    private function ensureSuggestionsTable(): void
+    {
+        $this->connection()->statement('
+            CREATE TABLE IF NOT EXISTS value_suggestions (
+                source TEXT NOT NULL,
+                raw_value TEXT NOT NULL,
+                suggestion TEXT NOT NULL,
+                PRIMARY KEY (source, raw_value)
+            )
+        ');
     }
 
     private function createConnection(): Connection

@@ -48,6 +48,7 @@
         disabled: @js($disabled),
         searchable: @js($searchable),
         activeIndex: -1,
+        openedWith: null,
 
         init() {
             this.$watch('open', (isOpen) => {
@@ -141,6 +142,9 @@
 
         openPanel() {
             if (this.disabled || this.open) return;
+            this.openedWith = this.multiple
+                ? (Array.isArray(this.selected) ? [...this.selected] : [])
+                : this.selected;
             this.$refs.panel?.open?.(this.$refs.trigger);
             this.open = true;
         },
@@ -149,8 +153,21 @@
             if (!this.open) return;
             this.$refs.panel?.close?.();
             this.open = false;
-            // Dispatch change event when closing (useful for syncing multi-select on close)
-            this.$dispatch('change', this.selected);
+
+            if (this.selectionChanged(this.openedWith, this.selected)) {
+                this.$dispatch('change', this.selected);
+            }
+        },
+
+        selectionChanged(before, after) {
+            if (this.multiple) {
+                const a = (Array.isArray(before) ? before : []).map(String).sort();
+                const b = (Array.isArray(after) ? after : []).map(String).sort();
+
+                return a.length !== b.length || a.some((v, i) => v !== b[i]);
+            }
+
+            return !this.valuesEqual(before, after);
         },
 
         select(value) {
@@ -446,7 +463,8 @@
                     class="w-full h-8 pl-8 pr-2 text-xs bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
                     x-ref="searchInput"
                     x-model="search"
-                    x-on:input="onSearchInput()"
+                    x-on:input.stop="onSearchInput()"
+                    x-on:change.stop
                     x-on:keydown="onSearchKeydown($event)"
                 />
             </div>
