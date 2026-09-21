@@ -105,6 +105,12 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
         MailboxSyncTracker::setCalendarRunTotal($account, count($jobs));
 
+        $batchId = $account->history_import_batch_id;
+
+        if (is_string($batchId) && $batchId !== '') {
+            resolve(MailboxHistoryImportService::class)->addCalendarDiscovered($batchId, count($jobs));
+        }
+
         Bus::batch($jobs)
             ->name("Incremental calendar sync: {$account->email_address}")
             ->onQueue('emails-sync')

@@ -98,7 +98,7 @@ it('shows 0% until store jobs exist on the history import batch', function (): v
         ->assertSee('motion-safe:animate-spin', false);
 });
 
-it('keeps import progress at 100% while calendar history continues after email listing finishes', function (): void {
+it('keeps import progress below 100% while calendar history continues after email listing finishes', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentWorkspace);
@@ -123,6 +123,78 @@ it('keeps import progress at 100% while calendar history continues after email l
 
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.importing'))
-        ->assertSee('aria-valuenow="100"', false)
-        ->assertDontSee('aria-valuenow="0"', false);
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 50]))
+        ->assertSee('aria-valuenow="50"', false)
+        ->assertDontSee('aria-valuenow="100"', false);
+});
+
+it('combines email and calendar as equal halves of the history import percent', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => 'history-done',
+        'calendar_sync_cursor' => null,
+        'initial_calendar_sync_imported' => 25,
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    setHistoryImportBatchProgress($batchId, 100, 50);
+    DB::table('job_batches')->where('id', $batchId)->update([
+        'finished_at' => null,
+    ]);
+
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markCalendarImportPending($batchId);
+    $import->addCalendarDiscovered($batchId, 50);
+    MailboxSyncTracker::markCalendarStarted($account);
+    MailboxSyncTracker::setCalendarRunTotal($account, 50);
+
+    for ($i = 0; $i < 25; $i++) {
+        MailboxSyncTracker::bumpCalendarProcessed($account);
+    }
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.importing'))
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 50]))
+        ->assertSee('aria-valuenow="50"', false);
+});
+
+it('does not drop history import percent when more calendar events are discovered', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'sync_cursor' => 'history-done',
+        'calendar_sync_cursor' => null,
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    setHistoryImportBatchProgress($batchId, 100, 0);
+    DB::table('job_batches')->where('id', $batchId)->update([
+        'finished_at' => now()->getTimestamp(),
+    ]);
+
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markCalendarImportPending($batchId);
+    $import->addCalendarDiscovered($batchId, 40);
+    MailboxSyncTracker::markCalendarStarted($account);
+    MailboxSyncTracker::setCalendarRunTotal($account, 40);
+
+    for ($i = 0; $i < 40; $i++) {
+        MailboxSyncTracker::bumpCalendarProcessed($account);
+    }
+
+    expect($import->progressPercent($account->fresh()))->toBe(99);
+
+    $import->addCalendarDiscovered($batchId, 60);
+    MailboxSyncTracker::addCalendarRunTotal($account, 60);
+
+    expect($import->progressPercent($account->fresh()))->toBe(99);
 });

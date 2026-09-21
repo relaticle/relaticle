@@ -27,6 +27,10 @@ final readonly class MailboxHistoryImportService
 
     private const string CALENDAR_IMPORT_PENDING_PREFIX = 'email-integration:history-import-calendar-pending:';
 
+    private const string CALENDAR_DISCOVERED_PREFIX = 'email-integration:history-import-calendar-discovered:';
+
+    private const string PROGRESS_HIGH_WATER_PREFIX = 'email-integration:history-import-progress-high-water:';
+
     public function markAwaitingRetrySuccessNotice(string $batchId): void
     {
         Cache::put(self::AWAITING_RETRY_SUCCESS_NOTICE_PREFIX.$batchId, true, now()->addWeek());
@@ -118,16 +122,37 @@ final readonly class MailboxHistoryImportService
     public function markCalendarImportPending(string $batchId): void
     {
         Cache::put(self::CALENDAR_IMPORT_PENDING_PREFIX.$batchId, true, now()->addMonth());
+        Cache::forget(self::CALENDAR_DISCOVERED_PREFIX.$batchId);
+        Cache::forget(self::PROGRESS_HIGH_WATER_PREFIX.$batchId);
     }
 
     public function markCalendarImportFinished(string $batchId): void
     {
         Cache::forget(self::CALENDAR_IMPORT_PENDING_PREFIX.$batchId);
+        Cache::forget(self::CALENDAR_DISCOVERED_PREFIX.$batchId);
+        Cache::forget(self::PROGRESS_HIGH_WATER_PREFIX.$batchId);
     }
 
     public function isCalendarImportPending(string $batchId): bool
     {
         return Cache::has(self::CALENDAR_IMPORT_PENDING_PREFIX.$batchId);
+    }
+
+    public function addCalendarDiscovered(string $batchId, int $count): void
+    {
+        if ($count <= 0) {
+            return;
+        }
+
+        $key = self::CALENDAR_DISCOVERED_PREFIX.$batchId;
+        $current = max(0, (int) Cache::get($key, 0));
+
+        Cache::put($key, $current + $count, now()->addMonth());
+    }
+
+    public function calendarDiscoveredCount(string $batchId): int
+    {
+        return max(0, (int) Cache::get(self::CALENDAR_DISCOVERED_PREFIX.$batchId, 0));
     }
 
     public function touchCalendarImport(ConnectedAccount $account): void
@@ -140,7 +165,7 @@ final readonly class MailboxHistoryImportService
             return;
         }
 
-        $this->markCalendarImportPending($batchId);
+        Cache::put(self::CALENDAR_IMPORT_PENDING_PREFIX.$batchId, true, now()->addMonth());
     }
 
     public function completeCalendarImport(ConnectedAccount $account, bool $succeeded): void
@@ -289,25 +314,11 @@ final readonly class MailboxHistoryImportService
 
     public function progressPercent(ConnectedAccount $account): int
     {
-        $batch = $this->historyImportBatch($account);
-
-        if ($batch instanceof Batch) {
-            if ($batch->totalJobs === 0) {
-                return $account->sync_cursor !== null ? 100 : 0;
-            }
-
-            return $this->batchProgressPercent($batch, $account);
+        if ($this->shouldCombineCalendarProgress($account)) {
+            return $this->combinedProgressPercent($account);
         }
 
-        if ($account->sync_cursor !== null) {
-            return 100;
-        }
-
-        if (filled($account->history_import_batch_id)) {
-            return 0;
-        }
-
-        return $account->initialSyncProgressPercent();
+        return $this->emailProgressPercent($account);
     }
 
     /**
@@ -361,6 +372,125 @@ final readonly class MailboxHistoryImportService
         }
 
         return $percent;
+    }
+
+    /**
+     * @return int<0, 100>
+     */
+    private function emailProgressPercent(ConnectedAccount $account): int
+    {
+        $batch = $this->historyImportBatch($account);
+
+        if ($batch instanceof Batch) {
+            if ($batch->totalJobs === 0) {
+                return $account->sync_cursor !== null ? 100 : 0;
+            }
+
+            return $this->batchProgressPercent($batch, $account);
+        }
+
+        if ($account->sync_cursor !== null) {
+            return 100;
+        }
+
+        if (filled($account->history_import_batch_id)) {
+            return 0;
+        }
+
+        return $account->initialSyncProgressPercent();
+    }
+
+    private function shouldCombineCalendarProgress(ConnectedAccount $account): bool
+    {
+        if (! $account->hasCalendar()) {
+            return false;
+        }
+
+        $batchId = $account->history_import_batch_id;
+
+        return is_string($batchId) && $batchId !== '' && $this->isCalendarImportPending($batchId);
+    }
+
+    /**
+     * @return int<0, 100>
+     */
+    private function combinedProgressPercent(ConnectedAccount $account): int
+    {
+        [$emailDone, $emailTotal] = $this->emailProgressCounts($account);
+        $batchId = (string) $account->history_import_batch_id;
+        [$calendarDone, $calendarTotal] = $this->calendarProgressCounts($account, $batchId);
+
+        $emailFraction = $emailTotal > 0
+            ? min(1.0, $emailDone / max($emailTotal, $emailDone))
+            : ($account->sync_cursor !== null ? 1.0 : 0.0);
+
+        $calendarFraction = $calendarTotal > 0
+            ? min(1.0, $calendarDone / max($calendarTotal, $calendarDone))
+            : 0.0;
+
+        $percent = (int) round((($emailFraction + $calendarFraction) / 2) * 100);
+        $percent = max(0, min(100, $percent));
+
+        if ($this->isEmailListingInProgress($account) || $this->isCalendarImportPending($batchId)) {
+            $percent = min(99, $percent);
+        }
+
+        return $this->rememberProgressHighWater($batchId, $percent);
+    }
+
+    /**
+     * @return int<0, 100>
+     */
+    private function rememberProgressHighWater(string $batchId, int $percent): int
+    {
+        $key = self::PROGRESS_HIGH_WATER_PREFIX.$batchId;
+        $highWater = max($percent, (int) Cache::get($key, 0));
+
+        Cache::put($key, $highWater, now()->addMonth());
+
+        return max(0, min(100, $highWater));
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function emailProgressCounts(ConnectedAccount $account): array
+    {
+        $batch = $this->historyImportBatch($account);
+
+        if ($batch instanceof Batch && $batch->totalJobs > 0) {
+            return [
+                $this->batchSuccessfulJobCount($batch),
+                $batch->totalJobs,
+            ];
+        }
+
+        if (filled($account->history_import_batch_id)) {
+            return [0, 0];
+        }
+
+        $estimated = $account->initial_sync_estimated;
+        $imported = $account->initial_sync_imported;
+        $total = is_int($estimated) && $estimated > 0 ? $estimated : max(1, $imported);
+
+        return [$imported, $total];
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private function calendarProgressCounts(ConnectedAccount $account, string $batchId): array
+    {
+        $discovered = max(
+            $this->calendarDiscoveredCount($batchId),
+            MailboxSyncTracker::calendarRunTotal($account),
+        );
+
+        $done = MailboxSyncTracker::isCalendarSyncing($account)
+            ? MailboxSyncTracker::calendarProcessedCount($account)
+            : max(0, $account->initial_calendar_sync_imported);
+
+        return [$done, $discovered];
     }
 
     private function historyImportBatch(ConnectedAccount $account): ?Batch
