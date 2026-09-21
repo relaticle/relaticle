@@ -205,6 +205,22 @@ it('gives staff a secure host-only cookie and separate database storage', functi
         ->and(DB::table('sessions')->where('id', $staffCookie->getValue())->exists())->toBeFalse();
 });
 
+it('ends the staff session with the browser only when configured to', function (bool $expireOnClose): void {
+    config()->set([
+        'system-admin.session.expire_on_close' => $expireOnClose,
+        'system-admin.session.lifetime' => 480,
+    ]);
+    $this->freezeTime();
+    $cookies = [];
+    $response = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/passkeys/login/options')->assertOk();
+
+    expect($response->getCookie('__Host-'.config('system-admin.session.cookie'))->getExpiresTime())
+        ->toBe($expireOnClose ? 0 : now()->addMinutes(480)->getTimestamp());
+})->with([
+    'on browser close' => [true],
+    'after the idle lifetime' => [false],
+]);
+
 it('isolates staff sessions when the configured hostname contains uppercase letters', function (): void {
     config()->set('app.sysadmin_domain', 'Staff.Example.test');
     foreach (app('router')->getRoutes() as $route) {

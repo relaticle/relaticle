@@ -18,6 +18,6 @@ return [
         'http_only' => true,
         'same_site' => 'strict',
         'lifetime' => (int) env('SYSADMIN_SESSION_LIFETIME', 120),
-        'expire_on_close' => true,
+        'expire_on_close' => (bool) env('SYSADMIN_SESSION_EXPIRE_ON_CLOSE', true),
     ],
 ];
