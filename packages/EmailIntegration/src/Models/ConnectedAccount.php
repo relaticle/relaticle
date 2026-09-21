@@ -459,6 +459,8 @@ final class ConnectedAccount extends Model
     /**
      * Percent of the first mailbox import. Starts at 0 until the provider
      * gives a size estimate and imported rows start landing.
+     *
+     * @return int<0, 100>
      */
     public function initialSyncProgressPercent(): int
     {
