@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
@@ -36,6 +37,16 @@ beforeEach(function (): void {
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
 });
+
+it('opens the tab named in the url and falls back to visibility for an unknown tab', function (string $requested, string $expected): void {
+    Livewire::withQueryParams(['tab' => $requested])
+        ->test(EmailPrivacySettingsPage::class)
+        ->assertSet('tab', $expected);
+})->with([
+    'sharing' => ['sharing', 'sharing'],
+    'record creation' => ['record_creation', 'record_creation'],
+    'unknown' => ['outbox', 'visibility'],
+]);
 
 it('updates the team default_email_sharing_tier on save', function (): void {
     livewire(EmailPrivacySettingsPage::class)

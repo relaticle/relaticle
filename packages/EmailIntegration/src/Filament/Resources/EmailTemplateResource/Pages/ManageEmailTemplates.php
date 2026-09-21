@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Support\Enums\Size;
-use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 
 /**
@@ -16,17 +17,18 @@ use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
  */
 final class ManageEmailTemplates extends ManageRecords
 {
-    use HasClusterBreadcrumbs;
+    use HasEmailSettingsHeader;
+    use HasWorkspaceSettingsNavigation;
 
     protected static string $resource = EmailTemplateResource::class;
 
     /**
      * Blank so the stock full-width header is not rendered: the page view carries its
-     * own `<x-email-integration::cluster-header />` inside the content column.
+     * own `<x-email-integration::settings-header />` inside the content column.
      */
     protected ?string $heading = '';
 
-    public function shouldRenderClusterBreadcrumbs(): bool
+    public function shouldRenderSettingsBreadcrumbs(): bool
     {
         return false;
     }
@@ -34,7 +36,7 @@ final class ManageEmailTemplates extends ManageRecords
     /**
      * @return array<int, Action>
      */
-    public function clusterHeaderActions(): array
+    public function settingsHeaderActions(): array
     {
         return [$this->createEmailTemplateAction];
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Field;
@@ -41,7 +42,6 @@ use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -63,13 +63,11 @@ use Relaticle\EmailIntegration\Support\SharingTierChangeConfirmation;
  */
 final class EmailAccountSettingsPage extends Page implements HasSchemas
 {
-    use HasConnectedAccountActions, HasEmailFeatureFlag, InteractsWithSchemas;
+    use HasConnectedAccountActions, HasEmailFeatureFlag, HasWorkspaceSettingsNavigation, InteractsWithSchemas;
 
     protected string $view = 'email-integration::filament.pages.email-account-settings';
 
-    protected static ?string $cluster = EmailSettings::class;
-
-    protected static ?string $slug = 'accounts/{account}';
+    protected static ?string $slug = 'workspace/email/accounts/{account}';
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -125,8 +123,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     public function getBreadcrumbs(): array
     {
         return [
-            EmailSettings::getUrl() => (string) __('filament/clusters/email-settings.breadcrumb'),
-            EmailAccountsPage::getUrl() => (string) __('filament/pages/email-accounts.navigation_label'),
+            EmailAccountsPage::getUrl() => (string) __('workspaces.tabs.email'),
             $this->account()->email_address,
         ];
     }

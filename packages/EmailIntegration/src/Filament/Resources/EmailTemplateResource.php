@@ -22,7 +22,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Override;
 use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
@@ -32,17 +31,13 @@ final class EmailTemplateResource extends Resource
 {
     use HasEmailFeatureFlag;
 
-    protected static ?string $cluster = EmailSettings::class;
-
     protected static ?string $model = EmailTemplate::class;
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $slug = 'templates';
+    protected static ?string $slug = 'workspace/email/templates';
 
-    protected static ?int $navigationSort = 3;
-
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-duplicate';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function getNavigationLabel(): string
     {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use Filament\Actions\Action;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
@@ -17,9 +18,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
-use Relaticle\EmailIntegration\Filament\Clusters\EmailSettings;
-use Relaticle\EmailIntegration\Filament\Concerns\HasClusterBreadcrumbs;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
@@ -28,14 +28,13 @@ use Relaticle\EmailIntegration\Models\EmailSignature;
  */
 final class EmailSignaturesPage extends Page
 {
-    use HasClusterBreadcrumbs;
     use HasEmailFeatureFlag;
+    use HasEmailSettingsHeader;
+    use HasWorkspaceSettingsNavigation;
 
     protected string $view = 'email-integration::filament.pages.email-signatures';
 
-    protected static ?string $cluster = EmailSettings::class;
-
-    protected static ?string $slug = 'signatures';
+    protected static ?string $slug = 'workspace/email/signatures';
 
     protected static ?string $title = 'Signatures';
 
@@ -45,7 +44,7 @@ final class EmailSignaturesPage extends Page
 
     /**
      * Blank so the stock full-width header is not rendered: the page view carries its
-     * own `<x-email-integration::cluster-header />` inside the content column.
+     * own `<x-email-integration::settings-header />` inside the content column.
      */
     protected ?string $heading = '';
 
@@ -109,7 +108,7 @@ final class EmailSignaturesPage extends Page
     /**
      * @return array<int, Action>
      */
-    public function clusterHeaderActions(): array
+    public function settingsHeaderActions(): array
     {
         return [$this->createSignatureAction];
     }

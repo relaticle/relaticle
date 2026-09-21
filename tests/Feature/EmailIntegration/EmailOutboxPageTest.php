@@ -43,7 +43,7 @@ function makeOutboxEmail(User $user, ConnectedAccount $account, EmailStatus $sta
 }
 
 it('does not expose Outbox in workspace settings', function (): void {
-    $this->get("/app/{$this->workspace->slug}/email-settings/outbox")
+    $this->get("/app/{$this->workspace->slug}/workspace/email/outbox")
         ->assertNotFound();
 });
 

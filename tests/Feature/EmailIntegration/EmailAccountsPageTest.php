@@ -420,9 +420,9 @@ it('renders Connect Gmail and hides Connect Outlook for now', function (): void 
         ->assertActionHidden('connectAzure');
 });
 
-it('shows only accounts and templates in the email settings cluster', function (): void {
-    expect(EmailAccountsPage::shouldRegisterNavigation())->toBeTrue()
-        ->and(EmailTemplateResource::shouldRegisterNavigation())->toBeTrue()
+it('keeps email settings out of the sidebar and shows only accounts and templates as per-user tabs', function (): void {
+    expect(EmailAccountsPage::shouldRegisterNavigation())->toBeFalse()
+        ->and(EmailTemplateResource::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailSignaturesPage::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailAccessRequestsPage::shouldRegisterNavigation())->toBeFalse()
         ->and(UserEmailPrivacyPage::shouldRegisterNavigation())->toBeFalse();
