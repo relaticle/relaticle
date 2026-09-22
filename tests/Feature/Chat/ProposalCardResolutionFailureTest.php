@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Company\CreateCompany;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -254,4 +255,45 @@ it('never puts a database error message on the card or in the transcript', funct
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('leaves the winning approval untouched when a second tab approves the same proposal', function (): void {
+    Bus::fake();
+
+    $action = PendingAction::query()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Fabrikam Inc'],
+        'display_data' => ['title' => 'Create Company', 'summary' => 'Create company "Fabrikam Inc"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+    $winningResult = ['id' => '01ff0000000000000000000001', 'type' => 'company'];
+
+    $secondTab = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    $firstTabWins = true;
+    PendingAction::retrieved(function (PendingAction $loaded) use (&$firstTabWins, $action, $winningResult): void {
+        if (! $firstTabWins || $loaded->getKey() !== $action->getKey()) {
+            return;
+        }
+
+        $firstTabWins = false;
+        PendingAction::query()->whereKey($action->getKey())->update([
+            'status' => PendingActionStatus::Approved,
+            'resolved_at' => now(),
+            'result_data' => $winningResult,
+        ]);
+    });
+
+    $secondTab->call('createCurrent');
+
+    expect($firstTabWins)->toBeFalse()
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and($action->fresh()->result_data)->toBe($winningResult);
 });

@@ -41,8 +41,9 @@ production: message ordering, approval races, duplicate proposals.
   allowlist) or the prompt's related-records rule has nothing to call for it.
 - Replayed proposal tool results are NEVER rewritten: mutating an earlier
   message invalidates the Anthropic prompt-cache prefix from that turn on.
-  Decided status travels only in `<resolved_actions>`, auto-cancelled status in
-  `<superseded_proposals>`, both re-queried per turn. Never label a proposal by
+  Decided status travels in `<resolved_actions>`, re-queried per turn, and in the
+  resume opener row the decision appends (`ResolvedActionText` owns both texts);
+  auto-cancelled status in `<superseded_proposals>`. Never label a proposal by
   its card heading.
 - A field reachable in the Filament form must be settable from chat; the
   assistant answering "that field isn't supported" is a bug, not a limitation

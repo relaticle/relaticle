@@ -132,6 +132,14 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         return this.messages.findLast((m) => m.role === 'assistant') ?? null;
     },
 
+    // Keyed on live bubbles, not on the last row: a resumed turn has no user
+    // bubble, so its last row is the assistant's own proposal reply.
+    showThinkingIndicator() {
+        if (!this.isStreaming || this.currentToolStatus) return false;
+
+        return !this.messages.some((m) => m.role === 'assistant' && !m.rendered && m.content);
+    },
+
     // Resolve which bubble a stream event belongs to.
     //  - exact invocation match anywhere -> that bubble (trailing deltas of a
     //    still-open turn keep landing in THEIR bubble even after a continuation
