@@ -20,8 +20,9 @@ use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Relaticle\EmailIntegration\Actions\DeleteTeamEmailVisibilityEntryAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityEntryAction;
-use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
+use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityEntrySubdomainsAction;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -46,11 +47,12 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             ->whereKey($entryId)
             ->firstOrFail();
 
-        if ($entry->type !== EmailBlocklistType::DOMAIN) {
-            return;
-        }
-
-        $entry->update(['include_subdomains' => $include]);
+        resolve(UpdateTeamEmailVisibilityEntrySubdomainsAction::class)->execute(
+            $this->currentWorkspace(),
+            $this->authUser(),
+            $entry,
+            $include,
+        );
 
         Notification::make()
             ->success()
@@ -88,11 +90,16 @@ final class EmailVisibilityTable extends Component implements HasActions, HasSch
             ->iconButton()
             ->requiresConfirmation()
             ->action(function (array $arguments): void {
-                TeamEmailBlocklist::query()
+                $entry = TeamEmailBlocklist::query()
                     ->where('workspace_id', $this->currentWorkspace()->getKey())
                     ->whereKey((string) $arguments['entry_id'])
-                    ->firstOrFail()
-                    ->delete();
+                    ->firstOrFail();
+
+                resolve(DeleteTeamEmailVisibilityEntryAction::class)->execute(
+                    $this->currentWorkspace(),
+                    $this->authUser(),
+                    $entry,
+                );
 
                 Notification::make()
                     ->success()

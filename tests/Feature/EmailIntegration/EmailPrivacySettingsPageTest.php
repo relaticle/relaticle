@@ -277,6 +277,30 @@ it('deletes a custom visibility entry from the table', function (): void {
     expect(TeamEmailBlocklist::query()->whereKey($entry->id)->exists())->toBeFalse();
 });
 
+it('forbids a non-admin member from deleting or editing a visibility entry', function (): void {
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->actingAs($member);
+    Filament::setTenant($this->workspace);
+
+    $entry = TeamEmailBlocklist::factory()->protected()->domain('acme.com')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->user->id,
+        'include_subdomains' => false,
+    ]);
+
+    livewire(EmailVisibilityTable::class)
+        ->call('setVisibilityIncludeSubdomains', (string) $entry->id, true)
+        ->assertForbidden();
+
+    livewire(EmailVisibilityTable::class)
+        ->callAction(TestAction::make('deleteVisibilityEntry')->arguments(['entry_id' => $entry->id]))
+        ->assertForbidden();
+
+    expect($entry->fresh())->not->toBeNull()
+        ->and($entry->fresh()->include_subdomains)->toBeFalse();
+});
+
 it('updates enforcement level for a custom visibility entry', function (): void {
     $entry = TeamEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
         'workspace_id' => $this->workspace->id,
