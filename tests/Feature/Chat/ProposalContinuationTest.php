@@ -159,6 +159,17 @@ it('opens the resumed turn with every decision of the turn, skipped records incl
     );
 });
 
+it('falls back to a plain opener when the resumed turn has no decided proposals', function (): void {
+    Queue::fake();
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, (string) Str::ulid());
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => $job->message === 'The user decided the proposals above.',
+    );
+});
+
 it('names an approved delete in the resumed turn by label, without the ids it removed', function (): void {
     Queue::fake();
 
