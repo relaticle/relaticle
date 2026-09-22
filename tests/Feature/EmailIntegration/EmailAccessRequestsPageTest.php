@@ -347,6 +347,29 @@ describe('getNavigationBadge', function (): void {
 
         expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();
     });
+
+    it('does not count pending requests raised in another workspace', function (): void {
+        $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+        $otherWorkspace->users()->attach($this->user, ['role' => 'editor']);
+        $requester = User::factory()->create(['current_workspace_id' => $otherWorkspace->id]);
+        $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $otherWorkspace->id,
+            'user_id' => $this->user->id,
+        ]));
+        $otherEmail = Email::factory()->private()->create([
+            'workspace_id' => $otherWorkspace->id,
+            'user_id' => $this->user->id,
+            'connected_account_id' => $otherAccount->getKey(),
+        ]);
+
+        EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $otherEmail->getKey(),
+        ]);
+
+        expect(EmailAccessRequestsPage::getNavigationBadge())->toBeNull();
+    });
 });
 
 describe('subject privacy', function (): void {

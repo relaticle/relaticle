@@ -9,7 +9,6 @@ use App\Models\User;
 use Filament\Pages\Page;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 use Relaticle\EmailIntegration\Livewire\Concerns\InteractsWithEmailAccessRequests;
@@ -58,10 +57,7 @@ final class EmailAccessRequestsPage extends Page implements HasTable
             return null;
         }
 
-        $count = EmailAccessRequest::query()
-            ->where('owner_id', $user->getKey())
-            ->where('status', EmailAccessRequestStatus::PENDING)
-            ->count();
+        $count = EmailAccessRequest::query()->pendingIncomingFor($user)->count();
 
         return $count > 0 ? (string) $count : null;
     }

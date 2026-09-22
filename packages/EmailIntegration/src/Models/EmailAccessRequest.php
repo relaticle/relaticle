@@ -6,6 +6,8 @@ namespace Relaticle\EmailIntegration\Models;
 
 use App\Models\User;
 use Database\Factories\EmailAccessRequestFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +45,19 @@ final class EmailAccessRequest extends Model
         return [
             'status' => EmailAccessRequestStatus::class,
         ];
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function pendingIncomingFor(Builder $query, User $owner): Builder
+    {
+        return $query
+            ->where('owner_id', $owner->getKey())
+            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->whereHas('email', fn (Builder $email): Builder => $email->where('workspace_id', $owner->current_workspace_id));
     }
 
     /**

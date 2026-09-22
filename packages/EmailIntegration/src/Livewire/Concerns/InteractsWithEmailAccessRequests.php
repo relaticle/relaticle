@@ -81,11 +81,7 @@ trait InteractsWithEmailAccessRequests
     #[Computed]
     public function pendingIncomingCount(): int
     {
-        return EmailAccessRequest::query()
-            ->where('owner_id', $this->authUser()->getKey())
-            ->whereHas('email', fn (Builder $query): Builder => $query->where('workspace_id', $this->authUser()->current_workspace_id))
-            ->where('status', EmailAccessRequestStatus::PENDING)
-            ->count();
+        return EmailAccessRequest::query()->pendingIncomingFor($this->authUser())->count();
     }
 
     /** @return Builder<EmailAccessRequest> */
