@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Enums\MediaCollection;
+use App\Models\ActivityLog\Activity;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
@@ -143,6 +144,31 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->morphToMany(Task::class, 'taskable');
     }
 
+    /**
+     * Keeps the owner's name in the log rather than their id, so every activity
+     * surface reads a person and a deleted user's name survives in history.
+     */
+    public function beforeActivityLogged(Activity $activity, string $eventName): void
+    {
+        $changes = $activity->attribute_changes?->toArray() ?? [];
+
+        foreach (['attributes', 'old'] as $side) {
+            if (! is_array($changes[$side] ?? null) || ! array_key_exists('account_owner_id', $changes[$side])) {
+                continue;
+            }
+
+            $ownerId = $changes[$side]['account_owner_id'];
+            unset($changes[$side]['account_owner_id']);
+            $changes[$side]['account_owner'] = is_string($ownerId) ? User::query()->whereKey($ownerId)->value('name') : null;
+        }
+
+        if (($changes['attributes']['account_owner'] ?? null) === null && ($changes['old']['account_owner'] ?? null) === null) {
+            unset($changes['attributes']['account_owner'], $changes['old']['account_owner']);
+        }
+
+        $activity->attribute_changes = collect($changes);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -151,7 +177,7 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
             ->dontLogEmptyChanges()
             ->logExcept([
                 'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
-                'created_at', 'updated_at', 'deleted_at', 'account_owner_id',
+                'created_at', 'updated_at', 'deleted_at',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

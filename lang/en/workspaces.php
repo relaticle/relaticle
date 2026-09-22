@@ -188,6 +188,8 @@ return [
             'opportunity' => 'Opportunity',
             'task' => 'Task',
             'note' => 'Note',
+            'custom_field' => 'Custom field',
+            'custom_field_option' => 'Custom field option',
         ],
         'empty' => [
             'heading' => 'No activity yet',

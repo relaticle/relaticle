@@ -203,7 +203,7 @@ it('collapses one save\'s native and custom-field rows into a single entry', fun
 
     $payload = activityPayload();
 
-    expect(Activity::withoutGlobalScopes()->count())->toBe(3)
+    expect(Activity::withoutGlobalScopes()->where('subject_type', 'company')->count())->toBe(3)
         ->and($payload['data'])->toHaveCount(2)
         ->and($payload['data'][0]['event'])->toBe('updated')
         ->and($payload['data'][0]['changes'])->toBe([
