@@ -12,6 +12,15 @@ final readonly class EmailTemplatePolicy
 {
     use HandlesAuthorization;
 
+    public function before(User $user, string $ability, mixed $template = null): ?bool
+    {
+        if (! $template instanceof EmailTemplate) {
+            return null;
+        }
+
+        return $user->belongsToWorkspaceId($template->workspace_id) ? null : false;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->hasVerifiedEmail() && $user->currentWorkspace !== null;
@@ -19,8 +28,7 @@ final readonly class EmailTemplatePolicy
 
     public function view(User $user, EmailTemplate $template): bool
     {
-        return $user->belongsToWorkspaceId($template->workspace_id)
-            && ($template->is_shared || $template->created_by === $user->getKey());
+        return $template->is_shared || $template->created_by === $user->getKey();
     }
 
     public function create(User $user): bool

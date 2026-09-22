@@ -55,3 +55,23 @@ it('bulk delete preserves a shared template created by another user', function (
     expect(EmailTemplate::whereKey($mine->getKey())->exists())->toBeFalse()
         ->and(EmailTemplate::whereKey($theirShared->getKey())->exists())->toBeTrue();
 });
+
+it('denies template writes to a creator who no longer belongs to the workspace', function (): void {
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $otherWorkspace->users()->attach($this->user, ['role' => 'editor']);
+
+    $template = EmailTemplate::factory()->create([
+        'workspace_id' => $otherWorkspace->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    expect($this->user->can('update', $template))->toBeTrue();
+
+    $otherWorkspace->users()->detach($this->user);
+    $this->user->unsetRelation('workspaces');
+
+    expect($this->user->can('update', $template))->toBeFalse()
+        ->and($this->user->can('delete', $template))->toBeFalse()
+        ->and($this->user->can('forceDelete', $template))->toBeFalse()
+        ->and($this->user->can('restore', $template))->toBeFalse();
+});
