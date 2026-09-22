@@ -24,4 +24,10 @@ enum WorkspaceCapability: string
     {
         return __("workspaces.capabilities.{$this->value}.label");
     }
+
+    /** @return array<int, self> */
+    public static function forOwner(): array
+    {
+        return self::cases();
+    }
 }

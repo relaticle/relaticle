@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Workspace\CreateWorkspaceInvitation;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Mail\WorkspaceInvitationMail;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
-use App\Support\Workspaces\RoleOptions;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
@@ -405,22 +405,53 @@ test('shows a hint for every role option in the invite modal', function (): void
         });
 });
 
-test('the compare-roles modal renders every cell of the capability map, not a hand-written copy', function (): void {
+test('shows a hint for every role option in the invite-link default role picker', function (): void {
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('manageInviteLink')
+        ->assertSchemaComponentExists('invite_link_default_role', checkComponentUsing: function (Radio $component): bool {
+            $options = $component->getOptions();
+            $descriptions = $component->getDescriptions();
+
+            return array_keys($options) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]
+                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
+                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
+        });
+});
+
+test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabilities() says, not a hand-written copy', function (): void {
     $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction(['invitePeople', 'compareRoles']);
 
     $content = (string) $component->instance()->getMountedAction()->getModalContent();
 
-    foreach (RoleOptions::matrix() as $capability => $roles) {
-        foreach ($roles as $role => $granted) {
-            $marker = sprintf(
-                'data-capability="%s" data-role="%s" data-granted="%s"',
-                $capability,
-                $role,
-                $granted ? '1' : '0',
+    $roleCapabilities = [
+        'owner' => WorkspaceCapability::forOwner(),
+        WorkspaceRole::Admin->value => WorkspaceRole::Admin->capabilities(),
+        WorkspaceRole::Member->value => WorkspaceRole::Member->capabilities(),
+        WorkspaceRole::Viewer->value => WorkspaceRole::Viewer->capabilities(),
+    ];
+
+    foreach (WorkspaceCapability::cases() as $capability) {
+        foreach ($roleCapabilities as $roleKey => $capabilities) {
+            $cellPattern = sprintf(
+                '/data-capability="%s" data-role="%s">(.*?)<\/td>/s',
+                preg_quote($capability->value, '/'),
+                preg_quote($roleKey, '/'),
             );
 
-            expect($content)->toContain($marker);
+            expect(preg_match($cellPattern, $content, $cellMatch))->toBe(1);
+
+            $granted = in_array($capability, $capabilities, true);
+            $expectedText = $granted
+                ? __('workspaces.role_matrix.granted')
+                : __('workspaces.role_matrix.not_granted');
+            $otherText = $granted
+                ? __('workspaces.role_matrix.not_granted')
+                : __('workspaces.role_matrix.granted');
+
+            expect($cellMatch[1])
+                ->toContain($expectedText)
+                ->not->toContain($otherText);
         }
     }
 });

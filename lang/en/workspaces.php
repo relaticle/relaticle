@@ -207,7 +207,6 @@ return [
     'roles' => [
         'owner' => [
             'label' => 'Owner',
-            'description' => 'Full control, including billing and deleting the workspace',
         ],
         'admin' => [
             'label' => 'Admin',
@@ -254,6 +253,7 @@ return [
     ],
 
     'role_matrix' => [
+        'capability_column' => 'Capability',
         'granted' => 'Included',
         'not_granted' => 'Not included',
     ],

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use Laravel\Jetstream\Jetstream;
-
 enum WorkspaceRole: string
 {
     case Admin = 'admin';
@@ -17,20 +15,14 @@ enum WorkspaceRole: string
         return __("workspaces.roles.{$this->value}.label");
     }
 
+    public function description(): string
+    {
+        return __("workspaces.roles.{$this->value}.description");
+    }
+
     public static function keyIsAdmin(?string $key): bool
     {
         return self::tryFrom((string) $key) === self::Admin;
-    }
-
-    public static function description(string $role): ?string
-    {
-        $registeredRole = Jetstream::findRole($role);
-
-        if ($registeredRole === null) {
-            return null;
-        }
-
-        return $registeredRole->description;
     }
 
     /** @return array<int, WorkspaceCapability> */

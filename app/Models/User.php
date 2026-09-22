@@ -362,7 +362,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         }
 
         if ($this->isWorkspaceOwner($workspaceId)) {
-            return WorkspaceCapability::cases();
+            return WorkspaceCapability::forOwner();
         }
 
         $this->loadMissing('workspaces');
