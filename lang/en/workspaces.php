@@ -181,6 +181,7 @@ return [
             'updated' => 'Updated',
             'deleted' => 'Deleted',
             'restored' => 'Restored',
+            'imported' => 'Imported',
         ],
         'types' => [
             'company' => 'Company',
@@ -190,7 +191,15 @@ return [
             'note' => 'Note',
             'custom_field' => 'Custom field',
             'custom_field_option' => 'Custom field option',
+            'import' => 'Import',
         ],
+        'import_counts' => [
+            'created' => ':count created',
+            'updated' => ':count updated',
+            'skipped' => ':count skipped',
+            'failed' => ':count failed',
+        ],
+        'via_import' => 'Via import :file',
         'empty' => [
             'heading' => 'No activity yet',
             'description' => 'Changes your members make to records will show up here.',
