@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Support;
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Support\Facades\URL;
 
 final class MailboxOAuthWorkspace
@@ -31,6 +32,10 @@ final class MailboxOAuthWorkspace
 
         $team = Workspace::query()->find($teamId);
 
-        return $team instanceof Workspace ? $team : null;
+        if (! $team instanceof Workspace || resolve(HostedWorkspaceAccess::class)->isPaused($team)) {
+            return null;
+        }
+
+        return $team;
     }
 }
