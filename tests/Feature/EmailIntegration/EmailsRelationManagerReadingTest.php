@@ -510,6 +510,47 @@ describe('subject column privacy enforcement', function (): void {
         ])
             ->assertTableColumnStateSet('subject', 'Real Subject', $email);
     });
+
+    it('does not match a guessed subject when the viewer cannot view the subject', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Secret Subject',
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertCanSeeTableRecords([$email])
+            ->searchTable('Secret Subject')
+            ->assertCanNotSeeTableRecords([$email]);
+    });
+
+    it('matches the subject when searching as a viewer who can view it', function (): void {
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Secret Subject',
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->searchTable('Secret Subject')
+            ->assertCanSeeTableRecords([$email]);
+    });
 });
 
 it('badges the emails tab with the visible count for the record', function (): void {

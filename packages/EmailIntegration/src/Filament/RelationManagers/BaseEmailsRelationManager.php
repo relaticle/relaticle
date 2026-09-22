@@ -23,13 +23,14 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
@@ -181,7 +182,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->columns([
                 TextColumn::make('subject')
                     ->label(__('filament/relation-managers/emails.columns.subject.label'))
-                    ->searchable()
+                    ->searchable(query: $this->searchVisibleEmails(...))
                     ->limit(60)
                     ->getStateUsing(function (Email $record): string {
                         if ($this->authUser()->can('viewSubject', $record)) {
@@ -264,7 +265,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 : [
                     $composeEmail
                         ->label(__('filament/relation-managers/emails.empty_state.compose')),
-                    ConfigureMailboxAction::make(),
+                    ConnectMailboxAction::make()
+                        ->hidden(fn (): bool => $this->hasActiveConnectedAccount()),
                 ]);
     }
 
@@ -347,6 +349,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
+    }
+
+    /** @param  Builder<Email>  $query */
+    private function searchVisibleEmails(Builder $query, string $search): void
+    {
+        resolve(EmailSearchService::class)->applyToQuery($query, $this->authUser(), $search);
     }
 
     private function authUser(): User
