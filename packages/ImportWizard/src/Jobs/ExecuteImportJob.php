@@ -8,6 +8,7 @@ use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\ActivityLog\CustomFieldChangeLog;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
@@ -79,6 +80,12 @@ final class ExecuteImportJob implements ShouldQueue
 
     /** @var array<string, array{field: CustomField, values: array<int, string>}> */
     private array $pendingTagOptions = [];
+
+    /** @var array<string, array{entity: Model, field: CustomField, old: mixed, new: mixed}> */
+    private array $pendingCustomFieldChanges = [];
+
+    /** @var array<string, true> Records this import created, keyed by morph class and id */
+    private array $recordsCreatedHere = [];
 
     /**
      * Zone the CSV's naive datetimes are interpreted in: the importer's own, so an
@@ -300,6 +307,10 @@ final class ExecuteImportJob implements ShouldQueue
                 $record->forceFill($prepared);
                 $record->save();
 
+                if ($isCreate) {
+                    $this->recordsCreatedHere[$record->getMorphClass().'|'.$record->getKey()] = true;
+                }
+
                 if ($isCreate && $matchField instanceof MatchableField && $matchSourceColumn !== null) {
                     $this->registerInMatchableValueCache($row, $matchField, $matchSourceColumn, (string) $record->getKey());
                 }
@@ -363,6 +374,9 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+        $existingValues = $isCreate
+            ? collect()
+            : $record->loadMissing('customFieldValues')->getRelation('customFieldValues')->keyBy('custom_field_id');
 
         foreach ($customFieldData as $code => $value) {
             $cf = $customFieldDefs->get($code);
@@ -411,7 +425,35 @@ final class ExecuteImportJob implements ShouldQueue
                 : $safeValue;
 
             $this->pendingCustomFieldValues[] = $row;
+
+            if (! $isCreate && ! isset($this->recordsCreatedHere[$record->getMorphClass().'|'.$record->getKey()])) {
+                $this->stageCustomFieldChange($record, $cf, $existingValues->get($cf->getKey()), $valueColumn, $row[$valueColumn]);
+            }
         }
+    }
+
+    /**
+     * The bulk upsert skips the value observer, so an update's change is logged here,
+     * after the upsert lands. Creates stay silent: their `created` row already says it.
+     */
+    private function stageCustomFieldChange(Model $record, CustomField $field, ?CustomFieldValue $existing, string $column, mixed $rawValue): void
+    {
+        $valueModel = CustomFields::valueModel();
+        $incoming = new $valueModel;
+        $incoming->setRawAttributes([$column => $rawValue]);
+        $incoming->setRelation('customField', $field);
+
+        $existing?->setRelation('customField', $field);
+
+        $key = $record->getMorphClass().'|'.$record->getKey().'|'.$field->getKey();
+
+        $this->pendingCustomFieldChanges[$key] ??= [
+            'entity' => $record,
+            'field' => $field,
+            'old' => $existing?->getValue(),
+            'new' => null,
+        ];
+        $this->pendingCustomFieldChanges[$key]['new'] = $incoming->getValue();
     }
 
     /**
@@ -487,6 +529,14 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $this->pendingCustomFieldValues = [];
+
+        $changeLog = resolve(CustomFieldChangeLog::class);
+
+        foreach ($this->pendingCustomFieldChanges as $change) {
+            $changeLog->record($change['entity'], $change['field'], $change['old'], $change['new']);
+        }
+
+        $this->pendingCustomFieldChanges = [];
     }
 
     /** @param array<int, mixed> $values */
@@ -559,6 +609,7 @@ final class ExecuteImportJob implements ShouldQueue
         return $modelClass::query()
             ->where('workspace_id', $this->workspaceId)
             ->whereIn((new $modelClass)->getKeyName(), $updateIds)
+            ->with('customFieldValues')
             ->get()
             ->keyBy(fn (Model $model): string => (string) $model->getKey())
             ->all();
@@ -824,6 +875,7 @@ final class ExecuteImportJob implements ShouldQueue
 
         return $modelClass::query()
             ->where('workspace_id', $this->workspaceId)
+            ->with('customFieldValues')
             ->find($matchedId);
     }
 

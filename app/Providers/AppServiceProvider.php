@@ -542,6 +542,7 @@ final class AppServiceProvider extends ServiceProvider
             ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
+            'custom_field_option' => CustomFieldOption::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
             'workspace_invitation' => WorkspaceInvitation::class,

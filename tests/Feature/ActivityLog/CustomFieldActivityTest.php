@@ -151,3 +151,26 @@ it('still logs a genuine link value change', function (): void {
         ->and($activity->properties['custom_field_changes'][0]['old']['label'])->toBe('airbnb.com')
         ->and($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('google.com');
 });
+
+it('logs a first value of false on a toggle, where normalizing alone would read it as empty', function (): void {
+    $toggle = CustomField::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'is_partner',
+        'name' => 'Is partner',
+        'type' => 'toggle',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $company = Company::factory()->for($this->workspace)->create();
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFieldValue($toggle, false);
+
+    $activity = Activity::query()->where('event', 'custom_field_changes')->latest('id')->firstOrFail();
+
+    expect($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('No');
+});

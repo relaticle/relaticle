@@ -41,6 +41,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Override;
+use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 
 /**
  * The workspace audit trail: who changed or deleted which record, and when.
@@ -64,6 +65,8 @@ final class ActivityLog extends Page implements HasTable
     ];
 
     private const string CUSTOM_FIELD_EVENT = 'custom_field_changes';
+
+    private const array CUSTOM_FIELD_SUBJECTS = ['custom_field', 'custom_field_option'];
 
     /** Characters of each side of a diff the table shows before the title takes over. */
     private const int VALUE_LENGTH = 60;
@@ -415,6 +418,10 @@ final class ActivityLog extends Page implements HasTable
         $entity = CrmEntity::tryFrom((string) $record->subject_type);
         $tenant = Filament::getTenant();
 
+        if (in_array($record->subject_type, self::CUSTOM_FIELD_SUBJECTS, true) && $tenant instanceof Workspace) {
+            return CustomFields::getUrl(tenant: $tenant);
+        }
+
         if (! $entity instanceof CrmEntity || ! $tenant instanceof Workspace) {
             return null;
         }
@@ -467,7 +474,7 @@ final class ActivityLog extends Page implements HasTable
             $model = $morphMap[$type];
 
             $subjects = $model::query()
-                ->withoutGlobalScopes([SoftDeletingScope::class])
+                ->withoutGlobalScopes([SoftDeletingScope::class, CustomFieldsActivableScope::class])
                 ->whereKey(array_values(array_unique($ids)))
                 ->get();
 
@@ -566,6 +573,10 @@ final class ActivityLog extends Page implements HasTable
 
     private function typeIcon(?string $state): ?Heroicon
     {
+        if (in_array($state, self::CUSTOM_FIELD_SUBJECTS, true)) {
+            return Heroicon::AdjustmentsHorizontal;
+        }
+
         return match (CrmEntity::tryFrom((string) $state)) {
             CrmEntity::Company => Heroicon::BuildingOffice,
             CrmEntity::People => Heroicon::User,
@@ -598,8 +609,8 @@ final class ActivityLog extends Page implements HasTable
     {
         $labels = [];
 
-        foreach (CrmEntity::cases() as $entity) {
-            $labels[$entity->value] = __('workspaces.activity.types.'.$entity->value);
+        foreach ([...array_map(fn (CrmEntity $entity): string => $entity->value, CrmEntity::cases()), ...self::CUSTOM_FIELD_SUBJECTS] as $type) {
+            $labels[$type] = __('workspaces.activity.types.'.$type);
         }
 
         return $labels;
