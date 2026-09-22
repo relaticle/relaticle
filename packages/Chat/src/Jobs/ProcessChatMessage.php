@@ -215,7 +215,11 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
-                'role' => $this->user->hasWorkspaceCapability($this->workspace->getKey(), WorkspaceCapability::WorkspaceManage) ? 'owner' : 'member',
+                'role' => $this->user->workspaceRoleLabel($this->workspace->getKey()) ?? '',
+                'capabilities' => array_map(
+                    fn (WorkspaceCapability $capability): string => $capability->value,
+                    $this->user->workspaceCapabilities($this->workspace->getKey()),
+                ),
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);

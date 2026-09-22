@@ -53,6 +53,14 @@ final readonly class GuideToPageTool implements Tool
 
         $destination = (string) ($request['destination'] ?? '');
 
+        $capability = $this->destinations->requiredCapability($destination);
+
+        if ($capability !== null && ! $user->hasWorkspaceCapability($workspace?->getKey(), $capability)) {
+            return (string) json_encode([
+                'error' => __('This user cannot open that page with their workspace role. Tell them a workspace owner or admin can do it for them. Do not link to any page.'),
+            ], JSON_UNESCAPED_SLASHES);
+        }
+
         $url = $workspace === null ? null : $this->destinations->resolve($destination, $workspace);
 
         if ($url === null) {

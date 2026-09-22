@@ -161,7 +161,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      * Who is typing: without it "assign to me" and "my tasks" cost a
      * clarification round-trip (observed live).
      *
-     * @var array{name: string, id: string, role: string}|null
+     * @var array{name: string, id: string, role: string, capabilities: array<int, string>}|null
      */
     public ?array $currentUser = null;
 
@@ -225,7 +225,7 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     }
 
     /**
-     * @param  array{name: string, id: string, role: string}|null  $user
+     * @param  array{name: string, id: string, role: string, capabilities: array<int, string>}|null  $user
      */
     public function withCurrentUser(?array $user): self
     {
@@ -329,8 +329,8 @@ When the answer is an action the user performs on a workspace page GuideToPageTo
 
 Some actions cannot be performed here but ARE available elsewhere in the workspace. NEVER reply that something is impossible or "not supported by this assistant". Instead, call GuideToPageTool with the right destination and give the user a direct link to do it themselves:
 - Custom field DEFINITIONS (creating, renaming, toggling active, or adding options):
-  - If the user is a workspace owner/admin: you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly; do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code`; you do not need an internal ID. If you don't already know the code, call ListCustomFieldsTool to look it up; never escort the user to settings just to find a field.
-  - If the user is NOT a workspace owner: you CANNOT create or modify field definitions. Call GuideToPageTool with destination "custom_fields" so they can ask their workspace owner to do it.
+  - If the current user's capabilities include `fields.manage` (owners and admins hold it): you CAN propose these operations via CreateCustomFieldTool, UpdateCustomFieldTool, and AddCustomFieldOptionsTool (all proposal-gated, require approval). Use them directly; do not escort an owner to the settings page for these operations. To update or add options to an EXISTING field, identify it by its `entity_type` and its `code`; you do not need an internal ID. If you don't already know the code, call ListCustomFieldsTool to look it up; never escort the user to settings just to find a field.
+  - If their capabilities do NOT include `fields.manage`: you CANNOT create or modify field definitions, and the Custom Fields page is closed to them too. Tell them a workspace owner or admin can make the change, and do not link to any page.
   - DELETING a custom field definition: you CANNOT delete field definitions from chat (for any user). Call GuideToPageTool with destination "custom_fields" to escort the user there.
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools); this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination.
@@ -379,6 +379,7 @@ A <resolved_actions> block lists every proposal decided in this conversation. En
 Read tool results and <resolved_actions> include a `url` per record. When you name a record in prose, render it as a markdown link using that url: `[Record Name](url)`.
 - Never show the raw ID: always use the human name as the link text.
 - Only link records whose url appeared in tool results or context blocks this conversation; never invent or guess a url, and never link a company to its website domain.
+- The same rule covers workspace pages: the only page url you may link is one GuideToPageTool returned in this conversation. Never assemble a settings url yourself, because a workspace path you guessed is a dead link.
 - If a record has no url (null), refer to it by name only without a link.
 PROMPT;
     }
@@ -414,11 +415,15 @@ PROMPT;
         }
 
         $name = $this->sanitizeLabel($this->currentUser['name']);
-        $role = $this->currentUser['role'] === 'owner' ? 'workspace owner' : 'workspace member';
+        $role = $this->sanitizeLabel($this->currentUser['role']);
+        $capabilities = implode(', ', $this->currentUser['capabilities']);
+
+        $roleClause = $role === '' ? '' : ", workspace role: {$role}";
 
         return "\n\n## Current user\n"
-            ."{$name} (user id: {$this->currentUser['id']}, {$role}). "
-            .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.';
+            ."{$name} (user id: {$this->currentUser['id']}{$roleClause}). "
+            .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.'
+            .($capabilities === '' ? '' : "\nWhat this role may do: {$capabilities}. A tool that answers with a role error is telling you the truth: explain it, say a workspace owner or admin can help, and do not link to any page.");
     }
 
     /**

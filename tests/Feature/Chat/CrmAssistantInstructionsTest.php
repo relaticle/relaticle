@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceCapability;
+use App\Enums\WorkspaceRole;
 use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
 use App\Models\People;
@@ -129,13 +131,42 @@ it('routes export requests to the export destinations', function (): void {
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
     $instructions = (new CrmAssistant)
-        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner'])
+        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'Owner', 'capabilities' => []])
         ->instructions();
 
     expect($instructions)
         ->toContain('## Current user')
-        ->toContain('Manuk bMinasyan/b (user id: 01USER, workspace owner)')
+        ->toContain('Manuk bMinasyan/b (user id: 01USER, workspace role: Owner)')
         ->toContain('"me", "my", "mine" and "I" refer to this user');
+});
+
+it('omits the role clause when the membership carries no role instead of printing an empty one', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser(['name' => 'Rory', 'id' => '01RORY', 'role' => '', 'capabilities' => []])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('Rory (user id: 01RORY).')
+        ->not->toContain('workspace role: )');
+});
+
+it('names the capabilities the role holds so the model does not promise what the user cannot do', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser([
+            'name' => 'Sam Viewer',
+            'id' => '01VIEWER',
+            'role' => WorkspaceRole::Viewer->label(),
+            'capabilities' => array_map(
+                fn (WorkspaceCapability $capability): string => $capability->value,
+                WorkspaceRole::Viewer->capabilities(),
+            ),
+        ])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('workspace role: Viewer')
+        ->toContain('What this role may do: records.view')
+        ->not->toContain('records.create');
 });
 
 it('marks the context blocks as internal so the model never names them to the user', function (): void {

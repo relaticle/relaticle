@@ -377,6 +377,26 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return WorkspaceRole::tryFrom((string) $role)?->capabilities() ?? [];
     }
 
+    public function workspaceRoleLabel(?string $workspaceId): ?string
+    {
+        if ($workspaceId === null) {
+            return null;
+        }
+
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return __('workspaces.roles.owner.label');
+        }
+
+        $this->loadMissing('workspaces');
+
+        $role = $this->workspaces
+            ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
+            ?->membership
+            ?->role;
+
+        return WorkspaceRole::tryFrom((string) $role)?->label();
+    }
+
     public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
     {
         return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
