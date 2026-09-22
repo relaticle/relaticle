@@ -8,8 +8,10 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final readonly class EmailAttachmentController
@@ -26,7 +28,7 @@ final readonly class EmailAttachmentController
             return $this->inlineResponse($attachment);
         }
 
-        return $this->stream($this->attachmentBinary($attachment), $attachment->filename ?? 'attachment');
+        return $this->stream($this->attachmentBinary($attachment), $this->downloadName($attachment));
     }
 
     private function inlineResponse(EmailAttachment $attachment): Response
@@ -112,12 +114,37 @@ final readonly class EmailAttachmentController
             function () use ($binary): void {
                 echo $binary;
             },
-            $filename,
+            null,
             [
                 'Content-Type' => 'application/octet-stream',
                 'X-Content-Type-Options' => 'nosniff',
                 'Content-Security-Policy' => "default-src 'none'; sandbox",
+                'Content-Disposition' => HeaderUtils::makeDisposition('attachment', $filename, $this->fallbackName($filename)),
             ],
         );
+    }
+
+    private function downloadName(EmailAttachment $attachment): string
+    {
+        $name = str_replace(['/', '\\'], '-', (string) $attachment->filename);
+
+        return $name === '' ? 'attachment' : $name;
+    }
+
+    /**
+     * Symfony rejects an empty ASCII fallback, and a name that transliterates to
+     * nothing (Japanese, Arabic, emoji) produces exactly that. The real name still
+     * travels in the RFC 5987 `filename*` parameter.
+     */
+    private function fallbackName(string $filename): string
+    {
+        $stem = str_replace('%', '', Str::ascii(pathinfo($filename, PATHINFO_FILENAME)));
+        $extension = str_replace('%', '', Str::ascii(pathinfo($filename, PATHINFO_EXTENSION)));
+
+        if ($stem === '') {
+            $stem = 'download';
+        }
+
+        return $extension === '' ? $stem : "{$stem}.{$extension}";
     }
 }

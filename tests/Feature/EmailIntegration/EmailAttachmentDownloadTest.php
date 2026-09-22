@@ -146,6 +146,40 @@ it('streams a file the user attached here, which never went through a provider',
     expect($response->streamedContent())->toBe('locally stored bytes');
 });
 
+it('downloads an attachment whose provider filename has no ASCII form', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/invoice.pdf', 'bytes');
+
+    $attachment = makeAttachmentForUser($this->user, $this->workspace, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/invoice.pdf',
+        'filename' => '請求書.pdf',
+    ]);
+
+    $response = $this->get(route('email-attachments.download', ['attachment' => $attachment->id]));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))
+        ->toContain('filename=download.pdf')
+        ->toContain("filename*=utf-8''%E8%AB%8B%E6%B1%82%E6%9B%B8.pdf");
+});
+
+it('downloads an attachment whose provider filename contains path separators', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/report.pdf', 'bytes');
+
+    $attachment = makeAttachmentForUser($this->user, $this->workspace, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/report.pdf',
+        'filename' => 'reports\\2024/q1.pdf',
+    ]);
+
+    $response = $this->get(route('email-attachments.download', ['attachment' => $attachment->id]));
+
+    $response->assertOk();
+    expect($response->headers->get('Content-Disposition'))->toContain('filename=reports-2024-q1.pdf');
+});
+
 it('serves inline image attachments for email body cid references', function (): void {
     Storage::fake(EmailAttachment::DISK);
     Storage::disk(EmailAttachment::DISK)->put('attachments/logo.png', 'png-bytes');
