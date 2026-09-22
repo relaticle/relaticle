@@ -30,6 +30,8 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 3;
 
+    public int $uniqueFor = 3600;
+
     /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
     public array $backoff = [60, 300, 900];
 
