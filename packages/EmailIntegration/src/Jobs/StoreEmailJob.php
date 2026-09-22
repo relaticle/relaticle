@@ -64,6 +64,15 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
      * Unique key prevents duplicate jobs for the same account + message from
      * being queued simultaneously (e.g. overlapping incremental syncs).
      */
+    /**
+     * History import batches count pending jobs until each store job finishes. release() does not
+     * consume tries, so 429 cooldown loops can park the batch at 99% indefinitely.
+     */
+    protected function shouldFailBatchJobOnProviderRateLimit(): bool
+    {
+        return $this->batch() !== null;
+    }
+
     public function uniqueId(): string
     {
         return "store-email-{$this->connectedAccount->getKey()}-{$this->messageId}";
