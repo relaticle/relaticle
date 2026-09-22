@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
@@ -14,11 +15,13 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteDeleteTool implements Tool
 {
     use LimitsPlanSteps;
+    use RequiresWorkspaceCapability;
     use WithConversationContext;
 
     /** @return class-string<Model> */
@@ -49,6 +52,12 @@ abstract class BaseWriteDeleteTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
+
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::RecordsDelete);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
+        }
 
         $planLimitError = $this->planStepLimitError();
 

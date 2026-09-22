@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
@@ -50,6 +51,21 @@ final readonly class DestinationResolver
      * @var array<string, string>
      */
     private const array EXPORT_ACTION = ['action' => 'export'];
+
+    /**
+     * The capability the destination's page checks on entry, so an escort never
+     * hands over a link that answers the user with a 403.
+     */
+    public function requiredCapability(string $destination): ?WorkspaceCapability
+    {
+        return match (true) {
+            $destination === 'custom_fields' => WorkspaceCapability::FieldsManage,
+            $destination === 'workspace_members' => WorkspaceCapability::MembersManage,
+            str_starts_with($destination, 'import_') => WorkspaceCapability::DataImport,
+            str_starts_with($destination, 'export_') => WorkspaceCapability::DataExport,
+            default => null,
+        };
+    }
 
     /**
      * Resolve a destination key to an absolute app-panel URL for the given workspace.
