@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
+use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailRead;
@@ -24,7 +25,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Queueable;
+    use DetectsAuthErrors, Queueable, ReleasesOnProviderRateLimit;
 
     public int $tries = 3;
 
@@ -47,6 +48,12 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $accountId = (string) $account->getKey();
+
+        if ($this->releaseIfProviderCoolingDown($accountId)) {
+            return;
+        }
+
         MailboxSyncTracker::markEmailStarted($account);
 
         $service = $mailFactory->make($account);
@@ -58,6 +65,14 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
             resolve(StartMailboxHistoryImportAction::class)->execute($account);
 
             return;
+        } catch (Throwable $exception) {
+            MailboxSyncTracker::markEmailFinished($account);
+
+            if ($this->releaseIfProviderRateLimited($accountId, $exception)) {
+                return;
+            }
+
+            throw $exception;
         }
 
         $allIds = $delta->messageIds->all();

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Google\Service\Exception as GoogleServiceException;
 use Illuminate\Bus\PendingBatch;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Testing\Fakes\BatchFake;
@@ -20,6 +22,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\ProviderRateLimit;
 
 mutates(IncrementalEmailSyncJob::class);
 
@@ -291,4 +294,26 @@ it('starts a fresh history import batch when mailbox history has expired', funct
         fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account)
             && $job->historyImportBatchId === $account->history_import_batch_id,
     );
+});
+
+it('releases instead of failing when the provider rate limits the delta listing', function (): void {
+    Queue::fake();
+    $account = syncableAccount();
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchDelta')->andThrow(new GoogleServiceException(json_encode([
+        'error' => ['code' => 429, 'message' => 'User-rate limit exceeded.', 'errors' => [['reason' => 'rateLimitExceeded']]],
+    ], JSON_THROW_ON_ERROR), 429));
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldReceive('release')->once();
+
+    $job = new IncrementalEmailSyncJob($account);
+    $job->setJob($queueJob);
+    $job->handle($factory);
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeGreaterThan(0);
 });

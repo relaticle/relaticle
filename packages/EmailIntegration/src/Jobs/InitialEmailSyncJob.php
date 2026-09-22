@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
+use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotification;
@@ -22,7 +23,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
-    use DetectsAuthErrors, Queueable;
+    use DetectsAuthErrors, Queueable, ReleasesOnProviderRateLimit;
 
     public int $timeout = 300;
 
@@ -50,9 +51,26 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         MailboxHistoryImportService $mailboxHistoryImport,
     ): void {
         $account = $this->connectedAccount;
+        $accountId = (string) $account->getKey();
+
+        if ($this->releaseIfProviderCoolingDown($accountId)) {
+            return;
+        }
+
         $mailboxHistoryImport->markEmailListingStarted($account);
         $service = $mailFactory->make($account);
-        $page = $service->initialBackfill($this->initialDaysCap(), $this->pageToken);
+
+        try {
+            $page = $service->initialBackfill($this->initialDaysCap(), $this->pageToken);
+        } catch (Throwable $exception) {
+            $mailboxHistoryImport->markEmailListingFinished($account);
+
+            if ($this->releaseIfProviderRateLimited($accountId, $exception)) {
+                return;
+            }
+
+            throw $exception;
+        }
 
         $historyCursor = $this->historyCursor ?? $page->cursor;
 
