@@ -209,6 +209,38 @@ it('writes one summary row for the import, caused by the importer', function ():
         ->and($summary->properties->has('import_id'))->toBeFalse();
 });
 
+it('keeps one summary row when a retried import runs again', function (): void {
+    runThreePersonImport($this);
+
+    ImportExecutionFixture::run($this);
+
+    expect(Activity::query()->withoutGlobalScopes()->where('subject_type', 'import')->count())->toBe(1);
+});
+
+it('records an import that exhausts its attempts as one failed entry', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+    $this->import->update(['created_rows' => 1]);
+    Activity::query()->withoutGlobalScopes()->delete();
+
+    $job = new ExecuteImportJob(importId: $this->import->id, workspaceId: (string) $this->workspace->id);
+    $job->failed(new RuntimeException('Timed out'));
+    $job->failed(new RuntimeException('Timed out'));
+
+    $summary = Activity::query()->withoutGlobalScopes()->where('subject_type', 'import')->sole();
+
+    expect($summary->event)->toBe('import_failed')
+        ->and($summary->causer_id)->toBe($this->user->getKey())
+        ->and($summary->properties['created'])->toBe(1);
+
+    livewire(ActivityLog::class)
+        ->assertCountTableRecords(1)
+        ->assertSee(__('workspaces.activity.events.import_failed'));
+});
+
 it('shows the import as one entry on the workspace activity page', function (): void {
     runThreePersonImport($this);
 

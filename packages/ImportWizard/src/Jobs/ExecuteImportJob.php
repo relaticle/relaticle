@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Jobs;
 
 use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\ActivityLog\CurrentImport;
@@ -183,14 +184,13 @@ final class ExecuteImportJob implements ShouldQueue
                 'failed_rows' => $results['failed'],
             ]);
 
-            $this->logImportSummary($import, $results, ImportStatus::Completed);
+            $this->logImportSummary($import, $results, 'imported');
 
             $this->notifyUser($import, $results);
         } catch (\Throwable $e) {
             $this->flushFailedRows($import);
             $this->persistResults($import, $results);
             $import->update(['status' => ImportStatus::Failed]);
-            $this->logImportSummary($import, $results, ImportStatus::Failed);
 
             try {
                 $this->notifyUser($import, $results, failed: true);
@@ -209,19 +209,22 @@ final class ExecuteImportJob implements ShouldQueue
      *
      * @param  array<string, int>  $results
      */
-    private function logImportSummary(Import $import, array $results, ImportStatus $status): void
+    private function logImportSummary(Import $import, array $results, string $event): void
     {
+        if (Activity::query()->withoutGlobalScopes()->whereMorphedTo('subject', $import)->exists()) {
+            return;
+        }
+
         activity((string) config('activitylog.default_log_name'))
             ->performedOn($import)
             ->causedBy($import->user)
             ->withProperties([
                 'import_file' => $import->file_name,
                 'entity_type' => $import->entity_type->value,
-                'status' => $status->value,
                 ...$results,
             ])
-            ->event('imported')
-            ->log('imported');
+            ->event($event)
+            ->log($event);
     }
 
     public function failed(\Throwable $exception): void
@@ -238,13 +241,17 @@ final class ExecuteImportJob implements ShouldQueue
 
         $this->flushFailedRows($import);
 
+        $results = [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
+
+        $this->logImportSummary($import, $results, 'import_failed');
+
         try {
-            $this->notifyUser($import, [
-                'created' => $import->created_rows,
-                'updated' => $import->updated_rows,
-                'skipped' => $import->skipped_rows,
-                'failed' => $import->failed_rows,
-            ], failed: true);
+            $this->notifyUser($import, $results, failed: true);
         } catch (\Throwable) {
         }
     }
