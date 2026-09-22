@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class ApplyDefaultSharingTierToExistingEmailsAction
 {
@@ -69,7 +70,7 @@ final readonly class ApplyDefaultSharingTierToExistingEmailsAction
                 continue;
             }
 
-            $tier = $team->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+            $tier = resolve(PrivacyService::class)->workspaceSharingTier($team);
 
             $updated += Email::query()
                 ->where('user_id', $user->getKey())

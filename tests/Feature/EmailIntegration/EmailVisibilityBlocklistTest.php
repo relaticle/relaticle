@@ -9,9 +9,9 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
-use Relaticle\EmailIntegration\Services\BlocklistService;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BlocklistService::class);
+mutates(EmailVisibilityService::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -24,7 +24,7 @@ beforeEach(function (): void {
         'user_id' => $this->owner->id,
     ]));
 
-    $this->service = app(BlocklistService::class);
+    $this->service = app(EmailVisibilityService::class);
 });
 
 function makeBlocklistEmail(array $overrides = []): Email
@@ -42,7 +42,7 @@ it('returns false when email has no owner', function (): void {
     // Simulate a missing owner by setting user relation to null in memory
     $email->setRelation('user', null);
 
-    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+    expect($this->service->isHiddenFromOwner($email))->toBeFalse();
 });
 
 it('returns false when account has no blocklist entries', function (): void {
@@ -53,7 +53,7 @@ it('returns false when account has no blocklist entries', function (): void {
         'email_address' => 'stranger@example.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+    expect($this->service->isHiddenFromOwner($email))->toBeFalse();
 });
 
 it('returns true when participant matches a blocked email address', function (): void {
@@ -70,7 +70,7 @@ it('returns true when participant matches a blocked email address', function ():
         'email_address' => 'spam@badactor.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('returns true when participant matches a blocked domain', function (): void {
@@ -87,7 +87,7 @@ it('returns true when participant matches a blocked domain', function (): void {
         'email_address' => 'anyone@badactor.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('does not block a subdomain when include subdomains is off', function (): void {
@@ -104,7 +104,7 @@ it('does not block a subdomain when include subdomains is off', function (): voi
         'email_address' => 'temu@commerce.temuemail.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+    expect($this->service->isHiddenFromOwner($email))->toBeFalse();
 });
 
 it('blocks a subdomain when include subdomains is on', function (): void {
@@ -121,7 +121,7 @@ it('blocks a subdomain when include subdomains is on', function (): void {
         'email_address' => 'temu@commerce.temuemail.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('returns false when participant does not match any blocklist entry', function (): void {
@@ -138,7 +138,7 @@ it('returns false when participant does not match any blocklist entry', function
         'email_address' => 'legit@example.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+    expect($this->service->isHiddenFromOwner($email))->toBeFalse();
 });
 
 it('performs case-insensitive matching on email addresses', function (): void {
@@ -155,7 +155,7 @@ it('performs case-insensitive matching on email addresses', function (): void {
         'email_address' => 'SPAM@BADACTOR.COM',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('performs case-insensitive matching on domains', function (): void {
@@ -172,7 +172,7 @@ it('performs case-insensitive matching on domains', function (): void {
         'email_address' => 'anyone@badactor.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('only checks this mailbox blocklist, not another connected account', function (): void {
@@ -194,7 +194,7 @@ it('only checks this mailbox blocklist, not another connected account', function
         'email_address' => 'spam@badactor.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeFalse();
+    expect($this->service->isHiddenFromOwner($email))->toBeFalse();
 });
 
 it('returns true when any one of multiple participants matches blocklist', function (): void {
@@ -216,7 +216,7 @@ it('returns true when any one of multiple participants matches blocklist', funct
         'email_address' => 'blocked@example.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });
 
 it('returns true when participant matches the workspace blocklist', function (): void {
@@ -232,5 +232,5 @@ it('returns true when participant matches the workspace blocklist', function ():
         'email_address' => 'spam@badactor.com',
     ]);
 
-    expect($this->service->isBlockedForOwner($email))->toBeTrue();
+    expect($this->service->isHiddenFromOwner($email))->toBeTrue();
 });

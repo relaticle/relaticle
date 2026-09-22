@@ -25,7 +25,7 @@ final readonly class RecordCommunicationMetrics
             return;
         }
 
-        $isInbound = $email->direction->value === EmailDirection::INBOUND->value;
+        $isInbound = $email->direction === EmailDirection::INBOUND;
 
         $sets = [
             'email_count = email_count + 1',

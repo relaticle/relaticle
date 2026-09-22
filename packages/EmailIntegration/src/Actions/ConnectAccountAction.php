@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 
@@ -62,7 +63,7 @@ final readonly class ConnectAccountAction
             ];
 
             if (! $importStillDraining) {
-                $values['status'] = 'active';
+                $values['status'] = EmailAccountStatus::ACTIVE;
                 $values['last_error'] = null;
             }
 

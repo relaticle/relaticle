@@ -13,6 +13,7 @@ use Filament\Forms\Components\RichEditor\RichContentRenderer;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -325,10 +326,7 @@ final readonly class EmailTemplateRenderService
 
     private function resolveMergeTagKey(string $raw): ?string
     {
-        $normalized = strtolower(trim($raw));
-        $normalized = preg_replace('/\s+/', ' ', $normalized) ?? $normalized;
-
-        return $this->mergeTagKeyAliases()[$normalized] ?? null;
+        return $this->mergeTagKeyAliases()[Str::squish(Str::lower($raw))] ?? null;
     }
 
     /**
