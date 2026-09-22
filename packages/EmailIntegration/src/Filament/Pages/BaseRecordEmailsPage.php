@@ -21,6 +21,7 @@ use Livewire\WithPagination;
 use Relaticle\EmailIntegration\Actions\MarkAllEmailsAsReadAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -143,6 +144,11 @@ abstract class BaseRecordEmailsPage extends Page
         resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $record);
 
         return $paginator;
+    }
+
+    public function connectMailboxAction(): ConnectMailboxAction
+    {
+        return ConnectMailboxAction::make();
     }
 
     /**

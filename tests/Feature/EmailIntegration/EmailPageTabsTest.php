@@ -205,16 +205,22 @@ it('saves an email privacy tier from the sharing cards', function (): void {
     expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-it('shows the configure empty state on drafts when no mailbox is connected', function (): void {
+it('offers a direct gmail connect on drafts when no mailbox is connected', function (): void {
     $this->account->forceDelete();
 
     Livewire::test(DraftsTable::class)
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
-        ->assertSee(__('filament/pages/email-accounts.not_connected.action'))
+        ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl(
+            $component,
+            TestAction::make('connectMailbox')->table(),
+            'gmail',
+            $this->account->workspace,
+        ))
         ->assertDontSee(__('filament/pages/email-inbox.drafts.empty.heading'))
         ->assertDontSee(__('filament/emails/composer.grant_send.description'))
         ->assertDontSee(__('filament/concerns/email-compose.actions.compose.label'))
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'configureMailbox']);
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox']);
 });
 
 it('opens the composer from the drafts empty state when a mailbox is connected', function (): void {
@@ -222,7 +228,8 @@ it('opens the composer from the drafts empty state when a mailbox is connected',
         ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
         ->assertSee(__('filament/concerns/email-compose.actions.compose.label'))
         ->assertTableHeaderActionsExistInOrder(['composeEmail'])
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'configureMailbox'])
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox'])
+        ->assertTableActionHidden('connectMailbox')
         ->callAction(TestAction::make('composeEmail')->table())
         ->assertDispatched('composer:open');
 });

@@ -1,6 +1,7 @@
 @props([
     'heading',
     'description',
+    'action',
     'icon' => 'heroicon-o-envelope',
 ])
 
@@ -13,12 +14,7 @@
 
     <p class="max-w-sm text-sm text-gray-500 dark:text-gray-400">{{ $description }}</p>
 
-    <x-filament::button
-        tag="a"
-        :href="\Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage::getUrl()"
-        icon="heroicon-o-cog-6-tooth"
-        class="mt-2"
-    >
-        {{ __('filament/pages/email-accounts.not_connected.action') }}
-    </x-filament::button>
+    <div class="mt-2">
+        {{ $action }}
+    </div>
 </div>

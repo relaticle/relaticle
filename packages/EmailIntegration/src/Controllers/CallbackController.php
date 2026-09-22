@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Controllers;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -113,9 +114,17 @@ final readonly class CallbackController
             hasSend: $hasSend,
         ));
 
-        return redirect(EmailAccountsPage::getUrl([
+        Notification::make()
+            ->title(__('filament/pages/email-accounts.notifications.connected.title'))
+            ->body(__('filament/pages/email-accounts.notifications.connected.body'))
+            ->success()
+            ->send();
+
+        $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
+
+        return redirect(is_string($returnUrl) ? $returnUrl : EmailAccountsPage::getUrl([
             'tenant' => $team->slug,
-        ]))->with('success', 'Account connected successfully.');
+        ]));
     }
 
     private function boundWorkspace(Request $request, User $user): ?Workspace

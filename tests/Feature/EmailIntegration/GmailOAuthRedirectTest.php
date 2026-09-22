@@ -85,3 +85,32 @@ it('binds oauth to the page workspace when another tab switched the active team'
 
     expect(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($pageWorkspace->getKey());
 });
+
+it('remembers the page that started the connect so the callback can return there', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $user->currentWorkspace, 'https://relaticle.test/app/acme/email'))
+        ->assertRedirect();
+
+    expect(session(RedirectController::RETURN_URL_SESSION_KEY))->toBe('https://relaticle.test/app/acme/email');
+});
+
+it('forgets an earlier return page when a connect starts without one', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/email');
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $user->currentWorkspace))
+        ->assertRedirect();
+
+    expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
+});
+
+it('rejects a return page that was not signed with the connect url', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $user->currentWorkspace).'&return=https://evil.test')
+        ->assertForbidden();
+});

@@ -35,6 +35,7 @@ use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\AssertsAllowedEmailRecipients;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -65,8 +66,6 @@ final class EmailInboxPage extends Page
 
     protected static ?string $navigationLabel = null;
 
-    protected static ?string $title = 'Email';
-
     protected static ?string $slug = 'email';
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-envelope';
@@ -74,6 +73,11 @@ final class EmailInboxPage extends Page
     protected static ?int $navigationSort = 6;
 
     public static function getNavigationLabel(): string
+    {
+        return __('filament/pages/email-inbox.navigation_label');
+    }
+
+    public function getTitle(): string
     {
         return __('filament/pages/email-inbox.navigation_label');
     }
@@ -169,15 +173,6 @@ final class EmailInboxPage extends Page
             'emailId' => $emailId,
             'mode' => $mode,
         ]);
-    }
-
-    /**
-     * No page heading. The sidebar already marks Email as active. Compose lives
-     * on the Drafts table so it does not appear on the other tabs.
-     */
-    public function getHeading(): string
-    {
-        return '';
     }
 
     /**
@@ -314,6 +309,19 @@ final class EmailInboxPage extends Page
     public function setTab(string $tab): void
     {
         $this->tab = EmailPageTab::from($tab);
+    }
+
+    #[Computed]
+    public function hasConnectedMailbox(): bool
+    {
+        $workspace = filament()->getTenant();
+
+        return ConnectedAccount::hasConnectedFor($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+    }
+
+    public function connectMailboxAction(): ConnectMailboxAction
+    {
+        return ConnectMailboxAction::make();
     }
 
     /**
