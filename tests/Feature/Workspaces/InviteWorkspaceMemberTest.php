@@ -10,8 +10,10 @@ use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Mail\WorkspaceInvitationMail;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
+use App\Support\Workspaces\RoleOptions;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Mail\Events\MessageSending;
@@ -389,4 +391,36 @@ test('an administrator can invite someone as an editor', function (): void {
     resolve(InviteWorkspaceMember::class)->invite($admin, $this->workspace, 'fine@example.com', WorkspaceRole::Member->value);
 
     expect(WorkspaceInvitation::query()->where('email', 'fine@example.com')->exists())->toBeTrue();
+});
+
+test('shows a hint for every role option in the invite modal', function (): void {
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('invitePeople')
+        ->assertSchemaComponentExists('role', checkComponentUsing: function (Radio $component): bool {
+            $descriptions = $component->getDescriptions();
+
+            return $descriptions[WorkspaceRole::Admin->value] === __('workspaces.roles.admin.description')
+                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
+                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
+        });
+});
+
+test('the compare-roles modal renders every cell of the capability map, not a hand-written copy', function (): void {
+    $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction(['invitePeople', 'compareRoles']);
+
+    $content = (string) $component->instance()->getMountedAction()->getModalContent();
+
+    foreach (RoleOptions::matrix() as $capability => $roles) {
+        foreach ($roles as $role => $granted) {
+            $marker = sprintf(
+                'data-capability="%s" data-role="%s" data-granted="%s"',
+                $capability,
+                $role,
+                $granted ? '1' : '0',
+            );
+
+            expect($content)->toContain($marker);
+        }
+    }
 });

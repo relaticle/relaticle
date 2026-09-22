@@ -19,4 +19,9 @@ enum WorkspaceCapability: string
     case BillingManage = 'billing.manage';
     case WorkspaceManage = 'workspace.manage';
     case ActivityView = 'activity.view';
+
+    public function label(): string
+    {
+        return __("workspaces.capabilities.{$this->value}.label");
+    }
 }

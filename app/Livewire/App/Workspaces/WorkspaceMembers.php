@@ -13,6 +13,7 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use App\Support\Workspaces\RoleOptions;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
@@ -34,7 +35,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
-use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use stdClass;
@@ -390,12 +390,9 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                 Radio::make('role')
                     ->hiddenLabel()
                     ->required()
-                    ->options(fn (): array => $this->assignableRoles())
-                    ->in(fn (): array => array_keys($this->assignableRoles()))
-                    ->descriptions(fn (): array => collect(Jetstream::$roles)
-                        ->only(array_keys($this->assignableRoles()))
-                        ->pluck('description', 'key')
-                        ->all())
+                    ->options(fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace))
+                    ->in(fn (): array => array_keys(RoleOptions::assignable($this->authUser(), $this->workspace)))
+                    ->descriptions(RoleOptions::descriptions())
                     ->default(fn (array $record): string => (string) $record['role'])
                     ->rules([
                         fn (array $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
@@ -408,6 +405,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                         },
                     ]),
             ])
+            ->extraModalFooterActions([$this->compareRolesAction()])
             ->action(function (?array $record, array $data): void {
                 $member = $this->findMember($record);
 
@@ -431,18 +429,19 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             });
     }
 
-    /**
-     * @return array<string, string>
-     */
-    private function assignableRoles(): array
+    private function compareRolesAction(): Action
     {
-        $roles = collect(Jetstream::$roles)->pluck('name', 'key');
-
-        if (! Gate::check('promoteToAdmin', $this->workspace)) {
-            $roles = $roles->except(WorkspaceRole::Admin->value);
-        }
-
-        return $roles->all();
+        return Action::make('compareRoles')
+            ->label(__('workspaces.actions.compare_roles'))
+            ->color('gray')
+            ->link()
+            ->modalHeading(__('workspaces.actions.compare_roles'))
+            ->modalWidth('2xl')
+            ->modalContent(fn (): View => view('livewire.app.workspaces.role-matrix', [
+                'matrix' => RoleOptions::matrix(),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('workspaces.actions.close'));
     }
 
     private function removeWorkspaceMemberAction(): Action
