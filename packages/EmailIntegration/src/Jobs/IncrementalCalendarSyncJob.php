@@ -64,8 +64,6 @@ final class IncrementalCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         }
 
         if (MailboxSyncTracker::isCalendarSyncing($account) && MailboxSyncTracker::hasCalendarRunTotal($account)) {
-            $this->release(30);
-
             return;
         }
 

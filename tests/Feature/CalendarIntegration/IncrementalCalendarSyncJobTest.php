@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
+use Illuminate\Contracts\Queue\Job;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Testing\Fakes\BatchFake;
@@ -66,6 +67,30 @@ it('does not fetch delta while a calendar store batch is still in progress', fun
     (new IncrementalCalendarSyncJob($account))->handle($factory);
 
     Bus::assertNothingBatched();
+});
+
+it('does not release itself while a calendar store batch is still in progress', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'capabilities' => ['email' => true, 'calendar' => true],
+        'calendar_sync_cursor' => 'valid-token',
+    ]));
+
+    MailboxSyncTracker::markCalendarStarted($account);
+    MailboxSyncTracker::setCalendarRunTotal($account, 2);
+
+    $factory = Mockery::mock(CalendarServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+
+    $queueJob = Mockery::mock(Job::class);
+    $queueJob->shouldNotReceive('release');
+
+    $job = new IncrementalCalendarSyncJob($account);
+    $job->setJob($queueJob);
+    $job->handle($factory);
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE);
 });
 
 it('forwards requested reconciliation when delegating to initial sync without a cursor', function (): void {
