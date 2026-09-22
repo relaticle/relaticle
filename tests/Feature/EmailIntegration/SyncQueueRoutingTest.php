@@ -190,8 +190,9 @@ it('keeps the job instance out of the initial calendar sync batch callback', fun
 });
 
 it('keeps redis retry_after above every worker timeout on that connection', function (): void {
-    $supervisors = collect(config('horizon.defaults'))
-        ->merge(collect(config('horizon.environments'))->flatMap(fn (array $environment): array => $environment));
+    $defaults = config('horizon.defaults');
+    $supervisors = collect(config('horizon.environments'))
+        ->flatMap(fn (array $environment): array => array_replace_recursive($defaults, $environment));
 
     $longestTimeout = $supervisors
         ->filter(fn (array $supervisor): bool => ($supervisor['connection'] ?? null) === 'redis')
