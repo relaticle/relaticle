@@ -93,6 +93,15 @@ it('hides emails and meetings relation managers on a person when the feature is 
         ->and($managers)->not->toContain(MeetingsRelationManager::class);
 });
 
+it('hides the communication intelligence section on a person when the feature is inactive', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+
+    $person = People::factory()->recycle([$this->user, $this->user->currentWorkspace])->create();
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertDontSee(__('filament/communication-intelligence.heading'));
+});
+
 it('registers the meetings relation manager on a person when the feature is active', function (): void {
     Feature::activate(EmailIntegration::class);
 

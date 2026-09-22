@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Infolists;
 
+use App\Features\EmailIntegration;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -16,6 +17,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Data\VisibleCommunicationIntelligence;
 use Relaticle\EmailIntegration\Enums\ConnectionStrength;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -27,6 +29,7 @@ final class CommunicationIntelligenceInfolist
         $translationKey = 'filament/communication-intelligence';
 
         return Section::make(__("{$translationKey}.heading"))
+            ->visible(fn (): bool => Feature::active(EmailIntegration::class))
             ->icon(Heroicon::ChartBar)
             ->compact()
             ->schema([
