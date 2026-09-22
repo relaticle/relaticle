@@ -20,12 +20,15 @@ use Illuminate\Support\Facades\Mail;
 #[Signature('notifications:send-task-digest')]
 final class SendTaskDigestCommand extends Command
 {
+    private const int ACTIVE_WITHIN_DAYS = 30;
+
     public function handle(DigestService $digestService): int
     {
         $sent = 0;
 
         User::query()
             ->atLocalHour(8)
+            ->where('last_login_at', '>=', now()->subDays(self::ACTIVE_WITHIN_DAYS))
             ->with(['ownedWorkspaces', 'workspaces'])
             ->chunkById(500, function (Collection $users) use ($digestService, &$sent): void {
                 foreach ($users as $user) {
