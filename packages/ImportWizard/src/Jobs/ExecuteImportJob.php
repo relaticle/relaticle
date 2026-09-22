@@ -8,6 +8,7 @@ use App\Actions\CustomFields\EnsureTagOptionsExist;
 use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\CustomFieldChangeLog;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
@@ -151,6 +152,9 @@ final class ExecuteImportJob implements ShouldQueue
             'creator_id' => $import->user_id,
         ];
 
+        $currentImport = resolve(CurrentImport::class);
+        $currentImport->set($import->id, $import->file_name);
+
         try {
             resolve(CauserResolver::class)->withCauser($import->user, function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, $import): void {
                 $store->query()
@@ -179,11 +183,14 @@ final class ExecuteImportJob implements ShouldQueue
                 'failed_rows' => $results['failed'],
             ]);
 
+            $this->logImportSummary($import, $results, ImportStatus::Completed);
+
             $this->notifyUser($import, $results);
         } catch (\Throwable $e) {
             $this->flushFailedRows($import);
             $this->persistResults($import, $results);
             $import->update(['status' => ImportStatus::Failed]);
+            $this->logImportSummary($import, $results, ImportStatus::Failed);
 
             try {
                 $this->notifyUser($import, $results, failed: true);
@@ -191,7 +198,30 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             throw $e;
+        } finally {
+            $currentImport->clear();
         }
+    }
+
+    /**
+     * One entry stands for the whole import on the workspace audit page, where the
+     * per-record rows it wrote are filtered out; record timelines keep their own.
+     *
+     * @param  array<string, int>  $results
+     */
+    private function logImportSummary(Import $import, array $results, ImportStatus $status): void
+    {
+        activity((string) config('activitylog.default_log_name'))
+            ->performedOn($import)
+            ->causedBy($import->user)
+            ->withProperties([
+                'import_file' => $import->file_name,
+                'entity_type' => $import->entity_type->value,
+                'status' => $status->value,
+                ...$results,
+            ])
+            ->event('imported')
+            ->log('imported');
     }
 
     public function failed(\Throwable $exception): void

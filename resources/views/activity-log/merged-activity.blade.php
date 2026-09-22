@@ -4,6 +4,7 @@
     /** @var \Relaticle\ActivityLog\Timeline\TimelineEntry $entry */
     /** @var \Relaticle\ActivityLog\Support\ActivityLogSummary $summary */
     /** @var list<array{label: string, old: string, new: string}> $rows */
+    /** @var string|null $importFile */
 
     $count = count($rows);
     // Only updates (and custom-field-only saves, whose event isn't a known operation)
@@ -53,6 +54,10 @@
                 {{ \Illuminate\Support\Str::of($summary->summarySentence)->after($summary->causerName)->trim() }}
             @endif
         </p>
+
+        @if (filled($importFile ?? null))
+            <p class="text-[12px] leading-5 text-gray-500 dark:text-gray-400">{{ __('workspaces.activity.via_import', ['file' => $importFile]) }}</p>
+        @endif
 
         @if ($hasDiff)
             <div x-show="open" x-cloak x-collapse class="mt-2">
