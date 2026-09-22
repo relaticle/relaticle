@@ -17,6 +17,8 @@ final readonly class RedirectController
 {
     public const string WORKSPACE_SESSION_KEY = 'email_integration.oauth.workspace_id';
 
+    public const string RETURN_URL_SESSION_KEY = 'email_integration.oauth.return_url';
+
     public function __invoke(Request $request, string $provider): RedirectResponse
     {
         /** @var User $user */
@@ -52,6 +54,12 @@ final readonly class RedirectController
         }
 
         $request->session()->put(self::WORKSPACE_SESSION_KEY, $team->getKey());
+
+        $returnUrl = $request->query('return');
+
+        is_string($returnUrl)
+            ? $request->session()->put(self::RETURN_URL_SESSION_KEY, $returnUrl)
+            : $request->session()->forget(self::RETURN_URL_SESSION_KEY);
 
         return $driver->redirect();
     }

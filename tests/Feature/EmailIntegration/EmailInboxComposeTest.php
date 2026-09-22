@@ -6,7 +6,6 @@ use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
-use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
@@ -28,17 +27,17 @@ beforeEach(function (): void {
     ]));
 });
 
-it('shows the page tabs and configure empty state when no account is connected', function (): void {
+it('shows only the gmail connect prompt when no account is connected', function (): void {
     $this->account->forceDelete();
 
     livewire(EmailInboxPage::class)
-        ->assertSee(__('filament/pages/email-inbox.tabs.drafts'))
-        ->assertSee(__('filament/pages/email-inbox.tabs.outbox'))
-        ->assertSee(__('filament/pages/email-inbox.tabs.failed'))
-        ->assertSee(__('filament/pages/email-inbox.tabs.templates'))
+        ->assertDontSee(__('filament/pages/email-inbox.tabs.drafts'))
+        ->assertDontSee(__('filament/pages/email-inbox.tabs.outbox'))
+        ->assertDontSee(__('filament/pages/email-inbox.tabs.failed'))
+        ->assertDontSee(__('filament/pages/email-inbox.tabs.templates'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
-        ->assertSee(__('filament/pages/email-accounts.not_connected.action'))
-        ->assertSeeHtml(EmailAccountsPage::getUrl());
+        ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->account->workspace));
 });
 
 it('shows the inbox instead of the prompt once an account is connected', function (): void {

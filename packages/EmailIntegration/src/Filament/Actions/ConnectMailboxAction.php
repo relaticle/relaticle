@@ -7,39 +7,39 @@ namespace Relaticle\EmailIntegration\Filament\Actions;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
-use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Livewire\Livewire;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
-/**
- * Empty-state call to action pointing users at the mailbox settings page.
- * Only shown while the user has no connected account in the current team.
- */
-final class ConfigureMailboxAction extends Action
+final class ConnectMailboxAction extends Action
 {
     public static function getDefaultName(): string
     {
-        return 'configureMailbox';
+        return 'connectMailbox';
     }
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->label(__('filament/pages/email-accounts.not_connected.action'))
-            ->icon('heroicon-o-cog-6-tooth')
-            ->url(fn (): string => EmailAccountsPage::getUrl())
-            ->visible(function (): bool {
-                /** @var User|null $user */
-                $user = auth()->user();
+        $this->label(__('filament/pages/email-accounts.actions.connect_gmail'))
+            ->icon('icon-google')
+            ->color('gray')
+            ->outlined()
+            ->url(fn (): ?string => ($workspace = $this->workspace()) instanceof Workspace
+                ? MailboxOAuthWorkspace::redirectUrl('gmail', $workspace, Livewire::originalUrl())
+                : null);
+    }
 
-                if (! $user instanceof User) {
-                    return false;
-                }
+    private function workspace(): ?Workspace
+    {
+        $tenant = filament()->getTenant();
 
-                $team = filament()->getTenant();
-                $team = $team instanceof Workspace ? $team : $user->currentWorkspace;
+        if ($tenant instanceof Workspace) {
+            return $tenant;
+        }
 
-                return ! ConnectedAccount::hasConnectedFor($user, $team instanceof Workspace ? $team : null);
-            });
+        $user = auth()->user();
+
+        return $user instanceof User ? $user->currentWorkspace : null;
     }
 }

@@ -27,7 +27,7 @@ use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
@@ -60,7 +60,8 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
                 : Heroicon::OutlinedEnvelope)
             ->emptyStateActions([
                 $composeEmail,
-                ConfigureMailboxAction::make(),
+                ConnectMailboxAction::make()
+                    ->hidden(fn (): bool => $this->hasMailbox()),
             ])
             ->recordAction('openDraft')
             ->columns([

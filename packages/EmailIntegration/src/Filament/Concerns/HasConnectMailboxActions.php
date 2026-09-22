@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Filament\Concerns;
 
 use App\Models\Workspace;
 use Filament\Actions\Action;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
 
@@ -13,12 +14,7 @@ trait HasConnectMailboxActions
 {
     public function connectGmailAction(): Action
     {
-        return Action::make('connectGmail')
-            ->label(__('filament/pages/email-accounts.actions.connect_gmail'))
-            ->icon('icon-google')
-            ->color('gray')
-            ->outlined()
-            ->url(fn (): string => MailboxOAuthWorkspace::redirectUrl('gmail', $this->mailboxOAuthWorkspace()), true);
+        return ConnectMailboxAction::make('connectGmail');
     }
 
     public function connectAzureAction(): Action

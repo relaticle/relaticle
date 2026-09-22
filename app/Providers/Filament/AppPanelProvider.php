@@ -298,6 +298,7 @@ final class AppPanelProvider extends PanelProvider
                 '*/auth/redirect/*',
                 '*/auth/link/redirect/*',
                 '*/auth/confirm/redirect/*',
+                '*/email-accounts/redirect/*',
             ])
             ->routes(function () use ($panel): void {
                 Route::get('/register', fn (): RedirectResponse => redirect()->to(Filament::getLoginUrl()))
