@@ -56,6 +56,10 @@ return [
         'submit_label' => 'Save',
     ],
     'notifications' => [
+        'connected' => [
+            'title' => 'Account connected.',
+            'body' => 'Emails and meetings will appear as the import runs.',
+        ],
         'calendar_sync_queued' => [
             'title' => 'Calendar sync started.',
             'body' => 'Your meetings will update on this page as the sync finishes.',
@@ -127,7 +131,6 @@ return [
         'calendar' => 'Calendar',
     ],
     'not_connected' => [
-        'action' => 'Configure mailbox',
         'inbox' => [
             'heading' => 'Send emails in Relaticle',
             'description' => 'Connect your mailbox to read and reply without leaving Relaticle. Mass sending, templates, attachments, and more.',

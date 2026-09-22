@@ -17,6 +17,7 @@
             <x-emails.not-connected
                 :heading="__('filament/pages/email-accounts.not_connected.record.heading')"
                 :description="__('filament/pages/email-accounts.not_connected.record.description')"
+                :action="$this->connectMailboxAction"
             />
         </div>
     @else

@@ -32,22 +32,7 @@ final class EmailAccountsPage extends Page
 
     public function getTitle(): string
     {
-        return __('filament/pages/email-accounts.title');
-    }
-
-    /**
-     * Heading and subheading are rendered inside the content column (see the page
-     * view) so they sit with the accounts panel under the workspace settings tabs. The page
-     * header itself stays empty.
-     */
-    public function getHeading(): string
-    {
-        return '';
-    }
-
-    public function getSubheading(): ?string
-    {
-        return null;
+        return __('workspaces.tabs.email');
     }
 
     public static function getNavigationLabel(): string
@@ -62,7 +47,6 @@ final class EmailAccountsPage extends Page
 
     public function mount(): void
     {
-        $this->sendSuccessNotification();
         $this->sendErrorNotification();
         $this->connectedAccounts = $this->getAccounts();
     }
@@ -109,16 +93,6 @@ final class EmailAccountsPage extends Page
     protected function afterAccountChanged(): void
     {
         $this->refreshAccounts();
-    }
-
-    public function sendSuccessNotification(): void
-    {
-        if (Session::has('success')) {
-            Notification::make()
-                ->title(Session::get('success'))
-                ->success()
-                ->send();
-        }
     }
 
     public function sendErrorNotification(): void

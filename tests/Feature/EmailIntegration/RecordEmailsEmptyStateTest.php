@@ -80,6 +80,8 @@ it('hides compose from the empty state when a search has no matches', function (
 it('keeps the connect prompt instead of compose when no mailbox is linked', function (): void {
     livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
         ->assertSee(__('filament/pages/email-accounts.not_connected.record.heading'))
+        ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
+        ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->workspace))
         ->assertDontSee(__('filament/pages/record-emails.empty.description'))
         ->assertDontSee(__('filament/pages/record-emails.empty.compose'));
 });
@@ -131,7 +133,7 @@ it('opens the composer from the emails table empty state', function (): void {
         ->assertSee(__('filament/relation-managers/emails.empty_state.heading'))
         ->assertSee(__('filament/relation-managers/emails.empty_state.description'))
         ->assertSee(__('filament/relation-managers/emails.empty_state.compose'))
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'configureMailbox'])
+        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox'])
         ->callAction(TestAction::make('composeEmail')->table())
         ->assertDispatched('composer:open');
 });

@@ -23,7 +23,7 @@ use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Actions\ConfigureMailboxAction;
+use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
@@ -264,7 +264,8 @@ abstract class BaseEmailsRelationManager extends RelationManager
                 : [
                     $composeEmail
                         ->label(__('filament/relation-managers/emails.empty_state.compose')),
-                    ConfigureMailboxAction::make(),
+                    ConnectMailboxAction::make()
+                        ->hidden(fn (): bool => $this->hasActiveConnectedAccount()),
                 ]);
     }
 
