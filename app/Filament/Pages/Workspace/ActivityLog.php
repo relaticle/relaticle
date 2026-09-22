@@ -218,7 +218,7 @@ final class ActivityLog extends Page implements HasTable
                     ->icon($this->eventIcon(...))
                     ->color(fn (?string $state): string => match ($state) {
                         'created', 'imported' => 'success',
-                        'deleted' => 'danger',
+                        'deleted', 'import_failed' => 'danger',
                         'restored' => 'warning',
                         default => 'gray',
                     })
@@ -591,6 +591,7 @@ final class ActivityLog extends Page implements HasTable
             'deleted' => Heroicon::Trash,
             'restored' => Heroicon::ArrowUturnLeft,
             'imported' => Heroicon::ArrowUpTray,
+            'import_failed' => Heroicon::ExclamationTriangle,
             default => Heroicon::PencilSquare,
         };
     }
@@ -635,6 +636,7 @@ final class ActivityLog extends Page implements HasTable
             'deleted' => __('workspaces.activity.events.deleted'),
             'restored' => __('workspaces.activity.events.restored'),
             'imported' => __('workspaces.activity.events.imported'),
+            'import_failed' => __('workspaces.activity.events.import_failed'),
         ];
     }
 

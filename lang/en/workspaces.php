@@ -182,6 +182,7 @@ return [
             'deleted' => 'Deleted',
             'restored' => 'Restored',
             'imported' => 'Imported',
+            'import_failed' => 'Import failed',
         ],
         'types' => [
             'company' => 'Company',
