@@ -82,6 +82,49 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
         ->and($shimmerLabel)->toBe('Searching companies…');
 });
 
+/**
+ * A resumed turn has no user bubble, so the transcript's last row is the
+ * assistant's own proposal reply. The shimmer used to key on that last row and
+ * never showed between the decision and the first token.
+ */
+it('renders the shimmer for a resumed turn whose last row is the proposal reply', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            data.messages = [
+                { role: 'user', content: 'remove the sample data' },
+                { role: 'assistant', content: 'Review the proposal below.', pending_actions: [], display_blocks: [], paywall: null, sessionExpired: false, rendered: true, prerendered: true },
+            ];
+            window.Livewire.dispatch('chat:resuming', { context: data.context });
+            return true;
+        })();
+    JS);
+
+    $shimmerCount = (int) $page->script(<<<'JS'
+        (() => document.querySelectorAll('[data-chat-loading-indicator]').length)();
+    JS);
+
+    $shimmerLabel = $page->script(<<<'JS'
+        (() => {
+            const el = document.querySelector('[data-chat-loading-indicator] [data-chat-loading-label]');
+            return el ? el.textContent.trim() : null;
+        })();
+    JS);
+
+    expect($shimmerCount)->toBe(1)
+        ->and($shimmerLabel)->toBe('Thinking…');
+});
+
 it('removes the shimmer once content arrives in the latest assistant message', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
@@ -121,8 +164,8 @@ it('removes the shimmer once content arrives in the latest assistant message', f
  */
 it('renders a human label for every tool the assistant can call', function (): void {
     $toolNames = array_map(
-        fn (object $tool): string => class_basename($tool),
-        app(CrmAssistant::class)->tools(),
+        class_basename(...),
+        resolve(CrmAssistant::class)->tools(),
     );
 
     $user = User::factory()->withWorkspace()->create();
