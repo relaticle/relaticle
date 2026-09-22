@@ -370,7 +370,7 @@ it('asks about the pipeline once the workspace holds records, seeded ones includ
         ->assertSee(__('filament/pages/dashboard.activation.steps.ask_rela.label'));
 });
 
-it('shows the invite row to a workspace admin and hides it from an editor', function (): void {
+it('shows the invite row to the owner and hides it from a member', function (): void {
     $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertSee(__('filament/pages/dashboard.activation.invite_members'));
@@ -381,8 +381,6 @@ it('shows the invite row to a workspace admin and hides it from an editor', func
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
-    // Members::canAccess() is can('update', $tenant), so this row would link an
-    // editor straight to a 403.
     $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));

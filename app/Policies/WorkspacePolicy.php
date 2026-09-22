@@ -45,10 +45,6 @@ final readonly class WorkspacePolicy
         return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage);
     }
 
-    /**
-     * Owner and Admin may invite, revoke, and change member roles.
-     * Renaming, deleting, billing, and custom fields stay owner-only.
-     */
     public function manageMembers(User $user, Workspace $workspace): bool
     {
         return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::MembersManage);

@@ -59,6 +59,8 @@ return [
         'disable_invite_link' => 'Turn off the link',
         'enable_invite_link' => 'Turn on the link',
         'update_workspace_role' => 'Change role',
+        'compare_roles' => 'Compare roles',
+        'compare_roles_help_link' => 'Read the full breakdown',
         'remove_workspace_member' => 'Remove',
         'leave_workspace' => 'Leave',
         'resend_workspace_invitation' => 'Resend',
@@ -81,7 +83,7 @@ return [
             'success' => 'You have left the workspace.',
         ],
         'permission_denied' => [
-            'cannot_promote_to_admin' => 'Only the workspace owner can grant or revoke Administrator access.',
+            'cannot_promote_to_admin' => 'Only the workspace owner can grant or revoke Admin access.',
             'cannot_remove_workspace_member' => 'You do not have permission to remove this member.',
             'cannot_delete_workspace' => 'You do not have permission to delete this workspace.',
             'cannot_cancel_workspace_deletion' => 'You do not have permission to cancel this workspace\'s deletion.',
@@ -114,8 +116,8 @@ return [
     'validation' => [
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'email_already_member' => 'This user already belongs to the workspace.',
-        'only_owner_promotes_admins' => 'Only the workspace owner can grant the Administrator role.',
-        'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Administrator role. Invite administrators by email instead.',
+        'only_owner_promotes_admins' => 'Only the workspace owner can grant the Admin role.',
+        'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Admin role. Invite admins by email instead.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
         'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :workspaces',
@@ -205,19 +207,55 @@ return [
     'roles' => [
         'owner' => [
             'label' => 'Owner',
+            'description' => 'Full control, including billing and deleting the workspace',
         ],
         'admin' => [
             'label' => 'Admin',
-            'description' => 'Can create, edit, and delete anything in this workspace.',
+            'description' => 'Manages members and custom fields, and can delete records permanently',
         ],
         'member' => [
             'label' => 'Member',
-            'description' => 'Can create and edit records, but not delete them.',
+            'description' => 'Creates and edits records, and deletes them to trash',
         ],
         'viewer' => [
             'label' => 'Viewer',
-            'description' => 'Can view records, but not change them.',
+            'description' => 'Reads everything and changes nothing',
         ],
+    ],
+
+    'capabilities' => [
+        'records' => [
+            'view' => ['label' => 'View records'],
+            'create' => ['label' => 'Create records'],
+            'update' => ['label' => 'Update records'],
+            'delete' => ['label' => 'Delete and restore records'],
+            'force_delete' => ['label' => 'Delete records permanently'],
+        ],
+        'data' => [
+            'import' => ['label' => 'Import data'],
+            'export' => ['label' => 'Export data'],
+        ],
+        'members' => [
+            'manage' => ['label' => 'Invite, revoke, and change member roles'],
+            'promote_admin' => ['label' => 'Promote someone to Admin'],
+        ],
+        'fields' => [
+            'manage' => ['label' => 'Manage custom fields'],
+        ],
+        'billing' => [
+            'manage' => ['label' => 'Manage billing'],
+        ],
+        'workspace' => [
+            'manage' => ['label' => 'Rename or delete the workspace'],
+        ],
+        'activity' => [
+            'view' => ['label' => 'View the activity log'],
+        ],
+    ],
+
+    'role_matrix' => [
+        'granted' => 'Included',
+        'not_granted' => 'Not included',
     ],
 
     'table' => [
@@ -246,7 +284,7 @@ return [
         'url' => 'Workspace link',
         'copied' => 'Link copied.',
         'default_role' => 'Role for people who join with this link',
-        'default_role_helper' => 'Saved as soon as you pick it. Administrators are invited by email instead.',
+        'default_role_helper' => 'Saved as soon as you pick it. Admins are invited by email instead.',
         'disabled_notice' => 'The workspace link is off, so email invitations are the only way in. Turning it on issues a new link.',
         'join' => [
             'heading' => 'Join :workspace',

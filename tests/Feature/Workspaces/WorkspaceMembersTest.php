@@ -10,6 +10,7 @@ use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Radio;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -394,4 +395,36 @@ test('the owner still manages an admin', function (): void {
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->assertTableActionVisible('updateWorkspaceRole', $admin->id)
         ->assertTableActionVisible('removeWorkspaceMember', $admin->id);
+});
+
+test('shows a hint for every role option in the change role modal', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction(TestAction::make('updateWorkspaceRole')->table($member->id))
+        ->assertSchemaComponentExists('role', checkComponentUsing: function (Radio $component): bool {
+            $descriptions = $component->getDescriptions();
+
+            return $descriptions[WorkspaceRole::Admin->value] === __('workspaces.roles.admin.description')
+                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
+                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
+        });
+});
+
+test('the change role modal offers a way to compare roles rendered from the capability map', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    $component = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction([
+            TestAction::make('updateWorkspaceRole')->table($member->id),
+            TestAction::make('compareRoles'),
+        ]);
+
+    $content = (string) $component->instance()->getMountedAction()->getModalContent();
+
+    expect($content)
+        ->toContain(__('workspaces.roles.owner.label'))
+        ->toContain(__('workspaces.capabilities.fields.manage.label'));
 });
