@@ -9,7 +9,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 /**
  * @phpstan-type ResolvedAction array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null, just_decided?: bool}
  */
-final class ResolvedActionText
+final readonly class ResolvedActionText
 {
     /**
      * @param  list<ResolvedAction>  $justDecided
