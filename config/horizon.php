@@ -408,6 +408,12 @@ return [
             'supervisor-emails-sync' => [
                 'maxProcesses' => 5,
             ],
+            'supervisor-emails-priority' => [
+                'maxProcesses' => 1,
+            ],
+            'supervisor-emails-bulk' => [
+                'maxProcesses' => 1,
+            ],
             'chat-supervisor' => [
                 'connection' => 'redis-chat',
                 'queue' => ['chat'],
