@@ -86,8 +86,8 @@
             'flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm',
             'opacity-50' => $isExcluded,
         ])>
-            @if (! in_array($row['value'] ?? $row['new'] ?? null, [null, ''], true) || ! empty($row['old']) || ! empty($row['values']))
-                @if (! empty($row['old']))
+            @if (! in_array($row['value'] ?? $row['new'] ?? null, [null, ''], true) || ! in_array($row['old'] ?? null, [null, ''], true) || ! empty($row['values']))
+                @if (! in_array($row['old'] ?? null, [null, ''], true))
                     <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">{{ $row['old'] }}</span>
                     <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                 @endif
