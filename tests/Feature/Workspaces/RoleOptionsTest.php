@@ -39,9 +39,7 @@ test('carries one hint per assignable role', function (): void {
 });
 
 test('every hint is one sentence with no trailing full stop', function (): void {
-    foreach (RoleOptions::descriptions() as $hint) {
-        expect($hint)->not->toEndWith('.');
-    }
+    expect(RoleOptions::descriptions())->each->not->toEndWith('.');
 });
 
 test('builds the matrix from the capability map', function (): void {

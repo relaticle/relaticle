@@ -41,7 +41,7 @@ test('the help page matrix renders every WorkspaceCapability label with the map\
     $rows = parseHelpRoleMatrix($page->body);
     $matrix = RoleOptions::matrix();
 
-    expect($rows)->toHaveCount(count(WorkspaceCapability::cases()));
+    expect($rows)->toHaveSameSize(WorkspaceCapability::cases());
 
     foreach (WorkspaceCapability::cases() as $capability) {
         $label = $capability->label();

@@ -439,7 +439,9 @@ test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabil
                 preg_quote($roleKey, '/'),
             );
 
-            expect(preg_match($cellPattern, $content, $cellMatch))->toBe(1);
+            expect($content)->toMatch($cellPattern);
+
+            preg_match($cellPattern, $content, $cellMatch);
 
             $granted = in_array($capability, $capabilities, true);
             $expectedText = $granted
