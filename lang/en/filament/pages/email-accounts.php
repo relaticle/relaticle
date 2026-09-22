@@ -10,6 +10,7 @@ return [
         'connect_gmail' => 'Connect Google Account',
         'connect_azure' => 'Connect Microsoft Account',
         'manage' => 'Manage',
+        'edit_settings' => 'Edit settings',
         'reconnect' => 'Reconnect',
         'set_default' => 'Set as default',
         'retry_sync' => 'Retry sync',
