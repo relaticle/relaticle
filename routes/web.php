@@ -181,14 +181,6 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
         ->name('workspace-invitations.token.accept');
 
-    Route::get('/email-attachments/{attachment}', EmailAttachmentController::class)
-        ->middleware(['auth', 'verified', AuthenticateSession::class])
-        ->name('email-attachments.download');
-
-    Route::get('/email-attachments/{attachment}/inline', EmailAttachmentController::class)
-        ->middleware(['auth', 'verified', AuthenticateSession::class])
-        ->name('email-attachments.inline');
-
     Route::post('/invitations/{token}', [AcceptWorkspaceInvitationController::class, 'store'])
         ->where('token', '[A-Za-z0-9]{40}')
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
