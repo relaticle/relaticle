@@ -253,7 +253,6 @@ arch('package service layers avoid mutation')
         'Relaticle\Chat\Support\PromptText',
         'Relaticle\Chat\Support\ProviderRateGate',
         'Relaticle\Chat\Support\TitleSanitizer',
-        // Legitimate per-instance memoization caches — intentionally mutable, not tech debt:
         'Relaticle\EmailIntegration\Services\EmailVisibilityService',
         'Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory',
         'Relaticle\EmailIntegration\Services\TeamMemberDirectory',
