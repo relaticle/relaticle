@@ -9,6 +9,7 @@ use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
+use App\Support\CustomFieldSettingsSchema;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
@@ -33,7 +34,7 @@ final class UpdateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose renaming a custom field or toggling its active status. Admin-only. Cannot modify system-defined fields. Returns a proposal for user approval.';
+        return 'Propose renaming a custom field, toggling its active status, or changing its settings (decimal places, currency, currency display, list and view visibility, search, option colors, multiple values, uniqueness). Owners and admins only. System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. Call ListCustomFieldsTool first: it returns each field\'s current settings and which ones it accepts. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -51,6 +52,8 @@ final class UpdateCustomFieldTool implements Tool
                         ->description('The new display name for the field.'),
                     'active' => $schema->boolean()
                         ->description('Set to false to deactivate the field, or true to reactivate it.'),
+                    'settings' => $schema->object()
+                        ->description('Settings to change, keyed by the names ListCustomFieldsTool returns under `settings` for this field, for example {"decimal_places": 0} to drop cents from a currency field or {"visible_in_list": false} to hide a column. Only the keys that field accepts are allowed.'),
                 ]))
                 ->required()
                 ->description(
@@ -105,14 +108,11 @@ final class UpdateCustomFieldTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}]: No custom field with code \"{$code}\" found on {$entityType}."], JSON_UNESCAPED_SLASHES);
             }
 
-            if ($field->isSystemDefined()) {
-                return (string) json_encode(['error' => "records[{$index}]: System-defined custom fields cannot be modified."], JSON_UNESCAPED_SLASHES);
-            }
-
             try {
-                $validated = CustomFieldDefinitionValidator::forRename($user, $field, array_filter([
+                $validated = CustomFieldDefinitionValidator::forUpdate($user, $field, array_filter([
                     'name' => $record['name'] ?? null,
                     'active' => $record['active'] ?? null,
+                    'settings' => $record['settings'] ?? null,
                 ], fn (mixed $value): bool => $value !== null));
             } catch (ValidationException $exception) {
                 return $this->validationError($exception);
@@ -142,8 +142,23 @@ final class UpdateCustomFieldTool implements Tool
                 ];
             }
 
+            $currentSettings = CustomFieldSettingsSchema::values($field);
+
+            foreach ($validated['settings'] ?? [] as $key => $value) {
+                if (($currentSettings[$key] ?? null) === $value) {
+                    continue;
+                }
+
+                $actionData['settings'][$key] = $value;
+                $displayFields[] = [
+                    'label' => CustomFieldSettingsSchema::label($key),
+                    'old' => CustomFieldSettingsSchema::displayValue($key, $currentSettings[$key] ?? null),
+                    'new' => CustomFieldSettingsSchema::displayValue($key, $value),
+                ];
+            }
+
             if ($displayFields === []) {
-                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. Pass a new name or an active flag."], JSON_UNESCAPED_SLASHES);
+                return (string) json_encode(['error' => "records[{$index}]: Nothing to update. The field already has every value you passed."], JSON_UNESCAPED_SLASHES);
             }
 
             $actionRecords[] = $actionData;

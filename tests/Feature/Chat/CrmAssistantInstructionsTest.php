@@ -125,7 +125,7 @@ it('routes export requests to the export destinations', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
-        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
+        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination, when their capabilities include `data.export`.')
         ->toContain('(custom field definitions, bulk imports, exports, workspace members)');
 });
 

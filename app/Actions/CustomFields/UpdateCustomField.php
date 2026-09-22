@@ -8,6 +8,7 @@ use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
+use App\Support\CustomFieldSettingsSchema;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class UpdateCustomField
@@ -22,7 +23,6 @@ final readonly class UpdateCustomField
             403,
             'Only workspace owners and admins can manage custom field definitions.',
         );
-        abort_if($field->isSystemDefined(), 422, 'System-defined custom fields cannot be modified.');
 
         $workspaceId = $user->currentWorkspace->getKey();
         $previousTenantId = TenantContextService::getCurrentTenantId();
@@ -31,7 +31,11 @@ final readonly class UpdateCustomField
         try {
             // Re-validated here, not just at proposal time: a rename approved after
             // someone else claimed the name must fail rather than write a duplicate.
-            $attributes = CustomFieldDefinitionValidator::forRename($user, $field, $data);
+            $attributes = CustomFieldDefinitionValidator::forUpdate($user, $field, $data);
+
+            if (array_key_exists('settings', $attributes)) {
+                $attributes['settings'] = CustomFieldSettingsSchema::apply($field, $attributes['settings']);
+            }
 
             $field->update($attributes);
         } finally {
