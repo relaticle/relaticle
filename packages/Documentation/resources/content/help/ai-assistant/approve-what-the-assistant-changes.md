@@ -50,6 +50,6 @@ nothing per approval.
 ## Who can propose what
 
 The assistant acts with your permissions. Creating and editing custom field
-definitions from chat is workspace-owner territory, exactly like the
-**Custom Fields** page itself. For other members the assistant explains and
+definitions from chat is owner-and-Admin territory, exactly like the
+**Custom Fields** page itself. For everyone else the assistant explains and
 links there instead.

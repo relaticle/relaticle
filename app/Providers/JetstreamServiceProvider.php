@@ -76,7 +76,7 @@ final class JetstreamServiceProvider extends ServiceProvider
 
         foreach (WorkspaceRole::cases() as $role) {
             Jetstream::role($role->value, $role->label(), $this->tokenPermissions($role))
-                ->description(__("workspaces.roles.{$role->value}.description"));
+                ->description($role->description());
         }
     }
 

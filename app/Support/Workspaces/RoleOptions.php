@@ -37,9 +37,7 @@ final readonly class RoleOptions
     public static function descriptions(): array
     {
         return collect(WorkspaceRole::cases())
-            ->mapWithKeys(fn (WorkspaceRole $role): array => [
-                $role->value => __("workspaces.roles.{$role->value}.description"),
-            ])
+            ->mapWithKeys(fn (WorkspaceRole $role): array => [$role->value => $role->description()])
             ->all();
     }
 
@@ -67,7 +65,7 @@ final readonly class RoleOptions
     {
         $roleCapabilities = collect(WorkspaceRole::cases())
             ->mapWithKeys(fn (WorkspaceRole $role): array => [$role->value => $role->capabilities()])
-            ->prepend(WorkspaceCapability::cases(), 'owner');
+            ->prepend(WorkspaceCapability::forOwner(), 'owner');
 
         return collect(WorkspaceCapability::cases())
             ->mapWithKeys(fn (WorkspaceCapability $capability): array => [

@@ -144,7 +144,7 @@ it('rejects a role outside member|viewer|admin before proposing', function (): v
 
     $decoded = json_decode($result, true);
 
-    expect($decoded['error'])->toContain('Role must be "member", "viewer", or "admin"')
+    expect($decoded['error'])->toContain('Role must be one of "admin", "member", "viewer"')
         ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
 
@@ -205,7 +205,7 @@ it('refuses to propose an invitation for a member who does not own the workspace
         'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Member->value]],
     ]));
 
-    expect($result)->toContain('Only workspace owners and administrators can invite teammates')
+    expect($result)->toContain('Only workspace owners and admins can invite teammates')
         ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
         ->and(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
 });
@@ -225,7 +225,7 @@ it('never links the non-owner refusal to a page that would 403 for them', functi
     $membersUrl = resolve(DestinationResolver::class)->resolve('workspace_members', $this->workspace);
 
     expect(Members::canAccess())->toBeFalse()
-        ->and($result)->toContain('Only workspace owners and administrators can invite teammates')
+        ->and($result)->toContain('Only workspace owners and admins can invite teammates')
         ->and($result)->toContain('ask one')
         ->and($result)->not->toContain($membersUrl)
         ->and($result)->not->toContain('http');
