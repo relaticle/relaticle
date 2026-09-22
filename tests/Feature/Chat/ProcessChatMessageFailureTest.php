@@ -166,7 +166,7 @@ it('records a dead resumed turn as its opener, never as words the user typed', f
     $job = new ProcessChatMessage(
         user: $user,
         workspace: $workspace,
-        message: '',
+        message: 'The user decided the proposals above.',
         conversationId: $conversationId,
         resolved: ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
@@ -184,7 +184,7 @@ it('records a dead resumed turn as its opener, never as words the user typed', f
 
     expect($userRows)->toHaveCount(1)
         ->and($userRows->first()->origin)->toBe(MessageOrigin::Resume->value)
-        ->and($userRows->first()->content)->toBe(MessageOrigin::Resume->opener())
+        ->and($userRows->first()->content)->toBe('The user decided the proposals above.')
         ->and(array_column(resolve(ListConversationMessages::class)->execute($user, $conversationId), 'role'))
         ->toBe(['assistant']);
 });

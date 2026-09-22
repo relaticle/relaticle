@@ -13,9 +13,9 @@ it('renders a resolved_actions block when set', function (): void {
         ->instructions();
 
     expect($instructions)->toContain('<resolved_actions>')
-        ->and($instructions)->toContain('approved: create task "Review Q3" (id: 01ABC)')
-        ->and($instructions)->toContain('rejected: create person "Sarah"')
-        ->and($instructions)->not->toContain('rejected: create person "Sarah" (id:')
+        ->and($instructions)->toContain('APPROVED (written): create task "Review Q3" (id: 01ABC)')
+        ->and($instructions)->toContain('REJECTED (nothing was written): create person "Sarah"')
+        ->and($instructions)->not->toContain('REJECTED (nothing was written): create person "Sarah" (id:')
         ->and($instructions)->toContain('NEVER describe a decided proposal as pending')
         ->and($instructions)->toContain('when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal');
 });
@@ -80,10 +80,10 @@ it('cites each approved record by title and url so the next turn can link it', f
         ->instructions();
 
     expect($instructions)
-        ->toContain("approved: create 2 note records:\n    - \"Alpha\" (id: n-a, url: /r/note/n-a)\n    - \"Beta\" (id: n-b, url: /r/note/n-b)")
-        ->toContain('approved: update note "Alpha 🚀" (id: n-a, url: /r/note/n-a)')
-        ->toContain('expired: delete company "Acme"')
-        ->toContain('expired')
+        ->toContain("APPROVED (written): create 2 note records:\n    - \"Alpha\" (id: n-a, url: /r/note/n-a)\n    - \"Beta\" (id: n-b, url: /r/note/n-b)")
+        ->toContain('APPROVED (written): update note "Alpha 🚀" (id: n-a, url: /r/note/n-a)')
+        ->toContain('EXPIRED (nothing was written): delete company "Acme"')
+        ->toContain('EXPIRED')
         ->not->toContain('since your last reply');
 });
 

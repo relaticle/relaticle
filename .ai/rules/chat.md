@@ -63,9 +63,13 @@ request. Four invariants keep it bounded, and all four are load-bearing:
 - It costs a credit like any other turn. Out of credits means no resume, not a queued
   one, the user can still type.
 The turn runs on a synthetic user message (the provider needs a final user turn). Who
-authored a message is its `origin` column, owned by `MessageOrigin`: the saved row holds
-only the enum's short `opener()`, and the instructions for the turn travel in a `<turn>`
-block of `dynamicInstructions()`, so they are never stored or replayed. The job hands the
+authored a message is its `origin` column, owned by `MessageOrigin`. For a resume the
+saved row is the outcome itself, `ResolvedActionText::resumeOpener()` built at dispatch
+from the just-decided proposals ("REJECTED (nothing was written): delete ..."), because a
+rejection stated only in the `<resolved_actions>` system block was reported as done in
+three of five production turns (2026-09). The greeting row holds the enum's short
+`opener()`. The instructions for either turn travel in a `<turn>` block of
+`dynamicInstructions()`, so they are never stored or replayed. The job hands the
 origin to the store through `Context::scope()`, and `SupersededAwareConversationStore`
 writes it in the same insert as the row. "Typed by the user" is the `typed()` scope on
 `AgentConversationMessage`, and "not synthetic" is `withoutSynthetic()`; the transcript

@@ -593,7 +593,7 @@ final readonly class PendingActionService
      * proposals are left out: they travel in their own block (see
      * supersededForConversation()) and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null, just_decided: bool}>
      */
     public function resolvedForConversation(string $conversationId, ?string $justDecidedTurnId): array
     {

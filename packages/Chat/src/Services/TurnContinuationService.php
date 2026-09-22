@@ -11,6 +11,7 @@ use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\TurnPresence;
 
 /**
@@ -40,6 +41,7 @@ final readonly class TurnContinuationService
     public function __construct(
         private CreditService $credits,
         private AiModelResolver $models,
+        private PendingActionService $pendingActions,
     ) {}
 
     /**
@@ -73,6 +75,7 @@ final readonly class TurnContinuationService
         }
 
         $turnId = (string) Str::ulid();
+        $message = ResolvedActionText::resumeOpener($this->justDecided($conversationId, $resolvedTurnId));
 
         if (! $this->credits->reserveCredit(
             $workspace,
@@ -90,7 +93,7 @@ final readonly class TurnContinuationService
         dispatch(new ProcessChatMessage(
             user: $user,
             workspace: $workspace,
-            message: '',
+            message: $message,
             conversationId: $conversationId,
             resolved: $this->models->resolve($user, $model),
             turnId: $turnId,
@@ -99,6 +102,20 @@ final readonly class TurnContinuationService
         ));
 
         return true;
+    }
+
+    /**
+     * Stated only in the <resolved_actions> system block, a rejection was
+     * reported as done in three of five production resumes.
+     *
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null, just_decided: bool}>
+     */
+    private function justDecided(string $conversationId, string $resolvedTurnId): array
+    {
+        return array_values(array_filter(
+            $this->pendingActions->resolvedForConversation($conversationId, $resolvedTurnId),
+            static fn (array $action): bool => $action['just_decided'],
+        ));
     }
 
     /**
