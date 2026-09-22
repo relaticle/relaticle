@@ -82,11 +82,6 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
         ->and($shimmerLabel)->toBe('Searching companies…');
 });
 
-/**
- * A resumed turn has no user bubble, so the transcript's last row is the
- * assistant's own proposal reply. The shimmer used to key on that last row and
- * never showed between the decision and the first token.
- */
 it('renders the shimmer for a resumed turn whose last row is the proposal reply', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

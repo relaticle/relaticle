@@ -7,12 +7,9 @@ namespace Relaticle\Chat\Support;
 use Relaticle\Chat\Enums\PendingActionStatus;
 
 /**
- * The <resolved_actions> block (with citations) and the user turn that opens
- * a resumed conversation (labels only) both read from here, so they cannot drift.
- *
  * @phpstan-type ResolvedAction array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null, just_decided?: bool}
  */
-final readonly class ResolvedActionText
+final class ResolvedActionText
 {
     /**
      * @param  list<ResolvedAction>  $justDecided

@@ -503,13 +503,6 @@ it('marks the proposals the resumed turn just decided', function (): void {
         ->toContain('Never call it already done, already sent');
 });
 
-/**
- * The block header used to tell the model to report every JUST DECIDED entry
- * "as just completed", with the status one lowercase word in the entry line.
- * Three of five production resumes after a rejection reported the write as
- * done, so the status now carries its consequence and the header never says
- * "completed".
- */
 it('names what a rejected decision did not do', function (): void {
     $agent = resolve(CrmAssistant::class);
     $agent->resolvedActions = [
