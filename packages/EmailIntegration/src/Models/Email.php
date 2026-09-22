@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Database\Factories\EmailFactory;
+use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -304,6 +305,11 @@ final class Email extends Model
     public function downloadAttachments(): EloquentCollection
     {
         return $this->attachments->where('is_inline', false);
+    }
+
+    public function sentAtForViewer(): ?CarbonInterface
+    {
+        return $this->sent_at?->setTimezone(FilamentTimezone::get());
     }
 
     public function sanitizedBodyHtml(): ?string

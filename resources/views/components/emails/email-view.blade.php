@@ -306,7 +306,7 @@
 
                 @if ($record->sent_at)
                     <time class="ml-2 hidden whitespace-nowrap text-xs text-gray-400 dark:text-gray-500 sm:block">
-                        {{ $record->sent_at->format('M j, Y · g:i A') }}
+                        {{ $record->sentAtForViewer()?->format('M j, Y · g:i A') }}
                     </time>
                 @endif
             </div>

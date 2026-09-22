@@ -42,7 +42,7 @@
             <p class="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">
                 {{ $senderName }}
                 @if ($record->sent_at)
-                    · {{ $record->sent_at->format('M j, Y · g:i A') }}
+                    · {{ $record->sentAtForViewer()?->format('M j, Y · g:i A') }}
                 @endif
             </p>
         </div>

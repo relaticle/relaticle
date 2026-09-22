@@ -297,3 +297,14 @@ it('sandboxes the threaded iframe without same-origin access', function (): void
         ->not->toContain('allow-scripts')
         ->not->toContain('allow-same-origin');
 });
+
+it('renders the sent time in the viewer timezone', function (): void {
+    $this->owner->forceFill(['timezone' => 'Asia/Yerevan'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    $email = makeEmailWithBody('<p>when</p>');
+    $email->forceFill(['sent_at' => '2026-03-10 20:30:00'])->save();
+
+    mountEmailView($email)
+        ->assertSee('Mar 11, 2026 · 12:30 AM')
+        ->assertDontSee('Mar 10, 2026 · 8:30 PM');
+});

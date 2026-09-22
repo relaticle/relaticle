@@ -19,7 +19,7 @@
     $hasPendingAccessRequest = (bool) ($email->viewer_has_pending_access_request ?? false);
     $ownerName = $email->user?->name ?: $email->user?->email ?: __('filament/pages/email-inbox.pending_access.unknown_user');
 
-    $sentAt = $email->sent_at;
+    $sentAt = $email->sentAtForViewer();
     $timestamp = match (true) {
         $sentAt === null          => null,
         $sentAt->isToday()        => $sentAt->format('g:i A'),
