@@ -15,6 +15,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -138,7 +139,7 @@ it('returns error when trying to update a system_defined field', function (): vo
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
-it('refuses to propose reactivating a system-defined field', function (): void {
+it('proposes reactivating an inactive system-defined field, as the panel allows', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $priorityField = CustomField::factory()->create([
         $tenantKey => $this->workspace->getKey(),
@@ -156,8 +157,21 @@ it('refuses to propose reactivating a system-defined field', function (): void {
         'active' => true,
     ]]]));
 
+    expect(json_decode($result, true)['type'])->toBe('pending_action')
+        ->and(PendingAction::query()->where('entity_type', 'custom_field')->count())->toBe(1);
+});
+
+it('refuses to deactivate a system-defined field', function (): void {
+    $amount = makeSystemAmountField($this);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'opportunity',
+        'code' => $amount->code,
+        'active' => false,
+    ]]]));
+
     expect($result)->toContain('System-defined')
-        ->and(PendingAction::query()->where('entity_type', 'custom_field')->count())->toBe(0);
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('rejects renaming to a name that already exists on the entity at proposal time', function (): void {
@@ -286,4 +300,185 @@ it('batches several field definitions into one per-item proposal', function (): 
 
     expect($this->field->refresh()->name)->toBe('Sector')
         ->and(CustomField::withoutGlobalScopes()->find($second->getKey())->active)->toBeFalse();
+});
+
+function makeSystemAmountField(object $context): CustomField
+{
+    return CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $context->workspace->getKey(),
+        'entity_type' => 'opportunity',
+        'name' => 'Amount',
+        'type' => 'currency',
+        'system_defined' => true,
+        'active' => true,
+        'settings' => new CustomFieldSettingsData(additional: [
+            'currency_code' => 'USD',
+            'display_type' => 'symbol',
+            'decimal_places' => 2,
+        ]),
+    ]);
+}
+
+it('proposes removing cents from a system currency field and applies it on approval', function (): void {
+    $amount = makeSystemAmountField($this);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'opportunity',
+        'code' => $amount->code,
+        'settings' => ['decimal_places' => 0],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action')
+        ->and($pending->display_data['fields'])->toContainEqual([
+            'label' => __('custom-fields::custom-fields.currency.decimal_places'),
+            'old' => '2',
+            'new' => '0',
+        ]);
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    $amount->refresh();
+
+    expect($amount->getCurrencySettings()->decimalPlaces)->toBe(0)
+        ->and($amount->getCurrencySettings()->currencyCode)->toBe('USD')
+        ->and($amount->name)->toBe('Amount');
+});
+
+it('applies a list visibility setting on a regular field', function (): void {
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'settings' => ['visible_in_list' => false],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action');
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    expect($this->field->fresh()->settings->visible_in_list)->toBeFalse();
+});
+
+it('refuses a setting that does not apply to the field type and names the ones that do', function (): void {
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'settings' => ['decimal_places' => 0],
+    ]]]));
+
+    expect($result)->toContain('decimal_places')
+        ->and($result)->toContain('visible_in_list')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses settings the panel locks once a field exists', function (): void {
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'settings' => ['encrypted' => true],
+    ]]]));
+
+    expect($result)->toContain('encrypted')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses a uniqueness change on a system field', function (): void {
+    $systemText = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Domains',
+        'type' => 'text',
+        'system_defined' => true,
+        'active' => true,
+    ]);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $systemText->code,
+        'settings' => ['unique_per_entity_type' => true],
+    ]]]));
+
+    expect($result)->toContain('unique_per_entity_type')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses a decimal count the panel does not offer and names the ones it does', function (): void {
+    $amount = makeSystemAmountField($this);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'opportunity',
+        'code' => $amount->code,
+        'settings' => ['decimal_places' => 7],
+    ]]]));
+
+    expect($result)->toContain('decimal_places must be 0, 2, 3 or 4')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('keeps the decimals when only the currency changes on a field still using its defaults', function (): void {
+    $amount = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where(config('custom-fields.database.column_names.tenant_foreign_key'), $this->workspace->getKey())
+        ->where('entity_type', 'opportunity')
+        ->where('code', 'amount')
+        ->firstOrFail();
+
+    expect($amount->settings->additional)->toBe([]);
+
+    makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'opportunity',
+        'code' => 'amount',
+        'settings' => ['currency_code' => 'JPY'],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    expect($pending->display_data['fields'])->toHaveCount(1);
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    $amount->refresh();
+
+    expect($amount->getCurrencySettings()->currencyCode)->toBe('JPY')
+        ->and($amount->getCurrencySettings()->decimalPlaces)->toBe(2);
+});
+
+it('raises the value limit when allowing multiple values, as the panel toggle does', function (): void {
+    $email = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Billing emails',
+        'type' => 'email',
+        'system_defined' => false,
+        'active' => true,
+    ]);
+
+    makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $email->code,
+        'settings' => ['allow_multiple' => true],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    expect($pending->display_data['fields'])->toContainEqual([
+        'label' => __('custom-fields::custom-fields.field.form.max_values'),
+        'old' => '1',
+        'new' => '2',
+    ]);
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    expect($email->fresh()->settings->allow_multiple)->toBeTrue()
+        ->and($email->fresh()->settings->max_values)->toBe(2);
+});
+
+it('re-validates settings at approval time', function (): void {
+    $amount = makeSystemAmountField($this);
+
+    expect(fn () => resolve(UpdateCustomField::class)->execute($this->owner, $amount, ['settings' => ['encrypted' => true]]))
+        ->toThrow(ValidationException::class);
 });
