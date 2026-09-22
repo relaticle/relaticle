@@ -188,7 +188,10 @@ final readonly class SendEmailAction
             $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
             if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
-                $linked = $linkToType::query()->whereKey($linkToId)->first();
+                $linked = $linkToType::query()
+                    ->where('workspace_id', $account->workspace_id)
+                    ->whereKey($linkToId)
+                    ->first();
 
                 if ($linked instanceof Company || $linked instanceof Opportunity || $linked instanceof People) {
                     // Attach through the record relation so emailable_type is the

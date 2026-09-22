@@ -155,6 +155,28 @@ it('ignores an in_reply_to_email_id that belongs to another team', function (): 
         ->and($email->in_reply_to)->toBeNull();
 });
 
+it('ignores a link_to record that belongs to another team', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $foreignPerson = People::factory()->create([
+        'workspace_id' => $otherUser->currentWorkspace->getKey(),
+        'creator_id' => $otherUser->getKey(),
+    ]);
+
+    $email = app(SendEmailAction::class)->execute([
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'cc' => [],
+        'bcc' => [],
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+    ], People::class, $foreignPerson->getKey());
+
+    expect($foreignPerson->emails()->whereKey($email->getKey())->exists())->toBeFalse();
+});
+
 it('does not copy a provider thread id from a different sending mailbox', function (): void {
     $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
