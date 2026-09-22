@@ -165,12 +165,16 @@ final readonly class PendingActionService
     public function recordResolveFailure(PendingAction $pendingAction, string $message): void
     {
         try {
-            $pendingAction->update([
-                'result_data' => [
-                    ...(is_array($pendingAction->result_data) ? $pendingAction->result_data : []),
-                    'last_error' => $message,
-                ],
-            ]);
+            DB::transaction(function () use ($pendingAction, $message): void {
+                $locked = PendingAction::query()->whereKey($pendingAction->getKey())->pending()->lockForUpdate()->first();
+
+                $locked?->update([
+                    'result_data' => [
+                        ...(is_array($locked->result_data) ? $locked->result_data : []),
+                        'last_error' => $message,
+                    ],
+                ]);
+            });
         } catch (Throwable $e) {
             report($e);
         }
