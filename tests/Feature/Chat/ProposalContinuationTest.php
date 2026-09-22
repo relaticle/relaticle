@@ -159,6 +159,35 @@ it('opens the resumed turn with every decision of the turn, skipped records incl
     );
 });
 
+it('names an approved delete in the resumed turn by label, without the ids it removed', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $turnId,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'company',
+        'action_data' => ['_record_ids' => ['01dd0000000000000000000001', '01dd0000000000000000000002']],
+        'display_data' => ['title' => 'Delete 2 companies', 'summary' => 'Delete 2 companies'],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['ids' => ['01dd0000000000000000000001', '01dd0000000000000000000002'], 'type' => 'company'],
+    ]);
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId);
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => str_starts_with($job->message, "The user decided the proposals above:\n- APPROVED (written): delete company ")
+            && ! str_contains($job->message, '01dd0000000000000000000001'),
+    );
+});
+
 it('does not resume while another step of the plan is still pending', function (): void {
     Queue::fake();
 
@@ -344,7 +373,7 @@ it('saves a resumed turn as its opener with a resume origin and keeps it out of 
     new ProcessChatMessage(
         user: $this->user,
         workspace: $workspace,
-        message: 'The user decided the proposals above.',
+        message: "The user decided the proposals above:\n- REJECTED (nothing was written): create company \"Rejected Co\"",
         conversationId: $this->convId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
@@ -357,7 +386,10 @@ it('saves a resumed turn as its opener with a resume origin and keeps it out of 
         ->sole();
 
     expect($row->origin)->toBe(MessageOrigin::Resume->value)
-        ->and($row->content)->toBe('The user decided the proposals above.')
+        ->and($row->content)->toBe("The user decided the proposals above:\n- REJECTED (nothing was written): create company \"Rejected Co\"")
         ->and(array_column(resolve(ListConversationMessages::class)->execute($this->user, $this->convId), 'role'))
         ->toBe(['assistant']);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->prompt === $row->content
+        && str_contains($prompt->agent->dynamicInstructions(), "The latest user message is the system's record of each decision"));
 });
