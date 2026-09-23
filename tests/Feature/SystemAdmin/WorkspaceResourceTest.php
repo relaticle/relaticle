@@ -315,6 +315,12 @@ function billingStatusArrangements(): array
             },
             BillingStatus::PastDue,
         ],
+        'a past-due subscription past its end date reads Subscription ended' => [
+            function (Workspace $workspace): void {
+                Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'ends_at' => now()->subDay()]);
+            },
+            BillingStatus::SubscriptionEnded,
+        ],
         'an expired trial awaiting the nightly downgrade reads Trial ended, not Granted' => [
             fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save(),
             BillingStatus::TrialEnded,

@@ -54,7 +54,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     {
         $subscription = $workspace->subscription();
 
-        if ($subscription?->pastDue() === true) {
+        if ($subscription?->pastDue() === true && ! $subscription->ended()) {
             return self::PastDue;
         }
 
@@ -223,7 +223,9 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
      */
     private static function pastDue(Builder $query): Builder
     {
-        return $query->pastDue();
+        return $query->pastDue()->where(fn (Builder $live): Builder => $live
+            ->notCanceled()
+            ->orWhere(fn (Builder $grace): Builder => $grace->onGracePeriod()));
     }
 
     /**
