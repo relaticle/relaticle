@@ -45,7 +45,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
 
     protected function entitySchema(JsonSchema $schema): array
     {
-        $roleValues = self::quotedRoles();
+        $roleValues = $this->quotedRoles();
 
         return [
             'email' => $schema->string()->description('Email address to invite.')->required(),
@@ -54,7 +54,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
         ];
     }
 
-    private static function quotedRoles(): string
+    private function quotedRoles(): string
     {
         return implode(', ', array_map(fn (string $value): string => "\"{$value}\"", WorkspaceRole::values()));
     }
@@ -94,7 +94,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
 
         if (! in_array($role, WorkspaceRole::values(), true)) {
             return __('Role must be one of :roles, got :role.', [
-                'roles' => self::quotedRoles(),
+                'roles' => $this->quotedRoles(),
                 'role' => "\"{$role}\"",
             ]);
         }
