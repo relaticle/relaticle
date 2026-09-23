@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldDefinitionValidator;
+use App\Support\CustomFieldSettingsSchema;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,7 @@ use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(UpdateCustomFieldTool::class, UpdateCustomField::class);
+mutates(UpdateCustomFieldTool::class, UpdateCustomField::class, CustomFieldSettingsSchema::class, CustomFieldDefinitionValidator::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withPersonalWorkspace()->create();
@@ -94,13 +96,13 @@ it('proposes renaming a custom field and updates name on approval', function ():
     expect($this->field->name)->toBe('Sector');
 });
 
-it('returns error and creates no proposal for non-owner', function (): void {
-    $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'member']);
-    $nonOwner->switchWorkspace($this->workspace);
+it('refuses a member with the role error and creates no proposal', function (): void {
+    $member = User::factory()->create();
+    $member->workspaces()->attach($this->workspace, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
 
-    Auth::guard('web')->setUser($nonOwner);
-    $this->actingAs($nonOwner);
+    Auth::guard('web')->setUser($member);
+    $this->actingAs($member);
 
     $tool = makeUpdateFieldTool($this->convId);
     $result = $tool->handle(new Request(['records' => [[
@@ -111,7 +113,8 @@ it('returns error and creates no proposal for non-owner', function (): void {
 
     $decoded = json_decode($result, true);
 
-    expect($decoded)->toHaveKey('error')
+    expect($decoded['error'])->toContain('workspace role does not allow that')
+        ->and($decoded['error'])->toContain('Do not link to any page')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
@@ -481,4 +484,54 @@ it('re-validates settings at approval time', function (): void {
 
     expect(fn () => resolve(UpdateCustomField::class)->execute($this->owner, $amount, ['settings' => ['encrypted' => true]]))
         ->toThrow(ValidationException::class);
+});
+
+it('leaves the currency settings unwritten when only a shared setting changes', function (): void {
+    $budget = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Budget',
+        'type' => 'currency',
+        'system_defined' => false,
+        'active' => true,
+        'settings' => new CustomFieldSettingsData,
+    ]);
+
+    makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $budget->code,
+        'settings' => ['visible_in_list' => false],
+    ]]]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    expect($budget->fresh()->settings->visible_in_list)->toBeFalse()
+        ->and($budget->fresh()->settings->additional)->toBe([]);
+});
+
+it('lets an admin remove cents from a currency field on approval', function (): void {
+    $amount = makeSystemAmountField($this);
+
+    $admin = User::factory()->create();
+    $admin->workspaces()->attach($this->workspace, ['role' => 'admin']);
+    $admin->switchWorkspace($this->workspace);
+
+    Auth::guard('web')->setUser($admin);
+    $this->actingAs($admin);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'opportunity',
+        'code' => $amount->code,
+        'settings' => ['decimal_places' => 0],
+    ]]]));
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->latest('id')->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $admin);
+
+    expect($amount->refresh()->getCurrencySettings()->decimalPlaces)->toBe(0);
 });

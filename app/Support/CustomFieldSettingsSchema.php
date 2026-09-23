@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\CustomField;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
-use ReflectionClass;
-use ReflectionNamedType;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Data\FieldTypeData;
 use Relaticle\CustomFields\Data\Settings\CurrencyFieldSettingsData;
@@ -18,13 +17,17 @@ use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 use Relaticle\CustomFields\Support\CurrencyProvider;
 
-/**
- * Which settings of an existing field may change outside the Filament form, derived
- * from the same feature flags and field-type metadata the management form reads.
- */
 final readonly class CustomFieldSettingsSchema
 {
     private const array OPTION_COLOR_TYPES = ['select', 'multi_select', 'tags-input'];
+
+    private const array CURRENCY_DISPLAY_TYPES = ['symbol', 'code'];
+
+    private const array CURRENCY_DECIMAL_PLACES = [0, 2, 3, 4];
+
+    private const int MIN_MAX_VALUES = 1;
+
+    private const int MAX_MAX_VALUES = 20;
 
     private const array LABEL_KEYS = [
         'visible_in_list' => 'custom-fields::custom-fields.field.form.visible_in_list',
@@ -43,10 +46,6 @@ final readonly class CustomFieldSettingsSchema
     ];
 
     /**
-     * Validation rules for the settings this field accepts, given the change being made:
-     * a key that only exists once another is set (max_values after allow_multiple) is
-     * judged against the resulting state, as the form's live visibility does.
-     *
      * @param  array<string, mixed>  $incoming
      * @return array<string, array<int, mixed>>
      */
@@ -76,7 +75,7 @@ final readonly class CustomFieldSettingsSchema
             $rules['allow_multiple'] = ['boolean'];
 
             if (! $type->requiresLookupType && (bool) $resulting['allow_multiple']) {
-                $rules['max_values'] = ['integer', 'min:1', 'max:20'];
+                $rules['max_values'] = ['integer', 'min:'.self::MIN_MAX_VALUES, 'max:'.self::MAX_MAX_VALUES];
             }
         }
 
@@ -96,8 +95,6 @@ final readonly class CustomFieldSettingsSchema
     }
 
     /**
-     * The field's current value for every setting it accepts.
-     *
      * @return array<string, mixed>
      */
     public static function current(CustomField $field): array
@@ -106,15 +103,18 @@ final readonly class CustomFieldSettingsSchema
     }
 
     /**
-     * Writes validated settings onto a copy of the field's settings object.
-     *
      * @param  array<string, mixed>  $settings
      */
     public static function apply(CustomField $field, array $settings): CustomFieldSettingsData
     {
         $data = clone $field->settings;
         $typeKeys = array_keys(self::typeRules(CustomFieldsType::getFieldType($field->type)));
-        $additional = [...$data->additional, ...self::typeValues($field)];
+        $touchesTypeSettings = array_intersect_key($settings, array_flip($typeKeys)) !== [];
+
+        // Pinning every type default keeps the decimals when only the currency changes.
+        $additional = $touchesTypeSettings
+            ? [...$data->additional, ...self::typeValues($field)]
+            : $data->additional;
 
         foreach ($settings as $key => $value) {
             if (in_array($key, $typeKeys, true)) {
@@ -138,9 +138,6 @@ final readonly class CustomFieldSettingsSchema
     }
 
     /**
-     * Carries the side effects the panel form applies when a setting changes, so a
-     * change approved from chat lands the same way a form save would.
-     *
      * @param  array<string, mixed>  $settings
      * @return array<string, mixed>
      */
@@ -161,18 +158,18 @@ final readonly class CustomFieldSettingsSchema
      */
     public static function messages(): array
     {
+        $maxValuesRange = 'max_values must be between '.self::MIN_MAX_VALUES.' and '.self::MAX_MAX_VALUES.'.';
+
         return [
             'settings.currency_code.in' => 'currency_code must be an uppercase ISO 4217 code the panel offers, such as USD, EUR or JPY.',
-            'settings.display_type.in' => 'display_type must be symbol or code.',
-            'settings.decimal_places.in' => 'decimal_places must be 0, 2, 3 or 4.',
-            'settings.max_values.min' => 'max_values must be between 1 and 20.',
-            'settings.max_values.max' => 'max_values must be between 1 and 20.',
+            'settings.display_type.in' => 'display_type must be '.Arr::join(self::CURRENCY_DISPLAY_TYPES, ', ', ' or ').'.',
+            'settings.decimal_places.in' => 'decimal_places must be '.Arr::join(self::CURRENCY_DECIMAL_PLACES, ', ', ' or ').'.',
+            'settings.max_values.min' => $maxValuesRange,
+            'settings.max_values.max' => $maxValuesRange,
         ];
     }
 
     /**
-     * Casts validated input to the type each setting stores.
-     *
      * @param  array<string, mixed>  $settings
      * @param  array<string, array<int, mixed>>  $rules
      * @return array<string, mixed>
@@ -208,8 +205,6 @@ final readonly class CustomFieldSettingsSchema
     }
 
     /**
-     * The field's effective value for every known setting, defaults included.
-     *
      * @return array<string, mixed>
      */
     public static function values(CustomField $field): array
@@ -246,39 +241,17 @@ final readonly class CustomFieldSettingsSchema
     }
 
     /**
-     * Keys come from the type's own settings data class; value constraints mirror the
-     * options its settings schema offers, which only CurrencyFieldType defines today.
-     *
      * @return array<string, array<int, mixed>>
      */
     private static function typeRules(?FieldTypeData $type): array
     {
-        $class = $type?->settingsDataClass;
-
-        if ($class === null || ! class_exists($class)) {
-            return [];
-        }
-
-        $constructor = new ReflectionClass($class)->getConstructor();
-        $rules = [];
-
-        foreach ($constructor?->getParameters() ?? [] as $parameter) {
-            $parameterType = $parameter->getType();
-            $typeName = $parameterType instanceof ReflectionNamedType ? $parameterType->getName() : 'string';
-
-            $rules[Str::snake($parameter->getName())] = [match ($typeName) {
-                'int' => 'integer',
-                'bool' => 'boolean',
-                default => 'string',
-            }];
-        }
-
-        if ($class === CurrencyFieldSettingsData::class) {
-            $rules['currency_code'][] = Rule::in(array_keys(CurrencyProvider::getOptions()));
-            $rules['display_type'][] = Rule::in(['symbol', 'code']);
-            $rules['decimal_places'][] = Rule::in([0, 2, 3, 4]);
-        }
-
-        return $rules;
+        return match ($type?->settingsDataClass) {
+            CurrencyFieldSettingsData::class => [
+                'currency_code' => ['string', Rule::in(array_keys(CurrencyProvider::getOptions()))],
+                'display_type' => ['string', Rule::in(self::CURRENCY_DISPLAY_TYPES)],
+                'decimal_places' => ['integer', Rule::in(self::CURRENCY_DECIMAL_PLACES)],
+            ],
+            default => [],
+        };
     }
 }

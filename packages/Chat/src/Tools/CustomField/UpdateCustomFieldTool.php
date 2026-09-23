@@ -18,12 +18,14 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
 
 final class UpdateCustomFieldTool implements Tool
 {
     use ReportsValidationFailures;
+    use RequiresWorkspaceCapability;
     use ResolvesOwnedCustomField;
     use WithConversationContext;
 
@@ -68,10 +70,10 @@ final class UpdateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage)) {
-            return (string) json_encode([
-                'error' => 'Only workspace owners and admins can update custom field definitions.',
-            ], JSON_UNESCAPED_SLASHES);
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::FieldsManage);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
         }
 
         $records = $request['records'] ?? null;
@@ -130,15 +132,15 @@ final class UpdateCustomFieldTool implements Tool
 
             if ($newName !== null) {
                 $actionData['name'] = $newName;
-                $displayFields[] = ['label' => 'Name', 'old' => $field->name, 'new' => $newName];
+                $displayFields[] = ['label' => __('Name'), 'old' => $field->name, 'new' => $newName];
             }
 
             if ($newActive !== null) {
                 $actionData['active'] = $newActive;
                 $displayFields[] = [
-                    'label' => 'Active',
-                    'old' => $field->active ? 'Yes' : 'No',
-                    'new' => $newActive ? 'Yes' : 'No',
+                    'label' => __('Active'),
+                    'old' => $field->active ? __('Yes') : __('No'),
+                    'new' => $newActive ? __('Yes') : __('No'),
                 ];
             }
 
