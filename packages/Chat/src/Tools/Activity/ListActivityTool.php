@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Activity;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
@@ -97,6 +98,10 @@ final readonly class ListActivityTool implements Tool
 
         if ($recordId !== null && $recordType === null) {
             return $this->error('record_id requires record_type so the record can be identified.');
+        }
+
+        if ($recordId === null && ! $user->hasWorkspaceCapability($workspace?->getKey(), WorkspaceCapability::ActivityView)) {
+            return $this->error('This user\'s workspace role cannot read activity across records. Pass record_type and record_id to read one record\'s history.');
         }
 
         if ($recordType !== null && $recordId !== null) {

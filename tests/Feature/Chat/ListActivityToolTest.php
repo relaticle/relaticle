@@ -6,6 +6,7 @@ use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\WorkspaceRole;
 use App\Models\ActivityLog\Activity;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
@@ -454,4 +455,17 @@ it('returns a second page of activity entries', function (): void {
     expect($second['data'])->not->toBeEmpty()
         ->and($second['data'])->not->toEqual($first['data'])
         ->and($second['next_page'])->toBeNull();
+});
+
+it('refuses the workspace-wide feed to a member without activity access, but still reads one record', function (): void {
+    $company = resolve(CreateCompany::class)->execute($this->user, ['name' => 'Acme']);
+
+    $member = User::factory()->create();
+    $this->user->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->user->currentWorkspace);
+    $this->actingAs($member->fresh());
+
+    expect(activityPayload())->toHaveKey('error')
+        ->and(activityPayload(['record_type' => 'company']))->toHaveKey('error')
+        ->and(activityPayload(['record_type' => 'company', 'record_id' => (string) $company->getKey()]))->not->toHaveKey('error');
 });

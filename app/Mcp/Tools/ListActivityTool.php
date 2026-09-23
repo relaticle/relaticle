@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Enums\CrmEntity;
+use App\Enums\WorkspaceCapability;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\ActivityLog\Activity;
@@ -97,6 +98,10 @@ final class ListActivityTool extends Tool
             if ($user->cannot('viewAny', $entity->model())) {
                 return Response::error('You do not have permission to view CRM activity.');
             }
+        }
+
+        if ($recordId === null && ! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::ActivityView)) {
+            return Response::error('Your workspace role cannot read activity across records. Pass record_type and record_id to read one record\'s history.');
         }
 
         if ($recordId !== null && $recordType instanceof CrmEntity) {

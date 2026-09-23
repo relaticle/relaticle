@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Company\UpdateCompany;
 use App\Actions\Crm\GetCrmSummary;
 use App\Actions\Opportunity\AggregateOpportunities;
+use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
 use App\Mcp\Tools\BaseListTool;
@@ -315,4 +316,20 @@ it('keeps custom-field definition reads scoped to the current workspace', functi
         ->tool(ListCustomFieldsTool::class)
         ->assertOk()
         ->assertDontSee($otherField->id);
+});
+
+it('refuses the workspace-wide activity feed to a member without activity access', function (): void {
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+
+    RelaticleServer::actingAs($member->fresh())
+        ->tool(ListActivityTool::class, [])
+        ->assertHasErrors();
+
+    RelaticleServer::actingAs($member->fresh())
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk();
 });
