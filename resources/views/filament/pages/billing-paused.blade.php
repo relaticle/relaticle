@@ -136,9 +136,16 @@
             <main class="flex flex-1 items-center justify-center py-16">
                 <div class="w-full max-w-sm text-center">
                     @if($activating)
-                        <div class="flex flex-col items-center gap-4" role="status">
-                            <x-filament::loading-indicator class="h-6 w-6 text-primary" />
-                            <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ __('billing.upgrade.activating') }}</p>
+                        <div x-data="{ waited: false }" x-init="setTimeout(() => waited = true, 60000)" role="status">
+                            <div class="flex flex-col items-center gap-4" x-show="! waited">
+                                <x-filament::loading-indicator class="h-6 w-6 text-primary" />
+                                <p class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ __('billing.upgrade.activating') }}</p>
+                            </div>
+
+                            <div x-show="waited" x-cloak>
+                                <h1 class="font-display text-xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('billing.upgrade.activation_delayed_title') }}</h1>
+                                <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">{{ __('billing.upgrade.activation_delayed_body') }}</p>
+                            </div>
                         </div>
                     @else
                         <h1 class="font-display text-2xl font-semibold tracking-tight text-balance text-gray-950 dark:text-white">
@@ -147,7 +154,9 @@
 
                         <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">
                             @if(! $isOwner)
-                                {{ __('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]) }}
+                                {{ $workspace->owner
+                                    ? __('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
+                                    : __('billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
                             @elseif($trialAvailable)
                                 {{ __('billing.paused.trial_body', ['workspace' => $workspace->name]) }}
                             @else

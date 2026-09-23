@@ -187,6 +187,30 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
         ->assertDontSee(__('billing.paused.delete'));
 });
 
+it('tells a member of a paused workspace whose owner was deleted who can reopen it', function (): void {
+    [$owner, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'editor']);
+    $owner->delete();
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace->refresh());
+
+    livewire(Billing::class)
+        ->assertOk()
+        ->assertSee(__('billing.paused.member_body_ownerless', ['workspace' => $workspace->name]));
+});
+
+it('tells the owner when paid activation takes longer than expected', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    livewire(Billing::class, ['checkout' => 'success'])
+        ->assertSee(__('billing.upgrade.activating'))
+        ->assertSee(__('billing.upgrade.activation_delayed_title'));
+});
+
 it('lets a paused user switch to another of their workspaces', function (): void {
     [$user, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();

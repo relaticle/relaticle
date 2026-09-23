@@ -62,6 +62,7 @@ return [
         'owner_body' => 'Subscribe to Cloud Pro to reopen :workspace. Your records are safe, and nothing has been deleted.',
         'trial_body' => 'Start a free 14-day Pro trial to reopen :workspace. Your records are safe, and nothing has been deleted.',
         'member_body' => ':owner owns :workspace and can reopen it by subscribing to Cloud Pro. Your records are safe.',
+        'member_body_ownerless' => ':workspace no longer has an owner who can subscribe. Talk to us to reopen it. Your records are safe.',
         'continue' => 'Continue with Pro',
         'switch' => 'Switch workspace',
         'help' => 'Need a hand with your plan?',
