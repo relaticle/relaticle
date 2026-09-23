@@ -35,6 +35,8 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 
     case Grandfathered = 'grandfathered';
 
+    case TrialEnded = 'trial_ended';
+
     case Granted = 'granted';
 
     case Free = 'free';
@@ -66,6 +68,10 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 
         if ($workspace->hosted_free_grandfathered_at !== null) {
             return self::Grandfathered;
+        }
+
+        if ($workspace->trial_ends_at !== null) {
+            return self::TrialEnded;
         }
 
         if ($workspace->plan !== Plan::Free) {
@@ -109,6 +115,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             self::Enterprise => 'Enterprise',
             self::Trialing => 'Trial',
             self::Grandfathered => 'Free (legacy)',
+            self::TrialEnded => 'Trial ended',
             self::Granted => 'Granted',
             self::Free => 'Free',
         };
@@ -127,6 +134,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             self::Enterprise => 'Put on the Enterprise plan by hand. No self-serve price exists for it.',
             self::Trialing => 'Running an unexpired Pro trial. Nothing has been charged yet.',
             self::Grandfathered => 'Existed before billing shipped, so hosted access stays free for good.',
+            self::TrialEnded => 'Pro trial expired with no subscription. Hosted access is paused until the owner subscribes.',
             self::Granted => 'Given a paid plan by hand, with no subscription or trial behind it.',
             self::Free => 'No subscription, trial, or grandfathering. Hosted access is paused while billing is on.',
         };
@@ -135,7 +143,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     public function getColor(): string
     {
         return match ($this) {
-            self::PastDue => 'danger',
+            self::PastDue, self::TrialEnded => 'danger',
             self::Subscribed => 'success',
             self::Enterprise => 'primary',
             self::Trialing => 'info',
@@ -159,6 +167,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
             self::Enterprise => $query->where('plan', Plan::Enterprise),
             self::Trialing => $query->onGenericTrial(),
             self::Grandfathered => $query->whereNotNull('hosted_free_grandfathered_at'),
+            self::TrialEnded => $query->whereNotNull('trial_ends_at'),
             self::Granted => $query->whereNot('plan', Plan::Free),
             self::Free => $query->where('plan', Plan::Free),
         };

@@ -315,6 +315,10 @@ function billingStatusArrangements(): array
             },
             BillingStatus::PastDue,
         ],
+        'an expired trial awaiting the nightly downgrade reads Trial ended, not Granted' => [
+            fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save(),
+            BillingStatus::TrialEnded,
+        ],
         'a hand-assigned plan reads Granted, not Pro' => [
             fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro])->save(),
             BillingStatus::Granted,
