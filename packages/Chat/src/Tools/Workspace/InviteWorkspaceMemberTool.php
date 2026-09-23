@@ -45,16 +45,18 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
 
     protected function entitySchema(JsonSchema $schema): array
     {
-        $roleValues = implode(', ', array_map(
-            fn (WorkspaceRole $role): string => "\"{$role->value}\"",
-            WorkspaceRole::cases(),
-        ));
+        $roleValues = self::quotedRoles();
 
         return [
             'email' => $schema->string()->description('Email address to invite.')->required(),
             'role' => $schema->string()
                 ->description("Workspace role: {$roleValues}. Defaults to \"".WorkspaceRole::Member->value.'".'),
         ];
+    }
+
+    private static function quotedRoles(): string
+    {
+        return implode(', ', array_map(fn (string $value): string => "\"{$value}\"", WorkspaceRole::values()));
     }
 
     protected function extractRecordData(array $record): array
@@ -89,11 +91,10 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
         }
 
         $role = $record['role'] ?? WorkspaceRole::Member->value;
-        $validRoles = array_map(fn (WorkspaceRole $case): string => $case->value, WorkspaceRole::cases());
 
-        if (! in_array($role, $validRoles, true)) {
+        if (! in_array($role, WorkspaceRole::values(), true)) {
             return __('Role must be one of :roles, got :role.', [
-                'roles' => implode(', ', array_map(fn (string $value): string => "\"{$value}\"", $validRoles)),
+                'roles' => self::quotedRoles(),
                 'role' => "\"{$role}\"",
             ]);
         }

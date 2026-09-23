@@ -221,7 +221,7 @@ it('tells an approver demoted since the plan was proposed that their role no lon
         ->call('approveAll');
 
     expect($component->errors()->get('resolve'))->toBe([
-        __('Step :step could not be completed: :message', ['step' => 1, 'message' => __('Your role no longer allows this change.')]),
+        __('Step :step could not be completed: :message', ['step' => 1, 'message' => __('You no longer have permission to make this change.')]),
     ])
         ->and(Company::query()->where('name', 'Northwind Traders')->exists())->toBeFalse();
 });

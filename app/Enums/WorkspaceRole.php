@@ -20,6 +20,12 @@ enum WorkspaceRole: string
         return __("workspaces.roles.{$this->value}.description");
     }
 
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
+
     public static function labelFor(?string $key): string
     {
         return self::tryFrom((string) $key)?->label() ?? (string) $key;

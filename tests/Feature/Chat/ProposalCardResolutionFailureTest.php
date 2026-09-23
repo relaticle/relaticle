@@ -324,8 +324,8 @@ it('tells an approver demoted since the proposal that their role no longer allow
         ->assertDispatched('proposal:resolve-failed')
         ->assertNotDispatched('proposal:resolved');
 
-    expect($component->errors()->get('resolve'))->toBe([__('Your role no longer allows this change.')])
-        ->and($action->fresh()->result_data['last_error'] ?? null)->toBe(__('Your role no longer allows this change.'))
+    expect($component->errors()->get('resolve'))->toBe([__('You no longer have permission to make this change.')])
+        ->and($action->fresh()->result_data['last_error'] ?? null)->toBe(__('You no longer have permission to make this change.'))
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
         ->and(Company::query()->where('name', 'Demoted Co')->exists())->toBeFalse();
 });
