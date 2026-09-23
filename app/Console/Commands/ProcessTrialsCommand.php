@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\Plan;
+use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
 use App\Models\Workspace;
@@ -64,7 +65,7 @@ final class ProcessTrialsCommand extends Command
         Workspace::query()
             ->whereNotNull('trial_ends_at')
             ->where('trial_ends_at', '<', now())
-            ->with('subscriptions')
+            ->with(['subscriptions', 'owner'])
             ->chunkById(100, function (Collection $workspaces) use ($credits, &$count): void {
                 $workspaces->each(function (Workspace $workspace) use ($credits, &$count): void {
                     $hasLiveSubscription = $workspace->subscriptions()
@@ -87,6 +88,10 @@ final class ProcessTrialsCommand extends Command
                         $workspace->forceFill(['plan' => Plan::Free, 'trial_ends_at' => null])->save();
                         $credits->resetPeriod($workspace);
                     });
+
+                    if ($workspace->owner instanceof User) {
+                        Mail::to($workspace->owner->email)->queue(ProEndedMail::afterTrial($workspace));
+                    }
 
                     $this->info("Trial expired, paused hosted access: {$workspace->name}");
                     $count++;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Billing\StartProTrial;
 use App\Console\Commands\ProcessTrialsCommand;
 use App\Enums\Plan;
+use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
 use App\Models\Workspace;
@@ -121,6 +122,44 @@ it('does not downgrade an expired trial that converted to a subscription', funct
     expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($workspace->trial_ends_at)->toBeNull();
 });
+
+it('emails the owner once when their expired trial is paused', function (): void {
+    Mail::fake();
+
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProEndedMail::class, 1);
+    Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
+        && $mail->cause === 'trial'
+        && $mail->workspace->is($workspace));
+});
+
+it('sends no trial-ended email when the plan outlives the trial', function (callable $arrange): void {
+    Mail::fake();
+
+    [, $workspace] = trialOwnerAndWorkspace();
+    $arrange($workspace);
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
+})->with([
+    'converted to a subscription' => [function (Workspace $workspace): void {
+        $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
+        $workspace->subscriptions()->create([
+            'type' => 'default',
+            'stripe_id' => 'sub_live',
+            'stripe_status' => 'active',
+            'stripe_price' => 'price_pro_monthly_test',
+            'quantity' => 1,
+        ]);
+    }],
+    'granted Enterprise by a sysadmin' => [fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Enterprise, 'trial_ends_at' => now()->subDay()])->save()],
+]);
 
 it('emails the owner when the trial ends in three days', function (): void {
     $this->travelTo(now()->startOfDay()->addHours(12));
