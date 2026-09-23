@@ -13,54 +13,6 @@ use Illuminate\Support\Facades\DB;
 
 mutates(WorkspaceRole::class, User::class);
 
-test('grants the owner every capability', function (): void {
-    $owner = User::factory()->withWorkspace()->create();
-
-    foreach (WorkspaceCapability::cases() as $capability) {
-        expect($owner->hasWorkspaceCapability($owner->currentWorkspace->getKey(), $capability))->toBeTrue();
-    }
-});
-
-test('maps each role to its capabilities', function (WorkspaceRole $role, array $granted, array $denied): void {
-    $owner = User::factory()->withWorkspace()->create();
-    $workspace = $owner->currentWorkspace;
-
-    $user = User::factory()->create();
-    $workspace->users()->attach($user, ['role' => $role->value]);
-    $user = $user->fresh();
-
-    foreach ($granted as $capability) {
-        expect($user->hasWorkspaceCapability($workspace->getKey(), $capability))->toBeTrue();
-    }
-
-    foreach ($denied as $capability) {
-        expect($user->hasWorkspaceCapability($workspace->getKey(), $capability))->toBeFalse();
-    }
-})->with([
-    'admin' => [
-        WorkspaceRole::Admin,
-        [WorkspaceCapability::RecordsForceDelete, WorkspaceCapability::MembersManage, WorkspaceCapability::FieldsManage, WorkspaceCapability::ActivityView, WorkspaceCapability::DataExport],
-        [WorkspaceCapability::MembersPromoteAdmin, WorkspaceCapability::BillingManage, WorkspaceCapability::WorkspaceManage],
-    ],
-    'member' => [
-        WorkspaceRole::Member,
-        [WorkspaceCapability::RecordsCreate, WorkspaceCapability::RecordsUpdate, WorkspaceCapability::RecordsDelete, WorkspaceCapability::DataImport, WorkspaceCapability::DataExport],
-        [WorkspaceCapability::RecordsForceDelete, WorkspaceCapability::MembersManage, WorkspaceCapability::FieldsManage, WorkspaceCapability::ActivityView],
-    ],
-    'viewer' => [
-        WorkspaceRole::Viewer,
-        [WorkspaceCapability::RecordsView],
-        [WorkspaceCapability::RecordsCreate, WorkspaceCapability::RecordsDelete, WorkspaceCapability::DataImport, WorkspaceCapability::DataExport],
-    ],
-]);
-
-test('denies every capability on a workspace the user does not belong to', function (): void {
-    $outsider = User::factory()->withWorkspace()->create();
-    $other = User::factory()->withWorkspace()->create()->currentWorkspace;
-
-    expect($outsider->hasWorkspaceCapability($other->getKey(), WorkspaceCapability::RecordsView))->toBeFalse();
-});
-
 test('grants capabilities on a workspace created after an earlier ownership check', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
 

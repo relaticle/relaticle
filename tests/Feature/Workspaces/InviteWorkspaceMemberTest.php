@@ -405,6 +405,17 @@ test('shows a hint for every role option in the invite modal', function (): void
         });
 });
 
+test('offers an admin every role but admin in the invite modal', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($this->workspace);
+    $this->actingAs($admin->fresh());
+
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('invitePeople')
+        ->assertSchemaComponentExists('role', checkComponentUsing: fn (Radio $component): bool => array_keys($component->getOptions()) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
+});
+
 test('shows a hint for every role option in the invite-link default role picker', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction('manageInviteLink')
