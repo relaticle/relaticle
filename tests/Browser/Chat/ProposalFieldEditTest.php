@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Note\CreateNote;
 use App\Models\User;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -19,7 +20,7 @@ it('keeps a rich-text field being edited, and its save button, inside the docked
         'workspace_id' => $workspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
-        'action_class' => \App\Actions\Note\CreateNote::class,
+        'action_class' => CreateNote::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'note',
         'action_data' => ['title' => 'Call HQ about invoice', 'custom_fields' => ['body' => '<p>Call HQ about the overdue invoice.</p>']],

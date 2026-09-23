@@ -9,6 +9,13 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class UserObserver
 {
+    public function updating(User $user): void
+    {
+        if ($user->isDirty('email')) {
+            $user->email_bounced_at = null;
+        }
+    }
+
     /**
      * Clear the deleted user from any chat participation that outlives them.
      *
