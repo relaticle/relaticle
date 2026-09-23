@@ -25,6 +25,9 @@ final readonly class UpdateCustomField
         );
 
         $workspaceId = $user->currentWorkspace->getKey();
+
+        abort_unless((string) $field->tenant_id === (string) $workspaceId, 404);
+
         $previousTenantId = TenantContextService::getCurrentTenantId();
         TenantContextService::setTenantId($workspaceId);
 
