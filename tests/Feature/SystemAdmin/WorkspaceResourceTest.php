@@ -319,6 +319,55 @@ function billingStatusArrangements(): array
             fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save(),
             BillingStatus::TrialEnded,
         ],
+        'a trial paused by the nightly downgrade still reads Trial ended' => [
+            fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Free, 'pro_trial_used_at' => now()->subDays(15)])->save(),
+            BillingStatus::TrialEnded,
+        ],
+        'a trial that ended beside an abandoned checkout reads Trial ended' => [
+            function (Workspace $workspace): void {
+                $workspace->forceFill(['pro_trial_used_at' => now()->subDays(15)])->save();
+                Subscription::factory()->incompleteAndExpired()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::TrialEnded,
+        ],
+        'a cancelled subscription reads Subscription ended' => [
+            function (Workspace $workspace): void {
+                $workspace->forceFill(['pro_trial_used_at' => now()->subMonths(3)])->save();
+                Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::SubscriptionEnded,
+        ],
+        'a cancelled subscription followed by an abandoned checkout still reads Subscription ended' => [
+            function (Workspace $workspace): void {
+                Subscription::factory()->canceled()->create([
+                    'workspace_id' => $workspace->getKey(),
+                    'created_at' => now()->subMonths(2),
+                    'updated_at' => now()->subMonths(2),
+                ]);
+                Subscription::factory()->incompleteAndExpired()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::SubscriptionEnded,
+        ],
+        'a cancelled subscriber granted Pro by hand reads Granted' => [
+            function (Workspace $workspace): void {
+                $workspace->forceFill(['plan' => Plan::Pro])->save();
+                Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::Granted,
+        ],
+        'a grandfathered workspace whose subscription ended reads Free (legacy)' => [
+            function (Workspace $workspace): void {
+                $workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save();
+                Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::Grandfathered,
+        ],
+        'a checkout abandoned without a trial reads Free' => [
+            function (Workspace $workspace): void {
+                Subscription::factory()->incompleteAndExpired()->create(['workspace_id' => $workspace->getKey()]);
+            },
+            BillingStatus::Free,
+        ],
         'a hand-assigned plan reads Granted, not Pro' => [
             fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro])->save(),
             BillingStatus::Granted,
@@ -351,25 +400,28 @@ it('labels a workspace by why it has its plan, not by the plan alone', function 
 })->with(billingStatusArrangements());
 
 it('filters workspaces by the badge they show, and by no other', function (): void {
-    $workspaces = [];
+    $arranged = [];
 
-    foreach (billingStatusArrangements() as [$arrange, $status]) {
+    foreach (billingStatusArrangements() as $name => [$arrange, $status]) {
         $workspace = billingStatusWorkspace();
         $arrange($workspace);
-        $workspaces[$status->value] = $workspace->fresh();
+        $arranged[$name] = ['workspace' => $workspace->fresh(), 'status' => $status];
     }
 
-    expect(array_keys($workspaces))
+    expect(collect($arranged)->map(fn (array $entry): string => $entry['status']->value)->unique()->values()->all())
         ->toEqualCanonicalizing(array_column(BillingStatus::cases(), 'value'));
 
-    expect(collect($workspaces)->map(fn (Workspace $workspace): string => $workspace->billingStatus()->value)->all())
-        ->toBe(array_combine(array_keys($workspaces), array_keys($workspaces)));
+    foreach ($arranged as $entry) {
+        $others = collect($arranged)
+            ->reject(fn (array $other): bool => $other['status'] === $entry['status'])
+            ->map(fn (array $other): Workspace => $other['workspace'])
+            ->values()
+            ->all();
 
-    foreach ($workspaces as $value => $workspace) {
         livewire(ListWorkspaces::class)
-            ->filterTable('billing_status', [$value])
-            ->assertCanSeeTableRecords([$workspace])
-            ->assertCanNotSeeTableRecords(collect($workspaces)->except($value)->values()->all());
+            ->filterTable('billing_status', [$entry['status']->value])
+            ->assertCanSeeTableRecords([$entry['workspace']])
+            ->assertCanNotSeeTableRecords($others);
     }
 });
 

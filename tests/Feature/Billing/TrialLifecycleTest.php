@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Billing\StartProTrial;
 use App\Console\Commands\ProcessTrialsCommand;
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
@@ -136,6 +137,21 @@ it('emails the owner once when their expired trial is paused', function (): void
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
         && $mail->cause === 'trial'
         && $mail->workspace->is($workspace));
+});
+
+it('still reads Trial ended after the nightly downgrade pauses the trial', function (): void {
+    Mail::fake();
+
+    [, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->subHour(),
+        'pro_trial_used_at' => now()->subDays(14),
+    ])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded);
 });
 
 it('sends no trial-ended email when the plan outlives the trial', function (callable $arrange): void {
