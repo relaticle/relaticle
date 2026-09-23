@@ -18,7 +18,7 @@
             && ! $onTrial
             && ! $onLegacyFree
             && $workspace->plan !== \App\Enums\Plan::Free);
-        $showEnterpriseOffer = $isOwner && ! $isEnterprise && ! $pastDue && ! $onGrace && ! $activating;
+        $showEnterpriseOffer = $canManageBilling && ! $isEnterprise && ! $pastDue && ! $onGrace && ! $activating;
         $trialDaysLeft = $onTrial ? max(0, (int) ceil(now()->floatDiffInDays($workspace->trial_ends_at))) : 0;
 
         $planLabel = match (true) {
@@ -149,7 +149,7 @@
                         <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
                     @endif
 
-                    @if($isOwner && $availablePacks !== [])
+                    @if($canManageBilling && $availablePacks !== [])
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach($availablePacks as $key => $pack)
                                 <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
@@ -169,7 +169,7 @@
                     <div class="flex-1">
                         <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('billing.manage.past_due_title') }}</h3>
                         <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ $isEnterprise ? __('billing.enterprise.previous_subscription_past_due') : __('billing.manage.past_due_body') }}</p>
-                        @if($isOwner)
+                        @if($canManageBilling)
                             <div class="mt-3">
                                 <x-filament::button color="danger" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
                             </div>
@@ -197,7 +197,7 @@
             </div>
         @endif
 
-        @if(! $isOwner)
+        @if(! $canManageBilling)
             <div class="{{ $card }} flex items-start gap-3 p-6">
                 <x-ri-information-line class="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
                 <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('billing.member.ask_owner', ['owner' => $workspace->owner->name]) }}</p>

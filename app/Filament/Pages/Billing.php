@@ -187,7 +187,7 @@ final class Billing extends Page
             // Not $workspace->plan->credits(): a past-due workspace refills at the Free
             // allowance, so the plan's figure would name credits it never gets.
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
-            'isOwner' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
+            'canManageBilling' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             'subscription' => $subscription,
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,

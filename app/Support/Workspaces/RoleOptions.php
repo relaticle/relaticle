@@ -8,13 +8,10 @@ use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Actions\Action;
+use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 
-/**
- * The only source of assignable roles, their labels, and their hints, so an
- * invite picker, a role-change picker, and the invite-link default can never
- * drift from one another or from the capability map behind them.
- */
 final readonly class RoleOptions
 {
     /**
@@ -42,23 +39,16 @@ final readonly class RoleOptions
     }
 
     /**
-     * The link can only ever grant Member or Viewer: Admin access
-     * always names the person it went to, through an emailed invite.
-     *
      * @return array<string, string>
      */
-    public static function forInviteLink(User $user, Workspace $workspace): array
+    public static function forInviteLink(): array
     {
-        return collect(self::assignable($user, $workspace))
+        return self::labels()
             ->except(WorkspaceRole::Admin->value)
             ->all();
     }
 
     /**
-     * Capability value to role key to granted, Owner included even though it
-     * carries no `WorkspaceRole` case, so a row only Owner holds never reads
-     * as something nobody can do.
-     *
      * @return array<string, array<string, bool>>
      */
     public static function matrix(): array
@@ -74,6 +64,21 @@ final readonly class RoleOptions
                     ->all(),
             ])
             ->all();
+    }
+
+    public static function compareAction(): Action
+    {
+        return Action::make('compareRoles')
+            ->label(__('workspaces.actions.compare_roles'))
+            ->color('gray')
+            ->link()
+            ->modalHeading(__('workspaces.actions.compare_roles'))
+            ->modalWidth('2xl')
+            ->modalContent(fn (): View => view('livewire.app.workspaces.role-matrix', [
+                'matrix' => self::matrix(),
+            ]))
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel(__('workspaces.actions.close'));
     }
 
     /**

@@ -287,7 +287,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             return __('workspaces.roles.owner.label');
         }
 
-        return WorkspaceRole::tryFrom((string) $record['role'])?->label() ?? (string) $record['role'];
+        return WorkspaceRole::labelFor($record['role']);
     }
 
     /**
@@ -360,10 +360,6 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     }
 
     /**
-     * Only the owner may change or remove another Administrator, so those
-     * actions are hidden on a peer Admin's row rather than offered and then
-     * refused, matching how the owner row hides Leave.
-     *
      * @param  array<string, mixed>  $record
      */
     private function canActOnRole(array $record): bool
@@ -405,7 +401,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                         },
                     ]),
             ])
-            ->extraModalFooterActions([$this->compareRolesAction()])
+            ->extraModalFooterActions([RoleOptions::compareAction()])
             ->action(function (?array $record, array $data): void {
                 $member = $this->findMember($record);
 
@@ -427,21 +423,6 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
 
                 $this->resetTable();
             });
-    }
-
-    private function compareRolesAction(): Action
-    {
-        return Action::make('compareRoles')
-            ->label(__('workspaces.actions.compare_roles'))
-            ->color('gray')
-            ->link()
-            ->modalHeading(__('workspaces.actions.compare_roles'))
-            ->modalWidth('2xl')
-            ->modalContent(fn (): View => view('livewire.app.workspaces.role-matrix', [
-                'matrix' => RoleOptions::matrix(),
-            ]))
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('workspaces.actions.close'));
     }
 
     private function removeWorkspaceMemberAction(): Action

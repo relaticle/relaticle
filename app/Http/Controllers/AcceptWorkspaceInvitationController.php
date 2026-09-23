@@ -16,7 +16,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
-use Laravel\Jetstream\Jetstream;
 
 /**
  * GET renders a confirm page and never mutates membership; POST is the only
@@ -90,7 +89,7 @@ final readonly class AcceptWorkspaceInvitationController
             'workspaceName' => $invitation->workspace->name,
             'workspaceAvatarUrl' => $invitation->workspace->getFilamentAvatarUrl(),
             'inviterName' => $invitation->inviter?->name,
-            'roleName' => Jetstream::findRole($invitation->role)?->name,
+            'roleName' => WorkspaceRole::labelFor($invitation->role),
             'roleDescription' => WorkspaceRole::tryFrom($invitation->role)?->description(),
             'memberCount' => $invitation->workspace->users()->count() + 1,
             'joinUrl' => route('workspace-invitations.token.join', ['token' => $request->route('token')]),

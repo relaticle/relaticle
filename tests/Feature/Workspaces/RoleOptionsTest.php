@@ -22,11 +22,8 @@ test('offers admin only to a user who can promote admins', function (): void {
         ->toBe([WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
 });
 
-test('never offers admin on the invite link, even to the owner', function (): void {
-    $owner = User::factory()->withWorkspace()->create();
-    $workspace = $owner->currentWorkspace;
-
-    expect(array_keys(RoleOptions::forInviteLink($owner, $workspace)))
+test('never offers admin on the invite link', function (): void {
+    expect(array_keys(RoleOptions::forInviteLink()))
         ->toBe([WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
 });
 

@@ -80,8 +80,6 @@ final class ActivationChecklist extends Component
             return false;
         }
 
-        // Every step links somewhere only a workspace admin can act on, so showing
-        // this to a member would be a checklist of 403s.
         if (! $this->user()->can('update', $workspace)) {
             return false;
         }

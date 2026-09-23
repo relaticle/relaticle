@@ -20,6 +20,11 @@ enum WorkspaceRole: string
         return __("workspaces.roles.{$this->value}.description");
     }
 
+    public static function labelFor(?string $key): string
+    {
+        return self::tryFrom((string) $key)?->label() ?? (string) $key;
+    }
+
     public static function keyIsAdmin(?string $key): bool
     {
         return self::tryFrom((string) $key) === self::Admin;

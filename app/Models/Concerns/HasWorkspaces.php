@@ -121,10 +121,6 @@ trait HasWorkspaces
         return $membershipRole === null ? null : Jetstream::findRole($membershipRole);
     }
 
-    /**
-     * The role key alone, for callers that only need to compare it (an owner's
-     * key is `owner`, unlike any `WorkspaceRole` case).
-     */
     public function membershipRole(?Model $workspace): ?string
     {
         return $this->workspaceRole($workspace)?->key;

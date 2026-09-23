@@ -100,28 +100,13 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     ->default(WorkspaceRole::Member->value)
                     ->required(),
             ])
-            ->extraModalFooterActions([$this->compareRolesAction()])
+            ->extraModalFooterActions([RoleOptions::compareAction()])
             ->action(function (array $data): void {
                 $this->sendInvitations(
                     $this->parseEmails((string) $data['emails']),
                     (string) $data['role'],
                 );
             });
-    }
-
-    private function compareRolesAction(): Action
-    {
-        return Action::make('compareRoles')
-            ->label(__('workspaces.actions.compare_roles'))
-            ->color('gray')
-            ->link()
-            ->modalHeading(__('workspaces.actions.compare_roles'))
-            ->modalWidth('2xl')
-            ->modalContent(fn (): View => view('livewire.app.workspaces.role-matrix', [
-                'matrix' => RoleOptions::matrix(),
-            ]))
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('workspaces.actions.close'));
     }
 
     public function manageInviteLinkAction(): Action
@@ -165,8 +150,8 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     ->label(__('workspaces.invite_link.default_role'))
                     ->helperText(__('workspaces.invite_link.default_role_helper'))
                     ->visible(fn (): bool => $this->workspace->hasInviteLink())
-                    ->options(fn (): array => RoleOptions::forInviteLink($this->authUser(), $this->workspace))
-                    ->in(fn (): array => array_keys(RoleOptions::forInviteLink($this->authUser(), $this->workspace)))
+                    ->options(RoleOptions::forInviteLink())
+                    ->in(array_keys(RoleOptions::forInviteLink()))
                     ->descriptions(RoleOptions::descriptions())
                     ->required()
                     ->live()
@@ -178,7 +163,7 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                         resolve(UpdateInviteLinkSettings::class)->update($this->authUser(), $this->workspace, $state);
 
                         $this->sendNotification(__('workspaces.notifications.invite_link_role_updated.success', [
-                            'role' => WorkspaceRole::tryFrom($state)?->label() ?? $state,
+                            'role' => WorkspaceRole::labelFor($state),
                         ]));
                     }),
                 Text::make(__('workspaces.invite_link.disabled_notice'))

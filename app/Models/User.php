@@ -346,15 +346,6 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * Every capability the user holds on the workspace owning the given foreign
-     * key: every case for an owner, the role map's list otherwise.
-     *
-     * Ownership reads the row directly rather than the cached `ownedWorkspaces`
-     * relation, memoised per workspace id: a workspace never changes owner after
-     * creation, so an id resolved earlier this request stays correct, and a
-     * workspace created later in the same request is a new id that was never
-     * cached stale.
-     *
      * @return array<int, WorkspaceCapability>
      */
     public function workspaceCapabilities(?string $workspaceId): array
@@ -367,14 +358,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             return WorkspaceCapability::forOwner();
         }
 
-        $this->loadMissing('workspaces');
-
-        $role = $this->workspaces
-            ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
-            ?->membership
-            ?->role;
-
-        return WorkspaceRole::tryFrom((string) $role)?->capabilities() ?? [];
+        return $this->membershipRoleFor($workspaceId)?->capabilities() ?? [];
     }
 
     public function workspaceRoleLabel(?string $workspaceId): ?string
@@ -387,6 +371,16 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             return __('workspaces.roles.owner.label');
         }
 
+        return $this->membershipRoleFor($workspaceId)?->label();
+    }
+
+    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
+    {
+        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+    }
+
+    private function membershipRoleFor(string $workspaceId): ?WorkspaceRole
+    {
         $this->loadMissing('workspaces');
 
         $role = $this->workspaces
@@ -394,12 +388,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             ?->membership
             ?->role;
 
-        return WorkspaceRole::tryFrom((string) $role)?->label();
-    }
-
-    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
-    {
-        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+        return WorkspaceRole::tryFrom((string) $role);
     }
 
     // Memoised per request. The sysadmin panel can reassign an owner, which is safe only
