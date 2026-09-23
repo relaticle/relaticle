@@ -205,7 +205,7 @@ final class Billing extends Page
     {
         return [
             'pausedCause' => match (true) {
-                $workspace->subscriptions()->whereIn('stripe_status', [StripeSubscriptionStatus::Canceled, StripeSubscriptionStatus::Unpaid])->exists() => 'subscription',
+                $workspace->subscriptions->whereIn('stripe_status', [StripeSubscriptionStatus::Canceled->value, StripeSubscriptionStatus::Unpaid->value])->isNotEmpty() => 'subscription',
                 $workspace->pro_trial_used_at !== null => 'trial',
                 default => 'paused',
             },

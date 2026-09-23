@@ -12,7 +12,10 @@
         </header>
 
         @if($reviewingPlan)
-            <main class="flex flex-1 justify-center py-10 sm:py-14" x-data="{ yearly: true }">
+            <main class="flex flex-1 justify-center py-10 sm:py-14" x-data="{
+                yearly: true,
+                get amount() { return this.yearly ? @js(__('billing.paused.review.amount_yearly')) : @js(__('billing.paused.review.amount_monthly')) },
+            }">
                 <div class="w-full max-w-4xl">
                     <button type="button" wire:click="$set('step', null)" class="mb-4 inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition hover:text-gray-950 dark:text-gray-400 dark:hover:text-white">
                         <x-ri-arrow-left-line class="h-4 w-4" />
@@ -92,7 +95,7 @@
                                 <dl class="mt-5 space-y-3 text-sm">
                                     <div class="flex justify-between gap-4">
                                         <dt class="text-gray-950 dark:text-white">{{ __('billing.paused.review.line_item', ['workspace' => $workspace->name]) }}</dt>
-                                        <dd class="text-gray-700 tabular-nums dark:text-gray-300" x-text="yearly ? @js(__('billing.paused.review.amount_yearly')) : @js(__('billing.paused.review.amount_monthly'))">{{ __('billing.paused.review.amount_yearly') }}</dd>
+                                        <dd class="text-gray-700 tabular-nums dark:text-gray-300" x-text="amount">{{ __('billing.paused.review.amount_yearly') }}</dd>
                                     </div>
                                     <div class="flex justify-between gap-4">
                                         <dt class="text-gray-950 dark:text-white">{{ __('billing.paused.review.credits', ['credits' => number_format(\App\Enums\Plan::Pro->credits())]) }}</dt>
@@ -103,7 +106,7 @@
 
                                     <div class="flex justify-between gap-4">
                                         <dt class="text-gray-600 dark:text-gray-400">{{ __('billing.paused.review.subtotal') }}</dt>
-                                        <dd class="text-gray-700 tabular-nums dark:text-gray-300" x-text="yearly ? @js(__('billing.paused.review.amount_yearly')) : @js(__('billing.paused.review.amount_monthly'))">{{ __('billing.paused.review.amount_yearly') }}</dd>
+                                        <dd class="text-gray-700 tabular-nums dark:text-gray-300" x-text="amount">{{ __('billing.paused.review.amount_yearly') }}</dd>
                                     </div>
                                     <div class="flex justify-between gap-4">
                                         <dt class="text-gray-600 dark:text-gray-400">{{ __('billing.paused.review.tax') }}</dt>
@@ -114,7 +117,7 @@
 
                                     <div class="flex items-baseline justify-between gap-4">
                                         <dt class="font-medium text-gray-950 dark:text-white" x-text="yearly ? @js(__('billing.paused.review.total_yearly')) : @js(__('billing.paused.review.total_monthly'))">{{ __('billing.paused.review.total_yearly') }}</dt>
-                                        <dd class="font-display text-2xl font-semibold tracking-tight text-gray-950 tabular-nums dark:text-white" x-text="yearly ? @js(__('billing.paused.review.amount_yearly')) : @js(__('billing.paused.review.amount_monthly'))">{{ __('billing.paused.review.amount_yearly') }}</dd>
+                                        <dd class="font-display text-2xl font-semibold tracking-tight text-gray-950 tabular-nums dark:text-white" x-text="amount">{{ __('billing.paused.review.amount_yearly') }}</dd>
                                     </div>
                                 </dl>
 
