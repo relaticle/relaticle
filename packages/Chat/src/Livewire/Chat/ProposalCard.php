@@ -35,6 +35,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
@@ -906,7 +907,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($anchor, $exception->getMessage());
+            $this->reportResolveFailure($anchor, $this->approvalFailureMessage($exception));
 
             return;
         }
@@ -967,7 +968,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, $exception->getMessage());
+            $this->reportResolveFailure($step, $this->approvalFailureMessage($exception));
 
             return;
         }
@@ -1110,11 +1111,10 @@ final class ProposalCard extends BaseLivewireComponent
             // ValidationException is thrown by the action's tenant guards when a
             // referenced record or assignee stopped being reachable between the
             // proposal and the approval. HttpException (from abort_*() inside an
-            // action, e.g. the owner-only guard) is a RuntimeException too, and its
-            // message is written for the user, so it renders as-is. Livewire would
-            // otherwise absorb these into an error bag nothing renders, leaving the
-            // button a permanent no-op.
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            // action, e.g. a capability guard) is a RuntimeException too. Livewire
+            // would otherwise absorb these into an error bag nothing renders,
+            // leaving the button a permanent no-op.
+            $this->reportResolveFailure($pendingAction, $this->approvalFailureMessage($exception));
 
             return;
         }
@@ -1164,7 +1164,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $exception->getMessage()));
+            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $this->approvalFailureMessage($exception)));
             $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
 
             return;
@@ -1208,6 +1208,16 @@ final class ProposalCard extends BaseLivewireComponent
         $after = array_values(array_filter($unresolved, fn (int $i): bool => $i > $decidedIndex));
 
         $this->cursor = $after[0] ?? ($unresolved[0] ?? 0);
+    }
+
+    private function approvalFailureMessage(RuntimeException|ValidationException $exception): string
+    {
+        // Entity actions abort_unless(..., 403) with no message once the approver lost the role.
+        if ($exception instanceof HttpException && $exception->getStatusCode() === 403 && $exception->getMessage() === '') {
+            return __('Your role no longer allows this change.');
+        }
+
+        return $exception->getMessage();
     }
 
     /**

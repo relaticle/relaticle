@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Company\CreateCompany;
+use App\Enums\WorkspaceRole;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -10,12 +11,14 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -296,4 +299,33 @@ it('leaves the winning approval untouched when a second tab approves the same pr
     expect($firstTabWins)->toBeFalse()
         ->and($action->fresh()->status)->toBe(PendingActionStatus::Approved)
         ->and($action->fresh()->result_data)->toBe($winningResult);
+});
+
+it('tells an approver demoted since the proposal that their role no longer allows it, and writes nothing', function (): void {
+    Bus::fake();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member->fresh());
+
+    $result = resolve(CreateCompanyTool::class)->handle(new Request(['records' => [['name' => 'Demoted Co']]]));
+
+    expect($result)->toContain('pending_action');
+
+    $action = PendingAction::query()->where('user_id', $member->getKey())->sole();
+
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    $this->actingAs($member->fresh());
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved');
+
+    expect($component->errors()->get('resolve'))->toBe([__('Your role no longer allows this change.')])
+        ->and($action->fresh()->result_data['last_error'] ?? null)->toBe(__('Your role no longer allows this change.'))
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and(Company::query()->where('name', 'Demoted Co')->exists())->toBeFalse();
 });
