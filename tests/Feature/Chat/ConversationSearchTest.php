@@ -118,7 +118,7 @@ it('does not match a conversation by the opener of a synthetic message', functio
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'user',
         'origin' => MessageOrigin::Resume->value,
-        'content' => MessageOrigin::Resume->opener(),
+        'content' => 'The user decided the proposals above.',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
         'tool_calls' => '[]',

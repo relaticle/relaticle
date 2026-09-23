@@ -165,12 +165,16 @@ final readonly class PendingActionService
     public function recordResolveFailure(PendingAction $pendingAction, string $message): void
     {
         try {
-            $pendingAction->update([
-                'result_data' => [
-                    ...(is_array($pendingAction->result_data) ? $pendingAction->result_data : []),
-                    'last_error' => $message,
-                ],
-            ]);
+            DB::transaction(function () use ($pendingAction, $message): void {
+                $locked = PendingAction::query()->whereKey($pendingAction->getKey())->pending()->lockForUpdate()->first();
+
+                $locked?->update([
+                    'result_data' => [
+                        ...(is_array($locked->result_data) ? $locked->result_data : []),
+                        'last_error' => $message,
+                    ],
+                ]);
+            });
         } catch (Throwable $e) {
             report($e);
         }
@@ -593,7 +597,7 @@ final readonly class PendingActionService
      * proposals are left out: they travel in their own block (see
      * supersededForConversation()) and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null, just_decided: bool}>
      */
     public function resolvedForConversation(string $conversationId, ?string $justDecidedTurnId): array
     {

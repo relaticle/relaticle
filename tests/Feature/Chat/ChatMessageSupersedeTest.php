@@ -167,7 +167,7 @@ it('anchors a regenerate on the last typed message, never on a synthetic one', f
     $user = User::factory()->withPersonalWorkspace()->create();
     [$conversationId, $ids] = seedSupersedeConversation($user);
 
-    foreach ([['user', MessageOrigin::Resume->opener(), MessageOrigin::Resume], ['assistant', 'Created it.', MessageOrigin::Typed]] as [$role, $content, $origin]) {
+    foreach ([['user', 'The user decided the proposals above.', MessageOrigin::Resume], ['assistant', 'Created it.', MessageOrigin::Typed]] as [$role, $content, $origin]) {
         DB::table('agent_conversation_messages')->insert([
             'id' => (string) Str::uuid7(),
             'conversation_id' => $conversationId,
@@ -209,7 +209,7 @@ it('refuses a synthetic user row as the anchor', function (): void {
         'agent' => 'test',
         'role' => 'user',
         'origin' => MessageOrigin::Resume->value,
-        'content' => MessageOrigin::Resume->opener(),
+        'content' => 'The user decided the proposals above.',
         'attachments' => '[]',
         'tool_calls' => '[]',
         'tool_results' => '[]',

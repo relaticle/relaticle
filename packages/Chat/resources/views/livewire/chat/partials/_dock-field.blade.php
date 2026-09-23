@@ -53,7 +53,13 @@
     ])>{{ $row['label'] ?? '' }}</span>
 
     @if ($isEditing)
-        <div class="w-full min-w-0">
+        {{-- Filament loads field scripts lazily, so the editor grows after it mounts.
+             Following its size keeps the editor and its Save button inside the scroller. --}}
+        <div
+            class="w-full min-w-0"
+            x-data="{ observer: null, destroy() { this.observer?.disconnect() } }"
+            x-init="observer = new ResizeObserver(() => $el.scrollIntoView({ block: 'nearest' })); observer.observe($el)"
+        >
             {{ $this->form }}
 
             @error('field')

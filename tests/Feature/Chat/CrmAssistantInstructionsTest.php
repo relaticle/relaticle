@@ -157,7 +157,7 @@ it('routes bulk updates through one records[] call instead of one approval per r
 });
 
 it('carries the grounding, join, and formatting rules', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('Never state a count, a total, or an absence')
@@ -167,13 +167,13 @@ it('carries the grounding, join, and formatting rules', function (): void {
 });
 
 it('tells the model to name only the records its answer turns on', function (): void {
-    expect(app(CrmAssistant::class)->staticInstructions())
+    expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('Name only the records the answer turns on')
         ->toContain('Walking every row to show your work is re-listing');
 });
 
 it('tells the model to reach for include when asked for related records', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('pass `include` to the list tool')
@@ -188,7 +188,7 @@ it('tells the model to reach for include when asked for related records', functi
  * model to distrust a table that is now trustworthy.
  */
 it('no longer warns that showing can exceed what the table prints', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->not->toContain('can exceed the rows the table under your reply prints')
@@ -205,7 +205,7 @@ it('no longer warns that showing can exceed what the table prints', function ():
  * so that case is spelled out with the sentence to write instead.
  */
 it('forbids repeating a page size the user named', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('even when the user named a page size')
@@ -220,14 +220,14 @@ it('forbids repeating a page size the user named', function (): void {
  * silently truncate the user's request to the first page.
  */
 it('tells the model how to fetch the next page of a list result', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('page` set to the result\'s `next_page`');
 });
 
 it('tells the model to end every answer with exactly one offered next action', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('exactly one concrete offered next action or question')
@@ -235,7 +235,7 @@ it('tells the model to end every answer with exactly one offered next action', f
 });
 
 it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('<workspace_state>')
@@ -243,7 +243,7 @@ it('tells the model to name sample data as sample data when the workspace state 
 });
 
 it('removes all sample data in one approval but lets a partial removal use the creation source filter', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('wants all the sample data gone, call RemoveSampleDataTool')
@@ -386,7 +386,7 @@ it('strips prompt punctuation from a stage a user renamed', function (): void {
     $workspace = $owner->currentWorkspace;
     $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
-    $stageField = CustomField::withoutGlobalScopes()
+    $stageField = CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $workspace->getKey())
         ->where('code', 'stage')
         ->sole();
@@ -406,7 +406,7 @@ it('omits the stages line for a workspace with no stage field', function (): voi
     $workspace = $owner->currentWorkspace;
     $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Recruiting])->save();
 
-    CustomField::withoutGlobalScopes()
+    CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $workspace->getKey())
         ->where('code', 'stage')
         ->delete();
@@ -497,10 +497,29 @@ it('marks the proposals the resumed turn just decided', function (): void {
     $block = $agent->instructions();
 
     expect($block)
-        ->toContain('JUST DECIDED, approved: create workspace_invitations')
-        ->not->toContain('JUST DECIDED, approved: create companies')
+        ->toContain('JUST DECIDED, APPROVED (written): create workspace_invitations')
+        ->not->toContain('JUST DECIDED, APPROVED (written): create companies')
         ->not->toContain('already decided by the user earlier in this conversation')
-        ->toContain('Never call it already done, already sent, already invited');
+        ->toContain('Never call it already done, already sent');
+});
+
+it('names what a rejected decision did not do', function (): void {
+    $agent = resolve(CrmAssistant::class);
+    $agent->resolvedActions = [
+        [
+            'operation' => 'delete', 'entity_type' => 'sample_data', 'status' => 'rejected',
+            'label' => 'All sample records', 'record_id' => null, 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => true,
+        ],
+    ];
+
+    $instructions = $agent->instructions();
+
+    expect($instructions)
+        ->toContain('- JUST DECIDED, REJECTED (nothing was written): delete sample_data "All sample records"')
+        ->toContain('REJECTED and EXPIRED mean nothing was written')
+        ->not->toContain('Report it as just completed ("Invited X", "Created Y"). Never');
 });
 
 /**
@@ -512,7 +531,7 @@ it('does not tell the model the request is already approved without qualifying w
 
     expect($instructions)
         ->not->toContain('When everything requested is already approved')
-        ->toContain('If those approvals arrived on THIS turn');
+        ->toContain('reporting each decision as the Resuming section says');
 });
 
 /**
