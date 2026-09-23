@@ -11,53 +11,48 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Mail\Message;
 use Illuminate\Support\Facades\Mail;
+use Spatie\MailcoachMailer\MailcoachApiTransport;
+use Symfony\Component\HttpClient\Exception\TransportException;
+use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\Mailer\Envelope;
 use Symfony\Component\Mailer\Exception\HttpTransportException;
-use Symfony\Component\Mailer\SentMessage;
-use Symfony\Component\Mailer\Transport\TransportInterface;
-use Symfony\Component\Mime\RawMessage;
 
 mutates(ParksBouncedRecipients::class, DropBouncedRecipientsListener::class);
 
-function failingTransport(int $status): TransportInterface
+function useMailcoachAnswering(MockHttpClient $client): void
 {
-    return new readonly class($status) implements TransportInterface
-    {
-        public function __construct(private int $status) {}
-
-        public function send(RawMessage $message, ?Envelope $envelope = null): ?SentMessage
-        {
-            throw new HttpTransportException('Unable to send an email', new MockResponse('', ['http_code' => $this->status]));
-        }
-
-        public function __toString(): string
-        {
-            return 'failing';
-        }
-    };
+    Mail::mailer('array')->setSymfonyTransport((new MailcoachApiTransport('token', $client))->setHost('relaticle.mailcoach.test'));
 }
 
-function queueDigestThrough(int $status, User $user): void
+function queueDigestThrough(MockHttpClient $client, User $user, string $expectedException = HttpTransportException::class): void
 {
-    Mail::mailer('array')->setSymfonyTransport(failingTransport($status));
+    useMailcoachAnswering($client);
 
     expect(fn () => Mail::mailer('array')->to($user)->queue(new TaskDigestMail($user, new DigestPayload([]))))
-        ->toThrow(HttpTransportException::class);
+        ->toThrow($expectedException);
 }
 
 it('parks the recipient when the provider reports an inactive address', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
 
-    queueDigestThrough(406, $user);
+    queueDigestThrough(new MockHttpClient(new MockResponse('', ['http_code' => 406])), $user);
 
     expect($user->fresh()->email_bounced_at)->not->toBeNull();
 });
 
-it('keeps the recipient on other transport failures', function (): void {
+it('keeps the recipient on other provider errors', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
 
-    queueDigestThrough(500, $user);
+    queueDigestThrough(new MockHttpClient(new MockResponse('', ['http_code' => 500])), $user);
+
+    expect($user->fresh()->email_bounced_at)->toBeNull();
+});
+
+it('keeps the recipient when the provider cannot be reached', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $client = new MockHttpClient(fn (): never => throw new TransportException('SSL certificate problem: certificate has expired'));
+
+    queueDigestThrough($client, $user, TransportException::class);
 
     expect($user->fresh()->email_bounced_at)->toBeNull();
 });
@@ -65,7 +60,7 @@ it('keeps the recipient on other transport failures', function (): void {
 it('parks the owner when the trial notice bounces', function (): void {
     $owner = User::factory()->create();
     $workspace = Workspace::factory()->create(['user_id' => $owner->id, 'trial_ends_at' => now()->addDays(3)]);
-    Mail::mailer('array')->setSymfonyTransport(failingTransport(406));
+    useMailcoachAnswering(new MockHttpClient(new MockResponse('', ['http_code' => 406])));
 
     expect(fn () => Mail::mailer('array')->to($owner)->queue(new ProTrialEndingSoonMail($workspace)))
         ->toThrow(HttpTransportException::class);
