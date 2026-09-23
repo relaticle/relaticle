@@ -58,6 +58,12 @@ enum StripeSubscriptionStatus: string implements HasColor, HasDescription, HasLa
         return $state instanceof self ? $state->getDescription() : null;
     }
 
+    /** @return list<string> */
+    public static function neverGranted(): array
+    {
+        return [self::Incomplete->value, self::IncompleteExpired->value];
+    }
+
     public function getLabel(): string
     {
         return match ($this) {
