@@ -247,7 +247,7 @@ return [
             'export' => ['label' => 'Export data'],
         ],
         'members' => [
-            'manage' => ['label' => 'Invite, revoke, and change member roles'],
+            'manage' => ['label' => 'Invite, remove, and change member roles'],
             'promote_admin' => ['label' => 'Promote someone to Admin'],
         ],
         'fields' => [
@@ -268,6 +268,7 @@ return [
         'capability_column' => 'Capability',
         'granted' => 'Included',
         'not_granted' => 'Not included',
+        'opens_in_new_tab' => '(opens in a new tab)',
     ],
 
     'table' => [

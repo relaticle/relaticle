@@ -6,11 +6,11 @@
     <table class="w-full text-sm" data-role-matrix>
         <thead>
             <tr class="border-b border-gray-200 dark:border-white/10">
-                <th class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">
+                <th scope="col" class="px-3 py-2 text-left font-medium text-gray-500 dark:text-gray-400">
                     <span class="sr-only">{{ __('workspaces.role_matrix.capability_column') }}</span>
                 </th>
                 @foreach ($roleKeys as $roleKey)
-                    <th class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
+                    <th scope="col" class="px-3 py-2 text-center font-medium text-gray-700 dark:text-gray-200">
                         {{ __("workspaces.roles.{$roleKey}.label") }}
                     </th>
                 @endforeach
@@ -45,6 +45,7 @@
             class="text-primary-600 hover:underline dark:text-primary-400"
         >
             {{ __('workspaces.actions.compare_roles_help_link') }}
+            <span class="sr-only">{{ __('workspaces.role_matrix.opens_in_new_tab') }}</span>
         </a>
     </p>
 </div>

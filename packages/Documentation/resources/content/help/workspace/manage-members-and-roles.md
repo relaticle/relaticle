@@ -12,12 +12,14 @@ Invitations, roles, and removals all live there. **Invite people** sends the
 invites. **Members** below it lists everyone with access, whether they have
 joined or not.
 
-## A recent change to Admin and Viewer access
+## A recent change to roles
 
-Admins can now invite people, revoke invitations, change member roles, and
-manage custom fields. They could not before. Check your **Members** list if
-you granted the Admin role earlier, because everyone holding it gained
-those abilities. Viewers lost one ability: they can no longer export data.
+The Administrator role is now called Admin, and Editor is now called Member.
+Admins can now manage custom fields, which only the owner could do before.
+Check your **Members** list if you granted the Admin role earlier. Viewers
+can no longer export data, so give anyone who still needs exports the
+Member role. A Viewer can still read records through an access token for the
+API or MCP.
 
 ## The four roles
 
@@ -30,14 +32,14 @@ those abilities. Viewers lost one ability: they can no longer export data.
 | Delete records permanently | Yes | Yes | No | No |
 | Import data | Yes | Yes | Yes | No |
 | Export data | Yes | Yes | Yes | No |
-| Invite, revoke, and change member roles | Yes | Yes | No | No |
+| Invite, remove, and change member roles | Yes | Yes | No | No |
 | Promote someone to Admin | Yes | No | No | No |
 | Manage custom fields | Yes | Yes | No | No |
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |
 
-Admins manage members and custom fields alongside working with records, but a
+Admins manage members and custom fields alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:
 promoting someone *to* Admin, renaming or deleting the workspace, and
 billing.
@@ -46,9 +48,9 @@ The owner isn't a role you assign. Whoever owns the workspace always
 appears with an **Owner** badge, has no role to change, and can't leave or
 be removed.
 
-**Compare roles**, in the footer of the **Invite workspace members** dialog and
-of the **Change role** dialog, opens this table in the app so it never
-falls out of date with what each role can actually do.
+The **Invite workspace members** and **Change role** dialogs both carry
+**Compare roles** in their footer. It opens this table in the app, and it
+always matches what each role can actually do.
 
 ## Invitations
 
