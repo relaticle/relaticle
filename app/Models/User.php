@@ -374,6 +374,12 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->membershipRoleFor($workspaceId)?->label();
     }
 
+    /** @return list<string> */
+    public function workspaceTokenPermissions(?string $workspaceId): array
+    {
+        return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
+    }
+
     public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
     {
         return in_array($capability, $this->workspaceCapabilities($workspaceId), true);

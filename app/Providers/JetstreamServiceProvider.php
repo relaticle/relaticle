@@ -75,21 +75,8 @@ final class JetstreamServiceProvider extends ServiceProvider
         Jetstream::defaultApiTokenPermissions(['read']);
 
         foreach (WorkspaceRole::cases() as $role) {
-            Jetstream::role($role->value, $role->label(), $this->tokenPermissions($role))
+            Jetstream::role($role->value, $role->label(), WorkspaceCapability::tokenPermissions($role->capabilities()))
                 ->description($role->description());
         }
-    }
-
-    /** @return array<int, string> */
-    private function tokenPermissions(WorkspaceRole $role): array
-    {
-        $capabilities = $role->capabilities();
-
-        return array_values(array_filter([
-            'read',
-            in_array(WorkspaceCapability::RecordsCreate, $capabilities, true) ? 'create' : null,
-            in_array(WorkspaceCapability::RecordsUpdate, $capabilities, true) ? 'update' : null,
-            in_array(WorkspaceCapability::RecordsDelete, $capabilities, true) ? 'delete' : null,
-        ]));
     }
 }

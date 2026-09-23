@@ -30,4 +30,23 @@ enum WorkspaceCapability: string
     {
         return self::cases();
     }
+
+    /**
+     * @param  array<int, self>  $capabilities
+     * @return list<string>
+     */
+    public static function tokenPermissions(array $capabilities): array
+    {
+        $permissions = [
+            'read' => self::RecordsView,
+            'create' => self::RecordsCreate,
+            'update' => self::RecordsUpdate,
+            'delete' => self::RecordsDelete,
+        ];
+
+        return array_keys(array_filter(
+            $permissions,
+            fn (self $capability): bool => in_array($capability, $capabilities, true),
+        ));
+    }
 }
