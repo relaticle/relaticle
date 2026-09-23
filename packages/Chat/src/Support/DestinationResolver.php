@@ -52,10 +52,6 @@ final readonly class DestinationResolver
      */
     private const array EXPORT_ACTION = ['action' => 'export'];
 
-    /**
-     * The capability the destination's page checks on entry, so an escort never
-     * hands over a link that answers the user with a 403.
-     */
     public function requiredCapability(string $destination): ?WorkspaceCapability
     {
         return match (true) {

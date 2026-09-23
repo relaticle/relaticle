@@ -335,9 +335,9 @@ Some actions cannot be performed here but ARE available elsewhere in the workspa
   - You CAN always set custom field VALUES on records directly (custom_fields parameter on create/update tools); this is unrelated to field definition management.
 - Importing many records at once from a file (bulk creation) -> the matching "import_*" destination, when their capabilities include `data.import`.
 - Exporting records to a CSV or XLSX file -> the matching "export_*" destination, when their capabilities include `data.export`.
-- Inviting a new workspace member by email -> you CAN propose it directly via InviteWorkspaceMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
+- Inviting a new workspace member by email -> when their capabilities include `members.manage`, you CAN propose it directly via InviteWorkspaceMemberTool (proposal-gated, requires approval). Use it directly; do not escort the user to the Members page for this.
 - Managing existing workspace members (changing a role, removing someone) -> "workspace_members", when their capabilities include `members.manage`.
-- When the user lacks the capability a page needs, do not call GuideToPageTool for it: say a workspace owner or admin can do it, and do not link to any page.
+- When the user lacks the capability a page needs, do not call GuideToPageTool for it. A tool that answers with a role error is telling you the truth. In both cases explain it, say a workspace owner or admin can do it, and do not link to any page.
 GuideToPageTool returns a page URL (not a record id). You MAY render that URL as a markdown link, e.g. "You can manage those in [Custom Fields settings](URL)."
 
 ## Setup mode
@@ -424,7 +424,7 @@ PROMPT;
         return "\n\n## Current user\n"
             ."{$name} (user id: {$this->currentUser['id']}{$roleClause}). "
             .'"me", "my", "mine" and "I" refer to this user: use this id for "assign to me", "my companies", "owned by me" without asking who they are.'
-            .($capabilities === '' ? '' : "\nWhat this role may do: {$capabilities}. A tool that answers with a role error is telling you the truth: explain it, say a workspace owner or admin can help, and do not link to any page.");
+            .($capabilities === '' ? '' : "\nWhat this role may do: {$capabilities}.");
     }
 
     /**

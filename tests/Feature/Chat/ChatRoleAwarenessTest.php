@@ -14,9 +14,14 @@ use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\BaseWriteCreateTool;
+use Relaticle\Chat\Tools\BaseWriteDeleteTool;
+use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
+
+mutates(BaseWriteCreateTool::class, BaseWriteUpdateTool::class, BaseWriteDeleteTool::class);
 
 beforeEach(function (): void {
     Bus::fake();

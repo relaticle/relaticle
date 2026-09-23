@@ -114,13 +114,13 @@ it('proposes adding options and creates them on approval', function (): void {
     expect($optionNames)->toBe(['Active', 'Inactive', 'Pending']);
 });
 
-it('returns error when non-owner tries to add options', function (): void {
-    $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'member']);
-    $nonOwner->switchWorkspace($this->workspace);
+it('refuses a member with the role error and creates no proposal', function (): void {
+    $member = User::factory()->create();
+    $member->workspaces()->attach($this->workspace, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
 
-    Auth::guard('web')->setUser($nonOwner);
-    $this->actingAs($nonOwner);
+    Auth::guard('web')->setUser($member);
+    $this->actingAs($member);
 
     $tool = makeAddOptionsTool($this->convId);
     $result = $tool->handle(new Request([
@@ -131,8 +131,37 @@ it('returns error when non-owner tries to add options', function (): void {
 
     $decoded = json_decode($result, true);
 
-    expect($decoded)->toHaveKey('error')
+    expect($decoded['error'])->toContain('workspace role does not allow that')
+        ->and($decoded['error'])->toContain('Do not link to any page')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('lets an admin propose options that land on approval', function (): void {
+    $admin = User::factory()->create();
+    $admin->workspaces()->attach($this->workspace, ['role' => 'admin']);
+    $admin->switchWorkspace($this->workspace);
+
+    Auth::guard('web')->setUser($admin);
+    $this->actingAs($admin);
+
+    $result = makeAddOptionsTool($this->convId)->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'Churned']],
+    ]));
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $admin);
+
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    expect(CustomFieldOption::query()
+        ->where('custom_field_id', $this->selectField->getKey())
+        ->where('name', 'Churned')
+        ->exists())->toBeTrue();
 });
 
 it('returns error when adding options to a non-choice type field', function (): void {

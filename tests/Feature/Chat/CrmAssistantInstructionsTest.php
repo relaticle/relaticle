@@ -169,6 +169,20 @@ it('names the capabilities the role holds so the model does not promise what the
         ->not->toContain('records.create');
 });
 
+it('keeps the role-error rule in the cached prefix and gates invites on members.manage', function (): void {
+    $agent = (new CrmAssistant)->withCurrentUser([
+        'name' => 'Sam Viewer',
+        'id' => '01VIEWER',
+        'role' => WorkspaceRole::Viewer->label(),
+        'capabilities' => [WorkspaceCapability::RecordsView->value],
+    ]);
+
+    expect($agent->staticInstructions())
+        ->toContain('A tool that answers with a role error is telling you the truth.')
+        ->toContain('Inviting a new workspace member by email -> when their capabilities include `members.manage`')
+        ->and($agent->dynamicInstructions())->not->toContain('role error');
+});
+
 it('marks the context blocks as internal so the model never names them to the user', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('internal')

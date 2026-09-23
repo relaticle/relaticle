@@ -15,11 +15,13 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 final class CreateCustomFieldTool implements Tool
 {
     use ReportsValidationFailures;
+    use RequiresWorkspaceCapability;
     use WithConversationContext;
 
     public function name(): string
@@ -61,10 +63,10 @@ final class CreateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage)) {
-            return (string) json_encode([
-                'error' => 'Only workspace owners and admins can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask them to do this.',
-            ], JSON_UNESCAPED_SLASHES);
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::FieldsManage);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
         }
 
         try {
