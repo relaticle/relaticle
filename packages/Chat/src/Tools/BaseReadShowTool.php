@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\CustomFieldType;
 use App\Models\User;
+use App\Support\PlainText;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -412,6 +413,6 @@ abstract class BaseReadShowTool implements Tool
 
     private function truncateFreeText(string $html): string
     {
-        return Str::limit(Str::squish(strip_tags($html)), self::FREE_TEXT_LIMIT);
+        return Str::limit(PlainText::fromHtml($html), self::FREE_TEXT_LIMIT);
     }
 }

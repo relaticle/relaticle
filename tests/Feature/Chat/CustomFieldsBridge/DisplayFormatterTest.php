@@ -54,6 +54,15 @@ it('formats rich-text fields by stripping HTML for the proposal card', function 
     expect($rows[0]['new'])->toBe('Hello world');
 });
 
+it('keeps the paragraphs of a rich-text field apart and decodes its entities', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => '<p>Send the quote &amp; terms.</p><p>Loop in finance.</p>'], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('Send the quote & terms. Loop in finance.');
+});
+
 it('includes the old value for updates with a current value on the model', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;

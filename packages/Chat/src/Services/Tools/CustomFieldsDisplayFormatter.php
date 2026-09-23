@@ -8,6 +8,7 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\PlainText;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -224,6 +225,10 @@ final readonly class CustomFieldsDisplayFormatter
 
         if ($field->type === CustomFieldType::RECORD->value) {
             return $this->renderRecords($field, $value);
+        }
+
+        if ($field->type === CustomFieldType::RICH_EDITOR->value) {
+            return PlainText::fromHtml((string) $value);
         }
 
         $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
