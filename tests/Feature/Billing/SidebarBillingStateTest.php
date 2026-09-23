@@ -6,6 +6,7 @@ use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Services\Billing\SidebarBillingState;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 
 mutates(SidebarBillingState::class);
@@ -47,6 +48,17 @@ it('asks a paused workspace to subscribe', function (): void {
     expect($state)->not->toBeNull()
         ->and($state['label'])->toBe(__('billing.sidebar.paused'))
         ->and($state['action'])->toBe(__('billing.sidebar.subscribe'));
+});
+
+it('asks a workspace whose subscription ended to subscribe', function (): void {
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $state = resolve(SidebarBillingState::class)->for($this->workspace->fresh());
+
+    expect($state)->not->toBeNull()
+        ->and($state['label'])->toBe(__('billing.sidebar.paused'))
+        ->and($state['action'])->toBe(__('billing.sidebar.subscribe'))
+        ->and($state['urgent'])->toBeFalse();
 });
 
 it('flags a past-due workspace even though its subscription still reads valid', function (): void {
