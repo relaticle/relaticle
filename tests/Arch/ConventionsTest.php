@@ -338,12 +338,21 @@ it('reads workspace authorization only through the capability map', function ():
         'app/Models/User.php',
         'app/Models/Concerns/HasWorkspaces.php',
         'app/Enums/WorkspaceRole.php',
+        'app/Actions/Jetstream/RemoveWorkspaceMember.php',
+        'tests/Feature/CRM/WorkspaceAuthorizationTest.php',
+        'tests/Feature/Workspaces/InviteLinkTokenTest.php',
+        'tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php',
+        'tests/Feature/Workspaces/UpdateWorkspaceMemberRoleTest.php',
+        'tests/Feature/Workspaces/WorkspaceMembersCrossTenantTest.php',
+        'tests/Feature/Workspaces/WorkspaceMembersTest.php',
     ];
 
     $directories = [
         $root.'/app',
         $root.'/packages',
         $root.'/database',
+        $root.'/resources',
+        $root.'/routes',
         $root.'/tests',
     ];
 
@@ -353,7 +362,7 @@ it('reads workspace authorization only through the capability map', function ():
     ));
 
     $pattern = '/('
-        .'hasWorkspaceRole\(|hasWorkspaceRoleForWorkspaceId\(|isViewerOnWorkspaceId\(|ownsWorkspace\(|workspaceRole\('
+        .'hasWorkspaceRole\(|hasWorkspaceRoleForWorkspaceId\(|isViewerOnWorkspaceId\(|ownsWorkspace\(|workspaceRole\(|membershipRole\('
         .'|WorkspaceRole::[A-Za-z]+(?:->value)?\s*(?:===|!==)'
         .'|(?:===|!==)\s*WorkspaceRole::[A-Za-z]+(?:->value)?'
         .'|(?:->role\b|\[\'role\'\]|->key\b|\$\w+|\))\s*(?:===|!==)\s*\'(?:'.$roleKeys.')\''
@@ -408,6 +417,63 @@ it('reads workspace authorization only through the capability map', function ():
         '(.ai/guidelines/relaticle/architecture.md). Only App\\Models\\User, HasWorkspaces and '.
         'WorkspaceRole may resolve a role or ownership directly; every other caller reads '.
         'User::hasWorkspaceCapability(). '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('keeps the retired editor role key out of everything but its historic migrations', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $allowedPrefixes = [
+        'database/migrations/2026_08_18_100000_',
+        'database/migrations/2026_09_01_203744_',
+        'database/migrations/2026_09_18_000000_',
+    ];
+
+    $directories = [
+        $root.'/app',
+        $root.'/config',
+        $root.'/database',
+        $root.'/lang',
+        $root.'/packages',
+        $root.'/resources',
+        $root.'/routes',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.(php|md|js|json)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            foreach ($allowedPrefixes as $prefix) {
+                if (str_starts_with($relativePath, $prefix)) {
+                    continue 2;
+                }
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                if (preg_match('/(?<![\w-]=)([\'"])editor\1/', $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = $relativePath.':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'The editor workspace role was renamed to member by 2026_09_18_000000_rename_editor_role_to_member. '.
+        'Only the historic migrations may still name the old key; an HTML attribute such as x-ref is exempt. '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

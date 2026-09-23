@@ -101,10 +101,10 @@ test('a user outside the workspace cannot open the members tab', function (): vo
 test('the tab strip hides activity from members without the admin role', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    $this->actingAs($editor);
+    $this->actingAs($member);
 
     expect(workspaceTabLabels(app(EditWorkspace::class)))
         ->not->toContain(__('workspaces.tabs.activity'))
@@ -123,11 +123,11 @@ test('a workspace admin can open the members tab', function (): void {
         ->assertSuccessful();
 });
 
-test('a workspace editor cannot open the members tab', function (): void {
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+test('a workspace member cannot open the members tab', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    $this->actingAs($editor)
+    $this->actingAs($member)
         ->get(Members::getUrl(tenant: $this->workspace))
         ->assertForbidden();
 });

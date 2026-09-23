@@ -50,19 +50,19 @@ test('admin cannot promote another member to admin', function (): void {
     $admin = User::factory()->create();
     $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
-    $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
     Filament::setTenant($workspace);
 
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
-        ->callAction(TestAction::make('updateWorkspaceRole')->table($editor->id), data: [
+        ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), data: [
             'role' => WorkspaceRole::Admin->value,
         ])
         ->assertHasActionErrors(['role']);
 
-    expect(WorkspaceRole::tryFrom((string) $editor->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
+    expect(WorkspaceRole::tryFrom((string) $member->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('admin cannot demote another admin', function (): void {

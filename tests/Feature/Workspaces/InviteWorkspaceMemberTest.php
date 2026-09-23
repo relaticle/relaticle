@@ -34,7 +34,7 @@ beforeEach(function () {
     Filament::setTenant($this->workspace);
 });
 
-test('an invite with only an email defaults to the editor role', function () {
+test('an invite with only an email defaults to the member role', function () {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction('invitePeople')
         ->assertActionDataSet(['role' => WorkspaceRole::Member->value])
@@ -125,7 +125,7 @@ test('creates an invitation through the chat adapter action', function () {
     Mail::assertQueued(WorkspaceInvitationMail::class);
 });
 
-test('the chat adapter action defaults to the editor role when none is given', function () {
+test('the chat adapter action defaults to the member role when none is given', function () {
     $invitation = resolve(CreateWorkspaceInvitation::class)->execute(
         $this->user,
         ['email' => 'no-role@example.com'],
@@ -215,19 +215,19 @@ test('admin can manage members but cannot promote to admin', function (): void {
         ->and($admin->can('delete', $workspace))->toBeFalse();
 });
 
-test('editor cannot manage members', function (): void {
+test('a member cannot manage members', function (): void {
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
 
-    $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    expect($editor->can('manageMembers', $workspace))->toBeFalse()
-        ->and($editor->can('addWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('updateWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('removeWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('promoteToAdmin', $workspace))->toBeFalse()
-        ->and($editor->can('update', $workspace))->toBeFalse();
+    expect($member->can('manageMembers', $workspace))->toBeFalse()
+        ->and($member->can('addWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('updateWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('removeWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('promoteToAdmin', $workspace))->toBeFalse()
+        ->and($member->can('update', $workspace))->toBeFalse();
 });
 
 test('viewer cannot manage members', function (): void {
@@ -384,7 +384,7 @@ test('an administrator cannot invite someone straight to administrator', functio
     expect(WorkspaceInvitation::query()->where('email', 'escalate@example.com')->exists())->toBeFalse();
 });
 
-test('an administrator can invite someone as an editor', function (): void {
+test('an administrator can invite someone as a member', function (): void {
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 

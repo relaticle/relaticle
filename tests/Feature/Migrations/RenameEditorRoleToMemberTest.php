@@ -2,9 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Actions\People\CreatePeople;
+use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
 
 function runRenameEditorRoleToMemberMigration(): void
 {
@@ -48,4 +53,43 @@ test('moves the invite link default so a new workspace stores member', function 
     );
 
     expect($default->column_default)->toContain('member');
+});
+
+test('retires a pending invitation proposal and leaves other pending proposals alone', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+
+    $invitationProposal = PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $owner->getKey(),
+        'action_class' => CreateWorkspaceInvitation::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'workspace_invitations',
+        'action_data' => ['records' => [['email' => 'invited@example.test', 'role' => 'editor']]],
+        'display_data' => ['title' => 'Invite member'],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $peopleProposal = PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $owner->getKey(),
+        'action_class' => CreatePeople::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['records' => [['name' => 'Dana Whitfield']]],
+        'display_data' => ['title' => 'Create Person'],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    runRenameEditorRoleToMemberMigration();
+
+    $invitationProposal->refresh();
+    $peopleProposal->refresh();
+
+    expect($invitationProposal->status)->toBe(PendingActionStatus::Superseded)
+        ->and($invitationProposal->resolved_at)->not->toBeNull()
+        ->and($peopleProposal->status)->toBe(PendingActionStatus::Pending)
+        ->and($peopleProposal->resolved_at)->toBeNull();
 });

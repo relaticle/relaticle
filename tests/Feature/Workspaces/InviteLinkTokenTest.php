@@ -351,7 +351,7 @@ test('the join link grants the configured default role', function (): void {
         ->toBe(WorkspaceRole::Viewer->value);
 });
 
-test('workspaces without a configured default still grant editor', function (): void {
+test('workspaces without a configured default still grant member', function (): void {
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
 

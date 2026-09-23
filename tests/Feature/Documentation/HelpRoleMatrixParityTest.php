@@ -6,6 +6,8 @@ use App\Enums\WorkspaceCapability;
 use App\Support\Workspaces\RoleOptions;
 use Relaticle\Documentation\Support\DocsRepository;
 
+mutates(RoleOptions::class);
+
 /**
  * @return array<string, array<string, string>>
  */

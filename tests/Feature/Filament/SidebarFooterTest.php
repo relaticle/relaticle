@@ -8,8 +8,12 @@ use App\Filament\Pages\Billing;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Workspace\Members;
 use App\Models\User;
+use App\Policies\WorkspacePolicy;
+use App\Services\Billing\SidebarBillingState;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
+
+mutates(WorkspacePolicy::class, SidebarBillingState::class);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);
@@ -19,11 +23,6 @@ beforeEach(function (): void {
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
 });
 
-/**
- * The sidebar footer is one block among many on the dashboard, and the chat
- * panel links to Billing on its own for a low-credit warning regardless of
- * role, so the assertions below scope to this block rather than the full page.
- */
 function sidebarFooterHtml(string $html): string
 {
     $start = strpos($html, 'fi-sidebar-footer-activation');
@@ -41,7 +40,7 @@ test('the owner sees both the members link and the billing link', function (): v
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
-    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->getContent());
+    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
         ->toContain(Members::getUrl())
@@ -55,7 +54,7 @@ test('an admin sees the members link but not the billing link', function (): voi
     $this->actingAs($admin);
     Filament::setTenant($this->workspace);
 
-    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->getContent());
+    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
         ->toContain(Members::getUrl())
@@ -69,7 +68,7 @@ test('a member sees neither the members link nor the billing link', function ():
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
-    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->getContent());
+    $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
         ->not->toContain(Members::getUrl())

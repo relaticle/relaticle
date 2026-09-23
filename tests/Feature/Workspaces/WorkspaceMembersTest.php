@@ -251,13 +251,13 @@ test('the invite link default role must be a role the app actually registers', f
 });
 
 test('a member role must be a role the app actually registers', function (): void {
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    expect(fn () => resolve(UpdateWorkspaceMemberRole::class)->update($this->owner, $this->workspace, (string) $editor->getKey(), 'superuser'))
+    expect(fn () => resolve(UpdateWorkspaceMemberRole::class)->update($this->owner, $this->workspace, (string) $member->getKey(), 'superuser'))
         ->toThrow(ValidationException::class);
 
-    expect($editor->fresh()->membershipRole($this->workspace->fresh()))->toBe(WorkspaceRole::Member->value);
+    expect($member->fresh()->membershipRole($this->workspace->fresh()))->toBe(WorkspaceRole::Member->value);
 });
 
 test('rotating the invite link changes the token', function (): void {
@@ -377,15 +377,15 @@ test('an admin sees no remove action on another admins row', function (): void {
 
 test('an admin still manages a non admin member', function (): void {
     $admin = User::factory()->create();
-    $editor = User::factory()->create();
+    $member = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Member->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->assertTableActionVisible('updateWorkspaceRole', $editor->id)
-        ->assertTableActionVisible('removeWorkspaceMember', $editor->id);
+        ->assertTableActionVisible('updateWorkspaceRole', $member->id)
+        ->assertTableActionVisible('removeWorkspaceMember', $member->id);
 });
 
 test('the owner still manages an admin', function (): void {
