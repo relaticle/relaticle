@@ -11,6 +11,9 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\MaxExceptions;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Actions\RecordMailboxHistoryImportStoreFailureAction;
@@ -24,13 +27,12 @@ use Throwable;
 
 #[DeleteWhenMissingModels]
 #[MaxExceptions(3)]
+#[Queue('emails-sync')]
+#[Tries(3)]
+#[UniqueFor(3600)]
 final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
 {
     use Batchable, Queueable, ReleasesOnProviderRateLimit;
-
-    public int $tries = 3;
-
-    public int $uniqueFor = 3600;
 
     /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
     public array $backoff;
@@ -39,7 +41,6 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
         public readonly ConnectedAccount $connectedAccount,
         public readonly string $messageId,
     ) {
-        $this->onQueue('emails-sync');
         $this->backoff = $this->resolveStoreBackoff();
     }
 

@@ -9,6 +9,9 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
@@ -19,19 +22,16 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 #[DeleteWhenMissingModels]
+#[Queue('emails-sync')]
+#[Timeout(300)]
+#[UniqueFor(3600)]
 final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
-
-    public int $uniqueFor = 3600;
-
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
-    ) {
-        $this->onQueue('emails-sync');
-    }
+    ) {}
 
     public function handle(LinkEmailAction $linkEmail, LinkMeetingAction $linkMeeting): void
     {

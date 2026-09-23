@@ -8,7 +8,11 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\CalendarPushChannelData;
@@ -23,22 +27,17 @@ use Relaticle\EmailIntegration\Support\CalendarPushWebhookUrl;
 use Throwable;
 
 #[DeleteWhenMissingModels]
+#[Backoff(60, 300, 900)]
+#[Queue('emails-sync')]
+#[Tries(3)]
+#[UniqueFor(3600)]
 final class EnsureCalendarPushChannelJob implements ShouldBeUnique, ShouldQueue
 {
     use DetectsAuthErrors, Queueable;
 
-    public int $tries = 3;
-
-    public int $uniqueFor = 3600;
-
-    /** @var array<int, int> */
-    public array $backoff = [60, 300, 900];
-
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
-    ) {
-        $this->onQueue('emails-sync');
-    }
+    ) {}
 
     public function handle(CalendarServiceFactoryInterface $calendarFactory): void
     {
