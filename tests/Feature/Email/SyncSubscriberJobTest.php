@@ -496,3 +496,127 @@ test('a user who typed a chat message is tagged has-ai-usage', function (): void
 
     syncSubscriberProfile($user);
 });
+
+test('stores the profile without any Mailcoach call when the user gave no marketing consent', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create(['email_verified_at' => now()]);
+
+    Mailcoach::shouldReceive('findByEmail')->never();
+    Mailcoach::shouldReceive('createSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh())
+        ->mailcoach_subscriber_uuid->toBeNull()
+        ->subscriber_profile_hash->not->toBeNull();
+});
+
+test('unsubscribes the stored subscriber when consent is withdrawn and keeps the uuid', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'mc-uuid-1',
+    ]);
+
+    Mailcoach::shouldReceive('subscriber')
+        ->once()
+        ->with('mc-uuid-1')
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-1', 'email' => $user->email, 'tags' => [], 'unsubscribed_at' => null]));
+    Mailcoach::shouldReceive('unsubscribeSubscriber')->once()->with('mc-uuid-1');
+    Mailcoach::shouldReceive('updateSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh())
+        ->mailcoach_subscriber_uuid->toBe('mc-uuid-1')
+        ->subscriber_profile_hash->not->toBeNull();
+});
+
+test('forgets a withdrawn subscriber Mailcoach no longer holds', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'gone-uuid',
+    ]);
+
+    Mailcoach::shouldReceive('subscriber')->once()->with('gone-uuid')->andThrow(new ResourceNotFound);
+    Mailcoach::shouldReceive('unsubscribeSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh()->mailcoach_subscriber_uuid)->toBeNull();
+});
+
+test('resubscribes an unsubscribed subscriber when consent returns', function (): void {
+    $user = User::factory()->withWorkspace()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'mc-uuid-1',
+    ]);
+
+    Mailcoach::shouldReceive('subscriber')
+        ->once()
+        ->with('mc-uuid-1')
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-1', 'email' => $user->email, 'tags' => [], 'unsubscribed_at' => '2026-09-01T00:00:00Z']));
+
+    Mailcoach::shouldReceive('resubscribeSubscriber')->once()->with('mc-uuid-1');
+    Mailcoach::shouldReceive('updateSubscriber')
+        ->once()
+        ->with('mc-uuid-1', Mockery::type('array'))
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-1', 'email' => $user->email, 'tags' => []]));
+
+    syncSubscriberProfile($user);
+});
+
+test('the reconcile sweep leaves a settled non-consenting user alone', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create(['email_verified_at' => now()]);
+
+    syncSubscriberProfile($user);
+
+    expect(new SubscriberProfileDeriver()->derive($user->refresh())->needsSync($user))->toBeFalse();
+});
+
+test('skips the unsubscribe call when Mailcoach already holds the subscriber as unsubscribed', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'mc-uuid-1',
+    ]);
+
+    Mailcoach::shouldReceive('subscriber')
+        ->once()
+        ->with('mc-uuid-1')
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-1', 'email' => $user->email, 'tags' => [], 'unsubscribed_at' => '2026-09-01T00:00:00Z']));
+    Mailcoach::shouldReceive('unsubscribeSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    expect($user->refresh()->subscriber_profile_hash)->not->toBeNull();
+});
+
+test('an email-link unsubscribe newer than the consent withdraws consent instead of resubscribing', function (): void {
+    $user = User::factory()->withWorkspace()->create([
+        'email_verified_at' => now(),
+        'mailcoach_subscriber_uuid' => 'mc-uuid-1',
+        'marketing_consent_at' => now()->subDays(10),
+    ]);
+
+    Mailcoach::shouldReceive('subscriber')
+        ->once()
+        ->with('mc-uuid-1')
+        ->andReturn(new Subscriber(['uuid' => 'mc-uuid-1', 'email' => $user->email, 'tags' => [], 'unsubscribed_at' => now()->subDay()->toIso8601String()]));
+    Mailcoach::shouldReceive('resubscribeSubscriber')->never();
+    Mailcoach::shouldReceive('updateSubscriber')->never();
+
+    syncSubscriberProfile($user);
+
+    $user->refresh();
+
+    expect($user->marketing_consent_at)->toBeNull()
+        ->and(new SubscriberProfileDeriver()->derive($user)->needsSync($user))->toBeFalse();
+});
+
+test('a withdrawn profile ignores tag changes so reconcile leaves it alone', function (): void {
+    $user = User::factory()->withWorkspace()->withoutMarketingConsent()->create(['email_verified_at' => now()]);
+
+    syncSubscriberProfile($user);
+
+    Company::factory()->create(['workspace_id' => $user->currentWorkspace->id, 'account_owner_id' => $user->id]);
+
+    expect(new SubscriberProfileDeriver()->derive($user->refresh())->needsSync($user))->toBeFalse();
+});

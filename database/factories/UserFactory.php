@@ -34,6 +34,7 @@ final class UserFactory extends Factory
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
+            'marketing_consent_at' => now(),
             'last_login_at' => null,
             'password' => self::$password ??= Hash::make('password'),
             'two_factor_secret' => null,
@@ -51,6 +52,13 @@ final class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    public function withoutMarketingConsent(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'marketing_consent_at' => null,
         ]);
     }
 

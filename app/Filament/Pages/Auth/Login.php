@@ -20,6 +20,7 @@ use Filament\Auth\Events\Registered;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
@@ -204,7 +205,7 @@ final class Login extends \Filament\Auth\Pages\Login
         $email = EmailAddress::canonicalize((string) $data['email']);
 
         try {
-            $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password']);
+            $user = resolve(CreateNewUser::class)->execute($email, (string) $data['password'], (bool) ($data['marketing_consent'] ?? false));
         } catch (UniqueConstraintViolationException) {
             $this->resetTurnstileChallenge();
 
@@ -451,11 +452,20 @@ final class Login extends \Filament\Auth\Pages\Login
 
         return $schema->components([
             ...$schema->getComponents(withHidden: true),
+            $this->getMarketingConsentFormComponent(),
             Hidden::make('cf_turnstile_expanded')
                 ->default(false)
                 ->dehydrated(false),
             $this->getTurnstileFormComponent(),
         ]);
+    }
+
+    protected function getMarketingConsentFormComponent(): Checkbox
+    {
+        return Checkbox::make('marketing_consent')
+            ->label(__('auth.login.marketing_consent'))
+            ->default(false)
+            ->visible(fn (): bool => $this->authMethod === 'signup');
     }
 
     protected function getTurnstileFormComponent(): ViewField

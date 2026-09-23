@@ -9,12 +9,13 @@ use Illuminate\Support\Str;
 
 final readonly class CreateNewUser
 {
-    public function execute(string $email, string $password): User
+    public function execute(string $email, string $password, bool $marketingConsent): User
     {
         return User::query()->create([
             'name' => $this->guessNameFromEmail($email),
             'email' => $email,
             'password' => $password,
+            'marketing_consent_at' => $marketingConsent ? now() : null,
         ]);
     }
 

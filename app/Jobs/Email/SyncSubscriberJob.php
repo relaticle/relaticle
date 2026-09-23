@@ -13,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Spatie\MailcoachSdk\Exceptions\InvalidData;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
@@ -74,11 +75,9 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
         }
 
         try {
-            $subscriber = $this->resolveSubscriber($user, $profile);
-
-            $uuid = $subscriber instanceof Subscriber
-                ? $this->updateSubscriber($subscriber, $profile)
-                : $this->createSubscriber($profile);
+            $uuid = $profile->subscribed
+                ? $this->subscribe($user, $profile)
+                : $this->withdraw($user);
         } catch (RateLimited $exception) {
             $this->release(max($exception->retryAfter, 10));
 
@@ -90,11 +89,59 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        if ($user->wasChanged('marketing_consent_at')) {
+            $profile = $deriver->derive($user);
+        }
+
         $user->forceFill([
             'mailcoach_subscriber_uuid' => $uuid,
             'subscriber_profile_hash' => $profile->hash(),
             'rejected_subscriber_profile_hash' => null,
         ])->saveQuietly();
+    }
+
+    private function subscribe(User $user, SubscriberProfile $profile): string
+    {
+        $subscriber = $this->resolveSubscriber($user, $profile);
+
+        if (! $subscriber instanceof Subscriber) {
+            return $this->createSubscriber($profile);
+        }
+
+        $unsubscribedAt = $subscriber->unsubscribedAt ?? null;
+
+        if ($unsubscribedAt === null) {
+            return $this->updateSubscriber($subscriber, $profile);
+        }
+
+        if ($user->marketing_consent_at?->lt(Date::parse($unsubscribedAt)) === true) {
+            $user->forceFill(['marketing_consent_at' => null])->saveQuietly();
+
+            return $subscriber->uuid;
+        }
+
+        Mailcoach::resubscribeSubscriber($subscriber->uuid);
+
+        return $this->updateSubscriber($subscriber, $profile);
+    }
+
+    private function withdraw(User $user): ?string
+    {
+        if ($user->mailcoach_subscriber_uuid === null) {
+            return null;
+        }
+
+        $subscriber = $this->findByUuid($user->mailcoach_subscriber_uuid);
+
+        if (! $subscriber instanceof Subscriber) {
+            return null;
+        }
+
+        if (($subscriber->unsubscribedAt ?? null) === null) {
+            Mailcoach::unsubscribeSubscriber($subscriber->uuid);
+        }
+
+        return $subscriber->uuid;
     }
 
     /**
@@ -105,12 +152,10 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
     private function resolveSubscriber(User $user, SubscriberProfile $profile): ?Subscriber
     {
         if ($user->mailcoach_subscriber_uuid) {
-            try {
-                return Mailcoach::subscriber($user->mailcoach_subscriber_uuid);
-            } catch (\Throwable $exception) {
-                // Only a deleted subscriber falls through to the email lookup.
-                // A typed catch reads as dead to PHPStan (the SDK lacks @throws).
-                throw_unless($exception instanceof ResourceNotFound, $exception);
+            $subscriber = $this->findByUuid($user->mailcoach_subscriber_uuid);
+
+            if ($subscriber instanceof Subscriber) {
+                return $subscriber;
             }
         }
 
@@ -118,6 +163,19 @@ final class SyncSubscriberJob implements ShouldBeUnique, ShouldQueue
 
         if ($subscriber instanceof Subscriber && strcasecmp($subscriber->email, $profile->email) === 0) {
             return $subscriber;
+        }
+
+        return null;
+    }
+
+    private function findByUuid(string $uuid): ?Subscriber
+    {
+        try {
+            return Mailcoach::subscriber($uuid);
+        } catch (\Throwable $exception) {
+            // Only a deleted subscriber reads as absent. A typed catch reads as
+            // dead to PHPStan (the SDK lacks @throws).
+            throw_unless($exception instanceof ResourceNotFound, $exception);
         }
 
         return null;

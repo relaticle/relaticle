@@ -15,6 +15,22 @@
         </div>
     </x-filament::section>
 
+    {{-- Product updates --}}
+    <x-filament::section :heading="__('notifications.marketing.heading')">
+        <div class="flex items-center justify-between gap-4">
+            <div>
+                <span class="block text-sm font-medium text-gray-950 dark:text-white">
+                    {{ __('notifications.marketing.title') }}
+                </span>
+                <span class="mt-1 block text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('notifications.marketing.description') }}
+                </span>
+            </div>
+
+            <x-filament::toggle state="$wire.$entangle('productUpdatesEnabled').live" />
+        </div>
+    </x-filament::section>
+
     {{-- Collaboration matrix --}}
     <x-filament::section :heading="__('notifications.collaboration.heading')">
         <div class="-mx-6 -my-4 divide-y divide-gray-200 dark:divide-white/10">

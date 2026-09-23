@@ -16,6 +16,7 @@ final readonly class SubscriberProfile
         public string $firstName,
         public string $lastName,
         public array $tags,
+        public bool $subscribed,
     ) {}
 
     /**
@@ -25,8 +26,11 @@ final readonly class SubscriberProfile
      */
     public function matchesStored(User $user): bool
     {
-        return $user->mailcoach_subscriber_uuid !== null
-            && $user->subscriber_profile_hash === $this->hash();
+        if ($user->subscriber_profile_hash !== $this->hash()) {
+            return false;
+        }
+
+        return $user->mailcoach_subscriber_uuid !== null || ! $this->subscribed;
     }
 
     /**
@@ -45,9 +49,10 @@ final readonly class SubscriberProfile
 
     public function hash(): string
     {
-        return hash('sha256', json_encode(
-            [$this->email, $this->firstName, $this->lastName, $this->tags],
-            JSON_THROW_ON_ERROR,
-        ));
+        $identity = $this->subscribed
+            ? [$this->email, $this->firstName, $this->lastName, $this->tags, true]
+            : [$this->email, false];
+
+        return hash('sha256', json_encode($identity, JSON_THROW_ON_ERROR));
     }
 }

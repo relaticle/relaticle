@@ -24,7 +24,7 @@ final readonly class SubscriberProfileDeriver
     {
         [$firstName, $lastName] = $this->splitName($user->name);
 
-        return new SubscriberProfile($user->email, $firstName, $lastName, $this->tags($user));
+        return new SubscriberProfile($user->email, $firstName, $lastName, $this->tags($user), $user->marketing_consent_at !== null);
     }
 
     /** @return list<string> */

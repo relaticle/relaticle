@@ -61,7 +61,7 @@ it('rejects a signup from a disposable email domain', function (): void {
         ->call('authenticate')
         ->assertHasFormErrors(['email']);
 
-    expect(User::where('email', $email)->exists())->toBeFalse();
+    expect(User::query()->where('email', $email)->exists())->toBeFalse();
 });
 
 it('rejects a disposable email in the active locale', function (): void {
@@ -87,7 +87,7 @@ it('rejects a signup from a subdomain of a disposable email domain', function (s
         ->call('authenticate')
         ->assertHasFormErrors(['email' => 'indisposable']);
 
-    expect(User::where('email', $email)->exists())->toBeFalse();
+    expect(User::query()->where('email', $email)->exists())->toBeFalse();
 })->with([
     'burner@anything.mailinator.com',
     'burner@sub.yopmail.com',
@@ -119,7 +119,7 @@ it('never treats a whitelisted domain as disposable, even when the upstream list
         File::delete($storagePath);
     }
 
-    expect(User::where('email', $email)->exists())->toBeTrue();
+    expect(User::query()->where('email', $email)->exists())->toBeTrue();
 })->with([
     'jane-whitelisted@gmail.com',
     'jane-whitelisted@relaticle.com',
@@ -137,7 +137,7 @@ it('rejects a signup submitted faster than a human could type', function (): voi
         ->assertForbidden()
         ->assertSet('authMethod', null);
 
-    expect(User::where('email', $email)->exists())->toBeFalse();
+    expect(User::query()->where('email', $email)->exists())->toBeFalse();
 });
 
 it('renders the honeypot fields on the login page', function (): void {
@@ -156,7 +156,7 @@ it('does not expose a fortify registration endpoint', function (): void {
         'password_confirmation' => 'Password123!',
     ])->assertStatus(405);
 
-    expect(User::where('email', 'burner-fortify@mailinator.com')->exists())->toBeFalse();
+    expect(User::query()->where('email', 'burner-fortify@mailinator.com')->exists())->toBeFalse();
 });
 
 it('redirects the bare register path to the login page', function (): void {
@@ -191,4 +191,32 @@ it('renders each conversion event only for its own flag', function (): void {
 
     expect($html)->toContain("fathom.trackEvent('signup')")
         ->and($html)->not->toContain("trackEvent('workspace_created')");
+});
+
+it('records marketing consent when the signup box is ticked', function (): void {
+    $email = 'jane-consent-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!', 'marketing_consent' => true])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::query()->where('email', $email)->sole()->marketing_consent_at)->not->toBeNull();
+});
+
+it('leaves marketing consent unset when the signup box is untouched', function (): void {
+    $email = 'jane-silent-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::query()->where('email', $email)->sole()->marketing_consent_at)->toBeNull();
 });

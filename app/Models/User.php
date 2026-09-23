@@ -57,6 +57,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
  * @property CarbonImmutable|null $email_verified_at
+ * @property CarbonImmutable|null $marketing_consent_at
  * @property CarbonImmutable|null $email_sign_in_enabled_at
  * @property CarbonImmutable|null $last_login_at
  * @property string|null $mailcoach_subscriber_uuid
@@ -82,6 +83,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'ai_preferences',
     'notification_preferences',
+    'marketing_consent_at',
 ])]
 #[Hidden([
     'password',
@@ -117,6 +119,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return [
             'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
+            'marketing_consent_at' => 'datetime',
             'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',

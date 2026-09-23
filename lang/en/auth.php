@@ -21,6 +21,7 @@ return [
         'password_helper' => 'At least 8 characters long.',
         'email_placeholder' => 'Enter your email address',
         'password_placeholder' => 'Password',
+        'marketing_consent' => 'Email me product updates. Unsubscribe any time.',
     ],
     'verify_email' => [
         'heading' => 'Check your inbox',

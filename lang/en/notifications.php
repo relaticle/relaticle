@@ -11,6 +11,12 @@ return [
         'description' => 'Includes tasks overdue and due today. Sent every morning if any tasks are due or overdue.',
     ],
 
+    'marketing' => [
+        'heading' => 'Product updates',
+        'title' => 'Email me product updates',
+        'description' => 'Occasional news about new features and changes. Unsubscribe any time.',
+    ],
+
     'collaboration' => [
         'heading' => 'Collaboration notifications',
         'notify_me_about' => 'Notify me about',

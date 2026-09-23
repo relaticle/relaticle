@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Notifications;
 
+use App\Actions\User\UpdateMarketingConsent;
 use App\Actions\User\UpdateNotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
@@ -17,6 +18,8 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
 
     public bool $digestEnabled = true;
 
+    public bool $productUpdatesEnabled = false;
+
     public function mount(): void
     {
         $user = $this->authUser();
@@ -28,6 +31,7 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
         }
 
         $this->digestEnabled = $user->wantsNotification(NotificationType::TaskDigest, NotificationChannel::Email);
+        $this->productUpdatesEnabled = $user->marketing_consent_at !== null;
     }
 
     public function updatedCells(bool $value, string $key): void
@@ -53,6 +57,11 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
     public function updatedDigestEnabled(bool $value): void
     {
         $this->persist(NotificationType::TaskDigest, NotificationChannel::Email, $value);
+    }
+
+    public function updatedProductUpdatesEnabled(bool $value): void
+    {
+        resolve(UpdateMarketingConsent::class)->execute($this->authUser(), $value);
     }
 
     public function render(): View
