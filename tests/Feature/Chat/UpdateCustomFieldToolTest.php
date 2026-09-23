@@ -401,6 +401,32 @@ it('refuses to make an encrypted field searchable, as the panel hides the toggle
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses a setting value the panel does not offer', function (string $type, array $settings, string $key): void {
+    $field = CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Edge field',
+        'type' => $type,
+        'system_defined' => false,
+        'active' => true,
+    ]);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $field->code,
+        'settings' => $settings,
+    ]]]));
+
+    expect($result)->toContain($key)
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+})->with([
+    'a lowercase currency code' => ['currency', ['currency_code' => 'usd'], 'currency_code'],
+    'more than twenty values' => ['email', ['allow_multiple' => true, 'max_values' => 21], 'max_values'],
+    'option colours on a text field' => ['text', ['enable_option_colors' => true], 'enable_option_colors'],
+    'an unknown description position' => ['text', ['description' => 'Shown to the team', 'description_position' => 'middle'], 'description_position'],
+    'a description position with the description cleared' => ['text', ['description' => null, 'description_position' => 'below'], 'description_position'],
+]);
+
 it('refuses a uniqueness change on a system field', function (): void {
     $systemText = CustomField::factory()->create([
         config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
