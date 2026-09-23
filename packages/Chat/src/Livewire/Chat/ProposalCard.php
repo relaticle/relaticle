@@ -6,6 +6,8 @@ namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
@@ -230,6 +232,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 TextInput::make($titleKey)
                     ->label($titleKey === 'title' ? __('Title') : __('Name'))
+                    ->hiddenLabel()
                     ->required(),
             ];
         }
@@ -238,6 +241,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 Select::make('account_owner_id')
                     ->label(__('Account Owner'))
+                    ->hiddenLabel()
                     ->options(collect(WorkspaceMembersContext::for($this->authUser()))
                         ->pluck('name', 'id')
                         ->all())
@@ -245,12 +249,16 @@ final class ProposalCard extends BaseLivewireComponent
             ];
         }
 
-        return [
-            CustomFields::form()
-                ->forModel($this->modelClass())
-                ->only([$code])
-                ->build(),
-        ];
+        return CustomFields::form()
+            ->forModel($this->modelClass())
+            ->withoutSections()
+            ->only([$code])
+            ->values()
+            // The package spans each field across its own 12-column grid; this schema has one column.
+            ->map(fn (Field $field): Field => $field->hiddenLabel()->columnSpan(['default' => 'full', 'lg' => 'full']))
+            // Filament's date panel cannot leave the card's scroller; the browser's picker can.
+            ->map(fn (Field $field): Field => $field instanceof DateTimePicker ? $field->native() : $field)
+            ->all();
     }
 
     /**
