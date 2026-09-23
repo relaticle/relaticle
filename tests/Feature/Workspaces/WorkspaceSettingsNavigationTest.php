@@ -132,6 +132,21 @@ test('a workspace member cannot open the members tab', function (): void {
         ->assertForbidden();
 });
 
+test('a workspace admin can open the custom fields tab, and a member cannot', function (): void {
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->get(CustomFields::getUrl(tenant: $this->workspace))
+        ->assertSuccessful();
+
+    $this->actingAs($member)
+        ->get(CustomFields::getUrl(tenant: $this->workspace))
+        ->assertForbidden();
+});
+
 test('the tab strip drops billing when the feature is off', function (): void {
     Feature::define(BillingFeature::class, false);
 

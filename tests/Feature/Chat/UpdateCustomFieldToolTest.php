@@ -388,6 +388,19 @@ it('refuses settings the panel locks once a field exists', function (): void {
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses to make an encrypted field searchable, as the panel hides the toggle', function (): void {
+    $this->field->update(['settings' => new CustomFieldSettingsData(encrypted: true)]);
+
+    $result = makeUpdateFieldTool($this->convId)->handle(new Request(['records' => [[
+        'entity_type' => 'company',
+        'code' => $this->field->code,
+        'settings' => ['searchable' => true],
+    ]]]));
+
+    expect($result)->toContain('searchable')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
 it('refuses a uniqueness change on a system field', function (): void {
     $systemText = CustomField::factory()->create([
         config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
