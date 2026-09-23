@@ -166,10 +166,7 @@ final class CreateAccessToken extends BaseLivewireComponent
         $token = DB::transaction(function () use ($user, $state, $workspaceId, $expiresAt): NewAccessToken {
             $token = $user->createToken(
                 $state['name'],
-                array_values(array_intersect(
-                    Jetstream::validPermissions($state['permissions'] ?? []),
-                    self::grantablePermissions($workspaceId),
-                )),
+                array_values(array_intersect($state['permissions'] ?? [], $user->grantableTokenPermissions($workspaceId))),
             );
 
             // Sanctum's createToken() does not accept extra attributes, so we update after creation
@@ -207,19 +204,12 @@ final class CreateAccessToken extends BaseLivewireComponent
             ->columns(2);
     }
 
-    // An unpinned token follows whichever workspace a request names, so only a
-    // pinned one is bounded by the holder's role there.
     /** @return list<string> */
     public static function grantablePermissions(mixed $workspaceId): array
     {
-        if (! is_string($workspaceId) || $workspaceId === '') {
-            return array_values(Jetstream::$permissions);
-        }
-
         $user = auth()->user();
-        $allowed = $user instanceof User ? $user->workspaceTokenPermissions($workspaceId) : [];
 
-        return array_values(array_intersect(Jetstream::$permissions, $allowed));
+        return $user instanceof User ? $user->grantableTokenPermissions(is_string($workspaceId) ? $workspaceId : null) : [];
     }
 
     public function render(): View

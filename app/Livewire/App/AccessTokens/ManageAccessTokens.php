@@ -16,7 +16,6 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
-use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\On;
 
 final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
@@ -94,7 +93,7 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
                         $record
                             ->forceFill([
                                 'abilities' => array_values(array_intersect(
-                                    Jetstream::validPermissions($data['permissions'] ?? []),
+                                    $data['permissions'] ?? [],
                                     CreateAccessToken::grantablePermissions($record->workspace_id),
                                 )),
                             ])

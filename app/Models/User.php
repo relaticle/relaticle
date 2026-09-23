@@ -45,6 +45,7 @@ use Illuminate\Support\Facades\Date;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
@@ -374,9 +375,15 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->membershipRoleFor($workspaceId)?->label();
     }
 
+    // An unpinned token follows whichever workspace a request names, so only a
+    // pinned one is bounded by the holder's role there.
     /** @return list<string> */
-    public function workspaceTokenPermissions(?string $workspaceId): array
+    public function grantableTokenPermissions(?string $workspaceId): array
     {
+        if ($workspaceId === null || $workspaceId === '') {
+            return array_values(Jetstream::$permissions);
+        }
+
         return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
     }
 

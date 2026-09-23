@@ -4,68 +4,69 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\Task;
 use App\Models\User;
-use App\Policies\Concerns\ChecksWorkspaceWriteAccess;
+use App\Policies\Concerns\ChecksWorkspaceCapability;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class TaskPolicy
 {
-    use ChecksWorkspaceWriteAccess;
+    use ChecksWorkspaceCapability;
     use HandlesAuthorization;
 
     public function viewAny(User $user): bool
     {
-        return $this->canViewAnyInCurrentWorkspace($user);
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsView);
     }
 
     public function view(User $user, Task $task): bool
     {
-        return $this->canViewInWorkspace($user, $task->workspace_id);
+        return $user->hasWorkspaceCapability($task->workspace_id, WorkspaceCapability::RecordsView);
     }
 
     public function create(User $user): bool
     {
-        return $this->canCreateInCurrentWorkspace($user);
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsCreate);
     }
 
     public function update(User $user, Task $task): bool
     {
-        return $this->canWriteInWorkspace($user, $task->workspace_id);
+        return $user->hasWorkspaceCapability($task->workspace_id, WorkspaceCapability::RecordsUpdate);
     }
 
     public function delete(User $user, Task $task): bool
     {
-        return $this->canDeleteInWorkspace($user, $task->workspace_id);
+        return $user->hasWorkspaceCapability($task->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $this->canDeleteInCurrentWorkspace($user);
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsDelete);
     }
 
     public function restore(User $user, Task $task): bool
     {
-        return $this->canDeleteInWorkspace($user, $task->workspace_id);
+        return $user->hasWorkspaceCapability($task->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function restoreAny(User $user): bool
     {
-        return $this->canDeleteInCurrentWorkspace($user);
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsDelete);
     }
 
     public function forceDelete(User $user, Task $task): bool
     {
-        return $this->canForceDeleteInWorkspace($user, $task->workspace_id);
+        return $user->hasWorkspaceCapability($task->workspace_id, WorkspaceCapability::RecordsForceDelete);
     }
 
     public function forceDeleteAny(User $user): bool
     {
-        return $this->canForceDeleteInWorkspace($user, $user->currentWorkspace?->getKey());
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::RecordsForceDelete);
     }
 
     public function exportAny(User $user): bool
     {
-        return $this->canExportInCurrentWorkspace($user);
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::DataExport);
     }
 }
