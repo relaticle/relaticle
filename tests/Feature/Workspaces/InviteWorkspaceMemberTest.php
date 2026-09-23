@@ -431,7 +431,10 @@ test('shows a hint for every role option in the invite-link default role picker'
 
 test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabilities() says, not a hand-written copy', function (): void {
     $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->mountAction(['invitePeople', 'compareRoles']);
+        ->mountAction([
+            TestAction::make('invitePeople'),
+            TestAction::make('compareRoles')->schemaComponent('role'),
+        ]);
 
     $content = (string) $component->instance()->getMountedAction()->getModalContent();
 

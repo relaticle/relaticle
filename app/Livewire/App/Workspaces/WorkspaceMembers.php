@@ -381,14 +381,21 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                 && $this->canActOnRole($record)
                 && Gate::check('updateWorkspaceMember', $this->workspace))
             ->modalHeading(__('workspaces.actions.update_workspace_role'))
+            ->modalDescription(fn (array $record): string => __('workspaces.modals.update_workspace_role.description', [
+                'name' => $record['name'],
+                'email' => $record['email'],
+            ]))
             ->modalWidth('lg')
+            ->modalSubmitActionLabel(__('workspaces.actions.save'))
             ->schema([
                 Radio::make('role')
-                    ->hiddenLabel()
+                    ->label(__('workspaces.form.role.label'))
                     ->required()
+                    ->markAsRequired(false)
                     ->options(fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace))
                     ->in(fn (): array => array_keys(RoleOptions::assignable($this->authUser(), $this->workspace)))
                     ->descriptions(RoleOptions::descriptions())
+                    ->hintAction(RoleOptions::compareAction())
                     ->default(fn (array $record): string => (string) $record['role'])
                     ->rules([
                         fn (array $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
@@ -401,7 +408,6 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                         },
                     ]),
             ])
-            ->extraModalFooterActions([RoleOptions::compareAction()])
             ->action(function (?array $record, array $data): void {
                 $member = $this->findMember($record);
 

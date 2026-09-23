@@ -70,7 +70,7 @@ final readonly class RoleOptions
     {
         return Action::make('compareRoles')
             ->label(__('workspaces.actions.compare_roles'))
-            ->color('gray')
+            ->icon('heroicon-m-table-cells')
             ->link()
             ->modalHeading(__('workspaces.actions.compare_roles'))
             ->modalWidth('2xl')
@@ -78,7 +78,19 @@ final readonly class RoleOptions
                 'matrix' => self::matrix(),
             ]))
             ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('workspaces.actions.close'));
+            ->modalCancelAction(fn (Action $action): Action => $action
+                ->label(__('workspaces.actions.close'))
+                ->extraAttributes(['autofocus' => true]))
+            ->extraModalFooterActions([
+                Action::make('readRolesHelp')
+                    ->label(__('workspaces.actions.compare_roles_help_link'))
+                    ->icon('heroicon-m-arrow-top-right-on-square')
+                    ->iconPosition('after')
+                    ->link()
+                    ->url(url()->getPublicUrl(route('help.show', ['category' => 'workspace', 'slug' => 'manage-members-and-roles'], false)))
+                    ->openUrlInNewTab()
+                    ->extraAttributes(['aria-label' => __('workspaces.actions.compare_roles_help_link').' '.__('workspaces.role_matrix.opens_in_new_tab')]),
+            ]);
     }
 
     /**

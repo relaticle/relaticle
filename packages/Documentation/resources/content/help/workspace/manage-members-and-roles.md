@@ -48,9 +48,9 @@ The owner isn't a role you assign. Whoever owns the workspace always
 appears with an **Owner** badge, has no role to change, and can't leave or
 be removed.
 
-The **Invite workspace members** and **Change role** dialogs both carry
-**Compare roles** in their footer. It opens this table in the app, and it
-always matches what each role can actually do.
+Wherever you pick a role, in **Invite workspace members**, **Change role**,
+or **Invite link**, **Compare roles** sits beside the choice. It opens this
+table in the app, and it always matches what each role can actually do.
 
 ## Invitations
 
@@ -77,6 +77,9 @@ can join with. Copy it to share directly, and set the role people get when
 they join with it, Member by default. The role saves as soon as you pick it.
 The link lasts 7 days and can grant Member or Viewer. Admins are
 invited by email, so the person is always named.
+
+The dialog shows how long the link has left. Once it expires, nobody can
+join with it, and the dialog offers **Generate a new link** in its place.
 
 Two controls sit under it:
 

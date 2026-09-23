@@ -10,14 +10,16 @@ use App\Enums\WorkspaceRole;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
 use App\Support\Workspaces\RoleOptions;
+use Carbon\CarbonInterface;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TextInput\Actions\CopyAction;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Text;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Gate;
@@ -69,6 +71,8 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
             ->icon('heroicon-m-user-plus')
             ->button()
             ->modalHeading(__('workspaces.actions.invite_people'))
+            ->modalDescription(fn (): string => __('workspaces.sections.invite_people.description', ['workspace' => $this->workspace->name]))
+            ->modalIcon('heroicon-o-user-plus')
             ->modalWidth('lg')
             ->modalSubmitActionLabel(__('workspaces.actions.send_invitations'))
             ->schema([
@@ -97,10 +101,10 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     ->options(fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace))
                     ->in(fn (): array => array_keys(RoleOptions::assignable($this->authUser(), $this->workspace)))
                     ->descriptions(RoleOptions::descriptions())
+                    ->hintAction(RoleOptions::compareAction())
                     ->default(WorkspaceRole::Member->value)
                     ->required(),
             ])
-            ->extraModalFooterActions([RoleOptions::compareAction()])
             ->action(function (array $data): void {
                 $this->sendInvitations(
                     $this->parseEmails((string) $data['emails']),
@@ -136,24 +140,40 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                     ->label(__('workspaces.invite_link.url'))
                     ->readOnly()
                     ->dehydrated(false)
-                    ->visible(fn (): bool => $this->workspace->hasInviteLink())
-                    ->prefixIcon('heroicon-m-link')
-                    // Selecting on focus makes a manual copy one keystroke, but
-                    // the caret lands at the tail and scrolls the host out of
-                    // view, so the field is wound back to the start.
+                    ->visible(fn (): bool => $this->hasLiveInviteLink())
+                    ->helperText(fn (): string => __('workspaces.invite_link.expires_in', [
+                        'time' => $this->workspace->invite_link_token_expires_at?->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE, options: CarbonInterface::ROUND),
+                    ]))
+                    // Clicking selects the whole link for a manual copy, but the
+                    // caret lands at the tail, so the field is wound back to the host.
                     ->extraInputAttributes([
                         'class' => 'font-mono text-sm',
-                        'onfocus' => 'this.select(); this.scrollLeft = 0',
+                        'onclick' => 'this.select(); this.scrollLeft = 0',
                     ])
-                    ->copyable(copyMessage: __('workspaces.invite_link.copied')),
+                    ->suffixAction(
+                        CopyAction::make()
+                            ->label(__('workspaces.actions.copy_invite_link'))
+                            ->icon(null)
+                            ->button()
+                            ->extraAttributes(['autofocus' => true])
+                            ->copyMessage(__('workspaces.invite_link.copied')),
+                    ),
+                Callout::make(fn (): string => __('workspaces.invite_link.lapsed.title', [
+                    'time' => $this->workspace->invite_link_token_expires_at?->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE),
+                ]))
+                    ->description(__('workspaces.invite_link.lapsed.notice'))
+                    ->warning()
+                    ->visible(fn (): bool => $this->workspace->hasInviteLink() && ! $this->hasLiveInviteLink()),
                 Radio::make('invite_link_default_role')
                     ->label(__('workspaces.invite_link.default_role'))
                     ->helperText(__('workspaces.invite_link.default_role_helper'))
+                    ->hintAction(RoleOptions::compareAction())
                     ->visible(fn (): bool => $this->workspace->hasInviteLink())
                     ->options(RoleOptions::forInviteLink())
                     ->in(array_keys(RoleOptions::forInviteLink()))
                     ->descriptions(RoleOptions::descriptions())
                     ->required()
+                    ->markAsRequired(false)
                     ->live()
                     ->afterStateUpdated(function (?string $state): void {
                         if ($state === null) {
@@ -166,7 +186,9 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
                             'role' => WorkspaceRole::labelFor($state),
                         ]));
                     }),
-                Text::make(__('workspaces.invite_link.disabled_notice'))
+                Callout::make(__('workspaces.invite_link.disabled.title'))
+                    ->description(__('workspaces.invite_link.disabled.notice'))
+                    ->icon('heroicon-o-no-symbol')
                     ->visible(fn (): bool => ! $this->workspace->hasInviteLink()),
             ])
             ->extraModalFooterActions([
@@ -185,7 +207,7 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
             ->icon('heroicon-m-arrow-path')
             ->color('gray')
             ->link()
-            ->visible(fn (): bool => $this->workspace->hasInviteLink())
+            ->visible(fn (): bool => $this->hasLiveInviteLink())
             ->requiresConfirmation()
             ->modalIcon('heroicon-o-exclamation-triangle')
             ->modalHeading(__('workspaces.modals.rotate_invite_link.heading'))
@@ -221,18 +243,25 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
     }
 
     // Turning the link back on mints a fresh token, so a link disabled after a
-    // leak cannot be revived by re-enabling it.
+    // leak cannot be revived by re-enabling it. An expired link renews the same way.
     private function enableInviteLinkAction(): Action
     {
         return Action::make('enableInviteLink')
-            ->label(__('workspaces.actions.enable_invite_link'))
+            ->label(fn (): string => $this->workspace->hasInviteLink()
+                ? __('workspaces.actions.rotate_invite_link')
+                : __('workspaces.actions.enable_invite_link'))
             ->icon('heroicon-m-link')
             ->button()
-            ->visible(fn (): bool => ! $this->workspace->hasInviteLink())
+            ->extraAttributes(['autofocus' => true])
+            ->visible(fn (): bool => ! $this->hasLiveInviteLink())
             ->action(function (): void {
+                $notification = $this->workspace->hasInviteLink()
+                    ? __('workspaces.notifications.invite_link_rotated.success')
+                    : __('workspaces.notifications.invite_link_enabled.success');
+
                 resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->workspace);
 
-                $this->sendNotification(__('workspaces.notifications.invite_link_enabled.success'));
+                $this->sendNotification($notification);
                 $this->remountInviteLinkModal();
             });
     }
@@ -249,9 +278,14 @@ final class InviteWorkspaceMembers extends BaseLivewireComponent
         $this->replaceMountedAction('manageInviteLink');
     }
 
+    private function hasLiveInviteLink(): bool
+    {
+        return $this->workspace->hasInviteLink() && ! $this->workspace->isInviteLinkTokenExpired();
+    }
+
     private function inviteLinkUrl(): ?string
     {
-        if (! $this->workspace->hasInviteLink()) {
+        if (! $this->hasLiveInviteLink()) {
             return null;
         }
 

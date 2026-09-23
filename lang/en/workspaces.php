@@ -12,12 +12,15 @@ return [
             'helper_text' => 'Only lowercase letters, numbers, and hyphens.',
         ],
         'emails' => [
-            'label' => 'Send invite to',
-            'placeholder' => 'example@email.com',
+            'label' => 'Email addresses',
+            'placeholder' => 'name@company.com, teammate@company.com',
             'helper' => 'Separate multiple addresses with a comma, a space, or a new line.',
         ],
         'invite_as' => [
             'label' => 'Invite as',
+        ],
+        'role' => [
+            'label' => 'Role',
         ],
         'workspace_logo' => [
             'label' => 'Workspace logo',
@@ -32,6 +35,9 @@ return [
         'update_workspace_logo' => [
             'title' => 'Workspace Logo',
             'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+        ],
+        'invite_people' => [
+            'description' => 'Each person gets an email with a link to join :workspace.',
         ],
         'add_workspace_member' => [
             'title' => 'Invite people',
@@ -55,6 +61,7 @@ return [
         'send_invitations' => 'Send invitations',
         'invite_link' => 'Invite link',
         'close' => 'Close',
+        'copy_invite_link' => 'Copy link',
         'rotate_invite_link' => 'Generate a new link',
         'disable_invite_link' => 'Turn off the link',
         'enable_invite_link' => 'Turn on the link',
@@ -124,6 +131,9 @@ return [
     ],
 
     'modals' => [
+        'update_workspace_role' => [
+            'description' => ':name (:email)',
+        ],
         'leave_workspace' => [
             'notice' => 'Are you sure you would like to leave this workspace?',
         ],
@@ -296,9 +306,17 @@ return [
         'description' => 'Share one link instead of typing addresses. Anyone who opens it joins this workspace.',
         'url' => 'Workspace link',
         'copied' => 'Link copied.',
-        'default_role' => 'Role for people who join with this link',
+        'expires_in' => 'Stops working in :time. Generating a new link resets the clock.',
+        'default_role' => 'People join as',
         'default_role_helper' => 'Saved as soon as you pick it. Admins are invited by email instead.',
-        'disabled_notice' => 'The workspace link is off, so email invitations are the only way in. Turning it on issues a new link.',
+        'lapsed' => [
+            'title' => 'This link expired :time ago',
+            'notice' => 'Nobody can join with it. Generate a new link to keep inviting people.',
+        ],
+        'disabled' => [
+            'title' => 'The workspace link is off',
+            'notice' => 'Email invitations are the only way in. Turning the link on issues a new one.',
+        ],
         'join' => [
             'heading' => 'Join :workspace',
             'body' => 'You will join with :role access.',

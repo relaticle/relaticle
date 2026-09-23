@@ -37,15 +37,4 @@
             @endforeach
         </tbody>
     </table>
-
-    <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
-        <a
-            href="{{ url()->getPublicUrl(route('help.show', ['category' => 'workspace', 'slug' => 'manage-members-and-roles'], false)) }}"
-            target="_blank"
-            class="text-primary-600 hover:underline dark:text-primary-400"
-        >
-            {{ __('workspaces.actions.compare_roles_help_link') }}
-            <span class="sr-only">{{ __('workspaces.role_matrix.opens_in_new_tab') }}</span>
-        </a>
-    </p>
 </div>

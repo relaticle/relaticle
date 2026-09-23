@@ -314,6 +314,50 @@ test('a workspace with the link off offers no rotate or disable action', functio
         ->assertActionVisible('enableInviteLink');
 });
 
+test('a live invite link says when it stops working', function (): void {
+    $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('manageInviteLink')
+        ->assertActionDataSet(['invite_link_url' => route('workspaces.join', ['token' => $this->workspace->invite_link_token])]);
+
+    $modal = $component->instance()->getSchema($component->instance()->getMountedActionSchemaName())->toHtml();
+
+    expect($modal)->toContain(__('workspaces.invite_link.expires_in', ['time' => '1 week']));
+});
+
+test('an expired invite link hides the dead url and offers a new link in place of a rotation', function (): void {
+    $this->travelTo($this->workspace->invite_link_token_expires_at->addMinute());
+
+    $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('manageInviteLink')
+        ->assertActionDataSet(['invite_link_url' => null])
+        ->assertFormFieldHidden('invite_link_url')
+        ->assertActionHidden('rotateInviteLink')
+        ->assertActionVisible('enableInviteLink')
+        ->assertActionVisible('disableInviteLink');
+
+    $modal = $component->instance()->getSchema($component->instance()->getMountedActionSchemaName())->toHtml();
+
+    expect($modal)->toContain(__('workspaces.invite_link.lapsed.notice'));
+});
+
+test('renewing an expired invite link issues a fresh token that works for another week', function (): void {
+    $expiredToken = $this->workspace->invite_link_token;
+
+    $this->travelTo($this->workspace->invite_link_token_expires_at->addMinute());
+
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->callAction([
+            TestAction::make('manageInviteLink'),
+            TestAction::make('enableInviteLink'),
+        ])
+        ->assertNotified(__('workspaces.notifications.invite_link_rotated.success'));
+
+    $workspace = $this->workspace->fresh();
+
+    expect($workspace->invite_link_token)->not->toBe($expiredToken)
+        ->and($workspace->isInviteLinkTokenExpired())->toBeFalse();
+});
+
 test('the members list is searchable by name and by email', function (): void {
     $needle = User::factory()->create(['name' => 'Zoltan Searchme', 'email' => 'searchme@example.test']);
     $this->workspace->users()->attach($needle, ['role' => WorkspaceRole::Member->value]);
@@ -419,7 +463,7 @@ test('the change role modal offers a way to compare roles rendered from the capa
     $component = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction([
             TestAction::make('updateWorkspaceRole')->table($member->id),
-            TestAction::make('compareRoles'),
+            TestAction::make('compareRoles')->schemaComponent('role'),
         ]);
 
     $content = (string) $component->instance()->getMountedAction()->getModalContent();
