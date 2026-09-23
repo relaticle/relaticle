@@ -18,6 +18,8 @@ final readonly class ActivityValue
 {
     public const string EMPTY = '—';
 
+    public const string REDACTED = '••••••';
+
     public static function display(mixed $value): string
     {
         if (is_array($value)) {

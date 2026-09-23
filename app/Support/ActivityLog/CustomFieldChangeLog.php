@@ -51,6 +51,10 @@ final readonly class CustomFieldChangeLog
             return ['value' => null, 'label' => ActivityValue::EMPTY];
         }
 
+        if ($field->settings->encrypted) {
+            return ['value' => ActivityValue::REDACTED, 'label' => ActivityValue::REDACTED];
+        }
+
         $dataType = CustomFieldsType::getFieldType($field->type)->dataType;
 
         $label = match ($dataType) {

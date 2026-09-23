@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\ActivityLog\ActivityValue;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use Filament\Facades\Filament;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
@@ -316,4 +317,30 @@ it('stops stamping once the import job has thrown', function (): void {
     $row = Activity::query()->withoutGlobalScopes()->where('subject_type', 'company')->where('subject_id', $company->getKey())->sole();
 
     expect($row->properties->has('import_id'))->toBeFalse();
+});
+
+it('never writes the plaintext of an encrypted field value an import updated', function (): void {
+    $cf = ImportExecutionFixture::customField($this, 'salary_note', 'text');
+    $cf->update(['settings' => new CustomFieldSettingsData(encrypted: true)]);
+    $person = People::factory()->create(['name' => 'John', 'workspace_id' => $this->workspace->getKey()]);
+    $person->saveCustomFields(['salary_note' => 'old secret']);
+
+    Activity::query()->withoutGlobalScopes()->delete();
+
+    ImportExecutionFixture::readyStore($this, ['ID', 'Note'], [
+        ImportExecutionFixture::row(2, ['ID' => (string) $person->getKey(), 'Note' => 'new secret'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->getKey(),
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Note', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    $change = Activity::query()->withoutGlobalScopes()->where('event', 'custom_field_changes')->sole()->properties['custom_field_changes'][0];
+
+    expect(json_encode($change))->not->toContain('old secret')->not->toContain('new secret')
+        ->and($change['new']['label'])->toBe(ActivityValue::REDACTED);
 });
