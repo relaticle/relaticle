@@ -9,7 +9,6 @@ use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
-use App\Enums\StripeSubscriptionStatus;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
@@ -201,15 +200,11 @@ final class Billing extends Page
         ];
     }
 
-    /** @return array{pausedCause: string, reviewingPlan: bool, otherWorkspaces: Collection<int, Workspace>} */
+    /** @return array{billingStatus: BillingStatus, reviewingPlan: bool, otherWorkspaces: Collection<int, Workspace>} */
     private function pausedViewData(Workspace $workspace): array
     {
         return [
-            'pausedCause' => match (true) {
-                $workspace->subscriptions->whereIn('stripe_status', [StripeSubscriptionStatus::Canceled->value, StripeSubscriptionStatus::Unpaid->value])->isNotEmpty() => 'subscription',
-                $workspace->pro_trial_used_at !== null => 'trial',
-                default => 'paused',
-            },
+            'billingStatus' => $workspace->billingStatus(),
             'reviewingPlan' => $this->step === 'plan'
                 && $this->user()->ownsWorkspace($workspace)
                 && $this->checkout !== 'success',

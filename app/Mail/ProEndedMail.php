@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Enums\BillingStatus;
 use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use Illuminate\Bus\Queueable;
@@ -19,22 +20,22 @@ final class ProEndedMail extends Mailable implements ShouldQueue
 
     private function __construct(
         public Workspace $workspace,
-        public string $cause,
+        public BillingStatus $status,
     ) {}
 
     public static function afterTrial(Workspace $workspace): self
     {
-        return new self($workspace, 'trial');
+        return new self($workspace, BillingStatus::TrialEnded);
     }
 
     public static function afterSubscription(Workspace $workspace): self
     {
-        return new self($workspace, 'subscription');
+        return new self($workspace, BillingStatus::SubscriptionEnded);
     }
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __("mail.pro_ended.{$this->cause}.subject"));
+        return new Envelope(subject: __("mail.pro_ended.{$this->status->value}.subject"));
     }
 
     public function content(): Content
@@ -42,7 +43,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'mail.pro-ended',
             with: [
-                'heading' => __("mail.pro_ended.{$this->cause}.heading", ['workspace' => $this->workspace->name]),
+                'heading' => __("mail.pro_ended.{$this->status->value}.heading", ['workspace' => $this->workspace->name]),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,
             ],

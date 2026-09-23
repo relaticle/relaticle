@@ -135,7 +135,7 @@ it('emails the owner once when their expired trial is paused', function (): void
 
     Mail::assertQueued(ProEndedMail::class, 1);
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
-        && $mail->cause === 'trial'
+        && $mail->status === BillingStatus::TrialEnded
         && $mail->workspace->is($workspace));
 });
 

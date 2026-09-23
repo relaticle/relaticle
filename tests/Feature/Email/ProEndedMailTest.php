@@ -24,8 +24,8 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
 
     $mail = ProEndedMail::afterTrial($workspace);
 
-    $mail->assertHasSubject(__('mail.pro_ended.trial.subject'));
-    $mail->assertSeeInHtml(__('mail.pro_ended.trial.heading', ['workspace' => 'Acme']));
+    $mail->assertHasSubject(__('mail.pro_ended.trial_ended.subject'));
+    $mail->assertSeeInHtml(__('mail.pro_ended.trial_ended.heading', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.pro_ended.restore'));
     $mail->assertSeeInText(__('mail.pro_ended.cta').': '.Billing::getUrl(panel: 'app', tenant: $workspace));
@@ -34,8 +34,8 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
 it('names the ended subscription rather than a trial', function (): void {
     $mail = ProEndedMail::afterSubscription(proEndedWorkspace());
 
-    $mail->assertHasSubject(__('mail.pro_ended.subscription.subject'));
-    $mail->assertSeeInHtml(__('mail.pro_ended.subscription.heading', ['workspace' => 'Acme']));
+    $mail->assertHasSubject(__('mail.pro_ended.subscription_ended.subject'));
+    $mail->assertSeeInHtml(__('mail.pro_ended.subscription_ended.heading', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
 });
 

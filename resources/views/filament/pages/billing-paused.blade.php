@@ -152,7 +152,7 @@
                         </div>
                     @else
                         <h1 class="font-display text-2xl font-semibold tracking-tight text-balance text-gray-950 dark:text-white">
-                            {{ __("billing.paused.heading.{$pausedCause}", ['workspace' => $workspace->name]) }}
+                            {{ __("billing.paused.heading.{$billingStatus->value}", ['workspace' => $workspace->name]) }}
                         </h1>
 
                         <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">

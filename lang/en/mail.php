@@ -45,11 +45,11 @@ return [
     ],
 
     'pro_ended' => [
-        'trial' => [
+        'trial_ended' => [
             'subject' => 'Your Pro trial has ended',
             'heading' => 'Your Pro trial for :workspace has ended',
         ],
-        'subscription' => [
+        'subscription_ended' => [
             'subject' => 'Your Cloud Pro subscription has ended',
             'heading' => 'Cloud Pro for :workspace has ended',
         ],

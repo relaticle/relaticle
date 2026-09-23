@@ -55,9 +55,9 @@ return [
     ],
     'paused' => [
         'heading' => [
-            'trial' => 'Your Pro trial has ended',
-            'subscription' => 'Your Cloud Pro subscription has ended',
-            'paused' => ':workspace is paused',
+            'trial_ended' => 'Your Pro trial has ended',
+            'subscription_ended' => 'Your Cloud Pro subscription has ended',
+            'free' => ':workspace is paused',
         ],
         'owner_body' => 'Subscribe to Cloud Pro to reopen :workspace. Your records are safe, and nothing has been deleted.',
         'trial_body' => 'Start a free 14-day Pro trial to reopen :workspace. Your records are safe, and nothing has been deleted.',

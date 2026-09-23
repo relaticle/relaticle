@@ -6,6 +6,7 @@ use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncWorkspacePlanFromSubscription;
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
@@ -183,7 +184,7 @@ it('emails the owner once when the subscription ends', function (): void {
 
     Mail::assertQueued(ProEndedMail::class, 1);
     Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($workspace->owner->email)
-        && $mail->cause === 'subscription');
+        && $mail->status === BillingStatus::SubscriptionEnded);
 });
 
 it('sends no ended email when an Enterprise grant outlives the subscription', function (): void {

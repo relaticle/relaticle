@@ -73,7 +73,7 @@ it('offers the trial on the paused screen to a hosted workspace that never recei
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
     livewire(Billing::class)
-        ->assertSee(__('billing.paused.heading.paused', ['workspace' => $workspace->name]))
+        ->assertSee(__('billing.paused.heading.free', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.paused.trial_body', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.upgrade.now'))
@@ -101,7 +101,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
-        ->assertSee(__('billing.paused.heading.trial'))
+        ->assertSee(__('billing.paused.heading.trial_ended'))
         ->assertSee(__('billing.paused.owner_body', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.paused.continue'))
         ->assertDontSee(__('billing.paused.review.proceed'))
@@ -135,7 +135,7 @@ it('keeps a member on the paused screen when they open the plan review step', fu
     Filament::setTenant($workspace->refresh());
 
     livewire(Billing::class, ['step' => 'plan'])
-        ->assertSee(__('billing.paused.heading.trial'))
+        ->assertSee(__('billing.paused.heading.trial_ended'))
         ->assertDontSee(__('billing.paused.review.proceed'));
 });
 
@@ -152,8 +152,8 @@ it('names the ended subscription on the paused screen', function (): void {
     ]);
 
     livewire(Billing::class)
-        ->assertSee(__('billing.paused.heading.subscription'))
-        ->assertDontSee(__('billing.paused.heading.trial'));
+        ->assertSee(__('billing.paused.heading.subscription_ended'))
+        ->assertDontSee(__('billing.paused.heading.trial_ended'));
 });
 
 it('calls it a trial ending when the only subscription was an abandoned checkout', function (): void {
@@ -168,8 +168,8 @@ it('calls it a trial ending when the only subscription was an abandoned checkout
     ]);
 
     livewire(Billing::class)
-        ->assertSee(__('billing.paused.heading.trial'))
-        ->assertDontSee(__('billing.paused.heading.subscription'));
+        ->assertSee(__('billing.paused.heading.trial_ended'))
+        ->assertDontSee(__('billing.paused.heading.subscription_ended'));
 });
 
 it('tells a member of a paused workspace who can reopen it, without checkout controls', function (): void {
