@@ -7,7 +7,11 @@ namespace Relaticle\EmailIntegration\Jobs;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Actions\ReconcileCalendarMeetingsAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
@@ -24,24 +28,19 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Throwable;
 
 #[DeleteWhenMissingModels]
+#[Backoff(60, 300, 900)]
+#[Queue('emails-sync')]
+#[Tries(3)]
+#[UniqueFor(3600)]
 final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 {
     use DetectsAuthErrors, Queueable;
-
-    public int $tries = 3;
-
-    public int $uniqueFor = 3600;
-
-    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
-    public array $backoff = [60, 300, 900];
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly ?string $pageToken = null,
         public readonly bool $reconcileAfter = false,
-    ) {
-        $this->onQueue('emails-sync');
-    }
+    ) {}
 
     public function handle(CalendarServiceFactoryInterface $serviceFactory): void
     {

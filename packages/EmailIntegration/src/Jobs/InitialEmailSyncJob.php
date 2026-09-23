@@ -7,7 +7,12 @@ namespace Relaticle\EmailIntegration\Jobs;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\Queue;
+use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -20,27 +25,21 @@ use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Throwable;
 
 #[DeleteWhenMissingModels]
+#[Backoff(60, 300, 900)]
+#[Queue('emails-sync')]
+#[Timeout(300)]
+#[Tries(3)]
+#[UniqueFor(3600)]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 {
     use DetectsAuthErrors, Queueable;
-
-    public int $timeout = 300;
-
-    public int $tries = 3;
-
-    public int $uniqueFor = 3600;
-
-    /** @var array<int, int> Spaced retry delays so transient 429/5xx don't hammer the provider. */
-    public array $backoff = [60, 300, 900];
 
     public function __construct(
         public readonly ConnectedAccount $connectedAccount,
         public readonly ?string $pageToken = null,
         public readonly ?string $historyCursor = null,
         public readonly ?string $historyImportBatchId = null,
-    ) {
-        $this->onQueue('emails-sync');
-    }
+    ) {}
 
     /**
      * @throws Throwable
