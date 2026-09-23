@@ -103,3 +103,25 @@ it('records the settings before and after the change', function (): void {
     expect($activity->attribute_changes['old']['settings']['visible_in_list'])->toBeTrue()
         ->and($activity->attribute_changes['attributes']['settings']['visible_in_list'])->toBeFalse();
 });
+
+it('never writes the plaintext name of an option on an encrypted field', function (): void {
+    $this->field->update(['settings' => new CustomFieldSettingsData(encrypted: true)]);
+
+    $option = $this->field->options()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'name' => 'Confidential source',
+        'sort_order' => 1,
+    ]);
+
+    $option->update(['name' => 'Secret referral']);
+
+    $logged = Activity::withoutGlobalScopes()
+        ->where('subject_type', 'custom_field_option')
+        ->get()
+        ->map(fn (Activity $activity): string => json_encode($activity->attribute_changes))
+        ->implode(' ');
+
+    expect($logged)->not->toBeEmpty()
+        ->not->toContain('Confidential source')
+        ->not->toContain('Secret referral');
+});

@@ -22,6 +22,7 @@ final class CustomFieldOption extends BaseCustomFieldOption
     {
         return LogOptions::defaults()
             ->logOnly(['name', 'settings'])
+            ->useAttributeRawValues(['name'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('crm')
