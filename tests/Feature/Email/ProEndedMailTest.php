@@ -29,6 +29,9 @@ it('tells the owner the trial ended, the workspace is paused, and how to reopen 
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.pro_ended.restore'));
     $mail->assertSeeInText(__('mail.pro_ended.cta').': '.Billing::getUrl(panel: 'app', tenant: $workspace));
+    $mail->assertDontSeeInHtml('mail.pro_ended.');
+
+    expect($mail->envelope()->subject)->not->toStartWith('mail.');
 });
 
 it('names the ended subscription rather than a trial', function (): void {
@@ -37,6 +40,9 @@ it('names the ended subscription rather than a trial', function (): void {
     $mail->assertHasSubject(__('mail.pro_ended.subscription_ended.subject'));
     $mail->assertSeeInHtml(__('mail.pro_ended.subscription_ended.heading', ['workspace' => 'Acme']));
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
+    $mail->assertDontSeeInHtml('mail.pro_ended.');
+
+    expect($mail->envelope()->subject)->not->toStartWith('mail.');
 });
 
 it('tells a grandfathered workspace it is back on Cloud Free, not paused', function (): void {

@@ -74,6 +74,7 @@ it('offers the trial on the paused screen to a hosted workspace that never recei
 
     livewire(Billing::class)
         ->assertSee(__('billing.paused.heading.free', ['workspace' => $workspace->name]))
+        ->assertDontSee('billing.paused.heading.', false)
         ->assertSee(__('billing.paused.trial_body', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.trial.start_button'))
         ->assertSee(__('billing.upgrade.now'))
@@ -102,6 +103,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
         ->assertSee(__('billing.paused.heading.trial_ended'))
+        ->assertDontSee('billing.paused.heading.', false)
         ->assertSee(__('billing.paused.owner_body', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.paused.continue'))
         ->assertDontSee(__('billing.paused.review.proceed'))
@@ -153,6 +155,7 @@ it('names the ended subscription on the paused screen', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('billing.paused.heading.subscription_ended'))
+        ->assertDontSee('billing.paused.heading.', false)
         ->assertDontSee(__('billing.paused.heading.trial_ended'));
 });
 
