@@ -7,6 +7,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\User;
+use App\Support\ActivityLog\ActivityValue;
 use Filament\Facades\Filament;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
@@ -123,5 +124,7 @@ it('never writes the plaintext name of an option on an encrypted field', functio
 
     expect($logged)->not->toBeEmpty()
         ->not->toContain('Confidential source')
-        ->not->toContain('Secret referral');
+        ->not->toContain('Secret referral')
+        ->and(Activity::withoutGlobalScopes()->where('subject_type', 'custom_field_option')->latest('id')->firstOrFail()->attribute_changes['attributes']['name'])
+        ->toBe(ActivityValue::REDACTED);
 });
