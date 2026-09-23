@@ -24,8 +24,8 @@ the published commitment. The full comparison is recorded in the
 - Managed-Cloud access is a separate entitlement. `App\Enums\BillingStatus` owns the state and
   `grantsAccess()` answers per state. `HostedWorkspaceAccess` only adds the billing feature flag,
   which is off on self-hosted installs. A live trial or subscription, a manual paid grant,
-  Enterprise, or `teams.hosted_free_grandfathered_at` grants access. Trial ended, Subscription
-  ended, and Free are paused, and the paused screen, sidebar, and ended email name which one.
+  Enterprise, or `workspaces.hosted_free_grandfathered_at` grants access. Trial ended, Subscription
+  ended, and Free are paused. The paused screen and the ended email name which one.
 - A plan gates **AI usage** (monthly credit allowance, model access, request rate limits),
   the value metric is the work AI does for a workspace, not how many people log in.
 - Member counts are tracked for visibility and enterprise license compliance only.
@@ -76,7 +76,7 @@ deletion remain reachable.
 
 ## Trials
 
-14-day Pro trial, no card, one per workspace (`teams.pro_trial_used_at`, never cleared). It starts automatically when
+14-day Pro trial, no card, one per workspace (`workspaces.pro_trial_used_at`, never cleared). It starts automatically when
 a hosted workspace is created. `StartProTrial` uses row locks so concurrent workspace creation
 cannot grant multiple trials, then sets
 `team.plan = pro` and `teams.trial_ends_at` (Cashier generic trial, so no Stripe objects until

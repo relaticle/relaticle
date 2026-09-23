@@ -7,6 +7,7 @@ namespace App\Filament\Pages;
 use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
 use App\Features\Billing as BillingFeature;
@@ -188,7 +189,7 @@ final class Billing extends Page
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
             'isOwner' => $this->user()->ownsWorkspace($workspace),
             'subscription' => $subscription,
-            'pastDue' => $subscription?->pastDue() ?? false,
+            'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
             'isGrandfathered' => $isGrandfathered,

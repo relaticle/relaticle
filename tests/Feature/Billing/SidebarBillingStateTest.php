@@ -79,6 +79,23 @@ it('flags a past-due workspace even though its subscription still reads valid', 
         ->and($state['urgent'])->toBeTrue();
 });
 
+it('asks a workspace whose past-due subscription has ended to subscribe, not to fix a card', function (): void {
+    $this->workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_sidebar_past_due_ended',
+        'stripe_status' => 'past_due',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->subDay(),
+    ]);
+
+    $state = resolve(SidebarBillingState::class)->for($this->workspace->fresh());
+
+    expect($state)->not->toBeNull()
+        ->and($state['label'])->toBe(__('billing.sidebar.paused'))
+        ->and($state['urgent'])->toBeFalse();
+});
+
 it('asks nothing of a paying subscriber', function (): void {
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
     $this->workspace->subscriptions()->create([
