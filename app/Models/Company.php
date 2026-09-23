@@ -144,19 +144,20 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->morphToMany(Task::class, 'taskable');
     }
 
-    /**
-     * Keeps the owner's name in the log rather than their id, so every activity
-     * surface reads a person and a deleted user's name survives in history.
-     */
     public function beforeActivityLogged(Activity $activity, string $eventName): void
     {
         $changes = $activity->attribute_changes?->toArray() ?? [];
 
-        foreach (['attributes', 'old'] as $side) {
-            if (! is_array($changes[$side] ?? null) || ! array_key_exists('account_owner_id', $changes[$side])) {
-                continue;
-            }
+        $sidesWithOwner = array_filter(
+            ['attributes', 'old'],
+            fn (string $side): bool => is_array($changes[$side] ?? null) && array_key_exists('account_owner_id', $changes[$side]),
+        );
 
+        if ($sidesWithOwner === []) {
+            return;
+        }
+
+        foreach ($sidesWithOwner as $side) {
             $ownerId = $changes[$side]['account_owner_id'];
             unset($changes[$side]['account_owner_id']);
             $changes[$side]['account_owner'] = is_string($ownerId) ? User::query()->whereKey($ownerId)->value('name') : null;

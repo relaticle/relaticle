@@ -334,7 +334,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $import = $this->app->make(CurrentImport::class);
 
-            if ($import->id() !== null && $activity->getAttribute('subject_type') !== 'import') {
+            if ($import->id() !== null && $activity->getAttribute('subject_type') !== Relation::getMorphAlias(Import::class)) {
                 $activity->properties = ($activity->properties ?? new Collection)
                     ->put('import_id', $import->id())
                     ->put('import_file', $import->fileName());

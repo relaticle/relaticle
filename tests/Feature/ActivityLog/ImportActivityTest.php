@@ -8,11 +8,14 @@ use App\Models\Company;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
+use App\Support\ActivityLog\ActivityValue;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use Filament\Facades\Filament;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Tests\Helpers\ImportExecutionFixture;
 
@@ -69,6 +72,31 @@ it('logs a custom field an import update changed, with its old and new value', f
         ->and($activity->subject_id)->toBe($person->getKey())
         ->and($activity->causer_id)->toBe($this->user->getKey())
         ->and($activity->workspace_id)->toBe($this->workspace->getKey());
+});
+
+it('logs an import update that sets a toggle with no prior value to false', function (): void {
+    $cf = ImportExecutionFixture::customField($this, 'opted_out', 'toggle');
+    $person = People::factory()->create(['name' => 'John', 'workspace_id' => $this->workspace->getKey()]);
+
+    Activity::query()->withoutGlobalScopes()->delete();
+
+    ImportExecutionFixture::readyStore($this, ['ID', 'OptedOut'], [
+        ImportExecutionFixture::row(2, ['ID' => (string) $person->getKey(), 'OptedOut' => '0'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $person->getKey(),
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'OptedOut', target: "custom_fields_{$cf->code}"),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    $change = Activity::query()->withoutGlobalScopes()->where('event', 'custom_field_changes')->sole()->properties['custom_field_changes'][0];
+
+    expect($change['code'])->toBe('opted_out')
+        ->and($change['old']['label'])->toBe(ActivityValue::EMPTY)
+        ->and($change['new']['label'])->toBe('No');
 });
 
 it('does not log an import update that leaves a custom field as it was', function (): void {
@@ -264,6 +292,26 @@ it('stops stamping once the import job is over', function (): void {
     runThreePersonImport($this);
 
     $company = Company::factory()->for($this->workspace)->create(['name' => 'After Import Co']);
+
+    $row = Activity::query()->withoutGlobalScopes()->where('subject_type', 'company')->where('subject_id', $company->getKey())->sole();
+
+    expect($row->properties->has('import_id'))->toBeFalse();
+});
+
+it('stops stamping once the import job has thrown', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Ada'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    Import::updating(function (Import $import): void {
+        throw_if($import->status === ImportStatus::Completed, RuntimeException::class, 'Storage went away');
+    });
+
+    expect(fn () => ImportExecutionFixture::run($this))->toThrow(RuntimeException::class, 'Storage went away');
+
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'After Failed Import Co']);
 
     $row = Activity::query()->withoutGlobalScopes()->where('subject_type', 'company')->where('subject_id', $company->getKey())->sole();
 

@@ -70,9 +70,6 @@ final readonly class ActivityChangeSummary
     }
 
     /**
-     * A settings object is stored whole, so it is compared key by key; type-specific
-     * keys live one level down in `additional` and read the same way.
-     *
      * @param  array<string, mixed>  $old
      * @param  array<string, mixed>  $new
      * @return list<array{label: string, old: string, new: string}>

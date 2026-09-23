@@ -12,13 +12,9 @@ use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 
-/**
- * Writes one custom field value change to a record's activity log, for every path
- * that changes a value: the model observer and the import job's bulk upsert.
- */
 final readonly class CustomFieldChangeLog
 {
-    public function record(Model $entity, CustomField $field, mixed $old, mixed $new, bool $isFirstValue = false): void
+    public function record(Model $entity, CustomField $field, mixed $old, mixed $new): void
     {
         if ($this->isEmpty($old) && $this->isEmpty($new)) {
             return;
@@ -26,7 +22,7 @@ final readonly class CustomFieldChangeLog
 
         // A normalization-only rewrite (a link field stripping its scheme) is not a user edit.
         // A first value skips the check: nothing was rewritten, and `false` normalizes to empty.
-        if (! $isFirstValue && $this->normalize($field, $old) === $this->normalize($field, $new)) {
+        if ($old !== null && $this->normalize($field, $old) === $this->normalize($field, $new)) {
             return;
         }
 

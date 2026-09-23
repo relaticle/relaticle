@@ -8,6 +8,8 @@ use App\Enums\CrmEntity;
 use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\ActivityLog\Activity;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\ActivityLog\ActivityChangeSummary;
@@ -44,6 +46,8 @@ use Livewire\Attributes\Url;
 use Override;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
+use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Models\Import;
 
 /**
  * The workspace audit trail: who changed or deleted which record, and when.
@@ -67,10 +71,6 @@ final class ActivityLog extends Page implements HasTable
     ];
 
     private const string CUSTOM_FIELD_EVENT = 'custom_field_changes';
-
-    private const array CUSTOM_FIELD_SUBJECTS = ['custom_field', 'custom_field_option'];
-
-    private const string IMPORT_SUBJECT = 'import';
 
     /** Characters of each side of a diff the table shows before the title takes over. */
     private const int VALUE_LENGTH = 60;
@@ -217,8 +217,8 @@ final class ActivityLog extends Page implements HasTable
                     ->badge()
                     ->icon($this->eventIcon(...))
                     ->color(fn (?string $state): string => match ($state) {
-                        'created', 'imported' => 'success',
-                        'deleted', 'import_failed' => 'danger',
+                        'created', ExecuteImportJob::IMPORTED_EVENT => 'success',
+                        'deleted', ExecuteImportJob::FAILED_EVENT => 'danger',
                         'restored' => 'warning',
                         default => 'gray',
                     })
@@ -376,7 +376,7 @@ final class ActivityLog extends Page implements HasTable
      */
     private function recordName(Activity $record): string
     {
-        if ($record->subject_type === self::IMPORT_SUBJECT) {
+        if ($record->subject_type === $this->importSubject()) {
             return $this->importSummary($record);
         }
 
@@ -425,7 +425,7 @@ final class ActivityLog extends Page implements HasTable
 
     private function destroyedNotice(Activity $record): ?string
     {
-        if ($record->subject_type === self::IMPORT_SUBJECT) {
+        if ($record->subject_type === $this->importSubject()) {
             return null;
         }
 
@@ -446,11 +446,11 @@ final class ActivityLog extends Page implements HasTable
         $entity = CrmEntity::tryFrom((string) $record->subject_type);
         $tenant = Filament::getTenant();
 
-        if (in_array($record->subject_type, self::CUSTOM_FIELD_SUBJECTS, true) && $tenant instanceof Workspace) {
+        if (in_array($record->subject_type, $this->customFieldSubjects(), true) && $tenant instanceof Workspace) {
             return CustomFields::getUrl(tenant: $tenant);
         }
 
-        if ($record->subject_type === self::IMPORT_SUBJECT && $tenant instanceof Workspace) {
+        if ($record->subject_type === $this->importSubject() && $tenant instanceof Workspace) {
             return ImportHistory::getUrl(tenant: $tenant);
         }
 
@@ -590,8 +590,8 @@ final class ActivityLog extends Page implements HasTable
             'created' => Heroicon::PlusCircle,
             'deleted' => Heroicon::Trash,
             'restored' => Heroicon::ArrowUturnLeft,
-            'imported' => Heroicon::ArrowUpTray,
-            'import_failed' => Heroicon::ExclamationTriangle,
+            ExecuteImportJob::IMPORTED_EVENT => Heroicon::ArrowUpTray,
+            ExecuteImportJob::FAILED_EVENT => Heroicon::ExclamationTriangle,
             default => Heroicon::PencilSquare,
         };
     }
@@ -607,11 +607,11 @@ final class ActivityLog extends Page implements HasTable
 
     private function typeIcon(?string $state): ?Heroicon
     {
-        if (in_array($state, self::CUSTOM_FIELD_SUBJECTS, true)) {
+        if (in_array($state, $this->customFieldSubjects(), true)) {
             return Heroicon::AdjustmentsHorizontal;
         }
 
-        if ($state === self::IMPORT_SUBJECT) {
+        if ($state === $this->importSubject()) {
             return Heroicon::ArrowUpTray;
         }
 
@@ -635,8 +635,8 @@ final class ActivityLog extends Page implements HasTable
             'updated' => __('workspaces.activity.events.updated'),
             'deleted' => __('workspaces.activity.events.deleted'),
             'restored' => __('workspaces.activity.events.restored'),
-            'imported' => __('workspaces.activity.events.imported'),
-            'import_failed' => __('workspaces.activity.events.import_failed'),
+            ExecuteImportJob::IMPORTED_EVENT => __('workspaces.activity.events.imported'),
+            ExecuteImportJob::FAILED_EVENT => __('workspaces.activity.events.import_failed'),
         ];
     }
 
@@ -649,11 +649,27 @@ final class ActivityLog extends Page implements HasTable
     {
         $labels = [];
 
-        foreach ([...array_map(fn (CrmEntity $entity): string => $entity->value, CrmEntity::cases()), ...self::CUSTOM_FIELD_SUBJECTS, self::IMPORT_SUBJECT] as $type) {
+        foreach ([...array_map(fn (CrmEntity $entity): string => $entity->value, CrmEntity::cases()), ...$this->customFieldSubjects(), $this->importSubject()] as $type) {
             $labels[$type] = __('workspaces.activity.types.'.$type);
         }
 
         return $labels;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function customFieldSubjects(): array
+    {
+        return [
+            (string) Relation::getMorphAlias(CustomField::class),
+            (string) Relation::getMorphAlias(CustomFieldOption::class),
+        ];
+    }
+
+    private function importSubject(): string
+    {
+        return (string) Relation::getMorphAlias(Import::class);
     }
 
     /**

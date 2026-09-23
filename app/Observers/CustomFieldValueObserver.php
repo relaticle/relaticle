@@ -48,7 +48,7 @@ final readonly class CustomFieldValueObserver
 
     public function created(CustomFieldValue $value): void
     {
-        $this->changeLog->record($value->entity, $value->customField, null, $value->getValue(), isFirstValue: true);
+        $this->changeLog->record($value->entity, $value->customField, null, $value->getValue());
     }
 
     public function updated(CustomFieldValue $value): void

@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Foundation\Queue\Queueable;
@@ -60,6 +61,10 @@ final class ExecuteImportJob implements ShouldQueue
     use Batchable;
     use Queueable;
 
+    public const string IMPORTED_EVENT = 'imported';
+
+    public const string FAILED_EVENT = 'import_failed';
+
     private const string CUSTOM_FIELD_PREFIX = 'custom_fields_';
 
     /** @var array<string, string> Dedup map for auto-created records: "{entityLinkKey}:{name}" => id */
@@ -86,7 +91,7 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, array{entity: Model, field: CustomField, old: mixed, new: mixed}> */
     private array $pendingCustomFieldChanges = [];
 
-    /** @var array<string, true> Records this import created, keyed by morph class and id */
+    /** @var array<string, true> */
     private array $recordsCreatedHere = [];
 
     /**
@@ -162,7 +167,7 @@ final class ExecuteImportJob implements ShouldQueue
                     ->where('processed', false)
                     ->orderBy('row_number')
                     ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, $store, $import): void {
-                        $existingRecords = $this->preloadExistingRecords($rows, $importer);
+                        $existingRecords = $this->preloadExistingRecords($rows, $importer, withCustomFieldValues: $customFieldFormatMap !== []);
 
                         foreach ($rows as $row) {
                             $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, $results, $existingRecords);
@@ -184,7 +189,7 @@ final class ExecuteImportJob implements ShouldQueue
                 'failed_rows' => $results['failed'],
             ]);
 
-            $this->logImportSummary($import, $results, 'imported');
+            $this->logImportSummary($import, $results, self::IMPORTED_EVENT);
 
             $this->notifyUser($import, $results);
         } catch (\Throwable $e) {
@@ -203,12 +208,7 @@ final class ExecuteImportJob implements ShouldQueue
         }
     }
 
-    /**
-     * One entry stands for the whole import on the workspace audit page, where the
-     * per-record rows it wrote are filtered out; record timelines keep their own.
-     *
-     * @param  array<string, int>  $results
-     */
+    /** @param  array<string, int>  $results */
     private function logImportSummary(Import $import, array $results, string $event): void
     {
         if (Activity::query()->withoutGlobalScopes()->whereMorphedTo('subject', $import)->exists()) {
@@ -248,7 +248,7 @@ final class ExecuteImportJob implements ShouldQueue
             'failed' => $import->failed_rows,
         ];
 
-        $this->logImportSummary($import, $results, 'import_failed');
+        $this->logImportSummary($import, $results, self::FAILED_EVENT);
 
         try {
             $this->notifyUser($import, $results, failed: true);
@@ -434,7 +434,7 @@ final class ExecuteImportJob implements ShouldQueue
             }
 
             if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
-                $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $tenantKey);
+                $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $existingValues->get($cf->getKey()));
             }
 
             if ($cf->promotesValuesToOptions() && is_array($safeValue)) {
@@ -469,10 +469,6 @@ final class ExecuteImportJob implements ShouldQueue
         }
     }
 
-    /**
-     * The bulk upsert skips the value observer, so an update's change is logged here,
-     * after the upsert lands. Creates stay silent: their `created` row already says it.
-     */
     private function stageCustomFieldChange(Model $record, CustomField $field, ?CustomFieldValue $existing, string $column, mixed $rawValue): void
     {
         $valueModel = CustomFields::valueModel();
@@ -501,7 +497,7 @@ final class ExecuteImportJob implements ShouldQueue
         Model $record,
         CustomField $cf,
         array $newValues,
-        string $tenantKey,
+        ?CustomFieldValue $existing,
     ): array {
         $entityType = $record->getMorphClass();
         $entityId = $record->getKey();
@@ -519,18 +515,8 @@ final class ExecuteImportJob implements ShouldQueue
             }
         }
 
-        if ($existingValues === []) {
-            $table = config('custom-fields.database.table_names.custom_field_values');
-            $dbRow = DB::table($table)
-                ->where('entity_type', $entityType)
-                ->where('entity_id', $entityId)
-                ->where('custom_field_id', $cfId)
-                ->where($tenantKey, $this->workspaceId)
-                ->value('json_value');
-
-            if ($dbRow !== null) {
-                $existingValues = json_decode($dbRow, true) ?? [];
-            }
+        if ($existingValues === [] && $existing?->json_value !== null) {
+            $existingValues = $existing->json_value->all();
         }
 
         if ($existingValues === []) {
@@ -629,7 +615,7 @@ final class ExecuteImportJob implements ShouldQueue
      * @param  Collection<int, ImportRow>  $rows
      * @return array<string, Model>
      */
-    private function preloadExistingRecords(Collection $rows, BaseImporter $importer): array
+    private function preloadExistingRecords(Collection $rows, BaseImporter $importer, bool $withCustomFieldValues): array
     {
         $updateIds = $rows
             ->filter(fn (ImportRow $row): bool => $row->isUpdate() && $row->matched_id !== null)
@@ -646,7 +632,7 @@ final class ExecuteImportJob implements ShouldQueue
         return $modelClass::query()
             ->where('workspace_id', $this->workspaceId)
             ->whereIn((new $modelClass)->getKeyName(), $updateIds)
-            ->with('customFieldValues')
+            ->when($withCustomFieldValues, fn (Builder $query): Builder => $query->with('customFieldValues'))
             ->get()
             ->keyBy(fn (Model $model): string => (string) $model->getKey())
             ->all();
@@ -912,7 +898,6 @@ final class ExecuteImportJob implements ShouldQueue
 
         return $modelClass::query()
             ->where('workspace_id', $this->workspaceId)
-            ->with('customFieldValues')
             ->find($matchedId);
     }
 
