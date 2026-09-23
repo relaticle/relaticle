@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Bus\PendingBatch;
+use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
 use Laravel\SerializableClosure\SerializableClosure;
@@ -10,6 +11,7 @@ use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
+use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
@@ -31,6 +33,7 @@ mutates(
     InitialCalendarSyncJob::class,
     StoreMeetingJob::class,
     RelinkMailboxHistoryJob::class,
+    EnsureCalendarPushChannelJob::class,
 );
 
 function queueRoutingCalendarEvent(): CalendarEventData
@@ -54,35 +57,20 @@ function queueRoutingCalendarEvent(): CalendarEventData
     );
 }
 
-it('routes inbound email and calendar sync jobs to emails-sync queue', function (): void {
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+it('routes inbound email and calendar sync jobs to emails-sync queue', function (string $job): void {
+    $queue = (new ReflectionClass($job))->getAttributes(Queue::class)[0]->newInstance();
 
-    $event = new CalendarEventData(
-        providerEventId: 'evt-queue',
-        providerRecurringEventId: null,
-        iCalUid: null,
-        title: 'Queue test',
-        description: null,
-        startsAt: Date::now(),
-        endsAt: Date::now()->addHour(),
-        isAllDay: false,
-        location: null,
-        htmlLink: null,
-        status: 'confirmed',
-        visibility: 'default',
-        organizerEmail: null,
-        organizerName: null,
-        attendees: [],
-    );
-
-    expect((new IncrementalEmailSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new InitialEmailSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new StoreEmailJob($account, 'msg-1'))->queue)->toBe('emails-sync')
-        ->and((new IncrementalCalendarSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new InitialCalendarSyncJob($account))->queue)->toBe('emails-sync')
-        ->and((new StoreMeetingJob($account, $event))->queue)->toBe('emails-sync')
-        ->and((new RelinkMailboxHistoryJob($account))->queue)->toBe('emails-sync');
-});
+    expect($queue->queue)->toBe('emails-sync');
+})->with([
+    IncrementalEmailSyncJob::class,
+    InitialEmailSyncJob::class,
+    StoreEmailJob::class,
+    IncrementalCalendarSyncJob::class,
+    InitialCalendarSyncJob::class,
+    StoreMeetingJob::class,
+    RelinkMailboxHistoryJob::class,
+    EnsureCalendarPushChannelJob::class,
+]);
 
 it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue', function (): void {
     Bus::fake();
