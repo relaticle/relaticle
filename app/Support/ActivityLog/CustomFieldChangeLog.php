@@ -26,6 +26,8 @@ final readonly class CustomFieldChangeLog
             return;
         }
 
+        $dataType = CustomFieldsType::getFieldType($field->type)->dataType;
+
         activity((string) config('activitylog.default_log_name'))
             ->performedOn($entity)
             ->causedBy(auth()->user())
@@ -34,8 +36,8 @@ final readonly class CustomFieldChangeLog
                     'code' => $field->code,
                     'label' => $field->name,
                     'type' => $field->type,
-                    'old' => $this->describe($field, $old),
-                    'new' => $this->describe($field, $new),
+                    'old' => $this->describe($field, $dataType, $old),
+                    'new' => $this->describe($field, $dataType, $new),
                 ]],
             ])
             ->event('custom_field_changes')
@@ -45,7 +47,7 @@ final readonly class CustomFieldChangeLog
     /**
      * @return array{value: mixed, label: string}
      */
-    private function describe(CustomField $field, mixed $value): array
+    private function describe(CustomField $field, FieldDataType $dataType, mixed $value): array
     {
         if ($this->isEmpty($value)) {
             return ['value' => null, 'label' => ActivityValue::EMPTY];
@@ -54,8 +56,6 @@ final readonly class CustomFieldChangeLog
         if ($field->settings->encrypted) {
             return ['value' => ActivityValue::REDACTED, 'label' => ActivityValue::REDACTED];
         }
-
-        $dataType = CustomFieldsType::getFieldType($field->type)->dataType;
 
         $label = match ($dataType) {
             FieldDataType::SINGLE_CHOICE => $this->optionLabel($field, $value) ?? (string) $value,

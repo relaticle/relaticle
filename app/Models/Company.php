@@ -157,10 +157,18 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
             return;
         }
 
+        $ownerIds = collect($sidesWithOwner)
+            ->map(fn (string $side): mixed => $changes[$side]['account_owner_id'])
+            ->filter(fn (mixed $id): bool => is_string($id));
+
+        $ownerNames = $ownerIds->isEmpty()
+            ? collect()
+            : User::query()->whereKey($ownerIds->all())->pluck('name', 'id');
+
         foreach ($sidesWithOwner as $side) {
             $ownerId = $changes[$side]['account_owner_id'];
             unset($changes[$side]['account_owner_id']);
-            $changes[$side]['account_owner'] = is_string($ownerId) ? User::query()->whereKey($ownerId)->value('name') : null;
+            $changes[$side]['account_owner'] = is_string($ownerId) ? $ownerNames->get($ownerId) : null;
         }
 
         if (($changes['attributes']['account_owner'] ?? null) === null && ($changes['old']['account_owner'] ?? null) === null) {

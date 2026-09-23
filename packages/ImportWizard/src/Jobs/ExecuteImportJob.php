@@ -211,7 +211,7 @@ final class ExecuteImportJob implements ShouldQueue
     /** @param  array<string, int>  $results */
     private function logImportSummary(Import $import, array $results, string $event): void
     {
-        if (Activity::query()->withoutGlobalScopes()->whereMorphedTo('subject', $import)->exists()) {
+        if (Activity::query()->withoutGlobalScopes()->forSubject($import)->exists()) {
             return;
         }
 
@@ -345,7 +345,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $record->save();
 
                 if ($isCreate) {
-                    $this->recordsCreatedHere[$record->getMorphClass().'|'.$record->getKey()] = true;
+                    $this->recordsCreatedHere[$this->recordKey($record)] = true;
                 }
 
                 if ($isCreate && $matchField instanceof MatchableField && $matchSourceColumn !== null) {
@@ -463,10 +463,15 @@ final class ExecuteImportJob implements ShouldQueue
 
             $this->pendingCustomFieldValues[] = $row;
 
-            if (! $isCreate && ! isset($this->recordsCreatedHere[$record->getMorphClass().'|'.$record->getKey()])) {
+            if (! $isCreate && ! isset($this->recordsCreatedHere[$this->recordKey($record)])) {
                 $this->stageCustomFieldChange($record, $cf, $existingValues->get($cf->getKey()), $valueColumn, $row[$valueColumn]);
             }
         }
+    }
+
+    private function recordKey(Model $record): string
+    {
+        return $record->getMorphClass().'|'.$record->getKey();
     }
 
     private function stageCustomFieldChange(Model $record, CustomField $field, ?CustomFieldValue $existing, string $column, mixed $rawValue): void
@@ -478,7 +483,7 @@ final class ExecuteImportJob implements ShouldQueue
 
         $existing?->setRelation('customField', $field);
 
-        $key = $record->getMorphClass().'|'.$record->getKey().'|'.$field->getKey();
+        $key = $this->recordKey($record).'|'.$field->getKey();
 
         $this->pendingCustomFieldChanges[$key] ??= [
             'entity' => $record,

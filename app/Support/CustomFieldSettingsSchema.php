@@ -209,19 +209,8 @@ final readonly class CustomFieldSettingsSchema
      */
     public static function values(CustomField $field): array
     {
-        $settings = $field->settings;
-
         return [
-            'visible_in_list' => $settings->visible_in_list,
-            'visible_in_view' => $settings->visible_in_view,
-            'list_toggleable_hidden' => $settings->list_toggleable_hidden,
-            'searchable' => $settings->searchable,
-            'enable_option_colors' => $settings->enable_option_colors,
-            'allow_multiple' => $settings->allow_multiple,
-            'max_values' => $settings->max_values,
-            'unique_per_entity_type' => $settings->unique_per_entity_type,
-            'description' => $settings->description,
-            'description_position' => $settings->descriptionPosition?->value,
+            ...Arr::except($field->settings->toArray(), ['encrypted', 'visibility', 'additional']),
             ...self::typeValues($field),
         ];
     }

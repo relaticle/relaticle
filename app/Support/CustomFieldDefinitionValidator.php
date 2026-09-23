@@ -10,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -97,6 +98,7 @@ final readonly class CustomFieldDefinitionValidator
         }
 
         $settingRules = CustomFieldSettingsSchema::rules($field, $settings);
+        $prefixedSettingRules = Arr::prependKeysWith($settingRules, 'settings.');
         $unsupported = array_diff(array_keys($settings), array_keys($settingRules));
 
         if ($unsupported !== []) {
@@ -122,11 +124,11 @@ final readonly class CustomFieldDefinitionValidator
             ],
             'active' => ['sometimes', 'boolean'],
             'settings' => ['sometimes', 'array'],
-            ...collect($settingRules)->mapWithKeys(fn (array $rules, string $key): array => ["settings.{$key}" => $rules])->all(),
+            ...$prefixedSettingRules,
         ], [
             'name.max' => 'Field names must be 50 characters or fewer.',
             ...CustomFieldSettingsSchema::messages(),
-        ], collect($settingRules)->mapWithKeys(fn (array $rules, string $key): array => ["settings.{$key}" => $key])->all())->validate();
+        ], array_combine(array_keys($prefixedSettingRules), array_keys($settingRules)))->validate();
 
         if (isset($validated['settings'])) {
             $validated['settings'] = CustomFieldSettingsSchema::withImpliedChanges(

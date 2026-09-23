@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
-use App\Enums\WorkspaceCapability;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\PersonalAccessToken;
@@ -75,10 +74,7 @@ final class WhoAmiTool extends Tool
                 'id' => $workspace->id,
                 'name' => $workspace->name,
                 'role' => $user->workspaceRoleLabel($workspace->id),
-                'capabilities' => array_map(
-                    fn (WorkspaceCapability $capability): string => $capability->value,
-                    $user->workspaceCapabilities($workspace->id),
-                ),
+                'capabilities' => array_column($user->workspaceCapabilities($workspace->id), 'value'),
             ],
             'workspace_members' => $workspaceMembers,
             'token_abilities' => $tokenAbilities,
