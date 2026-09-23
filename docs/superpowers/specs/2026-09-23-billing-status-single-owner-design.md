@@ -57,7 +57,7 @@ every paused workspace stays paused.
 | 3 | Enterprise | `plan = enterprise` | yes |
 | 4 | Trialing | generic trial running | yes |
 | 5 | Grandfathered | `hosted_free_grandfathered_at` set | yes |
-| 6 | SubscriptionEnded (new) | `plan = free` and a latest default subscription whose status is not never-granting | no |
+| 6 | SubscriptionEnded (new) | `plan = free` and any subscription whose status is not never-granting | no |
 | 7 | TrialEnded | `trial_ends_at` set, or `plan = free` and `pro_trial_used_at` set | no |
 | 8 | Granted | `plan != free` | yes |
 | 9 | Free | everything else | no |
@@ -71,6 +71,8 @@ Why each clause:
   SubscriptionEnded.
 - An abandoned checkout (`incomplete_expired`) is never-granting, so a trial that ended with one
   reads TrialEnded, and a workspace that never trialled reads Free.
+- Row 6 reads every subscription, not only the latest. A cancelled subscription followed by an
+  abandoned checkout still reads SubscriptionEnded, which is what the paused screen shows today.
 
 Worked cases:
 
@@ -81,6 +83,7 @@ Worked cases:
 | Trialled, subscribed, cancelled | SubscriptionEnded |
 | Cancelled subscriber later granted Pro by a sysadmin | Granted |
 | Trial ended with an abandoned checkout | TrialEnded |
+| Cancelled, then a later checkout abandoned | SubscriptionEnded |
 | Never trialled, abandoned checkout | Free |
 | Grandfathered, subscribed, cancelled | Grandfathered |
 
@@ -93,8 +96,8 @@ Worked cases:
 **`app/Enums/BillingStatus.php`**
 - New case `SubscriptionEnded = 'subscription_ended'`, declared between Grandfathered and
   TrialEnded, with label "Subscription ended", a description, and colour `danger`.
-- `fromWorkspace()` and `constrain()` implement rows 6 and 7 above. The query side reads
-  `latestDefaultSubscription` like the existing cases.
+- `fromWorkspace()` and `constrain()` implement rows 6 and 7 above. Row 6 reads the
+  `subscriptions` relation, not `latestDefaultSubscription`, because it asks about history.
 - New `grantsAccess(): bool`, an exhaustive `match`.
 - Class docblock: name it the owner that the other surfaces read.
 
@@ -109,8 +112,8 @@ Worked cases:
   output is identical to today's.
 
 **`app/Filament/Pages/Billing.php` and `resources/views/filament/pages/billing-paused.blade.php`**
-- `pausedCause` is replaced by `status` (`$workspace->billingStatus()`). The heading reads
-  `billing.paused.heading.{$status->value}`.
+- `pausedCause` is replaced by `billingStatus` (`$workspace->billingStatus()`). The heading reads
+  `billing.paused.heading.{$billingStatus->value}`.
 
 **`lang/en/billing.php`**
 - `paused.heading` keys become `trial_ended`, `subscription_ended`, and `free`. Copy is unchanged.
@@ -137,8 +140,8 @@ Worked cases:
 ## Testing
 
 - `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` `billingStatusArrangements()`: add the
-  worked cases above. The existing test that checks every arrangement through both
-  `fromWorkspace()` and `applyToQuery()` then gates the query side.
+  worked cases above. Re-key the filter test by arrangement name: it keys by status today, so a
+  second arrangement for one status overwrites the first and never reaches the query side.
 - `tests/Feature/Billing/TrialLifecycleTest.php`: after `billing:process-trials` pauses a trial,
   the workspace reads TrialEnded. This is the reproduced bug.
 - Access regression: the existing gate, middleware, sidebar, paused-screen, MCP, and chat tests
