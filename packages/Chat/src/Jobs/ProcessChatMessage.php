@@ -994,6 +994,11 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function bindAuth(): void
     {
+        // In memory only: the user may have switched workspace since dispatch, and the
+        // tools scope every query through currentWorkspace. Mirrors SetApiWorkspaceContext.
+        $this->user->forceFill(['current_workspace_id' => $this->workspace->getKey()]);
+        $this->user->setRelation('currentWorkspace', $this->workspace);
+
         Auth::guard('web')->setUser($this->user);
 
         // The job runs with no Filament panel request, so the custom-fields
