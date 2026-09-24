@@ -9,7 +9,6 @@ use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
-use Laravel\Ai\Storage\StoredMessage;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
@@ -20,6 +19,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TurnPresence;
 
@@ -332,7 +332,7 @@ final class ChatInterface extends BaseLivewireComponent
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
-            'display_blocks' => DisplayBlocks::collect(StoredMessage::fromArray(['steps' => $row->steps])->toolResults()),
+            'display_blocks' => DisplayBlocks::collect(StoredSteps::toolResults($row->steps)),
             'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }

@@ -9,13 +9,13 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Laravel\Ai\Storage\StoredMessage;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\StoredSteps;
 use stdClass;
 
 final readonly class ListConversationMessages
@@ -56,7 +56,7 @@ final readonly class ListConversationMessages
         $pendingIds = [];
 
         foreach ($messages as $msg) {
-            $toolResults = StoredMessage::fromArray(['steps' => $msg->steps])->toolResults();
+            $toolResults = StoredSteps::toolResults($msg->steps);
             $toolResultsByMessage[(string) $msg->id] = $toolResults;
 
             $envelopes = $this->pendingActionEnvelopes($toolResults);
