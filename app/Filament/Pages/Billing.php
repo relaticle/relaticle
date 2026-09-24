@@ -207,7 +207,7 @@ final class Billing extends Page
         return [
             'billingStatus' => $workspace->billingStatus(),
             'reviewingPlan' => $this->step === 'plan'
-                && $this->user()->ownsWorkspace($workspace)
+                && $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)
                 && $this->checkout !== 'success',
             'otherWorkspaces' => $this->user()->allWorkspaces()
                 ->reject(fn (Workspace $other): bool => $other->is($workspace))
