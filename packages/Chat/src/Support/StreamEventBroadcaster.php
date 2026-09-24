@@ -8,13 +8,19 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Broadcast;
+use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
+use Laravel\Ai\Streaming\Events\StreamStart;
+use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
 use Relaticle\Chat\Models\PendingAction;
 
 final readonly class StreamEventBroadcaster
 {
+    // The only stream events chat/stream.js listens for.
+    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class];
+
     public function __construct(
         private Channel $channel,
     ) {}
@@ -51,12 +57,17 @@ final readonly class StreamEventBroadcaster
     /**
      * Compute the slim broadcast payload for the given event.
      *
-     * Returns null when the event should be dropped entirely (read-tool results).
+     * Returns null when the event should be dropped entirely: read-tool results,
+     * and every event the client has no listener for.
      *
      * @return array{as: string, with: array<string, mixed>}|null
      */
     public static function payloadFor(StreamEvent $event): ?array
     {
+        if (! in_array($event::class, self::CLIENT_EVENTS, true)) {
+            return null;
+        }
+
         if ($event instanceof ToolResult) {
             return self::payloadForToolResult($event);
         }
