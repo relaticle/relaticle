@@ -232,7 +232,7 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Initialize a new record with workspace, creator, and source.
+     * Initialize a new record with workspace and creator.
      *
      * Call this in prepareForSave when the record is new.
      *

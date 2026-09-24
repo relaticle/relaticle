@@ -337,7 +337,7 @@ final class ExecuteImportJob implements ShouldQueue
                 $prepared = array_intersect_key($prepared, $allowedKeys);
 
                 if (! $isCreate) {
-                    unset($prepared['workspace_id'], $prepared['creator_id'], $prepared['creation_source']);
+                    unset($prepared['workspace_id'], $prepared['creator_id']);
                     $prepared = array_filter($prepared, filled(...));
                 }
 
@@ -889,7 +889,7 @@ final class ExecuteImportJob implements ShouldQueue
         $keys = collect($importer->allFields())
             ->reject(fn (ImportField $field): bool => $field->key === 'id')
             ->pluck('key')
-            ->merge(['workspace_id', 'creator_id', 'creation_source'])
+            ->merge(['workspace_id', 'creator_id'])
             ->merge(
                 collect($importer->entityLinks())
                     ->pluck('foreignKey')

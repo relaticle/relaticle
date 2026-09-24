@@ -165,3 +165,12 @@ it('records the channel a record was created through, unless the writer states o
         ->and($stated->creation_source)->toBe(CreationSource::SYSTEM)
         ->and($typed->creation_source)->toBe(CreationSource::WEB);
 });
+
+it('keeps the stored creation source of a record restored from serialization under another channel', function (): void {
+    $stored = $this->company->fresh();
+
+    $restored = CurrentSource::during(CreationSource::API, fn (): Company => unserialize(serialize($stored)));
+
+    expect($restored->creation_source)->toBe(CreationSource::WEB)
+        ->and($restored->isDirty())->toBeFalse();
+});

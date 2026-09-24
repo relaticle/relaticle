@@ -17,7 +17,7 @@ trait HasCreator
 {
     public function initializeHasCreator(): void
     {
-        $this->attributes['creation_source'] = CurrentSource::get()->value;
+        $this->attributes['creation_source'] ??= CurrentSource::get()->value;
     }
 
     /**
