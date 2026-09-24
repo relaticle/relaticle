@@ -13,6 +13,7 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
@@ -55,8 +56,7 @@ function seedFailedTurnMessage(string $conversationId, User $user, string $role,
         'role' => $role,
         'content' => $content,
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '[]',
         'meta' => '[]',
         'document' => json_encode(['type' => 'doc', 'content' => []], JSON_THROW_ON_ERROR),
@@ -462,6 +462,54 @@ it('does not fail over once the stream has already broadcast an event', function
     expect(fn (): mixed => $job->handle($credits))->toThrow(RuntimeException::class);
 
     Queue::assertNothingPushed();
+});
+
+it('keeps one user message and the failure note when the turn dies after a completed tool step', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    $credits = resolve(CreditService::class);
+    $credits->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::sequence()
+            ->push(AnthropicSse::toolUseStep('GetCrmSummaryTool'), 200, ['Content-Type' => 'text/event-stream'])
+            ->push('upstream exploded', 500),
+    ]);
+    Queue::fake();
+
+    $job = new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'How is my pipeline?',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    );
+
+    try {
+        $job->handle($credits);
+    } catch (Throwable $exception) {
+        $job->failed($exception);
+    }
+
+    $rows = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->orderBy('id')
+        ->get(['role', 'content', 'status']);
+
+    expect($rows->pluck('role')->all())->toBe(['user', 'assistant'])
+        ->and($rows[0]->content)->toBe('How is my pipeline?')
+        ->and($rows[1]->content)->toBe(__('The assistant encountered an error. Please try again.'))
+        ->and($rows->pluck('status')->unique()->all())->toBe(['completed']);
 });
 
 it('refunds the reservation when the job dies before it ever runs', function (): void {

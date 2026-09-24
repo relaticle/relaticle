@@ -88,7 +88,7 @@ final readonly class StreamEventBroadcaster
         unset($decoded['data']);
 
         // Added to the BROADCAST only, never to the tool result the message
-        // stores: `tool_results` is replayed verbatim to the model on every later
+        // stores: a stored tool result is replayed verbatim to the model on every later
         // turn, and a rewrite there invalidates the prompt-cache prefix. The
         // client needs the instant so a lapsed proposal stops hiding the composer.
         $expiresAt = self::expiryFor($decoded['pending_action_id'] ?? null);

@@ -8,6 +8,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Messages\ToolResultMessage;
+use Laravel\Ai\Messages\UserMessage;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Storage\DatabaseConversationStore;
@@ -15,6 +16,7 @@ use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Support\AssistantText;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\FirstChatUsageTagger;
+use Throwable;
 
 /**
  * Conversation store that hides superseded turns from the agent's history.
@@ -46,6 +48,8 @@ use Relaticle\Chat\Support\FirstChatUsageTagger;
  */
 final class SupersededAwareConversationStore extends DatabaseConversationStore
 {
+    private ?string $openedUserMessageId = null;
+
     /**
      * Drop presentation-only display blocks from the history replayed to the model.
      *
@@ -109,9 +113,11 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
      * RememberConversation middleware in laravel/ai), unlike the
      * AgentConversationMessage Eloquent model, which never receives writes.
      */
-    public function storeUserMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt): string
+    public function storeUserMessage(string $conversationId, ?string $participantType, string|int|null $participantId, string $agent, UserMessage $message): string
     {
-        $messageId = parent::storeUserMessage($conversationId, $participantType, $participantId, $prompt);
+        $messageId = parent::storeUserMessage($conversationId, $participantType, $participantId, $agent, $message);
+
+        $this->openedUserMessageId = $messageId;
 
         if (MessageOrigin::current()->isTyped()) {
             FirstChatUsageTagger::tagIfFirstMessage($messageId);
@@ -138,13 +144,28 @@ final class SupersededAwareConversationStore extends DatabaseConversationStore
     /**
      * Collapse a fully-repeated combined assistant text before persisting.
      *
-     * laravel/ai concatenates the model's text deltas across every agent step,
-     * so a model that echoes the same acknowledgment in both the tool-call step
-     * and the post-tool-result step yields that text repeated back-to-back. We
-     * store the single copy instead of the duplicate.
+     * laravel/ai joins the model's text across every agent step, so a model
+     * that echoes the same acknowledgment in both the tool-call step and the
+     * post-tool-result step yields that text twice. We store the single copy.
      */
-    public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response): ?string
+    public function storeAssistantMessage(string $conversationId, ?string $participantType, string|int|null $participantId, AgentPrompt $prompt, AgentResponse $response, ?Throwable $exception = null): ?string
     {
+        $openedUserMessageId = $this->openedUserMessageId;
+        $this->openedUserMessageId = null;
+
+        // ProcessChatMessage owns a dead turn (retry, failover, failure note), so
+        // the SDK's failed-turn rows would only duplicate it.
+        if ($exception instanceof Throwable) {
+            if ($openedUserMessageId !== null) {
+                $this->table($this->messagesTable())
+                    ->where('conversation_id', $conversationId)
+                    ->where('id', $openedUserMessageId)
+                    ->delete();
+            }
+
+            return null;
+        }
+
         $response->text = AssistantText::collapseRepeated($response->text);
 
         return parent::storeAssistantMessage($conversationId, $participantType, $participantId, $prompt, $response);

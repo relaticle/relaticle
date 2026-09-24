@@ -50,8 +50,7 @@ function seedDecidedProposal(User $user, int|string $workspaceId, string $conver
         'content' => 'Done.',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => json_encode([[
+        'steps' => storedToolSteps([[
             'id' => 'toolu_'.Str::random(8),
             'name' => 'CreatePersonTool',
             'result' => json_encode([
@@ -199,8 +198,7 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
         'content' => 'Done.',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => json_encode([[
+        'steps' => storedToolSteps([[
             'id' => 'toolu_'.Str::random(8),
             'name' => 'CreateTaskTool',
             'result' => json_encode([
@@ -288,8 +286,7 @@ function seedResolvedBatch(User $user, int|string $workspaceId, string $conversa
         'content' => 'Done.',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => json_encode([[
+        'steps' => storedToolSteps([[
             'id' => 'toolu_'.Str::random(8),
             'name' => 'CreateTaskTool',
             'result' => json_encode([

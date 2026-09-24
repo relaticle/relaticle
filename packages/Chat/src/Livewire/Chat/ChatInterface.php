@@ -9,6 +9,7 @@ use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Laravel\Ai\Storage\StoredMessage;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
@@ -321,7 +322,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->latest()
             ->orderByDesc('id')
             ->toBase()
-            ->first(['id', 'content', 'tool_results', 'meta']);
+            ->first(['id', 'content', 'steps', 'meta']);
 
         if ($row === null) {
             return null;
@@ -331,9 +332,7 @@ final class ChatInterface extends BaseLivewireComponent
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
-            'display_blocks' => DisplayBlocks::collect(
-                $row->tool_results === null ? null : (string) $row->tool_results,
-            ),
+            'display_blocks' => DisplayBlocks::collect(StoredMessage::fromArray(['steps' => $row->steps])->toolResults()),
             'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }

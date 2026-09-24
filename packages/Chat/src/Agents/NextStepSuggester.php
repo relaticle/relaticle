@@ -34,7 +34,7 @@ use Laravel\Ai\Promptable;
 #[MaxTokens(400)]
 #[Temperature(0.4)]
 #[Timeout(15)]
-final readonly class NextStepSuggester implements Agent, HasStructuredOutput
+final class NextStepSuggester implements Agent, HasStructuredOutput
 {
     use Promptable;
 

@@ -28,7 +28,7 @@ use Laravel\Ai\Promptable;
 #[MaxTokens(64)]
 #[Temperature(0.2)]
 #[Timeout(15)]
-final readonly class ConversationTitler implements Agent, HasStructuredOutput
+final class ConversationTitler implements Agent, HasStructuredOutput
 {
     use Promptable;
 

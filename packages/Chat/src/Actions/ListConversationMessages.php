@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Laravel\Ai\Storage\StoredMessage;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
@@ -35,7 +36,7 @@ final readonly class ListConversationMessages
             ->orderByDesc('id')
             ->limit($limit)
             ->toBase()
-            ->get(['id', 'role', 'content', 'document', 'tool_results', 'meta', 'created_at'])
+            ->get(['id', 'role', 'content', 'document', 'steps', 'meta', 'created_at'])
             ->reverse()
             ->values();
 
@@ -50,11 +51,15 @@ final readonly class ListConversationMessages
             ->get(['message_id', 'rating', 'category'])
             ->keyBy('message_id');
 
+        $toolResultsByMessage = [];
         $envelopesByMessage = [];
         $pendingIds = [];
 
         foreach ($messages as $msg) {
-            $envelopes = $this->pendingActionEnvelopes($msg->tool_results === null ? null : (string) $msg->tool_results);
+            $toolResults = StoredMessage::fromArray(['steps' => $msg->steps])->toolResults();
+            $toolResultsByMessage[(string) $msg->id] = $toolResults;
+
+            $envelopes = $this->pendingActionEnvelopes($toolResults);
             $envelopesByMessage[(string) $msg->id] = $envelopes;
 
             foreach ($envelopes as $inner) {
@@ -88,7 +93,7 @@ final readonly class ListConversationMessages
                 ])
                 ->all();
 
-        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $envelopesByMessage, $records): array {
+        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $toolResultsByMessage, $envelopesByMessage, $records): array {
             $attachment = $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta);
 
             return [
@@ -118,9 +123,7 @@ final readonly class ListConversationMessages
                 // already reading the wrong time before this fix).
                 'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
                 'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
-                'display_blocks' => DisplayBlocks::collect(
-                    $msg->tool_results === null ? null : (string) $msg->tool_results,
-                ),
+                'display_blocks' => DisplayBlocks::collect($toolResultsByMessage[(string) $msg->id]),
                 'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
                 'feedback' => isset($feedbackByMessage[$msg->id]) ? [
                     'rating' => (string) $feedbackByMessage[$msg->id]->rating,
@@ -175,27 +178,18 @@ final readonly class ListConversationMessages
     }
 
     /**
-     * The decoded `pending_action` envelopes inside a message's tool_results,
+     * The decoded `pending_action` envelopes inside a message's tool results,
      * parsed once and shared by the id collection and the card extraction.
      *
+     * @param  list<array<string, mixed>>  $toolResults
      * @return list<array<string, mixed>>
      */
-    private function pendingActionEnvelopes(?string $toolResults): array
+    private function pendingActionEnvelopes(array $toolResults): array
     {
-        if ($toolResults === null) {
-            return [];
-        }
-
-        $parsed = json_decode($toolResults, true);
-
-        if (! is_array($parsed)) {
-            return [];
-        }
-
         $envelopes = [];
 
-        foreach ($parsed as $toolResult) {
-            if (! is_array($toolResult) || ! isset($toolResult['result'])) {
+        foreach ($toolResults as $toolResult) {
+            if (! isset($toolResult['result'])) {
                 continue;
             }
 

@@ -70,7 +70,7 @@ it('approved actions expose record.url after conversation reload', function (): 
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -79,7 +79,7 @@ it('approved actions expose record.url after conversation reload', function (): 
         'id' => '019df800-4444-7000-8000-000000000010',
         'role' => 'assistant',
         'content' => 'I have proposed creating a person.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -152,7 +152,7 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -161,7 +161,7 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
         'id' => '019df800-4444-7000-8000-000000000030',
         'role' => 'assistant',
         'content' => 'I have proposed creating people.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -236,7 +236,7 @@ it('does not expose record on pending or rejected actions', function (): void {
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -245,7 +245,7 @@ it('does not expose record on pending or rejected actions', function (): void {
         'id' => '019df800-4444-7000-8000-000000000020',
         'role' => 'assistant',
         'content' => 'Pending.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -294,12 +294,12 @@ it('rehydrates a pending proposal with the instant it lapses', function (): void
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'role' => 'assistant',
         'content' => 'I have proposed creating a person.',
-        'tool_results' => json_encode([[
+        'steps' => storedToolSteps([[
             'id' => 'toolu_'.uniqid(),
             'name' => 'CreatePersonTool',
             'result' => json_encode([
