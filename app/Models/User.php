@@ -109,6 +109,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
+    public const string PROFILE_PHOTO_DIRECTORY = 'profile-photos';
+
     public const array PROFILE_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
     /** @var array<string, bool> */

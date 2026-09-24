@@ -50,7 +50,7 @@ trait HasProfilePhoto
         return resolve(AvatarService::class)->generateAuto($this->name);
     }
 
-    protected function profilePhotoDisk(): string
+    public function profilePhotoDisk(): string
     {
         return config('jetstream.profile_photo_disk', 'public');
     }

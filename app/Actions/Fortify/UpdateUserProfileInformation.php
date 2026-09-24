@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use Closure;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Fortify\Contracts\UpdatesUserProfileInformation;
@@ -21,7 +23,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-            'profile_photo_path' => ['nullable', 'string', 'max:255'],
+            'profile_photo_path' => ['nullable', 'string', 'max:255', $this->ownUploadedPhoto($user)],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
         ])->validateWithBag('updateProfileInformation');
 
@@ -42,6 +44,26 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
                 ...$this->timezoneAttribute($input),
             ])->save();
         }
+    }
+
+    // The path arrives from the client, and updateProfilePhoto() later deletes whatever the
+    // previous path named, so only a raster upload in the photo directory nobody else holds.
+    private function ownUploadedPhoto(User $user): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($user): void {
+            if ($value === $user->profile_photo_path) {
+                return;
+            }
+
+            $isOwnUpload = is_string($value)
+                && preg_match('#^'.User::PROFILE_PHOTO_DIRECTORY.'/[^/]+$#', $value) === 1
+                && User::query()->whereKeyNot($user->getKey())->where('profile_photo_path', $value)->doesntExist()
+                && in_array(Storage::disk($user->profilePhotoDisk())->mimeType($value), User::PROFILE_PHOTO_MIME_TYPES, true);
+
+            if (! $isOwnUpload) {
+                $fail('validation.image')->translate();
+            }
+        };
     }
 
     /**

@@ -78,7 +78,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->acceptedFileTypes(User::PROFILE_PHOTO_MIME_TYPES)
                             ->imageEditor()
                             ->disk(config('jetstream.profile_photo_disk'))
-                            ->directory('profile-photos')
+                            ->directory(User::PROFILE_PHOTO_DIRECTORY)
                             ->visibility('public')
                             ->formatStateUsing(fn () => auth('web')->user()?->profile_photo_path)
                             ->getUploadedFileUsing($this->resolveProfilePhotoUploadInfo(...)),
