@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Exceptions\SsrfGuardException;
+use App\Exceptions\UploadException;
 use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
+use App\Support\Media\UploadAllowlist;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
@@ -187,4 +189,13 @@ test('guard refuses a host that resolves to a private address at send time', fun
         ->toThrow(SsrfGuardException::class);
 
     Http::assertNothingSent();
+});
+
+test('guard aborts a download larger than the upload limit', function (): void {
+    $options = (fn (): array => $this->options)->call(SsrfGuard::guard(Http::timeout(5)));
+
+    expect(fn () => $options['progress'](UploadAllowlist::maxBytes() + 1, 0))
+        ->toThrow(UploadException::class)
+        ->and(fn () => $options['progress'](0, UploadAllowlist::maxBytes() + 1))
+        ->toThrow(UploadException::class);
 });

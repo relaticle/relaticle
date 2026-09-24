@@ -61,8 +61,13 @@ final readonly class SsrfGuard
     public static function guard(PendingRequest $request): PendingRequest
     {
         return $request
-            ->withOptions(self::redirectGuardOptions())
+            ->withOptions([...self::redirectGuardOptions(), 'progress' => self::abortPastUploadLimit(...)])
             ->withMiddleware(self::pinToValidatedAddress(...));
+    }
+
+    private static function abortPastUploadLimit(int $downloadTotal, int $downloaded): void
+    {
+        throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
     }
 
     // Runs inside the redirect middleware, so every hop connects to the address it
@@ -139,9 +144,7 @@ final readonly class SsrfGuard
             'connect_timeout' => 10,
             'timeout' => 30,
             'curl' => [CURLOPT_RESOLVE => [self::resolveEntry($host, 443, $address)]],
-            'progress' => static function (int $downloadTotal, int $downloaded): void {
-                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
-            },
+            'progress' => self::abortPastUploadLimit(...),
         ]);
     }
 
