@@ -28,12 +28,9 @@ final class AuthCode extends BaseAuthCode
     protected static function booted(): void
     {
         self::creating(function (self $code): void {
-            $workspaceId = session()->pull('mcp.oauth.workspace_id');
-            $workspaceId = is_string($workspaceId) && $workspaceId !== '' ? $workspaceId : $code->grantedWorkspaceId();
+            $consentedWorkspaceId = session()->pull('mcp.oauth.workspace_id');
 
-            if ($workspaceId !== null) {
-                $code->workspace_id = $workspaceId;
-            }
+            $code->workspace_id = filled($consentedWorkspaceId) ? $consentedWorkspaceId : $code->grantedWorkspaceId();
         });
     }
 

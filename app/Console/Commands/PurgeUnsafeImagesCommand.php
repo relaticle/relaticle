@@ -95,8 +95,7 @@ final class PurgeUnsafeImagesCommand extends Command
                 continue;
             }
 
-            $disk->delete($path);
-            $user->forceFill(['profile_photo_path' => null])->saveQuietly();
+            $user->deleteProfilePhoto();
         }
 
         return $purged;
