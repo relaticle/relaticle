@@ -1,6 +1,6 @@
 # Activity log: record which channel made each change
 
-Date: 2026-09-24. Branch: `issue-831`. Issue: #831.
+Date: 2026-09-24. Branch: `feat/activity-log-source`. Issue: #831.
 
 ## Problem
 

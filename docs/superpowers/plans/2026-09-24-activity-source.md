@@ -20,7 +20,7 @@
 - Tests live in `tests/Feature/`, go through real entry points, declare `mutates(...)`, and carry no comments.
 - Pest test files share one global function namespace. Before adding a top-level helper function, `grep -rn "function <name>(" tests/` must return nothing.
 - Before each commit: `vendor/bin/pint --dirty --format agent`, `vendor/bin/rector --dry-run` (apply with `vendor/bin/rector` if it suggests changes), `vendor/bin/phpstan analyse --memory-limit=2G`.
-- Conventional commits, lowercase, subject under 72 characters, no AI attribution. Branch `issue-831`. Stage only the files the task names; `public/css/**` has unrelated local changes that must never be staged.
+- Conventional commits, lowercase, subject under 72 characters, no AI attribution. Branch `feat/activity-log-source`. Stage only the files the task names; `public/css/**` has unrelated local changes that must never be staged.
 
 ## Review Focus
 
