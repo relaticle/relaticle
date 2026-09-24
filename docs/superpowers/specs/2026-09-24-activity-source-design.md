@@ -100,7 +100,9 @@ Gains `initializeHasCreator()`, setting the raw `creation_source` attribute with
 `??= CurrentSource::get()->value`. Laravel runs trait initializers before `fill()`, and hydration
 from the database overwrites every attribute afterwards, so explicit and stored values win. The
 `??=` matters because `Model::__wakeup()` re-runs initializers: a plain assignment would re-stamp
-an unserialized record with the current channel and mark it dirty. The `$attributes` default (its
+an unserialized record with the current channel and mark it dirty. The initializer also returns
+early when `$this->exists`, so a record loaded without the column and then unserialized gains
+no channel either. The `$attributes` default (its
 only entry) leaves `Company`, `People`, `Opportunity`, `Task`, and `Note`.
 
 ### Setting the channel

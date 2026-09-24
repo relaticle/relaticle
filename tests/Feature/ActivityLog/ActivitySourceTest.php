@@ -176,6 +176,15 @@ it('keeps the stored creation source of a record restored from serialization und
         ->and($restored->isDirty())->toBeFalse();
 });
 
+it('adds no creation source to a partially loaded record restored under another channel', function (): void {
+    $partial = Company::query()->select(['id', 'name', 'workspace_id'])->findOrFail($this->company->getKey());
+
+    $restored = CurrentSource::during(CreationSource::API, fn (): Company => unserialize(serialize($partial)));
+
+    expect($restored->getAttributes())->not->toHaveKey('creation_source')
+        ->and($restored->isDirty())->toBeFalse();
+});
+
 it('names the channel of an api change in the record timeline', function (): void {
     CurrentSource::during(CreationSource::API, fn (): bool => $this->company->update(['name' => 'Posted']));
 
