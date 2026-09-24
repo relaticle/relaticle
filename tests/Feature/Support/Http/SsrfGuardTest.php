@@ -113,14 +113,14 @@ test('pinned client refuses a private host', function (): void {
         ->toThrow(SsrfGuardException::class);
 });
 
-test('pinned client never follows redirects and pins the resolved address', function (): void {
+test('pinned client never follows redirects and leaves an address literal unpinned', function (): void {
     $client = SsrfGuard::pinnedClient('https://93.184.216.34/file.pdf');
     $options = (fn (): array => $this->options)->call($client);
 
     expect($options['allow_redirects'])->toBeFalse()
         ->and($options['decode_content'])->toBeFalse()
         ->and($options['timeout'])->toBe(30)
-        ->and($options['curl'][CURLOPT_RESOLVE])->toBe(['93.184.216.34:443:93.184.216.34']);
+        ->and($options['curl'])->toBe([]);
 });
 
 test('pinned client resolves a hostname once and pins the validated address', function (): void {
@@ -198,4 +198,27 @@ test('guard aborts a download larger than the upload limit', function (): void {
         ->toThrow(UploadException::class)
         ->and(fn () => $options['progress'](0, UploadAllowlist::maxBytes() + 1))
         ->toThrow(UploadException::class);
+});
+
+test('guard pins every validated address and leaves an address literal unpinned', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (string $host): array => match ($host) {
+        'cdn.example.com' => ['93.184.216.34', '2606:2800:220:1:248:1893:25c8:1946'],
+        default => [$host],
+    }));
+
+    $pins = [];
+
+    Http::fake(function (HttpClientRequest $request, array $options) use (&$pins) {
+        $pins[] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return Http::response('png');
+    });
+
+    SsrfGuard::guard(Http::timeout(5))->get('https://cdn.example.com/icon.png');
+    SsrfGuard::guard(Http::timeout(5))->get('https://[2606:4700:4700::1111]/icon.png');
+
+    expect($pins)->toBe([
+        ['cdn.example.com:443:93.184.216.34,[2606:2800:220:1:248:1893:25c8:1946]'],
+        null,
+    ]);
 });

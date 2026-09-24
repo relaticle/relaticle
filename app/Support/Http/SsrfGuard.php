@@ -80,14 +80,16 @@ final readonly class SsrfGuard
             $port = $uri->getPort() ?? ($uri->getScheme() === 'https' ? 443 : 80);
 
             try {
-                $address = self::publicAddress($host);
+                $pin = self::pin($host, $port);
             } catch (SsrfGuardException $exception) {
                 report($exception);
 
                 throw $exception;
             }
 
-            $options['curl'][CURLOPT_RESOLVE] = [self::resolveEntry($host, $port, $address)];
+            if ($pin !== null) {
+                $options['curl'][CURLOPT_RESOLVE] = [$pin];
+            }
 
             return $handler($request, $options);
         };
@@ -133,17 +135,14 @@ final readonly class SsrfGuard
 
         throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
 
-        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
-        $address = self::publicAddress($host);
+        $pin = self::pin(trim((string) parse_url($url, PHP_URL_HOST), '[]'), 443);
 
-        // CURLOPT_RESOLVE pins the connection to the address checked above, so a
-        // DNS answer cannot change between the check and the fetch.
         return Http::withOptions([
             'allow_redirects' => false,
             'decode_content' => false,
             'connect_timeout' => 10,
             'timeout' => 30,
-            'curl' => [CURLOPT_RESOLVE => [self::resolveEntry($host, 443, $address)]],
+            'curl' => $pin === null ? [] : [CURLOPT_RESOLVE => [$pin]],
             'progress' => self::abortPastUploadLimit(...),
         ]);
     }
@@ -154,10 +153,13 @@ final readonly class SsrfGuard
 
         throw_if(! is_string($host) || $host === '', SsrfGuardException::class, 'Invalid host in URL');
 
-        self::publicAddress(trim($host, '[]'));
+        self::publicAddresses(trim($host, '[]'));
     }
 
-    private static function publicAddress(string $host): string
+    /**
+     * @return list<string>
+     */
+    private static function publicAddresses(string $host): array
     {
         $addresses = self::resolveAddresses($host);
 
@@ -167,12 +169,20 @@ final readonly class SsrfGuard
             throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
         }
 
-        return $addresses[0];
+        return $addresses;
     }
 
-    private static function resolveEntry(string $host, int $port, string $address): string
+    // A CURLOPT_RESOLVE entry naming every validated address, so the connection cannot
+    // reach one a later DNS answer returns. An address literal has no lookup to pin.
+    private static function pin(string $host, int $port): ?string
     {
-        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
+        $addresses = self::publicAddresses($host);
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return null;
+        }
+
+        $pinned = implode(',', array_map(fn (string $address): string => str_contains($address, ':') ? "[{$address}]" : $address, $addresses));
 
         return "{$host}:{$port}:{$pinned}";
     }
