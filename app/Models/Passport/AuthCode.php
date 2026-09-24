@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Passport;
 
+use Illuminate\Support\Facades\DB;
 use Laravel\Passport\AuthCode as BaseAuthCode;
 
 /**
@@ -27,11 +28,27 @@ final class AuthCode extends BaseAuthCode
     protected static function booted(): void
     {
         self::creating(function (self $code): void {
-            $workspaceId = session()->pull('mcp.oauth.workspace_id');
+            $consentedWorkspaceId = session()->pull('mcp.oauth.workspace_id');
 
-            if (is_string($workspaceId) && $workspaceId !== '') {
-                $code->workspace_id = $workspaceId;
-            }
+            $code->workspace_id = is_string($consentedWorkspaceId) && $consentedWorkspaceId !== ''
+                ? $consentedWorkspaceId
+                : $code->grantedWorkspaceId();
         });
+    }
+
+    // Passport skips consent, and so the workspace picker, while the user holds an
+    // active token for the client; the code then inherits that token's workspace.
+    private function grantedWorkspaceId(): ?string
+    {
+        $workspaceId = DB::table('oauth_access_tokens')
+            ->where('user_id', $this->user_id)
+            ->where('client_id', $this->client_id)
+            ->where('revoked', false)
+            ->where('expires_at', '>', now())
+            ->whereNotNull('workspace_id')
+            ->latest()
+            ->value('workspace_id');
+
+        return is_string($workspaceId) ? $workspaceId : null;
     }
 }

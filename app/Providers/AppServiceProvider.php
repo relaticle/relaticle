@@ -52,6 +52,7 @@ use App\Support\Media\MediaLookup;
 use App\Support\Passport\ClientRepository;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\Exports\ExportColumn;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
@@ -254,6 +255,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $parameters['workspaces'] = $workspaces;
             $parameters['pausedWorkspaceIds'] = $pausedWorkspaceIds;
+            $parameters['redirectHost'] = $this->consentRedirectHost($parameters);
 
             // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
@@ -359,6 +361,25 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    private function consentRedirectHost(array $parameters): ?string
+    {
+        $request = $parameters['request'] ?? null;
+        $redirectUri = $request instanceof Request ? $request->string('redirect_uri')->value() : '';
+
+        if ($redirectUri === '') {
+            $redirectUri = data_get($parameters, 'client.redirect_uris.0');
+        }
+
+        if (! is_string($redirectUri)) {
+            return null;
+        }
+
+        return parse_url($redirectUri, PHP_URL_HOST) ?: $redirectUri;
     }
 
     private function configurePolicies(): void
@@ -623,6 +644,8 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureFilament(): void
     {
+        ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
+
         $slideOverActions = ['create', 'edit', 'view'];
 
         Action::configureUsing(function (Action $action) use ($slideOverActions): Action {

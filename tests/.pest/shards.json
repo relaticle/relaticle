@@ -175,6 +175,7 @@
         "Tests\\Feature\\Chat\\ProcessChatMessageFailureTest": 9.2018,
         "Tests\\Feature\\Chat\\ProcessChatMessageSettlementTest": 2.8266,
         "Tests\\Feature\\Chat\\ProcessChatMessageTest": 2.0519,
+        "Tests\\Feature\\Chat\\ProcessChatMessageWorkspaceBindingTest": 0.7765,
         "Tests\\Feature\\Chat\\PromptTextTest": 1.2641,
         "Tests\\Feature\\Chat\\ProposalCardEditingTest": 10.9338,
         "Tests\\Feature\\Chat\\ProposalCardLifecycleTest": 14.7828,
@@ -346,6 +347,7 @@
         "Tests\\Feature\\Media\\MediaStorageTest": 3.5161,
         "Tests\\Feature\\Media\\PrivateDiskTest": 3.8901,
         "Tests\\Feature\\Media\\PurgePendingUploadsCommandTest": 2.2151,
+        "Tests\\Feature\\Media\\PurgeUnsafeImagesCommandTest": 1.0273,
         "Tests\\Feature\\Media\\UploadClaimsTest": 4.3115,
         "Tests\\Feature\\Middleware\\CheckScheduledDeletionTest": 3.3748,
         "Tests\\Feature\\Middleware\\TrustProxiesTest": 1.4593,
@@ -483,6 +485,6 @@
         "Tests\\PHPStan\\Rules\\RelationAccessInPolicyRuleTest": 2.1373,
         "Tests\\Smoke\\RouteTest": 37.7524
     },
-    "checksum": "ee644291009a2525dc85d8e3e2334aa5",
-    "updated_at": "2026-09-24T10:49:49+00:00"
+    "checksum": "355e8a0da680c7ff24561a11d617a0b1",
+    "updated_at": "2026-09-24T15:40:31+00:00"
 }

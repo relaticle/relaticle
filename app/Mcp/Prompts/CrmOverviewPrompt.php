@@ -42,22 +42,24 @@ final class CrmOverviewPrompt extends Prompt
         $workspaceId = $user->currentWorkspace->getKey();
         $cacheKey = "crm_overview_{$workspaceId}";
 
-        $overview = Cache::remember($cacheKey, self::CACHE_TTL, function (): string {
+        $overview = Cache::remember($cacheKey, self::CACHE_TTL, function () use ($workspaceId): string {
             $counts = [
-                'companies' => Company::query()->count(),
-                'people' => People::query()->count(),
-                'opportunities' => Opportunity::query()->count(),
-                'tasks' => Task::query()->count(),
-                'notes' => Note::query()->count(),
+                'companies' => Company::query()->where('workspace_id', $workspaceId)->count(),
+                'people' => People::query()->where('workspace_id', $workspaceId)->count(),
+                'opportunities' => Opportunity::query()->where('workspace_id', $workspaceId)->count(),
+                'tasks' => Task::query()->where('workspace_id', $workspaceId)->count(),
+                'notes' => Note::query()->where('workspace_id', $workspaceId)->count(),
             ];
 
             $recentCompanies = Company::query()
+                ->where('workspace_id', $workspaceId)
                 ->latest()
                 ->take(5)
                 ->pluck('name')
                 ->implode(', ');
 
             $recentPeople = People::query()
+                ->where('workspace_id', $workspaceId)
                 ->latest()
                 ->take(5)
                 ->pluck('name')

@@ -7,11 +7,11 @@ namespace App\Support\Http;
 use App\Exceptions\SsrfGuardException;
 use App\Exceptions\UploadException;
 use App\Support\Media\UploadAllowlist;
+use Closure;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final readonly class SsrfGuard
@@ -35,6 +35,8 @@ final readonly class SsrfGuard
         '2001::/32',
         '2001:20::/28',
         '2001:db8::/32',
+        '::/96',
+        'fec0::/10',
     ];
 
     public static function isAllowed(string $url): bool
@@ -50,49 +52,44 @@ final readonly class SsrfGuard
         }
     }
 
-    /**
-     * An HTTP client that re-validates every redirect hop against this guard.
-     *
-     * The underlying client follows redirects by default, so validating only the
-     * initial URL would let an attacker-controlled public host redirect the request
-     * to an internal address (SSRF, CWE-918). Callers must still validate the initial
-     * URL with {@see self::isAllowed()}. The guard below only covers redirect hops.
-     */
-    public static function guardedHttpClient(): PendingRequest
+    public static function guard(PendingRequest $request): PendingRequest
     {
-        return Http::withOptions(self::redirectGuardOptions());
+        return $request
+            ->withOptions([
+                'allow_redirects' => ['max' => 5, 'strict' => true, 'referer' => false, 'protocols' => ['http', 'https']],
+                'progress' => self::abortPastUploadLimit(...),
+            ])
+            ->withMiddleware(self::pinToValidatedAddress(...));
     }
 
-    /**
-     * Guzzle options whose on_redirect callback aborts the request before any
-     * non-public redirect target is contacted, reporting the block for parity
-     * with the initial-URL check in {@see self::isAllowed()}.
-     *
-     * @return array{allow_redirects: array<string, mixed>}
-     */
-    public static function redirectGuardOptions(): array
+    private static function abortPastUploadLimit(int $downloadTotal, int $downloaded): void
     {
-        return [
-            'allow_redirects' => [
-                'max' => 5,
-                'strict' => true,
-                'referer' => false,
-                'protocols' => ['http', 'https'],
-                'on_redirect' => static function (
-                    RequestInterface $request,
-                    ResponseInterface $response,
-                    UriInterface $uri,
-                ): void {
-                    try {
-                        self::assertPublicHost((string) $uri);
-                    } catch (SsrfGuardException $exception) {
-                        report($exception);
+        throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
+    }
 
-                        throw $exception;
-                    }
-                },
-            ],
-        ];
+    // Runs inside the redirect middleware, so every hop connects to the address it
+    // was validated against and a second DNS answer cannot rebind it.
+    private static function pinToValidatedAddress(callable $handler): Closure
+    {
+        return static function (RequestInterface $request, array $options) use ($handler): PromiseInterface {
+            $uri = $request->getUri();
+            $host = trim($uri->getHost(), '[]');
+            $port = $uri->getPort() ?? ($uri->getScheme() === 'https' ? 443 : 80);
+
+            try {
+                $pin = self::pin($host, $port);
+            } catch (SsrfGuardException $exception) {
+                report($exception);
+
+                throw $exception;
+            }
+
+            if ($pin !== null) {
+                $options['curl'][CURLOPT_RESOLVE] = [$pin];
+            }
+
+            return $handler($request, $options);
+        };
     }
 
     public static function pinnedClient(string $url): PendingRequest
@@ -103,29 +100,15 @@ final readonly class SsrfGuard
 
         throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
 
-        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
-        $addresses = self::resolveAddresses($host);
+        $pin = self::pin(trim((string) ($parts['host'] ?? ''), '[]'), 443);
 
-        throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
-
-        foreach ($addresses as $address) {
-            throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
-        }
-
-        $address = $addresses[0];
-        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
-
-        // CURLOPT_RESOLVE pins the connection to the address checked above, so a
-        // DNS answer cannot change between the check and the fetch.
         return Http::withOptions([
             'allow_redirects' => false,
             'decode_content' => false,
             'connect_timeout' => 10,
             'timeout' => 30,
-            'curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$pinned}"]],
-            'progress' => static function (int $downloadTotal, int $downloaded): void {
-                throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
-            },
+            'curl' => $pin === null ? [] : [CURLOPT_RESOLVE => [$pin]],
+            'progress' => self::abortPastUploadLimit(...),
         ]);
     }
 
@@ -135,8 +118,14 @@ final readonly class SsrfGuard
 
         throw_if(! is_string($host) || $host === '', SsrfGuardException::class, 'Invalid host in URL');
 
-        $host = trim($host, '[]');
+        self::publicAddresses(trim($host, '[]'));
+    }
 
+    /**
+     * @return list<string>
+     */
+    private static function publicAddresses(string $host): array
+    {
         $addresses = self::resolveAddresses($host);
 
         throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
@@ -144,6 +133,23 @@ final readonly class SsrfGuard
         foreach ($addresses as $address) {
             throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
         }
+
+        return $addresses;
+    }
+
+    // A CURLOPT_RESOLVE entry naming every validated address, so the connection cannot
+    // reach one a later DNS answer returns. An address literal has no lookup to pin.
+    private static function pin(string $host, int $port): ?string
+    {
+        $addresses = self::publicAddresses($host);
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            return null;
+        }
+
+        $pinned = implode(',', array_map(fn (string $address): string => str_contains($address, ':') ? "[{$address}]" : $address, $addresses));
+
+        return "{$host}:{$port}:{$pinned}";
     }
 
     /**
