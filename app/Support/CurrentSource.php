@@ -8,7 +8,7 @@ use App\Enums\CreationSource;
 use Closure;
 use Illuminate\Support\Facades\Context;
 
-final class CurrentSource
+final readonly class CurrentSource
 {
     private const string KEY = 'current_source';
 
