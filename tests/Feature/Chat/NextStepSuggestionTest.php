@@ -21,6 +21,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Tests\Helpers\OpenAiResponses;
 
 mutates(SuggestNextSteps::class, NextSteps::class);
 
@@ -114,6 +115,24 @@ it('persists the drafted steps on the assistant message and broadcasts them', fu
             && count($e->steps) === 2
             && $e->steps[0]['label'] === 'Import your companies',
     );
+});
+
+it('suggests next steps after a turn served by OpenAI', function (): void {
+    OpenAiResponses::fakeStructured(['suggestions' => [['label' => 'Add Acme Corp', 'prompt' => 'Create a company called Acme Corp']]]);
+
+    $messageId = seedSuggestibleMessage('assistant', 'Your workspace is empty.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'What can you help me with?',
+        reply: 'Your workspace is empty.',
+        provider: 'openai',
+    ))->handle();
+
+    expect(persistedNextSteps($messageId))->toBe([
+        ['label' => 'Add Acme Corp', 'prompt' => 'Create a company called Acme Corp'],
+    ]);
 });
 
 it('sends the reply, the message and the tools it used to the suggester', function (): void {

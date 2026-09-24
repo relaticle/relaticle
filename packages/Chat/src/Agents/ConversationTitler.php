@@ -7,7 +7,6 @@ namespace Relaticle\Chat\Agents;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Laravel\Ai\Attributes\MaxTokens;
-use Laravel\Ai\Attributes\Temperature;
 use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Attributes\UseCheapestModel;
 use Laravel\Ai\Contracts\Agent;
@@ -26,7 +25,6 @@ use Laravel\Ai\Promptable;
  */
 #[UseCheapestModel]
 #[MaxTokens(64)]
-#[Temperature(0.2)]
 #[Timeout(15)]
 final class ConversationTitler implements Agent, HasStructuredOutput
 {
