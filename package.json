@@ -13,7 +13,7 @@
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",
         "@tailwindcss/typography": "^0.5.20",
-        "autoprefixer": "^10.6.0",
+        "autoprefixer": "^10.6.1",
         "chokidar": "^5.0.0",
         "laravel-vite-plugin": "^3.2.0",
         "playwright": "^1.63.0",
@@ -23,7 +23,7 @@
         "vite": "^8.3.0"
     },
     "dependencies": {
-        "@alpinejs/collapse": "^3.17.3",
+        "@alpinejs/collapse": "^3.17.4",
         "@laravel/passkeys": "^0.4.0",
         "@tailwindcss/vite": "^4.3.3",
         "@tiptap/core": "^3.31.3",
@@ -35,11 +35,11 @@
         "@tiptap/extension-text": "^3.31.3",
         "@tiptap/pm": "^3.31.3",
         "@tiptap/suggestion": "^3.31.3",
-        "alpinejs": "^3.17.3",
+        "alpinejs": "^3.17.4",
         "dompurify": "^3.4.15",
         "laravel-echo": "^2.5.0",
-        "marked": "^18.0.13",
-        "motion": "^13.3.0",
+        "marked": "^18.0.14",
+        "motion": "^13.4.1",
         "pusher-js": "^8.6.0",
         "shiki": "^4.4.3"
     }
