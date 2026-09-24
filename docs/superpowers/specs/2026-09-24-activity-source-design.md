@@ -96,11 +96,12 @@ Owns where the source sits on an activity row.
 
 ### `App\Models\Concerns\HasCreator`
 
-Gains `initializeHasCreator()`, setting the raw `creation_source` attribute to
-`CurrentSource::get()->value`. Laravel runs trait initializers before `fill()`, and hydration
+Gains `initializeHasCreator()`, setting the raw `creation_source` attribute with
+`??= CurrentSource::get()->value`. Laravel runs trait initializers before `fill()`, and hydration
 from the database overwrites every attribute afterwards, so explicit and stored values win. The
-`$attributes` default (its only entry) leaves `Company`, `People`, `Opportunity`, `Task`, and
-`Note`.
+`??=` matters because `Model::__wakeup()` re-runs initializers: a plain assignment would re-stamp
+an unserialized record with the current channel and mark it dirty. The `$attributes` default (its
+only entry) leaves `Company`, `People`, `Opportunity`, `Task`, and `Note`.
 
 ### Setting the channel
 
@@ -133,6 +134,12 @@ from the database overwrites every attribute afterwards, so explicit and stored 
 | `lang/en/workspaces.php` | `activity.columns.source`, `activity.filters.source`, `activity.via_source` ("Via :source") |
 
 Only `en` carries `workspaces.php`, so no other locale needs the keys.
+
+`CreationSource` colors API `purple` and chat `indigo`. Neither panel registered those names, so
+the badges rendered transparent. `AppPanelProvider` and `SystemAdminPanelProvider` now register
+both next to `primary`; the SystemAdmin `creation_source` badges had the same gap.
+
+`CurrentSource` is a `final readonly class`, as the arch preset requires of a class with no state.
 
 ## Out of scope
 
