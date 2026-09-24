@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -71,9 +72,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $response = SsrfGuard::guardedHttpClient()
-                ->timeout(15)
-                ->get($url);
+            $response = SsrfGuard::guard(Http::timeout(15))->get($url);
 
             if (! $response->successful()) {
                 return;

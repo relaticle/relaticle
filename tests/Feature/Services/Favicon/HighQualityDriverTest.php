@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Exceptions\SsrfGuardException;
 use App\Services\Favicon\Drivers\HighQualityDriver;
+use App\Support\Http\HostResolver;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\Utils;
@@ -137,4 +138,20 @@ test('routes favicon requests through the SSRF-guarded redirect client', functio
 
     expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
         ->toThrow(SsrfGuardException::class);
+});
+
+test('sends nothing when a host resolves to a private address at send time', function (): void {
+    $lookups = 0;
+
+    app()->instance(HostResolver::class, new HostResolver(function () use (&$lookups): array {
+        $lookups++;
+
+        return $lookups === 1 ? ['93.184.216.34'] : ['169.254.169.254'];
+    }));
+
+    Http::fake(['*' => Http::response('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')]);
+
+    expect((new HighQualityDriver)->fetch('https://rebind.example.com'))->toBeNull();
+
+    Http::assertNothingSent();
 });

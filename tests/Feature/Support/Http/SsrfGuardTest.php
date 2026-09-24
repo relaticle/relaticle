@@ -146,7 +146,7 @@ test('pinned client refuses a hostname that fails to resolve', function (): void
         ->toThrow(SsrfGuardException::class);
 });
 
-test('guarded client pins every hop to the address it validated', function (): void {
+test('guard pins every hop to the address it validated', function (): void {
     app()->instance(HostResolver::class, new HostResolver(fn (string $host): array => match ($host) {
         'favicon.example.com' => ['93.184.216.34'],
         'cdn.example.com' => ['1.1.1.1'],
@@ -163,7 +163,7 @@ test('guarded client pins every hop to the address it validated', function (): v
             : Http::response('png');
     });
 
-    SsrfGuard::guardedHttpClient()->get('https://favicon.example.com/icon.png');
+    SsrfGuard::guard(Http::timeout(5))->get('https://favicon.example.com/icon.png');
 
     expect($pins)->toBe([
         ['favicon.example.com:443:93.184.216.34'],
@@ -171,7 +171,7 @@ test('guarded client pins every hop to the address it validated', function (): v
     ]);
 });
 
-test('guarded client refuses a host that resolves to a private address at send time', function (): void {
+test('guard refuses a host that resolves to a private address at send time', function (): void {
     $lookups = 0;
 
     app()->instance(HostResolver::class, new HostResolver(function () use (&$lookups): array {
@@ -183,7 +183,7 @@ test('guarded client refuses a host that resolves to a private address at send t
     Http::fake(['*' => Http::response('secret')]);
 
     expect(SsrfGuard::isAllowed('https://rebind.example.com/icon.png'))->toBeTrue()
-        ->and(fn () => SsrfGuard::guardedHttpClient()->get('https://rebind.example.com/icon.png'))
+        ->and(fn () => SsrfGuard::guard(Http::timeout(5))->get('https://rebind.example.com/icon.png'))
         ->toThrow(SsrfGuardException::class);
 
     Http::assertNothingSent();
