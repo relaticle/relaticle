@@ -295,12 +295,11 @@ it('fails closed with 403 instead of a type error when the resolved caller is no
 });
 
 /**
- * Walk the real OAuth 2.1 + PKCE dance the way Claude does: consent with a workspace
- * selected, then redeem the code at the token endpoint.
+ * Consent to the client with a workspace selected, the way Claude opens the picker.
  *
- * @return array{access_token: string, refresh_token: string}
+ * @return array{code: string, verifier: string}
  */
-function completeOauthFlow(User $user, Client $client, Workspace $workspace): array
+function consentToWorkspace(User $user, Client $client, Workspace $workspace): array
 {
     $verifier = Str::random(64);
     $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
@@ -322,12 +321,23 @@ function completeOauthFlow(User $user, Client $client, Workspace $workspace): ar
 
     parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
 
+    return ['code' => (string) $query['code'], 'verifier' => $verifier];
+}
+
+/**
+ * Redeem an authorization code at the token endpoint.
+ *
+ * @param  array{code: string, verifier: string}  $consent
+ * @return array{access_token: string, refresh_token: string}
+ */
+function redeemAuthorizationCode(Client $client, array $consent): array
+{
     $response = test()->postJson('/oauth/token', [
         'grant_type' => 'authorization_code',
         'client_id' => $client->getKey(),
         'redirect_uri' => 'https://example.com/callback',
-        'code_verifier' => $verifier,
-        'code' => $query['code'],
+        'code_verifier' => $consent['verifier'],
+        'code' => $consent['code'],
     ])->assertOk();
 
     // Drop the consent session. A real MCP client arrives with a bearer token and
@@ -340,6 +350,33 @@ function completeOauthFlow(User $user, Client $client, Workspace $workspace): ar
         'access_token' => (string) $response->json('access_token'),
         'refresh_token' => (string) $response->json('refresh_token'),
     ];
+}
+
+/**
+ * Walk the real OAuth 2.1 + PKCE dance the way Claude does: consent with a workspace
+ * selected, then redeem the code at the token endpoint.
+ *
+ * @return array{access_token: string, refresh_token: string}
+ */
+function completeOauthFlow(User $user, Client $client, Workspace $workspace): array
+{
+    return redeemAuthorizationCode($client, consentToWorkspace($user, $client, $workspace));
+}
+
+function whoAmI(string $accessToken): string
+{
+    auth()->forgetGuards();
+
+    $response = test()->withHeaders(['Authorization' => 'Bearer '.$accessToken])
+        ->postJson('/mcp', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => 'who-ami-tool', 'arguments' => (object) []],
+        ])
+        ->assertOk();
+
+    return (string) $response->getContent();
 }
 
 it('binds the consented workspace to the access token minted at the token endpoint', function (): void {
@@ -454,4 +491,79 @@ it('keeps the consented workspace when the client re-authorizes and Passport ski
 
     expect($tokens)->toHaveCount(2);
     expect($tokens->pluck('workspace_id')->unique()->all())->toBe([$this->otherWorkspace->getKey()]);
+});
+
+it('keeps a refreshed connector on its own workspace after the client is consented to another workspace', function (): void {
+    $personalTokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    DB::table('oauth_auth_codes')->update(['expires_at' => now()->subMinute()]);
+
+    $this->travel(31)->days();
+
+    completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
+
+    $refreshed = $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+        'refresh_token' => $personalTokens['refresh_token'],
+        'scope' => 'mcp:use',
+    ])->assertOk();
+
+    expect(whoAmI((string) $refreshed->json('access_token')))
+        ->toContain($this->personalWorkspace->getKey())
+        ->not->toContain($this->otherWorkspace->getKey());
+});
+
+it('keeps a refreshed connector on its own workspace when the auth codes are purged', function (): void {
+    $personalTokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    DB::table('oauth_auth_codes')->update(['expires_at' => now()->subMinute()]);
+
+    $this->travel(31)->days();
+
+    completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
+
+    DB::table('oauth_auth_codes')->delete();
+
+    $refreshed = $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+        'refresh_token' => $personalTokens['refresh_token'],
+        'scope' => 'mcp:use',
+    ])->assertOk();
+
+    expect(whoAmI((string) $refreshed->json('access_token')))
+        ->toContain($this->personalWorkspace->getKey())
+        ->not->toContain($this->otherWorkspace->getKey());
+});
+
+it('binds each code exchange to the workspace its own consent picked', function (): void {
+    $personalConsent = consentToWorkspace($this->user, $this->client, $this->personalWorkspace);
+
+    $otherConsent = consentToWorkspace($this->user, $this->client, $this->otherWorkspace);
+
+    DB::table('oauth_auth_codes')
+        ->where('workspace_id', $this->otherWorkspace->getKey())
+        ->update(['expires_at' => now()->addMinutes(20)]);
+
+    $personalTokens = redeemAuthorizationCode($this->client, $personalConsent);
+    $otherTokens = redeemAuthorizationCode($this->client, $otherConsent);
+
+    expect(whoAmI($personalTokens['access_token']))->toContain($this->personalWorkspace->getKey())
+        ->and(whoAmI($otherTokens['access_token']))->toContain($this->otherWorkspace->getKey());
+});
+
+it('forgets the chosen workspace when the approval is rejected', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client));
+
+    $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => 'not-the-session-token',
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ]);
+
+    expect(session()->has('mcp.oauth.workspace_id'))->toBeFalse();
 });
