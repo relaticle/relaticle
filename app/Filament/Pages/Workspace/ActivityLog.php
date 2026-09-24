@@ -555,11 +555,8 @@ final class ActivityLog extends Page implements HasTable
      */
     private function filterBySource(Builder $query, array $data): Builder
     {
-        $source = $data['value'] ?? null;
-
-        if (is_string($source)) {
-            $source = CreationSource::tryFrom($source);
-        }
+        $value = $data['value'] ?? null;
+        $source = is_string($value) ? CreationSource::tryFrom($value) : null;
 
         if (! $source instanceof CreationSource) {
             return $query;

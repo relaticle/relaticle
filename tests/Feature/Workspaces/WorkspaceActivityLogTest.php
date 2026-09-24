@@ -16,12 +16,14 @@ use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\CurrentSource;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentColor;
+use Filament\Support\View\Components\BadgeComponent;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
-mutates(ActivityLog::class);
+mutates(ActivityLog::class, Activity::class);
 
 function slideOverChanges(Testable $component): string
 {
@@ -706,6 +708,23 @@ test('it filters down to one channel', function (): void {
         ->filterTable('source', CreationSource::API->value)
         ->assertSee('Posted Co')
         ->assertDontSee('Typed In Co');
+});
+
+test('every source badge color resolves to real shade classes in the app panel', function (): void {
+    $this->get(ActivityLog::getUrl(tenant: $this->workspace))->assertSuccessful();
+
+    foreach (CreationSource::cases() as $source) {
+        $classes = FilamentColor::getComponentClasses(BadgeComponent::class, $source->getColor());
+
+        if ($source->getColor() === 'gray') {
+            expect($classes)->toBe([]);
+
+            continue;
+        }
+
+        expect(array_filter($classes, fn (string $class): bool => str_starts_with($class, 'fi-text-color-')))
+            ->not->toBeEmpty();
+    }
 });
 
 test('a company account owner change names both owners', function (): void {
