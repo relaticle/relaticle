@@ -12,6 +12,7 @@ use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\Concerns\HasCreator;
 use App\Models\User;
+use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\CurrentSource;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -22,7 +23,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
-mutates(CurrentSource::class, SetCurrentSource::class, RelaticleServer::class, PendingActionService::class, HasCreator::class);
+mutates(CurrentSource::class, SetCurrentSource::class, RelaticleServer::class, PendingActionService::class, HasCreator::class, MergedActivityRenderer::class);
 
 beforeEach(function (): void {
     Bus::fake();
@@ -173,4 +174,25 @@ it('keeps the stored creation source of a record restored from serialization und
 
     expect($restored->creation_source)->toBe(CreationSource::WEB)
         ->and($restored->isDirty())->toBeFalse();
+});
+
+it('names the channel of an api change in the record timeline', function (): void {
+    CurrentSource::during(CreationSource::API, fn (): bool => $this->company->update(['name' => 'Posted']));
+
+    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+
+    expect($html)->toContain(__('workspaces.activity.via_source', ['source' => CreationSource::API->getLabel()]));
+});
+
+it('leaves the channel line off web and legacy timeline entries', function (): void {
+    $this->company->update(['name' => 'Typed']);
+
+    $webHtml = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+
+    Activity::withoutGlobalScopes()->where('subject_id', $this->company->getKey())->update(['properties' => '{}']);
+
+    $legacyHtml = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+
+    expect($webHtml)->not->toContain('Via ')
+        ->and($legacyHtml)->not->toContain('Via ');
 });

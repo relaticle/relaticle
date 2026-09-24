@@ -5,6 +5,7 @@
     /** @var \Relaticle\ActivityLog\Support\ActivityLogSummary $summary */
     /** @var list<array{label: string, old: string, new: string}> $rows */
     /** @var string|null $importFile */
+    /** @var string|null $viaSource */
 
     $count = count($rows);
     // Only updates (and custom-field-only saves, whose event isn't a known operation)
@@ -57,6 +58,10 @@
 
         @if (filled($importFile ?? null))
             <p class="text-[12px] leading-5 text-gray-500 dark:text-gray-400">{{ __('workspaces.activity.via_import', ['file' => $importFile]) }}</p>
+        @endif
+
+        @if (filled($viaSource ?? null))
+            <p class="text-[12px] leading-5 text-gray-500 dark:text-gray-400">{{ $viaSource }}</p>
         @endif
 
         @if ($hasDiff)
