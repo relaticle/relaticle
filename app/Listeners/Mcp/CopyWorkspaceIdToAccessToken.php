@@ -31,8 +31,8 @@ final class CopyWorkspaceIdToAccessToken
         }
 
         $workspaceId = match ($this->request->input('grant_type')) {
-            'authorization_code' => $this->workspaceIdOf('oauth_auth_codes', $this->grantPayload('code')['auth_code_id'] ?? null, $event),
-            'refresh_token' => $this->workspaceIdOf('oauth_access_tokens', $this->grantPayload('refresh_token')['access_token_id'] ?? null, $event),
+            'authorization_code' => $this->workspaceIdOf('oauth_auth_codes', $this->grantedId('code', 'auth_code_id'), $event),
+            'refresh_token' => $this->workspaceIdOf('oauth_access_tokens', $this->grantedId('refresh_token', 'access_token_id'), $event),
             default => null,
         };
 
@@ -45,25 +45,22 @@ final class CopyWorkspaceIdToAccessToken
             ->update(['workspace_id' => $workspaceId]);
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    private function grantPayload(string $parameter): array
+    private function grantedId(string $parameter, string $key): ?string
     {
-        $encrypted = $this->request->input($parameter);
+        $encrypted = $this->request->string($parameter)->value();
 
-        if (! is_string($encrypted) || $encrypted === '') {
-            return [];
+        if ($encrypted === '') {
+            return null;
         }
 
-        $payload = json_decode($this->decrypt($encrypted), true);
+        $id = data_get(json_decode($this->decrypt($encrypted), true), $key);
 
-        return is_array($payload) ? $payload : [];
+        return is_string($id) ? $id : null;
     }
 
-    private function workspaceIdOf(string $table, mixed $id, AccessTokenCreated $event): ?string
+    private function workspaceIdOf(string $table, ?string $id, AccessTokenCreated $event): ?string
     {
-        if (! is_string($id) || $id === '') {
+        if ($id === null) {
             return null;
         }
 

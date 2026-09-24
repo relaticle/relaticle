@@ -84,6 +84,16 @@ it('names the host the connector sends the authorization back to', function (): 
         ->assertSee('attacker.example.net');
 });
 
+it('names the registered host when the client omits the redirect uri', function (): void {
+    $this->actingAs($this->user);
+
+    $this->client->forceFill(['redirect_uris' => ['https://only-registered.example.net/cb']])->save();
+
+    $this->get(authorizeUrl($this->client, ['redirect_uri' => null]))
+        ->assertOk()
+        ->assertSee('only-registered.example.net');
+});
+
 it('spells out what the connector will be able to do, including deletion', function (): void {
     $this->actingAs($this->user);
 
@@ -563,17 +573,34 @@ it('binds each code exchange to the workspace its own consent picked', function 
         ->and(whoAmI($otherTokens['access_token']))->toContain($this->otherWorkspace->getKey());
 });
 
-it('forgets the chosen workspace when the approval is rejected', function (): void {
+it('leaves no workspace from a rejected approval for a later authorization', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $otherClient = Client::query()->forceCreate([
+        'id' => (string) Str::uuid(),
+        'name' => 'Other MCP Client',
+        'redirect_uris' => ['https://example.com/callback'],
+        'grant_types' => ['authorization_code', 'refresh_token'],
+        'revoked' => false,
+        'owner_type' => $this->user->getMorphClass(),
+        'owner_id' => $this->user->getKey(),
+    ]);
+
     $this->actingAs($this->user);
-
-    $this->get(authorizeUrl($this->client));
-
+    $this->get(authorizeUrl($otherClient, ['scope' => 'mcp:use']))->assertOk();
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
-        'client_id' => $this->client->getKey(),
+        'client_id' => $otherClient->getKey(),
         'auth_token' => 'not-the-session-token',
         'workspace_id' => $this->otherWorkspace->getKey(),
     ]);
 
-    expect(session()->has('mcp.oauth.workspace_id'))->toBeFalse();
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertRedirect();
+
+    $skippedConsentCode = DB::table('oauth_auth_codes')
+        ->where('client_id', $this->client->getKey())
+        ->latest('expires_at')
+        ->first();
+
+    expect($skippedConsentCode->workspace_id)->toBe($this->personalWorkspace->getKey());
 });

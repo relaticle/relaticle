@@ -40,10 +40,10 @@ final class PurgeUnsafeImagesCommand extends Command
             ->where('collection_name', MediaCollection::Logo->value)
             ->where(fn (Builder $query): Builder => $query
                 ->where(fn (Builder $query): Builder => $query
-                    ->where('model_type', (new Company)->getMorphClass())
+                    ->whereMorphedTo('model', Company::class)
                     ->whereNotIn('mime_type', array_keys(Company::LOGO_MIME_TYPES)))
                 ->orWhere(fn (Builder $query): Builder => $query
-                    ->where('model_type', (new Workspace)->getMorphClass())
+                    ->whereMorphedTo('model', Workspace::class)
                     ->whereNotIn('mime_type', Workspace::LOGO_MIME_TYPES)))
             ->with('model')
             ->lazyById();

@@ -87,7 +87,6 @@ use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamMemberAdded;
-use Laravel\Passport\Client as PassportClient;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
@@ -370,12 +369,10 @@ final class AppServiceProvider extends ServiceProvider
     private function consentRedirectHost(array $parameters): ?string
     {
         $request = $parameters['request'] ?? null;
-        $client = $parameters['client'] ?? null;
+        $redirectUri = $request instanceof Request ? $request->string('redirect_uri')->value() : '';
 
-        $redirectUri = $request instanceof Request ? $request->query('redirect_uri') : null;
-
-        if (! is_string($redirectUri) || $redirectUri === '') {
-            $redirectUri = $client instanceof PassportClient ? ($client->redirect_uris[0] ?? null) : null;
+        if ($redirectUri === '') {
+            $redirectUri = data_get($parameters, 'client.redirect_uris.0');
         }
 
         if (! is_string($redirectUri)) {
