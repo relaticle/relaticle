@@ -174,6 +174,7 @@ return [
         'columns' => [
             'created_at' => 'When',
             'causer' => 'Who',
+            'source' => 'Source',
             'event' => 'Action',
             'subject_type' => 'Type',
             'record' => 'Record',
@@ -183,6 +184,7 @@ return [
             'event' => 'Action',
             'subject_type' => 'Type',
             'causer' => 'Who',
+            'source' => 'Source',
             'from' => 'From',
             'until' => 'Until',
         ],

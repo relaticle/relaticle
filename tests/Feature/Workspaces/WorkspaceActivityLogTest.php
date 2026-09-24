@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
@@ -12,6 +13,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\CurrentSource;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
@@ -669,6 +671,41 @@ test('a deactivated custom field still reads by its name', function (): void {
     livewire(ActivityLog::class)
         ->assertOk()
         ->assertSee('Churn reason');
+});
+
+test('each row names the channel it came through', function (): void {
+    $typed = Company::factory()->for($this->workspace)->create(['name' => 'Typed In Co']);
+    $posted = CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create(['name' => 'Posted Co']));
+
+    livewire(ActivityLog::class)
+        ->assertTableColumnStateSet('source', CreationSource::WEB, Activity::withoutGlobalScopes()->where('subject_id', $typed->getKey())->sole())
+        ->assertTableColumnStateSet('source', CreationSource::API, Activity::withoutGlobalScopes()->where('subject_id', $posted->getKey())->sole());
+});
+
+test('a row with no source, or one this build does not know, shows none', function (): void {
+    $legacy = Company::factory()->for($this->workspace)->create(['name' => 'Legacy Co']);
+    $unknown = Company::factory()->for($this->workspace)->create(['name' => 'Unknown Co']);
+
+    $legacyRow = Activity::withoutGlobalScopes()->where('subject_id', $legacy->getKey())->sole();
+    $unknownRow = Activity::withoutGlobalScopes()->where('subject_id', $unknown->getKey())->sole();
+    $legacyRow->update(['properties' => []]);
+    $unknownRow->update(['properties' => ['source' => 'fax']]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Legacy Co')
+        ->assertTableColumnStateSet('source', null, $legacyRow)
+        ->assertTableColumnStateSet('source', null, $unknownRow);
+});
+
+test('it filters down to one channel', function (): void {
+    Company::factory()->for($this->workspace)->create(['name' => 'Typed In Co']);
+    CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create(['name' => 'Posted Co']));
+
+    livewire(ActivityLog::class)
+        ->filterTable('source', CreationSource::API->value)
+        ->assertSee('Posted Co')
+        ->assertDontSee('Typed In Co');
 });
 
 test('a company account owner change names both owners', function (): void {

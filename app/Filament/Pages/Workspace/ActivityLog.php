@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Workspace;
 
+use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
@@ -212,6 +213,11 @@ final class ActivityLog extends Page implements HasTable
                     ->label(__('workspaces.activity.columns.causer'))
                     ->weight(FontWeight::Medium)
                     ->placeholder(__('workspaces.activity.system')),
+                TextColumn::make('source')
+                    ->label(__('workspaces.activity.columns.source'))
+                    ->state(fn (Activity $record): ?CreationSource => Activity::sourceFrom($record->properties?->toArray() ?? []))
+                    ->badge()
+                    ->placeholder(ActivityValue::EMPTY),
                 TextColumn::make('event')
                     ->label(__('workspaces.activity.columns.event'))
                     ->badge()
@@ -262,6 +268,10 @@ final class ActivityLog extends Page implements HasTable
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
                         ? $query->where('causer_type', 'user')->where('causer_id', $data['value'])
                         : $query),
+                SelectFilter::make('source')
+                    ->label(__('workspaces.activity.filters.source'))
+                    ->options(CreationSource::class)
+                    ->query($this->filterBySource(...)),
                 Filter::make('created_at')
                     ->schema([
                         DatePicker::make('from')->label(__('workspaces.activity.filters.from')),
@@ -536,6 +546,26 @@ final class ActivityLog extends Page implements HasTable
             'new' => Str::limit($state['new'], self::VALUE_LENGTH),
             'title' => Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH),
         ])->render());
+    }
+
+    /**
+     * @param  Builder<Activity>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Activity>
+     */
+    private function filterBySource(Builder $query, array $data): Builder
+    {
+        $source = $data['value'] ?? null;
+
+        if (is_string($source)) {
+            $source = CreationSource::tryFrom($source);
+        }
+
+        if (! $source instanceof CreationSource) {
+            return $query;
+        }
+
+        return $query->fromSource($source);
     }
 
     /**
