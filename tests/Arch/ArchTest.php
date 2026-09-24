@@ -229,8 +229,10 @@ arch('package service layers avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        // laravel/ai's Promptable trait holds mutable state; PHP forbids a
+        // readonly class using a trait with a non-readonly property.
+        'Relaticle\Chat\Agents',
         // Grandfathered (2026-06-12). Make each readonly, then unlist:
-        'Relaticle\Chat\Agents\CrmAssistant',
         'Relaticle\Chat\Services\TipTapDocumentParser',
         'Relaticle\Chat\Support\ChatTelemetry',
         'Relaticle\Chat\Support\PromptText',

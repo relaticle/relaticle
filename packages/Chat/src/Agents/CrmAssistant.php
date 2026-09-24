@@ -15,6 +15,7 @@ use App\Services\WorkspaceActivationFacts;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
+use Laravel\Ai\Attributes\RepairToolCalls;
 use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
@@ -72,6 +73,7 @@ use Relaticle\Chat\Tools\Workspace\RemoveSampleDataTool;
 // over: to get failover, stream() has to receive the array.
 #[Provider(Lab::Anthropic)]
 #[MaxSteps(15)]
+#[RepairToolCalls]
 #[Timeout(120)]
 final class CrmAssistant implements Agent, Conversational, HasProviderOptions, HasTools
 {

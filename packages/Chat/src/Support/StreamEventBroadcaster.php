@@ -8,13 +8,19 @@ use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Support\Facades\Broadcast;
+use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
+use Laravel\Ai\Streaming\Events\StreamStart;
+use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
 use Relaticle\Chat\Models\PendingAction;
 
 final readonly class StreamEventBroadcaster
 {
+    // The only stream events chat/stream.js listens for.
+    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class];
+
     public function __construct(
         private Channel $channel,
     ) {}
@@ -51,12 +57,17 @@ final readonly class StreamEventBroadcaster
     /**
      * Compute the slim broadcast payload for the given event.
      *
-     * Returns null when the event should be dropped entirely (read-tool results).
+     * Returns null when the event should be dropped entirely: read-tool results,
+     * and every event the client has no listener for.
      *
      * @return array{as: string, with: array<string, mixed>}|null
      */
     public static function payloadFor(StreamEvent $event): ?array
     {
+        if (! array_any(self::CLIENT_EVENTS, fn (string $class): bool => $event instanceof $class)) {
+            return null;
+        }
+
         if ($event instanceof ToolResult) {
             return self::payloadForToolResult($event);
         }
@@ -88,8 +99,8 @@ final readonly class StreamEventBroadcaster
         unset($decoded['data']);
 
         // Added to the BROADCAST only, never to the tool result the message
-        // stores: `tool_results` is replayed verbatim to the model on every later
-        // turn, and a rewrite there invalidates the prompt-cache prefix. The
+        // stores: a stored tool result is replayed verbatim to the model on every
+        // later turn, and a rewrite there invalidates the prompt-cache prefix. The
         // client needs the instant so a lapsed proposal stops hiding the composer.
         $expiresAt = self::expiryFor($decoded['pending_action_id'] ?? null);
 

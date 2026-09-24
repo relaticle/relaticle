@@ -6,17 +6,19 @@ namespace Relaticle\Chat\Support;
 
 final readonly class AssistantText
 {
-    /**
-     * Collapse an assistant message that the multi-step agent loop emitted as the
-     * same text repeated back-to-back (laravel/ai concatenates text deltas across
-     * every step; a model that echoes its acknowledgment before AND after a tool
-     * call yields "X.X."). When the whole string is exactly one unit repeated 2+
-     * times, returns the smallest such unit; otherwise returns the text unchanged.
-     * Natural prose is effectively never an exact whole-string repetition, so a
-     * legitimate message is not at risk of being collapsed.
-     */
+    // Laravel\Ai\Streaming\Events\TextDelta::combine() joins step texts with this.
+    private const string STEP_SEPARATOR = "\n\n";
+
+    // A model that echoes its acknowledgment before AND after a tool call yields
+    // "X.\n\nX." across steps, or "X.X." within one; natural prose never repeats whole.
     public static function collapseRepeated(string $text): string
     {
+        $steps = array_unique(array_map(trim(...), explode(self::STEP_SEPARATOR, $text)));
+
+        if (count($steps) === 1 && str_contains($text, self::STEP_SEPARATOR)) {
+            return $steps[0];
+        }
+
         $length = strlen($text);
 
         if ($length < 2) {

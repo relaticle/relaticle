@@ -98,7 +98,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             pending_actions: [],
             // Read-tool tables/cards. Never broadcast (Reverb's 10 KB frame cap),
             // so this stays empty until reconcileLatestAssistant() fills it from
-            // the persisted tool_results at stream end.
+            // the persisted tool results at stream end.
             display_blocks: [],
             paywall: null,
             sessionExpired: false,
@@ -486,7 +486,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
                 if (!have.has(card.pending_action_id)) assistantMsg.pending_actions.push(card);
             }
             // Replaced, not merged: the server derives the full set from this
-            // message's own persisted tool_results, so it is already complete
+            // message's own persisted tool results, so it is already complete
             // and a second reconcile of the same turn must not double it.
             if (Array.isArray(authoritative.display_blocks)) {
                 assistantMsg.display_blocks = authoritative.display_blocks;

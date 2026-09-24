@@ -35,11 +35,11 @@ use Laravel\Ai\ToolChoice;
 #[MaxSteps(1)]
 #[MaxTokens(16)]
 #[ToolChoice(ToolChoice::none)]
-final readonly class ModelProbeAgent implements Agent, HasProviderOptions, HasTools
+final class ModelProbeAgent implements Agent, HasProviderOptions, HasTools
 {
     use Promptable;
 
-    public function __construct(private CrmAssistant $assistant) {}
+    public function __construct(private readonly CrmAssistant $assistant) {}
 
     public function instructions(): string
     {

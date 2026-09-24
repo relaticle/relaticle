@@ -37,6 +37,28 @@ final class AnthropicSse
             .self::ERROR;
     }
 
+    /** A completed text reply from the given model id, 40 fresh input tokens beside 1,200 cached ones. */
+    public static function reply(string $text, string $model): string
+    {
+        return 'data: {"type":"message_start","message":{"model":'.json_encode($model, JSON_THROW_ON_ERROR).',"usage":{"input_tokens":40,"cache_read_input_tokens":1000,"cache_creation_input_tokens":200}}}'."\n\n"
+            ."data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}\n\n"
+            .'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":'.json_encode($text, JSON_THROW_ON_ERROR)."}}\n\n"
+            ."data: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+            ."data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":12}}\n\n"
+            ."data: {\"type\":\"message_stop\"}\n\n";
+    }
+
+    /** One completed generation step that calls the given tool with no input. */
+    public static function toolUseStep(string $tool): string
+    {
+        return self::MESSAGE_START
+            .'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_step_1","name":'.json_encode($tool, JSON_THROW_ON_ERROR).",\"input\":{}}}\n\n"
+            ."data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"input_json_delta\",\"partial_json\":\"{}\"}}\n\n"
+            ."data: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+            ."data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":3}}\n\n"
+            ."data: {\"type\":\"message_stop\"}\n\n";
+    }
+
     public static function fake(string $body): void
     {
         Http::fake([

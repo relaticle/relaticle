@@ -20,6 +20,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Tests\Helpers\ChatDocument;
+use Tests\Helpers\OpenAiResponses;
 
 mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
 
@@ -68,8 +69,7 @@ function seedTitlingMessage(string $conversationId, string $role, string $conten
         'role' => $role,
         'content' => $content,
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '[]',
         'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
         'origin' => $origin,
@@ -144,6 +144,21 @@ it('replaces the provisional title and broadcasts the new one', function (): voi
         fn (ConversationTitleGenerated $e): bool => $e->conversationId === $conversationId
             && $e->title === 'Follow Up With Acme',
     );
+});
+
+it('titles a conversation whose turn was served by OpenAI', function (): void {
+    OpenAiResponses::fakeStructured(['has_topic' => true, 'title' => 'Follow Up With Acme']);
+
+    $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        message: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        provider: 'openai',
+    ))->handle();
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('Follow Up With Acme');
 });
 
 it('never overwrites a title the user renamed while the model was thinking', function (): void {
