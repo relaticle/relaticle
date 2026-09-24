@@ -246,6 +246,14 @@ it('keeps one summary row when a retried import runs again', function (): void {
     expect(Activity::query()->withoutGlobalScopes()->where('subject_type', 'import')->count())->toBe(1);
 });
 
+it('stamps every row an import writes, its summary included, as an import', function (): void {
+    runThreePersonImport($this);
+
+    $sources = Activity::query()->withoutGlobalScopes()->get()->pluck('properties.source')->unique()->values()->all();
+
+    expect($sources)->toBe(['import']);
+});
+
 it('records an import that exhausts its attempts as one failed entry', function (): void {
     ImportExecutionFixture::readyStore($this, ['Name'], [
         ImportExecutionFixture::row(2, ['Name' => 'Ada'], ['match_action' => RowMatchAction::Create->value]),
@@ -263,7 +271,8 @@ it('records an import that exhausts its attempts as one failed entry', function 
 
     expect($summary->event)->toBe('import_failed')
         ->and($summary->causer_id)->toBe($this->user->getKey())
-        ->and($summary->properties['created'])->toBe(1);
+        ->and($summary->properties['created'])->toBe(1)
+        ->and($summary->properties['source'])->toBe('import');
 
     livewire(ActivityLog::class)
         ->assertCountTableRecords(1)
@@ -296,7 +305,8 @@ it('stops stamping once the import job is over', function (): void {
 
     $row = Activity::query()->withoutGlobalScopes()->where('subject_type', 'company')->where('subject_id', $company->getKey())->sole();
 
-    expect($row->properties->has('import_id'))->toBeFalse();
+    expect($row->properties->has('import_id'))->toBeFalse()
+        ->and($row->properties['source'])->toBe('web');
 });
 
 it('stops stamping once the import job has thrown', function (): void {
@@ -316,7 +326,8 @@ it('stops stamping once the import job has thrown', function (): void {
 
     $row = Activity::query()->withoutGlobalScopes()->where('subject_type', 'company')->where('subject_id', $company->getKey())->sole();
 
-    expect($row->properties->has('import_id'))->toBeFalse();
+    expect($row->properties->has('import_id'))->toBeFalse()
+        ->and($row->properties['source'])->toBe('web');
 });
 
 it('never writes the plaintext of an encrypted field value an import updated', function (): void {

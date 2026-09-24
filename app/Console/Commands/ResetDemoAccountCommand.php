@@ -25,6 +25,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -113,28 +114,12 @@ final class ResetDemoAccountCommand extends Command
         // workspace_id and creator_id from the authenticated user.
         Auth::setUser($user);
 
-        $seededCompanies = new EloquentCollection;
-
         try {
-            DB::transaction(function () use ($user, $workspace, &$seededCompanies): void {
-                $this->resetReviewerWorkspace($workspace);
+            CurrentSource::during(CreationSource::SYSTEM, function () use ($user, $workspace): void {
+                $seededCompanies = DB::transaction(fn (): EloquentCollection => $this->rebuildWorkspace($user, $workspace));
 
-                throw_unless(
-                    $this->onboardSeedManager->generateFor($user, $workspace, 'sales'),
-                    RuntimeException::class,
-                    'Reviewer workspace fixtures could not be generated.',
-                );
-
-                $seededCompanies = Company::query()->where('workspace_id', $workspace->getKey())->get();
-
-                $this->resetAiCredits($workspace);
-                $this->shapeOpportunities($user, $workspace);
-                $this->shapeTasks($user, $workspace);
-                $this->expandWorkspace($user, $workspace);
-                $this->ensureInactiveField($user, $workspace);
-                $this->recordCreationActivity($user, $workspace);
+                $this->fetchCompanyLogos($seededCompanies);
             });
-            $this->fetchCompanyLogos($seededCompanies);
         } finally {
             Auth::forgetUser();
             TenantContextService::setTenantId($previousTenantId);
@@ -144,6 +129,29 @@ final class ResetDemoAccountCommand extends Command
         $this->components->twoColumnDetail('Password', $password === null ? 'unchanged' : 'updated');
 
         return self::SUCCESS;
+    }
+
+    /** @return EloquentCollection<int, Company> */
+    private function rebuildWorkspace(User $user, Workspace $workspace): EloquentCollection
+    {
+        $this->resetReviewerWorkspace($workspace);
+
+        throw_unless(
+            $this->onboardSeedManager->generateFor($user, $workspace, 'sales'),
+            RuntimeException::class,
+            'Reviewer workspace fixtures could not be generated.',
+        );
+
+        $seededCompanies = Company::query()->where('workspace_id', $workspace->getKey())->get();
+
+        $this->resetAiCredits($workspace);
+        $this->shapeOpportunities($user, $workspace);
+        $this->shapeTasks($user, $workspace);
+        $this->expandWorkspace($user, $workspace);
+        $this->ensureInactiveField($user, $workspace);
+        $this->recordCreationActivity($user, $workspace);
+
+        return $seededCompanies;
     }
 
     // OnboardSeed writes its fixtures with model events disabled, so the observer that

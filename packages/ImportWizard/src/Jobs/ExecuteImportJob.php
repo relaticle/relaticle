@@ -11,6 +11,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\CustomFieldChangeLog;
+use App\Support\CurrentSource;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Batchable;
@@ -115,6 +116,11 @@ final class ExecuteImportJob implements ShouldQueue
     }
 
     public function handle(): void
+    {
+        CurrentSource::during(CreationSource::IMPORT, $this->runImport(...));
+    }
+
+    private function runImport(): void
     {
         $import = Import::query()->findOrFail($this->importId);
 
@@ -248,7 +254,9 @@ final class ExecuteImportJob implements ShouldQueue
             'failed' => $import->failed_rows,
         ];
 
-        $this->logImportSummary($import, $results, self::FAILED_EVENT);
+        CurrentSource::during(CreationSource::IMPORT, function () use ($import, $results): void {
+            $this->logImportSummary($import, $results, self::FAILED_EVENT);
+        });
 
         try {
             $this->notifyUser($import, $results, failed: true);
