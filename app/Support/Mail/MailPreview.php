@@ -8,6 +8,7 @@ use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
 use App\Mail\NewContactSubmissionMail;
+use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
@@ -60,6 +61,8 @@ final readonly class MailPreview
 
                 return new ProTrialEndingSoonMail($workspace);
             },
+            'trial-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace),
+            'subscription-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace),
             'setup-nudge' => fn (User $owner, Workspace $workspace): Mailable => new SetupNudgeMail($owner, $workspace, 'first_record', url()->getAppUrl('chat')),
             'task-assigned' => fn (User $owner, Workspace $workspace): Mailable => new TaskAssignedMail('Call Ana Reyes about the renewal', url()->getAppUrl('tasks'), $workspace->name),
             'task-digest' => fn (User $owner): Mailable => new TaskDigestMail($owner, new DigestPayload([

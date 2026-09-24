@@ -67,18 +67,177 @@ it('hides the trial CTA once the workspace used its trial', function (): void {
         ->assertSee(__('billing.upgrade.button'));
 });
 
-it('offers the trial to a hosted workspace that never received one', function (): void {
+it('offers the trial on the paused screen to a hosted workspace that never received one', function (): void {
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
     livewire(Billing::class)
+        ->assertSee(__('billing.paused.heading.free', ['workspace' => $workspace->name]))
+        ->assertDontSee('billing.paused.heading.', false)
+        ->assertSee(__('billing.paused.trial_body', ['workspace' => $workspace->name]))
         ->assertSee(__('billing.trial.start_button'))
-        ->assertSee(__('billing.paused.title'))
         ->assertSee(__('billing.upgrade.now'))
-        ->assertSee('$19')
-        ->assertSee(__('billing.pro_plan.billed_yearly'))
         ->assertDontSee(__('billing.packs.buy', ['credits' => number_format(1000)]));
+});
+
+it('opens the workspace once the trial starts from the paused screen', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
+
+    livewire(Billing::class)
+        ->call('startTrial')
+        ->assertRedirect(Filament::getUrl($workspace));
+});
+
+it('replaces the app shell with a standalone paused screen when the trial ends', function (): void {
+    config()->set('app.url', 'https://marketing.test');
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill([
+        'hosted_free_grandfathered_at' => null,
+        'plan' => Plan::Pro,
+        'pro_trial_used_at' => now()->subDays(14),
+        'trial_ends_at' => now()->subHour(),
+    ])->save();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
+        ->assertOk()
+        ->assertSee(__('billing.paused.heading.trial_ended'))
+        ->assertDontSee('billing.paused.heading.', false)
+        ->assertSee(__('billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertSee(__('billing.paused.continue'))
+        ->assertDontSee(__('billing.paused.review.proceed'))
+        ->assertSee('href="https://marketing.test/contact"', false)
+        ->assertSee(__('billing.paused.sign_out'))
+        ->assertDontSee('fi-sidebar', false)
+        ->assertDontSee(__('billing.usage.title'));
+});
+
+it('reviews the plan and totals on a second step before sending the owner to checkout', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    livewire(Billing::class)
+        ->call('$set', 'step', 'plan')
+        ->assertSee(__('billing.paused.review.summary'))
+        ->assertSee(__('billing.paused.review.line_item', ['workspace' => $workspace->name]))
+        ->assertSee(__('billing.paused.review.amount_yearly'))
+        ->assertSee(__('billing.paused.review.credits', ['credits' => number_format(Plan::Pro->credits())]))
+        ->assertSee(__('billing.paused.review.proceed'))
+        ->assertDontSee(__('billing.paused.continue'));
+});
+
+it('keeps a member on the paused screen when they open the plan review step', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'editor']);
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace->refresh());
+
+    livewire(Billing::class, ['step' => 'plan'])
+        ->assertSee(__('billing.paused.heading.trial_ended'))
+        ->assertDontSee(__('billing.paused.review.proceed'));
+});
+
+it('names the ended subscription on the paused screen', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subMonths(2)])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_ended',
+        'stripe_status' => 'canceled',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->subDay(),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.paused.heading.subscription_ended'))
+        ->assertDontSee('billing.paused.heading.', false)
+        ->assertDontSee(__('billing.paused.heading.trial_ended'));
+});
+
+it('calls it a trial ending when the only subscription was an abandoned checkout', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_abandoned',
+        'stripe_status' => 'incomplete_expired',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.paused.heading.trial_ended'))
+        ->assertDontSee(__('billing.paused.heading.subscription_ended'));
+});
+
+it('tells a member of a paused workspace who can reopen it, without checkout controls', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'editor']);
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace->refresh());
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
+        ->assertDontSee(__('billing.paused.continue'))
+        ->assertDontSee(__('billing.paused.delete'));
+});
+
+it('tells a member of a paused workspace whose owner was deleted who can reopen it', function (): void {
+    [$owner, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'editor']);
+    $owner->delete();
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace->refresh());
+
+    livewire(Billing::class)
+        ->assertOk()
+        ->assertSee(__('billing.paused.member_body_ownerless', ['workspace' => $workspace->name]));
+});
+
+it('tells the owner when paid activation takes longer than expected', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    livewire(Billing::class, ['checkout' => 'success'])
+        ->assertSee(__('billing.upgrade.activating'))
+        ->assertSee(__('billing.upgrade.activation_delayed_title'));
+});
+
+it('lets a paused user switch to another of their workspaces', function (): void {
+    [$user, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
+    $other = Workspace::factory()->create(['user_id' => $user->getKey(), 'name' => 'Northwind Traders', 'personal_workspace' => false]);
+    test()->actingAs($user->fresh());
+
+    livewire(Billing::class)
+        ->assertSee(__('billing.paused.switch'))
+        ->assertSee('Northwind Traders')
+        ->assertSee(Filament::getUrl($other), false);
+});
+
+it('keeps polling while checkout activation is pending, then opens the workspace', function (): void {
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
+
+    $page = livewire(Billing::class, ['checkout' => 'success'])
+        ->assertSee(__('billing.upgrade.activating'))
+        ->call('reopenWhenActive')
+        ->assertNoRedirect();
+
+    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
+
+    $page->call('reopenWhenActive')->assertRedirect(Filament::getUrl($workspace));
 });
 
 it('advertises all 39 MCP tools on the authenticated billing page', function (): void {
@@ -92,7 +251,7 @@ it('advertises all 39 MCP tools on the authenticated billing page', function ():
 it('starts a trial via the page action', function (): void {
     [, $workspace] = billingPageOwner();
 
-    livewire(Billing::class)->call('startTrial');
+    livewire(Billing::class)->call('startTrial')->assertNoRedirect();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Pro)
         ->and($workspace->onGenericTrial())->toBeTrue();

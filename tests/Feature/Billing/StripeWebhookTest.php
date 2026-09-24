@@ -6,12 +6,15 @@ use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\StartProTrial;
 use App\Actions\Billing\SyncWorkspacePlanFromSubscription;
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
+use App\Mail\ProEndedMail;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
@@ -162,6 +165,40 @@ it('downgrades the workspace to Free when the subscription is deleted', function
 
     expect($workspace->refresh()->plan)->toBe(Plan::Free)
         ->and($balance->credits_remaining)->toBe(Plan::Free->credits());
+});
+
+it('emails the owner once when the subscription ends', function (): void {
+    Mail::fake();
+    $workspace = stripeBillingWorkspace();
+    $deleted = stripeSubscriptionEvent($workspace, 'deleted', [
+        'status' => 'canceled',
+        'ended_at' => now()->getTimestamp(),
+    ]);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
+
+    sendStripeWebhook($deleted)->assertSuccessful();
+    sendStripeWebhook($deleted)->assertSuccessful();
+
+    Mail::assertQueued(ProEndedMail::class, 1);
+    Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($workspace->owner->email)
+        && $mail->status === BillingStatus::SubscriptionEnded);
+});
+
+it('sends no ended email when an Enterprise grant outlives the subscription', function (): void {
+    Mail::fake();
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+    $workspace->refresh()->forceFill(['plan' => Plan::Enterprise])->save();
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'deleted', [
+        'status' => 'canceled',
+        'ended_at' => now()->getTimestamp(),
+    ]))->assertSuccessful();
+
+    Mail::assertNotQueued(ProEndedMail::class);
 });
 
 it('preserves a sysadmin-granted plan when an unrelated subscription ends', function (): void {

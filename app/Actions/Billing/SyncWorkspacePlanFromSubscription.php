@@ -5,22 +5,18 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Enums\Plan;
+use App\Enums\StripeSubscriptionStatus;
+use App\Mail\ProEndedMail;
+use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Services\CreditService;
 
 final readonly class SyncWorkspacePlanFromSubscription
 {
-    /**
-     * Stripe statuses a subscription can hold without ever having granted
-     * access: a checkout whose first payment failed or was abandoned.
-     *
-     * @var list<string>
-     */
-    private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
-
     public function __construct(private CreditService $credits) {}
 
     public function execute(Workspace $workspace, Subscription $subscription): void
@@ -59,6 +55,10 @@ final readonly class SyncWorkspacePlanFromSubscription
                 'subscription_id' => $subscription->stripe_id,
             ]);
         });
+
+        if ($target === Plan::default() && $workspace->owner instanceof User) {
+            Mail::to($workspace->owner->email)->queue(ProEndedMail::afterSubscription($workspace));
+        }
     }
 
     private function targetPlan(Workspace $workspace, Subscription $subscription, Plan $subscriptionPlan): ?Plan
@@ -73,7 +73,7 @@ final readonly class SyncWorkspacePlanFromSubscription
 
         // A subscription that never charged (abandoned or failed checkout) has
         // granted nothing, so it must not take anything away either.
-        if (in_array($subscription->stripe_status, self::NON_GRANTING_STATUSES, true)) {
+        if (in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true)) {
             return null;
         }
 
