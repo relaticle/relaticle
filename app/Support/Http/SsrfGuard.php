@@ -7,6 +7,8 @@ namespace App\Support\Http;
 use App\Exceptions\SsrfGuardException;
 use App\Exceptions\UploadException;
 use App\Support\Media\UploadAllowlist;
+use Closure;
+use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
@@ -35,6 +37,8 @@ final readonly class SsrfGuard
         '2001::/32',
         '2001:20::/28',
         '2001:db8::/32',
+        '::/96',
+        'fec0::/10',
     ];
 
     public static function isAllowed(string $url): bool
@@ -60,7 +64,31 @@ final readonly class SsrfGuard
      */
     public static function guardedHttpClient(): PendingRequest
     {
-        return Http::withOptions(self::redirectGuardOptions());
+        return Http::withOptions(self::redirectGuardOptions())
+            ->withMiddleware(self::pinToValidatedAddress(...));
+    }
+
+    // Runs inside the redirect middleware, so every hop connects to the address it
+    // was validated against and a second DNS answer cannot rebind it.
+    private static function pinToValidatedAddress(callable $handler): Closure
+    {
+        return static function (RequestInterface $request, array $options) use ($handler): PromiseInterface {
+            $uri = $request->getUri();
+            $host = trim($uri->getHost(), '[]');
+            $port = $uri->getPort() ?? ($uri->getScheme() === 'https' ? 443 : 80);
+
+            try {
+                $address = self::publicAddress($host);
+            } catch (SsrfGuardException $exception) {
+                report($exception);
+
+                throw $exception;
+            }
+
+            $options['curl'][CURLOPT_RESOLVE] = [self::resolveEntry($host, $port, $address)];
+
+            return $handler($request, $options);
+        };
     }
 
     /**
@@ -104,16 +132,7 @@ final readonly class SsrfGuard
         throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
 
         $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
-        $addresses = self::resolveAddresses($host);
-
-        throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
-
-        foreach ($addresses as $address) {
-            throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
-        }
-
-        $address = $addresses[0];
-        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
+        $address = self::publicAddress($host);
 
         // CURLOPT_RESOLVE pins the connection to the address checked above, so a
         // DNS answer cannot change between the check and the fetch.
@@ -122,7 +141,7 @@ final readonly class SsrfGuard
             'decode_content' => false,
             'connect_timeout' => 10,
             'timeout' => 30,
-            'curl' => [CURLOPT_RESOLVE => ["{$host}:443:{$pinned}"]],
+            'curl' => [CURLOPT_RESOLVE => [self::resolveEntry($host, 443, $address)]],
             'progress' => static function (int $downloadTotal, int $downloaded): void {
                 throw_if(max($downloadTotal, $downloaded) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
             },
@@ -135,8 +154,11 @@ final readonly class SsrfGuard
 
         throw_if(! is_string($host) || $host === '', SsrfGuardException::class, 'Invalid host in URL');
 
-        $host = trim($host, '[]');
+        self::publicAddress(trim($host, '[]'));
+    }
 
+    private static function publicAddress(string $host): string
+    {
         $addresses = self::resolveAddresses($host);
 
         throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
@@ -144,6 +166,15 @@ final readonly class SsrfGuard
         foreach ($addresses as $address) {
             throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
         }
+
+        return $addresses[0];
+    }
+
+    private static function resolveEntry(string $host, int $port, string $address): string
+    {
+        $pinned = str_contains($address, ':') ? "[{$address}]" : $address;
+
+        return "{$host}:{$port}:{$pinned}";
     }
 
     /**
