@@ -86,6 +86,7 @@ use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Jetstream\Events\TeamMemberAdded;
+use Laravel\Passport\Client as PassportClient;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
@@ -254,6 +255,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $parameters['workspaces'] = $workspaces;
             $parameters['pausedWorkspaceIds'] = $pausedWorkspaceIds;
+            $parameters['redirectHost'] = $this->consentRedirectHost($parameters);
 
             // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
@@ -359,6 +361,27 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    private function consentRedirectHost(array $parameters): ?string
+    {
+        $request = $parameters['request'] ?? null;
+        $client = $parameters['client'] ?? null;
+
+        $redirectUri = $request instanceof Request ? $request->query('redirect_uri') : null;
+
+        if (! is_string($redirectUri) || $redirectUri === '') {
+            $redirectUri = $client instanceof PassportClient ? ($client->redirect_uris[0] ?? null) : null;
+        }
+
+        if (! is_string($redirectUri)) {
+            return null;
+        }
+
+        return parse_url($redirectUri, PHP_URL_HOST) ?: $redirectUri;
     }
 
     private function configurePolicies(): void

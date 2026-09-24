@@ -74,6 +74,16 @@ it('renders the consent view with the user\'s workspaces', function (): void {
     $response->assertSee('name="workspace_id"', false);
 });
 
+it('names the host the connector sends the authorization back to', function (): void {
+    $this->actingAs($this->user);
+
+    $this->client->forceFill(['redirect_uris' => ['https://attacker.example.net/cb']])->save();
+
+    $this->get(authorizeUrl($this->client, ['redirect_uri' => 'https://attacker.example.net/cb']))
+        ->assertOk()
+        ->assertSee('attacker.example.net');
+});
+
 it('spells out what the connector will be able to do, including deletion', function (): void {
     $this->actingAs($this->user);
 
