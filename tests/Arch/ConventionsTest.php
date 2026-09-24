@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use Illuminate\Contracts\Database\Eloquent\Builder as EloquentBuilderContract;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilderContract;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -325,6 +326,154 @@ it('keeps the mutable Carbon class out of the codebase', function (): void {
         'class no longer matches what the date factory builds, so a type hint becomes a TypeError and an '.
         'instanceof check silently turns false. Use CarbonImmutable, or CarbonInterface where a vendor '.
         'may still hand you a mutable date. '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('reads workspace authorization only through the capability map', function (): void {
+    $root = dirname(__DIR__, 2);
+    $self = __FILE__;
+
+    $allowedFiles = [
+        'app/Models/User.php',
+        'app/Models/Concerns/HasWorkspaces.php',
+        'app/Enums/WorkspaceRole.php',
+        'app/Actions/Jetstream/RemoveWorkspaceMember.php',
+        'tests/Feature/CRM/WorkspaceAuthorizationTest.php',
+        'tests/Feature/Workspaces/InviteLinkTokenTest.php',
+        'tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php',
+        'tests/Feature/Workspaces/UpdateWorkspaceMemberRoleTest.php',
+        'tests/Feature/Workspaces/WorkspaceMembersCrossTenantTest.php',
+        'tests/Feature/Workspaces/WorkspaceMembersTest.php',
+    ];
+
+    $directories = [
+        $root.'/app',
+        $root.'/packages',
+        $root.'/database',
+        $root.'/resources',
+        $root.'/routes',
+        $root.'/tests',
+    ];
+
+    $roleKeys = implode('|', array_map(
+        fn (WorkspaceRole $role): string => preg_quote($role->value, '/'),
+        WorkspaceRole::cases(),
+    ));
+
+    $pattern = '/('
+        .'hasWorkspaceRole\(|hasWorkspaceRoleForWorkspaceId\(|isViewerOnWorkspaceId\(|ownsWorkspace\(|workspaceRole\(|membershipRole\('
+        .'|WorkspaceRole::[A-Za-z]+(?:->value)?\s*(?:===|!==)'
+        .'|(?:===|!==)\s*WorkspaceRole::[A-Za-z]+(?:->value)?'
+        .'|(?:->role\b|\[\'role\'\]|->key\b|\$\w+|\))\s*(?:===|!==)\s*\'(?:'.$roleKeys.')\''
+        .'|\'(?:'.$roleKeys.')\'\s*(?:===|!==)\s*(?:->role\b|\[\'role\'\]|->key\b|\$\w+)'
+        .')/';
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            if ($file->getPathname() === $self) {
+                continue;
+            }
+
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            if (in_array($relativePath, $allowedFiles, true)) {
+                continue;
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                $trimmed = mb_ltrim($line);
+
+                $isComment = str_starts_with($trimmed, '*')
+                    || str_starts_with($trimmed, '//')
+                    || str_starts_with($trimmed, '/*');
+
+                if ($isComment) {
+                    continue;
+                }
+
+                if (preg_match($pattern, $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = $relativePath.':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Workspace authorization is a role-string check outside the capability map '.
+        '(.ai/guidelines/relaticle/architecture.md). Only App\\Models\\User, HasWorkspaces and '.
+        'WorkspaceRole may resolve a role or ownership directly; every other caller reads '.
+        'User::hasWorkspaceCapability(). '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('keeps the retired editor role key out of everything but its historic migrations', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $allowedPrefixes = [
+        'database/migrations/2026_08_18_100000_',
+        'database/migrations/2026_09_01_203744_',
+        'database/migrations/2026_09_18_000000_',
+    ];
+
+    $directories = [
+        $root.'/app',
+        $root.'/config',
+        $root.'/database',
+        $root.'/lang',
+        $root.'/packages',
+        $root.'/resources',
+        $root.'/routes',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
+            '/\.(php|md|js|json)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            foreach ($allowedPrefixes as $prefix) {
+                if (str_starts_with($relativePath, $prefix)) {
+                    continue 2;
+                }
+            }
+
+            $lines = explode("\n", (string) file_get_contents($file->getPathname()));
+
+            foreach ($lines as $index => $line) {
+                if (preg_match('/(?<![\w-]=)([\'"])editor\1/', $line) !== 1) {
+                    continue;
+                }
+
+                $offenders[] = $relativePath.':'.($index + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'The editor workspace role was renamed to member by 2026_09_18_000000_rename_editor_role_to_member. '.
+        'Only the historic migrations may still name the old key; an HTML attribute such as x-ref is exempt. '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

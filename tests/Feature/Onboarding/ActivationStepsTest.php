@@ -71,7 +71,7 @@ it('completes invite for a pending invitation', function (): void {
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     expect(stepByKey($this->workspace, 'invite')->complete())->toBeTrue();

@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CompanyResource\Pages;
 
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
+use App\Models\Company;
 use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -39,7 +40,7 @@ final class ListCompanies extends ListRecords
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportCompanies::getUrl())
                     ->visible(ImportCompanies::canAccess(...)),
-                ExportAction::make()->exporter(CompanyExporter::class),
+                ExportAction::make()->exporter(CompanyExporter::class)->authorize('exportAny', Company::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')

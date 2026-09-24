@@ -32,6 +32,6 @@ Filter the whole board by **Assignee** to see one person's plate.
 ## The columns are yours
 
 Columns mirror the task **Status** field's options: To do, In progress, and
-Done out of the box. A workspace owner can rename them, add more, or reorder
-them on the Custom Fields page, and the board follows:
+Done out of the box. The workspace owner or an Admin can rename them, add
+more, or reorder them on the Custom Fields page, and the board follows:
 [edit the options in a select field](/help/custom-fields/edit-the-options-in-a-select-field).

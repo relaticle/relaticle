@@ -8,6 +8,7 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\PersonalAccessToken;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
+use Filament\Forms\Components\Hidden;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -15,7 +16,6 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\View\View;
-use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\On;
 
 final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
@@ -78,10 +78,12 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
                     ->modalWidth(Width::Large)
                     ->fillForm(
                         fn (PersonalAccessToken $record): array => [
+                            'workspace_id' => $record->workspace_id,
                             'permissions' => $record->abilities,
                         ],
                     )
                     ->schema([
+                        Hidden::make('workspace_id'),
                         CreateAccessToken::permissionsCheckboxList(),
                     ])
                     ->action(function (
@@ -90,9 +92,10 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
                     ): void {
                         $record
                             ->forceFill([
-                                'abilities' => Jetstream::validPermissions(
+                                'abilities' => array_values(array_intersect(
                                     $data['permissions'] ?? [],
-                                ),
+                                    CreateAccessToken::grantablePermissions($record->workspace_id),
+                                )),
                             ])
                             ->save();
 

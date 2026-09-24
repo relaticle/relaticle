@@ -194,7 +194,7 @@ it('loads company logos in one query on the people list', function (): void {
 it('renders member chips in the assignees filter and lets the caller order win', function (): void {
     $this->user->update(['name' => "Sheila O'Kon"]);
     $mate = User::factory()->create(['name' => 'Aaron Ant']);
-    $this->workspace->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'member']);
 
     $page = livewire(ManageTasks::class)->instance();
     $field = assigneesFilterField($page);

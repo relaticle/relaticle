@@ -84,7 +84,7 @@ it('notifies only the assignees submitted through the dashboard create action', 
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'member']);
 
     $this->actingAs($user);
     Filament::setTenant($workspace);
@@ -201,7 +201,7 @@ it('hides the completion control when the tenant has no Done status option', fun
 it('writes the Done option of the task workspace, not the ambient tenant, when the user belongs to both', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $other = User::factory()->withPersonalWorkspace()->create();
-    $other->currentWorkspace->users()->attach($user, ['role' => 'editor']);
+    $other->currentWorkspace->users()->attach($user, ['role' => 'member']);
 
     $task = Task::factory()->for($other->currentWorkspace)->create(['title' => 'Cross-workspace task']);
 

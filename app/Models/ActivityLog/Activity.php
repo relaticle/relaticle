@@ -33,6 +33,7 @@ final class Activity extends SpatieActivity
             }
 
             $workspaceId = $activity->subject?->getAttribute('workspace_id')
+                ?? $activity->subject?->getAttribute('tenant_id')
                 ?? Filament::getTenant()?->getKey();
 
             if ($workspaceId !== null) {

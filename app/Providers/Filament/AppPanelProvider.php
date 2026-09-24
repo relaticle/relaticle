@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
+use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -79,7 +80,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -358,7 +358,12 @@ final class AppPanelProvider extends PanelProvider
             )
             ->plugins([
                 CustomFieldsPlugin::make()
-                    ->authorize(fn () => Gate::check('update', Filament::getTenant()))
+                    ->authorize(function (): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::FieldsManage);
+                    })
                     ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
             ])

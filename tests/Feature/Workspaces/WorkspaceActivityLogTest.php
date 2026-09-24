@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
@@ -15,6 +17,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 mutates(ActivityLog::class);
 
@@ -102,10 +105,10 @@ test('another workspace activity never leaks in', function (): void {
 });
 
 test('a member without the admin role cannot open the audit log', function (): void {
-    $editor = User::factory()->create(['name' => 'Eddie Editor']);
-    $this->workspace->users()->attach($editor, ['role' => 'editor']);
+    $member = User::factory()->create(['name' => 'Mandy Member']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
-    $this->actingAs($editor);
+    $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
     expect(ActivityLog::canAccess())->toBeFalse();
@@ -607,4 +610,81 @@ test('a long rich editor body does not ship whole into every row title', functio
         ->toContain('Description')
         ->and(mb_strlen($body))->toBeGreaterThan(6000)
         ->and(mb_strlen($matches[1] ?? ''))->toBeLessThan(300);
+});
+
+function auditedCustomField(object $context, string $name, string $type, CustomFieldSettingsData $settings = new CustomFieldSettingsData): CustomField
+{
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $context->workspace->getKey(),
+        'entity_type' => 'opportunity',
+        'code' => 'audit_'.Str::random(6),
+        'name' => 'Audit',
+        'type' => 'section',
+        'sort_order' => 0,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $context->workspace->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'opportunity',
+        'code' => Str::snake($name).'_'.Str::random(4),
+        'name' => $name,
+        'type' => $type,
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+        'settings' => $settings,
+    ]);
+
+    Activity::withoutGlobalScopes()->delete();
+
+    return $field;
+}
+
+test('a custom field settings change reads one line per setting', function (): void {
+    $field = auditedCustomField($this, 'Budget', 'currency', new CustomFieldSettingsData(additional: [
+        'currency_code' => 'USD',
+        'display_type' => 'symbol',
+        'decimal_places' => 2,
+    ]));
+
+    $settings = $field->settings;
+    $settings->additional = [...$settings->additional, 'decimal_places' => 0];
+    $field->update(['settings' => $settings]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Budget')
+        ->assertSee(__('workspaces.activity.types.custom_field'))
+        ->assertSee(__('custom-fields::custom-fields.currency.decimal_places'))
+        ->assertDontSee('currency_code');
+});
+
+test('a deactivated custom field still reads by its name', function (): void {
+    $field = auditedCustomField($this, 'Churn reason', 'text');
+
+    $field->update(['active' => false]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Churn reason');
+});
+
+test('a company account owner change names both owners', function (): void {
+    $seller = User::factory()->create(['name' => 'Bea Seller']);
+    $this->workspace->users()->attach($seller, ['role' => 'member']);
+
+    $company = Company::factory()->for($this->workspace)->create([
+        'name' => 'Owned Co',
+        'account_owner_id' => $this->owner->getKey(),
+    ]);
+
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->update(['account_owner_id' => $seller->getKey()]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSeeInOrder(['Owned Co', __('filament/resources/company.fields.account_owner_id.label'), 'Ada Owner', 'Bea Seller']);
 });

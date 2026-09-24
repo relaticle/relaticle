@@ -101,10 +101,10 @@ test('a user outside the workspace cannot open the members tab', function (): vo
 test('the tab strip hides activity from members without the admin role', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    $this->actingAs($editor);
+    $this->actingAs($member);
 
     expect(workspaceTabLabels(app(EditWorkspace::class)))
         ->not->toContain(__('workspaces.tabs.activity'))
@@ -123,12 +123,27 @@ test('a workspace admin can open the members tab', function (): void {
         ->assertSuccessful();
 });
 
-test('a workspace editor cannot open the members tab', function (): void {
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+test('a workspace member cannot open the members tab', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    $this->actingAs($editor)
+    $this->actingAs($member)
         ->get(Members::getUrl(tenant: $this->workspace))
+        ->assertForbidden();
+});
+
+test('a workspace admin can open the custom fields tab, and a member cannot', function (): void {
+    $admin = User::factory()->create();
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    $this->actingAs($admin)
+        ->get(CustomFields::getUrl(tenant: $this->workspace))
+        ->assertSuccessful();
+
+    $this->actingAs($member)
+        ->get(CustomFields::getUrl(tenant: $this->workspace))
         ->assertForbidden();
 });
 

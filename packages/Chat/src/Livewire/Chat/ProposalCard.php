@@ -28,6 +28,7 @@ use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
@@ -906,7 +907,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($anchor, $exception->getMessage());
+            $this->reportResolveFailure($anchor, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -967,7 +968,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, $exception->getMessage());
+            $this->reportResolveFailure($step, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -1110,11 +1111,10 @@ final class ProposalCard extends BaseLivewireComponent
             // ValidationException is thrown by the action's tenant guards when a
             // referenced record or assignee stopped being reachable between the
             // proposal and the approval. HttpException (from abort_*() inside an
-            // action, e.g. the owner-only guard) is a RuntimeException too, and its
-            // message is written for the user, so it renders as-is. Livewire would
-            // otherwise absorb these into an error bag nothing renders, leaving the
-            // button a permanent no-op.
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            // action, e.g. a capability guard) is a RuntimeException too. Livewire
+            // would otherwise absorb these into an error bag nothing renders,
+            // leaving the button a permanent no-op.
+            $this->reportResolveFailure($pendingAction, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -1164,7 +1164,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $exception->getMessage()));
+            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, ApprovalFailureMessage::for($exception)));
             $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
 
             return;

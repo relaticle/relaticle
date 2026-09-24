@@ -189,7 +189,7 @@ it('hides your name for a user who already has a workspace', function (): void {
 it('hides your name for an invited member who owns no workspace yet', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $member = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $owner->currentWorkspace->getKey()])->save();
 
     $this->actingAs($member);

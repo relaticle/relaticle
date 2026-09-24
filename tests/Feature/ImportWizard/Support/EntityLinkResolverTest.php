@@ -16,7 +16,7 @@ beforeEach(function (): void {
 
 it('resolves workspace member by email via pivot', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
@@ -43,7 +43,7 @@ it('resolves workspace owner by email', function (): void {
 
 it('resolves workspace member by ID', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)
@@ -73,8 +73,8 @@ it('returns null for non-workspace-member email', function (): void {
 it('resolves multiple workspace members in batch', function (): void {
     $member1 = User::factory()->create();
     $member2 = User::factory()->create();
-    $this->workspace->users()->attach($member1, ['role' => 'editor']);
-    $this->workspace->users()->attach($member2, ['role' => 'editor']);
+    $this->workspace->users()->attach($member1, ['role' => 'member']);
+    $this->workspace->users()->attach($member2, ['role' => 'member']);
 
     $resolver = new EntityLinkResolver($this->workspace->id);
     $link = EntityLink::belongsTo('account_owner', User::class)

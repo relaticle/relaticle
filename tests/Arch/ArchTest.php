@@ -129,6 +129,8 @@ arch('avoid mutation')
         // Request-scoped batch_uuid holder, mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
+        // Job-scoped holder of the running import, set and cleared by ExecuteImportJob.
+        'App\Support\ActivityLog\CurrentImport',
         // Request-scoped media lookup cache, same shape: filled as list endpoints
         // prime it, reset per request via the scoped container binding.
         'App\Support\Media\MediaLookup',

@@ -185,7 +185,7 @@ it('sweeps attachments with the workspace that owns them', function (): void {
 it('hides an attachment from other members of the same team', function (): void {
     $id = $this->postJson(route('chat.attachments.store'), ['file' => csvUpload(2)])->json('id');
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $member->switchWorkspace($this->workspace);
 
     expect(ChatAttachment::find($member, $id))->toBeNull();

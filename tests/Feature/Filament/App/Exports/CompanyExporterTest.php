@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\App\Exports;
 
 use App\Enums\CustomFields\CompanyField;
+use App\Enums\WorkspaceRole;
 use App\Events\WorkspaceCreated;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -31,7 +32,7 @@ beforeEach(function () {
 
     $this->workspace = Workspace::factory()->create();
     $this->user = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->user->workspaces()->attach($this->workspace);
+    $this->user->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($this->user);
     Filament::setTenant($this->workspace);

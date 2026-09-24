@@ -48,7 +48,7 @@ it('anonymises chat participation on a plain eloquent delete', function (): void
     $workspace = $owner->currentWorkspace;
 
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     $conversationId = seedChatParticipation($member, (string) $workspace->id);
 
@@ -67,7 +67,7 @@ it('leaves other participants untouched when a user is deleted', function (): vo
     $workspace = $owner->currentWorkspace;
 
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     $survivorConversationId = seedChatParticipation($owner, (string) $workspace->id);
     seedChatParticipation($member, (string) $workspace->id);

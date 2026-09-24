@@ -156,7 +156,7 @@
                         </h1>
 
                         <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">
-                            @if(! $isOwner)
+                            @if(! $canManageBilling)
                                 {{ $workspace->owner
                                     ? __('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
                                     : __('billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
@@ -167,7 +167,7 @@
                             @endif
                         </p>
 
-                        @if($isOwner)
+                        @if($canManageBilling)
                             <div class="mt-8 flex flex-col gap-3">
                                 @if($trialAvailable)
                                     <x-filament::button size="lg" class="w-full justify-center" wire:click="startTrial" wire:loading.attr="disabled" wire:target="startTrial">
@@ -221,9 +221,9 @@
         <footer class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pb-8 text-sm text-gray-500 dark:text-gray-400">
             <span>{{ __('billing.paused.copyright', ['year' => now()->year]) }}</span>
             <a href="{{ url()->getPublicUrl(route('policy.show', absolute: false)) }}" class="{{ $footerLink }}">{{ __('billing.paused.privacy') }}</a>
-            @if($isOwner)
+            @can('delete', $workspace)
                 <a href="{{ filament()->getTenantProfileUrl() }}" class="{{ $footerLink }}">{{ __('billing.paused.delete') }}</a>
-            @endif
+            @endcan
             <form method="post" action="{{ filament()->getLogoutUrl() }}">
                 @csrf
                 <button type="submit" class="{{ $footerLink }}">{{ __('billing.paused.sign_out') }}</button>

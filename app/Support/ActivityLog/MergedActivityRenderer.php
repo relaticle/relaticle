@@ -22,10 +22,13 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
     {
         $summary = ActivityLogSummary::from($entry);
 
+        $importFile = $entry->properties['import_file'] ?? null;
+
         return view('activity-log.merged-activity', [
             'entry' => $entry,
             'summary' => $summary,
             'rows' => $this->rows($entry, $summary),
+            'importFile' => is_string($importFile) ? $importFile : null,
         ]);
     }
 

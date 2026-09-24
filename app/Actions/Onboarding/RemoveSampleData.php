@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Onboarding;
 
 use App\Enums\CreationSource;
+use App\Enums\WorkspaceCapability;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -29,7 +30,7 @@ final readonly class RemoveSampleData
 
     public function execute(User $user, Workspace $workspace, bool $allowEmptyWorkspace = false): int
     {
-        abort_unless($user->ownsWorkspace($workspace), 403);
+        abort_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), 403);
         abort_unless($allowEmptyWorkspace || $this->facts->hasOwnRecord($workspace), 422);
 
         $removed = DB::transaction(function () use ($workspace): int {

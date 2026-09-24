@@ -129,7 +129,7 @@ it('returns actionable MCP errors without successful structured content', functi
 
 it('can create, update, and clear a company account owner', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateCompanyTool::class, [

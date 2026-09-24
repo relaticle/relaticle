@@ -229,7 +229,7 @@ test('auto-generated slug from reserved name gets suffixed', function () {
 test('issueToken stores a hash and returns the raw secret', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
 
-    $invitation = $workspace->workspaceInvitations()->make(['email' => 'x@example.test', 'role' => 'editor']);
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'x@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -245,7 +245,7 @@ test('issueToken stores a hash and returns the raw secret', function (): void {
 test('workspaces default their join link to the editor role', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
 
-    expect($workspace->invite_link_default_role)->toBe(WorkspaceRole::Editor->value);
+    expect($workspace->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('workspace invitation belongs to its inviter', function (): void {
@@ -325,7 +325,7 @@ test('removing a member clears the workspace as their current one', function ():
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
     $member = User::factory()->withPersonalWorkspace()->create();
-    $workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $workspace->getKey()])->save();
 
     $workspace->removeUser($member);
@@ -338,7 +338,7 @@ test('purging a workspace detaches its members and clears their current workspac
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
     $member = User::factory()->withPersonalWorkspace()->create();
-    $workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $workspace->getKey()])->save();
 
     $workspace->purge();

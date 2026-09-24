@@ -8,6 +8,7 @@ use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Models\Concerns\HasWorkspaces;
@@ -107,6 +108,9 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use Notifiable;
     use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
+
+    /** @var array<string, bool> */
+    private array $ownershipByWorkspaceId = [];
 
     /**
      * Get the attributes that should be cast.
@@ -343,49 +347,70 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * Determine whether the user holds the given role on the workspace owning the
-     * given foreign key.
+     * @return array<int, WorkspaceCapability>
      */
-    public function hasWorkspaceRoleForWorkspaceId(?string $workspaceId, string $role): bool
+    public function workspaceCapabilities(?string $workspaceId): array
     {
         if ($workspaceId === null) {
-            return false;
+            return [];
         }
 
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return true;
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return WorkspaceCapability::forOwner();
         }
 
+        return $this->membershipRoleFor($workspaceId)?->capabilities() ?? [];
+    }
+
+    public function workspaceRoleLabel(?string $workspaceId): ?string
+    {
+        if ($workspaceId === null) {
+            return null;
+        }
+
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return __('workspaces.roles.owner.label');
+        }
+
+        return $this->membershipRoleFor($workspaceId)?->label();
+    }
+
+    // An unpinned token follows whichever workspace a request names, so only a
+    // pinned one is bounded by the holder's role there.
+    /** @return list<string> */
+    public function grantableTokenPermissions(?string $workspaceId): array
+    {
+        if ($workspaceId === null || $workspaceId === '') {
+            return array_values(Jetstream::$permissions);
+        }
+
+        return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
+    }
+
+    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
+    {
+        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+    }
+
+    private function membershipRoleFor(string $workspaceId): ?WorkspaceRole
+    {
         $this->loadMissing('workspaces');
 
-        $membershipRole = $this->workspaces
+        $role = $this->workspaces
             ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
             ?->membership
             ?->role;
 
-        if ($membershipRole === null) {
-            return false;
-        }
-
-        return Jetstream::findRole($membershipRole)?->key === $role;
+        return WorkspaceRole::tryFrom((string) $role);
     }
 
-    // Ownership outranks the pivot role, so an owner row carrying a stale
-    // viewer value cannot lock them out of their own workspace.
-    public function isViewerOnWorkspaceId(?string $workspaceId): bool
+    // Memoised per request. The sysadmin panel can reassign an owner, which is safe only
+    // because no User instance lives in that request; a user-facing transfer must clear this.
+    private function isWorkspaceOwner(string $workspaceId): bool
     {
-        if ($workspaceId === null) {
-            return false;
-        }
-
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return false;
-        }
-
-        return $this->hasWorkspaceRoleForWorkspaceId($workspaceId, WorkspaceRole::Viewer->value);
+        return $this->ownershipByWorkspaceId[$workspaceId] ??= Workspace::query()
+            ->whereKey($workspaceId)
+            ->where($this->getForeignKey(), $this->getKey())
+            ->exists();
     }
 }

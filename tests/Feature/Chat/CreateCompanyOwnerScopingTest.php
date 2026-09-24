@@ -28,7 +28,7 @@ it('rejects creating a company with account_owner_id from a foreign workspace', 
 it('accepts a company whose account_owner_id is a member of the workspace', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $teammate = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
 
     $this->actingAs($owner);
 
@@ -64,7 +64,7 @@ function createToolConversationFor(User $owner, string $conversationId): CreateC
 it('CreateCompanyTool accepts an explicit workspace-member owner and shows it on the card', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $teammate = User::factory()->create(['name' => 'Casey Closer']);
-    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($teammate, ['role' => 'member']);
 
     $tool = createToolConversationFor($owner, '019df800-3333-7000-8000-000000000077');
 

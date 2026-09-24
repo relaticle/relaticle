@@ -40,6 +40,7 @@ use App\Services\DiscordService;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
@@ -95,6 +96,7 @@ use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
@@ -141,6 +143,7 @@ final class AppServiceProvider extends ServiceProvider
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
+        $this->app->scoped(CurrentImport::class);
 
         // Caches creation-source facts per workspace for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
@@ -327,6 +330,14 @@ final class AppServiceProvider extends ServiceProvider
 
             if (blank($activity->getAttribute('batch_uuid'))) {
                 $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
+            }
+
+            $import = $this->app->make(CurrentImport::class);
+
+            if ($import->id() !== null && $activity->getAttribute('subject_type') !== Relation::getMorphAlias(Import::class)) {
+                $activity->properties = ($activity->properties ?? new Collection)
+                    ->put('import_id', $import->id())
+                    ->put('import_file', $import->fileName());
             }
 
             // The causer stays the impersonated user because the record is theirs.
@@ -542,9 +553,11 @@ final class AppServiceProvider extends ServiceProvider
             ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
             'custom_field' => CustomField::class,
+            'custom_field_option' => CustomFieldOption::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
             'workspace_invitation' => WorkspaceInvitation::class,
+            'import' => Import::class,
         ]);
 
         // Use custom models for custom-fields package

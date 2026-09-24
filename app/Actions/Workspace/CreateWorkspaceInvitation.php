@@ -30,7 +30,7 @@ final readonly class CreateWorkspaceInvitation
         $workspace = $user->currentWorkspace;
 
         $email = (string) ($data['email'] ?? '');
-        $role = is_string($data['role'] ?? null) ? $data['role'] : WorkspaceRole::Editor->value;
+        $role = is_string($data['role'] ?? null) ? $data['role'] : WorkspaceRole::Member->value;
 
         return $this->inviteWorkspaceMember->invite($user, $workspace, $email, $role);
     }
