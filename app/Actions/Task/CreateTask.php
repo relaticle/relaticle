@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Task;
 
-use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -23,7 +22,7 @@ final readonly class CreateTask
     /**
      * @param  array<string, mixed>  $data
      */
-    public function execute(User $user, array $data, CreationSource $source = CreationSource::WEB): Task
+    public function execute(User $user, array $data): Task
     {
         abort_unless($user->can('create', Task::class), 403);
 
@@ -41,7 +40,6 @@ final readonly class CreateTask
         $assigneeIds = Arr::pull($data, 'assignee_ids');
 
         $attributes = Arr::only($data, ['title', 'custom_fields']);
-        $attributes['creation_source'] = $source;
         /** @var array<int, string> $newAssigneeIds */
         $newAssigneeIds = [];
 

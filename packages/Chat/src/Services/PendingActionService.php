@@ -509,7 +509,7 @@ final readonly class PendingActionService
         }
 
         /** @var Model */
-        return $action->execute($user, $record, CreationSource::CHAT);
+        return $action->execute($user, $record);
     }
 
     private function makeBatchItemAction(PendingAction $pendingAction): object
@@ -981,7 +981,7 @@ final readonly class PendingActionService
         );
 
         /** @var Model */
-        return $action->execute($user, $data, CreationSource::CHAT);
+        return $action->execute($user, $data);
     }
 
     /**

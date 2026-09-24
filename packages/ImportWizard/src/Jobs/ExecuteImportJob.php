@@ -1080,7 +1080,6 @@ final class ExecuteImportJob implements ShouldQueue
             'name' => $creationName,
             'workspace_id' => $context['workspace_id'],
             'creator_id' => $context['creator_id'],
-            'creation_source' => CreationSource::IMPORT,
         ]);
         $record->save();
 

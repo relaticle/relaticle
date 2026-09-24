@@ -54,13 +54,6 @@ final class Note extends Model implements HasCustomFields, HasMedia, HasTimeline
     use UsesCustomFields;
 
     /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
-    ];
-
-    /**
      * The attributes that should be cast.
      *
      * @return array<string, string|class-string>

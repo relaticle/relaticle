@@ -6,6 +6,7 @@ namespace App\Models\Concerns;
 
 use App\Enums\CreationSource;
 use App\Models\User;
+use App\Support\CurrentSource;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -14,6 +15,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 trait HasCreator
 {
+    public function initializeHasCreator(): void
+    {
+        $this->attributes['creation_source'] = CurrentSource::get()->value;
+    }
+
     /**
      * @return BelongsTo<User, $this>
      */

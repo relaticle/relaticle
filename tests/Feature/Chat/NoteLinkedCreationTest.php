@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Note\CreateNote;
 use App\Actions\People\CreatePeople;
-use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -74,7 +73,6 @@ it('approving a note with people_ids creates the noteables pivot', function (): 
     $note = resolve(CreateNote::class)->execute(
         $this->user,
         ['title' => 'Discovery call notes', 'people_ids' => [(string) $angel->id]],
-        CreationSource::CHAT,
     );
 
     expect($note)->toBeInstanceOf(Note::class);
@@ -87,7 +85,6 @@ it('approving a note with company_ids creates the noteables pivot', function ():
     $note = resolve(CreateNote::class)->execute(
         $this->user,
         ['title' => 'Account brief', 'company_ids' => [(string) $acme->id]],
-        CreationSource::CHAT,
     );
 
     expect($note->companies()->pluck('companies.id')->all())->toContain((string) $acme->id);
@@ -99,7 +96,6 @@ it('approving a note with opportunity_ids creates the noteables pivot', function
     $note = resolve(CreateNote::class)->execute(
         $this->user,
         ['title' => 'Deal review', 'opportunity_ids' => [(string) $deal->id]],
-        CreationSource::CHAT,
     );
 
     expect($note->opportunities()->pluck('opportunities.id')->all())->toContain((string) $deal->id);
@@ -112,7 +108,6 @@ it('rejects cross-tenant people_ids at the action layer', function (): void {
     expect(fn () => resolve(CreateNote::class)->execute(
         $this->user,
         ['title' => 'X', 'people_ids' => [(string) $foreign->id]],
-        CreationSource::CHAT,
     ))->toThrow(ValidationException::class);
 });
 
@@ -123,7 +118,6 @@ it('rejects cross-tenant company_ids at the action layer', function (): void {
     expect(fn () => resolve(CreateNote::class)->execute(
         $this->user,
         ['title' => 'X', 'company_ids' => [(string) $foreign->id]],
-        CreationSource::CHAT,
     ))->toThrow(ValidationException::class);
 });
 

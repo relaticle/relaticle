@@ -402,7 +402,7 @@ final class ResetDemoAccountCommand extends Command
                     'icp' => $fixture['icp'],
                     'linkedin' => 'www.linkedin.com/company/'.$fixture['handle'],
                 ],
-            ], CreationSource::SYSTEM);
+            ]);
         }
 
         return $companies;
@@ -428,7 +428,7 @@ final class ResetDemoAccountCommand extends Command
                     'job_title' => $fixture['title'],
                     'linkedin' => 'www.linkedin.com/in/'.Str::slug($name),
                 ],
-            ], CreationSource::SYSTEM);
+            ]);
         }
 
         return $people;
@@ -458,7 +458,7 @@ final class ResetDemoAccountCommand extends Command
                     'close_date' => now()->addDays($fixture['closes_in_days']),
                     'stage' => $stageIds->get($fixture['stage']),
                 ],
-            ], CreationSource::SYSTEM);
+            ]);
         }
 
         return $opportunities;
@@ -495,7 +495,7 @@ final class ResetDemoAccountCommand extends Command
                     'status' => $statusIds->get($fixture['status']),
                     'priority' => $priorityIds->get($fixture['priority']),
                 ],
-            ], CreationSource::SYSTEM);
+            ]);
         }
     }
 
@@ -518,7 +518,7 @@ final class ResetDemoAccountCommand extends Command
                 'custom_fields' => [
                     'body' => '<p>'.$fixture['body'].'</p>',
                 ],
-            ], CreationSource::SYSTEM);
+            ]);
         }
     }
 

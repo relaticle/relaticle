@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Importers;
 
-use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -244,7 +243,6 @@ abstract class BaseImporter implements ImporterContract
     {
         $data['workspace_id'] = $this->workspaceId;
         $data['creator_id'] = $creatorId;
-        $data['creation_source'] = CreationSource::IMPORT;
 
         return $data;
     }

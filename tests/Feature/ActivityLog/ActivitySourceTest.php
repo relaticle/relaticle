@@ -3,12 +3,14 @@
 declare(strict_types=1);
 
 use App\Actions\Company\UpdateCompany;
+use App\Enums\CreationSource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Http\Middleware\SetCurrentSource;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
+use App\Models\Concerns\HasCreator;
 use App\Models\User;
 use App\Support\CurrentSource;
 use Filament\Actions\Testing\TestAction;
@@ -20,7 +22,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
-mutates(CurrentSource::class, SetCurrentSource::class, RelaticleServer::class, PendingActionService::class);
+mutates(CurrentSource::class, SetCurrentSource::class, RelaticleServer::class, PendingActionService::class, HasCreator::class);
 
 beforeEach(function (): void {
     Bus::fake();
@@ -152,4 +154,14 @@ it('stamps each item of a batch chat approval as chat', function (): void {
 
     expect(sourcesOfCompanyUpdates($this->company))->toBe(['chat'])
         ->and(sourcesOfCompanyUpdates($secondCompany))->toBe(['chat']);
+});
+
+it('records the channel a record was created through, unless the writer states one', function (): void {
+    $posted = CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create());
+    $stated = CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create(['creation_source' => CreationSource::SYSTEM]));
+    $typed = Company::factory()->for($this->workspace)->create();
+
+    expect($posted->creation_source)->toBe(CreationSource::API)
+        ->and($stated->creation_source)->toBe(CreationSource::SYSTEM)
+        ->and($typed->creation_source)->toBe(CreationSource::WEB);
 });

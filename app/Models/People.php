@@ -61,13 +61,6 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasMedia
     use UsesCustomFields;
 
     /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
-    ];
-
-    /**
      * The attributes that should be cast.
      *
      * @return array<string, string|class-string>

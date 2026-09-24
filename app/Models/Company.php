@@ -66,13 +66,6 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
 
     /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
-    ];
-
-    /**
      * The attributes that should be cast.
      *
      * @return array<string, string|class-string>
