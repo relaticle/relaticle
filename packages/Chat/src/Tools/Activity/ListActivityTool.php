@@ -26,7 +26,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * "What changed on this deal last week", answered from the activity log.
  *
  * @phpstan-type ChangeRow array{field: string, old: string|null, new: string|null}
- * @phpstan-type ActivityEntry array{at: string, by: string, event: string, record: array{type: string, id: string, name: string, url: string}, changes: list<ChangeRow>}
+ * @phpstan-type ActivityEntry array{at: string, by: string, source: string|null, event: string, record: array{type: string, id: string, name: string, url: string}, changes: list<ChangeRow>}
  */
 final readonly class ListActivityTool implements Tool
 {
@@ -61,7 +61,7 @@ final readonly class ListActivityTool implements Tool
 
     public function description(): string
     {
-        return 'Read the change history of CRM records: who changed what, and when.'
+        return 'Read the change history of CRM records: who changed what, through which channel (web, api, mcp, chat, import, or system), and when.'
             .' Use it for questions like "what changed on this deal last week", "what did'
             .' my workspace update recently", or "who edited this company".'
             .' Scope it to one record with record_type + record_id, to one entity type with'
@@ -338,6 +338,7 @@ final readonly class ListActivityTool implements Tool
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
             'by' => $this->causerName($base),
+            'source' => Activity::sourceFrom($base->properties?->toArray() ?? [])?->value,
             'event' => $event,
             'record' => [
                 'type' => $subjectType,

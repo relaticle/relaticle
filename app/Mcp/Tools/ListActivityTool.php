@@ -30,7 +30,7 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\ActivityLog\Support\ActivityLogDiffRow;
 
 #[Title('List CRM Activity')]
-#[Description('List who changed which CRM records, when they changed them, and the field-level differences. Results use the caller timezone.')]
+#[Description('List who changed which CRM records, through which channel (web, api, mcp, chat, import, or system), when they changed them, and the field-level differences. Results use the caller timezone.')]
 final class ListActivityTool extends Tool
 {
     use ChecksTokenAbility;
@@ -256,6 +256,7 @@ final class ListActivityTool extends Tool
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
             'by' => $this->causerName($base),
+            'source' => Activity::sourceFrom($base->properties?->toArray() ?? [])?->value,
             'event' => (string) ($base->event ?? $base->description),
             'record' => [
                 'type' => $subjectType,
