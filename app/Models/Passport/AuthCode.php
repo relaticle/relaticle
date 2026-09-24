@@ -30,7 +30,9 @@ final class AuthCode extends BaseAuthCode
         self::creating(function (self $code): void {
             $consentedWorkspaceId = session()->pull('mcp.oauth.workspace_id');
 
-            $code->workspace_id = filled($consentedWorkspaceId) ? $consentedWorkspaceId : $code->grantedWorkspaceId();
+            $code->workspace_id = is_string($consentedWorkspaceId) && $consentedWorkspaceId !== ''
+                ? $consentedWorkspaceId
+                : $code->grantedWorkspaceId();
         });
     }
 
