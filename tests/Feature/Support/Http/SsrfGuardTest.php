@@ -7,9 +7,6 @@ use App\Exceptions\UploadException;
 use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
 use App\Support\Media\UploadAllowlist;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -84,19 +81,25 @@ test('accepts a clearly-public address literal', function (): void {
     expect(true)->toBeTrue();
 });
 
-test('redirect guard blocks redirects to non-public hosts but allows public ones', function (): void {
-    $onRedirect = SsrfGuard::redirectGuardOptions()['allow_redirects']['on_redirect'];
+test('guard refuses a redirect to a non-public host and follows a public one', function (string $location, bool $followed): void {
+    Http::fake(function (HttpClientRequest $request) use ($location) {
+        return $request->url() === 'https://1.1.1.1/icon.png'
+            ? Http::response('', 302, ['Location' => $location])
+            : Http::response('png');
+    });
 
-    $request = new Request('GET', 'https://1.1.1.1');
-    $response = new Response(302);
+    $send = fn () => SsrfGuard::guard(Http::timeout(5))->get('https://1.1.1.1/icon.png');
 
-    expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://10.0.0.1/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://1.1.1.1/')))
-        ->not->toThrow(SsrfGuardException::class);
-});
+    $followed
+        ? expect($send()->body())->toBe('png')
+        : expect($send)->toThrow(SsrfGuardException::class);
+
+    Http::assertSentCount($followed ? 2 : 1);
+})->with([
+    'cloud metadata' => ['http://169.254.169.254/latest/meta-data/', false],
+    'private range' => ['http://10.0.0.1/', false],
+    'public host' => ['http://1.0.0.1/icon.png', true],
+]);
 
 test('pinned client refuses plain http', function (): void {
     expect(fn (): PendingRequest => SsrfGuard::pinnedClient('http://example.com/file.pdf'))

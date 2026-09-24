@@ -12,8 +12,6 @@ use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\UriInterface;
 use Symfony\Component\HttpFoundation\IpUtils;
 
 final readonly class SsrfGuard
@@ -54,14 +52,13 @@ final readonly class SsrfGuard
         }
     }
 
-    /**
-     * Harden a client so every hop, redirects included, is validated and then pinned
-     * to the address it was validated against (SSRF, CWE-918).
-     */
     public static function guard(PendingRequest $request): PendingRequest
     {
         return $request
-            ->withOptions([...self::redirectGuardOptions(), 'progress' => self::abortPastUploadLimit(...)])
+            ->withOptions([
+                'allow_redirects' => ['max' => 5, 'strict' => true, 'referer' => false, 'protocols' => ['http', 'https']],
+                'progress' => self::abortPastUploadLimit(...),
+            ])
             ->withMiddleware(self::pinToValidatedAddress(...));
     }
 
@@ -95,38 +92,6 @@ final readonly class SsrfGuard
         };
     }
 
-    /**
-     * Guzzle options whose on_redirect callback aborts the request before any
-     * non-public redirect target is contacted, reporting the block for parity
-     * with the initial-URL check in {@see self::isAllowed()}.
-     *
-     * @return array{allow_redirects: array<string, mixed>}
-     */
-    public static function redirectGuardOptions(): array
-    {
-        return [
-            'allow_redirects' => [
-                'max' => 5,
-                'strict' => true,
-                'referer' => false,
-                'protocols' => ['http', 'https'],
-                'on_redirect' => static function (
-                    RequestInterface $request,
-                    ResponseInterface $response,
-                    UriInterface $uri,
-                ): void {
-                    try {
-                        self::assertPublicHost((string) $uri);
-                    } catch (SsrfGuardException $exception) {
-                        report($exception);
-
-                        throw $exception;
-                    }
-                },
-            ],
-        ];
-    }
-
     public static function pinnedClient(string $url): PendingRequest
     {
         $parts = parse_url($url);
@@ -135,7 +100,7 @@ final readonly class SsrfGuard
 
         throw_unless($scheme === 'https' && $port === 443, SsrfGuardException::class, 'Only https URLs on port 443 are allowed');
 
-        $pin = self::pin(trim((string) parse_url($url, PHP_URL_HOST), '[]'), 443);
+        $pin = self::pin(trim((string) ($parts['host'] ?? ''), '[]'), 443);
 
         return Http::withOptions([
             'allow_redirects' => false,

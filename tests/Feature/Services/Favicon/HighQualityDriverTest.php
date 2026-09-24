@@ -2,12 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Exceptions\SsrfGuardException;
 use App\Services\Favicon\Drivers\HighQualityDriver;
 use App\Support\Http\HostResolver;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Utils;
+use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Http;
 
 mutates(HighQualityDriver::class);
@@ -128,16 +125,15 @@ test('refuses to fetch from private addresses', function (): void {
         ->and($driver->fetch('http://169.254.169.254/'))->toBeNull();
 });
 
-test('routes favicon requests through the SSRF-guarded redirect client', function (): void {
-    $driver = new HighQualityDriver;
+test('never follows a page redirect to a non-public host', function (): void {
+    Http::fake([
+        'https://1.1.1.1' => Http::response('', 302, ['Location' => 'http://169.254.169.254/latest/meta-data/']),
+        '*' => Http::response('<link rel="apple-touch-icon" href="/apple-touch-icon.png">'),
+    ]);
 
-    $onRedirect = invade($driver)->guardedHttpClient()->getOptions()['allow_redirects']['on_redirect'];
+    (new HighQualityDriver)->fetch('https://1.1.1.1');
 
-    $request = new Request('GET', 'https://1.1.1.1');
-    $response = new Response(302);
-
-    expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
-        ->toThrow(SsrfGuardException::class);
+    Http::assertNotSent(fn (HttpClientRequest $request): bool => str_contains($request->url(), '169.254.169.254'));
 });
 
 test('sends nothing when a host resolves to a private address at send time', function (): void {
