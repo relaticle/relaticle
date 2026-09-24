@@ -306,6 +306,7 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
+    #[Renderless]
     public function latestAssistantMessage(?string $conversationId = null): ?array
     {
         $conversationId ??= $this->conversationId;
@@ -389,6 +390,7 @@ final class ChatInterface extends BaseLivewireComponent
      * therefore passes its own id, scoped to the authed user and workspace by
      * FindConversation.
      */
+    #[Renderless]
     public function conversationTitle(?string $conversationId = null): ?string
     {
         $conversationId ??= $this->conversationId;
