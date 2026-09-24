@@ -492,3 +492,13 @@ it('names the channel of each change, and none for a row that predates it', func
 
     expect(array_column($legacy['data'], 'source'))->toBe([null, null]);
 });
+
+it('names every known channel and null in its description', function (): void {
+    $description = app(ListActivityTool::class)->description();
+
+    foreach (CreationSource::values() as $value) {
+        expect($description)->toContain($value);
+    }
+
+    expect($description)->toContain('null');
+});

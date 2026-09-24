@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Activity;
 
+use App\Enums\CreationSource;
 use App\Enums\WorkspaceCapability;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
@@ -61,7 +62,9 @@ final readonly class ListActivityTool implements Tool
 
     public function description(): string
     {
-        return 'Read the change history of CRM records: who changed what, through which channel (web, api, mcp, chat, import, or system), and when.'
+        $channels = implode(', ', CreationSource::values());
+
+        return "Read the change history of CRM records: who changed what, through which channel ({$channels}; null when it was not recorded), and when."
             .' Use it for questions like "what changed on this deal last week", "what did'
             .' my workspace update recently", or "who edited this company".'
             .' Scope it to one record with record_type + record_id, to one entity type with'

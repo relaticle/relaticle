@@ -361,3 +361,13 @@ it('names the channel of each change in the activity it returns', function (): v
             ->where('items.0.source', null)
             ->etc());
 });
+
+it('names every known channel and null in its description', function (): void {
+    $description = resolve(ListActivityTool::class)->description();
+
+    foreach (CreationSource::values() as $value) {
+        expect($description)->toContain($value);
+    }
+
+    expect($description)->toContain('null');
+});
