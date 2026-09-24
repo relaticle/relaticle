@@ -359,7 +359,7 @@ it('removes stored logos before rebuilding the workspace', function (): void {
 
     $workspace = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalWorkspace();
     $company = Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion')->firstOrFail();
-    $company->addMediaFromString('logo-bytes')
+    $company->addMediaFromString(onePixelPng())
         ->usingFileName('logo.png')
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 

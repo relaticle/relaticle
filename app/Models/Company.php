@@ -65,6 +65,16 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
 
+    /** @var array<string, string> */
+    public const array LOGO_MIME_TYPES = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/vnd.microsoft.icon' => 'ico',
+        'image/x-icon' => 'ico',
+    ];
+
     /**
      * @var array<string, mixed>
      */
@@ -104,7 +114,9 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)->useDisk('public');
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
+            ->acceptsMimeTypes(array_keys(self::LOGO_MIME_TYPES))
+            ->useDisk('public');
 
         $this->addMediaCollection(MediaCollection::Attachments->value)
             ->acceptsMimeTypes(UploadAllowlist::mimeTypes());
