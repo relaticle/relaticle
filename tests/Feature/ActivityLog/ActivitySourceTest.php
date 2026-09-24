@@ -117,3 +117,39 @@ it('stamps a write after a chat approval in the same request as web again', func
 
     expect(sourcesOfCompanyUpdates($this->company))->toBe(['chat', 'web']);
 });
+
+it('stamps each item of a batch chat approval as chat', function (): void {
+    $secondCompany = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
+
+    $proposal = PendingAction::query()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => UpdateCompany::class,
+        'operation' => PendingActionOperation::Update,
+        'entity_type' => 'company',
+        'action_data' => [
+            '_batch' => true,
+            'records' => [
+                ['_record_id' => (string) $this->company->getKey(), '_model_class' => Company::class, 'name' => 'Acme Batch'],
+                ['_record_id' => (string) $secondCompany->getKey(), '_model_class' => Company::class, 'name' => 'Globex Batch'],
+            ],
+        ],
+        'display_data' => [
+            'title' => 'Update 2 companies',
+            'summary' => 'Update 2 companies',
+            'items' => [
+                ['summary' => 'Update company "Acme"', 'fields' => []],
+                ['summary' => 'Update company "Globex"', 'fields' => []],
+            ],
+        ],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    resolve(PendingActionService::class)->approveItem($proposal, $this->user, 0);
+    resolve(PendingActionService::class)->approveItem($proposal, $this->user, 1);
+
+    expect(sourcesOfCompanyUpdates($this->company))->toBe(['chat'])
+        ->and(sourcesOfCompanyUpdates($secondCompany))->toBe(['chat']);
+});
