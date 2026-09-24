@@ -512,6 +512,50 @@ it('keeps one user message and the failure note when the turn dies after a compl
         ->and($rows->pluck('status')->unique()->all())->toBe(['completed']);
 });
 
+it('lets the model recover from calling a tool that does not exist instead of failing the turn', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    $credits = resolve(CreditService::class);
+    $credits->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::sequence()
+            ->push(AnthropicSse::toolUseStep('ListDealsTool'), 200, ['Content-Type' => 'text/event-stream'])
+            ->push(AnthropicSse::reply('Deals live under opportunities.', 'claude-sonnet-5'), 200, ['Content-Type' => 'text/event-stream']),
+    ]);
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'List my deals',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle($credits);
+
+    $assistant = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->sole();
+
+    $repairedCall = json_decode((string) $assistant->steps, true)[0]['tool_calls'][0];
+
+    expect($assistant->content)->toBe('Deals live under opportunities.')
+        ->and($repairedCall['name'])->toBe('ListDealsTool')
+        ->and($repairedCall['failed'])->toBeTrue()
+        ->and($repairedCall['result'])->toStartWith("Tool 'ListDealsTool' does not exist. Available tools: ");
+});
+
 it('refunds the reservation when the job dies before it ever runs', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
