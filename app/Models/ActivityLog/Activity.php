@@ -15,6 +15,8 @@ use Spatie\Activitylog\Models\Activity as SpatieActivity;
  */
 final class Activity extends SpatieActivity
 {
+    public const string SOURCE_PROPERTY = 'source';
+
     /**
      * @return BelongsTo<Workspace, $this>
      */

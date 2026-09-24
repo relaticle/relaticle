@@ -34,6 +34,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentSource;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
@@ -221,7 +222,7 @@ final readonly class PendingActionService
                     'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
                 );
 
-                $result = $this->executeAction($pendingAction, $user, $excludedFields);
+                $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
 
                 $resultData = $result instanceof Model
                     ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
@@ -348,7 +349,7 @@ final readonly class PendingActionService
                     return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
                 }
 
-                $model = $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type));
+                $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
 
                 // A failure remembered from an earlier attempt is history the
                 // moment an item commits; leaving it would report a stale error
