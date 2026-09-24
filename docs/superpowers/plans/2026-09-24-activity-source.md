@@ -49,7 +49,7 @@
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `tests/Feature/ActivityLog/ActivitySourceTest.php`:
+Create the file the project way, then replace its body: `php artisan make:test --pest ActivityLog/ActivitySourceTest --no-interaction`. `tests/Feature/ActivityLog/ActivitySourceTest.php`:
 
 ```php
 <?php
@@ -504,7 +504,7 @@ git commit -m "feat(activity-log): stamp imports and the demo reset with their c
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `tests/Feature/ActivityLog/ActivitySourceTest.php` (add import `App\Enums\CreationSource`):
+Append to `tests/Feature/ActivityLog/ActivitySourceTest.php` (add imports `App\Enums\CreationSource`, `App\Models\Concerns\HasCreator`; add `HasCreator::class` to the `mutates(...)` call):
 
 ```php
 it('records the channel a record was created through, unless the writer states one', function (): void {
@@ -589,11 +589,18 @@ Expected: all pass. That includes the existing `creation_source` assertions in `
 vendor/bin/pint --dirty --format agent
 vendor/bin/rector --dry-run
 vendor/bin/phpstan analyse --memory-limit=2G
-git add app/Models app/Actions app/Http/Controllers/Api/V1 app/Mcp/Tools/BaseCreateTool.php packages/Chat/src/Services/PendingActionService.php app/Console/Commands/ResetDemoAccountCommand.php packages/ImportWizard tests/Feature
+git add app/Models/Concerns/HasCreator.php app/Models/Company.php app/Models/People.php app/Models/Opportunity.php app/Models/Task.php app/Models/Note.php \
+  app/Actions/Company/CreateCompany.php app/Actions/People/CreatePeople.php app/Actions/Opportunity/CreateOpportunity.php app/Actions/Task/CreateTask.php app/Actions/Note/CreateNote.php \
+  app/Http/Controllers/Api/V1/CompaniesController.php app/Http/Controllers/Api/V1/PeopleController.php app/Http/Controllers/Api/V1/OpportunitiesController.php app/Http/Controllers/Api/V1/TasksController.php app/Http/Controllers/Api/V1/NotesController.php \
+  app/Mcp/Tools/BaseCreateTool.php packages/Chat/src/Services/PendingActionService.php app/Console/Commands/ResetDemoAccountCommand.php \
+  packages/ImportWizard/src/Importers/BaseImporter.php packages/ImportWizard/src/Jobs/ExecuteImportJob.php \
+  tests/Feature/ActivityLog/ActivitySourceTest.php tests/Feature/Chat/BatchCreateApprovalTest.php tests/Feature/Filament/App/Resources/CompanyResourceTest.php \
+  tests/Feature/Chat/TaskLinkedCreationTest.php tests/Feature/Chat/NoteLinkedCreationTest.php tests/Feature/Chat/OpportunityLinkedCreationTest.php tests/Feature/Chat/AiCreatedRecordsHaveOwnerTest.php
+git status --short
 git commit -m "refactor: derive creation_source from the current channel"
 ```
 
-Before committing, `git status --short` must show no `public/css` path staged.
+`git status --short` must show every path in this task staged (`M `) and no `public/` path staged. A modified file this task touched that is still unstaged means the list above missed it: add it.
 
 ---
 
@@ -700,10 +707,34 @@ Add after the `causer` `SelectFilter`:
                 SelectFilter::make('source')
                     ->label(__('workspaces.activity.filters.source'))
                     ->options(CreationSource::class)
-                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
-                        ? $query->fromSource(CreationSource::from((string) $data['value']))
-                        : $query),
+                    ->query($this->filterBySource(...)),
 ```
+
+and the private method, next to the other private helpers. A Select bound to an enum can hand back the enum instance in the real panel, while `filterTable()` in tests passes the string (see `.ai/rules/chat.md`, "A Filament Select bound to an enum returns the enum"), so it accepts both:
+
+```php
+    /**
+     * @param  Builder<Activity>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Activity>
+     */
+    private function filterBySource(Builder $query, array $data): Builder
+    {
+        $source = $data['value'] ?? null;
+
+        if (is_string($source)) {
+            $source = CreationSource::tryFrom($source);
+        }
+
+        if (! $source instanceof CreationSource) {
+            return $query;
+        }
+
+        return $query->fromSource($source);
+    }
+```
+
+Task 7 Step 4 exercises this filter through the real panel.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -924,7 +955,7 @@ and change the first sentence in `description()` to:
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `php artisan test --compact --parallel tests/Feature/Mcp tests/Feature/Chat`
-Expected: all pass. If `CrmAssistantInstructionsTest` asserts the old description sentence, update that assertion to the new sentence. The description is the fact under test, not a stale value.
+Expected: all pass. No test snapshots either old description string (checked with `grep -rln "List who changed which CRM records, when\|who changed what, and when" tests`, which prints nothing). The chat description sits in the Anthropic prompt-cache prefix, so the first turn after deploy pays one uncached prefix. That is expected.
 
 - [ ] **Step 5: Gates and commit**
 
@@ -970,4 +1001,4 @@ With Horizon running, `QUEUE_CONNECTION=redis`, and Reverb up, use agent-browser
 
 - [ ] **Step 4: UI screenshots**
 
-Use agent-browser to capture the Activity page (Source column, Source filter open) and a record timeline with a "Via API" line and a legacy entry. Take each in light and dark mode, plus the Activity page at a mobile viewport. Save them under `.context/`.
+In the browser, pick "API" in the Activity page's Source filter and confirm only API rows remain. That is the enum-state path `filterTable()` cannot reach. Then use agent-browser to capture the Activity page (Source column, Source filter open) and a record timeline with a "Via API" line and a legacy entry. Take each in light and dark mode, plus the Activity page at a mobile viewport. Save them under `.context/`.
