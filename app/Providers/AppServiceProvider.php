@@ -52,6 +52,7 @@ use App\Support\Media\MediaLookup;
 use App\Support\Passport\ClientRepository;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\Exports\ExportColumn;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
@@ -646,6 +647,8 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureFilament(): void
     {
+        ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
+
         $slideOverActions = ['create', 'edit', 'view'];
 
         Action::configureUsing(function (Action $action) use ($slideOverActions): Action {
