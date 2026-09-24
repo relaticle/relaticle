@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
@@ -295,7 +296,8 @@ it('keeps each imported record its own created entry, marked with the import', f
     $person = People::query()->where('workspace_id', $this->workspace->getKey())->where('name', 'Ada')->sole();
     $html = (new MergedActivityRenderer)->render($person->timeline()->get()->first())->render();
 
-    expect($html)->toContain(__('workspaces.activity.via_import', ['file' => 'test.csv']));
+    expect($html)->toContain(__('workspaces.activity.via_import', ['file' => 'test.csv']))
+        ->and($html)->not->toContain(__('workspaces.activity.via_source', ['source' => CreationSource::IMPORT->getLabel()]));
 });
 
 it('stops stamping once the import job is over', function (): void {
