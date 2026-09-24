@@ -496,6 +496,28 @@ describe('photo upload', function () {
             ->email->toBe('photo-test@example.com')
             ->profile_photo_path->not->toBeNull();
     });
+
+    test('refuses an svg profile photo', function () {
+        Storage::fake('public');
+        $user = User::factory()->withWorkspace()->create(['email' => 'svg-photo@example.com']);
+        $this->actingAs($user);
+
+        $svg = UploadedFile::fake()->createWithContent(
+            'avatar.svg',
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>',
+        );
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => 'Updated Name',
+                'email' => 'svg-photo@example.com',
+                'profile_photo_path' => $svg,
+            ])
+            ->call('updateProfile')
+            ->assertHasFormErrors(['profile_photo_path']);
+
+        expect($user->fresh()->profile_photo_path)->toBeNull();
+    });
 });
 
 describe('validation', function () {

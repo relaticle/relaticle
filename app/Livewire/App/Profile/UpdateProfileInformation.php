@@ -9,6 +9,7 @@ use App\Actions\Profile\RemoveUserProfilePhoto;
 use App\Actions\Profile\RequestEmailChange;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
+use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\EmailAddress;
 use App\Support\SameOriginUrl;
@@ -74,6 +75,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->label(__('profile.form.profile_photo.label'))
                             ->avatar()
                             ->image()
+                            ->acceptedFileTypes(User::PROFILE_PHOTO_MIME_TYPES)
                             ->imageEditor()
                             ->disk(config('jetstream.profile_photo_disk'))
                             ->directory('profile-photos')
