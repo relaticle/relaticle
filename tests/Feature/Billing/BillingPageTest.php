@@ -64,7 +64,8 @@ it('hides the trial CTA once the workspace used its trial', function (): void {
 
     livewire(Billing::class)
         ->assertDontSee(__('billing.trial.start_button'))
-        ->assertSee(__('billing.upgrade.button'));
+        ->assertSee(__('billing.upgrade.button'))
+        ->assertDontSee('@js(', false);
 });
 
 it('offers the trial on the paused screen to a hosted workspace that never received one', function (): void {
@@ -125,6 +126,7 @@ it('reviews the plan and totals on a second step before sending the owner to che
         ->assertSee(__('billing.paused.review.amount_yearly'))
         ->assertSee(__('billing.paused.review.credits', ['credits' => number_format(Plan::Pro->credits())]))
         ->assertSee(__('billing.paused.review.proceed'))
+        ->assertDontSee('@js(', false)
         ->assertDontSee(__('billing.paused.continue'));
 });
 

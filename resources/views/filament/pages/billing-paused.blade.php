@@ -122,7 +122,7 @@
                                 </dl>
 
                                 <x-filament::button size="lg" class="mt-6 w-full justify-center"
-                                    x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: @js(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) })">
+                                    x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
                                     {{ __('billing.paused.review.proceed') }}
                                 </x-filament::button>
 
