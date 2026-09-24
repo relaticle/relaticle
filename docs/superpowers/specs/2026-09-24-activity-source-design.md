@@ -143,6 +143,9 @@ both next to `primary`; the SystemAdmin `creation_source` badges had the same ga
 
 `CurrentSource` is a `final readonly class`, as the arch preset requires of a class with no state.
 
+The SystemAdmin activity view lists a row's properties when it has no diff (import summaries). It
+skips `Activity::SOURCE_PROPERTY` there, so the stamp never reads as a change.
+
 ## Out of scope
 
 - Edits made in the SystemAdmin panel stamp `web`. `CreationSource` has no staff case, and no
