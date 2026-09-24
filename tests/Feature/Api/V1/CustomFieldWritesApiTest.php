@@ -11,13 +11,20 @@ use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Classifier;
+use App\Support\CustomFields\CustomFieldInput;
+use App\Support\CustomFields\OptionMatcher;
 use App\Support\Media\MediaLookup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Prompts\ClassificationPrompt;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
 use Laravel\Sanctum\Sanctum;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Tests\Helpers\ClassificationFake;
 
-mutates(BaseCrmEntityRequest::class, MediaLookup::class);
+mutates(BaseCrmEntityRequest::class, MediaLookup::class, Classifier::class, OptionMatcher::class, CustomFieldInput::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -40,6 +47,86 @@ it('returns 422 with the field key for an unknown label', function (): void {
     $this->postJson('/api/v1/tasks', ['title' => 'Rest bad', 'custom_fields' => ['status' => 'Blocked']])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['custom_fields.status']);
+});
+
+it('suggests the closest option in the 422 for a near-miss label', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done']);
+
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest near miss', 'custom_fields' => ['status' => 'Completed']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['custom_fields.status' => 'Did you mean "Done"?']);
+
+    expect(Task::query()->where('title', 'Rest near miss')->exists())->toBeFalse();
+
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->model === 'jev-1.13.0');
+});
+
+it('keeps the plain unknown option error when the closest option is not confident', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done'], confidence: 0.5);
+
+    $response = $this->postJson('/api/v1/tasks', ['title' => 'Rest unsure', 'custom_fields' => ['status' => 'Completed']])
+        ->assertUnprocessable();
+
+    expect($response->json('errors')['custom_fields.status'][0])->not->toContain('Did you mean');
+});
+
+it('keeps the plain unknown option error when matching is off', function (): void {
+    Classification::fake();
+
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest off', 'custom_fields' => ['status' => 'Completed']])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['custom_fields.status' => 'is not one of: To do, In progress, Done.']);
+
+    Classification::assertNothingClassified();
+});
+
+it('keeps the plain unknown option error when the classifier fails', function (): void {
+    ClassificationFake::failing();
+
+    $response = $this->postJson('/api/v1/tasks', ['title' => 'Rest down', 'custom_fields' => ['status' => 'Completed']])
+        ->assertUnprocessable();
+
+    expect($response->json('errors')['custom_fields.status'][0])
+        ->toContain('is not one of: To do, In progress, Done.')
+        ->not->toContain('Did you mean');
+
+    Classification::assertClassified(fn (): bool => true);
+});
+
+it('treats an out-of-range choice as no match instead of failing the write', function (): void {
+    ClassificationFake::respondingWith(fn (): array => ['value_0' => new ChoiceAnswer('o99', [], 0.99)]);
+
+    $response = $this->postJson('/api/v1/tasks', ['title' => 'Rest malformed', 'custom_fields' => ['status' => 'Completed']])
+        ->assertUnprocessable();
+
+    expect($response->json('errors')['custom_fields.status'][0])->not->toContain('Did you mean');
+});
+
+it('does not cache a malformed answer', function (): void {
+    ClassificationFake::respondingWith(fn (): array => ['value_0' => new ChoiceAnswer('o99', [], 0.99)]);
+
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest malformed one', 'custom_fields' => ['status' => 'Completed']])->assertUnprocessable();
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest malformed two', 'custom_fields' => ['status' => 'Completed']])->assertUnprocessable();
+
+    expect(ClassificationFake::calls())->toBe(2);
+});
+
+it('never classifies a label the exact match resolves', function (): void {
+    ClassificationFake::choosing([]);
+
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest exact', 'custom_fields' => ['status' => 'done']])
+        ->assertCreated();
+
+    Classification::assertNothingClassified();
+});
+
+it('classifies a repeated near-miss label only once', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done']);
+
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest one', 'custom_fields' => ['status' => 'Completed']])->assertUnprocessable();
+    $this->postJson('/api/v1/tasks', ['title' => 'Rest two', 'custom_fields' => ['status' => 'Completed']])->assertUnprocessable();
+
+    expect(ClassificationFake::calls())->toBe(1);
 });
 
 it('updates a task select value by label', function (): void {

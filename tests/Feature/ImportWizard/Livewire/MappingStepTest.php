@@ -6,6 +6,9 @@ use App\Events\WorkspaceCreated;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
+use Laravel\Ai\Classification;
+use Laravel\Ai\Prompts\ClassificationPrompt;
+use Laravel\Ai\Responses\Data\ChoiceAnswer;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -16,8 +19,10 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\ColumnMatcher;
+use Tests\Helpers\ClassificationFake;
 
-mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
+mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class, ColumnMatcher::class);
 
 beforeEach(function (): void {
     Event::fake()->except([WorkspaceCreated::class]);
@@ -71,11 +76,11 @@ function createStoreWithHeaders(object $context, array $headers, array $rows = [
     $context->import->update(['total_rows' => count($rows)]);
 }
 
-function mountMappingStep(object $context): Testable
+function mountMappingStep(object $context, ImportEntityType $entityType = ImportEntityType::People): Testable
 {
     return Livewire::test(MappingStep::class, [
         'storeId' => $context->store->id(),
-        'entityType' => ImportEntityType::People,
+        'entityType' => $entityType,
     ]);
 }
 
@@ -246,4 +251,127 @@ it('previewValues returns sample values from SQLite', function (): void {
 
     $component->call('previewValues', 'Name')
         ->assertReturned(['John', 'Jane']);
+});
+
+it('maps a header the aliases miss to the field the classifier picks', function (): void {
+    ClassificationFake::choosing(['Position held' => 'Job Title']);
+    createStoreWithHeaders($this, ['Name', 'Position held'], [['Name' => 'Ann', 'Position held' => 'CTO']]);
+
+    $columns = mountMappingStep($this)->get('columns');
+
+    expect($columns['Position held']['target'])->toBe('custom_fields_job_title');
+});
+
+it('keeps the more confident header when two pick the same field', function (): void {
+    ClassificationFake::choosing(
+        ['Role' => 'Job Title', 'Position held' => 'Job Title'],
+        confidence: ['Role' => 0.95, 'Position held' => 0.85],
+    );
+    createStoreWithHeaders($this, ['Name', 'Role', 'Position held'], [['Name' => 'Ann', 'Role' => 'CTO', 'Position held' => 'CTO']]);
+
+    $columns = mountMappingStep($this)->get('columns');
+
+    expect($columns['Role']['target'])->toBe('custom_fields_job_title')
+        ->and($columns)->not->toHaveKey('Position held');
+});
+
+it('never offers the record id field to the classifier', function (): void {
+    ClassificationFake::choosing([]);
+    createStoreWithHeaders($this, ['Name', 'Customer number'], [['Name' => 'Ann', 'Customer number' => '8812']]);
+
+    mountMappingStep($this);
+
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => ! in_array('Record ID', $prompt->questions['column_0']->options, true));
+});
+
+it('never offers a matchable field to the classifier, because mapping one turns creates into updates', function (): void {
+    ClassificationFake::choosing(['Parent domain' => 'Domains']);
+    $this->import->update(['entity_type' => ImportEntityType::Company]);
+    createStoreWithHeaders($this, ['Name', 'Parent domain'], [['Name' => 'Acme', 'Parent domain' => 'acme.com']]);
+
+    $columns = mountMappingStep($this, ImportEntityType::Company)->get('columns');
+
+    expect($columns)->not->toHaveKey('Parent domain');
+    Classification::assertClassified(function (ClassificationPrompt $prompt): bool {
+        $labels = array_values($prompt->questions['column_0']->options);
+
+        return ! in_array('Domains', $labels, true) && ! in_array('Record ID', $labels, true);
+    });
+});
+
+it('never offers the record id field, even for an importer without match fields', function (): void {
+    ClassificationFake::choosing(['Customer number' => 'Record ID']);
+    $this->import->update(['entity_type' => ImportEntityType::Note]);
+    createStoreWithHeaders($this, ['Title', 'Customer number'], [['Title' => 'Kickoff', 'Customer number' => '8812']]);
+
+    $columns = mountMappingStep($this, ImportEntityType::Note)->get('columns');
+
+    expect($columns)->not->toHaveKey('Customer number');
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => ! in_array('Record ID', $prompt->questions['column_0']->options, true));
+});
+
+it('sends the first non-blank sample values even when the leading rows are blank', function (): void {
+    ClassificationFake::choosing([]);
+    createStoreWithHeaders($this, ['Name', 'Position held'], [
+        ['Name' => 'Ann', 'Position held' => ''],
+        ['Name' => 'Bob', 'Position held' => ''],
+        ['Name' => 'Cara', 'Position held' => ''],
+        ['Name' => 'Dan', 'Position held' => 'CTO'],
+    ]);
+
+    mountMappingStep($this);
+
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => $prompt->state['columns'][0]['samples'] === ['CTO']);
+});
+
+it('keeps a field already mapped by alias out of the classifier options for an unmapped header', function (): void {
+    ClassificationFake::choosing(['Referral source' => 'Name']);
+    createStoreWithHeaders($this, ['Name', 'Referral source'], [['Name' => 'Ann', 'Referral source' => 'Website']]);
+
+    $columns = mountMappingStep($this)->get('columns');
+
+    expect($columns['Name']['target'])->toBe('name')
+        ->and($columns)->not->toHaveKey('Referral source');
+    Classification::assertClassified(fn (ClassificationPrompt $prompt): bool => ! in_array('Name', $prompt->questions['column_0']->options, true));
+});
+
+it('does not classify when the aliases map every header', function (): void {
+    ClassificationFake::choosing([]);
+    createStoreWithHeaders($this, ['Name']);
+
+    mountMappingStep($this);
+
+    Classification::assertNothingClassified();
+});
+
+it('leaves unknown headers unmapped when matching is off', function (): void {
+    Classification::fake();
+    createStoreWithHeaders($this, ['Name', 'Position held'], [['Name' => 'Ann', 'Position held' => 'CTO']]);
+
+    $columns = mountMappingStep($this)->get('columns');
+
+    expect($columns)->not->toHaveKey('Position held');
+    Classification::assertNothingClassified();
+});
+
+it('leaves unknown headers unmapped when the classifier fails', function (): void {
+    ClassificationFake::failing();
+    createStoreWithHeaders($this, ['Name', 'Position held'], [['Name' => 'Ann', 'Position held' => 'CTO']]);
+
+    $component = mountMappingStep($this);
+
+    $component->assertOk();
+    expect($component->get('columns'))->not->toHaveKey('Position held');
+});
+
+it('leaves the header unmapped when the classifier returns a choice outside the field range', function (): void {
+    ClassificationFake::respondingWith(fn (ClassificationPrompt $prompt): array => [
+        'column_0' => new ChoiceAnswer('f99', [], 0.99),
+    ]);
+    createStoreWithHeaders($this, ['Name', 'Position held'], [['Name' => 'Ann', 'Position held' => 'CTO']]);
+
+    $component = mountMappingStep($this);
+
+    $component->assertOk();
+    expect($component->get('columns'))->not->toHaveKey('Position held');
 });

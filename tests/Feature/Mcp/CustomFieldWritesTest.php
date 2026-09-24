@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Tests\Helpers\ClassificationFake;
 
 mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
@@ -79,6 +80,29 @@ it('creates a task with a select value given as an option id', function (): void
         ->assertOk();
 
     expect(Task::query()->where('title', 'Id write')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($this->status))->toBe($id);
+});
+
+it('suggests the closest option for a near-miss label', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Near miss', 'custom_fields' => ['status' => 'Completed']])
+        ->assertHasErrors()
+        ->assertSee('Did you mean');
+
+    expect(Task::query()->where('title', 'Near miss')->exists())->toBeFalse();
+});
+
+it('suggests the closest option for a near-miss label on update', function (): void {
+    ClassificationFake::choosing(['Completed' => 'Done']);
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['status' => 'Completed']])
+        ->assertHasErrors()
+        ->assertSee('Did you mean');
+
+    expect($task->fresh('customFieldValues.customField.options')->getCustomFieldValue($this->status))->toBeNull();
 });
 
 it('rejects an unknown label and lists the valid ones', function (): void {

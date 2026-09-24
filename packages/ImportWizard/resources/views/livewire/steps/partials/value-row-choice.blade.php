@@ -5,10 +5,20 @@
     $validationError = $valueData->validation_error;
     $isValid = $validationError === null;
 
+    $canonicalOptionValue = function (string $value) use ($validOptions): string {
+        foreach ($validOptions as $option) {
+            if (mb_strtolower((string) $option['value']) === mb_strtolower($value)) {
+                return (string) $option['value'];
+            }
+        }
+
+        return $value;
+    };
+
     // Parse values - trim handles both "a, b" and "a,b" formats
     $selectedValue = $isMulti
-        ? collect(explode(',', $mappedValue))->map(fn ($v) => trim($v))->filter()->values()->all()
-        : $mappedValue;
+        ? collect(explode(',', $mappedValue))->map(fn ($v) => trim($v))->filter()->map($canonicalOptionValue)->values()->all()
+        : $canonicalOptionValue($mappedValue);
 
     // Build options: for multi-select include invalid values first, for single-select only valid
     // Single-select: user must select valid option or skip (no deselecting invalid)
@@ -23,7 +33,8 @@
 
     $options = $invalidOptions->merge($validOptions)->all();
 
-    $rowKey = 'choice-' . crc32($rawValue);
+    $rowKey = 'choice-' . crc32($rawValue . '|' . $mappedValue);
+    $suggestion = $isValid ? null : ($this->suggestions[$rawValue] ?? null);
 @endphp
 
 <div
@@ -65,6 +76,18 @@
             @change="if (isMulti) updateValue($event.detail)"
         />
     </div>
+
+    @if ($suggestion !== null)
+        <x-filament::button
+            size="xs"
+            color="gray"
+            outlined
+            class="shrink-0 mx-2"
+            wire:click.stop.preserve-scroll="acceptSuggestion({{ Js::from($rawValue) }})"
+        >
+            {{ __('import-wizard-new::review.use_suggestion', ['value' => $suggestion]) }}
+        </x-filament::button>
+    @endif
 
     <x-import-wizard-new::value-row-actions
         :selected-column="$selectedColumn"

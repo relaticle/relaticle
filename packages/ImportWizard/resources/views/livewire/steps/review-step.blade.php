@@ -196,6 +196,12 @@
                         </div>
 
                         <div class="flex items-center gap-2">
+                            @if (count($this->suggestions) > 0)
+                                <x-filament::button size="xs" wire:click="acceptAllSuggestions">
+                                    {{ trans_choice('import-wizard-new::review.accept_all_suggestions', count($this->suggestions), ['count' => count($this->suggestions)]) }}
+                                </x-filament::button>
+                            @endif
+
                             {{-- Search --}}
                             <div class="relative">
                                 <x-filament::icon
@@ -336,7 +342,7 @@
                                     @include('import-wizard-new::livewire.steps.partials.value-row-date', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                                 @elseif ($this->selectedColumn->getType()->isFloat())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-number', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
-                                @elseif ($this->selectedColumn->isMultiChoicePredefined())
+                                @elseif ($this->selectedColumn->isMultiChoicePredefined() || $this->selectedColumn->isSingleChoicePredefined())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-choice', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))
                                 @elseif ($this->selectedColumn->isMultiChoiceArbitrary())
                                     @include('import-wizard-new::livewire.steps.partials.value-row-multi-value', compact('rawValue', 'mappedValue', 'hasCorrection', 'selectedColumn', 'valueData'))

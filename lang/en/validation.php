@@ -29,6 +29,7 @@ return [
     'current_password' => 'The password is incorrect.',
     'custom_field' => [
         'unknown_option' => ':field: option ":value" is not one of: :labels.',
+        'unknown_option_suggestion' => ':field: option ":value" is not one of: :labels. Did you mean ":suggestion"?',
         'ambiguous_option' => ':field: option ":value" is ambiguous, pass the option ID.',
         'single_option' => ':field: pass a single option label or ID.',
         'option_list' => ':field: pass an array of option labels or IDs.',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\OptionMatching;
 use App\Models\User;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
@@ -33,7 +34,7 @@ final readonly class CustomFieldsRequestValidator
         $workspaceId = $user->currentWorkspace->getKey();
 
         try {
-            $clean = $this->input->normalize($workspaceId, $entityType, $rawCustomFields);
+            $clean = $this->input->normalize($workspaceId, $entityType, $rawCustomFields, OptionMatching::Apply);
         } catch (ValidationException $exception) {
             return new CustomFieldsValidationResult(
                 cleanFields: [],

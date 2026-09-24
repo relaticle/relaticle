@@ -23,6 +23,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
+use Relaticle\ImportWizard\Support\ColumnMatcher;
 use Relaticle\ImportWizard\Support\DataTypeInferencer;
 
 final class MappingStep extends Component implements HasActions, HasForms
@@ -152,15 +153,15 @@ final class MappingStep extends Component implements HasActions, HasForms
         return ['linkKey' => $mapping->entityLink, 'link' => $link, 'matcherKey' => $mapping->target];
     }
 
-    /** @return array<string> */
+    /** @return list<string> */
     public function previewValues(string $column, int $limit = 5): array
     {
-        return $this->store()->query()
+        return array_values($this->store()->query()
             ->limit($limit)
             ->get()
             ->pluck('raw_data')
             ->map(fn (Collection $data): string => (string) ($data[$column] ?? ''))
-            ->all();
+            ->all());
     }
 
     public function canProceed(): bool
@@ -168,11 +169,12 @@ final class MappingStep extends Component implements HasActions, HasForms
         return $this->unmappedRequired()->isEmpty();
     }
 
-    public function autoMap(): void
+    private function autoMap(): void
     {
         $this->autoMapByHeaders();
         $this->autoMapEntityLinks();
         $this->inferDataTypes();
+        $this->matchRemainingHeaders();
     }
 
     private function autoMapByHeaders(): void
@@ -267,6 +269,37 @@ final class MappingStep extends Component implements HasActions, HasForms
                 }
             }
         }
+    }
+
+    private function matchRemainingHeaders(): void
+    {
+        $samplesByHeader = collect($this->headers())
+            ->reject(fn (string $header): bool => $this->isMapped($header))
+            ->mapWithKeys(fn (string $header): array => [$header => $this->sampleValues($header)])
+            ->all();
+
+        $withheldFieldKeys = collect($this->getImporter()->matchableFields())
+            ->reject(fn (MatchableField $field): bool => $field->isCreate())
+            ->map(fn (MatchableField $field): string => $field->field)
+            ->push('id')
+            ->all();
+
+        $freeFields = $this->allFields()
+            ->reject(fn (ImportField $field): bool => $this->isTargetMapped($field->key))
+            ->reject(fn (ImportField $field): bool => in_array($field->key, $withheldFieldKeys, true));
+
+        foreach (resolve(ColumnMatcher::class)->match($samplesByHeader, $freeFields) as $header => $fieldKey) {
+            $this->columns[(string) $header] = ColumnData::toField((string) $header, $fieldKey)->toArray();
+        }
+    }
+
+    /** @return list<string> */
+    private function sampleValues(string $header): array
+    {
+        return array_values(collect($this->previewValues($header, 10))
+            ->filter(filled(...))
+            ->take(3)
+            ->all());
     }
 
     public function mapToField(string $source, string $target): void
