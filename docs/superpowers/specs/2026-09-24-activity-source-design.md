@@ -42,19 +42,26 @@ Acceptance, from the issue:
    callback ends. The `impersonated_by` stamp already travels this way. Rejected: a scoped class
    copying `CurrentImport`, as the issue proposed. It behaves differently on sync and Redis queues
    and needs a hand-written try/finally.
-3. **A record's `creation_source` comes from the holder.** A `creating` hook in `HasCreator` fills
-   it when blank. The `$source` argument, its callers, the explicit writes, and the model
-   defaults all go. The SystemAdmin form keeps its explicit field, because staff pick that value
-   on purpose. Every record write goes through a model save, the import's `forceFill` included,
-   and no factory sets the attribute, so tests get `WEB` unchanged.
-4. **Default `web`, explicit `system` inside the background writers.** Two create records today:
-   the onboarding sample-data seed and `ResetDemoAccountCommand`. Each wraps its own body in
-   `during(SYSTEM)`, so no caller can forget it. `RemoveSampleData` finds sample records by
-   `creation_source = system`, which makes this load-bearing. No `runningInConsole()` heuristic:
-   it is true under PHPUnit, so it would mislabel every panel test.
-5. **API and MCP are told apart by route middleware.** A new `SetCurrentSource` middleware takes
-   the source as a parameter. Rejected: a parameter on `SetApiWorkspaceContext`, which would give
-   the tenant middleware a second job.
+3. **A record's `creation_source` comes from the holder.** An `initializeHasCreator()` trait
+   initializer sets it from `CurrentSource::get()` in the model constructor, the same point where
+   the static `$attributes` default applies today. An explicit value still overrides it through
+   `fill()`. The `$source` argument, its callers, the explicit writes, and the static defaults all
+   go. The SystemAdmin form keeps its explicit field, because staff pick that value on purpose.
+   Rejected: a `creating` hook. The column is `NOT NULL` with no database default, and about 20
+   test files create records inside `withoutEvents()`, where no hook fires.
+4. **Default `web`, explicit `system` inside the background writers.** `ResetDemoAccountCommand`
+   wraps its rebuild in `during(SYSTEM)`, so no caller can forget it. The onboarding sample-data
+   seed runs inside `Model::withoutEvents()`: it writes no activity rows and no `creating` hook
+   fires for it. `BaseModelSeeder` therefore keeps its explicit `creation_source => SYSTEM`, the
+   one writer that states the source itself. `RemoveSampleData` finds sample records by that
+   value, so it must not change. No `runningInConsole()` heuristic: it is true under PHPUnit, so
+   it would mislabel every panel test.
+5. **The API is marked by route middleware, MCP by its server.** A new `SetCurrentSource`
+   middleware takes the source as a parameter on the v1 API routes. MCP overrides
+   `RelaticleServer::runMethodHandle()`, which both the HTTP transport and the
+   `RelaticleServer::actingAs()->tool()` test harness go through; a route middleware would miss
+   every MCP tool test. Rejected: a parameter on `SetApiWorkspaceContext`, which would give the
+   tenant middleware a second job.
 6. **The timeline names non-web sources only.** API, MCP, chat, and system rows get a "Via API"
    style line. Web rows get none, because it would sit on every manual edit. Import rows keep
    their existing "Via import <file>" line.
@@ -89,9 +96,11 @@ Owns where the source sits on an activity row.
 
 ### `App\Models\Concerns\HasCreator`
 
-Gains `bootHasCreator()`, registering `creating` to set `creation_source ??= CurrentSource::get()`.
-The `'creation_source' => CreationSource::WEB` entry leaves the `$attributes` of `Company`,
-`People`, `Opportunity`, `Task`, and `Note`; otherwise the hook would never see a blank value.
+Gains `initializeHasCreator()`, setting the raw `creation_source` attribute to
+`CurrentSource::get()->value`. Laravel runs trait initializers before `fill()`, and hydration
+from the database overwrites every attribute afterwards, so explicit and stored values win. The
+`$attributes` default (its only entry) leaves `Company`, `People`, `Opportunity`, `Task`, and
+`Note`.
 
 ### Setting the channel
 
@@ -99,11 +108,10 @@ The `'creation_source' => CreationSource::WEB` entry leaves the `$attributes` of
 |---|---|
 | `SetCurrentSource` (new middleware) | `handle(Request, Closure, string $source)` calls `CurrentSource::set(CreationSource::from($source))` |
 | `routes/api.php` | `SetCurrentSource::class.':api'` in the v1 stack |
-| `routes/ai.php` | `SetCurrentSource::class.':mcp'` in `$mcpMiddleware` |
-| `PendingActionService` | `executeAction()` and `executeBatchItem()` run inside `during(CreationSource::CHAT)`. `approve()`, `approveItem()`, `ProposalPlanService`, and `RemoveSampleDataTool` all reach these two methods |
-| `ExecuteImportJob` | The row loop runs inside `during(CreationSource::IMPORT)`, next to `CurrentImport::set()` |
-| `OnboardSeeder::run()` | Its body runs inside `during(CreationSource::SYSTEM)` |
-| `ResetDemoAccountCommand` | The reseed runs inside `during(CreationSource::SYSTEM)` |
+| `RelaticleServer` | Overrides `runMethodHandle()` to run the parent inside `during(CreationSource::MCP)`. No tool streams a generator result, which would otherwise run after the scope closes |
+| `PendingActionService` | The single call sites of `executeAction()` (in `approve()`) and `executeBatchItem()` (in `approveItem()`) run inside `during(CreationSource::CHAT)`. `ProposalPlanService` and `RemoveSampleDataTool` reach these too |
+| `ExecuteImportJob` | `handle()` runs its body, moved to a private method, inside `during(CreationSource::IMPORT)`. `failed()` writes its summary row the same way |
+| `ResetDemoAccountCommand` | The transaction body moves to a private method returning the seeded companies and runs inside `during(CreationSource::SYSTEM)` |
 
 ### Removing the per-record source
 
@@ -111,7 +119,7 @@ The `'creation_source' => CreationSource::WEB` entry leaves the `$attributes` of
 |---|---|
 | `CreateCompany`, `CreatePeople`, `CreateOpportunity`, `CreateTask`, `CreateNote` | Drop the `$source` parameter and the `creation_source` assignment |
 | Five `Api\V1` controllers, `BaseCreateTool`, `PendingActionService` (two calls), `ResetDemoAccountCommand` (five calls) | Stop passing a source |
-| `BaseImporter::initializeNewRecordData()`, `ExecuteImportJob` auto-created link records, `BaseModelSeeder` | Stop setting `creation_source` |
+| `BaseImporter::initializeNewRecordData()`, `ExecuteImportJob` auto-created link records | Stop setting `creation_source` |
 
 ### Writing and reading the activity stamp
 
@@ -144,6 +152,8 @@ New `ActivitySourceTest.php`:
   update tool, and an approved chat proposal yields four `updated` rows stamped `web`, `api`,
   `mcp`, and `chat`.
 - A delete through the API stamps `api` on the `deleted` row.
+- An MCP call over the real `/mcp` HTTP route stamps `mcp`.
+- A write after a chat approval, in the same request, stamps `web` again.
 - A legacy row without `source` renders on the Activity page with the placeholder, in the record
   timeline without a "Via" line, and in both tools with `source: null`.
 - The Activity page Source filter narrows to one channel.
@@ -154,7 +164,8 @@ Record `creation_source`, now derived from the holder:
 - A company created through the panel, `POST /api/v1/companies`, the MCP create tool, and an
   approved chat proposal carries `web`, `api`, `mcp`, and `chat`. Extend whichever existing API,
   MCP, and chat tests already assert `creation_source`; add the assertion where none does.
-- Onboarding sample records carry `system`, and `RemoveSampleData` still finds them.
+- A writer that states `creation_source` itself keeps it, whatever channel is current.
+- `RemoveSampleDataToolTest` keeps finding onboarding sample records by `system` unchanged.
 - The import tests that assert `CreationSource::IMPORT` today
   (`ExecuteImportJobCoreTest`, `ExecuteImportJobEntityTest`) keep passing unchanged.
 
@@ -167,8 +178,8 @@ Extended `tests/Feature/Commands/ResetDemoAccountCommandTest.php`: reseeded reco
 ## Verification
 
 - Gates: pint, rector, phpstan, type coverage, the targeted tests, then the full suite once.
-- Sweep: `grep -rn "CreationSource::" app packages` shows no write outside the holder, the
-  SystemAdmin form, and seeders under `database/`.
+- Sweep: `grep -rn "CreationSource::" app packages` shows no write outside the channel setters,
+  the SystemAdmin form, `BaseModelSeeder`, and seeders under `database/`.
 - Chat: approve a proposal on the production-shaped stack (Horizon, `QUEUE_CONNECTION=redis`,
   Reverb) in a real browser, then confirm the row reads "Via AI Chat" and a created record
   carries `chat`.
