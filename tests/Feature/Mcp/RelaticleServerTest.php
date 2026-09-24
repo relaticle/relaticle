@@ -221,6 +221,7 @@ it('keeps the CRM overview prompt to the current workspace', function (): void {
         ->prompt(CrmOverviewPrompt::class)
         ->assertOk()
         ->assertSee('Own Company')
+        ->assertSee('companies: 1')
         ->assertDontSee('Foreign Company');
 });
 
