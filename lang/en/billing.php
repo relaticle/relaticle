@@ -68,7 +68,6 @@ return [
         'help' => 'Need a hand with your plan?',
         'contact' => 'Talk to us',
         'privacy' => 'Privacy',
-        'delete' => 'Delete workspace',
         'sign_out' => 'Sign out',
         'copyright' => '© :year Relaticle',
         'review' => [

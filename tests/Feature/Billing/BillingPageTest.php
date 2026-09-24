@@ -12,6 +12,8 @@ use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -109,6 +111,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
         ->assertDontSee(__('billing.paused.review.proceed'))
         ->assertSee('href="https://marketing.test/contact"', false)
         ->assertSee(__('billing.paused.sign_out'))
+        ->assertDontSee('Delete workspace')
         ->assertDontSee('fi-sidebar', false)
         ->assertDontSee(__('billing.usage.title'));
 });
@@ -186,8 +189,7 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
 
     livewire(Billing::class)
         ->assertSee(__('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name]))
-        ->assertDontSee(__('billing.paused.continue'))
-        ->assertDontSee(__('billing.paused.delete'));
+        ->assertDontSee(__('billing.paused.continue'));
 });
 
 it('tells a member of a paused workspace whose owner was deleted who can reopen it', function (): void {
@@ -214,16 +216,20 @@ it('tells the owner when paid activation takes longer than expected', function (
         ->assertSee(__('billing.upgrade.activation_delayed_title'));
 });
 
-it('lets a paused user switch to another of their workspaces', function (): void {
+it('lets a paused user switch to another of their workspaces by name and logo', function (): void {
+    Storage::fake('public');
     [$user, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
     $other = Workspace::factory()->create(['user_id' => $user->getKey(), 'name' => 'Northwind Traders', 'personal_workspace' => false]);
+    $other->addMedia(UploadedFile::fake()->image('northwind-logo.png'))
+        ->toMediaCollection(Workspace::LOGO_MEDIA_COLLECTION);
     test()->actingAs($user->fresh());
 
     livewire(Billing::class)
         ->assertSee(__('billing.paused.switch'))
         ->assertSee('Northwind Traders')
-        ->assertSee(Filament::getUrl($other), false);
+        ->assertSee(Filament::getUrl($other), false)
+        ->assertSee('northwind-logo.png', false);
 });
 
 it('keeps polling while checkout activation is pending, then opens the workspace', function (): void {

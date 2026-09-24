@@ -187,7 +187,7 @@
 
                         @if($otherWorkspaces->isNotEmpty())
                             <div class="mt-5 flex justify-center">
-                                <x-filament::dropdown placement="bottom">
+                                <x-filament::dropdown placement="bottom" data-workspace-switcher>
                                     <x-slot name="trigger">
                                         <button type="button" class="inline-flex items-center gap-1 text-sm font-medium text-gray-600 transition hover:text-gray-950 dark:text-gray-400 dark:hover:text-white">
                                             {{ __('billing.paused.switch') }}
@@ -197,7 +197,7 @@
 
                                     <x-filament::dropdown.list>
                                         @foreach($otherWorkspaces as $other)
-                                            <x-filament::dropdown.list.item tag="a" :href="filament()->getUrl($other)">
+                                            <x-filament::dropdown.list.item tag="a" :href="filament()->getUrl($other)" :image="filament()->getTenantAvatarUrl($other)">
                                                 {{ $other->name }}
                                             </x-filament::dropdown.list.item>
                                         @endforeach
@@ -221,9 +221,6 @@
         <footer class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pb-8 text-sm text-gray-500 dark:text-gray-400">
             <span>{{ __('billing.paused.copyright', ['year' => now()->year]) }}</span>
             <a href="{{ url()->getPublicUrl(route('policy.show', absolute: false)) }}" class="{{ $footerLink }}">{{ __('billing.paused.privacy') }}</a>
-            @can('delete', $workspace)
-                <a href="{{ filament()->getTenantProfileUrl() }}" class="{{ $footerLink }}">{{ __('billing.paused.delete') }}</a>
-            @endcan
             <form method="post" action="{{ filament()->getLogoutUrl() }}">
                 @csrf
                 <button type="submit" class="{{ $footerLink }}">{{ __('billing.paused.sign_out') }}</button>
