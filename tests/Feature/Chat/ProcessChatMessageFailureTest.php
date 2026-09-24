@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -510,6 +511,67 @@ it('keeps one user message and the failure note when the turn dies after a compl
         ->and($rows[0]->content)->toBe('How is my pipeline?')
         ->and($rows[1]->content)->toBe(__('The assistant encountered an error. Please try again.'))
         ->and($rows->pluck('status')->unique()->all())->toBe(['completed']);
+});
+
+it('replays the failure note to the model on the next turn', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    makeFailedTurnJob($user, $conversationId)->failed(new RuntimeException('boom'));
+
+    $history = resolve(ConversationStore::class)->getLatestConversationMessages($conversationId, 100);
+
+    expect($history->last()->role->value)->toBe('assistant')
+        ->and($history->last()->content)->toBe(__('The assistant encountered an error. Please try again.'));
+});
+
+it('keeps one user message when a turn retried after a transient failure mid-turn succeeds', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    $credits = resolve(CreditService::class);
+    $credits->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::sequence()
+            ->push(AnthropicSse::toolUseStep('GetCrmSummaryTool'), 200, ['Content-Type' => 'text/event-stream'])
+            ->push('overloaded', 529)
+            ->push(AnthropicSse::reply('Your pipeline is healthy.', 'claude-sonnet-5'), 200, ['Content-Type' => 'text/event-stream']),
+    ]);
+    Queue::fake();
+    Event::fake([ChatStreamRetrying::class]);
+
+    $job = fn (): ProcessChatMessage => new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'How is my pipeline?',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    );
+
+    $job()->handle($credits);
+
+    Event::assertDispatched(ChatStreamRetrying::class);
+
+    $job()->handle($credits);
+
+    $rows = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->orderBy('id')
+        ->get(['role', 'content']);
+
+    expect($rows->pluck('role')->all())->toBe(['user', 'assistant'])
+        ->and($rows[1]->content)->toBe('Your pipeline is healthy.');
 });
 
 it('lets the model recover from calling a tool that does not exist instead of failing the turn', function (): void {
