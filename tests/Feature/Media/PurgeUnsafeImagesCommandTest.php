@@ -61,3 +61,28 @@ it('removes only the unsafe logos and profile photos with --force and refetches 
     Queue::assertPushed(FetchFaviconForCompany::class, fn (FetchFaviconForCompany $job): bool => $job->company->is($this->unsafeCompany));
     Queue::assertPushed(FetchFaviconForCompany::class, 1);
 });
+
+it('removes every unsafe logo when several are stored', function (): void {
+    $secondCompany = Company::factory()->create(['workspace_id' => $this->workspace->getKey()]);
+    $secondLogo = $secondCompany->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+    $secondLogo->forceFill(['file_name' => 'logo.html', 'mime_type' => 'text/html'])->save();
+
+    $this->artisan('media:purge-unsafe-images --force')
+        ->expectsOutputToContain('3 unsafe image(s) removed.')
+        ->assertSuccessful();
+
+    expect(Media::query()->whereKey([$this->unsafeLogo->getKey(), $secondLogo->getKey()])->exists())->toBeFalse();
+
+    Queue::assertPushed(FetchFaviconForCompany::class, 2);
+});
+
+it('keeps a profile photo whose type cannot be read', function (): void {
+    Storage::disk('public')->put('profile-photos/unreadable', onePixelPng());
+    chmod(Storage::disk('public')->path('profile-photos/unreadable'), 0000);
+    $user = User::factory()->create(['profile_photo_path' => 'profile-photos/unreadable']);
+
+    $this->artisan('media:purge-unsafe-images --force')->assertSuccessful();
+
+    expect($user->fresh()->profile_photo_path)->toBe('profile-photos/unreadable')
+        ->and(Storage::disk('public')->exists('profile-photos/unreadable'))->toBeTrue();
+});

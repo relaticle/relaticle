@@ -49,14 +49,15 @@ final class PurgeUnsafeImagesCommand extends Command
                 ->orWhere(fn (Builder $query): Builder => $query
                     ->where('model_type', (new Workspace)->getMorphClass())
                     ->whereNotIn('mime_type', Workspace::LOGO_MIME_TYPES)))
+            ->with('model')
             ->lazyById();
 
         foreach ($logos as $logo) {
             $this->info("Logo {$logo->getKey()} on {$logo->model_type} {$logo->model_id}: [{$logo->mime_type}]");
 
-            $purged++;
-
             if (! $this->write) {
+                $purged++;
+
                 continue;
             }
 
@@ -67,6 +68,8 @@ final class PurgeUnsafeImagesCommand extends Command
                 if ($owner instanceof Company) {
                     dispatch(new FetchFaviconForCompany($owner));
                 }
+
+                $purged++;
             } catch (Throwable $exception) {
                 $this->warn("Logo {$logo->getKey()}: {$exception->getMessage()}, skipped.");
             }
@@ -82,20 +85,26 @@ final class PurgeUnsafeImagesCommand extends Command
 
         foreach (User::query()->whereNotNull('profile_photo_path')->lazyById() as $user) {
             $path = (string) $user->profile_photo_path;
+            $mime = $disk->exists($path) ? $disk->mimeType($path) : false;
 
-            if (! $disk->exists($path) || in_array($disk->mimeType($path), User::PROFILE_PHOTO_MIME_TYPES, true)) {
+            if ($mime === false || in_array($mime, User::PROFILE_PHOTO_MIME_TYPES, true)) {
                 continue;
             }
 
-            $this->info("Profile photo of user {$user->getKey()}: {$path}");
-
-            $purged++;
+            $this->info("Profile photo of user {$user->getKey()}: {$path} [{$mime}]");
 
             if (! $this->write) {
+                $purged++;
+
                 continue;
             }
 
-            $user->deleteProfilePhoto();
+            try {
+                $user->deleteProfilePhoto();
+                $purged++;
+            } catch (Throwable $exception) {
+                $this->warn("Profile photo of user {$user->getKey()}: {$exception->getMessage()}, skipped.");
+            }
         }
 
         return $purged;
