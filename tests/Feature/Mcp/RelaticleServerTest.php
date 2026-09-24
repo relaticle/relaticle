@@ -21,6 +21,7 @@ use App\Mcp\Tools\Task\ListTasksTool;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -210,6 +211,17 @@ it('can read the CRM overview prompt', function (): void {
 
     $response->assertOk()
         ->assertSee('CRM Overview');
+});
+
+it('keeps the CRM overview prompt to the current workspace', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Company']);
+    Company::factory()->for(Workspace::factory())->create(['name' => 'Foreign Company']);
+
+    RelaticleServer::actingAs($this->user)
+        ->prompt(CrmOverviewPrompt::class)
+        ->assertOk()
+        ->assertSee('Own Company')
+        ->assertDontSee('Foreign Company');
 });
 
 it('returns error when updating non-existent company', function (): void {
