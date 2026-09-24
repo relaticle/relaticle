@@ -51,15 +51,11 @@
         @endif
 
         @if($billing !== null)
-            @php
-                $opensModal = $user->ownsWorkspace($workspace) && ! $billing['urgent'];
-            @endphp
-
             {{-- The whole row is the target, not just a button at its end: the
                  line states the deadline and the click acts on it, so there is
                  no dead text sitting next to a live control. --}}
             <div class="mt-2 border-t border-gray-200 pt-2 dark:border-white/10">
-                @if($opensModal)
+                @if(! $billing['urgent'])
                     <button
                         type="button"
                         class="{{ $rowClasses }} group w-[calc(100%-2rem)] text-left"
