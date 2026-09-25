@@ -88,11 +88,9 @@ it('ships a complete brand archive matching the published assets and original ar
 
         foreach ($manifest['platforms'] as $platform) {
             foreach ($platform['files'] as $file) {
-                $dimensions = getimagesize(public_path('brand/kit/'.$file));
+                [$width, $height, $type] = getimagesize(public_path('brand/kit/'.$file));
 
-                expect($dimensions[0])->toBe($platform['size']);
-                expect($dimensions[1])->toBe($platform['size']);
-                expect($dimensions[2])->toBe(IMAGETYPE_PNG);
+                expect([$width, $height, $type])->toBe([$platform['size'], $platform['size'], IMAGETYPE_PNG]);
             }
         }
     } finally {
