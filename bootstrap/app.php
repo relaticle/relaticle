@@ -225,7 +225,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 __('REST API spec') => 'openapi.json',
             ], Route::has(...));
 
-            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => $request->url()]), ''];
+            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
 
             foreach ($indexes as $label => $routeName) {
                 $lines[] = "- {$label}: ".route($routeName);

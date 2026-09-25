@@ -116,3 +116,12 @@ it('keeps the json 404 for the api', function (): void {
         ->assertNotFound()
         ->assertHeader('content-type', 'application/json');
 });
+
+it('echoes the missing url as inert code in the markdown 404', function (string $path): void {
+    $body = $this->get($path, ['Accept' => 'text/markdown'])->assertNotFound()->getContent();
+
+    expect($body)->toMatch('/^Nothing lives at `[^`\n]+`\.$/m');
+})->with([
+    'markdown link' => ['/x[login](https://evil.example)'],
+    'backtick breakout' => ['/x`[login](https://evil.example)`'],
+]);
