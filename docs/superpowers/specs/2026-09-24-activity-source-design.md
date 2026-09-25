@@ -162,8 +162,9 @@ twice; the four-channel test had to call the API last to hide it.
   once. The scope reads the request-scoped `App\Support\CurrentWorkspace` and does nothing when it is
   unset, which matches today: outside the tenant middleware no scope existed.
 - `SetApiWorkspaceContext` and `ApplyTenantScopes` set the holder instead of adding five scopes.
-  Laravel resets the scoped binding per queue job; `SetApiWorkspaceContext::terminate()` clears it
-  for long-lived processes, since the HTTP kernel does not.
+  Laravel resets the scoped binding per queue job, and PHP-FPM starts every request clean.
+  `SetApiWorkspaceContext::terminate()` also clears it, so a later API or MCP call in the same test
+  process starts unscoped. `ApplyTenantScopes` leaves it set, as it always left its `User` scope.
 - The API's `User` `tenant` scope stays a runtime closure, removed by name through
   `Model::getAllGlobalScopes()`/`setAllGlobalScopes()`. The panel's Filament-named `User` scope is
   unchanged, because `AcceptWorkspaceInvitation` suspends it by name.
