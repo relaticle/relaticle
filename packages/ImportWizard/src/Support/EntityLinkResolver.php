@@ -197,7 +197,6 @@ final class EntityLinkResolver
                 ->whereIn($valueColumn, $uniqueValues)
                 ->pluck('entity_id', $valueColumn)
                 ->all();
-
     }
 
     /** @return Builder<Model> */

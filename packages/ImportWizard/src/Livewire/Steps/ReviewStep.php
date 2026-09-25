@@ -410,17 +410,19 @@ final class ReviewStep extends Component
     public function retryFailedValidation(): void
     {
         foreach (array_keys($this->failedColumns) as $columnSource) {
+            unset($this->failedColumns[$columnSource]);
+
             if ($columnSource === '__match_resolution') {
                 $this->batchIds[$columnSource] = $this->dispatchMatchResolution();
-            } else {
-                $column = $this->columns->firstWhere('source', $columnSource);
 
-                if ($column instanceof ColumnData) {
-                    $this->batchIds[$columnSource] = $this->validateColumnAsync($column);
-                }
+                continue;
             }
 
-            unset($this->failedColumns[$columnSource]);
+            $column = $this->columns->firstWhere('source', $columnSource);
+
+            if ($column instanceof ColumnData) {
+                $this->batchIds[$columnSource] = $this->validateColumnAsync($column);
+            }
         }
 
         $this->cacheValidationState($this->currentMappingsHash());
