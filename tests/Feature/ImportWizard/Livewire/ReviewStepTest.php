@@ -239,6 +239,21 @@ it('blocks Preview after failed relationship revalidation until retry succeeds',
         ->assertDontSee('missing-company');
 });
 
+it('cancels the superseded validation when a company link is corrected again', function (): void {
+    $this->originalCompany = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $this->controlCompany = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $component = reviewCompanyLink($this, 'missing-company');
+    Queue::fake([ValidateColumnJob::class]);
+
+    $component->call('updateMappedValue', 'missing-company', (string) $this->originalCompany->id);
+    $superseded = $component->get('batchIds.Company');
+    $component->call('updateMappedValue', 'missing-company', (string) $this->controlCompany->id);
+
+    expect(Bus::findBatch($superseded)->cancelled())->toBeTrue()
+        ->and($component->get('batchIds.Company'))->not->toBe($superseded)
+        ->and(Bus::findBatch($component->get('batchIds.Company'))->cancelled())->toBeFalse();
+});
+
 it('blocks Preview after failed match resolution until retry succeeds', function (): void {
     $component = Livewire::test(ReviewStep::class, ['storeId' => $this->store->id(), 'entityType' => ImportEntityType::People]);
     Bus::findBatch($component->get('batchIds.__match_resolution'))
