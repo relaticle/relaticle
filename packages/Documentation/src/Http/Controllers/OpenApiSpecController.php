@@ -17,7 +17,7 @@ final readonly class OpenApiSpecController
 {
     public function json(): Response
     {
-        $spec = Yaml::parse($this->spec());
+        $spec = Yaml::parse($this->spec(), Yaml::PARSE_OBJECT_FOR_MAP);
 
         return response(json_encode($spec, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR), 200, [
             'Content-Type' => 'application/json',

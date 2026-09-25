@@ -32,6 +32,15 @@ it('serves the generated spec as yaml and as json', function (): void {
         ->assertExactJson(['openapi' => '3.1.0', 'info' => ['title' => 'Relaticle'], 'paths' => []]);
 });
 
+it('keeps empty yaml maps as json objects so the spec stays valid openapi', function (): void {
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\npaths: {}\ncomponents:\n  schemas:\n    Empty:\n      type: object\n      properties: {}\n    Tags:\n      type: array\n      example: []\n");
+
+    expect($this->get('/openapi.json')->assertOk()->getContent())
+        ->toContain('"paths":{}')
+        ->toContain('"properties":{}')
+        ->toContain('"example":[]');
+});
+
 it('documents the error envelope, scoped abilities, and rate limits on every operation', function (): void {
     $generatedView = resource_path('views/scribe/index.blade.php');
     $committedView = File::get($generatedView);
