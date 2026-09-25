@@ -706,11 +706,7 @@ final class ExecuteImportJob implements ShouldQueue
     private function assertRequiredFieldsPresent(array $data, BaseImporter $importer): void
     {
         foreach ($importer->allFields()->required() as $field) {
-            if (! array_key_exists($field->key, $data)) {
-                continue;
-            }
-
-            $value = $data[$field->key];
+            $value = $data[$field->key] ?? null;
 
             if (is_string($value) ? trim($value) === '' : blank($value)) {
                 throw new MissingRequiredFieldException($field->label);

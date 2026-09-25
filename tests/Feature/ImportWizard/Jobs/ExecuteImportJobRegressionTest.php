@@ -259,3 +259,26 @@ it('fails a row that leaves a required field empty rather than creating a namele
 
     expect($import->failedRows()->value('validation_error'))->toContain('required');
 });
+
+it('fails a create row whose required name cell was withheld', function (array $withheld): void {
+    ImportExecutionFixture::readyStore($this, ['Name', 'Email'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Has A Name', 'Email' => 'ok@example.test'], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(3, ['Name' => str_repeat('a', 300), 'Email' => 'withheld@example.test'], ['match_action' => RowMatchAction::Create->value, ...$withheld]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Email', target: 'emails'),
+    ]);
+
+    ImportExecutionFixture::run($this);
+
+    $import = $this->import->fresh();
+
+    expect($import->created_rows)->toBe(1)
+        ->and($import->failed_rows)->toBe(1)
+        ->and($import->failedRows()->value('validation_error'))
+        ->toContain('Name is required')
+        ->not->toContain('SQLSTATE');
+})->with([
+    'skipped by the user' => [['skipped' => json_encode(['Name' => true])]],
+    'failing validation' => [['validation' => json_encode(['Name' => 'The name field must not be greater than 255 characters.'])]],
+]);
