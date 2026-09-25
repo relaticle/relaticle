@@ -8,7 +8,9 @@
     "scripts": {
         "dev": "vite",
         "prebuild": "rm -f public/hot",
-        "build": "vite build"
+        "build": "vite build",
+        "brand:build": "node bin/build-brand-assets.mjs",
+        "brand:check": "node bin/build-brand-assets.mjs --check"
     },
     "devDependencies": {
         "@tailwindcss/forms": "^0.5.11",
