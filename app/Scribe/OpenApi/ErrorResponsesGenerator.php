@@ -66,13 +66,12 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
             '402' => $this->errorResponse('Relaticle Cloud only: the workspace is paused until it has an active subscription. The body carries an `upgrade_url`.'),
             '403' => $this->errorResponse("The token lacks the `{$ability}` ability, or its user no longer belongs to the token's workspace."),
             '429' => [
-                'description' => 'Rate limit exceeded. Back off for the number of seconds in `Retry-After`.',
+                ...$this->errorResponse('Rate limit exceeded. Back off for the number of seconds in `Retry-After`.'),
                 'headers' => [
                     'Retry-After' => ['schema' => ['type' => 'integer'], 'description' => 'Seconds until the limit resets.'],
                     'X-RateLimit-Limit' => ['schema' => ['type' => 'integer']],
                     'X-RateLimit-Remaining' => ['schema' => ['type' => 'integer']],
                 ],
-                'content' => ['application/json' => ['schema' => ['$ref' => self::ERROR_SCHEMA]]],
             ],
         ];
 
@@ -81,10 +80,7 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
         }
 
         if (in_array($method, ['POST', 'PUT', 'PATCH'], true)) {
-            $errors['422'] = [
-                'description' => 'Validation failed.',
-                'content' => ['application/json' => ['schema' => ['$ref' => self::VALIDATION_ERROR_SCHEMA]]],
-            ];
+            $errors['422'] = $this->errorResponse('Validation failed.', self::VALIDATION_ERROR_SCHEMA);
         }
 
         $existing = is_array($pathItem['responses'] ?? null) ? $pathItem['responses'] : [];
@@ -96,11 +92,11 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
     }
 
     /** @return array<string, mixed> */
-    private function errorResponse(string $description): array
+    private function errorResponse(string $description, string $schema = self::ERROR_SCHEMA): array
     {
         return [
             'description' => $description,
-            'content' => ['application/json' => ['schema' => ['$ref' => self::ERROR_SCHEMA]]],
+            'content' => ['application/json' => ['schema' => ['$ref' => $schema]]],
         ];
     }
 }

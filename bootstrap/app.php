@@ -234,9 +234,7 @@ return Application::configure(basePath: dirname(__DIR__))
             $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
             $lines[] = '';
 
-            $body = implode("\n", $lines);
-
-            return response($body, 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
+            return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
         });
 
         // Stale tabs and deploy boundaries produce checksum failures that
