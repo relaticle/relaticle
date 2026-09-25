@@ -137,7 +137,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * The search term belongs in the URL for the same reason the filters do, but
-     * it cannot get there the same way: Filament's table trait declares
+     * it cannot get there the same way: Filament's `InteractsWithTable` declares
      * `$tableSearch` untyped, so redeclaring it here to carry a `#[Url]` is a
      * fatal property-composition conflict. Livewire's query-string map attaches
      * the same binding without touching the property.
