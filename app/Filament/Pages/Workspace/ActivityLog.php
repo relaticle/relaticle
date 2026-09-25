@@ -215,7 +215,6 @@ final class ActivityLog extends Page implements HasTable
                     ->placeholder(__('workspaces.activity.system')),
                 TextColumn::make('source')
                     ->label(__('workspaces.activity.columns.source'))
-                    ->state(fn (Activity $record): ?CreationSource => Activity::sourceFrom($record->properties?->toArray() ?? []))
                     ->badge()
                     ->placeholder(ActivityValue::EMPTY),
                 TextColumn::make('event')

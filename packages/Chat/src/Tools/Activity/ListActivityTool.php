@@ -341,7 +341,7 @@ final readonly class ListActivityTool implements Tool
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
             'by' => $this->causerName($base),
-            'source' => Activity::sourceFrom($base->properties?->toArray() ?? [])?->value,
+            'source' => $base->source?->value,
             'event' => $event,
             'record' => [
                 'type' => $subjectType,

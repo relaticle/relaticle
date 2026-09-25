@@ -10,11 +10,13 @@ use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity as SpatieActivity;
 
 /**
  * @property string|null $workspace_id
+ * @property-read CreationSource|null $source
  */
 final class Activity extends SpatieActivity
 {
@@ -34,6 +36,12 @@ final class Activity extends SpatieActivity
     public function workspace(): BelongsTo
     {
         return $this->belongsTo(Workspace::class);
+    }
+
+    /** @return Attribute<CreationSource|null, never> */
+    protected function source(): Attribute
+    {
+        return Attribute::get(fn (): ?CreationSource => self::sourceFrom($this->properties?->toArray() ?? []));
     }
 
     /** @param  Builder<self>  $query */

@@ -264,7 +264,7 @@ final class ListActivityTool extends Tool
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
             'by' => $this->causerName($base),
-            'source' => Activity::sourceFrom($base->properties?->toArray() ?? [])?->value,
+            'source' => $base->source?->value,
             'event' => (string) ($base->event ?? $base->description),
             'record' => [
                 'type' => $subjectType,
