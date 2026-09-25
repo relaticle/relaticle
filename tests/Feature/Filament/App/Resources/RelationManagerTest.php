@@ -9,6 +9,7 @@ use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager as OpportunityNotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager as OpportunityTasksRelationManager;
+use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager as PeopleNotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager as PeopleTasksRelationManager;
@@ -19,6 +20,8 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+
+mutates(PeopleRelationManager::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -107,3 +110,17 @@ it('renders the :dataset relation manager with multiple records', function (stri
         },
     ],
 ]);
+
+it('opens a company person row on the person view page', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $company->getKey(),
+    ]);
+
+    livewire(PeopleRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
+        ->assertOk()
+        ->assertSeeHtml(PeopleResource::getUrl('view', ['record' => $person]));
+});

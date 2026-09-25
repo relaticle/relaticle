@@ -10,6 +10,13 @@ use Filament\Forms\Components\RichEditor;
 
 final class RichEditorComponent extends RichEditor
 {
+    public function asDocument(): static
+    {
+        return $this
+            ->placeholder(null)
+            ->extraAttributes(['class' => 'fi-fo-rich-editor-seamless'], merge: true);
+    }
+
     public function callAfterStateHydrated(): static
     {
         parent::callAfterStateHydrated();

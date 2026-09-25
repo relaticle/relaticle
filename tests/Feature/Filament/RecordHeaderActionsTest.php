@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Concerns\RendersRecordSplitView;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -9,9 +10,10 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 
-mutates(ViewCompany::class, ViewPeople::class, ViewOpportunity::class);
+mutates(RendersRecordSplitView::class, ViewCompany::class, ViewPeople::class, ViewOpportunity::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -26,7 +28,9 @@ it('no longer exposes the AI summary or ask-about-this actions on a company', fu
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->assertActionDoesNotExist('generateSummary')
         ->assertActionDoesNotExist('askAboutThis')
-        ->assertActionExists('edit');
+        ->assertActionDoesNotExist(TestAction::make('edit')->schemaComponent('companyDetails'))
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('companyDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('companyDetails'));
 });
 
 it('no longer exposes the AI summary or ask-about-this actions on a person', function (): void {
@@ -35,7 +39,9 @@ it('no longer exposes the AI summary or ask-about-this actions on a person', fun
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->assertActionDoesNotExist('generateSummary')
         ->assertActionDoesNotExist('askAboutThis')
-        ->assertActionExists('edit');
+        ->assertActionDoesNotExist(TestAction::make('edit')->schemaComponent('personDetails'))
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('personDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('personDetails'));
 });
 
 it('no longer exposes the AI summary or ask-about-this actions on an opportunity', function (): void {
@@ -44,5 +50,7 @@ it('no longer exposes the AI summary or ask-about-this actions on an opportunity
     livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
         ->assertActionDoesNotExist('generateSummary')
         ->assertActionDoesNotExist('askAboutThis')
-        ->assertActionExists('edit');
+        ->assertActionDoesNotExist(TestAction::make('edit')->schemaComponent('opportunityDetails'))
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('opportunityDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('opportunityDetails'));
 });

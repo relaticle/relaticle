@@ -8,6 +8,7 @@ use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
+use App\Filament\Concerns\UsesRecordIndexLayout;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
@@ -39,6 +40,7 @@ use Throwable;
 final class TasksBoard extends BoardResourcePage
 {
     use HasBoardViewSwitcher;
+    use UsesRecordIndexLayout;
 
     protected static string $resource = TaskResource::class;
 

@@ -67,3 +67,7 @@ it('renders exactly one sidebar collapse toggle, in the sidebar above the naviga
 it('sizes the collapsed rail to the width that centres the navigation icons', function (): void {
     expect(Filament::getPanel('app')->getCollapsedSidebarWidth())->toBe('4.25rem');
 });
+
+it('sizes the open sidebar to the compact rail width', function (): void {
+    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('268px');
+});

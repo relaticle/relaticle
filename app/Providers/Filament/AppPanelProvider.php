@@ -316,6 +316,7 @@ final class AppPanelProvider extends PanelProvider
             })
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
+            ->sidebarWidth('268px')
             // Navigation icons stay start-aligned so they hold their column
             // while the sidebar animates. 4.25rem is the width at which that
             // column is also the centre of the collapsed rail.
@@ -438,6 +439,10 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_START,
                 fn (): View|Factory => view('filament.app.appearance-preference')
+            )
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_BEFORE,
+                fn (): View|Factory => view('filament.app.record-rail-overflow-tooltips')
             )
             /**
              * The activation checklist lives here rather than on the dashboard

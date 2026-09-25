@@ -26,7 +26,22 @@ final readonly class RecordChip implements Htmlable
         public ?string $iconPath = null,
         public bool $circular = true,
         public string $size = 'sm',
+        public ?string $url = null,
+        public bool $openUrlInNewTab = false,
     ) {}
+
+    public function url(?string $url, bool $openUrlInNewTab = false): self
+    {
+        return new self(
+            name: $this->name,
+            imageUrl: $this->imageUrl,
+            iconPath: $this->iconPath,
+            circular: $this->circular,
+            size: $this->size,
+            url: $url,
+            openUrlInNewTab: $openUrlInNewTab,
+        );
+    }
 
     public static function forRecord(Model $record, ?string $name = null, string $size = 'sm'): self
     {

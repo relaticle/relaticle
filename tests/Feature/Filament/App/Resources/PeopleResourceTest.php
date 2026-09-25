@@ -2,16 +2,19 @@
 
 declare(strict_types=1);
 
+use App\Filament\Concerns\RendersRecordSplitView;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 
-mutates(PeopleResource::class);
+mutates(PeopleResource::class, ViewPeople::class, RendersRecordSplitView::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -30,6 +33,37 @@ it('can render the view page', function (): void {
 
     livewire(ViewPeople::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('places person details beside tasks notes and activity', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Mail',
+    ]);
+    $record = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Ilya Pashayan',
+        'company_id' => $company->getKey(),
+    ]);
+
+    $page = livewire(ViewPeople::class, ['record' => $record->getKey()])
+        ->assertOk()
+        ->assertSee('fi-record-split', false)
+        ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-record-work-pane', false)
+        ->assertSeeHtml('x-data="recordRailOverflowTooltips"')
+        ->assertSee('Ilya Pashayan')
+        ->assertSee('Mail')
+        ->assertSee(__('filament/resources/task.navigation_label'))
+        ->assertSee(__('filament/resources/note.navigation_label'))
+        ->assertDontSee(__('filament/resources/person.pages.view.actions.edit.label'))
+        ->assertSee('fi-record-details-more', false)
+        ->assertSee('fi-record-details-overflow-toggle', false)
+        ->assertSee(__('filament/inline-edit.view_more'))
+        ->assertDontSee('fi-record-work-more', false)
+        ->assertSee('fi-in-entry-has-inline-label', false)
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('personDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('personDetails'));
+
+    expect($page->instance()->getMaxContentWidth())->toBe(Width::Full);
 });
 
 // Column metadata is checked against a single mounted table rather than one

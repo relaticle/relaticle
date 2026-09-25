@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
 use App\Filament\Components\Tables\RecordChipColumn;
+use App\Filament\Resources\PeopleResource;
+use App\Models\People;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -49,6 +51,7 @@ final class PeopleRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('name')
+            ->recordUrl(fn (People $record): string => PeopleResource::getUrl('view', ['record' => $record]))
             ->columns([
                 RecordChipColumn::make('name'),
 

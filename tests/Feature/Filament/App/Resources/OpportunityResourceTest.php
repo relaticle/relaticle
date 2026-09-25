@@ -2,17 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Filament\Concerns\RendersRecordSplitView;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Models\Company;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
-mutates(OpportunityResource::class);
+mutates(OpportunityResource::class, ViewOpportunity::class, RendersRecordSplitView::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -31,6 +35,42 @@ it('can render the view page', function (): void {
 
     livewire(ViewOpportunity::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('places opportunity details beside tasks notes and activity', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Acme',
+    ]);
+    $contact = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Ada Lovelace',
+        'company_id' => $company->getKey(),
+    ]);
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Enterprise rollout',
+        'company_id' => $company->getKey(),
+        'contact_id' => $contact->getKey(),
+    ]);
+
+    $page = livewire(ViewOpportunity::class, ['record' => $record->getKey()])
+        ->assertOk()
+        ->assertSee('fi-record-split', false)
+        ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-record-work-pane', false)
+        ->assertSee('Enterprise rollout')
+        ->assertSee('Acme')
+        ->assertSee('Ada Lovelace')
+        ->assertSee(__('filament/resources/task.navigation_label'))
+        ->assertSee(__('filament/resources/note.navigation_label'))
+        ->assertDontSee(__('filament/resources/opportunity.pages.view.actions.edit.label'))
+        ->assertSee('fi-record-details-more', false)
+        ->assertSee('fi-record-details-overflow-toggle', false)
+        ->assertSee(__('filament/inline-edit.view_more'))
+        ->assertDontSee('fi-record-work-more', false)
+        ->assertSee('fi-in-entry-has-inline-label', false)
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('opportunityDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('opportunityDetails'));
+
+    expect($page->instance()->getMaxContentWidth())->toBe(Width::Full);
 });
 
 // Column metadata is checked against a single mounted table rather than one

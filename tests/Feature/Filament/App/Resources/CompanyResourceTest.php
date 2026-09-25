@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Filament\Concerns\RendersRecordSplitView;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -12,10 +13,11 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Components\Component;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
-mutates(CompanyResource::class);
+mutates(CompanyResource::class, ViewCompany::class, RendersRecordSplitView::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -34,6 +36,50 @@ it('can render the view page', function (): void {
 
     livewire(ViewCompany::class, ['record' => $record->getKey()])
         ->assertOk();
+});
+
+it('places company details beside people tasks notes and activity', function (): void {
+    $record = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Northwind',
+    ]);
+
+    $page = livewire(ViewCompany::class, ['record' => $record->getKey()])
+        ->assertOk()
+        ->assertSee('fi-record-split', false)
+        ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-record-work-pane', false)
+        ->assertSee('Northwind')
+        ->assertSee(__('filament/resources/company.pages.view.infolist.fields.account_owner.label'))
+        ->assertSee(__('filament/resources/company.pages.view.infolist.fields.creator.label'))
+        ->assertSee(__('filament/resources/person.navigation_label'))
+        ->assertSee(__('filament/resources/task.navigation_label'))
+        ->assertSee(__('filament/resources/note.navigation_label'))
+        ->assertDontSee(__('filament/resources/company.pages.view.actions.edit.label'))
+        ->assertSee('fi-record-details-more', false)
+        ->assertSee('fi-record-details-overflow-toggle', false)
+        ->assertSee(__('filament/inline-edit.view_more'))
+        ->assertDontSee('fi-record-work-more', false)
+        ->assertSee('fi-in-entry-has-inline-label', false)
+        ->assertActionExists(TestAction::make('copyPageUrl')->schemaComponent('companyDetails'))
+        ->assertActionExists(TestAction::make('delete')->schemaComponent('companyDetails'));
+
+    expect($page->instance()->getMaxContentWidth())->toBe(Width::Full);
+});
+
+it('reveals extra company details when view more is toggled', function (): void {
+    $record = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Northwind',
+    ]);
+
+    livewire(ViewCompany::class, ['record' => $record->getKey()])
+        ->assertSet('recordDetailsExpanded', false)
+        ->assertSee(__('filament/inline-edit.view_more'))
+        ->call('toggleRecordDetails')
+        ->assertSet('recordDetailsExpanded', true)
+        ->assertSee(__('filament/inline-edit.hide'))
+        ->call('toggleRecordDetails')
+        ->assertSet('recordDetailsExpanded', false)
+        ->assertSee(__('filament/inline-edit.view_more'));
 });
 
 // Column metadata is checked against a single mounted table rather than one
@@ -266,5 +312,6 @@ it('keeps the slash menu but not the document canvas on a rich-editor field adde
 
     expect($editor->getToolbarButtons())->toBe([])
         ->and($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
-        ->and($editor->getExtraAttributes())->not->toHaveKey('class');
+        ->and($editor->getExtraAttributes())->not->toHaveKey('class')
+        ->and($editor->getPlaceholder())->toBe('Set account plan');
 });

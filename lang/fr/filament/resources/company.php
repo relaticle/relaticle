@@ -52,7 +52,7 @@ return [
         'view' => [
             'actions' => [
                 'edit' => [
-                    'label' => 'Modifier',
+                    'label' => 'Tout modifier',
                 ],
                 'copy_page_url' => [
                     'label' => "Copier l'URL de la page",

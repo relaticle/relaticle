@@ -35,37 +35,44 @@ final class RichEditorFieldType extends BaseFieldType
     public function configure(): FieldSchema
     {
         return (new PackageRichEditorFieldType)->configure()
-            ->formComponent(fn (CustomField $customField): RichEditor => RichEditorComponent::make($customField->getFieldName())
-                ->plugins([SlashMenuPlugin::make()])
-                ->toolbarButtons([])
-                // Filament decides attachments by whether `attachFiles` sits in the toolbar,
-                // and there is no toolbar: without this, an uploaded image saves as null.
-                ->fileAttachments(true)
-                ->fileAttachmentsVisibility('private')
-                ->fileAttachmentsMaxSize((int) (UploadAllowlist::maxBytes() / 1024))
-                ->dehydrateStateUsing(fn (mixed $state): mixed => is_string($state)
-                    ? $this->attachments()->canonicalize($state)
-                    : $state)
-                ->saveUploadedFileAttachmentUsing(fn (TemporaryUploadedFile $file): string => $this->attachments()->saveUploadedFileAttachment($file))
-                ->getFileAttachmentUrlUsing(fn (mixed $file): ?string => $this->attachments()->getFileAttachmentUrl($file))
-                // The defaults carry the table controls, unreachable otherwise without a toolbar.
-                ->floatingToolbars(function (RichEditor $component): array {
-                    $tools = $component->getTools();
-                    $tools['paragraph']->label(__('filament/rich-editor.slash_menu.items.paragraph.label'));
-                    $tools['h1']->label(__('filament/rich-editor.slash_menu.items.h1.label'));
-                    $tools['h2']->label(__('filament/rich-editor.slash_menu.items.h2.label'));
-                    $tools['h3']->label(__('filament/rich-editor.slash_menu.items.h3.label'));
+            ->formComponent(function (CustomField $customField): RichEditor {
+                $editor = RichEditorComponent::make($customField->getFieldName())
+                    ->plugins([SlashMenuPlugin::make()])
+                    ->toolbarButtons([])
+                    // Filament decides attachments by whether `attachFiles` sits in the toolbar,
+                    // and there is no toolbar: without this, an uploaded image saves as null.
+                    ->fileAttachments(true)
+                    ->fileAttachmentsVisibility('private')
+                    ->fileAttachmentsMaxSize((int) (UploadAllowlist::maxBytes() / 1024))
+                    ->dehydrateStateUsing(fn (mixed $state): mixed => is_string($state)
+                        ? $this->attachments()->canonicalize($state)
+                        : $state)
+                    ->saveUploadedFileAttachmentUsing(fn (TemporaryUploadedFile $file): string => $this->attachments()->saveUploadedFileAttachment($file))
+                    ->getFileAttachmentUrlUsing(fn (mixed $file): ?string => $this->attachments()->getFileAttachmentUrl($file))
+                    // The defaults carry the table controls, unreachable otherwise without a toolbar.
+                    ->floatingToolbars(function (RichEditor $component): array {
+                        $tools = $component->getTools();
+                        $tools['paragraph']->label(__('filament/rich-editor.slash_menu.items.paragraph.label'));
+                        $tools['h1']->label(__('filament/rich-editor.slash_menu.items.h1.label'));
+                        $tools['h2']->label(__('filament/rich-editor.slash_menu.items.h2.label'));
+                        $tools['h3']->label(__('filament/rich-editor.slash_menu.items.h3.label'));
 
-                    return [
-                        'paragraph' => $this->selectionToolbar(),
-                        'heading' => $this->selectionToolbar(),
-                        ...$component->getDefaultFloatingToolbars(),
-                    ];
-                })
-                ->extraAttributes(fn (RichEditor $component): array => [
-                    ...SlashMenuPlugin::attributes($component),
-                    ...($this->isDocument($customField) ? ['class' => 'fi-fo-rich-editor-seamless'] : []),
-                ]))
+                        return [
+                            'paragraph' => $this->selectionToolbar(),
+                            'heading' => $this->selectionToolbar(),
+                            ...$component->getDefaultFloatingToolbars(),
+                        ];
+                    })
+                    ->extraAttributes(fn (RichEditor $component): array => SlashMenuPlugin::attributes($component));
+
+                if ($this->isDocument($customField)) {
+                    return $editor->asDocument();
+                }
+
+                $placeholder = __('filament/inline-edit.set', ['field' => mb_strtolower((string) $customField->name)]);
+
+                return $editor->placeholder(is_string($placeholder) ? $placeholder : null);
+            })
             ->infolistEntry(RichContentEntry::class);
     }
 

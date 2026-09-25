@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\NoteResource\Pages;
 
+use App\Filament\Concerns\UsesRecordIndexLayout;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource;
 use App\Models\Note;
@@ -23,6 +24,7 @@ final class ManageNotes extends ManageRecords
 {
     use HasResizableColumn;
     use InteractsWithCustomFields;
+    use UsesRecordIndexLayout;
 
     protected static string $resource = NoteResource::class;
 

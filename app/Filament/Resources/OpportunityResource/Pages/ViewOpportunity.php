@@ -5,96 +5,59 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Concerns\EditsRecordFieldsInline;
+use App\Filament\Concerns\RendersRecordSplitView;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\Opportunity;
-use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\EditAction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Schemas\Components\Flex;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Support\Livewire\Partials\PartialsComponentHook;
-use Illuminate\Support\Js;
-use Relaticle\CustomFields\Facades\CustomFields;
 
 final class ViewOpportunity extends ViewRecord
 {
+    use EditsRecordFieldsInline;
+    use RendersRecordSplitView;
+
     protected static string $resource = OpportunityResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            EditAction::make()
-                ->icon('heroicon-o-pencil-square')
-                ->label(__('filament/resources/opportunity.pages.view.actions.edit.label'))
-                ->after(function (): void {
-                    $this->getRecord()
-                        ->refresh()
-                        ->load(['company.media', 'contact', 'customFieldValues.customField.options']);
-
-                    resolve(PartialsComponentHook::class)->forceRender($this);
-                }),
-            ActionGroup::make([
-                ActionGroup::make([
-                    Action::make('copyPageUrl')
-                        ->label(__('filament/resources/opportunity.pages.view.actions.copy_page_url.label'))
-                        ->icon('heroicon-o-clipboard-document')
-                        ->action(function (Opportunity $record): void {
-                            $jsUrl = Js::from(OpportunityResource::getUrl('view', [$record]));
-                            $this->js("
-                            navigator.clipboard.writeText({$jsUrl}).then(() => {
-                                new FilamentNotification()
-                                    .title('URL copied to clipboard')
-                                    .success()
-                                    .send()
-                            })
-                        ");
-                        }),
-                    Action::make('copyRecordId')
-                        ->label(__('filament/resources/opportunity.pages.view.actions.copy_record_id.label'))
-                        ->icon('heroicon-o-clipboard-document')
-                        ->action(function (Opportunity $record): void {
-                            $jsId = Js::from((string) $record->getKey());
-                            $this->js("
-                            navigator.clipboard.writeText({$jsId}).then(() => {
-                                new FilamentNotification()
-                                    .title('Record ID copied to clipboard')
-                                    .success()
-                                    .send()
-                            })
-                        ");
-                        }),
-                ])->dropdown(false),
-                DeleteAction::make(),
-            ]),
-        ];
-    }
 
     public function infolist(Schema $schema): Schema
     {
-        return $schema->schema([
-            Section::make()->schema([
-                Flex::make([
-                    TextEntry::make('name')->grow(true),
-                    RecordChipEntry::make('company.name')
-                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
-                        ->color('primary')
-                        ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null)
-                        ->grow(false),
-                    RecordChipEntry::make('contact.name')
-                        ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
-                        ->color('primary')
-                        ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null)
-                        ->grow(false),
-                ]),
-                CustomFields::infolist()->forSchema($schema)->build()->columnSpanFull(),
-            ])
-                ->columnSpanFull(),
+        return $this->recordDetailsInfolist($schema, 'opportunityDetails', [
+            $this->makeInlineEditable(
+                TextEntry::make('name')
+                    ->hiddenLabel()
+                    ->inlineLabel(false),
+                'name',
+            ),
+            $this->makeInlineEditable(
+                RecordChipEntry::make('company.name')
+                    ->label(__('filament/resources/opportunity.pages.view.infolist.fields.company.label'))
+                    ->color('primary')
+                    ->url(fn (Opportunity $record): ?string => $record->company ? CompanyResource::getUrl('view', [$record->company]) : null),
+                'company_id',
+            ),
+            $this->makeInlineEditable(
+                RecordChipEntry::make('contact.name')
+                    ->label(__('filament/resources/opportunity.pages.view.infolist.fields.contact.label'))
+                    ->color('primary')
+                    ->url(fn (Opportunity $record): ?string => $record->contact ? PeopleResource::getUrl('view', [$record->contact]) : null),
+                'contact_id',
+            ),
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function inlineEditEagerLoads(): array
+    {
+        return ['company.media', 'contact', 'customFieldValues.customField.options'];
+    }
+
+    protected function recordOverflowTranslationPrefix(): string
+    {
+        return 'filament/resources/opportunity';
     }
 }

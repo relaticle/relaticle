@@ -88,4 +88,42 @@ enum CustomFieldType: string
             default => false,
         };
     }
+
+    public function isBoolean(): bool
+    {
+        return match ($this) {
+            self::CHECKBOX, self::TOGGLE => true,
+            default => false,
+        };
+    }
+
+    public function isInlineEditable(): bool
+    {
+        return match ($this) {
+            self::FILE_UPLOAD => false,
+            default => true,
+        };
+    }
+
+    public function opensInModal(): bool
+    {
+        return $this === self::RICH_EDITOR;
+    }
+
+    public function savesOnChange(): bool
+    {
+        return match ($this) {
+            self::CHECKBOX, self::TOGGLE, self::SELECT, self::RADIO, self::TOGGLE_BUTTONS,
+            self::MULTI_SELECT, self::CHECKBOX_LIST, self::DATE, self::DATE_TIME => true,
+            default => false,
+        };
+    }
+
+    public function keepsInlineEditorOpen(): bool
+    {
+        return match ($this) {
+            self::CHECKBOX_LIST, self::MULTI_SELECT => true,
+            default => false,
+        };
+    }
 }

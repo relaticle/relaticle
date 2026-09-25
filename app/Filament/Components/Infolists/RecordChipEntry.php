@@ -27,11 +27,23 @@ final class RecordChipEntry extends TextEntry
         parent::setUp();
 
         $this->html();
-        $this->formatStateUsing(fn (): HtmlString => new HtmlString(
-            implode('', array_map(
-                fn (RecordChip $chip): string => $chip->toHtml(),
+        $this->formatStateUsing(function (): HtmlString {
+            $url = $this->evaluate($this->url);
+            $url = is_string($url) && filled($url) ? $url : null;
+            $openUrlInNewTab = $this->shouldOpenUrlInNewTab();
+
+            return new HtmlString(implode('', array_map(
+                fn (RecordChip $chip): string => ($url === null
+                    ? $chip
+                    : $chip->url($url, $openUrlInNewTab)
+                )->toHtml(),
                 $this->recordChips($this->getRecord(), $this->getName(), $this->chipSize),
-            )),
-        ));
+            )));
+        });
+    }
+
+    public function getUrl(mixed $state = null): ?string
+    {
+        return null;
     }
 }

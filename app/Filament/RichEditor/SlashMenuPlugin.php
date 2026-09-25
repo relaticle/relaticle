@@ -65,11 +65,14 @@ final class SlashMenuPlugin implements RichContentPlugin
 
         // Base64, not raw JSON: the attribute bag escapes `"` as `\"`, so a quote in a
         // translation would close the attribute. Default json_encode keeps it ASCII for `atob`.
+        $editorPlaceholder = $editor->getPlaceholder();
+        $slashPlaceholder = __('filament/rich-editor.placeholder');
+
         return [
             'data-slash-menu' => base64_encode((string) json_encode([
                 'items' => $items,
                 'noResults' => __('filament/rich-editor.slash_menu.no_results'),
-                'placeholder' => __('filament/rich-editor.placeholder'),
+                'placeholder' => filled($editorPlaceholder) ? $editorPlaceholder : $slashPlaceholder,
                 'limitReached' => __('filament/rich-editor.limit_reached'),
             ])),
         ];
