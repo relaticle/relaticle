@@ -47,6 +47,15 @@ it('keeps each workspace to itself across sequential requests in one process', f
     expect(Company::query()->whereKey([$ownCompany->id, $otherCompany->id])->count())->toBe(2);
 });
 
+it('leaves user queries unscoped once an api request ends', function (): void {
+    $outsider = User::factory()->withPersonalWorkspace()->create();
+
+    Sanctum::actingAs($this->user);
+    $this->getJson('/api/v1/user')->assertOk();
+
+    expect(User::query()->whereKey($outsider->getKey())->exists())->toBeTrue();
+});
+
 it('can switch workspace via X-Workspace-Id header', function (): void {
     $otherWorkspace = Workspace::factory()->create();
     $this->user->workspaces()->attach($otherWorkspace, ['role' => WorkspaceRole::Member->value]);
