@@ -153,7 +153,7 @@
                                         @if($column->isEntityLinkMapping())
                                             @php
                                                 $relMatch = $row->relationships?->first(fn ($m) => $m->relationship === $column->entityLink);
-                                                $value = $row->getFinalValue($column->source);
+                                                $value = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
                                             @endphp
                                             @if($relMatch && filled($value))
                                                 <span class="inline-flex items-center gap-1 text-xs truncate" title="{{ $value }}">
