@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Scribe\OpenApi;
 
-use App\Http\Middleware\EnsureTokenHasAbility;
 use Knuckles\Camel\Output\OutputEndpointData;
 use Knuckles\Scribe\Writing\OpenApiSpecGenerators\OpenApiGenerator;
 
@@ -59,7 +58,7 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
     public function pathItem(array $pathItem, array $groupedEndpoints, OutputEndpointData $endpoint): array
     {
         $method = strtoupper($endpoint->httpMethods[0]);
-        $ability = EnsureTokenHasAbility::abilityFor($method);
+        $ability = $this->abilityFor($method);
 
         $errors = [
             '401' => $this->errorResponse('Missing or invalid access token.'),
@@ -98,5 +97,15 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
             'description' => $description,
             'content' => ['application/json' => ['schema' => ['$ref' => $schema]]],
         ];
+    }
+
+    private function abilityFor(string $method): string
+    {
+        return match ($method) {
+            'POST' => 'create',
+            'PUT', 'PATCH' => 'update',
+            'DELETE' => 'delete',
+            default => 'read',
+        };
     }
 }

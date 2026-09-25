@@ -26,14 +26,14 @@ final readonly class EnsureTokenHasAbility
             return $next($request);
         }
 
-        $ability = self::abilityFor($request->method());
+        $ability = $this->resolveAbility($request->method());
 
         throw_unless($token->can($ability), MissingAbilityException::class, [$ability]);
 
         return $next($request);
     }
 
-    public static function abilityFor(string $method): string
+    private function resolveAbility(string $method): string
     {
         return match ($method) {
             'POST' => 'create',
