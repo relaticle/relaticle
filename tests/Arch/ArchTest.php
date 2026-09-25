@@ -131,6 +131,8 @@ arch('avoid mutation')
         'App\Support\ActivityLog\RequestActivityBatch',
         // Job-scoped holder of the running import, set and cleared by ExecuteImportJob.
         'App\Support\ActivityLog\CurrentImport',
+        // Request-scoped holder of the workspace WorkspaceScope filters by, set by the tenant middleware.
+        'App\Support\CurrentWorkspace',
         // Request-scoped media lookup cache, same shape: filled as list endpoints
         // prime it, reset per request via the scoped container binding.
         'App\Support\Media\MediaLookup',

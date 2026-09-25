@@ -559,3 +559,36 @@ it('keeps new file uploads on medialibrary', function (): void {
         'Durable uploads go through medialibrary (.ai/rules/file-uploads.md). Offending files: '.implode(', ', $offenders),
     );
 });
+
+it('keeps the word trait out of class files so type coverage analyses them', function (): void {
+    $root = dirname(__DIR__, 2);
+    $offenders = [];
+
+    foreach (['app', 'config', 'packages', 'routes'] as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
+            '/(?<!\.blade)\.php$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $contents = (string) file_get_contents($file->getPathname());
+
+            if (! str_contains($contents, 'trait ')) {
+                continue;
+            }
+
+            if (preg_match('/^\s*trait\s+\w+/m', $contents) === 1) {
+                continue;
+            }
+
+            $offenders[] = str_replace($root.'/', '', $file->getPathname());
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'The type-coverage plugin skips every file whose text contains "trait ", comments included, so '.
+        'these files are never checked. Reword the text. Offending files: '.implode(', ', $offenders),
+    );
+});

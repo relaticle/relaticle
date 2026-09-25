@@ -23,9 +23,9 @@ use App\Mcp\Tools\Note\UpdateNoteTool;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 
 mutates(
@@ -51,10 +51,6 @@ mutates(
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function () {
-    Note::clearBootedModels();
 });
 
 it('can create a note linked to a company', function (): void {
@@ -271,7 +267,7 @@ it('cannot detach relationships from a note outside the current workspace', func
 
 describe('workspace scoping', function () {
     beforeEach(function () {
-        Note::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes notes to current workspace', function (): void {

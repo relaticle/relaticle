@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
-use App\Enums\CreationSource;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
@@ -67,7 +66,6 @@ it('approving a task with people_ids creates the taskables pivot', function (): 
     $task = resolve(CreateTask::class)->execute(
         $this->user,
         ['title' => 'Follow up call', 'people_ids' => [(string) $angel->id]],
-        CreationSource::CHAT,
     );
 
     expect($task)->toBeInstanceOf(Task::class);
@@ -81,7 +79,6 @@ it('rejects cross-tenant people_ids at the action layer', function (): void {
     expect(fn () => resolve(CreateTask::class)->execute(
         $this->user,
         ['title' => 'X', 'people_ids' => [(string) $foreign->id]],
-        CreationSource::CHAT,
     ))->toThrow(ValidationException::class);
 });
 

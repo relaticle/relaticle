@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Company\UpdateCompany;
 use App\Actions\Crm\GetCrmSummary;
 use App\Actions\Opportunity\AggregateOpportunities;
+use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
@@ -18,12 +19,14 @@ use App\Mcp\Tools\Note\ListNotesTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\People\ListPeopleTool;
 use App\Mcp\Tools\Task\ListTasksTool;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentSource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -332,4 +335,39 @@ it('refuses the workspace-wide activity feed to a member without activity access
     RelaticleServer::actingAs($member->fresh())
         ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
         ->assertOk();
+});
+
+it('names the channel of each change in the activity it returns', function (): void {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()
+        ->recycle([$this->user, $this->workspace])
+        ->create(['name' => 'Before']));
+
+    $this->actingAs($this->user);
+    CurrentSource::during(CreationSource::API, fn (): Company => resolve(UpdateCompany::class)->execute($this->user, $company, ['name' => 'After']));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.source', 'api')
+            ->etc());
+
+    Activity::withoutGlobalScopes()->where('subject_id', $company->getKey())->update(['properties' => '{}']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.source', null)
+            ->etc());
+});
+
+it('names every known channel and null in its description', function (): void {
+    $description = resolve(ListActivityTool::class)->description();
+
+    foreach (CreationSource::values() as $value) {
+        expect($description)->toContain($value);
+    }
+
+    expect($description)->toContain('null');
 });

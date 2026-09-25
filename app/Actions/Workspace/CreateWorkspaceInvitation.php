@@ -11,12 +11,8 @@ use App\Models\WorkspaceInvitation;
 
 /**
  * Proposal-pipeline adapter over the Jetstream invite action: the chat
- * approval flow calls every create action as execute($user, $data, $source),
- * while InviteWorkspaceMember speaks ($user, $workspace, $email, $role). Workspace
- * invitations carry no creation_source column, so the $source argument that
- * PendingActionService::executeCreate() passes is accepted and discarded by
- * PHP's normal extra-argument handling (see CreateCustomField for the same
- * pattern).
+ * approval flow calls every create action as execute($user, $data), while
+ * InviteWorkspaceMember speaks ($user, $workspace, $email, $role).
  */
 final readonly class CreateWorkspaceInvitation
 {

@@ -25,10 +25,10 @@ use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Models\Company;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -63,10 +63,6 @@ mutates(
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function (): void {
-    Task::clearBootedModels();
 });
 
 it('can create a task with assignees and company', function (): void {
@@ -535,7 +531,7 @@ it('can filter tasks by company_id', function (): void {
 
 describe('workspace scoping', function (): void {
     beforeEach(function (): void {
-        Task::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes tasks to current workspace', function (): void {

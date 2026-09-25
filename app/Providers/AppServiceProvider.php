@@ -44,6 +44,8 @@ use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\CurrentSource;
+use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Impersonation\Impersonator;
@@ -145,6 +147,7 @@ final class AppServiceProvider extends ServiceProvider
         // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
         $this->app->scoped(CurrentImport::class);
+        $this->app->scoped(CurrentWorkspace::class);
 
         // Caches creation-source facts per workspace for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
@@ -341,6 +344,9 @@ final class AppServiceProvider extends ServiceProvider
                     ->put('import_id', $import->id())
                     ->put('import_file', $import->fileName());
             }
+
+            $activity->properties = ($activity->properties ?? new Collection)
+                ->put(ActivityModel::SOURCE_PROPERTY, CurrentSource::get()->value);
 
             // The causer stays the impersonated user because the record is theirs.
             $administratorId = $this->app->make(Impersonator::class)->administratorId(request())

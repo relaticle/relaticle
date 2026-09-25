@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\WorkspaceCapability;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
@@ -24,13 +25,12 @@ use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
-use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
+use Override;
 use Relaticle\ActivityLog\Support\ActivityLogDiffRow;
 
 #[Title('List CRM Activity')]
-#[Description('List who changed which CRM records, when they changed them, and the field-level differences. Results use the caller timezone.')]
 final class ListActivityTool extends Tool
 {
     use ChecksTokenAbility;
@@ -47,6 +47,14 @@ final class ListActivityTool extends Tool
     public function __construct(
         private readonly CanonicalRecordUrl $urls,
     ) {}
+
+    #[Override]
+    public function description(): string
+    {
+        $channels = implode(', ', CreationSource::values());
+
+        return "List who changed which CRM records, through which channel ({$channels}; null when it was not recorded), when they changed them, and the field-level differences. Results use the caller timezone.";
+    }
 
     public function schema(JsonSchema $schema): array
     {
@@ -256,6 +264,7 @@ final class ListActivityTool extends Tool
         return [
             'at' => $this->occurredAt($user, $base)->toIso8601String(),
             'by' => $this->causerName($base),
+            'source' => $base->source?->value,
             'event' => (string) ($base->event ?? $base->description),
             'record' => [
                 'type' => $subjectType,

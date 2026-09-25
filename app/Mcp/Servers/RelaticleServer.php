@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Servers;
 
+use App\Enums\CreationSource;
 use App\Mcp\Prompts\CrmOverviewPrompt;
 use App\Mcp\Resources\CompanySchemaResource;
 use App\Mcp\Resources\CrmSummaryResource;
@@ -50,12 +51,17 @@ use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Mcp\Tools\UploadFileTool;
 use App\Mcp\Tools\WhoAmiTool;
+use App\Support\CurrentSource;
 use Laravel\Mcp\Server;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Transport\JsonRpcRequest;
+use Laravel\Mcp\Transport\JsonRpcResponse;
+use Override;
 
 #[Name('Relaticle CRM')]
 #[Version('2.0.0')]
@@ -121,4 +127,11 @@ final class RelaticleServer extends Server
     protected array $prompts = [
         CrmOverviewPrompt::class,
     ];
+
+    #[Override]
+    protected function runMethodHandle(JsonRpcRequest $request, ServerContext $context): iterable|JsonRpcResponse
+    {
+        // A tool that yields a streamed result would run after this scope closes; none does.
+        return CurrentSource::during(CreationSource::MCP, fn (): iterable|JsonRpcResponse => parent::runMethodHandle($request, $context));
+    }
 }

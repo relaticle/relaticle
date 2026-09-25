@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\UpdateOpportunity;
-use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -80,7 +79,6 @@ it('approving an opportunity creates it linked to a company and contact', functi
             'company_id' => (string) $company->id,
             'contact_id' => (string) $contact->id,
         ],
-        CreationSource::CHAT,
     );
 
     expect($opportunity)->toBeInstanceOf(Opportunity::class);
@@ -95,7 +93,6 @@ it('rejects cross-tenant company_id at the action layer', function (): void {
     expect(fn () => resolve(CreateOpportunity::class)->execute(
         $this->user,
         ['name' => 'X', 'company_id' => (string) $foreign->id],
-        CreationSource::CHAT,
     ))->toThrow(ValidationException::class);
 });
 
@@ -106,7 +103,6 @@ it('rejects cross-tenant contact_id at the action layer', function (): void {
     expect(fn () => resolve(CreateOpportunity::class)->execute(
         $this->user,
         ['name' => 'X', 'contact_id' => (string) $foreign->id],
-        CreationSource::CHAT,
     ))->toThrow(ValidationException::class);
 });
 

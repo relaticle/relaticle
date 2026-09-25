@@ -62,6 +62,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Facades\FilamentTimezone;
@@ -273,6 +274,8 @@ final class AppPanelProvider extends PanelProvider
             )
             ->colors([
                 'primary' => BrandColors::primary(),
+                'purple' => Color::Purple,
+                'indigo' => Color::Indigo,
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
@@ -12,14 +13,17 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\CurrentSource;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentColor;
+use Filament\Support\View\Components\BadgeComponent;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
-mutates(ActivityLog::class);
+mutates(ActivityLog::class, Activity::class);
 
 function slideOverChanges(Testable $component): string
 {
@@ -669,6 +673,58 @@ test('a deactivated custom field still reads by its name', function (): void {
     livewire(ActivityLog::class)
         ->assertOk()
         ->assertSee('Churn reason');
+});
+
+test('each row names the channel it came through', function (): void {
+    $typed = Company::factory()->for($this->workspace)->create(['name' => 'Typed In Co']);
+    $posted = CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create(['name' => 'Posted Co']));
+
+    livewire(ActivityLog::class)
+        ->assertTableColumnStateSet('source', CreationSource::WEB, Activity::withoutGlobalScopes()->where('subject_id', $typed->getKey())->sole())
+        ->assertTableColumnStateSet('source', CreationSource::API, Activity::withoutGlobalScopes()->where('subject_id', $posted->getKey())->sole());
+});
+
+test('a row with no source, or one this build does not know, shows none', function (): void {
+    $legacy = Company::factory()->for($this->workspace)->create(['name' => 'Legacy Co']);
+    $unknown = Company::factory()->for($this->workspace)->create(['name' => 'Unknown Co']);
+
+    $legacyRow = Activity::withoutGlobalScopes()->where('subject_id', $legacy->getKey())->sole();
+    $unknownRow = Activity::withoutGlobalScopes()->where('subject_id', $unknown->getKey())->sole();
+    $legacyRow->update(['properties' => []]);
+    $unknownRow->update(['properties' => ['source' => 'fax']]);
+
+    livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertSee('Legacy Co')
+        ->assertTableColumnStateSet('source', null, $legacyRow)
+        ->assertTableColumnStateSet('source', null, $unknownRow);
+});
+
+test('it filters down to one channel', function (): void {
+    Company::factory()->for($this->workspace)->create(['name' => 'Typed In Co']);
+    CurrentSource::during(CreationSource::API, fn (): Company => Company::factory()->for($this->workspace)->create(['name' => 'Posted Co']));
+
+    livewire(ActivityLog::class)
+        ->filterTable('source', CreationSource::API->value)
+        ->assertSee('Posted Co')
+        ->assertDontSee('Typed In Co');
+});
+
+test('every source badge color resolves to real shade classes in the app panel', function (): void {
+    $this->get(ActivityLog::getUrl(tenant: $this->workspace))->assertSuccessful();
+
+    foreach (CreationSource::cases() as $source) {
+        $classes = FilamentColor::getComponentClasses(BadgeComponent::class, $source->getColor());
+
+        if ($source->getColor() === 'gray') {
+            expect($classes)->toBe([]);
+
+            continue;
+        }
+
+        expect(array_filter($classes, fn (string $class): bool => str_starts_with($class, 'fi-text-color-')))
+            ->not->toBeEmpty();
+    }
 });
 
 test('a company account owner change names both owners', function (): void {

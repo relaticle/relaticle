@@ -174,6 +174,7 @@ return [
         'columns' => [
             'created_at' => 'When',
             'causer' => 'Who',
+            'source' => 'Source',
             'event' => 'Action',
             'subject_type' => 'Type',
             'record' => 'Record',
@@ -183,6 +184,7 @@ return [
             'event' => 'Action',
             'subject_type' => 'Type',
             'causer' => 'Who',
+            'source' => 'Source',
             'from' => 'From',
             'until' => 'Until',
         ],
@@ -211,6 +213,7 @@ return [
             'failed' => ':count failed',
         ],
         'via_import' => 'Via import :file',
+        'via_source' => 'Via :source',
         'empty' => [
             'heading' => 'No activity yet',
             'description' => 'Changes your members make to records will show up here.',

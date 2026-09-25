@@ -11,6 +11,7 @@ use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasWorkspace;
+use App\Models\Scopes\WorkspaceScope;
 use App\Observers\CompanyObserver;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
@@ -18,6 +19,7 @@ use Database\Factories\CompanyFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -42,6 +44,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
+#[ScopedBy(WorkspaceScope::class)]
 #[Fillable([
     'name',
     'creation_source',
@@ -73,13 +76,6 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         'image/webp' => 'webp',
         'image/vnd.microsoft.icon' => 'ico',
         'image/x-icon' => 'ico',
-    ];
-
-    /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
     ];
 
     /**
