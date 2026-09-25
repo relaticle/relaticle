@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Support\CompetitorFacts;
 use Dom\HTMLDocument;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 
 mutates(CompetitorFacts::class);
@@ -18,6 +20,25 @@ it('renders the press page with facts and unique metadata', function (): void {
         ->assertSee('AGPL-3.0')
         ->assertSee(CompetitorFacts::mcpToolCount().' MCP tools')
         ->assertSee('<title>'.e(__('Press kit & brand assets')).' - Relaticle</title>', false);
+});
+
+it('shows the live GitHub star count', function (): void {
+    Cache::put('github_stars_Relaticle_relaticle', 1_734, 60);
+
+    $this->get('/press')
+        ->assertOk()
+        ->assertSee('1,734 stars')
+        ->assertDontSee('stars as of');
+});
+
+it('falls back to the dated star count without a live count', function (): void {
+    Cache::put('github_stars_Relaticle_relaticle', 0, 60);
+
+    $facts = CompetitorFacts::all()['relaticle'];
+
+    $this->get('/press')
+        ->assertOk()
+        ->assertSee(number_format($facts['stars']).' stars as of '.Date::parse($facts['stars_verified'])->format('F j, Y'));
 });
 
 it('serves the press page as markdown', function (): void {

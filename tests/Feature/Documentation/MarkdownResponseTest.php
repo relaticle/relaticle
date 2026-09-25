@@ -43,8 +43,8 @@ it('decodes html entities instead of leaking double-escaped ampersands', functio
         ->assertOk()
         ->getContent();
 
-    expect($markdown)->toContain('Press Kit & Facts')
-        ->and($markdown)->not->toContain('Press Kit &amp; Facts');
+    expect($markdown)->toContain('Press & brand resources')
+        ->and($markdown)->not->toContain('Press &amp; brand resources');
 });
 
 it('declares Vary: Accept on both variants of a content-negotiated route', function (): void {

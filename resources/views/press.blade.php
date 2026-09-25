@@ -1,7 +1,9 @@
 @php
     $facts = \App\Support\CompetitorFacts::all()['relaticle'];
     $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
-    $starsAsOf = \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->format('F j, Y');
+    $starsLabel = $githubStars > 0
+        ? __(':stars stars', ['stars' => number_format($githubStars)])
+        : __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->format('F j, Y')]);
     $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->format('F j, Y');
     $brand = json_decode(file_get_contents(public_path('brand/kit/manifest.json')), true, flags: JSON_THROW_ON_ERROR);
     $avatarLabels = ['purple' => __('Purple'), 'light' => __('Light'), 'dark' => __('Dark')];
@@ -177,11 +179,11 @@
                     </div>
                     <div class="lg:col-span-2">
                         <ul class="grid gap-px overflow-hidden rounded-2xl border border-gray-200 bg-gray-200 dark:border-gray-800 dark:bg-gray-800 sm:grid-cols-2">
-                            @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => $starsAsOf]), __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':count MCP tools and a built-in AI chat assistant. Both support self-hosting.', ['count' => $mcpToolCount])] as $label => $value)
+                            @foreach ([__('Founded') => '2024', __('License') => $facts['license'], __('Tech stack') => $facts['stack'], __('GitHub stars') => $starsLabel, __('Pricing') => $facts['pricing'], __('AI & MCP') => __(':count MCP tools and a built-in AI chat assistant. Both support self-hosting.', ['count' => $mcpToolCount])] as $label => $value)
                                 <li class="bg-white p-5 dark:bg-gray-950"><p class="text-xs font-medium text-gray-500 dark:text-gray-400">{{ $label }}</p><p class="mt-2 text-sm leading-relaxed text-gray-800 dark:text-gray-200">{{ $value }}</p></li>
                             @endforeach
                         </ul>
-                        <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Company facts verified :date. GitHub stars have a separate date above.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
+                        <p class="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
                     </div>
                 </div>
             </section>

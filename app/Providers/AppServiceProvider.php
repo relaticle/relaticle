@@ -709,7 +709,7 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configureCommunityCounts(): void
     {
-        Facades\View::composer(['components.layout.community-links', 'home.partials.hero'], function (View $view): void {
+        Facades\View::composer(['components.layout.community-links', 'home.partials.hero', 'press'], function (View $view): void {
             $gitHubService = resolve(GitHubService::class);
             $starsCount = $gitHubService->getStarsCount();
             $formattedStarsCount = $gitHubService->getFormattedStarsCount();
