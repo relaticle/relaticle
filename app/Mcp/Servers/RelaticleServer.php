@@ -53,6 +53,7 @@ use App\Mcp\Tools\UploadFileTool;
 use App\Mcp\Tools\WhoAmiTool;
 use App\Support\CurrentSource;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\Attributes\Icon;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
@@ -66,6 +67,8 @@ use Override;
 #[Name('Relaticle CRM')]
 #[Version('2.0.0')]
 #[Instructions('This server provides access to Relaticle CRM data including companies, people, opportunities, tasks, and notes. All operations are scoped to the single workspace this connection was authorized for.')]
+#[Icon('brand/logomark.svg', 'image/svg+xml', ['any'])]
+#[Icon('web-app-manifest-512x512.png', 'image/png', ['512x512'])]
 final class RelaticleServer extends Server
 {
     public int $defaultPaginationLength = 50;

@@ -10,6 +10,7 @@ use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Schema\CustomFieldSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Models\CustomField;
@@ -18,6 +19,7 @@ use App\Models\CustomFieldSection;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 
 mutates(
@@ -79,6 +81,38 @@ it('returns valid note schema with correct fields', function (): void {
         ->assertOk()
         ->assertSee('note')
         ->assertSee('"title"');
+});
+
+it('lets a client cache an entity schema privately for as long as the server does', function (string $uri): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'resources/read',
+        'params' => ['uri' => $uri],
+    ])
+        ->assertOk()
+        ->assertJsonPath('result.ttlMs', McpSchemaCache::TTL * 1000)
+        ->assertJsonPath('result.cacheScope', 'private');
+})->with([
+    'relaticle://schema/company',
+    'relaticle://schema/people',
+    'relaticle://schema/opportunity',
+    'relaticle://schema/task',
+    'relaticle://schema/note',
+]);
+
+it('marks every entity schema as high-priority context for the assistant', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $schemas = collect($this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'resources/list'])
+        ->assertOk()
+        ->json('result.resources'))
+        ->filter(fn (array $resource): bool => str_starts_with((string) $resource['uri'], 'relaticle://schema/'));
+
+    expect($schemas)->toHaveCount(5)
+        ->each->toHaveKey('annotations', ['audience' => ['assistant'], 'priority' => 0.8]);
 });
 
 it('publishes complete task and note output contracts', function (string $entityType, string $relationship, string $toolsHint): void {
