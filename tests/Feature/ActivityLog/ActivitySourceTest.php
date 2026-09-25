@@ -185,6 +185,16 @@ it('adds no creation source to a partially loaded record restored under another 
         ->and($restored->isDirty())->toBeFalse();
 });
 
+it('keeps writes to one record under two channels in one request as separate saves', function (): void {
+    CurrentSource::during(CreationSource::API, fn (): bool => $this->company->update(['name' => 'Posted']));
+    $this->company->update(['name' => 'Typed']);
+
+    $batches = Activity::withoutGlobalScopes()->where('subject_id', $this->company->getKey())->pluck('batch_uuid');
+
+    expect($batches->unique())->toHaveCount(2)
+        ->and($this->company->timeline()->get())->toHaveCount(2);
+});
+
 it('names the channel of an api change in the record timeline', function (): void {
     CurrentSource::during(CreationSource::API, fn (): bool => $this->company->update(['name' => 'Posted']));
 

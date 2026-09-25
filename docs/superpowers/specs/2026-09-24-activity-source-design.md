@@ -146,6 +146,10 @@ both next to `primary`; the SystemAdmin `creation_source` badges had the same ga
 The SystemAdmin activity view lists a row's properties when it has no diff (import summaries). It
 skips `Activity::SOURCE_PROPERTY` there, so the stamp never reads as a change.
 
+`RequestActivityBatch` holds one `batch_uuid` per channel within a request or job. Rows written
+through two channels are two saves, so the timeline, the Activity page and the tools never merge
+them and never disagree about the source.
+
 ## Out of scope
 
 - Edits made in the SystemAdmin panel stamp `web`. `CreationSource` has no staff case, and no
