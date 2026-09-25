@@ -41,6 +41,8 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
             ],
         ];
 
+        $root['info']['description'] = trim("{$root['info']['description']}\n\n".config('scribe.intro_text'));
+
         $root['components']['securitySchemes']['default']['description'] = implode("\n\n", [
             'Generate an access token from **Settings > Access Tokens** in the Relaticle app.',
             'Tokens carry scoped abilities: `read` (GET), `create` (POST), `update` (PUT/PATCH), `delete` (DELETE). A request whose token lacks the ability for its HTTP method is rejected with 403.',

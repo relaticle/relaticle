@@ -55,7 +55,8 @@ it('documents the error envelope, scoped abilities, and rate limits on every ope
 
     $spec = $this->get('/openapi.json')->assertOk()->json();
 
-    expect($spec['components']['schemas'])->toHaveKeys(['Error', 'ValidationError'])
+    expect($spec['info']['description'])->toContain('Retry-After')->toContain('six months')
+        ->and($spec['components']['schemas'])->toHaveKeys(['Error', 'ValidationError'])
         ->and($spec['components']['securitySchemes']['default']['description'])->toContain('`read` (GET)');
 
     foreach ($spec['paths'] as $path => $operations) {
