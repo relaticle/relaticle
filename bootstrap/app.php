@@ -37,6 +37,9 @@ use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
 use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
+use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
+use Spatie\MarkdownResponse\Enums\DetectionMethod;
+use Spatie\MarkdownResponse\Support\Config;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -204,14 +207,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $exceptions->shouldRenderJsonWhen($rendersJson);
 
-        // Agents fetching a dead URL get a markdown body that points at the
-        // indexes, so they can recover instead of guessing. Browsers send
-        // text/html and keep the regular error page.
+        // Detected like every markdown page: wire:navigate fetches send Accept */*,
+        // so reading the header alone would swap the panel for this body.
         $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($rendersJson): ?Response {
-            $accept = (string) $request->header('Accept', '');
-            $wantsMarkdown = str_contains($accept, 'text/markdown') || ! str_contains($accept, 'text/html');
+            if ($rendersJson($request)) {
+                return null;
+            }
 
-            if ($rendersJson($request) || ! $wantsMarkdown) {
+            if (! Config::getAction('detection.detector', DetectsMarkdownRequest::class)($request) instanceof DetectionMethod) {
                 return null;
             }
 

@@ -88,22 +88,30 @@ it('converts a real html table to pipe-table markdown', function (): void {
         ->and($markdown)->toContain('| Pro | $29 |');
 });
 
-it('gives agents a markdown 404 that links the indexes, and browsers the html page', function (): void {
-    $this->get('/no-such-page', ['Accept' => 'text/markdown'])
+it('gives agents a markdown 404 that links the indexes', function (array $headers, string $url): void {
+    $this->get($url, $headers)
         ->assertNotFound()
         ->assertHeader('content-type', 'text/markdown; charset=UTF-8')
         ->assertSee('# Not found', false)
         ->assertSee(route('llms-txt'), false)
         ->assertSee(route('openapi.json'), false);
+})->with([
+    'markdown accept header' => [['Accept' => 'text/markdown'], '/no-such-page'],
+    'ai user agent' => [['Accept' => '*/*', 'User-Agent' => 'Mozilla/5.0 (compatible; ClaudeBot/1.0)'], '/no-such-page'],
+    'md suffix' => [['Accept' => '*/*'], '/no-such-page.md'],
+]);
 
-    $this->get('/no-such-page', ['Accept' => '*/*'])
-        ->assertNotFound()
-        ->assertHeader('content-type', 'text/markdown; charset=UTF-8');
-
-    $this->get('/no-such-page', ['Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8'])
+it('keeps the html 404 for browsers, including in-app wire:navigate fetches', function (array $headers): void {
+    $this->get('/no-such-page', $headers)
         ->assertNotFound()
         ->assertHeader('content-type', 'text/html; charset=UTF-8');
+})->with([
+    'page load' => [['Accept' => 'text/html,application/xhtml+xml,*/*;q=0.8']],
+    'wire:navigate' => [['Accept' => '*/*', 'X-Livewire-Navigate' => '1']],
+    'generic client' => [['Accept' => '*/*']],
+]);
 
+it('keeps the json 404 for the api', function (): void {
     $this->getJson('/api/v1/no-such-endpoint')
         ->assertNotFound()
         ->assertHeader('content-type', 'application/json');
