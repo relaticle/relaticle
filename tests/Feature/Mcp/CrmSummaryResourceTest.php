@@ -15,6 +15,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Laravel\Sanctum\Sanctum;
 
 mutates(
     AggregateOpportunities::class,
@@ -102,6 +103,30 @@ it('keeps unstaged and orphaned-stage opportunities in separate pipeline buckets
         ->and($summary['by_stage']["Unknown stage ({$optionId})"]['total_amount'])->toBe(2000.0)
         ->and(array_sum(array_column($summary['by_stage'], 'total_amount')))
         ->toBe($summary['total_pipeline_value']);
+});
+
+it('never lets a client cache the summary', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'resources/read',
+        'params' => ['uri' => 'relaticle://summary/crm'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('result.ttlMs', 0);
+});
+
+it('offers the summary to both the user and the assistant', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $summary = collect($this->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'resources/list'])
+        ->assertOk()
+        ->json('result.resources'))
+        ->firstWhere('uri', 'relaticle://summary/crm');
+
+    expect($summary['annotations'])->toBe(['audience' => ['user', 'assistant'], 'priority' => 0.5]);
 });
 
 function opportunityField(Workspace $workspace, string $code): CustomField

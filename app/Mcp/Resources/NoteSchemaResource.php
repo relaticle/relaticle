@@ -7,10 +7,16 @@ namespace App\Mcp\Resources;
 use App\Enums\CrmEntity;
 use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
 use App\Mcp\Schema\CustomFieldSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use Laravel\Mcp\Enums\CacheScope;
+use Laravel\Mcp\Enums\Role;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\Priority;
+use Laravel\Mcp\Server\Attributes\Cacheable;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
@@ -19,6 +25,9 @@ use Laravel\Mcp\Server\Resource;
 #[Description('Schema for notes including available custom fields. Read this before creating or updating notes.')]
 #[Uri('relaticle://schema/note')]
 #[MimeType('application/json')]
+#[Cacheable(ttlMs: McpSchemaCache::TTL * 1000, scope: CacheScope::Private)]
+#[Audience(Role::Assistant)]
+#[Priority(0.8)]
 final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
 {
     public function __construct(private readonly CustomFieldSchema $schema) {}
