@@ -239,6 +239,23 @@ it('blocks Preview after failed relationship revalidation until retry succeeds',
         ->assertDontSee('missing-company');
 });
 
+it('blocks Preview after failed match resolution until retry succeeds', function (): void {
+    $component = Livewire::test(ReviewStep::class, ['storeId' => $this->store->id(), 'entityType' => ImportEntityType::People]);
+    Bus::findBatch($component->get('batchIds.__match_resolution'))
+        ->recordFailedJob('failed-match-resolution', new RuntimeException('Match worker failed'));
+
+    $component->call('checkProgress')
+        ->assertSee('Validation failed. Retry before continuing.')
+        ->call('continueToPreview')
+        ->assertNotDispatched('completed');
+
+    $component->call('retryFailedValidation')
+        ->call('checkProgress')
+        ->assertDontSee('Validation failed. Retry before continuing.')
+        ->call('continueToPreview')
+        ->assertDispatched('completed');
+});
+
 it('renders with correct columns', function (): void {
     $component = mountReviewStep($this);
 
