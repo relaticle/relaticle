@@ -64,7 +64,8 @@ it('documents the error envelope, scoped abilities, and rate limits on every ope
                 continue;
             }
 
-            expect($operation['responses'])->toHaveKeys(['401', '403', '429'], "{$method} {$path}");
+            expect($operation['responses'])->toHaveKeys(['401', '402', '403', '429'], "{$method} {$path}");
+            expect($operation['responses']['403']['description'])->not->toContain('another workspace');
             expect($operation['responses']['429']['headers'])->toHaveKey('Retry-After');
             expect(isset($operation['responses']['404']))->toBe(str_contains($path, '{id}'), "{$method} {$path}");
             expect(isset($operation['responses']['422']))->toBe(in_array($method, ['post', 'put', 'patch'], true), "{$method} {$path}");

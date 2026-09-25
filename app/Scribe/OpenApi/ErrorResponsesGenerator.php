@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Scribe\OpenApi;
 
+use App\Http\Middleware\EnsureTokenHasAbility;
 use Knuckles\Camel\Output\OutputEndpointData;
 use Knuckles\Scribe\Writing\OpenApiSpecGenerators\OpenApiGenerator;
 
@@ -63,10 +64,12 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
     public function pathItem(array $pathItem, array $groupedEndpoints, OutputEndpointData $endpoint): array
     {
         $method = strtoupper($endpoint->httpMethods[0]);
+        $ability = EnsureTokenHasAbility::abilityFor($method);
 
         $errors = [
             '401' => $this->errorResponse('Missing or invalid access token.'),
-            '403' => $this->errorResponse('The token lacks the `'.$this->abilityFor($method).'` ability, or the record belongs to another workspace.'),
+            '402' => $this->errorResponse('Relaticle Cloud only: the workspace is paused until it has an active subscription. The body carries an `upgrade_url`.'),
+            '403' => $this->errorResponse("The token lacks the `{$ability}` ability, or its user no longer belongs to the token's workspace."),
             '429' => [
                 'description' => 'Rate limit exceeded. Back off for the number of seconds in `Retry-After`.',
                 'headers' => [
@@ -104,15 +107,5 @@ final class ErrorResponsesGenerator extends OpenApiGenerator
             'description' => $description,
             'content' => ['application/json' => ['schema' => ['$ref' => self::ERROR_SCHEMA]]],
         ];
-    }
-
-    private function abilityFor(string $method): string
-    {
-        return match ($method) {
-            'POST' => 'create',
-            'PUT', 'PATCH' => 'update',
-            'DELETE' => 'delete',
-            default => 'read',
-        };
     }
 }
