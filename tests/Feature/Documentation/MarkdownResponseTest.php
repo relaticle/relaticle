@@ -115,6 +115,10 @@ it('keeps the json 404 for the api', function (): void {
     $this->getJson('/api/v1/no-such-endpoint')
         ->assertNotFound()
         ->assertHeader('content-type', 'application/json');
+
+    $this->get('/api/v1/no-such-endpoint', ['Accept' => 'text/markdown'])
+        ->assertNotFound()
+        ->assertHeader('content-type', 'application/json');
 });
 
 it('echoes the missing url as inert code in the markdown 404', function (string $path): void {
