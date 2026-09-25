@@ -150,6 +150,27 @@ skips `Activity::SOURCE_PROPERTY` there, so the stamp never reads as a change.
 through two channels are two saves, so the timeline, the Activity page and the tools never merge
 them and never disagree about the source.
 
+## Tenant scoping without static teardown
+
+`SetApiWorkspaceContext::terminate()` used to call `clearBootedModels()` to drop the scopes it
+added. That resets boot state shared by every model, so the next use of any model boots it again
+and registers its listeners twice: measured, `Company` created listeners went 2 to 4 and
+`CustomField`, never scoped, went 1 to 2. In one test process every write after an API call logged
+twice; the four-channel test had to call the API last to hide it.
+
+- `Company`, `People`, `Opportunity`, `Task`, and `Note` declare `#[ScopedBy(WorkspaceScope::class)]`
+  once. The scope reads the request-scoped `App\Support\CurrentWorkspace` and does nothing when it is
+  unset, which matches today: outside the tenant middleware no scope existed.
+- `SetApiWorkspaceContext` and `ApplyTenantScopes` set the holder instead of adding five scopes.
+  Laravel resets the scoped binding per queue job; `SetApiWorkspaceContext::terminate()` clears it
+  for long-lived processes, since the HTTP kernel does not.
+- The API's `User` `tenant` scope stays a runtime closure, removed by name through
+  `Model::getAllGlobalScopes()`/`setAllGlobalScopes()`. The panel's Filament-named `User` scope is
+  unchanged, because `AcceptWorkspaceInvitation` suspends it by name.
+- Rejected: holding the workspace in `Context`, which would scope every queued job dispatched from
+  an API request; `flushEventListeners()`, which leaves every other model doubled; explicit
+  `whereBelongsTo()` in each caller, where one missed call leaks a tenant.
+
 ## Out of scope
 
 - Edits made in the SystemAdmin panel stamp `web`. `CreationSource` has no staff case, and no
