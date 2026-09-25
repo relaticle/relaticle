@@ -71,3 +71,13 @@ it('documents the error envelope, scoped abilities, and rate limits on every ope
         }
     }
 });
+
+it('serves the regenerated spec as json after the next deploy', function (): void {
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\ninfo:\n  version: 1.0.0\n");
+
+    $this->get('/openapi.json')->assertOk()->assertJsonPath('info.version', '1.0.0');
+
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\ninfo:\n  version: 1.1.0\n");
+
+    $this->get('/openapi.json')->assertOk()->assertJsonPath('info.version', '1.1.0');
+});
