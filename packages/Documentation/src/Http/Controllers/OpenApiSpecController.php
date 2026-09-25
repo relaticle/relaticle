@@ -9,11 +9,6 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
-/**
- * Serves the Scribe-generated spec at the root URLs agents probe by
- * convention (/openapi.json, /openapi.yaml). The file exists only after
- * scribe:generate has run, so a missing spec is a 404 rather than a 500.
- */
 final readonly class OpenApiSpecController
 {
     private const string SPEC_PATH = 'scribe/openapi.yaml';

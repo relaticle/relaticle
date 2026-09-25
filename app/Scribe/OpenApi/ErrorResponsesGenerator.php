@@ -8,11 +8,6 @@ use App\Http\Middleware\EnsureTokenHasAbility;
 use Knuckles\Camel\Output\OutputEndpointData;
 use Knuckles\Scribe\Writing\OpenApiSpecGenerators\OpenApiGenerator;
 
-/**
- * Adds what Scribe cannot extract from a successful response call: the error
- * envelope Laravel returns on every endpoint, the token abilities that gate
- * each HTTP method, and the rate-limit headers the throttle middleware sets.
- */
 final class ErrorResponsesGenerator extends OpenApiGenerator
 {
     private const string ERROR_SCHEMA = '#/components/schemas/Error';
