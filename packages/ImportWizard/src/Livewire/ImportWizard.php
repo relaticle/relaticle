@@ -208,14 +208,14 @@ final class ImportWizard extends Component implements HasActions, HasForms
             return null;
         }
 
-        $teamId = $this->getCurrentTeamId();
+        $workspaceId = $this->getCurrentWorkspaceId();
 
-        if ($teamId === null) {
+        if ($workspaceId === null) {
             return null;
         }
 
         $import = Import::query()
-            ->forTeam($teamId)
+            ->forWorkspace($workspaceId)
             ->find($this->storeId);
 
         return $import instanceof Import ? $import : null;
@@ -243,14 +243,14 @@ final class ImportWizard extends Component implements HasActions, HasForms
 
     private function destroyImportAndStore(string $importId): void
     {
-        $teamId = $this->getCurrentTeamId();
+        $workspaceId = $this->getCurrentWorkspaceId();
 
-        if ($teamId === null) {
+        if ($workspaceId === null) {
             return;
         }
 
         Import::query()
-            ->forTeam($teamId)
+            ->forWorkspace($workspaceId)
             ->where('id', $importId)
             ->delete();
 
@@ -270,7 +270,7 @@ final class ImportWizard extends Component implements HasActions, HasForms
         return null;
     }
 
-    private function getCurrentTeamId(): ?string
+    private function getCurrentWorkspaceId(): ?string
     {
         $tenant = filament()->getTenant();
 

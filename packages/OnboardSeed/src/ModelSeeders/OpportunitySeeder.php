@@ -7,7 +7,7 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Models\Company;
 use App\Models\Opportunity;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Log;
 use Relaticle\OnboardSeed\Support\BaseModelSeeder;
@@ -25,7 +25,7 @@ final class OpportunitySeeder extends BaseModelSeeder
         OpportunityCustomField::STAGE->value,
     ];
 
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
+    protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
 
@@ -46,7 +46,7 @@ final class OpportunitySeeder extends BaseModelSeeder
                 continue;
             }
 
-            $this->createOpportunityFromFixture($team, $user, $company, $key, $data);
+            $this->createOpportunityFromFixture($workspace, $user, $company, $key, $data);
         }
     }
 
@@ -56,7 +56,7 @@ final class OpportunitySeeder extends BaseModelSeeder
      * @param  array<string, mixed>  $data
      */
     private function createOpportunityFromFixture(
-        Team $team,
+        Workspace $workspace,
         Authenticatable $user,
         Company $company,
         string $key,
@@ -79,6 +79,6 @@ final class OpportunitySeeder extends BaseModelSeeder
         $processedFields = $this->processCustomFieldValues($customFields, $fieldMappings);
 
         /** @var Opportunity */
-        return $this->registerEntityFromFixture($key, $attributes, $processedFields, $team, $user);
+        return $this->registerEntityFromFixture($key, $attributes, $processedFields, $workspace, $user);
     }
 }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Livewire\Steps;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use Illuminate\Bus\Batch;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Eloquent\Builder;
@@ -51,6 +52,9 @@ final class ReviewStep extends Component
     /** @var array<string, string> Column source => batch ID */
     public array $batchIds = [];
 
+    /** @var array<string, bool> */
+    public array $failedColumns = [];
+
     private function connection(): Connection
     {
         return $this->store()->connection();
@@ -68,7 +72,7 @@ final class ReviewStep extends Component
         }
 
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
-            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof Carbon
+            return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof CarbonImmutable
                 ? null
                 : 'Invalid date format';
         }
@@ -78,7 +82,7 @@ final class ReviewStep extends Component
 
     private function validateEntityLinkValue(ColumnData $column, string $value): ?string
     {
-        $validator = new EntityLinkValidator($this->import()->team_id);
+        $validator = new EntityLinkValidator($this->import()->workspace_id);
 
         return $validator->validateFromColumn($column, $this->import()->getImporter(), $value);
     }
@@ -104,13 +108,33 @@ final class ReviewStep extends Component
 
     private function validateColumnAsync(ColumnData $column): string
     {
+        unset($this->failedColumns[$column->source]);
+
+        $oldBatchId = $this->batchIds[$column->source] ?? null;
+
+        if ($oldBatchId !== null) {
+            Bus::findBatch($oldBatchId)?->cancel();
+        }
+
         $batch = Bus::batch([
             new ValidateColumnJob($this->import()->id, $column),
         ])
             ->name("Validate {$column->source}")
             ->dispatch();
 
+        $this->dispatch('validation-started');
+
         return $batch->id;
+    }
+
+    private function revalidateEntityLinkColumn(): void
+    {
+        if (! $this->selectedColumn->isEntityLinkMapping()) {
+            return;
+        }
+
+        $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
+        $this->cacheValidationState($this->currentMappingsHash());
     }
 
     private function clearRelationshipsForReentry(): void
@@ -141,6 +165,7 @@ final class ReviewStep extends Component
 
         if ($cached !== null && $cached['hash'] === $currentHash) {
             $this->batchIds = $this->filterRunningBatches($cached['batch_ids']);
+            $this->checkProgress();
 
             return;
         }
@@ -264,12 +289,6 @@ final class ReviewStep extends Component
         );
         $this->selectedColumn = $updated;
 
-        $oldBatchId = $this->batchIds[$this->selectedColumn->source] ?? null;
-
-        if ($oldBatchId !== null) {
-            Bus::findBatch($oldBatchId)?->cancel();
-        }
-
         $this->batchIds[$this->selectedColumn->source] = $this->validateColumnAsync($this->selectedColumn);
 
         $this->cacheValidationState($this->currentMappingsHash());
@@ -294,6 +313,7 @@ final class ReviewStep extends Component
         ", [$jsonPath, $newValue, $jsonPath, $rawValue]);
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
+        $this->revalidateEntityLinkColumn();
 
         unset($this->columnErrorStatuses);
 
@@ -318,6 +338,7 @@ final class ReviewStep extends Component
         ', [$jsonPath, $jsonPath, $rawValue]);
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
+        $this->revalidateEntityLinkColumn();
 
         unset($this->columnErrorStatuses);
     }
@@ -335,6 +356,7 @@ final class ReviewStep extends Component
         ", [$jsonPath, $jsonPath, $jsonPath, $rawValue]);
 
         $this->updateValidationForRawValue($jsonPath, $rawValue, $error);
+        $this->revalidateEntityLinkColumn();
 
         unset($this->columnErrorStatuses);
     }
@@ -349,35 +371,69 @@ final class ReviewStep extends Component
             WHERE json_extract(raw_data, ?) = ?
         ', [$jsonPath, $jsonPath, $rawValue]);
 
+        $this->revalidateEntityLinkColumn();
+
         unset($this->columnErrorStatuses);
     }
 
     public function checkProgress(): void
     {
-        $hasCompleted = false;
+        $stateChanged = false;
 
         foreach ($this->batchIds as $columnSource => $batchId) {
-            if (Bus::findBatch($batchId)?->finished()) {
-                unset($this->batchIds[$columnSource]);
+            $batch = Bus::findBatch($batchId);
+
+            if ($this->batchFailed($batch)) {
+                $stateChanged = $stateChanged || ! isset($this->failedColumns[$columnSource]);
+                $this->failedColumns[$columnSource] = true;
+
+                continue;
+            }
+
+            if ($batch?->finished()) {
+                unset($this->batchIds[$columnSource], $this->failedColumns[$columnSource]);
                 $this->dispatch('validation-complete', column: $columnSource);
-                $hasCompleted = true;
+                $stateChanged = true;
             }
         }
 
-        if ($hasCompleted) {
+        if ($stateChanged) {
             unset($this->columnErrorStatuses);
             $this->cacheValidationState($this->currentMappingsHash());
         }
 
-        if ($this->batchIds === []) {
+        if (array_diff_key($this->batchIds, $this->failedColumns) === []) {
             $this->dispatch('polling-complete');
         }
+    }
+
+    public function retryFailedValidation(): void
+    {
+        foreach (array_keys($this->failedColumns) as $columnSource) {
+            unset($this->failedColumns[$columnSource]);
+
+            if ($columnSource === '__match_resolution') {
+                $this->batchIds[$columnSource] = $this->dispatchMatchResolution();
+
+                continue;
+            }
+
+            $column = $this->columns->firstWhere('source', $columnSource);
+
+            if ($column instanceof ColumnData) {
+                $this->batchIds[$columnSource] = $this->validateColumnAsync($column);
+            }
+        }
+
+        $this->cacheValidationState($this->currentMappingsHash());
+        $this->dispatch('validation-started');
     }
 
     #[Computed]
     public function isSelectedColumnValidating(): bool
     {
-        return isset($this->batchIds[$this->selectedColumn->source]);
+        return isset($this->batchIds[$this->selectedColumn->source])
+            && ! isset($this->failedColumns[$this->selectedColumn->source]);
     }
 
     #[Computed]
@@ -400,7 +456,7 @@ final class ReviewStep extends Component
 
     public function continueToPreview(): void
     {
-        if ($this->isValidating()) {
+        if ($this->isValidating() || $this->failedColumns !== []) {
             return;
         }
 
@@ -447,8 +503,13 @@ final class ReviewStep extends Component
         return array_filter($batchIds, function (string $batchId): bool {
             $batch = Bus::findBatch($batchId);
 
-            return $batch !== null && ! $batch->finished();
+            return $this->batchFailed($batch) || ! $batch?->finished();
         });
+    }
+
+    private function batchFailed(?Batch $batch): bool
+    {
+        return ! $batch instanceof Batch || $batch->cancelled() || $batch->hasFailures();
     }
 
     /** @param array{hash: string, batch_ids: array<string, string>}|null $cached */

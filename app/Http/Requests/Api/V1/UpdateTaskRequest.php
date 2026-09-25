@@ -4,35 +4,37 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Models\User;
-use App\Rules\ArrayExistsForTeam;
-use App\Rules\ValidCustomFields;
-use Illuminate\Foundation\Http\FormRequest;
+use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Validation\Rule;
 
-final class UpdateTaskRequest extends FormRequest
+final class UpdateTaskRequest extends BaseCrmEntityRequest
 {
+    protected function entity(): CrmEntity
+    {
+        return CrmEntity::Task;
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
-    public function rules(): array
+    protected function entityRules(User $user): array
     {
-        /** @var User $user */
-        $user = $this->user();
-        $team = $user->currentTeam;
-        $teamId = $team->getKey();
-        $teamMemberIds = $team->users()->pluck('users.id')->push($team->user_id)->unique()->all();
+        $workspace = $user->currentWorkspace;
+        $workspaceId = $workspace->getKey();
+        $workspaceMemberIds = $workspace->users()->pluck('users.id')->push($workspace->user_id)->unique()->all();
 
-        return array_merge([
+        return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'company_ids' => ['nullable', 'array'],
-            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForWorkspace('companies', 'company_ids', $workspaceId)],
             'people_ids' => ['nullable', 'array'],
-            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForWorkspace('people', 'people_ids', $workspaceId)],
             'opportunity_ids' => ['nullable', 'array'],
-            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForWorkspace('opportunities', 'opportunity_ids', $workspaceId)],
             'assignee_ids' => ['nullable', 'array'],
-            'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
-        ], new ValidCustomFields($teamId, 'task', isUpdate: true)->toRules($this->input('custom_fields')));
+            'assignee_ids.*' => ['string', Rule::in($workspaceMemberIds)],
+        ];
     }
 }

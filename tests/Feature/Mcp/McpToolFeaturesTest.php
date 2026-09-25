@@ -27,12 +27,12 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 // ---------------------------------------------------------------------------
@@ -40,10 +40,10 @@ beforeEach(function () {
 // ---------------------------------------------------------------------------
 describe('ListTasksTool assigned_to_me', function () {
     it('filters tasks assigned to the current user', function (): void {
-        $assignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Assigned Task']);
+        $assignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Assigned Task']);
         $assignedTask->assignees()->attach($this->user);
 
-        $unassignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unassigned Task']);
+        $unassignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned Task']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListTasksTool::class, [
@@ -55,10 +55,10 @@ describe('ListTasksTool assigned_to_me', function () {
     });
 
     it('returns all tasks when assigned_to_me is not set', function (): void {
-        $assignedTask = Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Assigned Task']);
+        $assignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Assigned Task']);
         $assignedTask->assignees()->attach($this->user);
 
-        Task::factory()->recycle([$this->user, $this->team])->create(['title' => 'Unassigned Task']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned Task']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListTasksTool::class)
@@ -73,13 +73,13 @@ describe('ListTasksTool assigned_to_me', function () {
 // ---------------------------------------------------------------------------
 describe('ListNotesTool notable filtering', function () {
     it('filters notes by notable_type company', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $companyNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Company Note']);
+        $companyNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Company Note']);
         $companyNote->companies()->attach($company);
 
-        $personNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Person Note']);
+        $personNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Person Note']);
         $personNote->people()->attach($person);
 
         RelaticleServer::actingAs($this->user)
@@ -92,13 +92,13 @@ describe('ListNotesTool notable filtering', function () {
     });
 
     it('filters notes by notable_type people', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $companyNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Company Note']);
+        $companyNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Company Note']);
         $companyNote->companies()->attach($company);
 
-        $personNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Person Note']);
+        $personNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Person Note']);
         $personNote->people()->attach($person);
 
         RelaticleServer::actingAs($this->user)
@@ -111,13 +111,13 @@ describe('ListNotesTool notable filtering', function () {
     });
 
     it('filters notes by notable_id', function (): void {
-        $company1 = Company::factory()->recycle([$this->user, $this->team])->create();
-        $company2 = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company1 = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $company2 = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $note1 = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Note For Company 1']);
+        $note1 = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Note For Company 1']);
         $note1->companies()->attach($company1);
 
-        $note2 = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Note For Company 2']);
+        $note2 = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Note For Company 2']);
         $note2->companies()->attach($company2);
 
         RelaticleServer::actingAs($this->user)
@@ -130,13 +130,13 @@ describe('ListNotesTool notable filtering', function () {
     });
 
     it('filters notes by notable_type and notable_id combined', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $companyNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Specific Company Note']);
+        $companyNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Specific Company Note']);
         $companyNote->companies()->attach($company);
 
-        $opportunityNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Opportunity Note']);
+        $opportunityNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Opportunity Note']);
         $opportunityNote->opportunities()->attach($opportunity);
 
         RelaticleServer::actingAs($this->user)
@@ -267,8 +267,8 @@ describe('custom field create via MCP', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
-                'tenant_id' => $this->team->id,
+            $section = CustomFieldSection::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'entity_type' => $entityType,
                 'name' => "MCP Test Section for {$entityType}",
                 'code' => "mcp_test_{$entityType}",
@@ -277,8 +277,8 @@ describe('custom field create via MCP', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
-                'tenant_id' => $this->team->id,
+            CustomField::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,
                 'code' => 'cf_website',
@@ -362,8 +362,8 @@ describe('custom field update via MCP', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
-                'tenant_id' => $this->team->id,
+            $section = CustomFieldSection::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'entity_type' => $entityType,
                 'name' => "MCP Update Section for {$entityType}",
                 'code' => "mcp_update_{$entityType}",
@@ -372,8 +372,8 @@ describe('custom field update via MCP', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
-                'tenant_id' => $this->team->id,
+            CustomField::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,
                 'code' => 'cf_notes',
@@ -387,7 +387,7 @@ describe('custom field update via MCP', function () {
     });
 
     it('updates company with custom fields', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -398,7 +398,7 @@ describe('custom field update via MCP', function () {
     });
 
     it('updates person with custom fields', function (): void {
-        $person = People::factory()->recycle([$this->user, $this->team])->create();
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdatePeopleTool::class, [
@@ -409,7 +409,7 @@ describe('custom field update via MCP', function () {
     });
 
     it('updates opportunity with custom fields', function (): void {
-        $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateOpportunityTool::class, [
@@ -420,7 +420,7 @@ describe('custom field update via MCP', function () {
     });
 
     it('updates task with custom fields', function (): void {
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateTaskTool::class, [
@@ -431,7 +431,7 @@ describe('custom field update via MCP', function () {
     });
 
     it('updates note with custom fields', function (): void {
-        $note = Note::factory()->recycle([$this->user, $this->team])->create();
+        $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateNoteTool::class, [
@@ -447,8 +447,8 @@ describe('custom field update via MCP', function () {
 // ---------------------------------------------------------------------------
 describe('partial custom_fields update preserves omitted fields', function () {
     beforeEach(function () {
-        $section = CustomFieldSection::create([
-            'tenant_id' => $this->team->id,
+        $section = CustomFieldSection::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'entity_type' => 'company',
             'name' => 'Partial Update Section',
             'code' => 'partial_update',
@@ -457,8 +457,8 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'active' => true,
         ]);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
             'code' => 'cf_alpha',
@@ -469,8 +469,8 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
             'code' => 'cf_beta',
@@ -481,8 +481,8 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
             'code' => 'cf_links',
@@ -493,8 +493,8 @@ describe('partial custom_fields update preserves omitted fields', function () {
             'validation_rules' => [],
         ]);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
             'code' => 'cf_flag',
@@ -615,8 +615,8 @@ describe('partial custom_fields update preserves omitted fields', function () {
 // ---------------------------------------------------------------------------
 describe('unknown custom field key rejection', function () {
     beforeEach(function () {
-        $section = CustomFieldSection::create([
-            'tenant_id' => $this->team->id,
+        $section = CustomFieldSection::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'entity_type' => 'company',
             'name' => 'Unknown Key Test Section',
             'code' => 'unknown_key_test',
@@ -625,8 +625,8 @@ describe('unknown custom field key rejection', function () {
             'active' => true,
         ]);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $section->id,
             'entity_type' => 'company',
             'code' => 'valid_field',
@@ -648,7 +648,7 @@ describe('unknown custom field key rejection', function () {
     });
 
     it('rejects unknown custom field key on update', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdateCompanyTool::class, [
@@ -679,8 +679,8 @@ describe('custom field validation rejection', function () {
         $entityTypes = ['company', 'people', 'opportunity', 'task', 'note'];
 
         foreach ($entityTypes as $entityType) {
-            $section = CustomFieldSection::create([
-                'tenant_id' => $this->team->id,
+            $section = CustomFieldSection::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'entity_type' => $entityType,
                 'name' => "Number Section for {$entityType}",
                 'code' => "number_{$entityType}",
@@ -689,8 +689,8 @@ describe('custom field validation rejection', function () {
                 'active' => true,
             ]);
 
-            CustomField::create([
-                'tenant_id' => $this->team->id,
+            CustomField::factory()->create([
+                'tenant_id' => $this->workspace->id,
                 'custom_field_section_id' => $section->id,
                 'entity_type' => $entityType,
                 'code' => 'cf_amount',
@@ -754,7 +754,7 @@ describe('custom field validation rejection', function () {
 // ---------------------------------------------------------------------------
 describe('relationship includes filter sensitive fields', function () {
     it('does not leak sensitive user fields in GetCompanyTool creator include', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create([
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
             'creator_id' => $this->user->id,
         ]);
 
@@ -767,13 +767,13 @@ describe('relationship includes filter sensitive fields', function () {
             ->assertSee($this->user->name)
             ->assertDontSee('email_verified_at')
             ->assertDontSee('two_factor_confirmed_at')
-            ->assertDontSee('current_team_id')
+            ->assertDontSee('current_workspace_id')
             ->assertDontSee('profile_photo_path')
             ->assertDontSee('password');
     });
 
     it('does not leak sensitive fields in ListCompaniesTool with creator include', function (): void {
-        Company::factory()->recycle([$this->user, $this->team])->create([
+        Company::factory()->recycle([$this->user, $this->workspace])->create([
             'creator_id' => $this->user->id,
         ]);
 
@@ -785,14 +785,14 @@ describe('relationship includes filter sensitive fields', function () {
             ->assertSee($this->user->name)
             ->assertDontSee('email_verified_at')
             ->assertDontSee('two_factor_confirmed_at')
-            ->assertDontSee('current_team_id')
+            ->assertDontSee('current_workspace_id')
             ->assertDontSee('profile_photo_path')
             ->assertDontSee('password');
     });
 
     it('serializes related people through resource in GetCompanyTool', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        People::factory()->recycle([$this->user, $this->team])->create([
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        People::factory()->recycle([$this->user, $this->workspace])->create([
             'name' => 'Included Person',
             'company_id' => $company->id,
         ]);
@@ -804,21 +804,21 @@ describe('relationship includes filter sensitive fields', function () {
             ])
             ->assertOk()
             ->assertSee('Included Person')
-            ->assertDontSee('team_id')
+            ->assertDontSee('workspace_id')
             ->assertDontSee('creator_id')
             ->assertDontSee('deleted_at');
     });
 });
 
 // ---------------------------------------------------------------------------
-// Detach tools: team-scoped validation
+// Detach tools: workspace-scoped validation
 // ---------------------------------------------------------------------------
-describe('detach tools reject cross-team entity IDs', function () {
-    it('rejects company from another team when detaching from task', function (): void {
-        $task = Task::factory()->recycle([$this->user, $this->team])->create();
-        $otherTeam = Team::factory()->create();
+describe('detach tools reject cross-workspace entity IDs', function () {
+    it('rejects company from another workspace when detaching from task', function (): void {
+        $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+        $otherWorkspace = Workspace::factory()->create();
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -829,11 +829,11 @@ describe('detach tools reject cross-team entity IDs', function () {
             ->assertHasErrors(['company_ids.0']);
     });
 
-    it('rejects company from another team when detaching from note', function (): void {
-        $note = Note::factory()->recycle([$this->user, $this->team])->create();
-        $otherTeam = Team::factory()->create();
+    it('rejects company from another workspace when detaching from note', function (): void {
+        $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+        $otherWorkspace = Workspace::factory()->create();
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ]));
 
         RelaticleServer::actingAs($this->user)

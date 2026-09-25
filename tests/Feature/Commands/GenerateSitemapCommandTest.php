@@ -99,8 +99,9 @@ it('adds developer guide urls with lastmod from front matter', function (): void
     $xml = File::get($this->sitemap);
 
     expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
-        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-08-14#')
-        ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-08-12#');
+        ->and($xml)->toContain('<loc>'.route('aiNativeCrm').'</loc>')
+        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-08-30#')
+        ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-09-15#');
 });
 
 it('omits lastmod for a help page with no updated front matter', function (): void {
@@ -126,6 +127,33 @@ it('omits lastmod for a help page with no updated front matter', function (): vo
 
     expect($xml)->toContain('<loc>'.route('help.show', ['category' => 'no-date', 'slug' => 'undated-page']).'</loc>')
         ->and($xml)->not->toMatch('#no-date/undated-page</loc>\s*<lastmod>#');
+});
+
+it('excludes query string variants of a page already in the sitemap', function (): void {
+    fakeSitemapCrawl([
+        config('app.url') => '<html><body><a href="'.url('/contact').'">Contact</a>'
+            .'<a href="'.url('/contact?plan=enterprise').'">Enterprise</a></body></html>',
+        url('/contact') => '<html><body>contact</body></html>',
+        url('/contact?plan=enterprise') => '<html><body>contact</body></html>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = File::get($this->sitemap);
+
+    expect($xml)->toContain('<loc>'.url('/contact').'</loc>')
+        ->and($xml)->not->toContain('plan=enterprise');
+});
+
+it('excludes non-html assets from the sitemap', function (): void {
+    fakeSitemapCrawl([
+        config('app.url') => '<html><body><a href="'.url('/llms.txt').'">llms.txt</a></body></html>',
+        url('/llms.txt') => 'plain text',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    expect(File::get($this->sitemap))->not->toContain('llms.txt');
 });
 
 it('excludes auth and utility redirect urls from the sitemap', function (): void {

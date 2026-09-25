@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
 use App\Models\UserSocialAccount;
+use App\Models\Workspace;
+use App\Services\AvatarService;
 use Filament\Panel;
 
-mutates(User::class);
+mutates(User::class, AvatarService::class);
 
 test('user has many social accounts', function () {
     $user = User::factory()->create();
@@ -32,30 +33,32 @@ test('user belongs to many tasks', function () {
 
 test('user can access tenants', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create(['user_id' => $user->id]);
-    $user->ownedTeams()->save($team);
+    $workspace = Workspace::factory()->create(['user_id' => $user->id]);
+    $user->ownedWorkspaces()->save($workspace);
 
     $tenants = $user->getTenants(app(Panel::class)->id('app'));
 
     expect($tenants->count())->toBe(1)
-        ->and($tenants->first()->id)->toBe($team->id);
+        ->and($tenants->first()->id)->toBe($workspace->id);
 });
 
 test('user can access tenant', function () {
     $user = User::factory()->create();
-    $team = Team::factory()->create(['user_id' => $user->id]);
-    $user->ownedTeams()->save($team);
-    $user->currentTeam()->associate($team);
+    $workspace = Workspace::factory()->create(['user_id' => $user->id]);
+    $user->ownedWorkspaces()->save($workspace);
+    $user->currentWorkspace()->associate($workspace);
     $user->save();
 
-    expect($user->canAccessTenant($team))->toBeTrue();
+    expect($user->canAccessTenant($workspace))->toBeTrue();
 });
 
-test('user has avatar', function () {
+test('user has a consistent local initial avatar', function () {
     $user = User::factory()->create([
         'name' => 'John Doe',
     ]);
 
-    expect($user->getFilamentAvatarUrl())->not->toBeNull()
-        ->and($user->avatar)->not->toBeNull();
+    expect($user->getFilamentAvatarUrl())
+        ->toStartWith('data:image/svg+xml;base64,')
+        ->toBe($user->profile_photo_url)
+        ->and($user->avatar)->toBe($user->profile_photo_url);
 });

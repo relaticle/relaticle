@@ -5,33 +5,26 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Company;
 
 use App\Actions\Company\DeleteCompany;
-use App\Models\Company;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use Relaticle\Chat\Tools\BaseWriteDeleteTool;
 
 final class DeleteCompanyTool extends BaseWriteDeleteTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose deleting a company. Returns a proposal for user approval.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Company::class;
+        return CrmEntity::Company;
     }
 
     protected function actionClass(): string
     {
         return DeleteCompany::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Company';
-    }
-
-    protected function entityType(): string
-    {
-        return 'company';
     }
 }

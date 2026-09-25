@@ -16,25 +16,25 @@ use Tests\Helpers\ChatDocument;
 mutates(ListConversationMessages::class);
 
 it('approved actions expose record.url after conversation reload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
-    $angel = People::factory()->for($user->currentTeam)->create(['name' => 'Angel']);
+    $angel = People::factory()->for($user->currentWorkspace)->create(['name' => 'Angel']);
 
     $convId = '019df800-4444-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -70,7 +70,7 @@ it('approved actions expose record.url after conversation reload', function (): 
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -79,7 +79,7 @@ it('approved actions expose record.url after conversation reload', function (): 
         'id' => '019df800-4444-7000-8000-000000000010',
         'role' => 'assistant',
         'content' => 'I have proposed creating a person.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -98,25 +98,25 @@ it('approved actions expose record.url after conversation reload', function (): 
 });
 
 it('reconstructs per-item batch chips so resolved items survive reload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
-    $angel = People::factory()->for($user->currentTeam)->create(['name' => 'Angel']);
+    $angel = People::factory()->for($user->currentWorkspace)->create(['name' => 'Angel']);
 
     $convId = '019df800-4444-7000-8000-000000000003';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -152,7 +152,7 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -161,7 +161,7 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
         'id' => '019df800-4444-7000-8000-000000000030',
         'role' => 'assistant',
         'content' => 'I have proposed creating people.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -188,23 +188,23 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
 });
 
 it('does not expose record on pending or rejected actions', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     $convId = '019df800-4444-7000-8000-000000000002';
     DB::table('agent_conversations')->insert([
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
 
     $pending = PendingAction::query()->create([
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
         'conversation_id' => $convId,
         'action_class' => 'App\\Actions\\People\\CreatePeople',
@@ -236,7 +236,7 @@ it('does not expose record on pending or rejected actions', function (): void {
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -245,7 +245,7 @@ it('does not expose record on pending or rejected actions', function (): void {
         'id' => '019df800-4444-7000-8000-000000000020',
         'role' => 'assistant',
         'content' => 'Pending.',
-        'tool_results' => json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ] + $base);
@@ -255,4 +255,72 @@ it('does not expose record on pending or rejected actions', function (): void {
 
     expect($action)->not->toBeNull();
     expect($action['record'] ?? null)->toBeNull();
+});
+
+it('rehydrates a pending proposal with the instant it lapses', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $convId = '019df800-4444-7000-8000-000000000005';
+    DB::table('agent_conversations')->insert([
+        'id' => $convId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $pending = PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $convId,
+        'action_class' => 'App\\Actions\\People\\CreatePeople',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['name' => 'Angel'],
+        'display_data' => ['title' => 'Create Person'],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(1440),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => '019df800-4444-7000-8000-000000000050',
+        'conversation_id' => $convId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'crm',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => '[]',
+        'usage' => '{}',
+        'meta' => '{}',
+        'role' => 'assistant',
+        'content' => 'I have proposed creating a person.',
+        'steps' => storedToolSteps([[
+            'id' => 'toolu_'.uniqid(),
+            'name' => 'CreatePersonTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'entity_type' => 'people',
+                'operation' => 'create',
+                'data' => ['name' => 'Angel'],
+                'display' => ['title' => 'Create Person'],
+            ]),
+        ]]),
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0];
+
+    // Without this the client cannot tell a lapsed proposal from a live one, and
+    // since the composer is hidden while one is docked, a tab left open past the
+    // expiry is left with no way to type. The sweeper broadcasts nothing.
+    expect($action['status'])->toBe('pending')
+        ->and($action['expires_at'])->toBe($pending->expires_at->toIso8601String());
 });

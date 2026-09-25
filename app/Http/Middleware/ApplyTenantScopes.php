@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
-use App\Models\Scopes\TeamScope;
-use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use LogicException;
 
 final readonly class ApplyTenantScopes
 {
     public function handle(Request $request, Closure $next): mixed
     {
-        $tenantId = Filament::getTenant()->getKey();
+        $tenant = Filament::getTenant();
+
+        throw_unless($tenant instanceof Workspace, LogicException::class, 'Tenant scopes need a resolved workspace tenant.');
+
+        $tenantId = $tenant->getKey();
 
         User::addGlobalScope(
             filament()->getTenancyScopeName(),
             fn (Builder $query) => $query
-                ->whereHas('teams', fn (Builder $query) => $query->where('teams.id', $tenantId))
-                ->orWhereHas('ownedTeams', fn (Builder $query) => $query->where('teams.id', $tenantId))
+                ->whereHas('workspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
+                ->orWhereHas('ownedWorkspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
         );
 
-        Company::addGlobalScope(new TeamScope);
-        People::addGlobalScope(new TeamScope);
-        Opportunity::addGlobalScope(new TeamScope);
-        Task::addGlobalScope(new TeamScope);
-        Note::addGlobalScope(new TeamScope);
+        resolve(CurrentWorkspace::class)->set($tenant);
 
         return $next($request);
     }

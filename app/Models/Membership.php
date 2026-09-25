@@ -15,6 +15,8 @@ final class Membership extends JetstreamMembership
     /** @use HasFactory<Factory<self>> */
     use HasFactory;
 
+    protected $table = 'workspace_user';
+
     /**
      * Indicates if the IDs are auto-incrementing.
      *
@@ -31,11 +33,11 @@ final class Membership extends JetstreamMembership
     }
 
     /**
-     * @return BelongsTo<Team, $this>
+     * @return BelongsTo<Workspace, $this>
      */
-    public function team(): BelongsTo
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Workspace::class);
     }
 
     protected function getRoleNameAttribute(): string

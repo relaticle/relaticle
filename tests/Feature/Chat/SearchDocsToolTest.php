@@ -11,8 +11,8 @@ use Relaticle\Chat\Tools\SearchDocsTool;
 mutates(SearchDocsTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
@@ -35,7 +35,7 @@ it('answers the connector question that used to be a dead end', function (): voi
     $content = implode("\n", array_column($results, 'content'));
 
     expect($content)->toContain('https://mcp.relaticle.com')
-        ->and(array_column($results, 'title'))->toContain('Connect Claude or ChatGPT to your workspace');
+        ->and(array_column($results, 'title'))->toContain('Connect Claude or ChatGPT to Relaticle');
 });
 
 it('keeps inline code the flattened search index drops', function (): void {
@@ -59,7 +59,7 @@ it('matches a stemmed term in both directions', function (): void {
 it('ranks a rare term above a term the whole corpus uses', function (): void {
     $results = searchDocs('how do I add a custom connector')['results'];
 
-    expect($results[0]['title'])->toBe('Connect Claude or ChatGPT to your workspace');
+    expect($results[0]['title'])->toBe('Connect Claude or ChatGPT to Relaticle');
 });
 
 it('cites route-derived urls so self-hosted installs link to themselves', function (): void {
@@ -95,7 +95,7 @@ it('caps the number of sections returned', function (): void {
 });
 
 it('does not create a pending action because it is not a write', function (): void {
-    searchDocs('how do I invite my team');
+    searchDocs('how do I invite my workspace');
 
     expect(PendingAction::query()->count())->toBe(0);
 });

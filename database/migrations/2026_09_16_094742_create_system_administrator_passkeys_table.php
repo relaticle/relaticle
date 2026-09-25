@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        // Staff credentials live apart from `passkeys` so both tables keep a real
+        // foreign key; one shared table would have to drop the customer one.
+        Schema::create('system_administrator_passkeys', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignUlid('user_id')->constrained('system_administrators')->cascadeOnDelete();
+            $table->string('name');
+            $table->string('credential_id', 1024)->unique();
+            $table->json('credential');
+            $table->timestamp('last_used_at')->nullable();
+            $table->timestamps();
+
+            $table->index('user_id');
+        });
+    }
+};

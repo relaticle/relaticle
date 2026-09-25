@@ -10,11 +10,11 @@ use Relaticle\Chat\Models\AiCreditBalance;
 
 beforeEach(function (): void {
     Queue::fake();
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->user->currentTeam->getKey()], [
-        'team_id' => $this->user->currentTeam->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->user->currentWorkspace->getKey()], [
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -25,7 +25,7 @@ beforeEach(function (): void {
 it('two-step first-message protocol: create returns id without dispatch; send to that id dispatches', function (): void {
     $doc = ['type' => 'doc', 'content' => [['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'first message']]]]];
 
-    // Step 1: create — must NOT dispatch
+    // Step 1: create, which must NOT dispatch
     $createRes = $this->postJson(route('chat.conversations.create'), [
         'document' => $doc,
     ])->assertOk()->assertJsonStructure(['conversation_id']);
@@ -35,7 +35,7 @@ it('two-step first-message protocol: create returns id without dispatch; send to
     expect(DB::table('agent_conversations')->where('id', $conversationId)->exists())->toBeTrue();
     Queue::assertNotPushed(ProcessChatMessage::class);
 
-    // Step 2: send — must dispatch exactly once for this conversation_id
+    // Step 2: send, which must dispatch exactly once for this conversation_id
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => $doc,
     ])->assertOk();

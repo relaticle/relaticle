@@ -13,8 +13,8 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -27,11 +27,12 @@ mutates(
     UpdateCompany::class,
     DeleteCompany::class,
     ListCompanies::class,
+    CompanyResource::class,
 );
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('requires authentication', function (): void {
@@ -41,8 +42,8 @@ it('requires authentication', function (): void {
 it('can list companies', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Company::query()->where('team_id', $this->team->id)->count();
-    Company::factory(3)->recycle([$this->user, $this->team])->create();
+    $seeded = Company::query()->where('workspace_id', $this->workspace->id)->count();
+    Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/companies')
         ->assertOk()
@@ -71,7 +72,7 @@ it('can create a company', function (): void {
             )
         );
 
-    $this->assertDatabaseHas('companies', ['name' => 'Acme Corp', 'team_id' => $this->team->id]);
+    $this->assertDatabaseHas('companies', ['name' => 'Acme Corp', 'workspace_id' => $this->workspace->id]);
 });
 
 it('validates required fields on create', function (): void {
@@ -85,7 +86,7 @@ it('validates required fields on create', function (): void {
 it('can show a company', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Show Test']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Show Test']);
 
     $this->getJson("/api/v1/companies/{$company->id}")
         ->assertOk()
@@ -97,7 +98,7 @@ it('can show a company', function (): void {
                     ->where('name', 'Show Test')
                     ->whereType('creation_source', 'string')
                     ->whereType('custom_fields', 'array')
-                    ->missing('team_id')
+                    ->missing('workspace_id')
                     ->missing('creator_id')
                     ->etc()
                 )
@@ -109,7 +110,7 @@ it('can show a company', function (): void {
 it('can update a company', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $this->putJson("/api/v1/companies/{$company->id}", ['name' => 'Updated Name'])
         ->assertOk()
@@ -130,7 +131,7 @@ it('can update a company', function (): void {
 it('can delete a company', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $this->deleteJson("/api/v1/companies/{$company->id}")
         ->assertNoContent();
@@ -138,12 +139,12 @@ it('can delete a company', function (): void {
     $this->assertSoftDeleted('companies', ['id' => $company->id]);
 });
 
-it('scopes companies to current team', function (): void {
-    $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => Team::factory()->create()->id]));
+it('scopes companies to current workspace', function (): void {
+    $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['workspace_id' => Workspace::factory()->create()->id]));
 
     Sanctum::actingAs($this->user);
 
-    $ownCompany = Company::factory()->recycle([$this->user, $this->team])->create();
+    $ownCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = $this->getJson('/api/v1/companies');
 
@@ -155,31 +156,31 @@ it('scopes companies to current team', function (): void {
 });
 
 describe('cross-tenant isolation', function (): void {
-    it('cannot show a company from another team', function (): void {
+    it('cannot show a company from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->getJson("/api/v1/companies/{$otherCompany->id}")
             ->assertNotFound();
     });
 
-    it('cannot update a company from another team', function (): void {
+    it('cannot update a company from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->putJson("/api/v1/companies/{$otherCompany->id}", ['name' => 'Hacked'])
             ->assertNotFound();
     });
 
-    it('cannot delete a company from another team', function (): void {
+    it('cannot delete a company from another workspace', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
-        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['team_id' => $otherTeam->id]));
+        $otherWorkspace = Workspace::factory()->create();
+        $otherCompany = Company::withoutEvents(fn () => Company::factory()->create(['workspace_id' => $otherWorkspace->id]));
 
         $this->deleteJson("/api/v1/companies/{$otherCompany->id}")
             ->assertNotFound();
@@ -190,7 +191,7 @@ describe('includes', function (): void {
     it('can include relations on list endpoint', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory()->recycle([$this->user, $this->team])->create();
+        Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/companies?include=creator')
             ->assertOk()
@@ -204,7 +205,7 @@ describe('includes', function (): void {
     it('can include relations on show endpoint with full structure', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson("/api/v1/companies/{$company->id}?include=creator")
             ->assertOk()
@@ -229,7 +230,7 @@ describe('includes', function (): void {
     it('can include multiple relations', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson("/api/v1/companies/{$company->id}?include=creator,people")
             ->assertOk()
@@ -240,10 +241,21 @@ describe('includes', function (): void {
             );
     });
 
+    it('does not expose MCP-only task relationships through the public API', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=tasks")
+            ->assertOk()
+            ->assertJsonMissingPath('data.relationships.tasks')
+            ->assertJsonMissingPath('included');
+    });
+
     it('does not include relations when not requested', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $response = $this->getJson("/api/v1/companies/{$company->id}")
             ->assertOk();
@@ -254,8 +266,8 @@ describe('includes', function (): void {
     it('can include relationship counts', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        People::factory(3)->recycle([$this->user, $this->team])->create(['company_id' => $company->id]);
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        People::factory(3)->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
 
         $response = $this->getJson('/api/v1/companies?include=peopleCount');
 
@@ -276,8 +288,8 @@ describe('includes', function (): void {
 
 describe('custom fields', function (): void {
     beforeEach(function (): void {
-        $this->section = CustomFieldSection::create([
-            'tenant_id' => $this->team->id,
+        $this->section = CustomFieldSection::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'entity_type' => 'company',
             'name' => 'General',
             'code' => 'general',
@@ -290,8 +302,8 @@ describe('custom fields', function (): void {
     it('can create a company with custom fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'industry',
@@ -325,8 +337,8 @@ describe('custom fields', function (): void {
     it('can update a company with custom fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'industry',
@@ -337,7 +349,7 @@ describe('custom fields', function (): void {
             'validation_rules' => [],
         ]);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->putJson("/api/v1/companies/{$company->id}", [
             'name' => 'Updated Name',
@@ -362,8 +374,8 @@ describe('custom fields', function (): void {
     it('validates custom field values on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'annual_revenue',
@@ -402,8 +414,8 @@ describe('custom fields', function (): void {
     it('does not leak available field names in validation errors', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'secret_field',
@@ -435,8 +447,8 @@ describe('custom fields', function (): void {
     it('rejects invalid option ID for select custom field on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
-            'tenant_id' => $this->team->id,
+        $field = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'stage',
@@ -448,8 +460,8 @@ describe('custom fields', function (): void {
         ]);
 
         $field->options()->createMany([
-            ['name' => 'Lead', 'sort_order' => 1, 'tenant_id' => $this->team->id],
-            ['name' => 'Customer', 'sort_order' => 2, 'tenant_id' => $this->team->id],
+            ['name' => 'Lead', 'sort_order' => 1, 'tenant_id' => $this->workspace->id],
+            ['name' => 'Customer', 'sort_order' => 2, 'tenant_id' => $this->workspace->id],
         ]);
 
         $this->postJson('/api/v1/companies', [
@@ -465,8 +477,8 @@ describe('custom fields', function (): void {
     it('accepts valid option ID for select custom field on create', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
-            'tenant_id' => $this->team->id,
+        $field = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'stage',
@@ -480,7 +492,7 @@ describe('custom fields', function (): void {
         $option = $field->options()->create([
             'name' => 'Lead',
             'sort_order' => 1,
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
         ]);
 
         $this->postJson('/api/v1/companies', [
@@ -496,8 +508,8 @@ describe('custom fields', function (): void {
     it('rejects invalid option ID for select custom field on update', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
-            'tenant_id' => $this->team->id,
+        $field = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'stage',
@@ -509,11 +521,11 @@ describe('custom fields', function (): void {
         ]);
 
         $field->options()->createMany([
-            ['name' => 'Lead', 'sort_order' => 1, 'tenant_id' => $this->team->id],
-            ['name' => 'Customer', 'sort_order' => 2, 'tenant_id' => $this->team->id],
+            ['name' => 'Lead', 'sort_order' => 1, 'tenant_id' => $this->workspace->id],
+            ['name' => 'Customer', 'sort_order' => 2, 'tenant_id' => $this->workspace->id],
         ]);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->putJson("/api/v1/companies/{$company->id}", [
             'name' => 'Updated Name',
@@ -528,8 +540,8 @@ describe('custom fields', function (): void {
     it('rejects invalid option IDs for multi-select custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
-            'tenant_id' => $this->team->id,
+        $field = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'categories',
@@ -543,7 +555,7 @@ describe('custom fields', function (): void {
         $validOption = $field->options()->create([
             'name' => 'Option A',
             'sort_order' => 1,
-            'tenant_id' => $this->team->id,
+            'tenant_id' => $this->workspace->id,
         ]);
 
         $this->postJson('/api/v1/companies', [
@@ -553,14 +565,14 @@ describe('custom fields', function (): void {
             ],
         ])
             ->assertUnprocessable()
-            ->assertInvalid(['custom_fields.categories.1']);
+            ->assertInvalid(['custom_fields.categories' => 'invalid-id']);
     });
 
     it('accepts valid option IDs for multi-select custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        $field = CustomField::create([
-            'tenant_id' => $this->team->id,
+        $field = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'categories',
@@ -572,8 +584,8 @@ describe('custom fields', function (): void {
         ]);
 
         $options = $field->options()->createMany([
-            ['name' => 'Option A', 'sort_order' => 1, 'tenant_id' => $this->team->id],
-            ['name' => 'Option B', 'sort_order' => 2, 'tenant_id' => $this->team->id],
+            ['name' => 'Option A', 'sort_order' => 1, 'tenant_id' => $this->workspace->id],
+            ['name' => 'Option B', 'sort_order' => 2, 'tenant_id' => $this->workspace->id],
         ]);
 
         $this->postJson('/api/v1/companies', [
@@ -587,10 +599,10 @@ describe('custom fields', function (): void {
     });
 
     it('handles orphaned custom field values gracefully', function (): void {
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $customField = CustomField::create([
-            'tenant_id' => $this->team->getKey(),
+        $customField = CustomField::factory()->create([
+            'tenant_id' => $this->workspace->getKey(),
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'orphan_field',
@@ -602,7 +614,7 @@ describe('custom fields', function (): void {
         ]);
 
         TenantContextService::withTenant(
-            $this->team->getKey(),
+            $this->workspace->getKey(),
             fn () => $company->saveCustomFields(['orphan_field' => 'test value']),
         );
 
@@ -659,12 +671,12 @@ describe('custom fields', function (): void {
 
         $domainsField = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->team->id)
+            ->where('tenant_id', $this->workspace->id)
             ->where('entity_type', 'company')
             ->where('code', 'domains')
             ->first();
 
-        expect($domainsField)->not->toBeNull('domains custom field should be auto-created by team listener');
+        expect($domainsField)->not->toBeNull('domains custom field should be auto-created by workspace listener');
 
         $this->postJson('/api/v1/companies', [
             'name' => 'Acme Corp',
@@ -681,12 +693,12 @@ describe('custom fields', function (): void {
 
         $domainsField = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->team->id)
+            ->where('tenant_id', $this->workspace->id)
             ->where('entity_type', 'company')
             ->where('code', 'domains')
             ->first();
 
-        expect($domainsField)->not->toBeNull('domains custom field should be auto-created by team listener');
+        expect($domainsField)->not->toBeNull('domains custom field should be auto-created by workspace listener');
 
         $this->postJson('/api/v1/companies', [
             'name' => 'Acme Corp',
@@ -700,8 +712,8 @@ describe('custom fields', function (): void {
     it('rejects invalid email in email custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'emails',
@@ -725,8 +737,8 @@ describe('custom fields', function (): void {
     it('accepts valid items in email custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'emails',
@@ -749,8 +761,8 @@ describe('custom fields', function (): void {
     it('rejects invalid phone number in phone custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'phones',
@@ -774,8 +786,8 @@ describe('custom fields', function (): void {
     it('accepts valid items in phone custom field', function (): void {
         Sanctum::actingAs($this->user);
 
-        CustomField::create([
-            'tenant_id' => $this->team->id,
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->id,
             'custom_field_section_id' => $this->section->id,
             'entity_type' => 'company',
             'code' => 'phones',
@@ -800,8 +812,8 @@ describe('filtering and sorting', function (): void {
     it('can filter companies by name', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Beta Inc']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta Inc']);
 
         $response = $this->getJson('/api/v1/companies?filter[name]=Acme');
 
@@ -812,11 +824,22 @@ describe('filtering and sorting', function (): void {
         expect($names)->not->toContain('Beta Inc');
     });
 
+    it('can filter companies by creation source', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Sample Corp', 'creation_source' => CreationSource::SYSTEM]);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Real Corp', 'creation_source' => CreationSource::WEB]);
+
+        $names = collect($this->getJson('/api/v1/companies?filter[creation_source]=system')->assertOk()->json('data'))->pluck('attributes.name');
+
+        expect($names->all())->toBe(['Sample Corp']);
+    });
+
     it('can sort companies by name ascending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Corp']);
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Inc']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zulu Corp']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Alpha Inc']);
 
         $response = $this->getJson('/api/v1/companies?sort=name');
 
@@ -831,8 +854,8 @@ describe('filtering and sorting', function (): void {
     it('can sort companies by name descending', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Alpha Inc']);
-        Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Zulu Corp']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Alpha Inc']);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zulu Corp']);
 
         $response = $this->getJson('/api/v1/companies?sort=-name');
 
@@ -847,14 +870,14 @@ describe('filtering and sorting', function (): void {
     it('rejects disallowed filter fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        $this->getJson('/api/v1/companies?filter[team_id]=fake')
+        $this->getJson('/api/v1/companies?filter[workspace_id]=fake')
             ->assertStatus(400);
     });
 
     it('rejects disallowed sort fields', function (): void {
         Sanctum::actingAs($this->user);
 
-        $this->getJson('/api/v1/companies?sort=team_id')
+        $this->getJson('/api/v1/companies?sort=workspace_id')
             ->assertStatus(400);
     });
 });
@@ -863,10 +886,10 @@ describe('soft deletes', function (): void {
     it('excludes soft-deleted companies from list', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Deleted Corp']);
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deleted Corp']);
         $company->delete();
 
-        $active = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Active Corp']);
+        $active = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Active Corp']);
 
         $response = $this->getJson('/api/v1/companies');
 
@@ -878,7 +901,7 @@ describe('soft deletes', function (): void {
     it('cannot show a soft-deleted company', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $company->delete();
 
         $this->getJson("/api/v1/companies/{$company->id}")
@@ -888,7 +911,7 @@ describe('soft deletes', function (): void {
     it('cannot update a soft-deleted company', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $company->delete();
 
         $this->putJson("/api/v1/companies/{$company->id}", ['name' => 'Revived'])
@@ -900,7 +923,7 @@ describe('pagination', function (): void {
     it('paginates with per_page parameter', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory(5)->recycle([$this->user, $this->team])->create();
+        Company::factory(5)->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/companies?per_page=2')
             ->assertOk()
@@ -910,7 +933,7 @@ describe('pagination', function (): void {
     it('returns second page of results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory(5)->recycle([$this->user, $this->team])->create();
+        Company::factory(5)->recycle([$this->user, $this->workspace])->create();
 
         $page1 = $this->getJson('/api/v1/companies?per_page=3&page=1');
         $page2 = $this->getJson('/api/v1/companies?per_page=3&page=2');
@@ -934,7 +957,7 @@ describe('pagination', function (): void {
     it('returns empty data array for page beyond results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory(2)->recycle([$this->user, $this->team])->create();
+        Company::factory(2)->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/companies?page=999')
             ->assertOk()
@@ -943,19 +966,19 @@ describe('pagination', function (): void {
 });
 
 describe('mass assignment protection', function (): void {
-    it('ignores team_id in create request', function (): void {
+    it('ignores workspace_id in create request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $otherTeam = Team::factory()->create();
+        $otherWorkspace = Workspace::factory()->create();
 
         $this->postJson('/api/v1/companies', [
             'name' => 'Test Corp',
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ])
             ->assertCreated();
 
         $company = Company::query()->where('name', 'Test Corp')->first();
-        expect($company->team_id)->toBe($this->team->id);
+        expect($company->workspace_id)->toBe($this->workspace->id);
     });
 
     it('ignores creator_id in create request', function (): void {
@@ -973,19 +996,19 @@ describe('mass assignment protection', function (): void {
         expect($company->creator_id)->toBe($this->user->id);
     });
 
-    it('ignores team_id in update request', function (): void {
+    it('ignores workspace_id in update request', function (): void {
         Sanctum::actingAs($this->user);
 
-        $company = Company::factory()->recycle([$this->user, $this->team])->create();
-        $otherTeam = Team::factory()->create();
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $otherWorkspace = Workspace::factory()->create();
 
         $this->putJson("/api/v1/companies/{$company->id}", [
             'name' => 'Updated',
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ])
             ->assertOk();
 
-        expect($company->refresh()->team_id)->toBe($this->team->id);
+        expect($company->refresh()->workspace_id)->toBe($this->workspace->id);
     });
 });
 
@@ -1034,7 +1057,7 @@ describe('non-existent record', function (): void {
 it('can update a company via PATCH', function (): void {
     Sanctum::actingAs($this->user);
 
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = $this->patchJson("/api/v1/companies/{$company->id}", [
         'name' => 'Patched Name',
@@ -1057,7 +1080,7 @@ describe('cursor pagination', function (): void {
     it('returns cursor-paginated results', function (): void {
         Sanctum::actingAs($this->user);
 
-        Company::factory()->count(5)->recycle([$this->user, $this->team])->create();
+        Company::factory()->count(5)->recycle([$this->user, $this->workspace])->create();
 
         $response = $this->getJson('/api/v1/companies?cursor=true&per_page=2');
 
@@ -1076,4 +1099,37 @@ describe('cursor pagination', function (): void {
         $firstIds = collect($response->json('data'))->pluck('id');
         expect($firstIds)->toHaveCount(2);
     });
+});
+
+it('sets the account owner on create', function (): void {
+    Sanctum::actingAs($this->user);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'admin']);
+
+    $this->postJson('/api/v1/companies', ['name' => 'Acme Corp', 'account_owner_id' => $member->getKey()])
+        ->assertCreated()
+        ->assertValid()
+        ->assertJsonPath('data.attributes.account_owner_id', $member->getKey());
+});
+
+it('changes the account owner on update', function (): void {
+    Sanctum::actingAs($this->user);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'admin']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $this->patchJson("/api/v1/companies/{$company->getKey()}", ['account_owner_id' => $member->getKey()])
+        ->assertOk()
+        ->assertJsonPath('data.attributes.account_owner_id', $member->getKey());
+
+    expect($company->refresh()->account_owner_id)->toBe($member->getKey());
+});
+
+it('rejects an account owner outside the workspace', function (): void {
+    Sanctum::actingAs($this->user);
+    $outsider = User::factory()->create();
+
+    $this->postJson('/api/v1/companies', ['name' => 'Acme Corp', 'account_owner_id' => $outsider->getKey()])
+        ->assertUnprocessable()
+        ->assertInvalid('account_owner_id');
 });

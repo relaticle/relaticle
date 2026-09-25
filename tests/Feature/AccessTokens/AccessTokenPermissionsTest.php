@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Livewire\App\AccessTokens\ManageAccessTokens;
 use App\Models\User;
 use Illuminate\Support\Str;
@@ -10,7 +11,7 @@ use Laravel\Jetstream\Features;
 mutates(User::class);
 
 test('api token permissions can be updated', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $token = $user->tokens()->create([
         'name' => 'Test Token',
@@ -28,22 +29,46 @@ test('api token permissions can be updated', function () {
     expect($freshToken->abilities)->toBe(['delete', 'update']);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('table shows team name column', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+test('a viewer cannot widen a pinned token past read', function () {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $viewer = User::factory()->create();
+    $workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($workspace);
+    $this->actingAs($viewer = $viewer->fresh());
+
+    $token = $viewer->tokens()->create([
+        'name' => 'Viewer Token',
+        'token' => Str::random(40),
+        'abilities' => ['read'],
+        'workspace_id' => $workspace->id,
+    ]);
+
+    livewire(ManageAccessTokens::class)
+        ->callTableAction('permissions', $token, data: [
+            'workspace_id' => $owner->personalWorkspace()?->id ?? $workspace->id,
+            'permissions' => ['read', 'delete'],
+        ]);
+
+    expect($token->fresh()->abilities)->toBe(['read']);
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('table shows workspace name column', function () {
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $user->tokens()->create([
         'name' => 'Test Token',
         'token' => Str::random(40),
         'abilities' => ['read'],
-        'team_id' => $user->currentTeam->id,
+        'workspace_id' => $user->currentWorkspace->id,
     ]);
 
     livewire(ManageAccessTokens::class)
-        ->assertCanRenderTableColumn('team.name');
+        ->assertCanRenderTableColumn('workspace.name');
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('table shows expiration column', function () {
-    $this->actingAs($user = User::factory()->withTeam()->create());
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
 
     $user->tokens()->create([
         'name' => 'Expiring Token',

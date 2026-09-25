@@ -21,17 +21,17 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(AddCustomFieldOptionsTool::class, AddCustomFieldOptions::class);
 
 beforeEach(function (): void {
-    $this->owner = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->owner->currentTeam;
+    $this->owner = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->owner->currentWorkspace;
 
     Auth::guard('web')->setUser($this->owner);
     $this->actingAs($this->owner);
-    Filament::setTenant($this->team);
-    TenantContextService::setTenantId($this->team->getKey());
+    Filament::setTenant($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $this->selectField = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Status',
         'type' => 'select',
@@ -40,13 +40,13 @@ beforeEach(function (): void {
     ]);
 
     $this->selectField->options()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'name' => 'Active',
         'sort_order' => 0,
     ]);
 
     $this->textField = CustomField::factory()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'entity_type' => 'company',
         'name' => 'Description',
         'type' => 'text',
@@ -59,7 +59,7 @@ beforeEach(function (): void {
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->owner->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -103,7 +103,7 @@ it('proposes adding options and creates them on approval', function (): void {
     $service = resolve(PendingActionService::class);
     $service->approve($pending, $this->owner);
 
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
     $optionNames = CustomFieldOption::query()
         ->where('custom_field_id', $this->selectField->getKey())
         ->pluck('name')
@@ -114,13 +114,13 @@ it('proposes adding options and creates them on approval', function (): void {
     expect($optionNames)->toBe(['Active', 'Inactive', 'Pending']);
 });
 
-it('returns error when non-owner tries to add options', function (): void {
-    $nonOwner = User::factory()->create();
-    $nonOwner->teams()->attach($this->team, ['role' => 'editor']);
-    $nonOwner->switchTeam($this->team);
+it('refuses a member with the role error and creates no proposal', function (): void {
+    $member = User::factory()->create();
+    $member->workspaces()->attach($this->workspace, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
 
-    Auth::guard('web')->setUser($nonOwner);
-    $this->actingAs($nonOwner);
+    Auth::guard('web')->setUser($member);
+    $this->actingAs($member);
 
     $tool = makeAddOptionsTool($this->convId);
     $result = $tool->handle(new Request([
@@ -131,8 +131,37 @@ it('returns error when non-owner tries to add options', function (): void {
 
     $decoded = json_decode($result, true);
 
-    expect($decoded)->toHaveKey('error')
+    expect($decoded['error'])->toContain('workspace role does not allow that')
+        ->and($decoded['error'])->toContain('Do not link to any page')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('lets an admin propose options that land on approval', function (): void {
+    $admin = User::factory()->create();
+    $admin->workspaces()->attach($this->workspace, ['role' => 'admin']);
+    $admin->switchWorkspace($this->workspace);
+
+    Auth::guard('web')->setUser($admin);
+    $this->actingAs($admin);
+
+    $result = makeAddOptionsTool($this->convId)->handle(new Request([
+        'entity_type' => 'company',
+        'code' => $this->selectField->code,
+        'options' => [['name' => 'Churned']],
+    ]));
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $admin);
+
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    expect(CustomFieldOption::query()
+        ->where('custom_field_id', $this->selectField->getKey())
+        ->where('name', 'Churned')
+        ->exists())->toBeTrue();
 });
 
 it('returns error when adding options to a non-choice type field', function (): void {
@@ -223,7 +252,7 @@ it('rejects approval with a friendly message when the option appeared after the 
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     $this->selectField->options()->create([
-        $tenantKey => $this->team->getKey(),
+        $tenantKey => $this->workspace->getKey(),
         'name' => 'Fresh',
         'sort_order' => 5,
     ]);
@@ -233,7 +262,7 @@ it('rejects approval with a friendly message when the option appeared after the 
     expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->owner))
         ->toThrow(ValidationException::class, 'already exists');
 
-    TenantContextService::setTenantId($this->team->getKey());
+    TenantContextService::setTenantId($this->workspace->getKey());
     $freshCount = CustomFieldOption::query()
         ->where('custom_field_id', $this->selectField->getKey())
         ->where('name', 'Fresh')

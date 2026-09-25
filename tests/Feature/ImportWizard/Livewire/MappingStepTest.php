@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -20,16 +20,16 @@ use Relaticle\ImportWizard\Store\ImportStore;
 mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
-    $this->import = Import::create([
-        'team_id' => (string) $this->team->id,
+    $this->import = Import::factory()->create([
+        'workspace_id' => (string) $this->workspace->id,
         'user_id' => (string) $this->user->id,
         'entity_type' => ImportEntityType::People,
         'file_name' => 'test.csv',

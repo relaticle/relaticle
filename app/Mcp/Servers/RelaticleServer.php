@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Servers;
 
+use App\Enums\CreationSource;
 use App\Mcp\Prompts\CrmOverviewPrompt;
 use App\Mcp\Resources\CompanySchemaResource;
 use App\Mcp\Resources\CrmSummaryResource;
@@ -11,12 +12,18 @@ use App\Mcp\Resources\NoteSchemaResource;
 use App\Mcp\Resources\OpportunitySchemaResource;
 use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
+use App\Mcp\Tools\AggregateOpportunitiesTool;
 use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\FetchTool;
+use App\Mcp\Tools\GetCrmSchemaTool;
+use App\Mcp\Tools\GetCrmSummaryTool;
+use App\Mcp\Tools\ListActivityTool;
+use App\Mcp\Tools\ListCustomFieldsTool;
 use App\Mcp\Tools\Note\AttachNoteToEntitiesTool;
 use App\Mcp\Tools\Note\CreateNoteTool;
 use App\Mcp\Tools\Note\DeleteNoteTool;
@@ -42,17 +49,26 @@ use App\Mcp\Tools\Task\DetachTaskFromEntitiesTool;
 use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
+use App\Mcp\Tools\UploadFileTool;
 use App\Mcp\Tools\WhoAmiTool;
+use App\Support\CurrentSource;
 use Laravel\Mcp\Server;
+use Laravel\Mcp\Server\Attributes\Icon;
 use Laravel\Mcp\Server\Attributes\Instructions;
 use Laravel\Mcp\Server\Attributes\Name;
 use Laravel\Mcp\Server\Attributes\Version;
 use Laravel\Mcp\Server\Prompt;
+use Laravel\Mcp\Server\ServerContext;
 use Laravel\Mcp\Server\Tool;
+use Laravel\Mcp\Transport\JsonRpcRequest;
+use Laravel\Mcp\Transport\JsonRpcResponse;
+use Override;
 
 #[Name('Relaticle CRM')]
-#[Version('1.0.0')]
+#[Version('2.0.0')]
 #[Instructions('This server provides access to Relaticle CRM data including companies, people, opportunities, tasks, and notes. All operations are scoped to the single workspace this connection was authorized for.')]
+#[Icon('brand/logomark.svg', 'image/svg+xml', ['any'])]
+#[Icon('web-app-manifest-512x512.png', 'image/png', ['512x512'])]
 final class RelaticleServer extends Server
 {
     public int $defaultPaginationLength = 50;
@@ -62,6 +78,13 @@ final class RelaticleServer extends Server
         WhoAmiTool::class,
         SearchTool::class,
         FetchTool::class,
+        GetCrmSchemaTool::class,
+        GetCrmSummaryTool::class,
+        AggregateOpportunitiesTool::class,
+        ListActivityTool::class,
+        ListCustomFieldsTool::class,
+        CreateUploadUrlTool::class,
+        UploadFileTool::class,
         ListCompaniesTool::class,
         GetCompanyTool::class,
         CreateCompanyTool::class,
@@ -107,4 +130,11 @@ final class RelaticleServer extends Server
     protected array $prompts = [
         CrmOverviewPrompt::class,
     ];
+
+    #[Override]
+    protected function runMethodHandle(JsonRpcRequest $request, ServerContext $context): iterable|JsonRpcResponse
+    {
+        // A tool that yields a streamed result would run after this scope closes; none does.
+        return CurrentSource::during(CreationSource::MCP, fn (): iterable|JsonRpcResponse => parent::runMethodHandle($request, $context));
+    }
 }

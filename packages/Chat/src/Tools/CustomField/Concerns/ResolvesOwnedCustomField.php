@@ -12,19 +12,19 @@ use Relaticle\CustomFields\Services\TenantContextService;
 trait ResolvesOwnedCustomField
 {
     /**
-     * Resolve a custom field definition owned by the team, identified by its
+     * Resolve a custom field definition owned by the workspace, identified by its
      * entity type and machine code. Deactivated fields are included so they can
      * still be managed. Returns null when no matching field exists.
      */
-    private function resolveOwnedCustomField(int|string $teamId, string $entityType, string $code): ?BaseCustomField
+    private function resolveOwnedCustomField(int|string $workspaceId, string $entityType, string $code): ?BaseCustomField
     {
         $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($teamId);
+        TenantContextService::setTenantId($workspaceId);
 
         try {
             return CustomField::query()
                 ->withoutGlobalScope(CustomFieldsActivableScope::class)
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->where('entity_type', $entityType)
                 ->where('code', $code)
                 ->first();

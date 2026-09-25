@@ -8,10 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 
 trait BuildsRelationshipResponse
 {
-    protected function buildRelationshipResponse(Model $model): Response
+    protected function buildRelationshipResponse(Model $model): Response|ResponseFactory
     {
         $countRelations = collect($this->relationshipsToLoad())
             ->filter(fn (string $relation): bool => $model->isRelation($relation))
@@ -43,6 +44,9 @@ trait BuildsRelationshipResponse
             $response->relationship_counts = $counts;
         }
 
-        return Response::text((string) json_encode($response, JSON_PRETTY_PRINT));
+        /** @var array<string, mixed> $payload */
+        $payload = (array) $response;
+
+        return Response::structured($payload);
     }
 }

@@ -129,7 +129,17 @@ it('sizes the font by character count, not byte length', function () {
     // A single CJK glyph is three bytes; strlen() read it as multiple characters and
     // shrank the text to the two-initial size.
     expect(extractSvgFromDataUrl($this->avatarService->generate('株', initialCount: 1)))
-        ->toContain('font-size="48"')
+        ->toContain('font-size="46"')
         ->and(extractSvgFromDataUrl($this->avatarService->generate('株式会社テスト')))
-        ->toContain('font-size="44"');
+        ->toContain('font-size="40"');
+});
+
+it('renders initials with a polished system type treatment', function () {
+    $svg = extractSvgFromDataUrl($this->avatarService->generateAuto('John Doe'));
+
+    expect($svg)
+        ->toContain("font-family=\"-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif\"")
+        ->toContain('font-weight="600"')
+        ->toContain('fill-opacity="0.12"')
+        ->toContain('fill-opacity="0.04"');
 });

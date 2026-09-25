@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\UpdateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\Note;
 use App\Models\User;
-use App\Rules\ArrayExistsForTeam;
+use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Update Note')]
 #[Description('Update an existing note in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class UpdateNoteTool extends BaseUpdateTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Note::class;
+        return CrmEntity::Note;
     }
 
     protected function actionClass(): string
@@ -33,16 +34,6 @@ final class UpdateNoteTool extends BaseUpdateTool
     protected function resourceClass(): string
     {
         return NoteResource::class;
-    }
-
-    protected function entityType(): string
-    {
-        return 'note';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'note';
     }
 
     protected function entitySchema(JsonSchema $schema): array
@@ -57,16 +48,16 @@ final class UpdateNoteTool extends BaseUpdateTool
 
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'title' => ['sometimes', 'string', 'max:255'],
             'company_ids' => ['sometimes', 'array'],
-            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForWorkspace('companies', 'company_ids', $workspaceId)],
             'people_ids' => ['sometimes', 'array'],
-            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForWorkspace('people', 'people_ids', $workspaceId)],
             'opportunity_ids' => ['sometimes', 'array'],
-            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForWorkspace('opportunities', 'opportunity_ids', $workspaceId)],
         ];
     }
 }

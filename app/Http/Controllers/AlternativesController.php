@@ -20,7 +20,7 @@ final readonly class AlternativesController
 
         abort_unless(isset($facts[$competitor]), 404);
 
-        return view('alternatives.show', [
+        return view($competitor === 'attio' ? 'alternatives.attio' : 'alternatives.show', [
             'relaticle' => $facts['relaticle'],
             'competitor' => $facts[$competitor],
             'competitorSlug' => $competitor,

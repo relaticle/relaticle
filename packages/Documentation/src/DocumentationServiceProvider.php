@@ -27,7 +27,7 @@ final class DocumentationServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (! Feature::active(Documentation::class)) {
+        if (! Feature::for(null)->active(Documentation::class)) {
             return;
         }
 

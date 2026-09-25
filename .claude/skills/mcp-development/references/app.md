@@ -104,7 +104,7 @@ MCP Apps add interactive UI to the Model Context Protocol. The server returns se
 └─────────────────────────────────────────────┘
 ```
 
-The server automatically advertises `io.modelcontextprotocol/ui` capability when any `AppResource` is registered. The client declares support in `capabilities.extensions["io.modelcontextprotocol/ui"]` during the initialize handshake.
+The server automatically advertises `capabilities.extensions["io.modelcontextprotocol/ui"]` on `server/discover` when any `AppResource` is registered. Add cases of the `Extension` enum to the server's `$extensions` property to declare any other extension. The client declares its own support in the `io.modelcontextprotocol/clientCapabilities` member of each request's `_meta`.
 
 ---
 

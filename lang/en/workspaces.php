@@ -1,0 +1,371 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'form' => [
+        'workspace_name' => [
+            'label' => 'Workspace Name',
+        ],
+        'workspace_slug' => [
+            'label' => 'Workspace Slug',
+            'helper_text' => 'Only lowercase letters, numbers, and hyphens.',
+        ],
+        'emails' => [
+            'label' => 'Email addresses',
+            'placeholder' => 'name@company.com, teammate@company.com',
+            'helper' => 'Separate multiple addresses with a comma, a space, or a new line.',
+        ],
+        'invite_as' => [
+            'label' => 'Invite as',
+        ],
+        'role' => [
+            'label' => 'Role',
+        ],
+        'workspace_logo' => [
+            'label' => 'Workspace logo',
+        ],
+    ],
+
+    'sections' => [
+        'update_workspace_name' => [
+            'title' => 'Workspace Name',
+            'description' => 'The workspace\'s name and owner information.',
+        ],
+        'update_workspace_logo' => [
+            'title' => 'Workspace Logo',
+            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+        ],
+        'invite_people' => [
+            'description' => 'Each person gets an email with a link to join :workspace.',
+        ],
+        'add_workspace_member' => [
+            'title' => 'Invite people',
+            'description' => 'Send an email invitation, or share a link that lets people join themselves.',
+        ],
+        'workspace_members' => [
+            'title' => 'Members',
+            'description' => 'Everyone with access to this workspace, including people who have not accepted yet.',
+        ],
+        'delete_workspace' => [
+            'title' => 'Delete Workspace',
+            'description' => 'Schedule this workspace for deletion.',
+            'notice' => 'Deleting this workspace will schedule it for permanent removal after a 30-day grace period. You can cancel the deletion at any time before that. After the grace period, all resources and data will be permanently deleted.',
+            'scheduled_notice' => 'This workspace is scheduled for deletion on :date.',
+        ],
+    ],
+
+    'actions' => [
+        'save' => 'Save',
+        'invite_people' => 'Invite workspace members',
+        'send_invitations' => 'Send invitations',
+        'invite_link' => 'Invite link',
+        'close' => 'Close',
+        'copy_invite_link' => 'Copy link',
+        'rotate_invite_link' => 'Generate a new link',
+        'disable_invite_link' => 'Turn off the link',
+        'enable_invite_link' => 'Turn on the link',
+        'update_workspace_role' => 'Change role',
+        'compare_roles' => 'Compare roles',
+        'compare_roles_help_link' => 'Read the full breakdown',
+        'remove_workspace_member' => 'Remove',
+        'leave_workspace' => 'Leave',
+        'resend_workspace_invitation' => 'Resend',
+        'revoke_workspace_invitation' => 'Revoke',
+        'delete_workspace' => 'Delete Workspace',
+        'cancel_deletion' => 'Cancel Deletion',
+    ],
+
+    'notifications' => [
+        'workspace_invitation_sent' => [
+            'success' => 'Invitation sent.',
+        ],
+        'workspace_invitation_revoked' => [
+            'success' => 'Invitation revoked.',
+        ],
+        'workspace_member_removed' => [
+            'success' => 'You have removed this member.',
+        ],
+        'leave_workspace' => [
+            'success' => 'You have left the workspace.',
+        ],
+        'permission_denied' => [
+            'cannot_promote_to_admin' => 'Only the workspace owner can grant or revoke Admin access.',
+            'cannot_remove_workspace_member' => 'You do not have permission to remove this member.',
+            'cannot_delete_workspace' => 'You do not have permission to delete this workspace.',
+            'cannot_cancel_workspace_deletion' => 'You do not have permission to cancel this workspace\'s deletion.',
+        ],
+        'role_updated' => [
+            'success' => 'Role updated.',
+        ],
+        'invite_link_role_updated' => [
+            'success' => 'Anyone joining with this link is now a :role.',
+        ],
+        'invite_link_rotated' => [
+            'success' => 'A new invite link was generated. The previous link no longer works.',
+        ],
+        'invite_link_disabled' => [
+            'success' => 'The workspace link is off. Invite people by email instead.',
+        ],
+        'invite_link_enabled' => [
+            'success' => 'The workspace link is on. Anyone who opens it can join.',
+        ],
+        'resend_throttled' => 'Please wait :seconds seconds before resending.',
+        'some_invites_failed' => [
+            'title' => 'Some invitations could not be sent',
+        ],
+        'invite_rate_limited' => [
+            'title' => 'Too many invitations sent',
+            'body' => 'Please wait :seconds seconds before sending more invitations.',
+        ],
+    ],
+
+    'validation' => [
+        'email_already_invited' => 'This user has already been invited to the workspace.',
+        'email_already_member' => 'This user already belongs to the workspace.',
+        'only_owner_promotes_admins' => 'Only the workspace owner can grant the Admin role.',
+        'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Admin role. Invite admins by email instead.',
+        'no_valid_emails' => 'Enter at least one email address.',
+        'too_many_invites' => 'You can invite up to :max people at a time.',
+        'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :workspaces',
+    ],
+
+    'modals' => [
+        'update_workspace_role' => [
+            'description' => ':name (:email)',
+        ],
+        'leave_workspace' => [
+            'notice' => 'Are you sure you would like to leave this workspace?',
+        ],
+        'delete_workspace' => [
+            'notice' => 'This will schedule the workspace for deletion. You will have 30 days to cancel before all data is permanently removed.',
+        ],
+        'rotate_invite_link' => [
+            'heading' => 'Generate a new invite link?',
+            'notice' => 'The current link stops working immediately. Anyone still holding it, in a chat or an email, will not be able to join.',
+        ],
+        'disable_invite_link' => [
+            'heading' => 'Turn off the workspace link?',
+            'notice' => 'Nobody can join with the current link once it is off. Turning it back on issues a different link, so the old one stays dead.',
+        ],
+        'cancel_deletion' => [
+            'heading' => 'Cancel workspace deletion?',
+            'notice' => 'The workspace and all its data will be preserved.',
+        ],
+    ],
+
+    'edit_workspace' => 'Workspace Settings',
+
+    'tabs' => [
+        'general' => 'General',
+        'members' => 'Members',
+        'custom_fields' => 'Custom Fields',
+        'import_history' => 'Import History',
+        'activity' => 'Activity',
+        'billing' => 'Billing',
+    ],
+
+    'activity' => [
+        'system' => 'System',
+        'search_placeholder' => 'Search by record name',
+        'record_destroyed' => 'This record has been permanently deleted.',
+        'yes' => 'Yes',
+        'no' => 'No',
+        'columns' => [
+            'created_at' => 'When',
+            'causer' => 'Who',
+            'source' => 'Source',
+            'event' => 'Action',
+            'subject_type' => 'Type',
+            'record' => 'Record',
+            'changes' => 'Changes',
+        ],
+        'filters' => [
+            'event' => 'Action',
+            'subject_type' => 'Type',
+            'causer' => 'Who',
+            'source' => 'Source',
+            'from' => 'From',
+            'until' => 'Until',
+        ],
+        'events' => [
+            'created' => 'Created',
+            'updated' => 'Updated',
+            'deleted' => 'Deleted',
+            'restored' => 'Restored',
+            'imported' => 'Imported',
+            'import_failed' => 'Import failed',
+        ],
+        'types' => [
+            'company' => 'Company',
+            'people' => 'Person',
+            'opportunity' => 'Opportunity',
+            'task' => 'Task',
+            'note' => 'Note',
+            'custom_field' => 'Custom field',
+            'custom_field_option' => 'Custom field option',
+            'import' => 'Import',
+        ],
+        'import_counts' => [
+            'created' => ':count created',
+            'updated' => ':count updated',
+            'skipped' => ':count skipped',
+            'failed' => ':count failed',
+        ],
+        'via_import' => 'Via import :file',
+        'via_source' => 'Via :source',
+        'empty' => [
+            'heading' => 'No activity yet',
+            'description' => 'Changes your members make to records will show up here.',
+        ],
+        'changes_modal' => [
+            'trigger' => 'View all changes',
+            'close' => 'Close',
+        ],
+        'no_results' => [
+            'heading' => 'Nothing matches these filters',
+            'description' => 'Try a different search term, or widen the date range.',
+            'action' => 'Clear filters',
+        ],
+    ],
+
+    'roles' => [
+        'owner' => [
+            'label' => 'Owner',
+        ],
+        'admin' => [
+            'label' => 'Admin',
+            'description' => 'Manages members and custom fields, and can delete records permanently',
+        ],
+        'member' => [
+            'label' => 'Member',
+            'description' => 'Creates and edits records, and deletes them to trash',
+        ],
+        'viewer' => [
+            'label' => 'Viewer',
+            'description' => 'Reads everything and changes nothing',
+        ],
+    ],
+
+    'capabilities' => [
+        'records' => [
+            'view' => ['label' => 'View records'],
+            'create' => ['label' => 'Create records'],
+            'update' => ['label' => 'Update records'],
+            'delete' => ['label' => 'Delete and restore records'],
+            'force_delete' => ['label' => 'Delete records permanently'],
+        ],
+        'data' => [
+            'import' => ['label' => 'Import data'],
+            'export' => ['label' => 'Export data'],
+        ],
+        'members' => [
+            'manage' => ['label' => 'Invite, remove, and change member roles'],
+            'promote_admin' => ['label' => 'Promote someone to Admin'],
+        ],
+        'fields' => [
+            'manage' => ['label' => 'Manage custom fields'],
+        ],
+        'billing' => [
+            'manage' => ['label' => 'Manage billing'],
+        ],
+        'workspace' => [
+            'manage' => ['label' => 'Rename or delete the workspace'],
+        ],
+        'activity' => [
+            'view' => ['label' => 'View the activity log'],
+        ],
+    ],
+
+    'role_matrix' => [
+        'capability_column' => 'Capability',
+        'granted' => 'Included',
+        'not_granted' => 'Not included',
+        'opens_in_new_tab' => '(opens in a new tab)',
+    ],
+
+    'table' => [
+        'user' => 'User',
+        'role' => 'Role',
+        'status' => 'Status',
+        'search_placeholder' => 'Search name or email',
+        'invite_pending' => 'Invite pending',
+        'invite_expired' => 'Invite expired',
+        'expires_in' => 'Expires in :time',
+        'expired_ago' => 'Expired :time ago',
+        'expired' => 'Expired',
+        'no_results' => [
+            'heading' => 'Nobody matches that search',
+            'description' => 'Try part of a name, or the email address you invited.',
+        ],
+    ],
+
+    'invitation' => [
+        'members' => '{1} 1 person is already in this workspace|[2,*] :count people are already in this workspace',
+    ],
+
+    'invite_link' => [
+        'heading' => 'Invite link',
+        'description' => 'Share one link instead of typing addresses. Anyone who opens it joins this workspace.',
+        'url' => 'Workspace link',
+        'copied' => 'Link copied.',
+        'expires_in' => 'Stops working in :time. Generating a new link resets the clock.',
+        'default_role' => 'People join as',
+        'default_role_helper' => 'Saved as soon as you pick it. Admins are invited by email instead.',
+        'lapsed' => [
+            'title' => 'This link expired :time ago',
+            'notice' => 'Nobody can join with it. Generate a new link to keep inviting people.',
+        ],
+        'disabled' => [
+            'title' => 'The workspace link is off',
+            'notice' => 'Email invitations are the only way in. Turning the link on issues a new one.',
+        ],
+        'join' => [
+            'heading' => 'Join :workspace',
+            'body' => 'You will join with :role access.',
+            'joining_as' => 'Joining as',
+            'action' => 'Join workspace',
+            'decline' => 'Not now',
+        ],
+        'expired' => [
+            'heading' => 'Invite link expired',
+            'body' => 'This invite link has expired. Please ask the workspace owner to share a new link.',
+            'action' => 'Go to my workspace',
+        ],
+    ],
+
+    'pending_for_user' => [
+        'heading' => 'You have been invited to join :workspace',
+        'detail_with_inviter' => ':inviter invited you with :role access.',
+        'detail' => 'You will join with :role access.',
+        'accept' => 'Join workspace',
+        'decline' => 'Decline',
+        'declined' => 'Invitation declined.',
+    ],
+
+    'accept' => [
+        'joined' => 'You have joined the :workspace workspace.',
+        'already_member' => 'You are already a member of :workspace.',
+        'no_longer_valid' => 'That invitation is no longer valid. It may have been revoked or it may have expired.',
+        'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
+        'workspace_deleting' => 'This workspace is scheduled for deletion and is not accepting new members.',
+        'ready' => [
+            'heading' => 'Join :workspace',
+            'body_with_inviter' => ':inviter invited you to join :workspace with :role access.',
+            'body' => 'You have been invited to join :workspace with :role access.',
+            'action' => 'Join :workspace',
+            'decline' => 'Not now',
+        ],
+        'wrong_account' => [
+            'heading' => 'This invitation is for a different account',
+            'body' => 'This invitation was sent to :invited, but you are signed in as :current.',
+            'switch' => 'Sign out and switch account',
+            'stay' => 'Go to my workspace',
+        ],
+        'expired' => [
+            'heading' => 'Invitation no longer valid',
+            'body' => 'This invitation has expired or has already been accepted.',
+            'action' => 'Go to my workspace',
+        ],
+    ],
+];

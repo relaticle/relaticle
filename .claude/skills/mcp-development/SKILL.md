@@ -22,22 +22,17 @@ Register MCP servers in `routes/ai.php`:
 ```php
 use Laravel\Mcp\Facades\Mcp;
 
-Mcp::web();
+Mcp::web('/mcp/demo', \App\Mcp\Servers\AppServer::class);
 ```
 
 ### Creating MCP Primitives
 
 ```bash
 php artisan make:mcp-tool ToolName            # Create a tool
-
 php artisan make:mcp-resource ResourceName     # Create a resource
-
 php artisan make:mcp-prompt PromptName        # Create a prompt
-
 php artisan make:mcp-server ServerName        # Create a server
-
 php artisan make:mcp-app-resource DashboardApp # Create a UI app (2 files)
-
 ```
 
 After creating primitives, register them in your server's `$tools`, `$resources`, or `$prompts` properties.

@@ -11,9 +11,9 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 mutates(ChatSidePanel::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 });
 
 function sidePanelConversation(User $user, string $id, string $title): void
@@ -22,7 +22,7 @@ function sidePanelConversation(User $user, string $id, string $title): void
         'id' => $id,
         'participant_type' => $user->getMorphClass(),
         'participant_id' => $user->getKey(),
-        'team_id' => $user->current_team_id,
+        'workspace_id' => $user->current_workspace_id,
         'title' => $title,
         'created_at' => now(),
         'updated_at' => now(),
@@ -73,7 +73,7 @@ it('keeps the open transcript when a different conversation is deleted', functio
 });
 
 it('refuses to delete a conversation belonging to another user', function (): void {
-    $stranger = User::factory()->withPersonalTeam()->create();
+    $stranger = User::factory()->withPersonalWorkspace()->create();
     sidePanelConversation($stranger, 'csp-theirs', 'Not yours');
 
     Livewire::test(ChatSidePanel::class)

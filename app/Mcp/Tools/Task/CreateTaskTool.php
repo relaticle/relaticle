@@ -5,20 +5,29 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Task;
 
 use App\Actions\Task\CreateTask;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\TaskResource;
 use App\Mcp\Tools\BaseCreateTool;
-use App\Models\Team;
 use App\Models\User;
-use App\Rules\ArrayExistsForTeam;
+use App\Models\Workspace;
+use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Create Task')]
 #[Description('Create a new task in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsOpenWorld(false)]
 final class CreateTaskTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
+    protected function openWorldHint(): bool
+    {
+        return true;
+    }
+
     protected function actionClass(): string
     {
         return CreateTask::class;
@@ -29,9 +38,9 @@ final class CreateTaskTool extends BaseCreateTool
         return TaskResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'task';
+        return CrmEntity::Task;
     }
 
     protected function entitySchema(JsonSchema $schema): array
@@ -47,21 +56,21 @@ final class CreateTaskTool extends BaseCreateTool
 
     protected function entityRules(User $user): array
     {
-        /** @var Team $team */
-        $team = $user->currentTeam;
-        $teamId = $team->getKey();
-        $teamMemberIds = $team->allUsers()->pluck('id')->all();
+        /** @var Workspace $workspace */
+        $workspace = $user->currentWorkspace;
+        $workspaceId = $workspace->getKey();
+        $workspaceMemberIds = $workspace->allUsers()->pluck('id')->all();
 
         return [
             'title' => ['required', 'string', 'max:255'],
             'company_ids' => ['sometimes', 'array'],
-            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForWorkspace('companies', 'company_ids', $workspaceId)],
             'people_ids' => ['sometimes', 'array'],
-            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForWorkspace('people', 'people_ids', $workspaceId)],
             'opportunity_ids' => ['sometimes', 'array'],
-            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForWorkspace('opportunities', 'opportunity_ids', $workspaceId)],
             'assignee_ids' => ['sometimes', 'array'],
-            'assignee_ids.*' => ['string', Rule::in($teamMemberIds)],
+            'assignee_ids.*' => ['string', Rule::in($workspaceMemberIds)],
         ];
     }
 }

@@ -9,15 +9,15 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
 it('writes a Refund transaction row when refundReservation is called', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
 
-    $service->reserveCredit($team);
-    $service->refundReservation($team, resolutionKey: 'job-abc');
+    $service->reserveCredit($workspace);
+    $service->refundReservation($workspace, resolutionKey: 'job-abc');
 
     $refund = AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('type', AiCreditType::Refund)
         ->first();
 
@@ -27,37 +27,37 @@ it('writes a Refund transaction row when refundReservation is called', function 
         ->and($refund->metadata['reason'])->toBe('reservation_refund');
 });
 
-it('refund is idempotent on the ledger — second call writes no extra row', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+it('refund is idempotent on the ledger: a second call writes no extra row', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
 
-    $service->reserveCredit($team);
-    $service->refundReservation($team, resolutionKey: 'job-xyz');
-    $service->refundReservation($team, resolutionKey: 'job-xyz');
+    $service->reserveCredit($workspace);
+    $service->refundReservation($workspace, resolutionKey: 'job-xyz');
+    $service->refundReservation($workspace, resolutionKey: 'job-xyz');
 
     expect(
         AiCreditTransaction::query()
-            ->where('team_id', $team->getKey())
+            ->where('workspace_id', $workspace->getKey())
             ->where('type', AiCreditType::Refund)
             ->count()
     )->toBe(1);
 });
 
 it('balance and ledger stay consistent after a reserve + refund cycle', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
-    $startBalance = (int) AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining');
+    $startBalance = (int) AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining');
 
-    $service->reserveCredit($team);
-    $service->refundReservation($team, resolutionKey: 'job-1');
+    $service->reserveCredit($workspace);
+    $service->refundReservation($workspace, resolutionKey: 'job-1');
 
-    $endBalance = (int) AiCreditBalance::query()->where('team_id', $team->getKey())->value('credits_remaining');
+    $endBalance = (int) AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining');
     expect($endBalance)->toBe($startBalance);
 
     $refunds = (int) AiCreditTransaction::query()
-        ->where('team_id', $team->getKey())
+        ->where('workspace_id', $workspace->getKey())
         ->where('type', AiCreditType::Refund)
         ->sum('credits_charged');
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -18,7 +19,9 @@ final readonly class GuideToPageTool implements Tool
     {
         return 'Get a direct link to the workspace page where the user can perform an action this assistant '
             .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
-            .'from a file; or managing team members. Call this instead of telling the user something is impossible.';
+            .'from a file; exporting records to a file; or managing workspace members; creating or revoking API '
+            .'access tokens and connectors; or connecting Claude, ChatGPT or another MCP client to the workspace. '
+            .'Call this instead of telling the user something is impossible.';
     }
 
     /**
@@ -34,7 +37,11 @@ final readonly class GuideToPageTool implements Tool
                     .'"custom_fields" (create/edit/delete custom field definitions); '
                     .'"import_companies", "import_people", "import_opportunities", "import_tasks", "import_notes" '
                     .'(bulk-import many records of that type from a file); '
-                    .'"team_members" (invite or manage team members).',
+                    .'"export_companies", "export_people", "export_opportunities", "export_tasks", "export_notes" '
+                    .'(export records of that type to a CSV or XLSX file); '
+                    .'"workspace_members" (invite or manage workspace members); '
+                    .'"access_tokens" (create or revoke API access tokens and connectors); '
+                    .'"connect_assistant" (the help page for connecting Claude, ChatGPT or another MCP client).',
                 ),
         ];
     }
@@ -43,22 +50,30 @@ final readonly class GuideToPageTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $destination = (string) ($request['destination'] ?? '');
 
-        $url = $team === null ? null : $this->destinations->resolve($destination, $team);
+        $capability = $this->destinations->requiredCapability($destination);
+
+        if ($capability instanceof WorkspaceCapability && ! $user->hasWorkspaceCapability($workspace?->getKey(), $capability)) {
+            return (string) json_encode([
+                'error' => __('This user cannot open that page with their workspace role. Tell them a workspace owner or admin can do it for them. Do not link to any page.'),
+            ], JSON_UNESCAPED_SLASHES);
+        }
+
+        $url = $workspace === null ? null : $this->destinations->resolve($destination, $workspace);
 
         if ($url === null) {
             return (string) json_encode([
                 'error' => "No page is available for destination [{$destination}].",
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         return (string) json_encode([
             'type' => 'navigation',
             'destination' => $destination,
             'url' => $url,
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

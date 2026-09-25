@@ -170,7 +170,7 @@ final class InstallCommand extends Command
             'PHP 8.5+' => version_compare(PHP_VERSION, '8.5.0', '>='),
             'Composer' => $this->commandExists('composer'),
             'Node.js' => $this->commandExists('node'),
-            'NPM' => $this->commandExists('npm'),
+            'pnpm' => $this->commandExists('pnpm'),
         ];
 
         $extensions = [
@@ -271,10 +271,10 @@ final class InstallCommand extends Command
             return false;
         }
 
-        $npmResult = Process::run('npm ci --silent');
-        if (! $npmResult->successful()) {
-            $this->error('NPM install failed:');
-            $this->line($npmResult->errorOutput());
+        $pnpmResult = Process::run('pnpm install --frozen-lockfile --silent');
+        if (! $pnpmResult->successful()) {
+            $this->error('pnpm install failed:');
+            $this->line($pnpmResult->errorOutput());
 
             return false;
         }
@@ -298,7 +298,7 @@ final class InstallCommand extends Command
 
     private function buildAssets(): bool
     {
-        $result = Process::run('npm run build');
+        $result = Process::run('pnpm run build');
 
         if (! $result->successful()) {
             $this->error('Asset compilation failed:');

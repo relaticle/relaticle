@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
+use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\AttachAction;
@@ -37,10 +38,8 @@ final class NotesRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns([
                 TextColumn::make('title'),
-                TextColumn::make('people.name')
+                RecordChipColumn::make('people.name')
                     ->label(__('filament/resources/company.relation_managers.notes.fields.people.label'))
-                    ->badge()
-                    ->color('primary')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()

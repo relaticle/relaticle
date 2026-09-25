@@ -9,13 +9,20 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class UserObserver
 {
+    public function updating(User $user): void
+    {
+        if ($user->isDirty('email')) {
+            $user->email_bounced_at = null;
+        }
+    }
+
     /**
      * Clear the deleted user from any chat participation that outlives them.
      *
-     * Conversations in teams the user merely belonged to survive the purge, and
+     * Conversations in workspaces the user merely belonged to survive the purge, and
      * participant_id is a polymorphic key, so no foreign key can null itself on
      * delete the way agent_conversations.user_id used to. This lives on the model
-     * rather than in DeleteUser so that every delete path is covered — the
+     * rather than in DeleteUser so that every delete path is covered. The
      * SystemAdmin panel deletes users through plain Eloquent, not the
      * DeletesUsers contract.
      */

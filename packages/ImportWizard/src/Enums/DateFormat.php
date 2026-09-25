@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Enums;
 
-use Carbon\Carbon;
+use Carbon\CarbonImmutable;
+use DateTimeImmutable;
+use DateTimeZone;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Support\Facades\Date;
 
@@ -19,6 +21,12 @@ enum DateFormat: string implements HasLabel
     case ISO = 'iso';
     case EUROPEAN = 'european';
     case AMERICAN = 'american';
+
+    /**
+     * `Y` matches a two-digit year, so without a floor `1/1/24` parses to 1 January 24 AD
+     * and imports as a plausible-looking date two thousand years out.
+     */
+    private const int MINIMUM_YEAR = 1000;
 
     public function getLabel(): string
     {
@@ -52,9 +60,9 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Format a Carbon instance for display.
+     * Format a date for display.
      */
-    public function format(Carbon $date, bool $withTime = false): string
+    public function format(CarbonImmutable $date, bool $withTime = false): string
     {
         if ($withTime) {
             return match ($this) {
@@ -90,12 +98,12 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Parse a date string into a Carbon instance.
+     * Parse a date string into an immutable date.
      *
      * Attempts multiple format variations to handle real-world CSV data.
      *
      * A CSV carries no offset, so a naive datetime means the wall clock where the person
-     * who exported it lives — the same thing it means when they type it into the form,
+     * who exported it lives, the same thing it means when they type it into the form,
      * which converts out of their zone before storing. `$timezone` is that zone; parsing
      * in it keeps the two paths on the same instant. Null keeps the PHP default, for
      * callers with no user in scope.
@@ -104,7 +112,7 @@ enum DateFormat: string implements HasLabel
      * and interpreting midnight in a negative-offset zone would move it to the previous
      * calendar day.
      */
-    public function parse(string $value, bool $withTime = false, ?string $timezone = null): ?Carbon
+    public function parse(string $value, bool $withTime = false, ?string $timezone = null): ?CarbonImmutable
     {
         $value = trim($value);
 
@@ -113,14 +121,10 @@ enum DateFormat: string implements HasLabel
         }
 
         foreach ($this->getParseFormats($withTime) as $format) {
-            try {
-                $date = Date::createFromFormat($format, $value, $withTime ? $timezone : null);
+            $date = $this->parseStrictly($format, $value, $withTime ? $timezone : null);
 
-                if ($date instanceof Carbon) {
-                    return $withTime && $timezone !== null ? $date->utc() : $date;
-                }
-            } catch (\Exception) {
-                continue;
+            if ($date instanceof CarbonImmutable) {
+                return $withTime && $timezone !== null ? $date->utc() : $date;
             }
         }
 
@@ -128,9 +132,42 @@ enum DateFormat: string implements HasLabel
     }
 
     /**
-     * Format a Carbon instance for use in HTML date/datetime-local input.
+     * `createFromFormat` overflows silently: `d/m/Y` turns 31/02/2024 into 2 March and
+     * `Y-m-d` turns 2024-02-31 into the same, so a typo imports as a real date nobody
+     * typed. The `!` prefix does not prevent it and `Carbon::hasFormat()` does not detect
+     * it either. `getLastErrors()` reports a warning for every overflow, so that is the
+     * gate. The `!` prefix is still used, to zero the fields the format does not carry
+     * rather than inheriting them from the current clock.
      */
-    public function toPickerValue(Carbon $date, bool $withTime = false): string
+    private function parseStrictly(string $format, string $value, ?string $timezone): ?CarbonImmutable
+    {
+        $parsed = DateTimeImmutable::createFromFormat(
+            '!'.$format,
+            $value,
+            $timezone !== null ? new DateTimeZone($timezone) : null,
+        );
+
+        if ($parsed === false) {
+            return null;
+        }
+
+        $errors = DateTimeImmutable::getLastErrors();
+
+        if ($errors !== false && ($errors['warning_count'] > 0 || $errors['error_count'] > 0)) {
+            return null;
+        }
+
+        if ((int) $parsed->format('Y') < self::MINIMUM_YEAR) {
+            return null;
+        }
+
+        return Date::instance($parsed);
+    }
+
+    /**
+     * Format a date for use in HTML date/datetime-local input.
+     */
+    public function toPickerValue(CarbonImmutable $date, bool $withTime = false): string
     {
         return $date->format($withTime ? 'Y-m-d\TH:i' : 'Y-m-d');
     }
@@ -163,6 +200,10 @@ enum DateFormat: string implements HasLabel
                     'H:i:s d-m-Y',
                     'H:i d/m/Y',
                     'H:i d-m-Y',
+                    'H:i:s j F Y',
+                    'H:i:s j M Y',
+                    'H:i j F Y',
+                    'H:i j M Y',
                 ],
                 self::AMERICAN => [
                     'm/d/Y H:i:s',
@@ -175,6 +216,10 @@ enum DateFormat: string implements HasLabel
                     'H:i:s m-d-Y',
                     'H:i m/d/Y',
                     'H:i m-d-Y',
+                    'H:i:s F jS Y',
+                    'H:i:s F j, Y',
+                    'H:i F jS Y',
+                    'H:i F j, Y',
                 ],
             };
         }
@@ -190,12 +235,18 @@ enum DateFormat: string implements HasLabel
                 'j/n/Y',
                 'j-n-Y',
                 'j.n.Y',
+                'j F Y',
+                'j M Y',
             ],
             self::AMERICAN => [
                 'm/d/Y',
                 'm-d-Y',
                 'n/j/Y',
                 'n-j-Y',
+                'F jS Y',
+                'F j, Y',
+                'M jS Y',
+                'M j, Y',
             ],
         };
     }

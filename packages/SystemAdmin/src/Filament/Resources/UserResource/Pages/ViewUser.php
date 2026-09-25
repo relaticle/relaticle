@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 
 final class ViewUser extends ViewRecord
 {
@@ -17,7 +18,8 @@ final class ViewUser extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            EditAction::make(),
+            Impersonate::user(),
+            EditAction::make()->action(null),
         ];
     }
 }

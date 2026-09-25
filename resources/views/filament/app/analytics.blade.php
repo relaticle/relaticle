@@ -1,13 +1,12 @@
 @if(app()->isProduction() && !empty(config('services.fathom.site_id')))
     <script src="https://cdn.usefathom.com/script.js"
         data-site="{{ config('services.fathom.site_id') }}"
-        data-spa="auto"
         data-auto="false"
         defer></script>
 <script>
-window.addEventListener('load', function() {
+(() => {
     function normalizeUrl(pathname) {
-        // Panel-level pages carry no tenant slug — track them as-is so the
+        // Panel-level pages carry no tenant slug, so track them as-is and the
         // auth funnel (/login, /register, …) doesn't collapse into /dashboard.
         var tenantless = ['/login', '/register', '/forgot-password', '/password-reset', '/email-verification', '/two-factor-authentication', '/new', '/logout'];
         for (var i = 0; i < tenantless.length; i++) {
@@ -16,7 +15,7 @@ window.addEventListener('load', function() {
             }
         }
 
-        // Remove tenant slug: /my-team/people → /people
+        // Remove tenant slug: /my-workspace/people → /people
         pathname = pathname.replace(/^\/[^\/]+/, '');
 
         // Normalize record IDs (numeric or ULID) out of paths:
@@ -36,20 +35,18 @@ window.addEventListener('load', function() {
         }
     }
 
-    // Initial track
-    setTimeout(track, 100);
-
-    @if(session()->pull('fathom.track_signup'))
-    // One-time conversion event, flagged during registration
-    setTimeout(function () {
-        if (typeof fathom !== 'undefined') {
-            fathom.trackEvent('signup');
-        }
-    }, 150);
-    @endif
-
-    // SPA navigation
     document.addEventListener('livewire:navigated', track);
-});
+})();
 </script>
+@foreach (['signup', 'workspace_created'] as $event)
+    @if(session()->pull('fathom.track_'.$event))
+        <script>
+            document.addEventListener('livewire:navigated', () => {
+                if (typeof fathom !== 'undefined') {
+                    fathom.trackEvent(@js($event));
+                }
+            }, { once: true });
+        </script>
+    @endif
+@endforeach
 @endif

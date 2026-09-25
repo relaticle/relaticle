@@ -6,9 +6,9 @@
 # Otherwise silent.
 #
 # Test injection:
-#   MANUAL_TESTING_TEST_DIFF — newline-separated paths (forwarded to should-skip.sh)
-#   MANUAL_TESTING_TEST_BRANCH — fake branch name (forwarded to should-skip.sh)
-#   CLAUDE_TURN_ID — current turn id; used to compare against state file
+#   MANUAL_TESTING_TEST_DIFF: newline-separated paths (forwarded to should-skip.sh)
+#   MANUAL_TESTING_TEST_BRANCH: fake branch name (forwarded to should-skip.sh)
+#   CLAUDE_TURN_ID: current turn id, compared against the state file
 
 set -euo pipefail
 
@@ -31,7 +31,7 @@ turn_id="${CLAUDE_TURN_ID:-${CLAUDE_SESSION_ID:-unknown}}"
 if [[ -f "$STATE_FILE" ]]; then
     last_turn=$(grep -o '"turn_id":"[^"]*"' "$STATE_FILE" 2>/dev/null | sed 's/.*:"//;s/"$//' || echo "")
     if [[ "$last_turn" == "$turn_id" ]]; then
-        # Skill already ran this turn — stay silent
+        # Skill already ran this turn, so stay silent
         exit 0
     fi
 fi

@@ -16,10 +16,9 @@ use Illuminate\Support\Collection;
  */
 final class ImportFieldCollection extends Collection
 {
-    /** @phpstan-param ImportField|null $default */
-    public function get(mixed $key, mixed $default = null): ?ImportField
+    public function getByKey(string $key): ?ImportField
     {
-        return $this->first(fn (ImportField $f): bool => $f->key === $key) ?? $default;
+        return $this->first(fn (ImportField $f): bool => $f->key === $key);
     }
 
     /**
@@ -27,7 +26,7 @@ final class ImportFieldCollection extends Collection
      */
     public function hasKey(string $key): bool
     {
-        return $this->get($key) instanceof ImportField;
+        return $this->getByKey($key) instanceof ImportField;
     }
 
     /**

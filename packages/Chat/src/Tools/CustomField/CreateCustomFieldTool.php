@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -14,11 +15,13 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 final class CreateCustomFieldTool implements Tool
 {
     use ReportsValidationFailures;
+    use RequiresWorkspaceCapability;
     use WithConversationContext;
 
     public function name(): string
@@ -28,7 +31,7 @@ final class CreateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity — check ListCustomFieldsTool first. Admin-only — returns an error for non-owners. Returns a proposal for user approval.';
+        return 'Propose creating a new custom field definition on a CRM entity. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for members and viewers. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -43,7 +46,7 @@ final class CreateCustomFieldTool implements Tool
                 ->description('The display name for the field (e.g. "Industry", "Priority"). Max 50 characters, and must not match an existing field on the same entity.')
                 ->required(),
             'type' => $schema->string()
-                ->description("The field type. Allowed: {$allowedTypes}. NOT allowed: file-upload, record, rich-editor, markdown-editor, currency.")
+                ->description("The field type. Allowed: {$allowedTypes}. NOT allowed: file-upload, record, rich-editor, currency.")
                 ->required(),
             'code' => $schema->string()
                 ->description('Optional machine-readable code (snake_case). Auto-generated from name if omitted.'),
@@ -60,10 +63,10 @@ final class CreateCustomFieldTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsTeam($user->currentTeam)) {
-            return (string) json_encode([
-                'error' => 'Only team owners can create custom field definitions. I can guide you to the Custom Fields settings page if you want to ask your team owner to do this.',
-            ]);
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::FieldsManage);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
         }
 
         try {
@@ -122,17 +125,19 @@ final class CreateCustomFieldTool implements Tool
             entityType: 'custom_field',
             actionData: $actionData,
             displayData: $displayData,
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => 'CreateCustomField',
             'entity_type' => 'custom_field',
             'operation' => 'create',
             'data' => $pending->action_data,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 }

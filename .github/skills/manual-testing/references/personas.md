@@ -6,7 +6,7 @@
 |---|---|
 | smoke | Default User |
 | light | Default + (Cross-Tenant Spy if model/policy/scope path touched, else Power User) |
-| medium | Default + Cross-Tenant Spy + Rushed Salesperson + (one of First-Time User / Destructive User / Inattentive Returner — pick whichever stresses the changed surface) |
+| medium | Default + Cross-Tenant Spy + Rushed Salesperson + (one of First-Time User / Destructive User / Inattentive Returner, whichever stresses the changed surface) |
 | deep | All 8 |
 
 Each persona maps to a specific bug class. Each charter must justify which personas it picked and why others were excluded.
@@ -45,7 +45,7 @@ Each persona maps to a specific bug class. Each charter must justify which perso
 
 **Profile:** 1000+ contacts, keyboard-driven, uses bulk actions, exports to CSV regularly.
 
-**Setup:** If the dev DB has < 500 records of the relevant model, this persona is best-effort and may report "skipped — insufficient data."
+**Setup:** If the dev DB has < 500 records of the relevant model, this persona is best-effort and may report "skipped, insufficient data."
 
 **Behavior:** Tab through forms. Use keyboard shortcuts. Bulk-select. Search/filter at scale. Export.
 
@@ -98,7 +98,7 @@ Each persona maps to a specific bug class. Each charter must justify which perso
 
 **Bug class hunted:** CSRF mismatch (419 errors with no friendly message), expired tokens, optimistic-locking failures (silent overwrite of another user's edit), tab desync.
 
-**Required check:** If the diff touches form submission or auth, simulate "submit form with stale CSRF token" — expected: friendly retry, not a crash.
+**Required check:** If the diff touches form submission or auth, simulate "submit form with stale CSRF token". Expect a friendly retry, not a crash.
 
 ---
 

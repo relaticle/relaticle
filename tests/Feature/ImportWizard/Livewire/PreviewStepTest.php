@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -11,7 +12,6 @@ use Filament\Facades\Filament;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -20,6 +20,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
@@ -28,13 +29,13 @@ use Relaticle\ImportWizard\Support\MatchResolver;
 mutates(PreviewStep::class, MatchResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -53,8 +54,8 @@ function createPreviewReadyStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): ImportStore {
-    $import = Import::create([
-        'team_id' => (string) $context->team->id,
+    $import = Import::factory()->create([
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
         'file_name' => 'test.csv',
@@ -83,27 +84,25 @@ function mountPreviewStep(object $context): Testable
     ]);
 }
 
-if (! function_exists('makeRow')) {
-    /** @param array<string, mixed> $overrides */
-    function makeRow(int $rowNumber, array $rawData, array $overrides = []): array
-    {
-        return array_merge([
-            'row_number' => $rowNumber,
-            'raw_data' => json_encode($rawData),
-            'validation' => null,
-            'corrections' => null,
-            'skipped' => null,
-            'match_action' => null,
-            'matched_id' => null,
-            'relationships' => null,
-        ], $overrides);
-    }
+/** @param array<string, mixed> $overrides */
+function makePreviewRow(int $rowNumber, array $rawData, array $overrides = []): array
+{
+    return array_merge([
+        'row_number' => $rowNumber,
+        'raw_data' => json_encode($rawData),
+        'validation' => null,
+        'corrections' => null,
+        'skipped' => null,
+        'match_action' => null,
+        'matched_id' => null,
+        'relationships' => null,
+    ], $overrides);
 }
 
 it('mounts and renders with summary data', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
-        makeRow(3, ['Name' => 'Jane']),
+        makePreviewRow(2, ['Name' => 'John']),
+        makePreviewRow(3, ['Name' => 'Jane']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -117,8 +116,8 @@ it('mounts and renders with summary data', function (): void {
 
 it('resolves all rows as Create when only name is mapped', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
-        makeRow(3, ['Name' => 'Jane']),
+        makePreviewRow(2, ['Name' => 'John']),
+        makePreviewRow(3, ['Name' => 'Jane']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -133,28 +132,27 @@ it('resolves all rows as Create when only name is mapped', function (): void {
 it('resolves rows as Update when email matches existing record', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing Person',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $emailField = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->team->id)
+        ->where('tenant_id', $this->workspace->id)
         ->where('entity_type', 'people')
         ->where('code', 'emails')
         ->first();
 
     if ($emailField) {
-        CustomFieldValue::create([
+        CustomFieldValue::factory()->withJsonValue(['existing@test.com'])->create([
             'custom_field_id' => $emailField->id,
             'entity_type' => 'people',
             'entity_id' => $person->id,
-            'tenant_id' => $this->team->id,
-            'json_value' => ['existing@test.com'],
+            'tenant_id' => $this->workspace->id,
         ]);
     }
 
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'existing@test.com']),
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'existing@test.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -174,7 +172,7 @@ it('resolves rows as Update when email matches existing record', function (): vo
 
 it('resolves rows as Create when email does not match existing record', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'nonexistent@test.com']),
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'nonexistent@test.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -188,7 +186,7 @@ it('resolves rows as Create when email does not match existing record', function
 
 it('resolves rows as Skip when id does not match existing record', function (): void {
     createPreviewReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '99999', 'Name' => 'Ghost']),
+        makePreviewRow(2, ['ID' => '99999', 'Name' => 'Ghost']),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -203,11 +201,11 @@ it('resolves rows as Skip when id does not match existing record', function (): 
 it('resolves rows as Update when id matches existing record', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing Person',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     createPreviewReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated Name']),
+        makePreviewRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated Name']),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -224,7 +222,7 @@ it('renders entity link relationships from pre-populated data', function (): voi
     $companyMatch = RelationshipMatch::create('company', 'Acme Corp');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
+        makePreviewRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
     ], [
@@ -244,7 +242,7 @@ it('renders entity link relationships from pre-populated data', function (): voi
 
 it('handles rows with no entity link relationships', function (): void {
     createPreviewReadyStore($this, ['Name', 'Company ID'], [
-        makeRow(2, ['Name' => 'John', 'Company ID' => '99999']),
+        makePreviewRow(2, ['Name' => 'John', 'Company ID' => '99999']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company'),
@@ -259,13 +257,13 @@ it('handles rows with no entity link relationships', function (): void {
 it('renders existing entity link relationships from pre-populated data', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $companyMatch = RelationshipMatch::existing('company', (string) $company->id);
 
     createPreviewReadyStore($this, ['Name', 'Company ID'], [
-        makeRow(2, ['Name' => 'John', 'Company ID' => (string) $company->id], [
+        makePreviewRow(2, ['Name' => 'John', 'Company ID' => (string) $company->id], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
     ], [
@@ -285,7 +283,7 @@ it('renders existing entity link relationships from pre-populated data', functio
 
 it('resolves rows with validation errors through normal match resolution', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Name is required'])]),
+        makePreviewRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Name is required'])]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -298,9 +296,9 @@ it('resolves rows with validation errors through normal match resolution', funct
 
 it('createCount returns correct count', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
-        makeRow(3, ['Name' => 'Jane']),
-        makeRow(4, ['Name' => 'Bob']),
+        makePreviewRow(2, ['Name' => 'John']),
+        makePreviewRow(3, ['Name' => 'Jane']),
+        makePreviewRow(4, ['Name' => 'Bob']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -313,12 +311,12 @@ it('createCount returns correct count', function (): void {
 it('updateCount returns correct count', function (): void {
     $person = People::factory()->create([
         'name' => 'Existing',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     createPreviewReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated']),
-        makeRow(3, ['ID' => '99999', 'Name' => 'Ghost']),
+        makePreviewRow(2, ['ID' => (string) $person->id, 'Name' => 'Updated']),
+        makePreviewRow(3, ['ID' => '99999', 'Name' => 'Ghost']),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -331,7 +329,7 @@ it('updateCount returns correct count', function (): void {
 
 it('skipCount returns correct count', function (): void {
     createPreviewReadyStore($this, ['ID', 'Name'], [
-        makeRow(2, ['ID' => '99999', 'Name' => 'Ghost']),
+        makePreviewRow(2, ['ID' => '99999', 'Name' => 'Ghost']),
     ], [
         ColumnData::toField(source: 'ID', target: 'id'),
         ColumnData::toField(source: 'Name', target: 'name'),
@@ -344,8 +342,8 @@ it('skipCount returns correct count', function (): void {
 
 it('errorCount returns count of rows with validation errors', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Error'])]),
-        makeRow(3, ['Name' => 'Jane']),
+        makePreviewRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Error'])]),
+        makePreviewRow(3, ['Name' => 'Jane']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -359,7 +357,7 @@ it('startImport dispatches ExecuteImportJob and sets status to Importing', funct
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -376,11 +374,33 @@ it('startImport dispatches ExecuteImportJob and sets status to Importing', funct
     expect($freshImport->status)->toBe(ImportStatus::Importing);
 });
 
+it('does not start while match resolution is incomplete', function (): void {
+    Bus::fake();
+
+    createPreviewReadyStore($this, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->store->query()->update(['match_action' => null]);
+
+    $component = mountPreviewStep($this);
+    $component
+        ->assertActionDisabled('startImport')
+        ->assertActionHasLabel('startImport', 'Match resolution failed')
+        ->call('startImport');
+
+    Bus::assertNothingBatched();
+
+    expect($this->import->fresh()->status)->toBe(ImportStatus::Reviewing);
+});
+
 it('startImport proceeds even when rows have validation errors', function (): void {
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Error'])]),
+        makePreviewRow(2, ['Name' => 'John'], ['validation' => json_encode(['Name' => 'Error'])]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -398,7 +418,7 @@ it('startImport sets batchId for progress tracking', function (): void {
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -413,7 +433,7 @@ it('isImporting returns true while batch is running', function (): void {
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -426,7 +446,7 @@ it('isImporting returns true while batch is running', function (): void {
 
 it('does not skip rows with validation errors that are covered by per-value skips', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'bad-email'], [
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'bad-email'], [
             'validation' => json_encode(['$.Email' => 'Invalid email']),
             'skipped' => json_encode(['$.Email' => true]),
         ]),
@@ -443,9 +463,9 @@ it('does not skip rows with validation errors that are covered by per-value skip
 
 it('previewRows returns paginated rows', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
-        makeRow(3, ['Name' => 'Jane']),
-        makeRow(4, ['Name' => 'Bob']),
+        makePreviewRow(2, ['Name' => 'John']),
+        makePreviewRow(3, ['Name' => 'Jane']),
+        makePreviewRow(4, ['Name' => 'Bob']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -460,7 +480,7 @@ it('previewRows returns paginated rows', function (): void {
 
 it('columns returns mapped column data', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com']),
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'john@test.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -478,7 +498,7 @@ it('relationshipTabs returns entity link tabs', function (): void {
     $companyMatch = RelationshipMatch::create('company', 'Acme');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+        makePreviewRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
     ], [
@@ -496,7 +516,7 @@ it('relationshipTabs returns entity link tabs', function (): void {
 
 it('relationshipTabs returns empty when no entity links mapped', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -511,13 +531,13 @@ it('relationshipSummary aggregates by entity link key', function (): void {
     $newCorpMatch = RelationshipMatch::create('company', 'New Corp');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
+        makePreviewRow(2, ['Name' => 'John', 'Company' => 'Acme Corp'], [
             'relationships' => json_encode([$acmeMatch->toArray()]),
         ]),
-        makeRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp'], [
+        makePreviewRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp'], [
             'relationships' => json_encode([$acmeMatch->toArray()]),
         ]),
-        makeRow(4, ['Name' => 'Bob', 'Company' => 'New Corp'], [
+        makePreviewRow(4, ['Name' => 'Bob', 'Company' => 'New Corp'], [
             'relationships' => json_encode([$newCorpMatch->toArray()]),
         ]),
     ], [
@@ -540,7 +560,7 @@ it('relationshipSummary returns empty on all tab', function (): void {
     $companyMatch = RelationshipMatch::create('company', 'Acme');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+        makePreviewRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
     ], [
@@ -557,7 +577,7 @@ it('setActiveTab changes tab and resets page', function (): void {
     $companyMatch = RelationshipMatch::create('company', 'Acme');
 
     createPreviewReadyStore($this, ['Name', 'Company'], [
-        makeRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
+        makePreviewRow(2, ['Name' => 'John', 'Company' => 'Acme'], [
             'relationships' => json_encode([$companyMatch->toArray()]),
         ]),
     ], [
@@ -578,7 +598,7 @@ it('setActiveTab changes tab and resets page', function (): void {
 
 it('renders preview data table with row values', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'john@test.com']),
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'john@test.com']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Email', target: 'custom_fields_emails'),
@@ -595,7 +615,7 @@ it('renders preview data table with row values', function (): void {
 
 it('renders skipped and invalid cells as empty', function (): void {
     createPreviewReadyStore($this, ['Name', 'Email'], [
-        makeRow(2, ['Name' => 'John', 'Email' => 'bad'], [
+        makePreviewRow(2, ['Name' => 'John', 'Email' => 'bad'], [
             'validation' => json_encode(['Email' => 'Invalid']),
             'skipped' => json_encode(['Name' => true]),
         ]),
@@ -611,9 +631,26 @@ it('renders skipped and invalid cells as empty', function (): void {
         ->assertDontSee('bad');
 });
 
+it('shows a company it will create for an unmatched domain', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Company Domain', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+    createPreviewReadyStore($this, ['Name', 'Company Domain'], [
+        makePreviewRow(2, ['Name' => 'Nina Park', 'Company Domain' => 'northline.example']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+    new ValidateColumnJob($this->import->id, $column)->handle();
+
+    mountPreviewStep($this)
+        ->assertSee('northline.example')
+        ->call('startImport');
+
+    expect(People::query()->where('name', 'Nina Park')->sole()->company->name)->toBe('northline.example');
+});
+
 it('checkImportProgress detects completion', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -638,7 +675,7 @@ it('startImport is a no-op when batchId is already set', function (): void {
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -654,7 +691,7 @@ it('startImport is a no-op when already completed', function (): void {
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -670,7 +707,7 @@ it('startImport is a no-op when status is already Importing', function (): void 
     Bus::fake();
 
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -685,7 +722,7 @@ it('startImport is a no-op when status is already Importing', function (): void 
 
 it('downloadFailedRows action is visible when there are failed rows', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);
@@ -705,7 +742,7 @@ it('downloadFailedRows action is visible when there are failed rows', function (
 
 it('downloadFailedRows action is hidden when there are no failed rows', function (): void {
     createPreviewReadyStore($this, ['Name'], [
-        makeRow(2, ['Name' => 'John']),
+        makePreviewRow(2, ['Name' => 'John']),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
     ]);

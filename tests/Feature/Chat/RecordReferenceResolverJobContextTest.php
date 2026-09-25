@@ -11,14 +11,14 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 mutates(RecordReferenceResolver::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
-    // Deliberately do NOT call Filament::setTenant() — this mirrors the queued job context
+    // Deliberately do NOT call Filament::setTenant(); this mirrors the queued job context
 });
 
-it('resolves a company URL without Filament tenant bound, using auth user currentTeam', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme Corp']);
+it('resolves a company URL without Filament tenant bound, using auth user currentWorkspace', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme Corp']);
 
     $resolver = resolve(RecordReferenceResolver::class);
     $ref = $resolver->resolve('company', (string) $company->getKey());
@@ -30,7 +30,7 @@ it('resolves a company URL without Filament tenant bound, using auth user curren
 });
 
 it('resolves a people URL without Filament tenant bound', function (): void {
-    $person = People::factory()->for($this->user->currentTeam)->create(['name' => 'Jane Smith']);
+    $person = People::factory()->for($this->user->currentWorkspace)->create(['name' => 'Jane Smith']);
 
     $ref = resolve(RecordReferenceResolver::class)->resolve('people', (string) $person->getKey());
 
@@ -39,7 +39,7 @@ it('resolves a people URL without Filament tenant bound', function (): void {
 });
 
 it('resolves an opportunity URL without Filament tenant bound', function (): void {
-    $opportunity = Opportunity::factory()->for($this->user->currentTeam)->create(['name' => 'Big Deal']);
+    $opportunity = Opportunity::factory()->for($this->user->currentWorkspace)->create(['name' => 'Big Deal']);
 
     $ref = resolve(RecordReferenceResolver::class)->resolve('opportunity', (string) $opportunity->getKey());
 
@@ -67,8 +67,8 @@ it('resolves note to a record edit deep-link without Filament tenant bound', fun
         ->and($ref['url'])->toContain('tableActionRecord=any-id');
 });
 
-it('returns null when the user has no current team', function (): void {
-    // Remove from session so currentTeam is null
+it('returns null when the user has no current workspace', function (): void {
+    // Remove from session so currentWorkspace is null
     auth()->logout();
 
     $resolver = resolve(RecordReferenceResolver::class);

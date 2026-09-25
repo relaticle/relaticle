@@ -39,7 +39,7 @@
             <ul class="space-y-3">
                 @foreach([
                     'Unlimited users and data',
-                    'MCP server with 32 tools',
+                    'MCP server with 39 tools',
                     'REST API with full CRUD',
                     '22 custom field types',
                     'Multi-team workspaces',
@@ -69,7 +69,7 @@
             </div>
         </div>
 
-        <x-marketing.button href="{{ route('register') }}">
+        <x-marketing.button href="{{ route('login') }}">
             Start for free
         </x-marketing.button>
         </div>
@@ -104,7 +104,7 @@
             <ul class="space-y-3">
                 @foreach([
                     'Unlimited users and data',
-                    'MCP server with 32 tools',
+                    'MCP server with 39 tools',
                     'REST API with full CRUD',
                     '22 custom field types',
                     'Multi-team workspaces',

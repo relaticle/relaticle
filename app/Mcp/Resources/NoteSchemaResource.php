@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
-use App\Mcp\Resources\Concerns\ResolvesEntitySchema;
+use App\Enums\CrmEntity;
+use App\Mcp\Resources\Contracts\ProvidesEntitySchema;
+use App\Mcp\Schema\CustomFieldSchema;
+use App\Mcp\Schema\McpSchemaCache;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use Laravel\Mcp\Enums\CacheScope;
+use Laravel\Mcp\Enums\Role;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\Priority;
+use Laravel\Mcp\Server\Attributes\Cacheable;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
@@ -17,9 +25,17 @@ use Laravel\Mcp\Server\Resource;
 #[Description('Schema for notes including available custom fields. Read this before creating or updating notes.')]
 #[Uri('relaticle://schema/note')]
 #[MimeType('application/json')]
-final class NoteSchemaResource extends Resource
+#[Cacheable(ttlMs: McpSchemaCache::TTL * 1000, scope: CacheScope::Private)]
+#[Audience(Role::Assistant)]
+#[Priority(0.8)]
+final class NoteSchemaResource extends Resource implements ProvidesEntitySchema
 {
-    use ResolvesEntitySchema;
+    public function __construct(private readonly CustomFieldSchema $schema) {}
+
+    private function entity(): CrmEntity
+    {
+        return CrmEntity::Note;
+    }
 
     public function shouldRegister(): bool
     {
@@ -39,14 +55,20 @@ final class NoteSchemaResource extends Resource
         /** @var User $user */
         $user = $request->user();
 
-        $schema = [
-            'entity' => 'note',
+        return Response::text(json_encode($this->toSchema($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    }
+
+    /** @return array<string, mixed> */
+    public function toSchema(User $user): array
+    {
+        return [
+            'entity' => $this->entity()->value,
             'description' => 'Free-form notes attached to CRM records.',
             'fields' => [
                 'title' => ['type' => 'string', 'required' => true],
             ],
-            'custom_fields' => $this->resolveCustomFields($user, 'note'),
-            'filterable_fields' => $this->resolveFilterableFields($user, 'note'),
+            'custom_fields' => $this->schema->fields($user, $this->entity()),
+            'filterable_fields' => $this->schema->filterableFields($user, $this->entity()),
             'relationships' => ['creator', 'companies', 'people', 'opportunities'],
             'writable_relationships' => [
                 'company_ids' => [
@@ -70,7 +92,5 @@ final class NoteSchemaResource extends Resource
             ],
             'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys.',
         ];
-
-        return Response::text(json_encode($schema, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

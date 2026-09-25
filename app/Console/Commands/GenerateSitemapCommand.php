@@ -48,7 +48,19 @@ final class GenerateSitemapCommand extends Command
         $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
 
         return SitemapGenerator::create(config('app.url'))
-            ->shouldCrawl(fn (string $url): bool => ! in_array(parse_url($url, PHP_URL_PATH), $excluded, true))
+            ->shouldCrawl(function (string $url) use ($excluded): bool {
+                $path = (string) parse_url($url, PHP_URL_PATH);
+
+                if (in_array($path, $excluded, true)) {
+                    return false;
+                }
+
+                if (parse_url($url, PHP_URL_QUERY) !== null) {
+                    return false;
+                }
+
+                return pathinfo($path, PATHINFO_EXTENSION) === '';
+            })
             ->getSitemap();
     }
 
@@ -65,6 +77,7 @@ final class GenerateSitemapCommand extends Command
     {
         $this->ensureUrl($sitemap, route('help.index'));
         $this->ensureUrl($sitemap, route('documentation.index'));
+        $this->ensureUrl($sitemap, route('aiNativeCrm'));
 
         $docsRepository->categories()
             ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)

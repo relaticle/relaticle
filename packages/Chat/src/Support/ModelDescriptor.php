@@ -40,6 +40,40 @@ final readonly class ModelDescriptor
     }
 
     /**
+     * A descriptor for a stored catalog entry.
+     *
+     * The provider's own model tag is the id. A stored entry carries no separate
+     * identifier: one that an operator types is one an operator can mistype or
+     * rename, and the tag is already the identity everywhere it is persisted
+     * (`ai_credit_transactions.model`, `ModelRegistry::ratesFor()`). Retagging a
+     * row is therefore a new model by construction, which is what it is.
+     *
+     * `selfHosted` is false by construction: self-hosted models are never stored,
+     * they are merged from env by ModelRegistry, and they keep the env-derived ids
+     * they have always had because no operator types those either.
+     *
+     * An unmeasured entry gets the weaker guard. Claiming `api` without proof
+     * would tell the write path the provider refuses parallel tool calls when it
+     * may not.
+     */
+    public static function fromCatalogEntry(CatalogEntry $entry): self
+    {
+        $measurement = $entry->measurement;
+
+        return new self(
+            id: $entry->model,
+            label: $entry->label,
+            provider: $entry->provider,
+            model: $entry->model,
+            minPlan: $entry->minPlan,
+            creditMultiplier: $entry->creditMultiplier,
+            supportsTools: $measurement instanceof Measurement && $measurement->supportsTools,
+            writeGuard: $measurement instanceof Measurement ? $measurement->writeGuard : WriteGuard::Prompt,
+            selfHosted: false,
+        );
+    }
+
+    /**
      * Servable on this install: tool-capable, has a model tag, and its provider
      * connection is configured. Cloud providers need a key; self-hosted providers
      * need a base URL.

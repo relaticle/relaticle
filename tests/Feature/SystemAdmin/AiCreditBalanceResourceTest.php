@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\Team;
+use App\Enums\BillingStatus;
+use App\Enums\Plan;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource;
@@ -19,27 +21,28 @@ beforeEach(function (): void {
 });
 
 it('lists balances across all tenants', function (): void {
-    $team1 = Team::factory()->create(['name' => 'Acme']);
-    $team2 = Team::factory()->create(['name' => 'Globex']);
-    AiCreditBalance::query()->where('team_id', $team1->getKey())->delete();
-    $b1 = AiCreditBalance::factory()->create(['team_id' => $team1->getKey(), 'credits_remaining' => 200]);
-    AiCreditBalance::query()->where('team_id', $team2->getKey())->delete();
-    $b2 = AiCreditBalance::factory()->create(['team_id' => $team2->getKey(), 'credits_remaining' => 50]);
+    $team1 = Workspace::factory()->create(['name' => 'Acme']);
+    $team2 = Workspace::factory()->create(['name' => 'Globex']);
+    AiCreditBalance::query()->where('workspace_id', $team1->getKey())->delete();
+    $b1 = AiCreditBalance::factory()->create(['workspace_id' => $team1->getKey(), 'credits_remaining' => 200]);
+    AiCreditBalance::query()->where('workspace_id', $team2->getKey())->delete();
+    $b2 = AiCreditBalance::factory()->create(['workspace_id' => $team2->getKey(), 'credits_remaining' => 50]);
 
     livewire(ListAiCreditBalances::class)
         ->assertCanSeeTableRecords([$b1, $b2])
-        ->assertCanRenderTableColumn('team.name')
+        ->assertCanRenderTableColumn('workspace.name')
         ->assertCanRenderTableColumn('credits_remaining')
-        ->assertCanRenderTableColumn('credits_used');
+        ->assertCanRenderTableColumn('credits_used')
+        ->assertCanRenderTableColumn('period_ends_at');
 });
 
 it('filters by low balance', function (): void {
-    $team1 = Team::factory()->create();
-    $team2 = Team::factory()->create();
-    AiCreditBalance::query()->where('team_id', $team1->getKey())->delete();
-    $low = AiCreditBalance::factory()->create(['team_id' => $team1->getKey(), 'credits_remaining' => 5]);
-    AiCreditBalance::query()->where('team_id', $team2->getKey())->delete();
-    $high = AiCreditBalance::factory()->create(['team_id' => $team2->getKey(), 'credits_remaining' => 500]);
+    $team1 = Workspace::factory()->create();
+    $team2 = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $team1->getKey())->delete();
+    $low = AiCreditBalance::factory()->create(['workspace_id' => $team1->getKey(), 'credits_remaining' => 5]);
+    AiCreditBalance::query()->where('workspace_id', $team2->getKey())->delete();
+    $high = AiCreditBalance::factory()->create(['workspace_id' => $team2->getKey(), 'credits_remaining' => 500]);
 
     livewire(ListAiCreditBalances::class)
         ->filterTable('low_balance')
@@ -48,17 +51,17 @@ it('filters by low balance', function (): void {
 });
 
 it('filters by expired period', function (): void {
-    $team1 = Team::factory()->create();
-    $team2 = Team::factory()->create();
-    AiCreditBalance::query()->where('team_id', $team1->getKey())->delete();
+    $team1 = Workspace::factory()->create();
+    $team2 = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $team1->getKey())->delete();
     $expired = AiCreditBalance::factory()->create([
-        'team_id' => $team1->getKey(),
+        'workspace_id' => $team1->getKey(),
         'period_starts_at' => now()->subMonth(),
         'period_ends_at' => now()->subDay(),
     ]);
-    AiCreditBalance::query()->where('team_id', $team2->getKey())->delete();
+    AiCreditBalance::query()->where('workspace_id', $team2->getKey())->delete();
     $current = AiCreditBalance::factory()->create([
-        'team_id' => $team2->getKey(),
+        'workspace_id' => $team2->getKey(),
         'period_ends_at' => now()->addDays(10),
     ]);
 
@@ -69,16 +72,16 @@ it('filters by expired period', function (): void {
 });
 
 it('shows the balance detail page', function (): void {
-    $team = Team::factory()->create();
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $workspace = Workspace::factory()->create();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
     livewire(ViewAiCreditBalance::class, ['record' => $balance->getKey()])
         ->assertSuccessful();
 });
 
 it('rejects an edit that would drop credits_remaining below purchased_credits', function (): void {
-    $team = Team::factory()->create();
-    $balance = AiCreditBalance::query()->where('team_id', $team->getKey())->sole();
+    $workspace = Workspace::factory()->create();
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     $balance->update(['credits_remaining' => 500, 'purchased_credits' => 200]);
 
     livewire(EditAiCreditBalance::class, ['record' => $balance->getKey()])
@@ -87,4 +90,35 @@ it('rejects an edit that would drop credits_remaining below purchased_credits', 
         ->assertHasFormErrors(['credits_remaining']);
 
     expect($balance->refresh()->credits_remaining)->toBe(500);
+});
+
+it('renders the period dates on the administrator calendar day, not the server one', function (): void {
+    $admin = SystemAdministrator::factory()->create(['timezone' => 'Asia/Yerevan']);
+    $this->actingAs($admin, 'sysadmin');
+
+    $workspace = Workspace::factory()->create();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
+
+    // 01:00 on Jun 10 in Yerevan, still Jun 9 on the server.
+    $balance = AiCreditBalance::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'period_starts_at' => '2026-06-09 21:00:00',
+    ]);
+
+    livewire(ListAiCreditBalances::class)
+        ->assertTableColumnFormattedStateSet('period_starts_at', 'Jun 10, 2026', $balance);
+});
+
+it('explains an allowance with the workspace billing badge, not a vocabulary of its own', function (): void {
+    $workspace = Workspace::factory()->create();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
+    $balance = AiCreditBalance::factory()->create(['workspace_id' => $workspace->getKey()]);
+
+    livewire(ListAiCreditBalances::class)
+        ->assertCanSeeTableRecords([$balance])
+        ->assertCanRenderTableColumn('billing_status')
+        ->assertSee(BillingStatus::Trialing->getLabel())
+        ->assertSeeHtml(BillingStatus::Trialing->getDescription());
 });

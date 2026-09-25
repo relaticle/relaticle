@@ -4,23 +4,25 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
+use App\Support\CurrentSource;
 use Illuminate\Support\Str;
 
 /**
- * Holds a single `batch_uuid` for the lifetime of one request or queued job, so
- * every activity row written while handling it shares the same value. This is the
- * key the timeline groups on when collapsing a single save's native + custom-field
- * rows into one entry.
+ * Holds one `batch_uuid` per channel for the lifetime of one request or queued job,
+ * so every activity row written through the same channel while handling it shares
+ * the same value. This is the key the timeline groups on when collapsing a single
+ * save's native + custom-field rows into one entry.
  *
- * Bound as a scoped container instance — Laravel forgets scoped instances between
+ * Bound as a scoped container instance. Laravel forgets scoped instances between
  * HTTP requests and between queue jobs, so the uuid never leaks across them.
  */
 final class RequestActivityBatch
 {
-    private ?string $uuid = null;
+    /** @var array<string, string> */
+    private array $uuids = [];
 
     public function id(): string
     {
-        return $this->uuid ??= (string) Str::uuid();
+        return $this->uuids[CurrentSource::get()->value] ??= (string) Str::uuid();
     }
 }

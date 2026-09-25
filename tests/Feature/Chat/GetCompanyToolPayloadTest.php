@@ -11,10 +11,10 @@ use Relaticle\Chat\Tools\Company\GetCompanyTool;
 mutates(GetCompanyTool::class);
 
 it('surfaces the account owner in the get-company payload', function (): void {
-    $user = User::factory()->withPersonalTeam()->create(['name' => 'Olive Owner']);
+    $user = User::factory()->withPersonalWorkspace()->create(['name' => 'Olive Owner']);
     Auth::guard('web')->setUser($user);
 
-    $company = Company::factory()->for($user->currentTeam)->create([
+    $company = Company::factory()->for($user->currentWorkspace)->create([
         'name' => 'Owned Co',
         'account_owner_id' => (string) $user->getKey(),
     ]);
@@ -28,10 +28,10 @@ it('surfaces the account owner in the get-company payload', function (): void {
 });
 
 it('returns a null account owner when the company is unowned', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($user);
 
-    $company = Company::factory()->for($user->currentTeam)->create([
+    $company = Company::factory()->for($user->currentWorkspace)->create([
         'name' => 'Unowned Co',
         'account_owner_id' => null,
     ]);

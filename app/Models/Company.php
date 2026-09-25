@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
-use App\Models\Concerns\BelongsToTeamCreator;
+use App\Enums\MediaCollection;
+use App\Models\ActivityLog\Activity;
+use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
-use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\HasWorkspace;
+use App\Models\Scopes\WorkspaceScope;
 use App\Observers\CompanyObserver;
-use App\Services\AvatarService;
+use App\Support\Media\UploadAllowlist;
+use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
+use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +27,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
 use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\ActivityLog\Timeline\TimelineBuilder;
@@ -34,39 +39,43 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property string $name
- * @property Carbon|null $deleted_at
+ * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
+#[ScopedBy(WorkspaceScope::class)]
 #[Fillable([
     'name',
     'creation_source',
 ])]
-final class Company extends Model implements HasCustomFields, HasMedia, HasTimeline
+final class Company extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
 {
-    use BelongsToTeamCreator;
+    use BelongsToWorkspaceCreator;
     use HasCreator;
 
     /** @use HasFactory<CompanyFactory> */
     use HasFactory;
 
     use HasNotes;
-    use HasTeam;
     use HasUlids;
+    use HasWorkspace;
     use InteractsWithMedia;
     use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
 
-    public const string LOGO_MEDIA_COLLECTION = 'logo';
+    public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
 
-    /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
+    /** @var array<string, string> */
+    public const array LOGO_MIME_TYPES = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/vnd.microsoft.icon' => 'ico',
+        'image/x-icon' => 'ico',
     ];
 
     /**
@@ -81,15 +90,36 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
         ];
     }
 
-    protected function getLogoAttribute(): string
+    /**
+     * Null when no logo has been uploaded. A company with no mark falls back to
+     * the shared entity icon (App\Enums\CrmEntity), not a generated initials
+     * tile: 57% of companies carry a real logo, so colour in a company column
+     * should only ever mean "this is the brand's own mark".
+     */
+    protected function getLogoAttribute(): ?string
     {
         $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
 
-        return $logo === '' || $logo === '0' ? resolve(AvatarService::class)->generateAuto(name: $this->name) : $logo;
+        return $logo === '' || $logo === '0' ? null : $logo;
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        return $this->logo;
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
+            ->acceptsMimeTypes(array_keys(self::LOGO_MIME_TYPES))
+            ->useDisk('public');
+
+        $this->addMediaCollection(MediaCollection::Attachments->value)
+            ->acceptsMimeTypes(UploadAllowlist::mimeTypes());
     }
 
     /**
-     * Team member responsible for managing the company account
+     * Workspace member responsible for managing the company account
      *
      * @return BelongsTo<User, $this>
      */
@@ -122,6 +152,40 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
         return $this->morphToMany(Task::class, 'taskable');
     }
 
+    public function beforeActivityLogged(Activity $activity, string $eventName): void
+    {
+        $changes = $activity->attribute_changes?->toArray() ?? [];
+
+        $sidesWithOwner = array_filter(
+            ['attributes', 'old'],
+            fn (string $side): bool => is_array($changes[$side] ?? null) && array_key_exists('account_owner_id', $changes[$side]),
+        );
+
+        if ($sidesWithOwner === []) {
+            return;
+        }
+
+        $ownerIds = collect($sidesWithOwner)
+            ->map(fn (string $side): mixed => $changes[$side]['account_owner_id'])
+            ->filter(fn (mixed $id): bool => is_string($id));
+
+        $ownerNames = $ownerIds->isEmpty()
+            ? collect()
+            : User::query()->whereKey($ownerIds->all())->pluck('name', 'id');
+
+        foreach ($sidesWithOwner as $side) {
+            $ownerId = $changes[$side]['account_owner_id'];
+            unset($changes[$side]['account_owner_id']);
+            $changes[$side]['account_owner'] = is_string($ownerId) ? $ownerNames->get($ownerId) : null;
+        }
+
+        if (($changes['attributes']['account_owner'] ?? null) === null && ($changes['old']['account_owner'] ?? null) === null) {
+            unset($changes['attributes']['account_owner'], $changes['old']['account_owner']);
+        }
+
+        $activity->attribute_changes = collect($changes);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -129,8 +193,8 @@ final class Company extends Model implements HasCustomFields, HasMedia, HasTimel
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->logExcept([
-                'id', 'team_id', 'creator_id', 'creation_source', 'custom_fields',
-                'created_at', 'updated_at', 'deleted_at', 'account_owner_id',
+                'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
+                'created_at', 'updated_at', 'deleted_at',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

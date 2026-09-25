@@ -12,7 +12,7 @@ final class RelationAccessPolicyFixture
 {
     public function view(User $user, Company $company): bool
     {
-        return $user->belongsToTeam($company->team);
+        return $user->belongsToWorkspace($company->workspace);
     }
 
     public function update(User $user, Task $task): bool
@@ -22,11 +22,11 @@ final class RelationAccessPolicyFixture
 
     public function delete(User $user, Task $task): bool
     {
-        return $task->team->getKey() === $user->currentTeam?->getKey();
+        return $task->workspace->getKey() === $user->currentWorkspace?->getKey();
     }
 
     public function restore(User $user, ?Task $task): bool
     {
-        return $task?->team?->getKey() === $user->currentTeam?->getKey();
+        return $task?->workspace?->getKey() === $user->currentWorkspace?->getKey();
     }
 }

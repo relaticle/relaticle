@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\Team;
 use App\Models\User;
-use App\Notifications\TeamDeletionReminderNotification;
+use App\Models\Workspace;
 use App\Notifications\UserDeletionReminderNotification;
+use App\Notifications\WorkspaceDeletionReminderNotification;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -17,14 +17,14 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Jetstream\Contracts\DeletesTeams;
 use Laravel\Jetstream\Contracts\DeletesUsers;
 
-#[Description('Permanently delete users and teams past their scheduled deletion date, and send reminders ahead of purge')]
+#[Description('Permanently delete users and workspaces past their scheduled deletion date, and send reminders ahead of purge')]
 #[Signature('app:purge-scheduled-deletions')]
 final class PurgeScheduledDeletionsCommand extends Command
 {
-    public function handle(DeletesUsers $deletesUsers, DeletesTeams $deletesTeams): int
+    public function handle(DeletesUsers $deletesUsers, DeletesTeams $deletesWorkspaces): int
     {
         $this->purgeExpiredUsers($deletesUsers);
-        $this->purgeExpiredTeams($deletesTeams);
+        $this->purgeExpiredWorkspaces($deletesWorkspaces);
         $this->sendReminders();
 
         return self::SUCCESS;
@@ -49,23 +49,23 @@ final class PurgeScheduledDeletionsCommand extends Command
         $this->info("Purged {$count} user(s).");
     }
 
-    private function purgeExpiredTeams(DeletesTeams $deletesTeams): void
+    private function purgeExpiredWorkspaces(DeletesTeams $deletesWorkspaces): void
     {
         $count = 0;
 
-        Team::query()
+        Workspace::query()
             ->expiredDeletion()
-            ->chunkById(100, function (Collection $teams) use ($deletesTeams, &$count): void {
-                $teams->each(function (Team $team) use ($deletesTeams, &$count): void {
-                    DB::transaction(fn () => $deletesTeams->delete($team));
+            ->chunkById(100, function (Collection $workspaces) use ($deletesWorkspaces, &$count): void {
+                $workspaces->each(function (Workspace $workspace) use ($deletesWorkspaces, &$count): void {
+                    DB::transaction(fn () => $deletesWorkspaces->delete($workspace));
 
-                    Log::info('Purged team', ['team_id' => $team->id, 'name' => $team->name]);
-                    $this->info("Purged team: {$team->name}");
+                    Log::info('Purged workspace', ['workspace_id' => $workspace->id, 'name' => $workspace->name]);
+                    $this->info("Purged workspace: {$workspace->name}");
                     $count++;
                 });
             });
 
-        $this->info("Purged {$count} team(s).");
+        $this->info("Purged {$count} workspace(s).");
     }
 
     private function sendReminders(): void
@@ -82,16 +82,19 @@ final class PurgeScheduledDeletionsCommand extends Command
                 $users->each(fn (User $user) => $user->notify(new UserDeletionReminderNotification($user)));
             });
 
-        Team::query()
+        Workspace::query()
             ->scheduledForDeletion()
             ->whereBetween('scheduled_deletion_at', [$reminderStart, $reminderEnd])
             ->with('owner')
-            ->chunkById(100, function (Collection $teams): void {
-                $teams->each(function (Team $team): void {
-                    /** @var User $owner */
-                    $owner = $team->owner;
+            ->chunkById(100, function (Collection $workspaces): void {
+                $workspaces->each(function (Workspace $workspace): void {
+                    $owner = $workspace->owner;
 
-                    $owner->notify(new TeamDeletionReminderNotification($team));
+                    if (! $owner instanceof User) {
+                        return;
+                    }
+
+                    $owner->notify(new WorkspaceDeletionReminderNotification($workspace));
                 });
             });
     }

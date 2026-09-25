@@ -37,7 +37,7 @@ final readonly class ListTasks
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(
-            Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
             ->allowedFilters(
@@ -67,7 +67,8 @@ final readonly class ListTasks
                 AllowedFilter::scope('opportunity_id', 'forOpportunity'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '<=', $value)),
-                AllowedFilter::custom('custom_fields', new CustomFieldFilter('task')),
+                AllowedFilter::exact('creation_source', 'tasks.creation_source'),
+                CustomFieldFilter::allowedFilter('task'),
             )
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(

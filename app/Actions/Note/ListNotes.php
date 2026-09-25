@@ -36,16 +36,17 @@ final readonly class ListNotes
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(
-            Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentTeam),
+            Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
             ->allowedFilters(
                 AllowedFilter::partial('title'),
                 AllowedFilter::scope('notable_type', 'forNotableType'),
                 AllowedFilter::scope('notable_id', 'forNotableId'),
-                AllowedFilter::custom('custom_fields', new CustomFieldFilter('note')),
+                CustomFieldFilter::allowedFilter('note'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '<=', $value)),
+                AllowedFilter::exact('creation_source', 'notes.creation_source'),
             )
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(

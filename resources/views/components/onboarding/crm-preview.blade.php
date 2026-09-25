@@ -106,33 +106,4 @@
             </div>
         </div>
     </div>
-
-    {{-- Team invite preview (floating card, visible on invite step) --}}
-    <div
-        x-show="wizardStep === 3"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 translate-y-2"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 translate-y-2"
-        class="absolute bottom-1/3 left-1/2 -translate-x-1/2 rounded-xl bg-white p-5 shadow-lg ring-1 ring-primary-200 dark:bg-gray-800 dark:ring-primary-500/30"
-        x-cloak
-    >
-        <div class="space-y-3">
-            <div class="flex -space-x-2">
-                <div class="flex size-8 items-center justify-center rounded-full bg-primary-100 ring-2 ring-white dark:bg-primary-900/30 dark:ring-gray-800">
-                    <x-filament::icon icon="ri-user-fill" class="size-4 text-primary-500" />
-                </div>
-                <div class="flex size-8 items-center justify-center rounded-full bg-primary-100 ring-2 ring-white dark:bg-primary-900/30 dark:ring-gray-800">
-                    <x-filament::icon icon="ri-user-fill" class="size-4 text-primary-500" />
-                </div>
-                <div class="flex size-8 items-center justify-center rounded-full bg-gray-100 ring-2 ring-white dark:bg-gray-700 dark:ring-gray-800">
-                    <x-filament::icon icon="ri-add-line" class="size-4 text-gray-400" />
-                </div>
-            </div>
-            <p class="text-sm font-medium text-gray-900 dark:text-white">Invite teammates</p>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Collaborate in real-time</p>
-        </div>
-    </div>
 </div>

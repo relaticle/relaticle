@@ -11,13 +11,13 @@ use App\Support\ActivityLog\MergedActivityRenderer;
 use Filament\Facades\Filament;
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
-    Filament::setTenant($this->team);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
 
     $section = CustomFieldSection::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'company',
         'code' => 'general',
         'name' => 'General',
@@ -27,7 +27,7 @@ beforeEach(function (): void {
     ]);
 
     CustomField::query()->create([
-        'tenant_id' => $this->team->getKey(),
+        'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $section->getKey(),
         'entity_type' => 'company',
         'code' => 'lead_source',
@@ -38,13 +38,13 @@ beforeEach(function (): void {
         'validation_rules' => [],
     ]);
 
-    $this->company = Company::factory()->for($this->team)->create();
+    $this->company = Company::factory()->for($this->workspace)->create();
     Activity::withoutGlobalScopes()->delete();
 });
 
 /**
  * Insert an activity row directly so each test controls the batch_uuid it groups
- * on — the per-request stamping itself is covered separately and end-to-end in the
+ * on. The per-request stamping itself is covered separately and end-to-end in the
  * browser flow.
  *
  * @param  array<string, mixed>  $attributeChanges
@@ -61,7 +61,7 @@ function seedActivityRow(Company $company, string $event, ?string $batchUuid, ar
         'attribute_changes' => $attributeChanges,
         'properties' => $properties,
         'batch_uuid' => $batchUuid,
-        'team_id' => $company->team_id,
+        'workspace_id' => $company->workspace_id,
     ]);
 }
 
@@ -173,3 +173,28 @@ it('still labels an updated event as changed with its diff', function (): void {
         ->toContain(__('activity-log::messages.entry.changed'))
         ->toContain('New name');
 })->mutates(MergedActivityRenderer::class);
+
+it('reads a company owner change by name on the record timeline', function (): void {
+    $seller = User::factory()->create(['name' => 'Bea Seller']);
+    Activity::withoutGlobalScopes()->delete();
+
+    $this->company->update(['account_owner_id' => $seller->getKey()]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)
+        ->toContain('Account Owner')
+        ->toContain('Bea Seller')
+        ->not->toContain((string) $seller->getKey());
+});
+
+it('does not log an empty account owner on a company created without one', function (): void {
+    Activity::withoutGlobalScopes()->delete();
+
+    Company::factory()->for($this->company->workspace)->create(['name' => 'Ownerless Co', 'account_owner_id' => null]);
+
+    $created = Activity::withoutGlobalScopes()->where('event', 'created')->latest('id')->firstOrFail();
+
+    expect($created->attribute_changes['attributes'] ?? [])->not->toHaveKey('account_owner');
+});

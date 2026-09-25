@@ -124,7 +124,7 @@ final class ApiTokensRelationManager extends RelationManager
 
     /**
      * `showCreatedTokenAction()` has no submit action (`modalSubmitAction(false)`),
-     * so closing it — via "Done", Escape, or the modal backdrop — always goes
+     * so closing it, via "Done", Escape, or the modal backdrop, always goes
      * through `unmountAction()`, never `callAfter()`. An `->after()` hook on that
      * action is therefore dead code that never runs, leaving the plaintext token
      * sitting in this component's public property (and re-serialized into the

@@ -21,14 +21,16 @@ use App\Mcp\Tools\Task\ListTasksTool;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
+use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('can list companies via MCP tool', function (): void {
-    Company::factory(3)->recycle([$this->user, $this->team])->create();
+    Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(ListCompaniesTool::class);
@@ -47,12 +49,12 @@ it('can create a company via MCP tool', function (): void {
 
     $this->assertDatabaseHas('companies', [
         'name' => 'MCP Test Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 });
 
 it('can update a company via MCP tool', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Name']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old Name']);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(UpdateCompanyTool::class, [
@@ -67,7 +69,7 @@ it('can update a company via MCP tool', function (): void {
 });
 
 it('can delete a company via MCP tool', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(DeleteCompanyTool::class, [
@@ -168,7 +170,7 @@ it('validates company_id exists when creating a person via MCP', function (): vo
 });
 
 it('validates company_id exists when updating a person via MCP', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(UpdatePeopleTool::class, [
@@ -191,8 +193,8 @@ it('validates company_id and contact_id exist when creating opportunity via MCP'
 });
 
 it('can filter companies by name via MCP search param', function (): void {
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Acme Corp']);
-    Company::factory()->recycle([$this->user, $this->team])->create(['name' => 'Beta Inc']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta Inc']);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(ListCompaniesTool::class, [
@@ -212,6 +214,18 @@ it('can read the CRM overview prompt', function (): void {
         ->assertSee('CRM Overview');
 });
 
+it('keeps the CRM overview prompt to the current workspace', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Company']);
+    Company::factory()->for(Workspace::factory())->create(['name' => 'Foreign Company']);
+
+    RelaticleServer::actingAs($this->user)
+        ->prompt(CrmOverviewPrompt::class)
+        ->assertOk()
+        ->assertSee('Own Company')
+        ->assertSee('companies: 1')
+        ->assertDontSee('Foreign Company');
+});
+
 it('returns error when updating non-existent company', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateCompanyTool::class, [
@@ -227,4 +241,48 @@ it('returns error when deleting non-existent company', function (): void {
             'id' => 'non-existent-id',
         ])
         ->assertHasErrors(['not found']);
+});
+
+it('shows the relaticle mark on the legacy initialize handshake', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-11-25',
+            'capabilities' => (object) [],
+            'clientInfo' => ['name' => 'test', 'version' => '1.0.0'],
+        ],
+    ])
+        ->assertOk()
+        ->assertJsonPath('result.serverInfo.icons', [
+            ['src' => asset('brand/logomark.svg'), 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
+            ['src' => asset('web-app-manifest-512x512.png'), 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+        ]);
+});
+
+it('shows the relaticle mark on the server discover handshake', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $response = $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'server/discover',
+        'params' => [
+            '_meta' => [
+                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities' => (object) [],
+            ],
+        ],
+    ], [
+        'MCP-Protocol-Version' => '2026-07-28',
+        'Mcp-Method' => 'server/discover',
+    ])->assertOk();
+
+    expect($response->json('result._meta')['io.modelcontextprotocol/serverInfo']['icons'])->toBe([
+        ['src' => asset('brand/logomark.svg'), 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
+        ['src' => asset('web-app-manifest-512x512.png'), 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+    ]);
 });

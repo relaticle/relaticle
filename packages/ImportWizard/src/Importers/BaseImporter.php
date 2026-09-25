@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Importers;
 
-use App\Enums\CreationSource;
 use App\Models\CustomField;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -32,20 +31,20 @@ abstract class BaseImporter implements ImporterContract
     /** @var array<string, EntityLink>|null */
     private ?array $entityLinksCache = null;
 
-    private ?Team $teamCache = null;
+    private ?Workspace $workspaceCache = null;
 
     public function __construct(
-        protected readonly string $teamId,
+        protected readonly string $workspaceId,
     ) {}
 
-    public function getTeamId(): string
+    public function getWorkspaceId(): string
     {
-        return $this->teamId;
+        return $this->workspaceId;
     }
 
-    public function getTeam(): ?Team
+    public function getWorkspace(): ?Workspace
     {
-        return $this->teamCache ??= Team::query()->find($this->teamId);
+        return $this->workspaceCache ??= Workspace::query()->find($this->workspaceId);
     }
 
     /**
@@ -96,12 +95,12 @@ abstract class BaseImporter implements ImporterContract
         return [];
     }
 
-    /** @return EloquentCollection<int, \Relaticle\CustomFields\Models\CustomField> */
+    /** @return EloquentCollection<int, CustomField> */
     protected function getRecordCustomFields(): EloquentCollection
     {
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
+            ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $this->entityName())
             ->forType('record')
             ->active()
@@ -162,7 +161,7 @@ abstract class BaseImporter implements ImporterContract
     {
         $customFields = CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $this->teamId)
+            ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $this->entityName())
             ->where('type', '!=', 'record')
             ->active()
@@ -233,7 +232,7 @@ abstract class BaseImporter implements ImporterContract
     }
 
     /**
-     * Initialize a new record with team, creator, and source.
+     * Initialize a new record with workspace and creator.
      *
      * Call this in prepareForSave when the record is new.
      *
@@ -242,22 +241,21 @@ abstract class BaseImporter implements ImporterContract
      */
     protected function initializeNewRecordData(array $data, ?string $creatorId = null): array
     {
-        $data['team_id'] = $this->teamId;
+        $data['workspace_id'] = $this->workspaceId;
         $data['creator_id'] = $creatorId;
-        $data['creation_source'] = CreationSource::IMPORT;
 
         return $data;
     }
 
     protected function saveCustomFieldValues(Model $record): void
     {
-        $team = $this->getTeam();
+        $workspace = $this->getWorkspace();
 
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             return;
         }
 
-        CustomFields::importer()->forModel($record)->saveValues($team);
+        CustomFields::importer()->forModel($record)->saveValues($workspace);
     }
 
     /**

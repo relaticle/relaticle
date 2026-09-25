@@ -32,26 +32,40 @@ final class ManageTasks extends ManageRecords
     #[Override]
     protected function getHeaderActions(): array
     {
+        /** @var array<int, string> $submittedAssigneeIds */
+        $submittedAssigneeIds = [];
+        $createTaskAction = CreateAction::make()
+            ->icon('heroicon-o-plus')
+            ->size(Size::Small)
+            ->slideOver()
+            ->before(function () use (&$createTaskAction, &$submittedAssigneeIds): void {
+                $submittedAssignees = $createTaskAction->getRawData()['assignees'] ?? [];
+
+                if (! is_array($submittedAssignees)) {
+                    $submittedAssignees = [];
+                }
+
+                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
+            })
+            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
+                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
+            });
+
         return [
             ActionGroup::make([
                 Action::make('import')
                     ->label(__('filament/resources/task.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportTasks::getUrl()),
-                ExportAction::make()->exporter(TaskExporter::class),
+                    ->url(ImportTasks::getUrl())
+                    ->visible(ImportTasks::canAccess(...)),
+                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')
                 ->button()
                 ->label(__('filament/resources/task.pages.list.actions.import_export.label'))
                 ->size(Size::Small),
-            CreateAction::make()
-                ->icon('heroicon-o-plus')
-                ->size(Size::Small)
-                ->slideOver()
-                ->after(function (Task $record): void {
-                    resolve(NotifyTaskAssignees::class)->execute($record);
-                }),
+            $createTaskAction,
         ];
     }
 

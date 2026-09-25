@@ -9,7 +9,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 
@@ -25,7 +25,7 @@ final class TipTapDocumentParser
      * @param  array<string, mixed>  $document
      * @return array{text: string, mentions: list<array{type: string, id: string, label: string}>}
      */
-    public function parse(array $document, Team $team): array
+    public function parse(array $document, Workspace $workspace): array
     {
         $textParts = [];
         $mentions = [];
@@ -33,7 +33,7 @@ final class TipTapDocumentParser
 
         $this->walkDocument($document, $textParts, $mentions, $nodeCount, 0);
 
-        $mentions = $this->filterToTeam($mentions, $team);
+        $mentions = $this->filterToWorkspace($mentions, $workspace);
 
         return [
             'text' => trim(implode('', $textParts)),
@@ -125,13 +125,13 @@ final class TipTapDocumentParser
      * @param  list<array{type: string, id: string, label: string}>  $mentionRows
      * @return array<string, mixed>
      */
-    public function buildFromText(string $text, array $mentionRows, Team $team): array
+    public function buildFromText(string $text, array $mentionRows, Workspace $workspace): array
     {
         if ($text === '') {
             return ['type' => 'doc', 'content' => []];
         }
 
-        $authorized = $this->filterToTeam($mentionRows, $team);
+        $authorized = $this->filterToWorkspace($mentionRows, $workspace);
 
         usort($authorized, static fn (array $a, array $b): int => mb_strlen($b['label']) <=> mb_strlen($a['label']));
 
@@ -208,7 +208,7 @@ final class TipTapDocumentParser
      * @param  list<array{type: string, id: string, label?: string}>  $mentions
      * @return list<array{type: string, id: string, label: string}>
      */
-    private function filterToTeam(array $mentions, Team $team): array
+    private function filterToWorkspace(array $mentions, Workspace $workspace): array
     {
         if ($mentions === []) {
             return [];
@@ -227,7 +227,7 @@ final class TipTapDocumentParser
             }
 
             $found = $modelClass::query()
-                ->whereBelongsTo($team)
+                ->whereBelongsTo($workspace)
                 ->whereIn('id', array_unique($ids))
                 ->pluck('id')
                 ->all();

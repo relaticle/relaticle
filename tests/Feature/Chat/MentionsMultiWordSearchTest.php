@@ -12,17 +12,17 @@ use Relaticle\Chat\Http\Controllers\ChatController;
 mutates(ChatController::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
     RateLimiter::clear('60|'.request()->ip());
 });
 
 it('matches multi-word company names', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);
-    Company::factory()->for($this->team)->create(['name' => 'Acme Industries']);
-    Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Corp']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Industries']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Acme C']))->assertOk();
 
@@ -32,8 +32,8 @@ it('matches multi-word company names', function (): void {
 });
 
 it('matches multi-word person names', function (): void {
-    People::factory()->for($this->team)->create(['name' => 'Sarah Chen']);
-    People::factory()->for($this->team)->create(['name' => 'Sarah Wright']);
+    People::factory()->for($this->workspace)->create(['name' => 'Sarah Chen']);
+    People::factory()->for($this->workspace)->create(['name' => 'Sarah Wright']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Sarah Ch']))->assertOk();
 

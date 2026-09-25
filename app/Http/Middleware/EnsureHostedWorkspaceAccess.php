@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Closure;
 use Filament\Facades\Filament;
@@ -22,6 +22,17 @@ final readonly class EnsureHostedWorkspaceAccess
         'filament.app.tenant.profile',
     ];
 
+    /**
+     * `chat.*` otherwise matches every route in this group with an XHR/JSON
+     * response, but these are full-page browser navigations (a transcript
+     * citation link, an import handoff redirect), so a paused workspace must
+     * redirect them to billing like any other page route instead of
+     * returning a raw JSON body.
+     *
+     * @var list<string>
+     */
+    private const array BROWSER_NAVIGATION_ROUTES = ['chat.record-redirect', 'chat.attachments.import'];
+
     public function __construct(private HostedWorkspaceAccess $access) {}
 
     /**
@@ -31,9 +42,9 @@ final readonly class EnsureHostedWorkspaceAccess
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $team = $this->resolveTeam($request);
+        $workspace = $this->resolveWorkspace($request);
 
-        if (! $team instanceof Team || $this->access->allows($team)) {
+        if (! $workspace instanceof Workspace || $this->access->allows($workspace)) {
             return $next($request);
         }
 
@@ -41,9 +52,11 @@ final readonly class EnsureHostedWorkspaceAccess
             return $next($request);
         }
 
-        $billingUrl = route('filament.app.pages.billing', ['tenant' => $team->slug]);
+        $billingUrl = route('filament.app.pages.billing', ['tenant' => $workspace->slug]);
 
-        if ($request->expectsJson() || $request->routeIs('chat.*')) {
+        $isXhrChatRoute = $request->routeIs('chat.*') && ! $request->routeIs(...self::BROWSER_NAVIGATION_ROUTES);
+
+        if ($request->expectsJson() || $isXhrChatRoute) {
             return response()->json([
                 'error' => 'workspace_subscription_required',
                 'message' => __('billing.access.paused_api'),
@@ -54,11 +67,11 @@ final readonly class EnsureHostedWorkspaceAccess
         return redirect()->to($billingUrl);
     }
 
-    private function resolveTeam(Request $request): ?Team
+    private function resolveWorkspace(Request $request): ?Workspace
     {
         $tenant = Filament::getTenant();
 
-        if ($tenant instanceof Team) {
+        if ($tenant instanceof Workspace) {
             return $tenant;
         }
 
@@ -68,6 +81,6 @@ final readonly class EnsureHostedWorkspaceAccess
             return null;
         }
 
-        return $user->currentTeam;
+        return $user->currentWorkspace;
     }
 }

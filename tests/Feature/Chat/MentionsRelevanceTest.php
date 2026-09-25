@@ -13,17 +13,17 @@ use Relaticle\Chat\Http\Controllers\ChatController;
 mutates(ChatController::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
     RateLimiter::clear('60|'.request()->ip());
 });
 
 it('orders prefix matches before substring matches within the same type', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Macao Inc']);     // substring match for "Ac"
-    Company::factory()->for($this->team)->create(['name' => 'Acme Corp']);     // prefix match
-    Company::factory()->for($this->team)->create(['name' => 'AcmeAir']);       // prefix match (shorter)
+    Company::factory()->for($this->workspace)->create(['name' => 'Macao Inc']);     // substring match for "Ac"
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Corp']);     // prefix match
+    Company::factory()->for($this->workspace)->create(['name' => 'AcmeAir']);       // prefix match (shorter)
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Ac']))->assertOk();
 
@@ -34,9 +34,9 @@ it('orders prefix matches before substring matches within the same type', functi
 });
 
 it('orders prefix matches before substring matches for tasks (title column)', function (): void {
-    Task::factory()->for($this->team)->create(['title' => 'Recall everyone about Friday']);  // substring
-    Task::factory()->for($this->team)->create(['title' => 'Friday standup']);              // prefix (14 chars)
-    Task::factory()->for($this->team)->create(['title' => 'Fri-only routine']);            // prefix (16 chars)
+    Task::factory()->for($this->workspace)->create(['title' => 'Recall everyone about Friday']);  // substring
+    Task::factory()->for($this->workspace)->create(['title' => 'Friday standup']);              // prefix (14 chars)
+    Task::factory()->for($this->workspace)->create(['title' => 'Fri-only routine']);            // prefix (16 chars)
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Fri']))->assertOk();
 
@@ -47,8 +47,8 @@ it('orders prefix matches before substring matches for tasks (title column)', fu
 });
 
 it('returns people before companies for ambiguous queries', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme Tim Co']);
-    People::factory()->for($this->team)->create(['name' => 'Tim Cook']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Tim Co']);
+    People::factory()->for($this->workspace)->create(['name' => 'Tim Cook']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Tim']))->assertOk();
 

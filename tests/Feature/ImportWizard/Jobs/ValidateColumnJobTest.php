@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -24,13 +24,13 @@ use Relaticle\ImportWizard\Support\Validation\ColumnValidator;
 mutates(ValidateColumnJob::class, ColumnValidator::class, EntityLinkValidator::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 });
 
 afterEach(function (): void {
@@ -47,8 +47,8 @@ function createValidationStore(
     array $mappings,
     ImportEntityType $entityType = ImportEntityType::People,
 ): array {
-    $import = Import::create([
-        'team_id' => (string) $context->team->id,
+    $import = Import::factory()->create([
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => $entityType,
         'file_name' => 'test.csv',
@@ -104,7 +104,7 @@ it('writes RelationshipMatch create for Create entity links', function (): void 
 it('writes RelationshipMatch existing when resolved to existing record', function (): void {
     $company = Company::factory()->create([
         'name' => 'Acme Corp',
-        'team_id' => $this->team->id,
+        'workspace_id' => $this->workspace->id,
     ]);
 
     $column = ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company');
@@ -140,6 +140,44 @@ it('skips relationship for MatchOnly when no match found', function (): void {
 
     $row = $this->store->query()->where('row_number', 2)->first();
     expect($row->relationships)->toBeNull();
+});
+
+it('validates a corrected company link by its corrected value', function (): void {
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $column = ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company ID'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company ID' => 'missing-company'], [
+            'corrections' => json_encode(['Company ID' => (string) $company->id]),
+            'validation' => json_encode(['Company ID' => 'No company found']),
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+    expect($row->hasValidationError('Company ID'))->toBeFalse()
+        ->and($row->relationships->sole()->id)->toBe((string) $company->id);
+});
+
+it('writes no company link for an empty company cell', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company' => '']),
+        makeValidationRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    expect($this->store->query()->where('row_number', 2)->first()->relationships)->toBeNull()
+        ->and($this->store->query()->where('row_number', 3)->first()->relationships->sole()->name)->toBe('Acme Corp');
 });
 
 it('writes validation errors for unresolvable account owner entity link', function (): void {
@@ -295,7 +333,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
 {
     $existing = CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $context->team->id)
+        ->where('tenant_id', $context->workspace->id)
         ->where('entity_type', $entityType)
         ->where('code', $code)
         ->first();
@@ -305,7 +343,7 @@ function ensureCustomFieldExists(object $context, string $code, string $type, st
     }
 
     return CustomField::forceCreate([
-        'tenant_id' => $context->team->id,
+        'tenant_id' => $context->workspace->id,
         'code' => $code,
         'name' => ucfirst(str_replace('_', ' ', $code)),
         'type' => $type,

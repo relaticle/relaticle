@@ -9,7 +9,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 
 it('persists the active conversation id on pending actions when a tool handles a request', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = '01957a1a-5b02-7a01-83b6-c2b7d9b6f1aa';
@@ -18,7 +18,7 @@ it('persists the active conversation id on pending actions when a tool handles a
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Tool persistence',
         'created_at' => now(),
         'updated_at' => now(),
@@ -31,7 +31,7 @@ it('persists the active conversation id on pending actions when a tool handles a
     $tool->handle(new Request(['records' => [['name' => 'Acme Corp']]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $user->currentTeam->getKey())
+        ->where('workspace_id', $user->currentWorkspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -39,7 +39,7 @@ it('persists the active conversation id on pending actions when a tool handles a
 });
 
 it('persists null conversation id when none is set on the tool', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     /** @var CreateCompanyTool $tool */
@@ -48,7 +48,7 @@ it('persists null conversation id when none is set on the tool', function (): vo
     $tool->handle(new Request(['records' => [['name' => 'Acme Corp']]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $user->currentTeam->getKey())
+        ->where('workspace_id', $user->currentWorkspace->getKey())
         ->latest()
         ->firstOrFail();
 

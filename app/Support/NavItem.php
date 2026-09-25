@@ -8,7 +8,7 @@ final readonly class NavItem
 {
     /**
      * @param  list<NavItem>  $children
-     * @param  string|null  $icon  Name of an `x-brand.nav-icon`, rendered in the mega menu only.
+     * @param  string|null  $icon  Name of the `icons.*` component the mega menu renders.
      * @param  string|null  $description  One line shown under the label in the mega menu.
      */
     public function __construct(

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 it('rename endpoint returns the conversation_id and the new title', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $conversationId = (string) Str::uuid7();
@@ -15,7 +15,7 @@ it('rename endpoint returns the conversation_id and the new title', function ():
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Old title',
         'created_at' => now(),
         'updated_at' => now(),

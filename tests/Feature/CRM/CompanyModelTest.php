@@ -7,8 +7,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\MediaLibrary\HasMedia;
@@ -16,14 +16,14 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 mutates(Company::class);
 
-test('company belongs to team', function () {
-    $team = Team::factory()->create();
+test('company belongs to workspace', function () {
+    $workspace = Workspace::factory()->create();
     $company = Company::factory()->create([
-        'team_id' => $team->getKey(),
+        'workspace_id' => $workspace->getKey(),
     ]);
 
-    expect($company->team)->toBeInstanceOf(Team::class)
-        ->and($company->team->getKey())->toBe($team->getKey());
+    expect($company->workspace)->toBeInstanceOf(Workspace::class)
+        ->and($company->workspace->getKey())->toBe($workspace->getKey());
 });
 
 test('company belongs to creator', function () {
@@ -86,12 +86,18 @@ test('company morph to many notes', function () {
         ->and($company->notes->first()->getKey())->toBe($note->getKey());
 });
 
-test('company has logo attribute', function () {
+test('company logo is null until one is uploaded', function () {
     $company = Company::factory()->create([
         'name' => 'Test Company',
     ]);
 
-    expect($company->logo)->not->toBeNull();
+    expect($company->logo)->toBeNull();
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    expect($company->refresh()->logo)->toContain('logo.png');
 });
 
 test('company uses media library', function () {

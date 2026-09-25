@@ -12,13 +12,20 @@ return [
         'settings' => 'Settings',
     ],
 
+    'settings_layout' => [
+        'back_to_app' => 'Back to app',
+    ],
+
+    'impersonation' => [
+        'banner' => 'Signed in as :name (:email) for support.',
+        'stop' => 'Stop',
+    ],
+
     'navigation_groups' => [
         'tasks' => 'Tasks',
     ],
 
-    'tenant_menu' => [
-        'import_history' => 'Import History',
-    ],
+    'payload_too_large' => 'That change is too large to save. Shorten the content and try again.',
 
     'selects' => [
         'member_self' => ':name (You)',

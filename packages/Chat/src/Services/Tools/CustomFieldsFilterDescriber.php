@@ -6,20 +6,20 @@ namespace Relaticle\Chat\Services\Tools;
 
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 
 /**
  * The read-path twin of {@see CustomFieldsSchemaDescriber}.
  *
- * Most of what a CRM user filters on — stage, status, due date, priority, amount —
+ * Most of what a CRM user filters on (stage, status, due date, priority, amount)
  * lives in custom fields, so a list tool without them can only ever answer "all of
  * them". This inlines the tenant's filterable codes, their operators and their
  * option labels into the tool's `custom_fields` slot, so the assistant can build a
  * correct filter without a discovery round-trip.
  *
- * Filterability and operators come from {@see CustomFieldFilterSchema} — the same
- * source the MCP server uses — so the two surfaces cannot drift apart.
+ * Filterability and operators come from {@see CustomFieldFilterSchema}, the same
+ * source the MCP server uses, so the two surfaces cannot drift apart.
  */
 final readonly class CustomFieldsFilterDescriber
 {
@@ -35,7 +35,7 @@ final readonly class CustomFieldsFilterDescriber
             return 'No filterable custom fields are defined for this entity type.';
         }
 
-        $optionLabels = $this->optionLabels($user->currentTeam, $entityType, array_keys($schema));
+        $optionLabels = $this->optionLabels($user->currentWorkspace, $entityType, array_keys($schema));
 
         $lines = [
             'Filter by custom field values. Keys MUST be one of the codes below; each value is an object of operator => operand.',
@@ -77,11 +77,11 @@ final readonly class CustomFieldsFilterDescriber
      * @param  list<string>  $codes
      * @return array<string, list<string>>
      */
-    private function optionLabels(Team $team, string $entityType, array $codes): array
+    private function optionLabels(Workspace $workspace, string $entityType, array $codes): array
     {
         return CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $team->getKey())
+            ->where('tenant_id', $workspace->getKey())
             ->where('entity_type', $entityType)
             ->whereIn('code', $codes)
             ->active()

@@ -2,7 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Actions\Note\AttachNoteRelationships;
+use App\Actions\Note\DetachNoteRelationships;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseAttachTool;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseDetachTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\Note\AttachNoteToEntitiesTool;
 use App\Mcp\Tools\Note\CreateNoteTool;
 use App\Mcp\Tools\Note\DeleteNoteTool;
@@ -13,22 +23,38 @@ use App\Mcp\Tools\Note\UpdateNoteTool;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
-use App\Models\Scopes\TeamScope;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 
-beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
-});
+mutates(
+    AttachNoteRelationships::class,
+    AttachNoteToEntitiesTool::class,
+    BaseAttachTool::class,
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseDetachTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreateNoteTool::class,
+    DeleteNoteTool::class,
+    DetachNoteRelationships::class,
+    DetachNoteFromEntitiesTool::class,
+    GetNoteTool::class,
+    ListNotesTool::class,
+    SerializesRelatedModels::class,
+    UpdateNoteTool::class,
+);
 
-afterEach(function () {
-    Note::clearBootedModels();
+beforeEach(function () {
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('can create a note linked to a company', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateNoteTool::class, [
@@ -44,9 +70,9 @@ it('can create a note linked to a company', function (): void {
 });
 
 it('reports per-item validation errors with correct array index via MCP', function (): void {
-    $validCompany = Company::factory()->recycle([$this->user, $this->team])->create();
-    $otherTeam = Team::factory()->create();
-    $invalidCompany = Company::factory()->for($otherTeam)->create();
+    $validCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherWorkspace = Workspace::factory()->create();
+    $invalidCompany = Company::factory()->for($otherWorkspace)->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateNoteTool::class, [
@@ -57,7 +83,7 @@ it('reports per-item validation errors with correct array index via MCP', functi
 });
 
 it('validates large arrays in bounded queries via MCP', function (): void {
-    $companies = Company::factory()->count(10)->recycle([$this->user, $this->team])->create();
+    $companies = Company::factory()->count(10)->recycle([$this->user, $this->workspace])->create();
 
     DB::enableQueryLog();
     DB::flushQueryLog();
@@ -70,15 +96,15 @@ it('validates large arrays in bounded queries via MCP', function (): void {
         ->assertOk();
 
     $lookups = collect(DB::getQueryLog())
-        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'team_id'))
+        ->filter(fn (array $q): bool => str_contains($q['query'], 'from "companies"') && str_contains($q['query'], 'workspace_id'))
         ->count();
 
     expect($lookups)->toBeLessThanOrEqual(2);
 });
 
 it('can update a note to link to an opportunity', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateNoteTool::class, [
@@ -91,8 +117,8 @@ it('can update a note to link to an opportunity', function (): void {
 });
 
 it('can detach all companies from a note via empty array', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $note->companies()->attach($company);
 
     RelaticleServer::actingAs($this->user)
@@ -102,11 +128,11 @@ it('can detach all companies from a note via empty array', function (): void {
         ])
         ->assertOk();
 
-    expect($note->refresh()->companies)->toHaveCount(0);
+    expect($note->refresh()->companies)->toBeEmpty();
 });
 
 it('can get a note by ID', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Meeting Notes']);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Meeting Notes']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetNoteTool::class, ['id' => $note->id])
@@ -115,7 +141,7 @@ it('can get a note by ID', function (): void {
 });
 
 it('can update a note via MCP tool', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Old Note']);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Old Note']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateNoteTool::class, [
@@ -129,7 +155,7 @@ it('can update a note via MCP tool', function (): void {
 });
 
 it('can delete a note via MCP tool', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Delete Me']);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Delete Me']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeleteNoteTool::class, [
@@ -142,8 +168,8 @@ it('can delete a note via MCP tool', function (): void {
 });
 
 it('can attach a note to a company', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachNoteToEntitiesTool::class, [
@@ -156,8 +182,8 @@ it('can attach a note to a company', function (): void {
 });
 
 it('can detach a note from a company', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $company = Company::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $note->companies()->attach($company);
 
     RelaticleServer::actingAs($this->user)
@@ -167,13 +193,13 @@ it('can detach a note from a company', function (): void {
         ])
         ->assertOk();
 
-    expect($note->refresh()->companies)->toHaveCount(0);
+    expect($note->refresh()->companies)->toBeEmpty();
 });
 
 it('attach does not remove existing links', function (): void {
-    $note = Note::factory()->recycle([$this->user, $this->team])->create();
-    $company1 = Company::factory()->recycle([$this->user, $this->team])->create();
-    $company2 = Company::factory()->recycle([$this->user, $this->team])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company1 = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $company2 = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $note->companies()->attach($company1);
 
     RelaticleServer::actingAs($this->user)
@@ -186,28 +212,81 @@ it('attach does not remove existing links', function (): void {
     expect($note->refresh()->companies)->toHaveCount(2);
 });
 
-describe('team scoping', function () {
+it('locks the note while attaching relationships', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AttachNoteToEntitiesTool::class, [
+            'id' => $note->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertOk();
+
+    expect(collect(DB::getQueryLog())->contains(
+        fn (array $query): bool => str_contains($query['query'], 'from "notes"')
+            && str_contains($query['query'], 'for update'),
+    ))->toBeTrue();
+});
+
+it('cannot attach relationships to a note outside the current workspace', function (): void {
+    $otherWorkspace = Workspace::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedWorkspaces');
+    $otherNote = Note::withoutEvents(fn () => Note::factory()->for($otherWorkspace)->create());
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AttachNoteToEntitiesTool::class, [
+            'id' => $otherNote->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertHasErrors();
+
+    expect($otherNote->companies()->whereKey($company->id)->exists())->toBeFalse();
+});
+
+it('cannot detach relationships from a note outside the current workspace', function (): void {
+    $otherWorkspace = Workspace::factory()->for($this->user, 'owner')->create();
+    $this->user->unsetRelation('ownedWorkspaces');
+    $otherNote = Note::withoutEvents(fn () => Note::factory()->for($otherWorkspace)->create());
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherNote->companies()->attach($company);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(DetachNoteFromEntitiesTool::class, [
+            'id' => $otherNote->id,
+            'company_ids' => [$company->id],
+        ])
+        ->assertHasErrors();
+
+    expect($otherNote->companies()->whereKey($company->id)->exists())->toBeTrue();
+});
+
+describe('workspace scoping', function () {
     beforeEach(function () {
-        Note::addGlobalScope(new TeamScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
-    it('scopes notes to current team', function (): void {
+    it('scopes notes to current workspace', function (): void {
         $otherNote = Note::withoutEvents(fn () => Note::factory()->create([
-            'team_id' => Team::factory()->create()->id,
-            'title' => 'Other Team Note',
+            'workspace_id' => Workspace::factory()->create()->id,
+            'title' => 'Other Workspace Note',
         ]));
-        $ownNote = Note::factory()->recycle([$this->user, $this->team])->create(['title' => 'Own Team Note']);
+        $ownNote = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Own Workspace Note']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class)
             ->assertOk()
-            ->assertSee('Own Team Note')
-            ->assertDontSee('Other Team Note');
+            ->assertSee('Own Workspace Note')
+            ->assertDontSee('Other Workspace Note');
     });
 
-    it('cannot update a note from another team', function (): void {
+    it('cannot update a note from another workspace', function (): void {
         $otherNote = Note::withoutEvents(fn () => Note::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -218,9 +297,9 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot delete a note from another team', function (): void {
+    it('cannot delete a note from another workspace', function (): void {
         $otherNote = Note::withoutEvents(fn () => Note::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)
@@ -230,9 +309,9 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot get a note from another team', function (): void {
+    it('cannot get a note from another workspace', function (): void {
         $otherNote = Note::withoutEvents(fn () => Note::factory()->create([
-            'team_id' => Team::factory()->create()->id,
+            'workspace_id' => Workspace::factory()->create()->id,
         ]));
 
         RelaticleServer::actingAs($this->user)

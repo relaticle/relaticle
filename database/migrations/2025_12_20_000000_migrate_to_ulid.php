@@ -8,7 +8,6 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Migrations\Migration;
@@ -1021,7 +1020,7 @@ return new class extends Migration
             // Populate using full class name mapping
             $fullClassMap = [
                 User::class => 'users',
-                Team::class => 'teams',
+                'App\\Models\\Team' => 'teams',
                 Company::class => 'companies',
                 People::class => 'people',
                 Opportunity::class => 'opportunities',
@@ -1053,7 +1052,7 @@ return new class extends Migration
      * Cutover a primary key from integer to ULID.
      *
      * MySQL requires removing AUTO_INCREMENT before dropping the primary key (Error 1075).
-     * PostgreSQL uses sequences — this step is unnecessary and skipped.
+     * PostgreSQL uses sequences, so this step is unnecessary and skipped.
      */
     private function cutoverPrimaryKey(string $table): void
     {

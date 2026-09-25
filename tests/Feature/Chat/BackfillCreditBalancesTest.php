@@ -2,49 +2,49 @@
 
 declare(strict_types=1);
 
-use App\Actions\Chat\SeedTeamCreditBalance;
+use App\Actions\Chat\SeedWorkspaceCreditBalance;
 use App\Enums\Plan;
-use App\Models\Team;
+use App\Models\Workspace;
 use Relaticle\Chat\Models\AiCreditBalance;
 
-mutates(SeedTeamCreditBalance::class);
+mutates(SeedWorkspaceCreditBalance::class);
 
-it('backfills credit balances for teams that have none', function (): void {
-    $t1 = Team::factory()->create();
-    $t2 = Team::factory()->create();
-    $t3 = Team::factory()->create();
-    AiCreditBalance::query()->whereIn('team_id', [$t1->getKey(), $t2->getKey(), $t3->getKey()])->delete();
+it('backfills credit balances for workspaces that have none', function (): void {
+    $t1 = Workspace::factory()->create();
+    $t2 = Workspace::factory()->create();
+    $t3 = Workspace::factory()->create();
+    AiCreditBalance::query()->whereIn('workspace_id', [$t1->getKey(), $t2->getKey(), $t3->getKey()])->delete();
 
-    $missingCount = Team::query()->whereDoesntHave('aiCreditBalance')->count();
+    $missingCount = Workspace::query()->whereDoesntHave('aiCreditBalance')->count();
     expect($missingCount)->toBeGreaterThanOrEqual(3);
 
-    $action = app(SeedTeamCreditBalance::class);
-    Team::query()
+    $action = app(SeedWorkspaceCreditBalance::class);
+    Workspace::query()
         ->whereDoesntHave('aiCreditBalance')
         ->with('subscriptions')
-        ->chunkById(200, function ($teams) use ($action): void {
-            foreach ($teams as $team) {
-                $action->execute($team);
+        ->chunkById(200, function ($workspaces) use ($action): void {
+            foreach ($workspaces as $workspace) {
+                $action->execute($workspace);
             }
         });
 
-    expect(Team::query()->whereDoesntHave('aiCreditBalance')->count())->toBe(0);
+    expect(Workspace::query()->whereDoesntHave('aiCreditBalance')->count())->toBe(0);
     expect($t1->fresh()->aiCreditBalance)->not->toBeNull()
         ->and($t2->fresh()->aiCreditBalance)->not->toBeNull()
         ->and($t3->fresh()->aiCreditBalance)->not->toBeNull();
 });
 
-it('falls back to Plan::default() when the team plan attribute is null at runtime', function (): void {
-    $team = Team::factory()->create();
+it('falls back to Plan::default() when the workspace plan attribute is null at runtime', function (): void {
+    $workspace = Workspace::factory()->create();
 
-    AiCreditBalance::query()->where('team_id', $team->getKey())->delete();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
 
     // forceFill sets the in-memory attribute to null without touching the persisted
     // row (which still holds the NOT NULL default). This exercises the defensive
-    // `?? Plan::default()` fallback in SeedTeamCreditBalance::execute().
-    $team->forceFill(['plan' => null]);
+    // `?? Plan::default()` fallback in SeedWorkspaceCreditBalance::execute().
+    $workspace->forceFill(['plan' => null]);
 
-    $balance = resolve(SeedTeamCreditBalance::class)->execute($team);
+    $balance = resolve(SeedWorkspaceCreditBalance::class)->execute($workspace);
 
     expect($balance->credits_remaining)->toBe(Plan::default()->credits());
 });

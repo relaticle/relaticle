@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Laravel\Cashier\Subscription;
@@ -65,14 +65,14 @@ function fakeStripeCustomerApi(ArrayObject $calls, bool $fails = false): void
  * A workspace pair owned by one person: the source holds the Stripe customer
  * and an active Pro subscription, the target holds nothing.
  *
- * @return array{0: Team, 1: Team, 2: Subscription}
+ * @return array{0: Workspace, 1: Workspace, 2: Subscription}
  */
 function transferPair(array $subscriptionOverrides = []): array
 {
     $owner = User::factory()->create();
 
-    /** @var Team $source */
-    $source = Team::factory()->create([
+    /** @var Workspace $source */
+    $source = Workspace::factory()->create([
         'user_id' => $owner->getKey(),
         'plan' => Plan::Pro,
         'stripe_id' => 'cus_transfer_source',
@@ -80,8 +80,8 @@ function transferPair(array $subscriptionOverrides = []): array
         'pm_last_four' => '4242',
     ]);
 
-    /** @var Team $target */
-    $target = Team::factory()->create([
+    /** @var Workspace $target */
+    $target = Workspace::factory()->create([
         'user_id' => $owner->getKey(),
         'plan' => Plan::Free,
     ]);
@@ -103,7 +103,7 @@ it('moves the stripe customer, the subscription and both plans to the target wor
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors()
         ->assertNotified('Billing transferred');
@@ -120,7 +120,7 @@ it('moves the stripe customer, the subscription and both plans to the target wor
         ->and($source->pm_type)->toBeNull()
         ->and($source->pm_last_four)->toBeNull()
         ->and($source->plan)->toBe(Plan::Free)
-        ->and($subscription->refresh()->team_id)->toBe($target->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($target->getKey());
 });
 
 it('moves every subscription on the source workspace, not just the one the action was called from', function (): void {
@@ -137,12 +137,12 @@ it('moves every subscription on the source workspace, not just the one the actio
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
-    expect($subscription->refresh()->team_id)->toBe($target->getKey())
-        ->and($secondSubscription->refresh()->team_id)->toBe($target->getKey());
+    expect($subscription->refresh()->workspace_id)->toBe($target->getKey())
+        ->and($secondSubscription->refresh()->workspace_id)->toBe($target->getKey());
 });
 
 it('keeps the source on its sysadmin-assigned plan when it differs from the transferred subscription plan', function (): void {
@@ -152,7 +152,7 @@ it('keeps the source on its sysadmin-assigned plan when it differs from the tran
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
@@ -164,17 +164,17 @@ it('grants the target the Pro allowance, drops the source to Free and keeps purc
     [$source, $target, $subscription] = transferPair();
 
     AiCreditBalance::query()
-        ->where('team_id', $target->getKey())
+        ->where('workspace_id', $target->getKey())
         ->update(['purchased_credits' => 500, 'credits_remaining' => 500]);
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
-    $targetBalance = AiCreditBalance::query()->where('team_id', $target->getKey())->sole();
-    $sourceBalance = AiCreditBalance::query()->where('team_id', $source->getKey())->sole();
+    $targetBalance = AiCreditBalance::query()->where('workspace_id', $target->getKey())->sole();
+    $sourceBalance = AiCreditBalance::query()->where('workspace_id', $source->getKey())->sole();
 
     expect($targetBalance->credits_remaining)->toBe(Plan::Pro->credits() + 500)
         ->and($targetBalance->purchased_credits)->toBe(500)
@@ -190,11 +190,11 @@ it('anchors the target credit period on the original subscription start date', f
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
-    $balance = AiCreditBalance::query()->where('team_id', $target->getKey())->sole();
+    $balance = AiCreditBalance::query()->where('workspace_id', $target->getKey())->sole();
 
     expect($balance->period_starts_at->toDateTimeString())
         ->toBe($anchor->copy()->addMonthNoOverflow()->toDateTimeString());
@@ -209,11 +209,11 @@ it('falls back the source credit period to the calendar month, not the moved sub
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
-    $sourceBalance = AiCreditBalance::query()->where('team_id', $source->getKey())->sole();
+    $sourceBalance = AiCreditBalance::query()->where('workspace_id', $source->getKey())->sole();
 
     expect($sourceBalance->period_starts_at->toDateTimeString())
         ->toBe(now()->startOfMonth()->toDateTimeString());
@@ -230,7 +230,7 @@ it('hides the transfer action when the source subscription is no longer valid', 
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('throws when the source subscription is no longer valid, called directly', function (): void {
@@ -244,7 +244,7 @@ it('throws when the source subscription is no longer valid, called directly', fu
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('refuses to transfer when the subscription price maps to no plan', function (): void {
@@ -252,13 +252,13 @@ it('refuses to transfer when the subscription price maps to no plan', function (
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertNotified('Transfer refused');
 
     expect($target->refresh()->stripe_id)->toBeNull()
         ->and($target->refresh()->plan)->toBe(Plan::Free)
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('rejects a target that already has its own stripe customer because the option list excludes it', function (): void {
@@ -268,35 +268,35 @@ it('rejects a target that already has its own stripe customer because the option
     // workspace stays eligible, so the action is still offered and the refusal
     // has to come from the submit, which is the race a sysadmin actually hits.
     $target->forceFill(['stripe_id' => 'cus_target_own'])->save();
-    Team::factory()->create(['user_id' => $source->user_id, 'plan' => Plan::Free]);
+    Workspace::factory()->create(['user_id' => $source->user_id, 'plan' => Plan::Free]);
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
-        ->assertHasActionErrors(['target_team_id']);
+        ->assertHasActionErrors(['target_workspace_id']);
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBe('cus_target_own')
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('rejects a target with a different owner because the option list excludes it', function (): void {
     [$source, , $subscription] = transferPair();
 
-    /** @var Team $stranger */
-    $stranger = Team::factory()->create(['plan' => Plan::Free]);
+    /** @var Workspace $stranger */
+    $stranger = Workspace::factory()->create(['plan' => Plan::Free]);
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $stranger->getKey(),
+            'target_workspace_id' => $stranger->getKey(),
         ])
-        ->assertHasActionErrors(['target_team_id']);
+        ->assertHasActionErrors(['target_workspace_id']);
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($stranger->refresh()->stripe_id)->toBeNull()
         ->and($stranger->plan)->toBe(Plan::Free)
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('throws when the target already has its own stripe customer, called directly', function (): void {
@@ -309,14 +309,14 @@ it('throws when the target already has its own stripe customer, called directly'
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBe('cus_target_own')
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('throws when the target belongs to a different owner, called directly', function (): void {
     [$source, , $subscription] = transferPair();
 
-    /** @var Team $stranger */
-    $stranger = Team::factory()->create(['plan' => Plan::Free]);
+    /** @var Workspace $stranger */
+    $stranger = Workspace::factory()->create(['plan' => Plan::Free]);
 
     expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $stranger, (string) $this->admin->getKey()))
         ->toThrow(TransferRefused::class);
@@ -324,14 +324,14 @@ it('throws when the target belongs to a different owner, called directly', funct
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($stranger->refresh()->stripe_id)->toBeNull()
         ->and($stranger->plan)->toBe(Plan::Free)
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('does not offer a workspace that already has its own stripe customer as a target', function (): void {
     [$source, $target, $subscription] = transferPair();
 
-    /** @var Team $subscribedSibling */
-    $subscribedSibling = Team::factory()->create([
+    /** @var Workspace $subscribedSibling */
+    $subscribedSibling = Workspace::factory()->create([
         'user_id' => $source->user_id,
         'stripe_id' => 'cus_sibling_own',
     ]);
@@ -346,8 +346,8 @@ it('does not offer a workspace that already has its own stripe customer as a tar
 it('does not offer a workspace scheduled for deletion as a target', function (): void {
     [$source, $target, $subscription] = transferPair();
 
-    /** @var Team $scheduledSibling */
-    $scheduledSibling = Team::factory()->create([
+    /** @var Workspace $scheduledSibling */
+    $scheduledSibling = Workspace::factory()->create([
         'user_id' => $source->user_id,
         'scheduled_deletion_at' => now()->addDays(7),
     ]);
@@ -369,7 +369,7 @@ it('throws when the target is scheduled for deletion, called directly', function
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('keeps the transfer modal open when the transfer is refused', function (): void {
@@ -377,14 +377,14 @@ it('keeps the transfer modal open when the transfer is refused', function (): vo
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertNotified('Transfer refused')
         ->assertActionHalted(TestAction::make('transfer')->table($subscription));
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
         ->and($target->refresh()->stripe_id)->toBeNull()
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
 it('renames the stripe customer to the workspace that now owns it', function (): void {
@@ -392,7 +392,7 @@ it('renames the stripe customer to the workspace that now owns it', function ():
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors();
 
@@ -411,7 +411,7 @@ it('keeps a committed transfer when the stripe rename fails', function (): void 
 
     livewire(ListSubscriptions::class)
         ->callAction(TestAction::make('transfer')->table($subscription), [
-            'target_team_id' => $target->getKey(),
+            'target_workspace_id' => $target->getKey(),
         ])
         ->assertHasNoActionErrors()
         ->assertNotified('Billing transferred');
@@ -421,7 +421,7 @@ it('keeps a committed transfer when the stripe rename fails', function (): void 
         ->and($target->plan)->toBe(Plan::Pro)
         ->and($source->refresh()->stripe_id)->toBeNull()
         ->and($source->plan)->toBe(Plan::Free)
-        ->and($subscription->refresh()->team_id)->toBe($target->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($target->getKey());
 });
 
 it('hides the transfer action when the owner has no workspace the billing can move to', function (): void {
@@ -433,5 +433,5 @@ it('hides the transfer action when the owner has no workspace the billing can mo
         ->assertActionHidden(TestAction::make('transfer')->table($subscription));
 
     expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
-        ->and($subscription->refresh()->team_id)->toBe($source->getKey());
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });

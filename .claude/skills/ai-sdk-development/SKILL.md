@@ -1,6 +1,6 @@
 ---
 name: ai-sdk-development
-description: TRIGGER when working with ai-sdk which is Laravel official first-party AI SDK. Activate when building, editing AI agents, chatbots, text generation, image generation, audio/TTS, transcription/STT, embeddings, RAG, vector stores, reranking, structured output, streaming, conversation memory, tools, queueing, broadcasting, and provider failover across OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama, ElevenLabs, Cohere, Jina, and VoyageAI. Invoke when the user references ai-sdk, the `Laravel\Ai\` namespace, or this project's AI features — not for other AI packages used directly.
+description: TRIGGER when working with ai-sdk, Laravel's official first-party AI SDK. Activate when building or editing AI agents, chatbots, text generation, image generation, audio/TTS, transcription/STT, embeddings, RAG, vector stores, reranking, structured output, streaming, conversation memory, tools, MCP servers, queueing, broadcasting, and provider failover across OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama, ElevenLabs, Cohere, Jina, and VoyageAI. Invoke when the user references ai-sdk, the `Laravel\Ai\` namespace, or this project's AI features — not for other AI packages used directly.
 license: MIT
 metadata:
   author: laravel
@@ -278,6 +278,20 @@ class MyAgent implements Agent
 
 The `#[UseCheapestModel]` and `#[UseSmartestModel]` attributes are also available for automatic model selection.
 
+Use `#[RepairToolCalls]` to let an agent recover when a model calls an unknown local tool. The failed call is returned to the model with the available local tool names, and the implicit step budget includes one repair step. Explicit `#[MaxSteps]` limits remain unchanged.
+
+```php
+use Laravel\Ai\Attributes\RepairToolCalls;
+
+#[RepairToolCalls]
+class SupportAgent implements Agent, HasTools
+{
+    use Promptable;
+
+    // ...
+}
+```
+
 The `#[WithoutBroadcasting]` attribute stops the given stream event types from broadcasting (e.g. data-heavy `ToolResult` payloads that exceed the WebSocket frame limit). The events are still streamed and persisted; they just never hit the channel:
 
 ```php
@@ -324,6 +338,31 @@ public function tools(): iterable
     ];
 }
 ```
+
+### MCP Servers
+
+Register the server once, then return its tools from `tools()`. The SDK automatically wraps each `Laravel\Mcp\Client\Primitives\Tool` and presents it to the model as `mcp_tools_<name>`. Return your own `Laravel\Mcp\Server\Tool` instances in the same way and they retain their names and run in-process.
+
+```php
+use Laravel\Mcp\Client;
+use Laravel\Mcp\Facades\Mcp;
+
+// In a service provider or routes/ai.php
+Mcp::registerClient('linear', fn () => Client::web('https://mcp.linear.app/mcp')
+    ->withToken(config('services.linear.token')));
+
+class SupportAgent implements Agent, HasTools
+{
+    use Promptable;
+
+    public function tools(): iterable
+    {
+        return Mcp::client('linear')->tools();
+    }
+}
+```
+
+The client connects on its first call, so call `connect()` only when you need to control the timing. Use `Client::local('npx', ['-y', 'some-server'])` for servers that run over stdio.
 
 ### Conversation Memory
 
@@ -420,6 +459,7 @@ Point the SDK at any OpenAI-compatible endpoint (LM Studio, vLLM, Together, etc.
             'default' => 'some-embedding-model',
             'dimensions' => 1024, // optional; omit to use native dimensions
         ],
+        'transcription' => ['default' => 'some-transcription-model'],
     ],
 ],
 ```
@@ -435,7 +475,15 @@ Embeddings::for(['Hello'])->generate(
 );
 ```
 
-It uses OpenAI-standard shapes and supports text, streaming, tools, structured output, image attachments, and text embeddings. Embedding dimensions are optional; omit them to use the model's native dimensions. For extra request-body fields, implement `HasProviderOptions` — the returned array is merged into the body.
+It uses OpenAI-standard shapes and supports text, streaming, tools, structured output, image attachments, text embeddings, and audio transcription. Embedding dimensions are optional; omit them to use the model's native dimensions. For extra request-body fields, implement `HasProviderOptions` — the returned array is merged into the body.
+
+Transcription uploads standard multipart (`file` + `model` + optional `language`) and defaults to `response_format: json`. Because endpoints vary, provider options override the defaults — pass `response_format: 'verbose_json'` for segments, or use `diarize()` on servers that implement `diarized_json`:
+
+```php
+Transcription::fromDisk('recordings', $path)
+    ->withProviderOptions(['response_format' => 'verbose_json'])
+    ->generate(provider: 'my-llm');
+```
 
 ## Common Pitfalls
 
@@ -464,8 +512,8 @@ Calling a capability not supported by a provider throws a `LogicException`. Refe
 | ---------- | --------------------------------------------------------------- |
 | Text       | OpenAI, Anthropic, Gemini, Azure, Groq, xAI, DeepSeek, Mistral, Ollama, OpenRouter, OpenAI-compatible |
 | Images     | OpenAI, Gemini, xAI                                            |
-| TTS        | OpenAI, ElevenLabs                                              |
-| STT        | OpenAI, ElevenLabs, Mistral                                     |
+| TTS        | OpenAI, ElevenLabs, Mistral                                     |
+| STT        | OpenAI, ElevenLabs, Mistral, Groq, OpenAI-compatible            |
 | Embeddings | OpenAI, OpenAI-compatible, Gemini, Azure, Cohere, Mistral, Jina, VoyageAI |
 | Reranking  | Cohere, Jina                                                    |
 | Files      | OpenAI, Anthropic, Gemini                                       |

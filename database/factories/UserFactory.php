@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
 
 /**
  * @extends Factory<User>
@@ -39,7 +40,7 @@ final class UserFactory extends Factory
             'two_factor_recovery_codes' => null,
             'remember_token' => Str::random(10),
             'profile_photo_path' => null,
-            'current_team_id' => null,
+            'current_workspace_id' => null,
         ];
     }
 
@@ -54,44 +55,44 @@ final class UserFactory extends Factory
     }
 
     /**
-     * Indicate that the user should have a personal team.
+     * Indicate that the user should have a personal workspace.
      */
-    public function withPersonalTeam(?callable $callback = null): UserFactory
+    public function withPersonalWorkspace(?callable $callback = null): UserFactory
     {
         return $this->afterCreating(function (User $user) use ($callback): void {
-            $team = Team::factory()->create([
-                'name' => $user->name.'\'s Team',
+            $workspace = Workspace::factory()->create([
+                'name' => $user->name.'\'s Workspace',
                 'user_id' => $user->id,
-                'personal_team' => true,
+                'personal_workspace' => true,
             ]);
 
             if (is_callable($callback)) {
-                $callback($team, $user);
+                $callback($workspace, $user);
             }
 
             // Update the relationship
-            $user->ownedTeams()->save($team);
+            $user->ownedWorkspaces()->save($workspace);
         });
     }
 
     /**
-     * Indicate that the user should have a standard (non-personal) team.
+     * Indicate that the user should have a standard (non-personal) workspace.
      */
-    public function withTeam(?callable $callback = null): static
+    public function withWorkspace(?callable $callback = null): static
     {
         return $this->afterCreating(function (User $user) use ($callback): void {
-            $team = Team::factory()->create([
-                'name' => $user->name."'s Team",
+            $workspace = Workspace::factory()->create([
+                'name' => $user->name."'s Workspace",
                 'user_id' => $user->id,
-                'personal_team' => false,
+                'personal_workspace' => false,
             ]);
 
             if (is_callable($callback)) {
-                $callback($team, $user);
+                $callback($workspace, $user);
             }
 
-            $user->ownedTeams()->save($team);
-            $user->switchTeam($team);
+            $user->ownedWorkspaces()->save($workspace);
+            $user->switchWorkspace($workspace);
         });
     }
 
@@ -99,6 +100,18 @@ final class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'password' => null,
+        ]);
+    }
+
+    public function withConfirmedMfa(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXP'),
+            'two_factor_recovery_codes' => Fortify::currentEncrypter()->encrypt(json_encode([
+                'recovery-code-one',
+                'recovery-code-two',
+            ], JSON_THROW_ON_ERROR)),
+            'two_factor_confirmed_at' => now(),
         ]);
     }
 

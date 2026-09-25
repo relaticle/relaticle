@@ -56,10 +56,10 @@ final class ImportResource extends Resource
                 TextEntry::make('status')
                     ->badge()
                     ->color(self::statusColor(...)),
-                TextEntry::make('team.name')
-                    ->label('Team')
+                TextEntry::make('workspace.name')
+                    ->label('Workspace')
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextEntry::make('user.name')
                     ->label('User')
                     ->color('primary')
@@ -92,12 +92,12 @@ final class ImportResource extends Resource
                     ->badge()
                     ->color(self::statusColor(...))
                     ->sortable(),
-                TextColumn::make('team.name')
-                    ->label('Team')
+                TextColumn::make('workspace.name')
+                    ->label('Workspace')
                     ->sortable()
                     ->searchable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'team')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                 TextColumn::make('user.name')
                     ->label('User')
                     ->sortable()
@@ -128,8 +128,8 @@ final class ImportResource extends Resource
                 SelectFilter::make('status')
                     ->options(ImportStatus::class)
                     ->multiple(),
-                SelectFilter::make('team')
-                    ->relationship('team', 'name')
+                SelectFilter::make('workspace')
+                    ->relationship('workspace', 'name')
                     ->searchable()
                     ->preload(),
             ])

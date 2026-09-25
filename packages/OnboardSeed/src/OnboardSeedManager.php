@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\OnboardSeed;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
@@ -32,12 +32,12 @@ final class OnboardSeedManager
     /** @var array<string, ModelSeederInterface> */
     private array $seeders = [];
 
-    public function generateFor(Authenticatable $user, ?Team $team = null, string $fixtureSet = 'sales'): bool
+    public function generateFor(Authenticatable $user, ?Workspace $workspace = null, string $fixtureSet = 'sales'): bool
     {
-        if (! $team instanceof Team) {
+        if (! $workspace instanceof Workspace) {
             /** @var User $user */
-            $user->loadMissing('ownedTeams');
-            $team = $user->personalTeam();
+            $user->loadMissing('ownedWorkspaces');
+            $workspace = $user->personalWorkspace();
         }
 
         try {
@@ -45,9 +45,9 @@ final class OnboardSeedManager
             FixtureLoader::setFixtureSet($fixtureSet);
             $this->initializeSeeders();
 
-            Model::withoutEvents(function () use ($user, $team): void {
+            Model::withoutEvents(function () use ($user, $workspace): void {
                 foreach ($this->seeders as $seeder) {
-                    $seeder->seed($team, $user);
+                    $seeder->seed($workspace, $user);
                 }
             });
 

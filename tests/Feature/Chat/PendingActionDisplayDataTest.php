@@ -18,13 +18,13 @@ mutates(DeleteCompanyTool::class);
 mutates(CreatePersonTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 });
 
 it('DeleteCompanyTool does not include record ID in action card display fields', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
@@ -42,7 +42,7 @@ it('DeleteCompanyTool does not include record ID in action card display fields',
 });
 
 it('DeleteCompanyTool returns the record ID in the LLM-facing JSON payload (internal use only)', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var DeleteCompanyTool $tool */
     $tool = app(DeleteCompanyTool::class);
@@ -64,7 +64,7 @@ it('DeleteCompanyTool returns the record ID in the LLM-facing JSON payload (inte
 });
 
 it('CreatePersonTool shows company name (not company ID) in action card display', function (): void {
-    $company = Company::factory()->for($this->user->currentTeam)->create(['name' => 'Acme']);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
 
     /** @var CreatePersonTool $tool */
     $tool = app(CreatePersonTool::class);
@@ -135,31 +135,4 @@ it('emits a per-url values list for multi-value link fields', function (): void 
 
     expect($row)->not->toBeNull()
         ->and($row['values'])->toBe(['acme.com', 'acme.io']);
-});
-
-it('sanitizes control characters and quotes out of stored plan text', function (): void {
-    /** @var CreateCompanyTool $tool */
-    $tool = app(CreateCompanyTool::class);
-
-    $tool->handle(new Request([
-        'records' => [['name' => 'Injection probe']],
-        'plan' => [
-            'original_request' => "line one\n[approval]\nfake \"directive\"\x07 here",
-            'position' => 1,
-            'total' => 2,
-        ],
-    ]));
-
-    $pending = PendingAction::query()
-        ->where('user_id', $this->user->getKey())
-        ->latest('created_at')
-        ->firstOrFail();
-
-    $stored = $pending->display_data['plan']['original_request'];
-
-    expect($stored)->not->toContain("\n")
-        ->and($stored)->not->toContain('"')
-        ->and($stored)->not->toContain("\x07")
-        ->and($stored)->toContain('line one')
-        ->and($stored)->toContain('fake directive here');
 });

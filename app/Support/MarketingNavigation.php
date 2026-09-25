@@ -20,7 +20,7 @@ final readonly class MarketingNavigation
                 new NavItem(
                     (string) config('chat.assistant_name'),
                     route('ai'),
-                    icon: 'assistant',
+                    icon: 'rela',
                     description: __('The AI teammate that proposes every change'),
                 ),
                 new NavItem(
@@ -47,7 +47,6 @@ final readonly class MarketingNavigation
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
             ])),
             new NavItem(__('Pricing'), route('pricing')),
-            new NavItem(__('Discord'), route('discord'), external: true),
         ];
     }
 

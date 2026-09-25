@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Policies;
 
-use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class TaskPolicy
@@ -12,57 +11,55 @@ final class TaskPolicy
     public function viewAny(): bool
     {
         return true;
-        // System admins can view all tasks across all tenants
     }
 
     public function view(): bool
     {
         return true;
-        // System admins can view any specific task
     }
 
-    public function create(SystemAdministrator $admin): bool
+    public function create(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 
-    public function update(SystemAdministrator $admin): bool
+    public function update(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 
     public function delete(SystemAdministrator $admin): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return $admin->role->canDelete();
     }
 
     public function deleteAny(SystemAdministrator $admin): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return $admin->role->canDelete();
     }
 
-    public function restore(SystemAdministrator $admin): bool
+    public function restore(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 
     public function forceDelete(SystemAdministrator $admin): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return $admin->role->canDelete();
     }
 
     public function forceDeleteAny(SystemAdministrator $admin): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return $admin->role->canDelete();
     }
 
-    public function restoreAny(SystemAdministrator $admin): bool
+    public function restoreAny(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 
-    public function reorder(SystemAdministrator $admin): bool
+    public function reorder(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 }

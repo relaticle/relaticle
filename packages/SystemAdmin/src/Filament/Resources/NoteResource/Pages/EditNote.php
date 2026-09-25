@@ -6,11 +6,11 @@ namespace Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages;
 
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
-use Filament\Resources\Pages\EditRecord;
 use Override;
+use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource;
 
-final class EditNote extends EditRecord
+final class EditNote extends EditCustomerRecord
 {
     protected static string $resource = NoteResource::class;
 

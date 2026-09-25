@@ -1,8 +1,9 @@
 <!doctype html>
 <html>
 <head>
-    <title>Relaticle API</title>
+    <title>REST API Reference for CRM Records - Relaticle</title>
     <meta charset="utf-8"/>
+    <meta name="description" content="REST API reference for Relaticle records and custom fields, with personal access token setup, filtering, sorting and request limits."/>
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1"/>

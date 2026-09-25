@@ -2,52 +2,57 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\SendTaskDigestCommand;
+use App\Enums\CreationSource;
 use App\Features\OnboardSeed;
 use App\Mail\TaskDigestMail;
 use App\Models\Task;
 use App\Models\User;
-use Illuminate\Support\Carbon;
+use App\Services\Notifications\DigestService;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+
+mutates(SendTaskDigestCommand::class, DigestService::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
     Mail::fake();
 });
 
-function digestCmdSetDue(Task $task, string $teamId, DateTimeInterface $dueAt): void
+function digestCmdSetDue(Task $task, string $workspaceId, DateTimeInterface $dueAt): void
 {
-    $field = DB::table('custom_fields')->where('tenant_id', $teamId)
+    $field = DB::table('custom_fields')->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')->where('code', 'due_date')->first();
     DB::table('custom_field_values')->insert([
         'id' => (string) Str::ulid(),
         'entity_type' => 'task',
         'entity_id' => $task->id,
         'custom_field_id' => trim((string) $field->id),
-        'tenant_id' => $teamId,
+        'tenant_id' => $workspaceId,
         'datetime_value' => $dueAt->format('Y-m-d H:i:s'),
     ]);
 }
 
 function userWithDueTask(string $timezone, bool $digestEmail = true): User
 {
-    $user = User::factory()->withPersonalTeam()->create(['timezone' => $timezone]);
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => $timezone, 'last_login_at' => now()]);
 
     if (! $digestEmail) {
         $user->update(['notification_preferences' => ['task_digest' => ['email' => false]]]);
     }
 
-    $task = Task::factory()->for($user->currentTeam)->create(['title' => 'Due task']);
+    $task = Task::factory()->for($user->currentWorkspace)->create(['title' => 'Due task']);
     $task->assignees()->attach($user);
-    digestCmdSetDue($task, $user->currentTeam->id, now()->subDay());
+    digestCmdSetDue($task, $user->currentWorkspace->id, now()->subDay());
 
     return $user;
 }
 
 it('queues a digest for a user at 08:00 local time', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
     $user = userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
@@ -56,7 +61,7 @@ it('queues a digest for a user at 08:00 local time', function (): void {
 });
 
 it('does not queue outside 08:00 local time', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 09:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 09:00:00', 'UTC'));
     userWithDueTask('UTC');
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
@@ -66,7 +71,7 @@ it('does not queue outside 08:00 local time', function (): void {
 
 it('filters recipients by timezone so only users at their local 08:00 are queued', function (): void {
     // At 23:00 UTC, Asia/Tokyo (UTC+9) is 08:00 the next day, while UTC is 23:00.
-    $this->travelTo(Carbon::parse('2026-06-29 23:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 23:00:00', 'UTC'));
     $tokyo = userWithDueTask('Asia/Tokyo');
     $utc = userWithDueTask('UTC');
 
@@ -77,8 +82,8 @@ it('filters recipients by timezone so only users at their local 08:00 are queued
 });
 
 it('suppresses the digest when the user has no due tasks', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
-    User::factory()->withPersonalTeam()->create(['timezone' => 'UTC']);
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 
@@ -86,8 +91,40 @@ it('suppresses the digest when the user has no due tasks', function (): void {
 });
 
 it('does not queue when the digest email channel is off', function (): void {
-    $this->travelTo(Carbon::parse('2026-06-29 08:00:00', 'UTC'));
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
     userWithDueTask('UTC', digestEmail: false);
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('skips users who have not logged in for 30 days', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
+    $user->forceFill(['last_login_at' => now()->subDays(31)])->saveQuietly();
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('skips users who never logged in', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = userWithDueTask('UTC');
+    $user->forceFill(['last_login_at' => null])->saveQuietly();
+
+    $this->artisan('notifications:send-task-digest')->assertSuccessful();
+
+    Mail::assertNothingQueued();
+});
+
+it('leaves seeded demo tasks out of the digest', function (): void {
+    $this->travelTo(Date::parse('2026-06-29 08:00:00', 'UTC'));
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC', 'last_login_at' => now()]);
+    $task = Task::factory()->for($user->currentWorkspace)->create(['title' => 'Demo task', 'creation_source' => CreationSource::SYSTEM]);
+    $task->assignees()->attach($user);
+    digestCmdSetDue($task, $user->currentWorkspace->id, now()->subDay());
 
     $this->artisan('notifications:send-task-digest')->assertSuccessful();
 

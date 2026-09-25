@@ -13,7 +13,7 @@ use Relaticle\CustomFields\Models\CustomField;
 
 /**
  * The package column formats the value itself and hands Filament a finished string,
- * so nothing downstream can still convert it — a date-time custom field renders the
+ * so nothing downstream can still convert it. A date-time custom field renders the
  * stored UTC wall clock to every viewer, while the DateTimePicker that wrote it and
  * the infolist entry that echoes it both convert. Same value, three surfaces, two
  * answers.

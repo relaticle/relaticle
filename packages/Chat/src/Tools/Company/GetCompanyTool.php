@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Company;
 
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Http\Resources\V1\NoteResource;
 use App\Http\Resources\V1\OpportunityResource;
@@ -16,29 +18,21 @@ use Relaticle\Chat\Tools\BaseReadShowTool;
 
 final class GetCompanyTool extends BaseReadShowTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Get a single company by ID with full details.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Company::class;
+        return CrmEntity::Company;
     }
 
     protected function resourceClass(): string
     {
         return CompanyResource::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Company';
-    }
-
-    protected function citationType(): string
-    {
-        return 'company';
     }
 
     protected function eagerLoad(): array

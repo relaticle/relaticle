@@ -9,8 +9,8 @@ Save filled to: .context/testing/reports/YYYY-MM-DD-HHMM-<task-slug>.md -->
 
 ## Risk classification
 
-- **Likelihood:** <N> — <reason, anchor selected>
-- **Impact:** <N> — <reason, including high-impact tag matches if any>
+- **Likelihood:** <N> (<reason, anchor selected>)
+- **Impact:** <N> (<reason, including high-impact tag matches if any>)
 - **Score:** <L>×<I>=<Total> → <smoke|light|medium|deep>
 - **Surfaces touched:** <comma-separated list>
 - **Auto-fix ceiling:** <Disabled | High only | High only excluding auth/tenancy/migration>
@@ -59,7 +59,7 @@ Save filled to: .context/testing/reports/YYYY-MM-DD-HHMM-<task-slug>.md -->
 
 ## Findings
 
-### F1 — <Severity> · <Title>
+### F1 · <Severity> · <Title>
 
 **Oracle:** <FEW HICCUPPS letter and name>
 
@@ -83,9 +83,9 @@ Save filled to: .context/testing/reports/YYYY-MM-DD-HHMM-<task-slug>.md -->
 <relevant log snippet>
 ```
 
-**Action:** <BLOCKED — awaiting triage | Auto-fixed in attempt N | Listed for user triage>
+**Action:** <BLOCKED, awaiting triage | Auto-fixed in attempt N | Listed for user triage>
 
-### F2 — ...
+### F2 · ...
 
 ## Auto-fix attempts
 
@@ -102,7 +102,7 @@ Final state: <fixed / exhausted / handed off>.
 
 ## Regression tests written
 
-- `<test path>` — <appended/created>, <passes locally>, staged for commit.
+- `<test path>`: <appended/created>, <passes locally>, staged for commit.
 
 ## PROOF debrief
 

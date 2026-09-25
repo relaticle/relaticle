@@ -9,11 +9,9 @@ use App\Enums\Notifications\NotificationType;
 use App\Mail\TaskDigestMail;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
-use DateTimeZone;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Mail;
@@ -22,12 +20,16 @@ use Illuminate\Support\Facades\Mail;
 #[Signature('notifications:send-task-digest')]
 final class SendTaskDigestCommand extends Command
 {
+    private const int ACTIVE_WITHIN_DAYS = 30;
+
     public function handle(DigestService $digestService): int
     {
         $sent = 0;
 
-        $this->recipientsAtLocalHour(8)
-            ->with(['ownedTeams', 'teams'])
+        User::query()
+            ->atLocalHour(8)
+            ->where('last_login_at', '>=', now()->subDays(self::ACTIVE_WITHIN_DAYS))
+            ->with(['ownedWorkspaces', 'workspaces'])
             ->chunkById(500, function (Collection $users) use ($digestService, &$sent): void {
                 foreach ($users as $user) {
                     if ($this->sendForUser($user, $digestService)) {
@@ -39,38 +41,6 @@ final class SendTaskDigestCommand extends Command
         $this->info("Queued {$sent} task digest email(s).");
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Users whose local time is currently at the given hour, filtered in the
-     * database (indexed on `timezone`) so the hourly run never loads the whole
-     * user table — only the ~1/24th of users currently in the 08:00 band.
-     *
-     * @return Builder<User>
-     */
-    private function recipientsAtLocalHour(int $hour): Builder
-    {
-        $timezones = $this->timezonesAtLocalHour($hour);
-        $appTimezoneMatches = in_array((string) config('app.timezone'), $timezones, true);
-
-        return User::query()->where(function (Builder $query) use ($timezones, $appTimezoneMatches): void {
-            $query->whereIn('timezone', $timezones);
-
-            if ($appTimezoneMatches) {
-                $query->orWhereNull('timezone');
-            }
-        });
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function timezonesAtLocalHour(int $hour): array
-    {
-        return array_values(array_filter(
-            DateTimeZone::listIdentifiers(),
-            fn (string $timezone): bool => (int) Date::now($timezone)->format('G') === $hour,
-        ));
     }
 
     private function sendForUser(User $user, DigestService $digestService): bool

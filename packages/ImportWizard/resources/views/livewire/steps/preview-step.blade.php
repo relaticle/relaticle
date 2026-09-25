@@ -153,16 +153,16 @@
                                         @if($column->isEntityLinkMapping())
                                             @php
                                                 $relMatch = $row->relationships?->first(fn ($m) => $m->relationship === $column->entityLink);
-                                                $rawValue = $row->raw_data->get($column->source);
+                                                $value = $row->corrections?->get($column->source) ?? $row->raw_data->get($column->source);
                                             @endphp
-                                            @if($relMatch && filled($rawValue))
-                                                <span class="inline-flex items-center gap-1 text-xs truncate" title="{{ $rawValue }}">
+                                            @if($relMatch && filled($value))
+                                                <span class="inline-flex items-center gap-1 text-xs truncate" title="{{ $value }}">
                                                     @if($relMatch->isExisting())
                                                         <x-filament::icon icon="heroicon-m-link" class="w-3.5 h-3.5 text-primary-500 shrink-0"/>
                                                     @else
                                                         <x-filament::icon icon="heroicon-m-plus" class="w-3.5 h-3.5 text-success-500 shrink-0"/>
                                                     @endif
-                                                    <span class="text-gray-900 dark:text-white truncate">{{ Str::limit((string) $rawValue, 28) }}</span>
+                                                    <span class="text-gray-900 dark:text-white truncate">{{ Str::limit((string) $value, 28) }}</span>
                                                 </span>
                                             @endif
                                         @else

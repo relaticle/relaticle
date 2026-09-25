@@ -21,5 +21,12 @@ final class SystemAdministratorSeeder extends Seeder
             'role' => SystemAdministratorRole::SuperAdministrator,
             'email_verified_at' => now(),
         ]);
+
+        SystemAdministrator::query()->firstOrCreate(['email' => 'administrator@relaticle.com'], [
+            'name' => 'Administrator',
+            'password' => bcrypt('password'),
+            'role' => SystemAdministratorRole::Administrator,
+            'email_verified_at' => now(),
+        ]);
     }
 }

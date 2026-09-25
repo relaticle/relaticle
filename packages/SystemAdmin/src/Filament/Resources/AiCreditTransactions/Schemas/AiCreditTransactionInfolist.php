@@ -8,8 +8,8 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Relaticle\Chat\Models\AiCreditTransaction;
-use Relaticle\SystemAdmin\Filament\Resources\TeamResource;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 
 final class AiCreditTransactionInfolist
@@ -23,10 +23,10 @@ final class AiCreditTransactionInfolist
                     ->schema([
                         TextEntry::make('created_at')->dateTime(),
                         TextEntry::make('type')->badge(),
-                        TextEntry::make('team.name')
-                            ->label('Team')
+                        TextEntry::make('workspace.name')
+                            ->label('Workspace')
                             ->color('primary')
-                            ->url(RecordLink::to(TeamResource::class, 'team')),
+                            ->url(RecordLink::to(WorkspaceResource::class, 'workspace')),
                         TextEntry::make('user.name')
                             ->label('User')
                             ->placeholder('—')

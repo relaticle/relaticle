@@ -2,6 +2,7 @@
     $cardBase = 'group feat-card rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] transition-all duration-300 hover:border-gray-300 dark:hover:border-white/[0.10] hover:shadow-sm';
     $cardTitle = 'font-display text-lg font-medium text-gray-900 dark:text-white mb-2';
     $cardDesc = 'text-[13px] leading-relaxed text-gray-500 dark:text-gray-400';
+    $mcpToolCount = \App\Support\CompetitorFacts::mcpToolCount();
 @endphp
 
 <section id="features" class="py-24 md:py-32 bg-gray-50 dark:bg-gray-950 relative overflow-hidden">
@@ -12,140 +13,36 @@
                 <span class="uppercase tracking-wider text-[10px] font-medium text-gray-500 dark:text-gray-400">Features</span>
             </div>
             <h2 class="font-display text-3xl sm:text-4xl md:text-[2.75rem] font-bold text-gray-950 dark:text-white tracking-[-0.02em] leading-[1.15]">
-                One CRM. Three ways to work: UI, chat, and agents.
+                One CRM. Three ways to work.
             </h2>
             <p class="mt-5 text-base md:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto leading-relaxed">
-                Manage records by hand, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask Relaticle in the app</a>, or connect Claude, ChatGPT, Gemini, and custom agents through MCP. Every path works from the same permissions, schema, and customer data.
+                Work in the app, <a href="{{ route('ai') }}" class="text-gray-700 dark:text-gray-300 underline decoration-gray-300 dark:decoration-gray-600 underline-offset-4 hover:text-primary dark:hover:text-primary-400 hover:decoration-primary transition-colors">ask {{ config('chat.assistant_name') }} in chat</a>, or connect your agents. Keep your team working from the same customer data.
             </p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-2">
 
-            {{-- Agent-Native Infrastructure — 2col 2row — external agents (MCP / REST) --}}
+            {{-- Agent-Native Infrastructure, 2col 2row: external agents (MCP / REST) --}}
             <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 lg:row-span-2 overflow-hidden flex flex-col">
-                <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
-                    <x-ri-git-merge-line class="w-4 h-4 text-primary dark:text-primary-400"/>
-                    Connect Any External Agent
+                <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-start gap-2">
+                    <x-ri-git-merge-line class="mt-1.5 w-4 h-4 shrink-0 text-primary dark:text-primary-400"/>
+                    Connect your AI agents
                 </h3>
                 <p class="{{ $cardDesc }} max-w-md">
-                    Bring your own agent through the MCP server with 32 tools, or build custom integrations with the REST API. Full CRUD, custom field support, and schema discovery built in.
+                    Give MCP-compatible agents access to your CRM through {{ $mcpToolCount }} tools. Build custom integrations with the REST API.
                 </p>
 
-                <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800/80 p-5 overflow-hidden flex-1 flex flex-col justify-center">
-                    <style>
-                        @media (min-width: 1024px) { #flow-mobile { display: none !important; } }
-                        @media (max-width: 1023px) { #flow-desktop { display: none !important; } }
-                    </style>
-
-                    <div id="flow-mobile" class="flex flex-col items-center gap-2">
-                        <div class="flex items-center gap-2 flex-wrap justify-center">
-                            @foreach([['ri-claude-fill', 'text-[#D4763C]', 'Claude'], ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT'], ['ri-gemini-fill', 'text-blue-500', 'Gemini']] as [$icon, $color, $name])
-                                <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-1.5">
-                                    <x-dynamic-component :component="$icon" class="w-4 h-4 {{ $color }}"/>
-                                    <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $name }}</span>
-                                </div>
-                            @endforeach
-                            <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600 rounded-lg px-3 py-1.5">
-                                <x-ri-add-line class="w-4 h-4 text-gray-400 dark:text-gray-500"/>
-                                <span class="text-xs font-medium text-gray-500 dark:text-gray-500">Custom</span>
-                            </div>
-                        </div>
-                        <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
-                        <div class="fn w-full bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
-                            <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">MCP Server · Connected</div>
-                            <div class="flex gap-4 text-[11px]">
-                                <span class="text-gray-500 dark:text-gray-400"><span class="font-mono font-medium text-gray-800 dark:text-gray-200">32</span> tools</span>
-                                <span class="text-gray-500 dark:text-gray-400">REST API <span class="font-mono font-medium text-gray-800 dark:text-gray-200">v1</span></span>
-                                <span class="text-gray-500 dark:text-gray-400">Schema <span class="font-mono font-medium text-emerald-700 dark:text-emerald-400">auto</span></span>
-                            </div>
-                        </div>
-                        <x-ri-arrow-down-double-line class="w-6 h-6 text-gray-300 dark:text-gray-600"/>
-                        <div class="fn flex gap-2 flex-wrap justify-center text-[11px] text-gray-600 dark:text-gray-300">
-                            @foreach(['Contacts', 'Companies', 'Deals', 'Tasks', 'Notes'] as $e)
-                                <span class="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2 py-1">{{ $e }}</span>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div id="flow-desktop" class="relative">
-                        <svg class="absolute inset-0 w-full h-full pointer-events-none z-0" viewBox="0 0 613 188" preserveAspectRatio="none">
-                            <defs>
-                                <linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="0%">
-                                    <stop offset="0%" stop-color="#d1d5db"/><stop offset="50%" stop-color="oklch(0.6 0.19 275 / 0.5)"/><stop offset="100%" stop-color="#d1d5db"/>
-                                </linearGradient>
-                            </defs>
-                            @foreach([42,81,119,158] as $i => $y)
-                                <path class="curve-path" pathLength="1" d="M 120 {{ $y }} C 183 {{ $y }}, 183 {{ 65 + $i * 12 }}, 246 {{ 65 + $i * 12 }}" stroke="url(#cg)" stroke-width="1.2" fill="none" opacity="{{ $i === 3 ? '0.4' : '0.6' }}"/>
-                            @endforeach
-                            @foreach([[65,40],[70,73],[82,105],[90,138],[100,170]] as [$sy,$ey])
-                                <path class="curve-path" pathLength="1" d="M 386 {{ $sy }} C 450 {{ $sy }}, 450 {{ $ey }}, 513 {{ $ey }}" stroke="url(#cg)" stroke-width="1.2" fill="none" opacity="0.6"/>
-                            @endforeach
-                        </svg>
-
-                        <div class="relative z-10 grid gap-0" style="grid-template-columns: 120px 1fr minmax(140px, auto) 1fr 100px;">
-                            <div class="space-y-2 py-1">
-                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">Agents</div>
-                                @foreach([['ri-claude-fill', 'text-[#D4763C]', 'Claude', false], ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', false], ['ri-gemini-fill', 'text-blue-500', 'Gemini', false], ['ri-add-line', 'text-gray-400 dark:text-gray-500', 'Custom', true]] as [$icon, $color, $name, $dashed])
-                                    <div class="fn flex items-center gap-2 bg-white dark:bg-gray-700 border {{ $dashed ? 'border-dashed border-gray-300' : 'border-gray-200' }} dark:border-gray-600 rounded-lg px-2.5 py-1.5 {{ $dashed ? '' : 'shadow-sm' }}">
-                                        <x-dynamic-component :component="$icon" class="w-3.5 h-3.5 {{ $color }}"/>
-                                        <span class="text-[11px] font-medium {{ $dashed ? 'text-gray-500 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300' }}">{{ $name }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <div></div>
-                            <div class="fn py-1">
-                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">MCP Server</div>
-                                <div class="bg-white dark:bg-gray-700 border border-primary/30 dark:border-primary/40 rounded-lg p-3 shadow-sm shadow-primary/5">
-                                    <div class="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 mb-2">Connected</div>
-                                    <div class="space-y-1.5">
-                                        @foreach([['Tools', '32', ''], ['REST API', 'v1', ''], ['Schema', 'auto', 'text-emerald-700 dark:text-emerald-400']] as [$label, $val, $valClass])
-                                            <div class="flex items-center justify-between text-[11px]">
-                                                <span class="text-gray-500 dark:text-gray-400">{{ $label }}</span>
-                                                <span class="font-mono font-medium {{ $valClass ?: 'text-gray-800 dark:text-gray-200' }}">{{ $val }}</span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                            <div></div>
-                            <div class="fn py-1">
-                                <div class="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 font-medium mb-2">Your CRM</div>
-                                <div class="space-y-1.5">
-                                    @foreach(['Contacts', 'Companies', 'Deals', 'Tasks', 'Notes'] as $entity)
-                                        <div class="flex items-center gap-2 text-[11px] text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-2.5 py-1">
-                                            <div class="w-1.5 h-1.5 rounded-full bg-primary/60"></div>
-                                            {{ $entity }}
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            var ease = [0.22, 1, 0.36, 1];
-                            animate(".curve-path", { pathLength: 0 }, { duration: 0 });
-                            inView("#flow-desktop", function() {
-                                animate("#flow-desktop .fn", { y: [12, 0] }, { delay: stagger(0.05), duration: 0.4, ease: ease });
-                                animate(".curve-path", { pathLength: [0, 1] }, { duration: 0.8, delay: stagger(0.06, { start: 0.3 }), ease: ease });
-                            }, { amount: 0.3 });
-                            inView("#flow-mobile", function() {
-                                animate("#flow-mobile .fn", { y: [12, 0] }, { delay: stagger(0.06), duration: 0.4, ease: ease });
-                            }, { amount: 0.3 });
-                        });
-                    </script>
-                </div>
+                @include('home.partials.agent-network')
             </div>
 
-            {{-- Built-in AI Chat — the in-app conversational agent --}}
+            {{-- Built-in AI Chat: the in-app conversational agent --}}
             <div id="card-builtin-ai" class="{{ $cardBase }} p-6 overflow-hidden">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-chat-smile-3-line id="ai-sparkle" class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Built-in AI Chat
+                    Built-in AI chat
                 </h3>
                 <p class="{{ $cardDesc }}">
-                    Ask anything about your CRM. @-mention records to scope a question, approve destructive actions, undo with one click. Voice in, persistent searchable history.
+                    Ask {{ config('chat.assistant_name') }} about your CRM and make changes through chat. Review proposed updates and deletions before they run.
                 </p>
                 {{-- Mini chat-bubble preview (uses ai-fill for staggered width animation) --}}
                 <div class="mt-4 space-y-2">
@@ -166,7 +63,7 @@
                      anchor, and making one of them one breaks the grid's contract. --}}
                 <a href="{{ route('ai') }}"
                    class="group mt-4 inline-flex items-center gap-1 text-xs font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
-                    Meet Rela
+                    Meet {{ config('chat.assistant_name') }}
                     <x-ri-arrow-right-line class="w-3 h-3"/>
                 </a>
             </div>
@@ -175,10 +72,10 @@
             <div id="card-data" class="{{ $cardBase }} p-6 overflow-hidden">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-stack-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Customizable Data Model
+                    Custom fields
                 </h3>
                 <p class="{{ $cardDesc }}">
-                    22 field types including entity relationships, conditional visibility, and per-field encryption.
+                    Capture the details that matter to your business. Add custom fields, connect related records, and show fields only when relevant.
                 </p>
                 <div class="mt-4 rounded-lg bg-gray-50 dark:bg-gray-800 p-3 space-y-2">
                     @foreach([['Text', 'Company name...', false], ['Select', 'Industry', true]] as [$label, $placeholder, $hasArrow])
@@ -205,9 +102,9 @@
                 <div class="relative">
                     <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                         <x-ri-building-2-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                        Company Management
+                        Company profiles
                     </h3>
-                    <p class="{{ $cardDesc }}">Track companies with detailed profiles, linked contacts, and opportunity history. See the full picture at a glance.</p>
+                    <p class="{{ $cardDesc }}">See every account in context. Keep company details, people, and deals together so your team can prepare for the next conversation.</p>
                 </div>
             </div>
 
@@ -215,19 +112,19 @@
             <div class="{{ $cardBase }} p-6">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-user-star-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    People Management
+                    People profiles
                 </h3>
-                <p class="{{ $cardDesc }}">Rich contact profiles with interaction history, notes, and linked companies. Find anyone with advanced search and filters.</p>
+                <p class="{{ $cardDesc }}">Know who you're talking to. Connect people to their companies, keep relationship notes, and find the right person with filters.</p>
             </div>
 
             {{-- Sales Opportunities --}}
             <div id="card-sales" class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-1 overflow-hidden">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-funds-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Sales Opportunities
+                    Sales pipeline
                 </h3>
                 <p class="{{ $cardDesc }}">
-                    Manage your pipeline with custom stages, lifecycle tracking, and win/loss analysis.
+                    Follow every deal from first contact to close. Move deals through custom stages on a visual board that matches your sales process.
                 </p>
                 <div class="mt-4 flex gap-1 h-2 rounded-full overflow-hidden">
                     <div class="pipe-seg flex-[3] bg-primary/70 rounded-l-full origin-left"></div>
@@ -242,16 +139,16 @@
                 </div>
             </div>
 
-            {{-- Task Management — 2col --}}
+            {{-- Task Management, 2col --}}
             <div id="card-tasks" class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-2 overflow-hidden">
                 <div class="flex flex-col md:flex-row md:gap-6">
                     <div class="md:flex-1">
                         <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white mb-2 inline-flex items-center gap-2">
                             <x-ri-layout-masonry-line class="w-4 h-4 text-primary dark:text-primary-400"/>
-                            Task Management
+                            Task management
                         </h3>
                         <p class="{{ $cardDesc }}">
-                            Create, assign, and track tasks linked to contacts, companies, and deals. Ask the chat to draft follow-ups, reschedule tasks, or roll up what's due — destructive edits ask before they run.
+                            Turn follow-ups into clear next steps. Assign tasks, set due dates, and link them to people, companies, or deals.
                         </p>
                     </div>
                     <div class="mt-4 md:mt-0 md:flex-1 rounded-lg bg-gray-50 dark:bg-gray-800 p-4 space-y-3">
@@ -274,8 +171,8 @@
 
             {{-- Simple feature cards row 2 --}}
             @foreach([
-                ['ri-team-line', 'Team Collaboration', 'Multi-workspace support with role-based permissions and 5-layer authorization. Every team member sees exactly what they should.'],
-                ['ri-download-cloud-2-line', 'Import & Export', 'Migrate from any CRM with CSV imports. Column mapping, validation, and error handling included. Export anytime — your data is yours.'],
+                ['ri-team-line', 'Team collaboration', 'Work from shared customer records. Organize teams in separate workspaces and use roles to control who can view or change data.'],
+                ['ri-download-cloud-2-line', 'Import and export', 'Bring your records into Relaticle with CSV imports. Map columns, review validation errors, and export your data when you need it.'],
             ] as [$icon, $title, $desc])
                 <div class="{{ $cardBase }} p-6">
                     <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
@@ -286,13 +183,13 @@
                 </div>
             @endforeach
 
-            {{-- Notes & Activity Log — spans full width on tablet to avoid orphan gap --}}
+            {{-- Notes & Activity Log, spanning full width on tablet to avoid an orphan gap --}}
             <div class="{{ $cardBase }} p-6 md:col-span-2 lg:col-span-1">
                 <h3 class="{{ $cardTitle }} inline-flex items-center gap-2">
                     <x-ri-quill-pen-line class="w-3.5 h-3.5 text-primary dark:text-primary-400"/>
-                    Notes & Activity Log
+                    Notes and activity
                 </h3>
-                <p class="{{ $cardDesc }}">Capture notes linked to any record — by hand, by voice, or by asking the chat. Search and retrieve context instantly across notes, messages, and activity.</p>
+                <p class="{{ $cardDesc }}">Keep customer context close to the records it belongs to. Add linked notes and review the activity history to see what changed.</p>
             </div>
 
             {{-- CTA Card --}}
@@ -303,7 +200,7 @@
                     <p class="{{ $cardDesc }}">Bring your team and agents onto the same CRM.</p>
                 </div>
                 <div class="relative mt-5">
-                    <x-marketing.button size="sm" href="{{ route('register') }}">
+                    <x-marketing.button size="sm" href="{{ route('login') }}">
                         Start for free
                     </x-marketing.button>
                     <div class="mt-3 flex items-center gap-3 text-[10px] text-gray-500 dark:text-gray-500">
@@ -318,28 +215,28 @@
             document.addEventListener('DOMContentLoaded', function() {
                 var e = [0.22, 1, 0.36, 1];
 
-                // Cards entrance — staggered fade up (visible by default for Lighthouse/no-JS)
-                inView('#features .grid', function() {
+                // Cards entrance: staggered fade up (visible by default for Lighthouse/no-JS)
+                inView('#features > div > .grid', function() {
                     animate('.feat-card', { y: [32, 0] }, { delay: stagger(0.07), duration: 0.6, ease: e });
                 }, { amount: 0.1 });
 
-                // Built-in AI Chat — bubbles fill in sequence (user → assistant → suggestion)
+                // Built-in AI Chat: bubbles fill in sequence (user → assistant → suggestion)
                 inView('#card-builtin-ai', function() {
                     animate('#card-builtin-ai .ai-fill', { width: ['0%', '100%'] }, { delay: stagger(0.18, { start: 0.3 }), duration: 0.6, ease: e });
                     animate('#ai-sparkle', { scale: [1, 1.2, 1] }, { duration: 0.5, delay: 0.2, ease: e });
                 }, { amount: 0.4 });
 
-                // Data Model — form fields slide in from left
+                // Data Model: form fields slide in from left
                 inView('#card-data', function() {
                     animate('#card-data .field-row', { x: [-16, 0] }, { delay: stagger(0.1, { start: 0.3 }), duration: 0.4, ease: e });
                 }, { amount: 0.4 });
 
-                // Sales Pipeline — segments scale in from left
+                // Sales Pipeline: segments scale in from left
                 inView('#card-sales', function() {
                     animate('.pipe-seg', { scaleX: [0, 1] }, { delay: stagger(0.12, { start: 0.3 }), duration: 0.6, ease: e });
                 }, { amount: 0.4 });
 
-                // Tasks — rows slide in staggered from right
+                // Tasks: rows slide in staggered from right
                 inView('#card-tasks', function() {
                     animate('.task-row', { x: [20, 0] }, { delay: stagger(0.15, { start: 0.2 }), duration: 0.45, ease: e });
                 }, { amount: 0.3 });

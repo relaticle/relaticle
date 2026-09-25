@@ -4,23 +4,25 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\CrmEntity;
 use App\Models\User;
-use App\Rules\ValidCustomFields;
-use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
-final class UpdateCompanyRequest extends FormRequest
+final class UpdateCompanyRequest extends BaseCrmEntityRequest
 {
+    protected function entity(): CrmEntity
+    {
+        return CrmEntity::Company;
+    }
+
     /**
      * @return array<string, array<int, mixed>>
      */
-    public function rules(): array
+    protected function entityRules(User $user): array
     {
-        /** @var User $user */
-        $user = $this->user();
-        $teamId = $user->currentTeam->getKey();
-
-        return array_merge([
+        return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-        ], new ValidCustomFields($teamId, 'company', isUpdate: true)->toRules($this->input('custom_fields')));
+            'account_owner_id' => ['sometimes', 'nullable', 'string', Rule::in($user->currentWorkspace->allUsers()->pluck('id')->all())],
+        ];
     }
 }

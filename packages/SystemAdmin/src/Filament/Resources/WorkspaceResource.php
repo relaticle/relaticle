@@ -1,0 +1,321 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\SystemAdmin\Filament\Resources;
+
+use App\Enums\BillingStatus;
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
+use App\Models\Workspace;
+use App\Rules\ValidWorkspaceSlug;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Laravel\Jetstream\Contracts\DeletesTeams;
+use Override;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\CreateWorkspace;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\EditWorkspace;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\ListWorkspaces;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\ViewWorkspace;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\ActivityRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\CompaniesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\ConversationsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\ImportsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\NotesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\OpportunitiesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\PeopleRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\SubscriptionsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
+
+final class WorkspaceResource extends Resource
+{
+    protected static ?string $model = Workspace::class;
+
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-user-group';
+
+    protected static string|\UnitEnum|null $navigationGroup = 'User Management';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $modelLabel = 'Workspace';
+
+    protected static ?string $pluralModelLabel = 'Workspaces';
+
+    protected static ?string $slug = 'workspaces';
+
+    /**
+     * `workspaces.plan` is capability, `BillingStatus` is provenance, and the two
+     * badges sit side by side. Without this the pair reads as a contradiction:
+     * a trialling workspace shows a green Pro next to an amber Trial.
+     */
+    private const string PLAN_TOOLTIP = 'What the workspace may use: its AI credit allowance and rate limit. A trial writes Pro here, so it cannot say whether anyone is paying. Billing answers that.';
+
+    /**
+     * @return Builder<Workspace>
+     */
+    #[Override]
+    public static function getEloquentQuery(): Builder
+    {
+        // billingStatus() reads the subscriptions relation per row.
+        return parent::getEloquentQuery()->with('subscriptions');
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        $count = self::getModel()::query()->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    #[Override]
+    public static function form(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Select::make('user_id')
+                    ->relationship('owner', 'name')
+                    ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
+                    ->dehydrated()
+                    ->label('Owner')
+                    ->searchable()
+                    ->required(),
+                TextInput::make('name')
+                    ->required()
+                    ->maxLength(255),
+                TextInput::make('slug')
+                    ->required()
+                    ->rules([fn (?Workspace $record): ValidWorkspaceSlug => new ValidWorkspaceSlug(ignoreValue: $record?->slug)])
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255),
+                Toggle::make('personal_workspace')
+                    ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
+                    ->dehydrated()
+                    ->required(),
+            ]);
+    }
+
+    #[Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make([
+                    TextEntry::make('name'),
+                    TextEntry::make('slug'),
+                    TextEntry::make('owner.name')
+                        ->label('Owner')
+                        ->color('primary')
+                        ->url(RecordLink::to(UserResource::class, 'owner')),
+                    IconEntry::make('personal_workspace')
+                        ->label('Personal')
+                        ->boolean(),
+                    TextEntry::make('billing_status')
+                        ->label('Billing')
+                        ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
+                        ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                        ->badge(),
+                    TextEntry::make('plan')
+                        ->label('Plan')
+                        ->tooltip(self::PLAN_TOOLTIP)
+                        ->badge(),
+                    TextEntry::make('trial_ends_at')
+                        ->label('Trial Ends')
+                        ->dateTime()
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_use_case')
+                        ->label('Use Case')
+                        ->badge()
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_context')
+                        ->label('Use Case Details')
+                        ->badge()
+                        ->formatStateUsing(self::contextLabel(...))
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_other_use_case')
+                        ->label('What They Track')
+                        ->placeholder('—'),
+                    TextEntry::make('onboarding_referral_source')
+                        ->label('Referral Source')
+                        ->badge()
+                        ->placeholder('—'),
+                    TextEntry::make('invite_link_token_expires_at')
+                        ->label('Invite Link Expires')
+                        ->dateTime()
+                        ->placeholder('—'),
+                    TextEntry::make('created_at')
+                        ->dateTime(),
+                    TextEntry::make('updated_at')
+                        ->dateTime(),
+                ])->columnSpanFull()->columns(),
+            ]);
+    }
+
+    public static function contextLabel(Workspace $record, string $state): string
+    {
+        return $record->onboarding_use_case?->getSubOptions()[$state] ?? $state;
+    }
+
+    #[Override]
+    public static function table(Table $table): Table
+    {
+        return $table
+            ->defaultSort('created_at', 'desc')
+            ->columns([
+                TextColumn::make('name')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('slug')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('owner.name')
+                    ->label('Owner')
+                    ->searchable()
+                    ->sortable()
+                    ->color('primary')
+                    ->url(RecordLink::to(UserResource::class, 'owner')),
+                IconColumn::make('personal_workspace')
+                    ->label('Personal')
+                    ->boolean(),
+                TextColumn::make('billing_status')
+                    ->label('Billing')
+                    ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
+                    ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
+                    ->badge(),
+                TextColumn::make('plan')
+                    ->label('Plan')
+                    ->tooltip(self::PLAN_TOOLTIP)
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('onboarding_use_case')
+                    ->label('Use Case')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_context')
+                    ->label('Use Case Details')
+                    ->badge()
+                    ->formatStateUsing(self::contextLabel(...))
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_other_use_case')
+                    ->label('What They Track')
+                    ->searchable()
+                    ->wrap()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                TextColumn::make('onboarding_referral_source')
+                    ->label('Referral')
+                    ->badge()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('—'),
+                TextColumn::make('created_at')
+                    ->dateTime()
+                    ->sortable(),
+                TextColumn::make('updated_at')
+                    ->dateTime()
+                    ->sortable(),
+            ])
+            ->filters([
+                SelectFilter::make('billing_status')
+                    ->label('Billing')
+                    ->options(BillingStatus::class)
+                    ->multiple()
+                    ->query(self::filterByBillingStatus(...)),
+                TernaryFilter::make('personal_workspace')
+                    ->label('Personal Workspace'),
+                SelectFilter::make('onboarding_use_case')
+                    ->label('Use Case')
+                    ->options(OnboardingUseCase::class),
+                SelectFilter::make('onboarding_referral_source')
+                    ->label('Referral Source')
+                    ->options(OnboardingReferralSource::class),
+            ])
+            ->recordActions([
+                ViewAction::make(),
+                EditAction::make()->action(null),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    SafeDelete::bulkAction(function (Workspace $record): void {
+                        resolve(DeletesTeams::class)->delete($record);
+                    }),
+                ]),
+            ]);
+    }
+
+    /**
+     * Rows whose derived billing badge is one of the selected statuses.
+     *
+     * The badge is computed per row in PHP, so the filter cannot read a column.
+     * BillingStatus::applyToQuery() owns the translation, including the
+     * precedence between statuses, and each selection is OR'd here.
+     *
+     * @param  Builder<Workspace>  $query
+     * @param  array{values?: array<int, string>}  $data
+     * @return Builder<Workspace>
+     */
+    private static function filterByBillingStatus(Builder $query, array $data): Builder
+    {
+        $statuses = array_filter(array_map(BillingStatus::tryFrom(...), $data['values'] ?? []));
+
+        if ($statuses === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $anyStatus) use ($statuses): void {
+            foreach ($statuses as $status) {
+                $anyStatus->orWhere(fn (Builder $matching): Builder => $status->applyToQuery($matching));
+            }
+        });
+    }
+
+    #[Override]
+    public static function getRelations(): array
+    {
+        return [
+            MembersRelationManager::class,
+            CompaniesRelationManager::class,
+            PeopleRelationManager::class,
+            TasksRelationManager::class,
+            OpportunitiesRelationManager::class,
+            NotesRelationManager::class,
+            ConversationsRelationManager::class,
+            ImportsRelationManager::class,
+            SubscriptionsRelationManager::class,
+            ActivityRelationManager::class,
+        ];
+    }
+
+    #[Override]
+    public static function getPages(): array
+    {
+        return [
+            'index' => ListWorkspaces::route('/'),
+            'create' => CreateWorkspace::route('/create'),
+            'view' => ViewWorkspace::route('/{record}'),
+            'edit' => EditWorkspace::route('/{record}/edit'),
+        ];
+    }
+}

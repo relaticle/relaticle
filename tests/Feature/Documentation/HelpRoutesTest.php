@@ -4,6 +4,14 @@ declare(strict_types=1);
 
 use Relaticle\Documentation\Support\DocsNavigation;
 
+dataset('documentation shell pages', [
+    '/help',
+    '/help/getting-started',
+    '/help/getting-started/create-your-first-company',
+    '/developers',
+    '/developers/mcp',
+]);
+
 mutates(DocsNavigation::class);
 
 it('renders the help hub with category cards', function (): void {
@@ -21,6 +29,17 @@ it('renders an article with its rendered body', function (): void {
     $this->get('/help/getting-started/create-your-first-company')
         ->assertOk()
         ->assertSee('Create your first company', false);
+});
+
+it('offers a direct contact path from the hub and the article footer', function (): void {
+    $this->get('/help')
+        ->assertOk()
+        ->assertSee(route('contact'), false);
+
+    $this->get('/help/getting-started/create-your-first-company')
+        ->assertOk()
+        ->assertSee(route('contact'), false)
+        ->assertSee('Contact support', false);
 });
 
 it('404s an unknown category and an unknown article', function (): void {
@@ -53,14 +72,14 @@ it('renders documentation pages in their own shell, not the marketing chrome', f
     // mount -- its id is the only stable marker of that specific chrome.
     expect($html)->not->toContain('id="main-header"')
         ->and($html)->toContain('Search the docs');
-})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp']);
+})->with('documentation shell pages');
 
 it('offers both areas in the sidebar of every documentation page', function (string $path): void {
     $html = $this->get($path)->assertOk()->getContent();
 
     expect($html)->toContain(route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']))
         ->and($html)->toContain(route('documentation.show', ['type' => 'mcp']));
-})->with(['/help', '/help/getting-started', '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp']);
+})->with('documentation shell pages');
 
 it('serves the .md variant the article copy-page action fetches', function (): void {
     $this->get('/help/getting-started/create-your-first-company.md')

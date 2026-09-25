@@ -20,13 +20,13 @@ them; changes apply to the whole workspace immediately.
 | Visible in View | Shows the field on the record's detail page |
 | Toggleable Hidden | Keeps the list column available but hidden until someone enables it from the list's column toggle |
 
-A field that's off in both places still exists on the create/edit form — use
+A field that's off in both places still exists on the create/edit form. Use
 this for data you capture but don't need to see day-to-day.
 
 ## Search, filters, and sorting
 
 - **Searchable** lets the list's search box match this field's values.
-- **Filters** appear automatically for choice fields — Select, Multi Select,
+- **Filters** appear automatically for choice fields: Select, Multi Select,
   Radio, Checkbox List, Toggle Buttons, Tags Input, and Record fields all get
   a filter on their list page. Text, number, and date fields don't.
 - **Sorting** works on text, number, currency, and date columns. Multi-value
@@ -37,6 +37,6 @@ this for data you capture but don't need to see day-to-day.
 | Setting | What it does |
 |---------|--------------|
 | Allow Multiple Values | Lets one record hold several values (with a cap you set, up to 20) |
-| Unique Per Entity Type | No two records of this type can share a value — how Domains and Emails prevent duplicates |
+| Unique Per Entity Type | No two records of this type can share a value; this is how Domains and Emails prevent duplicates |
 | Encrypted | Stores values encrypted at rest; encrypted fields can't be sorted |
-| Enable Color Options | For Select and Tags fields — gives each option a colour, shown as badges in lists and on the board |
+| Enable Color Options | For Select and Tags fields; gives each option a colour, shown as badges in lists and on the board |

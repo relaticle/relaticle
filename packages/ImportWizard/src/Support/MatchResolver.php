@@ -111,7 +111,7 @@ final readonly class MatchResolver
      */
     private function resolveMatchIds(MatchableField $matchField, array $uniqueValues): array
     {
-        $resolver = new EntityLinkResolver($this->import->team_id);
+        $resolver = new EntityLinkResolver($this->import->workspace_id);
         $selfLink = new EntityLink(
             key: 'self',
             source: EntityLinkSource::Relationship,

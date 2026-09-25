@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Filament\Pages\Billing;
-use App\Models\Team;
+use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
 use InvalidArgumentException;
 
@@ -15,21 +15,21 @@ final readonly class CreateCreditPackCheckout
 
     /**
      * Create a one-time Stripe Checkout session for a prepaid credit pack and
-     * return its redirect URL. Stripe round-trip — covered by the staging E2E
+     * return its redirect URL. Stripe round-trip, covered by the staging E2E
      * checklist, not unit tests (same policy as CreateProCheckout).
      */
-    public function execute(Team $team, string $pack): string
+    public function execute(Workspace $workspace, string $pack): string
     {
         $priceId = $this->priceId($pack);
 
-        $checkout = $team->checkout([$priceId => 1], $this->sessionOptions($team, $priceId));
+        $checkout = $workspace->checkout([$priceId => 1], $this->sessionOptions($workspace, $priceId));
 
         return (string) $checkout->asStripeCheckoutSession()->url;
     }
 
     private function priceId(string $pack): string
     {
-        // $pack arrives from the browser — pin it to the purchasable pack keys
+        // $pack arrives from the browser, so pin it to the purchasable pack keys
         // so neither an arbitrary string nor a pack without a configured Stripe
         // price ever reaches checkout.
         $config = $this->catalog->find($pack);
@@ -40,15 +40,17 @@ final readonly class CreateCreditPackCheckout
     }
 
     /** @return array<string, mixed> */
-    private function sessionOptions(Team $team, string $priceId): array
+    private function sessionOptions(Workspace $workspace, string $priceId): array
     {
-        $billingUrl = Billing::getUrl(panel: 'app', tenant: $team);
+        $billingUrl = Billing::getUrl(panel: 'app', tenant: $workspace);
 
         $options = [
             'success_url' => "{$billingUrl}?credits=success",
             'cancel_url' => $billingUrl,
+            // Stripe stores this key on its own side, and the webhook reads it
+            // back off sessions created before any deploy. It cannot be renamed.
             'metadata' => [
-                'team_id' => (string) $team->getKey(),
+                'team_id' => (string) $workspace->getKey(),
                 'credit_pack_price' => $priceId,
             ],
         ];

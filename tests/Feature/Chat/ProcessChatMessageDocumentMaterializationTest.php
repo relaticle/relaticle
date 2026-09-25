@@ -14,12 +14,12 @@ use Relaticle\Chat\Services\TipTapDocumentParser;
 mutates(ProcessChatMessage::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $this->team->getKey()], [
-        'team_id' => $this->team->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -33,7 +33,7 @@ it('materializes the assistant message document at stream end', function (): voi
         'id' => $conversationId,
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Test',
         'created_at' => now(),
         'updated_at' => now(),
@@ -43,10 +43,10 @@ it('materializes the assistant message document at stream end', function (): voi
 
     new ProcessChatMessage(
         user: $this->user,
-        team: $this->team,
+        workspace: $this->workspace,
         message: 'Show me my deals',
         conversationId: $conversationId,
-        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6'],
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         mentions: [],
     )->handle(resolve(CreditService::class));
 
@@ -70,10 +70,45 @@ it('materializes the assistant message document at stream end', function (): voi
     ]);
 });
 
+it('records turn duration in assistant message meta', function (): void {
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'title' => 'Test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    CrmAssistant::fake(['I found 2 deals.']);
+
+    new ProcessChatMessage(
+        user: $this->user,
+        workspace: $this->workspace,
+        message: 'Show me my deals',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
+        mentions: [],
+    )->handle(resolve(CreditService::class));
+
+    $meta = json_decode((string) DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->latest()
+        ->orderByDesc('id')
+        ->value('meta'), associative: true);
+
+    expect($meta['duration_ms'])->toBeInt()->toBeGreaterThan(0)
+        ->and($meta['model'])->toBe('claude-sonnet-4-6')
+        ->and($meta['provider'])->toBe('anthropic');
+});
+
 it('TipTapDocumentParser::buildFromText produces the expected stored shape', function (): void {
     $parser = resolve(TipTapDocumentParser::class);
 
-    $document = $parser->buildFromText('I found 2 deals.', [], $this->team);
+    $document = $parser->buildFromText('I found 2 deals.', [], $this->workspace);
 
     expect($document)->toMatchArray([
         'type' => 'doc',

@@ -119,6 +119,7 @@ return [
     'limiters' => [
         'login' => 'login',
         'two-factor' => 'two-factor',
+        'passkeys' => 'passkeys',
     ],
 
     /*
@@ -146,7 +147,6 @@ return [
     */
 
     'features' => [
-        Features::resetPasswords(),
         Features::emailVerification(),
         Features::updateProfileInformation(),
         Features::updatePasswords(),
@@ -155,6 +155,39 @@ return [
             'confirmPassword' => true,
             // 'window' => 0,
         ]),
+        Features::passkeys(),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys
+    |--------------------------------------------------------------------------
+    |
+    | Settings that drive Fortify's passkey (WebAuthn) support. The relying
+    | party id is the host browsers will scope credentials to; keep it set
+    | to the panel's host so credentials registered in the admin do not
+    | bleed across subdomains.
+    |
+    */
+
+    'passkeys' => [
+        'relying_party_id' => config('app.app_panel_domain')
+            ?: parse_url((string) config('app.url'), PHP_URL_HOST),
+        // The customer panel only: one shared list lets either panel's origin complete
+        // the other's ceremony. Staff use StaffWebAuthn::allowedOrigin().
+        'allowed_origins' => (function (): array {
+            $parsed = parse_url((string) config('app.url'));
+            $scheme = $parsed['scheme'] ?? 'https';
+            $port = isset($parsed['port']) ? ":{$parsed['port']}" : '';
+
+            // Built from a host, never from APP_URL itself: an origin is scheme, host
+            // and port, and a trailing path never matches one.
+            $host = config('app.app_panel_domain') ?: ($parsed['host'] ?? null);
+
+            return $host ? ["{$scheme}://{$host}{$port}"] : [];
+        })(),
+        'user_handle_secret' => env('PASSKEYS_USER_HANDLE_SECRET', config('app.key')),
+        'timeout' => 60000,
     ],
 
 ];

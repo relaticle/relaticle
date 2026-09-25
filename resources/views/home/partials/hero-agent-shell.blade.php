@@ -1,36 +1,17 @@
-{{-- Mock Filament app shell sidebar — visible from md: up, hidden on mobile.
+{{-- Mock Filament app shell sidebar, visible from md: up and hidden on mobile.
      Visually mirrors app.relaticle.test: white bg, dark workspace chip, light-gray
      active state with primary icon (not primary-tinted bg), and a "Chats" group
      at the bottom containing the active conversation.
      Icons use Heroicon outline to match the real Filament app exactly (the rest of
      the marketing site uses Remix Icon per project convention). --}}
 <aside class="hero-agent-shell hidden md:flex md:w-48 lg:w-56 shrink-0 flex-col border-r border-gray-200 bg-white dark:border-zinc-800 dark:bg-zinc-900">
-    {{-- Workspace switcher.
-         The mark is a pixel-art "N" constructed from 13 discrete <rect>
-         squares on a 5×5 grid: two full vertical columns plus three diagonal
-         stair-step squares between them. Each cell is 4 units wide with a
-         1-unit gap on a 24×24 viewBox, so the squares read as separate
-         pixels rather than a solid letter. --}}
+    {{-- Workspace switcher. The real tenant avatar (fi-tenant-avatar) is a
+         generated SVG: a solid black square with the workspace initials in
+         white, centred. Reproduced here as markup rather than a data URI so it
+         picks up the same dark-mode treatment as the rest of the mock. --}}
     <div class="flex items-center gap-2 px-3 pt-2.5 pb-2">
-        <div class="flex h-6 w-6 items-center justify-center rounded bg-gray-900 shrink-0 dark:bg-white/[0.1]">
-            <svg viewBox="0 0 24 24" class="h-3 w-3 text-white" fill="currentColor" aria-hidden="true" shape-rendering="crispEdges">
-                {{-- Left column --}}
-                <rect x="0"  y="0"  width="4" height="4"/>
-                <rect x="0"  y="5"  width="4" height="4"/>
-                <rect x="0"  y="10" width="4" height="4"/>
-                <rect x="0"  y="15" width="4" height="4"/>
-                <rect x="0"  y="20" width="4" height="4"/>
-                {{-- Diagonal stair --}}
-                <rect x="5"  y="5"  width="4" height="4"/>
-                <rect x="10" y="10" width="4" height="4"/>
-                <rect x="15" y="15" width="4" height="4"/>
-                {{-- Right column --}}
-                <rect x="20" y="0"  width="4" height="4"/>
-                <rect x="20" y="5"  width="4" height="4"/>
-                <rect x="20" y="10" width="4" height="4"/>
-                <rect x="20" y="15" width="4" height="4"/>
-                <rect x="20" y="20" width="4" height="4"/>
-            </svg>
+        <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-gray-900 dark:bg-white/[0.1]">
+            <span class="text-pico font-bold leading-none text-white">NW</span>
         </div>
         <div class="flex-1 min-w-0">
             <div class="text-sm font-semibold text-gray-900 dark:text-white truncate">Northwind</div>
@@ -38,9 +19,9 @@
         <x-heroicon-o-chevron-down class="w-3.5 h-3.5 text-gray-400 dark:text-zinc-500"/>
     </div>
 
-    {{-- Global search + notifications row — mirrors the real sidebar's
+    {{-- Global search + notifications row, mirroring the real sidebar's
          fi-sidebar-search-ctn (GlobalSearch pill + inbox trigger). --}}
-    <div class="flex items-center gap-1.5 px-2 pb-1.5">
+    <div class="flex items-center gap-1.5 px-2 pt-2.5 pb-1.5">
         <div class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-full bg-gray-100 px-2.5 dark:bg-white/[0.06]">
             <x-heroicon-o-magnifying-glass class="w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span class="min-w-0 flex-1 truncate text-xs text-gray-400 dark:text-zinc-500">Search</span>
@@ -51,7 +32,7 @@
         </div>
     </div>
 
-    {{-- Top-level nav items — icons match app/Filament/Resources/*Resource.php $navigationIcon.
+    {{-- Top-level nav items. Icons match app/Filament/Resources/*Resource.php $navigationIcon.
          The active item renders as gray-100 bg + primary-700 label AND icon (measured from
          the live Filament sidebar); inactive icons are a step lighter than their labels.
          Which item is active is swapped by heroChat.setShellActive() as the demo moves
@@ -66,15 +47,15 @@
             <span>People</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-home-modern class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-building-office class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Companies</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-trophy class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-currency-dollar class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Opportunities</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
-            <x-heroicon-o-check-circle class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
+            <x-heroicon-o-clipboard-document-check class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
             <span>Tasks</span>
         </div>
         <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
@@ -82,7 +63,7 @@
             <span>Notes</span>
         </div>
 
-        {{-- Chats group — recent conversations, mirroring chat-sidebar-nav.blade.php.
+        {{-- Chats group: recent conversations, mirroring chat-sidebar-nav.blade.php.
              None is active here because Home is the current page. --}}
         <div class="pt-3">
             <div class="flex items-center justify-between px-2 pb-1">
@@ -98,7 +79,7 @@
             @foreach ([
                 "This week's pipeline review",
                 'Follow up with Priya Nair',
-                'Renewal prep — Daniel Okafor',
+                'Renewal prep: Daniel Okafor',
             ] as $heroChatTitle)
                 <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-700 dark:text-zinc-200">
                     <x-heroicon-o-chat-bubble-left class="w-4 h-4 shrink-0 text-gray-400 dark:text-zinc-500"/>
@@ -106,7 +87,7 @@
                 </div>
             @endforeach
 
-            {{-- All chats trigger — mirrors the "All chats" footer item in chat-sidebar-nav.blade.php --}}
+            {{-- All chats trigger, mirroring the "All chats" footer item in chat-sidebar-nav.blade.php --}}
             <div class="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-500 opacity-60 dark:text-zinc-400">
                 <x-heroicon-o-ellipsis-horizontal class="w-4 h-4 shrink-0"/>
                 <span>All chats</span>

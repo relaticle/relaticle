@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
@@ -12,20 +12,18 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 
-uses(LazilyRefreshDatabase::class);
-
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
     Auth::guard('web')->setUser($this->user);
     $this->actingAs($this->user);
-    Filament::setTenant($this->user->currentTeam);
+    Filament::setTenant($this->user->currentWorkspace);
 
     $this->convId = '019df900-4444-7000-8000-000000000001';
     DB::table('agent_conversations')->insert([
         'id' => $this->convId,
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->user->currentTeam->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -81,4 +79,28 @@ it('collapses an identical re-proposed batch (job retry idempotency)', function 
         ->where('conversation_id', $this->convId)
         ->where('status', PendingActionStatus::Pending)
         ->count())->toBe(1);
+});
+
+it('rejects a linked record from another workspace at proposal time', function (): void {
+    $foreign = Company::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
+
+    $result = json_decode(proposeTasks($this->convId, [['title' => 'Call', 'company_ids' => [(string) $foreign->getKey()]]]), true);
+
+    // A rejected record is named by whatever identity the model gave it, not by
+    // its index: the reason is relayed to the user, and "records[0]" means
+    // nothing to them.
+    expect($result['error'])->toContain('Call')->toContain('company_ids')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('rejects a missing, blank, or over-length title at proposal time instead of after approval', function (): void {
+    $missing = json_decode(proposeTasks($this->convId, [['custom_fields' => []]]), true);
+    $blank = json_decode(proposeTasks($this->convId, [['title' => '  ']]), true);
+    $tooLong = json_decode(proposeTasks($this->convId, [['title' => str_repeat('x', 256)]]), true);
+
+    // No title to name it by, so it falls back to a 1-based position.
+    expect($missing['error'])->toContain('record 1')->toContain('title is required')
+        ->and($blank['error'])->toContain('title is required')
+        ->and($tooLong['error'])->toContain('longer than 255')
+        ->and(PendingAction::query()->count())->toBe(0);
 });

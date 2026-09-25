@@ -61,17 +61,17 @@ enum ImportEntityType: string
     {
         return match ($this) {
             self::Company => 'heroicon-o-building-office',
-            self::People => 'heroicon-o-users',
+            self::People => 'heroicon-o-user',
             self::Opportunity => 'heroicon-o-currency-dollar',
             self::Task => 'heroicon-o-clipboard-document-check',
             self::Note => 'heroicon-o-document-text',
         };
     }
 
-    public function importer(string $teamId): BaseImporter
+    public function importer(string $workspaceId): BaseImporter
     {
         $class = $this->importerClass();
 
-        return new $class($teamId);
+        return new $class($workspaceId);
     }
 }

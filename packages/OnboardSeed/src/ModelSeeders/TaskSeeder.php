@@ -6,11 +6,11 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Models\Task;
-use App\Models\Team;
+use App\Models\Workspace;
+use Carbon\CarbonInterface;
 use Exception;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Relaticle\OnboardSeed\Support\BaseModelSeeder;
 use Relaticle\OnboardSeed\Support\FixtureRegistry;
@@ -28,12 +28,12 @@ final class TaskSeeder extends BaseModelSeeder
         TaskCustomField::PRIORITY->value,
     ];
 
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
+    protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
 
         foreach ($fixtures as $key => $data) {
-            $task = $this->createTaskFromFixture($team, $user, $key, $data);
+            $task = $this->createTaskFromFixture($workspace, $user, $key, $data);
 
             // The dashboard's "My tasks" panel reads task_user, so seeded tasks must be
             // assigned to the new owner. Attaching CRM people alone leaves a brand-new
@@ -76,14 +76,14 @@ final class TaskSeeder extends BaseModelSeeder
      * @param  array<string, mixed>  $data
      */
     private function createTaskFromFixture(
-        Team $team,
+        Workspace $workspace,
         Authenticatable $user,
         string $key,
         array $data
     ): Task {
         $attributes = [
             'title' => $data['title'],
-            'team_id' => $team->id,
+            'workspace_id' => $workspace->id,
         ];
 
         $customFields = $data['custom_fields'] ?? [];
@@ -101,7 +101,7 @@ final class TaskSeeder extends BaseModelSeeder
         $processedFields = $this->processCustomFieldValues($customFields, $fieldMappings);
 
         /** @var Task */
-        return $this->registerEntityFromFixture($key, $attributes, $processedFields, $team, $user);
+        return $this->registerEntityFromFixture($key, $attributes, $processedFields, $workspace, $user);
     }
 
     /**
@@ -112,7 +112,7 @@ final class TaskSeeder extends BaseModelSeeder
      */
     private function formatDate(mixed $dateValue): string
     {
-        if ($dateValue instanceof Carbon) {
+        if ($dateValue instanceof CarbonInterface) {
             return $dateValue->format('Y-m-d H:i:s');
         }
 

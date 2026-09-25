@@ -8,13 +8,55 @@ use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
 mutates(ChatSidePanel::class);
 
 it('renders the side panel on the dashboard', function (): void {
-    $user = User::factory()->withTeam()->create();
-    $team = $user->ownedTeams()->first();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
 
-    $this->visit('/app/login')
-        ->type('[id="form.email"]', $user->email)
-        ->type('[id="form.password"]', 'password')
-        ->click('button.fi-btn')
-        ->assertPathIs("/app/{$team->slug}")
+    loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
         ->assertSourceHas('data-chat-side-panel');
+});
+
+it('stays closed when the browser goes back to a page where it was closed', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $assistantName = config('chat.assistant_name');
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->click('a.fi-sidebar-item-btn[href$="/people"]')
+        ->waitForText('No people')
+        ->click("button[aria-label=\"Ask {$assistantName}\"]")
+        ->assertVisible('[data-chat-side-panel]')
+        ->click('[data-chat-side-panel] button[aria-label="Close chat panel"]')
+        ->wait(0.5)
+        ->assertMissing('[data-chat-side-panel]')
+        ->click('a.fi-sidebar-item-btn[href$="/companies"]')
+        ->waitForText('No companies')
+        ->back()
+        ->waitForText('No people')
+        ->wait(0.5);
+
+    $page->assertMissing('[data-chat-side-panel]');
+});
+
+it('does not restore an open panel when the browser goes back', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $assistantName = config('chat.assistant_name');
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->click('a.fi-sidebar-item-btn[href$="/people"]')
+        ->waitForText('No people')
+        ->click("button[aria-label=\"Ask {$assistantName}\"]")
+        ->assertVisible('[data-chat-side-panel]');
+
+    $page->script("window.Livewire.navigate('/app/{$workspace->slug}/companies')");
+
+    $page->waitForText('No companies')
+        ->back()
+        ->waitForText('No people')
+        ->wait(0.5);
+
+    $page->assertMissing('[data-chat-side-panel]');
 });

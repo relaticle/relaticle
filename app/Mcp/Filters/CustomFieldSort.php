@@ -59,15 +59,15 @@ final readonly class CustomFieldSort implements Sort
     {
         /** @var User $user */
         $user = auth()->user();
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         /** @var Collection<string, CustomField> */
         return Cache::remember(
-            "custom_fields_sort_{$teamId}_{$this->entityType}",
+            "custom_fields_sort_{$workspaceId}_{$this->entityType}",
             60,
             fn () => CustomField::query()
                 ->withoutGlobalScopes()
-                ->where('tenant_id', $teamId)
+                ->where('tenant_id', $workspaceId)
                 ->where('entity_type', $this->entityType)
                 ->active()
                 ->get()

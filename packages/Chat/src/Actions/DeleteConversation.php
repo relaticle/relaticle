@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 
 final readonly class DeleteConversation
@@ -13,14 +14,9 @@ final readonly class DeleteConversation
     public function execute(User $user, string $conversationId): bool
     {
         return DB::transaction(function () use ($user, $conversationId): bool {
-            $deleted = DB::table('agent_conversations')
-                ->where('id', $conversationId)
-                ->where('participant_type', $user->getMorphClass())
-                ->where('participant_id', $user->getKey())
-                ->where('team_id', $user->current_team_id)
-                ->delete();
+            $conversation = AgentConversation::query()->ownedBy($user)->find($conversationId);
 
-            if ($deleted === 0) {
+            if (! $conversation instanceof AgentConversation) {
                 return false;
             }
 
@@ -31,6 +27,8 @@ final readonly class DeleteConversation
             PendingAction::query()
                 ->where('conversation_id', $conversationId)
                 ->delete();
+
+            $conversation->delete();
 
             return true;
         });

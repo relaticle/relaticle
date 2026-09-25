@@ -16,7 +16,7 @@ function syncTimezone(string $timezone): TestResponse
 }
 
 it('seeds the timezone from the browser when the user has none', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => null]);
+    $user = User::factory()->withWorkspace()->create(['timezone' => null]);
     $this->actingAs($user);
 
     syncTimezone('Asia/Tokyo')
@@ -27,7 +27,7 @@ it('seeds the timezone from the browser when the user has none', function (): vo
 });
 
 it('never overwrites a timezone the user already has, so a deliberate choice survives travel', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => 'Europe/London']);
+    $user = User::factory()->withWorkspace()->create(['timezone' => 'Europe/London']);
     $this->actingAs($user);
 
     syncTimezone('America/New_York')
@@ -38,7 +38,7 @@ it('never overwrites a timezone the user already has, so a deliberate choice sur
 });
 
 it('rejects an identifier that is not a real timezone', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => null]);
+    $user = User::factory()->withWorkspace()->create(['timezone' => null]);
     $this->actingAs($user);
 
     syncTimezone('Mars/Olympus_Mons')->assertUnprocessable();
@@ -47,7 +47,7 @@ it('rejects an identifier that is not a real timezone', function (): void {
 });
 
 it('rejects a fixed offset, so only DST-aware identifiers are ever stored', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => null]);
+    $user = User::factory()->withWorkspace()->create(['timezone' => null]);
     $this->actingAs($user);
 
     syncTimezone('+04:00')->assertUnprocessable();
@@ -72,7 +72,7 @@ it('requires authentication', function (): void {
  * the lock is there to make safe.
  */
 it('re-reads the row before writing, so it cannot clobber a zone set by a racing request', function (): void {
-    $user = User::factory()->withTeam()->create(['timezone' => null]);
+    $user = User::factory()->withWorkspace()->create(['timezone' => null]);
 
     // Not $user->update(): the point is that THIS instance still believes it is null.
     DB::table('users')->where('id', $user->getKey())->update(['timezone' => 'Europe/London']);

@@ -1,0 +1,369 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Livewire\App\Workspaces;
+
+use App\Actions\Jetstream\InviteWorkspaceMember;
+use App\Actions\Jetstream\UpdateInviteLinkSettings;
+use App\Enums\WorkspaceRole;
+use App\Livewire\BaseLivewireComponent;
+use App\Models\Workspace;
+use App\Support\Workspaces\RoleOptions;
+use Carbon\CarbonInterface;
+use Closure;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TextInput\Actions\CopyAction;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
+
+final class InviteWorkspaceMembers extends BaseLivewireComponent
+{
+    // Stops one authorized call queuing an unbounded number of mail sends.
+    private const int MAX_INVITES_PER_SUBMISSION = 10;
+
+    // Bounds cumulative volume per actor, which rateLimit() cannot: it counts
+    // calls, not the emails each call queues.
+    private const int MAX_INVITES_PER_WINDOW = 20;
+
+    private const int INVITE_WINDOW_SECONDS = 60;
+
+    #[Locked]
+    public Workspace $workspace;
+
+    public function mount(Workspace $workspace): void
+    {
+        $this->workspace = $workspace;
+    }
+
+    public function form(Schema $schema): Schema
+    {
+        return $schema->schema([
+            Section::make(__('workspaces.sections.add_workspace_member.title'))
+                ->aside()
+                ->visible(fn (): bool => Gate::check('addWorkspaceMember', $this->workspace))
+                ->description(__('workspaces.sections.add_workspace_member.description'))
+                ->schema([
+                    Actions::make([
+                        $this->invitePeopleAction(),
+                        $this->manageInviteLinkAction(),
+                    ]),
+                ]),
+        ]);
+    }
+
+    // The addresses and the role live in the modal rather than on the page: the
+    // page is a roster, and the form only has anything to say while inviting.
+    public function invitePeopleAction(): Action
+    {
+        return Action::make('invitePeople')
+            ->label(__('workspaces.actions.invite_people'))
+            ->icon('heroicon-m-user-plus')
+            ->button()
+            ->modalHeading(__('workspaces.actions.invite_people'))
+            ->modalDescription(fn (): string => __('workspaces.sections.invite_people.description', ['workspace' => $this->workspace->name]))
+            ->modalIcon('heroicon-o-user-plus')
+            ->modalWidth('lg')
+            ->modalSubmitActionLabel(__('workspaces.actions.send_invitations'))
+            ->schema([
+                Textarea::make('emails')
+                    ->label(__('workspaces.form.emails.label'))
+                    ->placeholder(__('workspaces.form.emails.placeholder'))
+                    ->helperText(__('workspaces.form.emails.helper'))
+                    ->rows(3)
+                    ->autofocus()
+                    ->required()
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        $emails = $this->parseEmails(is_string($value) ? $value : '');
+
+                        if ($emails === []) {
+                            $fail(__('workspaces.validation.no_valid_emails'));
+
+                            return;
+                        }
+
+                        if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
+                            $fail(__('workspaces.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
+                        }
+                    }),
+                Radio::make('role')
+                    ->label(__('workspaces.form.invite_as.label'))
+                    ->options(fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace))
+                    ->in(fn (): array => array_keys(RoleOptions::assignable($this->authUser(), $this->workspace)))
+                    ->descriptions(RoleOptions::descriptions())
+                    ->hintAction(RoleOptions::compareAction())
+                    ->default(WorkspaceRole::Member->value)
+                    ->required(),
+            ])
+            ->action(function (array $data): void {
+                $this->sendInvitations(
+                    $this->parseEmails((string) $data['emails']),
+                    (string) $data['role'],
+                );
+            });
+    }
+
+    public function manageInviteLinkAction(): Action
+    {
+        return Action::make('manageInviteLink')
+            ->label(__('workspaces.actions.invite_link'))
+            ->icon('heroicon-m-link')
+            ->color('gray')
+            ->button()
+            ->outlined()
+            ->modalHeading(__('workspaces.invite_link.heading'))
+            ->modalDescription(__('workspaces.invite_link.description'))
+            ->modalIcon('heroicon-o-link')
+            ->modalWidth('lg')
+            ->modalSubmitAction(false)
+            // No footer confirm: every control in here saves on use, so the only
+            // way out is the close icon.
+            ->modalCancelAction(false)
+            ->fillForm(fn (): array => [
+                'invite_link_default_role' => $this->workspace->invite_link_default_role,
+                'invite_link_url' => $this->inviteLinkUrl(),
+            ])
+            ->schema([
+                // Read-only rather than an entry: an input with a copy button is
+                // the shape people already know a shareable link by.
+                TextInput::make('invite_link_url')
+                    ->label(__('workspaces.invite_link.url'))
+                    ->readOnly()
+                    ->dehydrated(false)
+                    ->visible(fn (): bool => $this->hasLiveInviteLink())
+                    ->helperText(fn (): string => __('workspaces.invite_link.expires_in', [
+                        'time' => $this->workspace->invite_link_token_expires_at?->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE, options: CarbonInterface::ROUND),
+                    ]))
+                    // Clicking selects the whole link for a manual copy, but the
+                    // caret lands at the tail, so the field is wound back to the host.
+                    ->extraInputAttributes([
+                        'class' => 'font-mono text-sm',
+                        'onclick' => 'this.select(); this.scrollLeft = 0',
+                    ])
+                    ->suffixAction(
+                        CopyAction::make()
+                            ->label(__('workspaces.actions.copy_invite_link'))
+                            ->icon(null)
+                            ->button()
+                            ->extraAttributes(['autofocus' => true])
+                            ->copyMessage(__('workspaces.invite_link.copied')),
+                    ),
+                Callout::make(fn (): string => __('workspaces.invite_link.lapsed.title', [
+                    'time' => $this->workspace->invite_link_token_expires_at?->diffForHumans(syntax: CarbonInterface::DIFF_ABSOLUTE),
+                ]))
+                    ->description(__('workspaces.invite_link.lapsed.notice'))
+                    ->warning()
+                    ->visible(fn (): bool => $this->workspace->hasInviteLink() && ! $this->hasLiveInviteLink()),
+                Radio::make('invite_link_default_role')
+                    ->label(__('workspaces.invite_link.default_role'))
+                    ->helperText(__('workspaces.invite_link.default_role_helper'))
+                    ->hintAction(RoleOptions::compareAction())
+                    ->visible(fn (): bool => $this->workspace->hasInviteLink())
+                    ->options(RoleOptions::forInviteLink())
+                    ->in(array_keys(RoleOptions::forInviteLink()))
+                    ->descriptions(RoleOptions::descriptions())
+                    ->required()
+                    ->markAsRequired(false)
+                    ->live()
+                    ->afterStateUpdated(function (?string $state): void {
+                        if ($state === null) {
+                            return;
+                        }
+
+                        resolve(UpdateInviteLinkSettings::class)->update($this->authUser(), $this->workspace, $state);
+
+                        $this->sendNotification(__('workspaces.notifications.invite_link_role_updated.success', [
+                            'role' => WorkspaceRole::labelFor($state),
+                        ]));
+                    }),
+                Callout::make(__('workspaces.invite_link.disabled.title'))
+                    ->description(__('workspaces.invite_link.disabled.notice'))
+                    ->icon('heroicon-o-no-symbol')
+                    ->visible(fn (): bool => ! $this->workspace->hasInviteLink()),
+            ])
+            ->extraModalFooterActions([
+                $this->enableInviteLinkAction(),
+                $this->rotateInviteLinkAction(),
+                $this->disableInviteLinkAction(),
+            ]);
+    }
+
+    // Rotation invalidates a link that may already be circulating, so the modal
+    // says what breaks before it happens, not after.
+    private function rotateInviteLinkAction(): Action
+    {
+        return Action::make('rotateInviteLink')
+            ->label(__('workspaces.actions.rotate_invite_link'))
+            ->icon('heroicon-m-arrow-path')
+            ->color('gray')
+            ->link()
+            ->visible(fn (): bool => $this->hasLiveInviteLink())
+            ->requiresConfirmation()
+            ->modalIcon('heroicon-o-exclamation-triangle')
+            ->modalHeading(__('workspaces.modals.rotate_invite_link.heading'))
+            ->modalDescription(__('workspaces.modals.rotate_invite_link.notice'))
+            ->modalSubmitActionLabel(__('workspaces.actions.rotate_invite_link'))
+            ->action(function (): void {
+                resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->workspace);
+
+                $this->sendNotification(__('workspaces.notifications.invite_link_rotated.success'));
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    private function disableInviteLinkAction(): Action
+    {
+        return Action::make('disableInviteLink')
+            ->label(__('workspaces.actions.disable_invite_link'))
+            ->icon('heroicon-m-no-symbol')
+            ->color('danger')
+            ->link()
+            ->visible(fn (): bool => $this->workspace->hasInviteLink())
+            ->requiresConfirmation()
+            ->modalIcon('heroicon-o-no-symbol')
+            ->modalHeading(__('workspaces.modals.disable_invite_link.heading'))
+            ->modalDescription(__('workspaces.modals.disable_invite_link.notice'))
+            ->modalSubmitActionLabel(__('workspaces.actions.disable_invite_link'))
+            ->action(function (): void {
+                resolve(UpdateInviteLinkSettings::class)->disable($this->authUser(), $this->workspace);
+
+                $this->sendNotification(__('workspaces.notifications.invite_link_disabled.success'));
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    // Turning the link back on mints a fresh token, so a link disabled after a
+    // leak cannot be revived by re-enabling it. An expired link renews the same way.
+    private function enableInviteLinkAction(): Action
+    {
+        return Action::make('enableInviteLink')
+            ->label(fn (): string => $this->workspace->hasInviteLink()
+                ? __('workspaces.actions.rotate_invite_link')
+                : __('workspaces.actions.enable_invite_link'))
+            ->icon('heroicon-m-link')
+            ->button()
+            ->extraAttributes(['autofocus' => true])
+            ->visible(fn (): bool => ! $this->hasLiveInviteLink())
+            ->action(function (): void {
+                $notification = $this->workspace->hasInviteLink()
+                    ? __('workspaces.notifications.invite_link_rotated.success')
+                    : __('workspaces.notifications.invite_link_enabled.success');
+
+                resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->workspace);
+
+                $this->sendNotification($notification);
+                $this->remountInviteLinkModal();
+            });
+    }
+
+    /**
+     * The modal's fields are filled once at mount, so a token minted or cleared
+     * by a footer action would leave a stale URL on screen. Remounting refills
+     * the form against the workspace as it now stands.
+     */
+    private function remountInviteLinkModal(): void
+    {
+        $this->workspace->refresh();
+
+        $this->replaceMountedAction('manageInviteLink');
+    }
+
+    private function hasLiveInviteLink(): bool
+    {
+        return $this->workspace->hasInviteLink() && ! $this->workspace->isInviteLinkTokenExpired();
+    }
+
+    private function inviteLinkUrl(): ?string
+    {
+        if (! $this->hasLiveInviteLink()) {
+            return null;
+        }
+
+        return route('workspaces.join', ['token' => $this->workspace->invite_link_token]);
+    }
+
+    public function render(): View
+    {
+        return view('livewire.app.workspaces.invite-workspace-members');
+    }
+
+    /**
+     * Addresses arrive pasted from a spreadsheet or mail client, so any
+     * separator those produce counts: commas, semicolons, and whitespace.
+     *
+     * @return list<string>
+     */
+    private function parseEmails(string $input): array
+    {
+        $parts = preg_split('/[\s,;]+/', trim($input)) ?: [];
+
+        return array_values(array_unique(array_filter(
+            array_map(trim(...), $parts),
+            fn (string $email): bool => $email !== '',
+        )));
+    }
+
+    /**
+     * @param  list<string>  $emails
+     */
+    private function sendInvitations(array $emails, string $role): void
+    {
+        if ($emails === []) {
+            return;
+        }
+
+        // Volume-based, not call-based: the cap above bounds one submission,
+        // this bounds cumulative volume from the same actor.
+        $rateLimitKey = 'invite-workspace-members:'.$this->authUser()->id;
+
+        if (RateLimiter::tooManyAttempts($rateLimitKey, self::MAX_INVITES_PER_WINDOW)) {
+            $this->sendNotification(
+                __('workspaces.notifications.invite_rate_limited.title'),
+                __('workspaces.notifications.invite_rate_limited.body', [
+                    'seconds' => RateLimiter::availableIn($rateLimitKey),
+                ]),
+                'danger',
+            );
+
+            return;
+        }
+
+        RateLimiter::increment($rateLimitKey, self::INVITE_WINDOW_SECONDS, count($emails));
+
+        $failures = [];
+        $sent = 0;
+
+        foreach ($emails as $email) {
+            try {
+                resolve(InviteWorkspaceMember::class)->invite($this->authUser(), $this->workspace, $email, $role);
+
+                $sent++;
+            } catch (ValidationException $exception) {
+                $failures[] = "{$email}: {$exception->validator->errors()->first()}";
+            }
+        }
+
+        if ($sent > 0) {
+            $this->sendNotification(__('workspaces.notifications.workspace_invitation_sent.success'));
+            $this->dispatch('workspaceInvitationSent');
+        }
+
+        if ($failures !== []) {
+            $this->sendNotification(
+                __('workspaces.notifications.some_invites_failed.title'),
+                implode("\n", $failures),
+                'warning',
+            );
+        }
+    }
+}

@@ -1,4 +1,4 @@
-# Tiering — blast radius → Tier 0–3 (∪ user emphasis)
+# Tiering: blast radius → Tier 0–3 (∪ user emphasis)
 
 Tier is computed by `scripts/compute_tier.py` (fed `scripts/classify_diff.py --profile
 project-profile.json` output) before any planning. User emphasis can only RAISE it.
@@ -16,8 +16,8 @@ Union of two sources; any hit forces Tier 3 regardless of breadth:
 **Sanity-check the classifier, don't worship it** (field evidence: importer paths went
 undetected twice; incidental `auth()` tokens over-fired once; on PR 336 the word
 "session" in ONE shell-script comment escalated a pure nav refactor to Tier 3).
-`classify_diff.py` emits **`signal_evidence`** — the exact file + added line each
-signal fired on — so the sanity check is a one-glance read of
+`classify_diff.py` emits **`signal_evidence`**, the exact file and added line each
+signal fired on, so the sanity check is a one-glance read of
 `diff-classification.json`, not a manual re-grep. Read it EVERY run before accepting a
 critical bump. If the computed tier contradicts your read of the diff, re-tier manually
 and record `computed_tier`, the chosen `tier`, and a one-line `tier_rationale` in the
@@ -30,7 +30,7 @@ rationale).
 |---|---|
 | "100,000 customers", "deploy to prod", "stress", "every single angle/detail", "end-2-end" | 3 |
 | "deeply", "carefully", "as many scenarios as possible" | 2 |
-| "quick", "smoke", "sanity" | cap at 1 (cap, not floor — never below a critical signal) |
+| "quick", "smoke", "sanity" | cap at 1 (a cap, not a floor; never below a critical signal) |
 
 A critical signal still wins over a requested cap; say so rather than silently obeying.
 
@@ -44,7 +44,7 @@ A critical signal still wins over a requested cap; say so rather than silently o
 | **3** | any critical signal, wide multi-subsystem diff, or production-stakes language | 3–5 incl. `integrity-breaker` | Tier 2 + the **100k contract** (SKILL.md) |
 
 Concurrency cap ≤ 3 live browser sessions always; excess personas queue. Tier 0/1 stay
-**in-protocol** — same skeleton (env discovery → preflight → walk → honest frontier →
+**in-protocol**, on the same skeleton (env discovery → preflight → walk → honest frontier →
 report), minutes not hours. Scaling down gracefully is what keeps the protocol alive;
 abandoning it for "quick checks" is how regressions slip through.
 

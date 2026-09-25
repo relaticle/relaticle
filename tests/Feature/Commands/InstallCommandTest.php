@@ -11,8 +11,8 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 mutates(InstallCommand::class);
 
 beforeEach(function (): void {
-    // The command shells out to composer, npm and vite for real. Unfaked, this
-    // file rebuilds public/build and re-runs `composer install` on every run —
+    // The command shells out to composer, pnpm and vite for real. Unfaked, this
+    // file rebuilds public/build and re-runs `composer install` on every run:
     // ~110s, and it mutates the working tree of whoever runs the suite. Assert
     // the right commands are issued instead of executing them.
     Process::fake();
@@ -50,8 +50,8 @@ it('completes installation without demo data and system admin', function (): voi
     expect(File::get($tempEnv))->toContain('DB_CONNECTION=sqlite');
 
     Process::assertRan('composer install --no-interaction --prefer-dist --optimize-autoloader');
-    Process::assertRan('npm ci --silent');
-    Process::assertRan('npm run build');
+    Process::assertRan('pnpm install --frozen-lockfile --silent');
+    Process::assertRan('pnpm run build');
 
     File::delete($tempEnv);
 });

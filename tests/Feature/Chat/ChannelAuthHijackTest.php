@@ -13,7 +13,7 @@ use function Pest\Laravel\actingAs;
 use function Pest\Laravel\postJson;
 
 it('rejects channel auth for a conversation id that does not exist', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $conversationId = (string) Str::uuid();
 
     expect(chatChannelAuth($user, $conversationId))->toBeFalse();
@@ -23,11 +23,11 @@ it('rejects channel auth for a conversation id that does not exist', function ()
 it('blocks user B from accessing a conversation created by user A', function (): void {
     Queue::fake();
 
-    $userA = User::factory()->withPersonalTeam()->create();
-    $userB = User::factory()->withPersonalTeam()->create();
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $userB = User::factory()->withPersonalWorkspace()->create();
 
-    AiCreditBalance::query()->updateOrCreate(['team_id' => $userA->currentTeam->getKey()], [
-        'team_id' => $userA->currentTeam->getKey(),
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $userA->currentWorkspace->getKey()], [
+        'workspace_id' => $userA->currentWorkspace->getKey(),
         'credits_remaining' => 100,
         'credits_used' => 0,
         'period_starts_at' => now()->startOfMonth(),
@@ -47,8 +47,8 @@ it('blocks user B from accessing a conversation created by user A', function ():
 });
 
 it('does not authorize one user against another user channel that shares an integer-cast prefix', function (): void {
-    $userA = User::factory()->withPersonalTeam()->create();
-    $userB = User::factory()->withPersonalTeam()->create();
+    $userA = User::factory()->withPersonalWorkspace()->create();
+    $userB = User::factory()->withPersonalWorkspace()->create();
 
     // Both ULIDs start with "01" (Crockford timestamp prefix in 2026).
     expect($userA->getKey())->toStartWith('01');

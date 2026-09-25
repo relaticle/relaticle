@@ -8,10 +8,10 @@ use Filament\Facades\Filament;
 use Laravel\Jetstream\Features;
 
 test('rest api integration link points to scribe docs', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->actingAs($user);
-    Filament::setTenant($user->currentTeam);
+    Filament::setTenant($user->currentWorkspace);
 
     livewire(AccessTokens::class)
         ->assertSee(route('scribe'), escape: false)

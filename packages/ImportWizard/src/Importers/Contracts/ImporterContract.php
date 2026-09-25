@@ -18,9 +18,9 @@ use Relaticle\ImportWizard\Data\MatchableField;
 interface ImporterContract
 {
     /**
-     * Get the team ID for this import.
+     * Get the workspace ID for this import.
      */
-    public function getTeamId(): string;
+    public function getWorkspaceId(): string;
 
     /**
      * Get the fully-qualified model class name.

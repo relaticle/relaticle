@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
-use Illuminate\Contracts\Database\Query\Builder;
+use App\Support\LikePattern;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Support\TitleSanitizer;
 
 final readonly class SearchConversations
@@ -23,24 +24,18 @@ final readonly class SearchConversations
             return collect();
         }
 
-        $needle = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $query).'%';
+        $needle = '%'.LikePattern::escape($query).'%';
 
-        return DB::table('agent_conversations as ac')
-            ->select(['ac.id', 'ac.title', 'ac.created_at', 'ac.updated_at'])
-            ->where('ac.participant_type', $user->getMorphClass())
-            ->where('ac.participant_id', (string) $user->getKey())
-            ->where('ac.team_id', (string) $user->current_team_id)
-            ->where(function (Builder $q) use ($needle): void {
-                $q->where('ac.title', 'ilike', $needle)
-                    ->orWhereExists(function (Builder $sub) use ($needle): void {
-                        $sub->from('agent_conversation_messages as m')
-                            ->whereColumn('m.conversation_id', 'ac.id')
-                            ->where('m.content', 'ilike', $needle);
-                    });
+        return AgentConversation::query()
+            ->ownedBy($user)
+            ->where(function (Builder $conversation) use ($needle): void {
+                $conversation->where('title', 'ilike', $needle)
+                    ->orWhereHas('messages', fn (Builder $message): Builder => $message->withoutSynthetic()->where('content', 'ilike', $needle));
             })
-            ->latest('ac.updated_at')
+            ->latest('updated_at')
             ->limit(50)
-            ->get()
+            ->toBase()
+            ->get(['id', 'title', 'created_at', 'updated_at'])
             ->map(function (\stdClass $row): \stdClass {
                 $row->title = TitleSanitizer::clean((string) $row->title);
 

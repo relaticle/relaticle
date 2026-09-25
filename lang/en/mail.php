@@ -1,0 +1,255 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'fallback_link' => 'If the button does not work, copy this link into your browser:',
+
+    'footer' => [
+        'settings' => 'Notification settings',
+        'unsubscribe' => 'Unsubscribe from the daily digest',
+        'copyright' => '© :year :company',
+        'reason' => [
+            'owner' => 'You received this because you own the :workspace workspace.',
+            'member' => 'You received this because you are a member of :workspace.',
+            'former_member' => 'You received this because you were a member of :workspace.',
+            'digest' => 'You received this because you enabled the daily digest.',
+            'assignee' => 'You received this because a task in :workspace was assigned to you.',
+            'invitee' => 'You received this because :email was invited to :workspace.',
+            'contact' => 'You received this because someone submitted the contact form.',
+            'account' => 'You received this because of a request on your :company account.',
+            'onboarding' => 'You received this because you created a :company workspace.',
+        ],
+    ],
+
+    'unsubscribe' => [
+        'title' => 'Unsubscribe',
+        'heading' => 'Stop the daily digest?',
+        'body' => 'You will no longer receive the morning task digest at :email. You can turn it back on in notification settings.',
+        'confirm' => 'Unsubscribe',
+        'done_heading' => 'You are unsubscribed',
+        'done_body' => 'The daily digest is off for :email.',
+        'settings' => 'Notification settings',
+    ],
+
+    'trial_ending' => [
+        'subject' => 'Your Pro trial ends in 3 days',
+        'preheader' => 'Keep every AI model and 2,000 credits for one flat price',
+        'heading' => '3 days left on Pro for :workspace',
+        'ends_on' => 'Your 14-day Pro trial ends on :date.',
+        'keeps' => 'Pro keeps every AI model, 2,000 monthly credits, and higher rate limits.',
+        'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
+        'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
+        'paused' => 'If you do nothing, Cloud access pauses when the trial ends. Your data stays stored, and you can subscribe at any time to pick up where you left off.',
+        'cta' => 'Keep Pro',
+    ],
+
+    'pro_ended' => [
+        'trial_ended' => [
+            'subject' => 'Your Pro trial has ended',
+            'heading' => 'Your Pro trial for :workspace has ended',
+        ],
+        'subscription_ended' => [
+            'subject' => 'Your Cloud Pro subscription has ended',
+            'heading' => 'Cloud Pro for :workspace has ended',
+        ],
+        'preheader' => 'Your records are safe. Subscribe to reopen the workspace.',
+        'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
+        'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
+        'restore' => 'Subscribe to Cloud Pro to reopen the app, REST API, MCP server, and AI assistant exactly where you left off.',
+        'grandfathered' => ':workspace is back on its grandfathered Cloud Free plan. Your data is untouched, and you can return to Pro at any time.',
+        'cta' => 'Subscribe to Pro',
+        'cta_grandfathered' => 'Upgrade to Pro',
+    ],
+
+    'setup_nudge' => [
+        'subject' => 'Your workspace is waiting',
+        'preheader' => 'One step gets :workspace working: :step',
+        'heading' => ':name, :workspace is still empty',
+        'step' => 'Next step: :step.',
+        'cta' => 'Continue in :assistant',
+    ],
+
+    'task_assigned' => [
+        'subject' => 'New task: :title',
+        'preheader' => 'Assigned to you in :workspace',
+        'preheader_without_workspace' => 'A task was assigned to you',
+        'heading' => 'You have a new task',
+        'workspace_label' => 'Workspace',
+        'cta' => 'View task',
+    ],
+
+    'task_digest' => [
+        'subject' => 'Your tasks for :date',
+        'preheader' => ':overdue overdue, :due due today',
+        'heading' => "Today's tasks, :name",
+        'overdue' => 'Overdue',
+        'due_today' => 'Due today',
+        'due' => 'Due :date',
+        'cta' => 'View all my tasks',
+    ],
+
+    'workspace_invitation' => [
+        'subject' => ':inviter invited you to :workspace',
+        'subject_without_inviter' => 'You were invited to :workspace',
+        'preheader' => 'Join :workspace on Relaticle as :role',
+        'heading' => 'Join :workspace',
+        'line_with_inviter' => ':inviter invited you to the :workspace workspace on Relaticle with :role access.',
+        'line' => 'You were invited to the :workspace workspace on Relaticle with :role access.',
+        'expiry' => 'This invitation expires :expiry.',
+        'ignore' => 'Not expecting this? Ignore this email.',
+        'cta' => 'Accept invitation',
+    ],
+
+    'workspace_deletion_scheduled' => [
+        'subject' => ':workspace is scheduled for deletion',
+        'preheader' => 'Deletes on :date. Cancel any time before then',
+        'heading' => ':workspace will be deleted on :date',
+        'removes' => 'Contacts, companies, tasks, opportunities, notes, and every other record in :workspace are removed after that date.',
+        'cancel' => 'You can cancel from the workspace settings at any time before then.',
+        'cta' => 'Cancel deletion',
+    ],
+
+    'workspace_deletion_reminder' => [
+        'subject' => ':workspace deletes in :days day|:workspace deletes in :days days',
+        'preheader' => 'Last reminder before :date',
+        'heading' => ':days day until :workspace is deleted|:days days until :workspace is deleted',
+        'final' => 'This is the last reminder. Everything in :workspace is removed after :date.',
+        'cancel' => 'You can cancel from the workspace settings at any time before then.',
+        'cta' => 'Cancel deletion',
+    ],
+
+    'workspace_deletion_cancelled' => [
+        'subject' => ':workspace deletion cancelled',
+        'preheader' => 'Your data is safe',
+        'heading' => ':workspace is staying',
+        'body' => 'The scheduled deletion of :workspace was cancelled. Nothing was removed.',
+        'cta' => 'Open :workspace',
+    ],
+
+    'workspace_member_removed' => [
+        'subject' => 'You were removed from :workspace',
+        'preheader' => 'You no longer have access to this workspace',
+        'heading' => 'You were removed from :workspace',
+        'body' => 'Your access to :workspace and its records ended. Your other workspaces are unaffected.',
+        'cta' => 'Open Relaticle',
+    ],
+
+    'account_deletion_scheduled' => [
+        'subject' => 'Your account is scheduled for deletion',
+        'preheader' => 'Deletes on :date. Sign in to cancel',
+        'heading' => 'Your account will be deleted on :date',
+        'removes' => 'Your profile and every workspace you own are removed after that date.',
+        'cancel' => 'Changed your mind? Sign in before then and the deletion is cancelled.',
+        'cta' => 'Keep my account',
+    ],
+
+    'account_deletion_reminder' => [
+        'subject' => 'Your account deletes in :days day|Your account deletes in :days days',
+        'preheader' => 'Last reminder before :date',
+        'heading' => ':days day until your account is deleted|:days days until your account is deleted',
+        'final' => 'This is the last reminder. Your account and its data are removed after :date.',
+        'cancel' => 'Sign in before then and the deletion is cancelled.',
+        'cta' => 'Keep my account',
+    ],
+
+    'account_deletion_cancelled' => [
+        'subject' => 'Your account is staying',
+        'preheader' => 'Deletion cancelled, data untouched',
+        'heading' => 'Welcome back, :name',
+        'body' => 'The scheduled deletion of your account was cancelled. Nothing was removed.',
+        'cta' => 'Open Relaticle',
+    ],
+
+    'verify_email' => [
+        'subject' => 'Verify your email',
+        'preheader' => 'One click finishes signing up',
+        'heading' => 'Verify your email address',
+        'body' => 'Confirm this address to finish setting up your Relaticle account.',
+        'ignore' => 'Did not sign up? Ignore this email.',
+        'cta' => 'Verify email',
+    ],
+
+    'verify_email_change' => [
+        'subject' => 'Confirm your new email',
+        'preheader' => 'Confirm :email to finish the change',
+        'heading' => 'Confirm :email',
+        'body' => 'You asked to use :email for your :company account. Confirm it to finish the change. This link expires in :count minutes.',
+        'ignore' => 'Did not ask for this? Ignore this email and your current address stays.',
+        'cta' => 'Confirm new email',
+    ],
+
+    'email_code' => [
+        'expires' => 'This code expires in :count minutes.',
+        'browser_hint' => 'Enter this code in the browser tab where you started.',
+        'latest_only' => 'Only the latest code you requested works.',
+        'unsolicited' => 'Did not request this? You can ignore this email.',
+        'purposes' => [
+            'signup' => [
+                'subject' => 'Your Relaticle signup code',
+                'preheader' => 'Use this code to finish creating your account',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to finish creating your Relaticle account.',
+            ],
+            'verify_email' => [
+                'subject' => 'Your Relaticle verification code',
+                'preheader' => 'Use this code to verify your email',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to verify your Relaticle account email.',
+            ],
+            'sign_in' => [
+                'subject' => 'Your Relaticle sign-in code',
+                'preheader' => 'Use this code to sign in',
+                'heading' => "Confirm it's you",
+                'body' => 'Enter this code to sign in to your Relaticle account.',
+            ],
+            'confirm_identity' => [
+                'subject' => 'Your Relaticle confirmation code',
+                'preheader' => 'Use this code to continue',
+                'heading' => 'Confirm your identity',
+                'body' => 'Enter this code to continue with your Relaticle account.',
+            ],
+            'change_email' => [
+                'subject' => 'Your Relaticle email change code',
+                'preheader' => 'Use this code to confirm your new email',
+                'heading' => 'Confirm your new email',
+                'body' => 'Enter this code to finish changing your Relaticle account email.',
+            ],
+            'enable_email_sign_in' => [
+                'subject' => 'Your Relaticle email sign-in code',
+                'preheader' => 'Use this code to turn on email sign-in',
+                'heading' => 'Confirm your email address',
+                'body' => 'Enter this code to turn on email sign-in for your Relaticle account.',
+            ],
+        ],
+    ],
+
+    'email_change_notice' => [
+        'subject' => 'Email change requested',
+        'preheader' => 'Was this you? Block it if not',
+        'heading' => 'Someone asked to change your email to :email',
+        'body' => 'Someone signed in to your account asked to change its email. Once :email is confirmed, it becomes the address on your account.',
+        'block' => 'If this was not you, block the change now, then sign out of other sessions and change your password.',
+        'cta' => 'Block this change',
+    ],
+
+    'reset_password' => [
+        'subject' => 'Reset your password',
+        'preheader' => 'This link expires in :count minutes',
+        'heading' => 'Reset your password',
+        'body' => 'Choose a new password for your Relaticle account. This link expires in :count minutes.',
+        'ignore' => 'Did not ask for a reset? Ignore this email and your password stays.',
+        'cta' => 'Reset password',
+    ],
+
+    'contact_submission' => [
+        'subject' => 'New contact: :name',
+        'preheader' => ':company, :email',
+        'preheader_without_company' => ':email',
+        'heading' => 'New contact form message',
+        'name' => 'Name',
+        'email' => 'Email',
+        'company' => 'Company',
+        'cta' => 'Reply to :name',
+    ],
+];

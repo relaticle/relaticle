@@ -9,9 +9,16 @@
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="vendor/autoload.php"
+         defaultTestSuite="Default"
          colors="true"
 >
     <testsuites>
+        <testsuite name="Default">
+            <directory>tests/Arch</directory>
+            <directory>tests/PHPStan</directory>
+            <directory>tests/Smoke</directory>
+            <directory>tests/Feature</directory>
+        </testsuite>
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
         </testsuite>
@@ -49,6 +56,7 @@
         <env name="OPENAI_API_KEY" value="fake-openai-key"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="AUTH_TIMEBOX_DURATION" value="1000"/>
         <env name="DB_CONNECTION" value="pgsql"/>
         <env name="DB_DATABASE" value="relaticle_testing"/>
         <env name="DB_HOST" value="127.0.0.1"/>

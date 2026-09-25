@@ -1,0 +1,8 @@
+title: Run the RevOps training for Zapier
+assigned_people:
+  - elena
+custom_fields:
+  description: First of two onboarding sessions. Finance follows once RevOps is live.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

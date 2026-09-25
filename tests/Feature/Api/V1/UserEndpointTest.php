@@ -11,7 +11,7 @@ it('requires authentication', function (): void {
 });
 
 it('returns user resource with correct shape', function (): void {
-    $user = User::factory()->withPersonalTeam()->create([
+    $user = User::factory()->withPersonalWorkspace()->create([
         'name' => 'Jane Doe',
         'email' => 'jane@example.com',
     ]);
@@ -31,7 +31,7 @@ it('returns user resource with correct shape', function (): void {
                     ->missing('remember_token')
                     ->missing('two_factor_secret')
                     ->missing('two_factor_recovery_codes')
-                    ->missing('current_team_id')
+                    ->missing('current_workspace_id')
                     ->missing('email_verified_at')
                     ->missing('profile_photo_path')
                     ->missing('profile_photo_url')
@@ -43,7 +43,7 @@ it('returns user resource with correct shape', function (): void {
 });
 
 it('does not expose internal fields in response', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     Sanctum::actingAs($user);
 

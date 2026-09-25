@@ -4,62 +4,69 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\Note;
 use App\Models\User;
-use Filament\Facades\Filament;
+use App\Policies\Concerns\ChecksWorkspaceCapability;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 final readonly class NotePolicy
 {
+    use ChecksWorkspaceCapability;
     use HandlesAuthorization;
 
     public function viewAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsView);
     }
 
     public function view(User $user, Note $note): bool
     {
-        return $user->belongsToTeamId($note->team_id);
+        return $user->hasWorkspaceCapability($note->workspace_id, WorkspaceCapability::RecordsView);
     }
 
     public function create(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsCreate);
     }
 
     public function update(User $user, Note $note): bool
     {
-        return $user->belongsToTeamId($note->team_id);
+        return $user->hasWorkspaceCapability($note->workspace_id, WorkspaceCapability::RecordsUpdate);
     }
 
     public function delete(User $user, Note $note): bool
     {
-        return $user->belongsToTeamId($note->team_id);
+        return $user->hasWorkspaceCapability($note->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function deleteAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsDelete);
     }
 
     public function restore(User $user, Note $note): bool
     {
-        return $user->belongsToTeamId($note->team_id);
+        return $user->hasWorkspaceCapability($note->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function restoreAny(User $user): bool
     {
-        return $user->hasVerifiedEmail() && $user->currentTeam !== null;
+        return $this->allowsInCurrentWorkspace($user, WorkspaceCapability::RecordsDelete);
     }
 
-    public function forceDelete(User $user): bool
+    public function forceDelete(User $user, Note $note): bool
     {
-        return $user->hasTeamRole(Filament::getTenant(), 'admin');
+        return $user->hasWorkspaceCapability($note->workspace_id, WorkspaceCapability::RecordsForceDelete);
     }
 
     public function forceDeleteAny(User $user): bool
     {
-        return $user->hasTeamRole(Filament::getTenant(), 'admin');
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::RecordsForceDelete);
+    }
+
+    public function exportAny(User $user): bool
+    {
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::DataExport);
     }
 }

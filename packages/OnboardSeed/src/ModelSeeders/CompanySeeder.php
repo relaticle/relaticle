@@ -6,7 +6,7 @@ namespace Relaticle\OnboardSeed\ModelSeeders;
 
 use App\Enums\CustomFields\CompanyField as CompanyCustomField;
 use App\Models\Company;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Relaticle\OnboardSeed\Support\BaseModelSeeder;
 
@@ -22,12 +22,12 @@ final class CompanySeeder extends BaseModelSeeder
         CompanyCustomField::LINKEDIN->value,
     ];
 
-    protected function createEntitiesFromFixtures(Team $team, Authenticatable $user): void
+    protected function createEntitiesFromFixtures(Workspace $workspace, Authenticatable $user): void
     {
         $fixtures = $this->loadEntityFixtures();
 
         foreach ($fixtures as $key => $data) {
-            $this->createCompanyFromFixture($team, $user, $key, $data);
+            $this->createCompanyFromFixture($workspace, $user, $key, $data);
         }
     }
 
@@ -36,7 +36,7 @@ final class CompanySeeder extends BaseModelSeeder
      *
      * @param  array<string, mixed>  $data
      */
-    private function createCompanyFromFixture(Team $team, Authenticatable $user, string $key, array $data): Company
+    private function createCompanyFromFixture(Workspace $workspace, Authenticatable $user, string $key, array $data): Company
     {
         $attributes = [
             'name' => $data['name'],
@@ -46,6 +46,6 @@ final class CompanySeeder extends BaseModelSeeder
         $customFields = $data['custom_fields'] ?? [];
 
         /** @var Company */
-        return $this->registerEntityFromFixture($key, $attributes, $customFields, $team, $user);
+        return $this->registerEntityFromFixture($key, $attributes, $customFields, $workspace, $user);
     }
 }

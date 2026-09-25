@@ -6,6 +6,7 @@ namespace App\Filament\Resources\PeopleResource\Pages;
 
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
+use App\Models\People;
 use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -33,8 +34,9 @@ final class ListPeople extends ListRecords
                 Action::make('import')
                     ->label(__('filament/resources/person.pages.list.actions.import.label'))
                     ->icon('heroicon-o-arrow-up-tray')
-                    ->url(ImportPeople::getUrl()),
-                ExportAction::make()->exporter(PeopleExporter::class),
+                    ->url(ImportPeople::getUrl())
+                    ->visible(ImportPeople::canAccess(...)),
+                ExportAction::make()->exporter(PeopleExporter::class)->authorize('exportAny', People::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')

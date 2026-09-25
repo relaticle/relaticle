@@ -24,8 +24,8 @@ use PHPStan\Type\ObjectType;
  * Enforces the project's core write-path convention: all create/update/delete
  * operations go through action classes in app/Actions. Flags Eloquent write
  * calls (on models, eloquent builders, and relations) made from UI and
- * transport surfaces — controllers, MCP tools, Livewire components, Filament
- * resources, chat tools — where business logic must not live.
+ * transport surfaces (controllers, MCP tools, Livewire components, Filament
+ * resources, chat tools) where business logic must not live.
  *
  * Existing violations are grandfathered via path-scoped ignores in
  * phpstan.neon; new ones fail analysis.
@@ -153,7 +153,7 @@ final readonly class EloquentWriteOutsideActionRule implements Rule
     private function error(string $method): IdentifierRuleError
     {
         return RuleErrorBuilder::message(
-            "Eloquent write ->{$method}() in a UI/transport surface — route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md)."
+            "Eloquent write ->{$method}() in a UI/transport surface: route writes through an action class in app/Actions (see .ai/guidelines/relaticle/architecture.md)."
         )
             ->identifier('app.architecture.eloquentWriteOutsideAction')
             ->build();

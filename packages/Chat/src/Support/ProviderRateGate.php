@@ -29,7 +29,7 @@ final class ProviderRateGate
         } catch (LimiterTimeoutException) {
             return false;
         } catch (Throwable) {
-            // Redis hiccup must never take chat down — fail open.
+            // Redis hiccup must never take chat down, so fail open.
             return true;
         }
     }

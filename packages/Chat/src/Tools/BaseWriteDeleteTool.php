@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
@@ -13,10 +14,14 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 abstract class BaseWriteDeleteTool implements Tool
 {
+    use LimitsPlanSteps;
+    use RequiresWorkspaceCapability;
     use WithConversationContext;
 
     /** @return class-string<Model> */
@@ -31,10 +36,7 @@ abstract class BaseWriteDeleteTool implements Tool
 
     abstract public function description(): string;
 
-    protected function nameAttribute(): string
-    {
-        return 'name';
-    }
+    abstract protected function nameAttribute(): string;
 
     public function schema(JsonSchema $schema): array
     {
@@ -42,7 +44,7 @@ abstract class BaseWriteDeleteTool implements Tool
 
         return [
             'ids' => $schema->array()->items($schema->string())->required()
-                ->description("The {$label} IDs to delete. Pass one id to delete a single {$label}, or many to delete them all in one call."),
+                ->description("The {$label} IDs to delete. Pass one id to delete a single {$label}, or many to delete them all in one call. Deleting a {$label} never deletes the records linked to it."),
         ];
     }
 
@@ -51,21 +53,33 @@ abstract class BaseWriteDeleteTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::RecordsDelete);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
+        }
+
+        $planLimitError = $this->planStepLimitError();
+
+        if ($planLimitError !== null) {
+            return (string) json_encode(['error' => $planLimitError], JSON_UNESCAPED_SLASHES);
+        }
+
         $requestedIds = $this->requestedIds($request);
 
         if ($requestedIds === []) {
-            return (string) json_encode(['error' => 'Provide `ids` (a non-empty array) of records to delete.']);
+            return (string) json_encode(['error' => 'Provide `ids` (a non-empty array) of records to delete.'], JSON_UNESCAPED_SLASHES);
         }
 
         $maxBatchSize = (int) config('chat.max_batch_size');
 
         if (count($requestedIds) > $maxBatchSize) {
-            return (string) json_encode(['error' => "Too many records — at most {$maxBatchSize} per proposal."]);
+            return (string) json_encode(['error' => "Too many records: at most {$maxBatchSize} per proposal."], JSON_UNESCAPED_SLASHES);
         }
 
         /** @var Collection<int, Model> $models */
         $models = $this->modelClass()::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($requestedIds)
             ->get();
 
@@ -78,7 +92,7 @@ abstract class BaseWriteDeleteTool implements Tool
             return (string) json_encode([
                 'error' => "No matching {$this->entityLabel()} records you can delete were found.",
                 'skipped' => $skipped,
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $pending = resolve(PendingActionService::class)->createProposal(
@@ -89,11 +103,13 @@ abstract class BaseWriteDeleteTool implements Tool
             entityType: $this->entityType(),
             actionData: $this->actionData($deletable),
             displayData: $this->displayData($deletable),
+            turnId: $this->resolveTurnId(),
         );
 
         return (string) json_encode([
             'type' => 'pending_action',
             'pending_action_id' => $pending->id,
+            'turn_id' => $pending->turn_id,
             'action' => class_basename($this->actionClass()),
             'entity_type' => $this->entityType(),
             'operation' => 'delete',
@@ -101,7 +117,7 @@ abstract class BaseWriteDeleteTool implements Tool
             'skipped' => $skipped,
             'display' => $pending->display_data,
             'meta' => ['agent_should_stop' => true],
-        ], JSON_PRETTY_PRINT);
+        ], JSON_UNESCAPED_SLASHES);
     }
 
     /** @return list<string> */
@@ -160,9 +176,9 @@ abstract class BaseWriteDeleteTool implements Tool
             $name = (string) $models->first()->{$this->nameAttribute()};
 
             return [
-                'title' => "Delete {$this->entityLabel()}",
-                'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
-                'fields' => [['label' => 'Name', 'value' => $name]],
+                'title' => __('Delete :entity', ['entity' => $this->entityLabel()]),
+                'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                'fields' => [['label' => __('Name'), 'value' => $name]],
             ];
         }
 
@@ -171,8 +187,8 @@ abstract class BaseWriteDeleteTool implements Tool
                 $name = (string) $model->{$this->nameAttribute()};
 
                 return [
-                    'summary' => "Delete {$this->entityLabel()} \"{$name}\"",
-                    'fields' => [['label' => 'Name', 'value' => $name]],
+                    'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                    'fields' => [['label' => __('Name'), 'value' => $name]],
                 ];
             })
             ->all();
@@ -180,8 +196,11 @@ abstract class BaseWriteDeleteTool implements Tool
         $titleNoun = Str::plural(Str::headline($this->entityLabel()), $count);
 
         return [
-            'title' => "Delete {$count} {$titleNoun}",
-            'summary' => sprintf('Delete %d %s', $count, Str::plural(strtolower($this->entityLabel()), $count)),
+            'title' => __('Delete :count :entities', ['count' => $count, 'entities' => $titleNoun]),
+            'summary' => __('Delete :count :entities', [
+                'count' => $count,
+                'entities' => Str::plural(strtolower($this->entityLabel()), $count),
+            ]),
             'items' => $items,
         ];
     }

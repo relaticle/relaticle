@@ -1,17 +1,18 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
 
-    $title = __('Self-Hosted CRM: Deploy Relaticle on Your Own Server').' - Relaticle';
+    $title = __('Self-hosted CRM: Run it on your server').' - Relaticle';
     $description = __('Deploy Relaticle, the open-source AGPL-3.0 CRM, on your own server with two Docker commands. Unlimited users, no per-seat pricing, and your data stays yours.');
 
     $quickStartLines = [
         ['type' => 'comment', 'text' => __('Download the compose file')],
         ['type' => 'command', 'text' => 'curl -o compose.yml https://raw.githubusercontent.com/relaticle/relaticle/main/compose.yml'],
         ['type' => 'blank'],
-        ['type' => 'comment', 'text' => __('Add the two required secrets')],
+        ['type' => 'comment', 'text' => __('Add the two secrets and your public URL')],
         ['type' => 'command', 'text' => 'cat > .env << EOF'],
         ['type' => 'command', 'text' => 'APP_KEY=base64:$(openssl rand -base64 32)', 'continuation' => true],
         ['type' => 'command', 'text' => 'DB_PASSWORD=$(openssl rand -hex 24)', 'continuation' => true],
+        ['type' => 'command', 'text' => 'APP_URL=https://crm.example.com', 'continuation' => true],
         ['type' => 'command', 'text' => 'EOF', 'continuation' => true],
         ['type' => 'blank'],
         ['type' => 'comment', 'text' => __('Start Relaticle')],
@@ -199,7 +200,7 @@
 
             <ol class="space-y-4">
                 @foreach([
-                    [__('Get the compose file'), __('Download the published compose.yml and set the two variables it requires: :appKey and :dbPassword.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD'])],
+                    [__('Get the compose file'), __('Download the published compose.yml, set the two secrets it requires (:appKey and :dbPassword), and point :appUrl at the address you will serve from. Invitation and password-reset links are signed against that host, so they break if it is wrong.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD', 'appUrl' => 'APP_URL'])],
                     [__('Start the stack'), __('Run :command and Docker pulls five containers: the app, a queue worker, a scheduler, PostgreSQL, and Redis. Database migrations run automatically on startup.', ['command' => 'docker compose up -d'])],
                     [__('Create your admin account'), __('Run :command, choose the app panel, and sign in with the account you just created.', ['command' => 'docker compose exec app php artisan make:filament-user'])],
                 ] as $index => [$stepTitle, $stepDesc])
@@ -392,7 +393,7 @@
                 <x-marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
                     {{ __('Deploy self-hosted') }}
                 </x-marketing.button>
-                <x-marketing.button variant="secondary" href="{{ route('register') }}">
+                <x-marketing.button variant="secondary" href="{{ route('login') }}">
                     {{ __('Try Relaticle Cloud') }}
                 </x-marketing.button>
             </div>

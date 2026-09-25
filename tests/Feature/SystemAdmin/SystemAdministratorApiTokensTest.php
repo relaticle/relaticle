@@ -55,7 +55,7 @@ it('clears the plaintext token from component state once the "shown once" modal 
     expect((string) $component->get('plainTextToken'))->not->toBeEmpty();
 
     // The "showCreatedToken" modal has no submit action (modalSubmitAction(false)),
-    // so "Done"/Escape/backdrop all resolve to unmountAction() — never the ->after()
+    // so "Done"/Escape/backdrop all resolve to unmountAction(), never the ->after()
     // hook that used to live on the action, which never actually ran.
     $component->call('unmountAction')
         ->assertSet('plainTextToken', '');

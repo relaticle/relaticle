@@ -3,6 +3,12 @@
 declare(strict_types=1);
 
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\BaseCreateTool;
+use App\Mcp\Tools\BaseDeleteTool;
+use App\Mcp\Tools\BaseListTool;
+use App\Mcp\Tools\BaseShowTool;
+use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\GetPeopleTool;
@@ -10,21 +16,31 @@ use App\Mcp\Tools\People\ListPeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Scopes\TeamScope;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 
-beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
-});
+mutates(
+    BaseCreateTool::class,
+    BaseDeleteTool::class,
+    BaseListTool::class,
+    BaseShowTool::class,
+    BaseUpdateTool::class,
+    CreatePeopleTool::class,
+    DeletePeopleTool::class,
+    GetPeopleTool::class,
+    ListPeopleTool::class,
+    SerializesRelatedModels::class,
+    UpdatePeopleTool::class,
+);
 
-afterEach(function () {
-    People::clearBootedModels();
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('can get a person by ID', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Jane Doe']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Jane Doe']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetPeopleTool::class, ['id' => $person->id])
@@ -33,7 +49,7 @@ it('can get a person by ID', function (): void {
 });
 
 it('can update a person via MCP tool', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Old Name']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old Name']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(UpdatePeopleTool::class, [
@@ -46,8 +62,26 @@ it('can update a person via MCP tool', function (): void {
     expect($person->refresh()->name)->toBe('New Name');
 });
 
+it('allows an update to resubmit its own unique custom-field value', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdatePeopleTool::class, [
+            'id' => $person->id,
+            'custom_fields' => ['emails' => ['unique@example.com']],
+        ])
+        ->assertOk();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdatePeopleTool::class, [
+            'id' => $person->id,
+            'custom_fields' => ['emails' => ['unique@example.com']],
+        ])
+        ->assertOk();
+});
+
 it('can delete a person via MCP tool', function (): void {
-    $person = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Jane Doe']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Jane Doe']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(DeletePeopleTool::class, [
@@ -59,26 +93,26 @@ it('can delete a person via MCP tool', function (): void {
     expect($person->refresh()->trashed())->toBeTrue();
 });
 
-describe('team scoping', function () {
-    beforeEach(function () {
-        People::addGlobalScope(new TeamScope);
+describe('workspace scoping', function (): void {
+    beforeEach(function (): void {
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
-    it('scopes people to current team', function (): void {
-        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Team::factory())->create([
-            'name' => 'Other Team Person',
+    it('scopes people to current workspace', function (): void {
+        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Workspace::factory())->create([
+            'name' => 'Other Workspace Person',
         ]));
-        $ownPerson = People::factory()->recycle([$this->user, $this->team])->create(['name' => 'Own Team Person']);
+        $ownPerson = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Workspace Person']);
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListPeopleTool::class)
             ->assertOk()
-            ->assertSee('Own Team Person')
-            ->assertDontSee('Other Team Person');
+            ->assertSee('Own Workspace Person')
+            ->assertDontSee('Other Workspace Person');
     });
 
-    it('cannot update a person from another team', function (): void {
-        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Team::factory())->create());
+    it('cannot update a person from another workspace', function (): void {
+        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Workspace::factory())->create());
 
         RelaticleServer::actingAs($this->user)
             ->tool(UpdatePeopleTool::class, [
@@ -88,8 +122,8 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot delete a person from another team', function (): void {
-        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Team::factory())->create());
+    it('cannot delete a person from another workspace', function (): void {
+        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Workspace::factory())->create());
 
         RelaticleServer::actingAs($this->user)
             ->tool(DeletePeopleTool::class, [
@@ -98,8 +132,8 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('cannot get a person from another team', function (): void {
-        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Team::factory())->create());
+    it('cannot get a person from another workspace', function (): void {
+        $otherPerson = People::withoutEvents(fn () => People::factory()->for(Workspace::factory())->create());
 
         RelaticleServer::actingAs($this->user)
             ->tool(GetPeopleTool::class, [
@@ -108,10 +142,10 @@ describe('team scoping', function () {
             ->assertHasErrors(['not found']);
     });
 
-    it('rejects company_id from another team when creating person', function (): void {
-        $otherTeam = Team::factory()->create();
+    it('rejects company_id from another workspace when creating person', function (): void {
+        $otherWorkspace = Workspace::factory()->create();
         $otherCompany = Company::withoutEvents(fn () => Company::factory()->create([
-            'team_id' => $otherTeam->id,
+            'workspace_id' => $otherWorkspace->id,
         ]));
 
         RelaticleServer::actingAs($this->user)

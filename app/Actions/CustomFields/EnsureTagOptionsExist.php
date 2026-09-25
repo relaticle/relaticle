@@ -13,7 +13,7 @@ use Illuminate\Support\Collection;
  *
  * Gated to field types that accept arbitrary values AND own an option list
  * (tags-input). Email/phone/link also accept arbitrary values but own no
- * option list, so they are excluded — see CustomField::promotesValuesToOptions().
+ * option list, so they are excluded. See CustomField::promotesValuesToOptions().
  */
 final readonly class EnsureTagOptionsExist
 {
@@ -53,13 +53,15 @@ final readonly class EnsureTagOptionsExist
             }
 
             try {
-                $field->options()->create([
+                // Promoting a typed tag is not a schema edit: the record's own change row
+                // already names the value, so the option it implies stays out of the log.
+                activity()->withoutLogging(fn (): mixed => $field->options()->create([
                     $tenantKey => $field->{$tenantKey},
                     'name' => $value,
                     'sort_order' => ++$sortOrder,
-                ]);
+                ]));
             } catch (UniqueConstraintViolationException) {
-                // A concurrent import/edit created this option first — the option
+                // A concurrent import/edit created this option first. The option
                 // now exists, so treat it as a no-op rather than failing the row.
             }
 

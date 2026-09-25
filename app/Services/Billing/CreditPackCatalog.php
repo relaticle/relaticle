@@ -8,7 +8,7 @@ namespace App\Services\Billing;
  * The prepaid credit packs that can actually be bought right now.
  *
  * A pack whose Stripe price is not configured is not purchasable, so it must
- * not be offered anywhere — otherwise "Add credits" and "Buy more credits"
+ * not be offered anywhere. Otherwise "Add credits" and "Buy more credits"
  * lead to a billing page with nothing to buy.
  */
 final readonly class CreditPackCatalog

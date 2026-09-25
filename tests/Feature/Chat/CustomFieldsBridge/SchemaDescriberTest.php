@@ -13,17 +13,16 @@ beforeEach(function (): void {
 });
 
 it('describes the system-seeded task custom fields with type hints', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $description = resolve(CustomFieldsSchemaDescriber::class)
-        ->describe($user->currentTeam, 'task');
+        ->describe($user->currentWorkspace, 'task');
 
     expect($description)
         ->toContain('Available custom fields')
         ->toContain('due_date')
         ->toContain('date-time')
         ->toContain('ISO 8601')
-        ->toContain('status')
-        ->toContain('single-choice')
+        ->toContain('status (select')
         ->toContain('"To do"')
         ->toContain('"In progress"')
         ->toContain('"Done"')
@@ -32,24 +31,71 @@ it('describes the system-seeded task custom fields with type hints', function ()
 });
 
 it('returns a stable, sorted listing so the description is cache-friendly', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $describer = resolve(CustomFieldsSchemaDescriber::class);
 
-    $first = $describer->describe($user->currentTeam, 'task');
-    $second = $describer->describe($user->currentTeam, 'task');
+    $first = $describer->describe($user->currentWorkspace, 'task');
+    $second = $describer->describe($user->currentWorkspace, 'task');
 
     expect($first)->toBe($second);
 });
 
 it('returns an empty marker when the entity has no custom fields for the tenant', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     CustomField::query()
-        ->where('tenant_id', $user->currentTeam->getKey())
+        ->where('tenant_id', $user->currentWorkspace->getKey())
         ->where('entity_type', 'task')
         ->delete();
 
     $description = resolve(CustomFieldsSchemaDescriber::class)
-        ->describe($user->currentTeam, 'task');
+        ->describe($user->currentWorkspace, 'task');
 
     expect($description)->toBe('No custom fields are defined for this entity type.');
+});
+
+it('lists a deactivated field separately from the settable codes', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    CustomField::query()
+        ->where('tenant_id', $user->currentWorkspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'priority')
+        ->update(['active' => false]);
+
+    $description = resolve(CustomFieldsSchemaDescriber::class)
+        ->describe($user->currentWorkspace, 'task');
+
+    [$settablePart, $inactivePart] = explode('INACTIVE', $description, 2);
+
+    expect($settablePart)->not->toContain('priority')
+        ->and($inactivePart)->toContain('priority');
+});
+
+it('describes a record field as record ids and a multi-select field as option labels or ids', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
+
+    foreach ([['linked_company', 'Linked Company', 'record', 'company'], ['markets', 'Markets', 'multi-select', null]] as [$code, $name, $type, $lookup]) {
+        CustomField::query()->create([
+            'tenant_id' => $workspaceId,
+            'entity_type' => 'task',
+            'code' => $code,
+            'name' => $name,
+            'type' => $type,
+            'lookup_type' => $lookup,
+            'sort_order' => 60,
+            'validation_rules' => [],
+            'active' => true,
+            'system_defined' => false,
+        ]);
+    }
+
+    $lines = collect(explode("\n", resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, 'task')));
+
+    expect($lines->first(fn (string $line): bool => str_contains($line, 'linked_company')))
+        ->toContain('linked_company (record')
+        ->toContain('array of record IDs of the lookup entity; records must belong to this workspace')
+        ->and($lines->first(fn (string $line): bool => str_contains($line, 'markets')))
+        ->toContain('markets (multi-select')
+        ->toContain('array of option labels or IDs');
 });

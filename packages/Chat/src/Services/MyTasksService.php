@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Filament\Resources\TaskResource;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +22,7 @@ final readonly class MyTasksService
     /**
      * @return Collection<int, MyTaskItem>
      */
-    public function forUser(User $user, Team $team): Collection
+    public function forUser(User $user, Workspace $workspace): Collection
     {
         /**
          * "Overdue" and "today" are claims about the user's calendar, not the server's:
@@ -38,12 +38,12 @@ final readonly class MyTasksService
         $startOfToday = Date::now($timezone)->startOfDay()->utc();
         $startOfDayAfter = Date::now($timezone)->startOfDay()->addDay()->utc();
 
-        $meta = $this->resolveFieldMetadata($team);
+        $meta = $this->resolveFieldMetadata($workspace);
         $dueFieldId = $meta->dueFieldId;
 
         $query = DB::table('tasks as t')
             ->join('task_user as tu', 'tu.task_id', '=', 't.id')
-            ->where('t.team_id', $team->getKey())
+            ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
             ->when($meta->doneOptionId !== null, function (Builder $query) use ($meta): void {
@@ -77,7 +77,7 @@ final readonly class MyTasksService
             ->limit(self::MAX_ITEMS)
             ->get();
 
-        $tasksIndexUrl = TaskResource::getUrl('index', ['tenant' => $team]);
+        $tasksIndexUrl = TaskResource::getUrl('index', ['tenant' => $workspace]);
 
         return $rows->map(function (object $row) use ($tasksIndexUrl, $startOfToday, $startOfDayAfter): MyTaskItem {
             $dueAt = $row->due_at !== null ? Date::parse($row->due_at) : null;
@@ -91,10 +91,21 @@ final readonly class MyTasksService
                 id: (string) $row->id,
                 title: (string) $row->title,
                 dueAt: $dueAt,
-                severity: $dueAt instanceof Carbon ? $this->severity($dueAt, $startOfToday, $startOfDayAfter) : null,
+                severity: $dueAt instanceof CarbonImmutable ? $this->severity($dueAt, $startOfToday, $startOfDayAfter) : null,
                 editUrl: $editUrl,
             );
         })->values();
+    }
+
+    /**
+     * Whether the tenant still has a `Done` status option to complete a task into.
+     *
+     * Reuses the same memoized lookup as the list query, so the dashboard can hide
+     * a completion control that would fail on every click.
+     */
+    public function hasDoneOption(Workspace $workspace): bool
+    {
+        return $this->resolveFieldMetadata($workspace)->doneOptionId !== null;
     }
 
     /**
@@ -105,9 +116,9 @@ final readonly class MyTasksService
      * application container so concurrent dashboard renders within the same
      * request reuse the result instead of refiring three lookups each time.
      */
-    private function resolveFieldMetadata(Team $team): MyTasksFieldMetadata
+    private function resolveFieldMetadata(Workspace $workspace): MyTasksFieldMetadata
     {
-        $cacheKey = MyTasksFieldMetadata::class.':'.$team->getKey();
+        $cacheKey = MyTasksFieldMetadata::class.':'.$workspace->getKey();
 
         if (app()->bound($cacheKey)) {
             /** @var MyTasksFieldMetadata $cached */
@@ -121,7 +132,7 @@ final readonly class MyTasksService
                 $join->on('opt.custom_field_id', '=', 'cf.id')
                     ->where('opt.name', '=', 'Done');
             })
-            ->where('cf.tenant_id', $team->getKey())
+            ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')
             ->whereIn('cf.code', ['due_date', 'status'])
             ->selectRaw(implode(', ', [
@@ -142,7 +153,7 @@ final readonly class MyTasksService
         return $meta;
     }
 
-    private function severity(Carbon $dueAt, Carbon $startOfToday, Carbon $startOfDayAfter): string
+    private function severity(CarbonImmutable $dueAt, CarbonImmutable $startOfToday, CarbonImmutable $startOfDayAfter): string
     {
         if ($dueAt->lt($startOfToday)) {
             return 'overdue';
@@ -157,7 +168,7 @@ final readonly class MyTasksService
 }
 
 /**
- * @internal Memoization holder for resolved custom-field IDs per team.
+ * @internal Memoization holder for resolved custom-field IDs per workspace.
  */
 final readonly class MyTasksFieldMetadata
 {

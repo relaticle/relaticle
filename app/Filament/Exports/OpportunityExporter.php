@@ -24,8 +24,8 @@ final class OpportunityExporter extends BaseExporter
                 ->label(__('filament/exports.columns.company')),
             ExportColumn::make('contact.name')
                 ->label(__('filament/exports.columns.contact_person')),
-            ExportColumn::make('team.name')
-                ->label(__('filament/exports.columns.team')),
+            ExportColumn::make('workspace.name')
+                ->label(__('filament/exports.columns.workspace')),
             ExportColumn::make('creator.name')
                 ->label(__('filament/exports.columns.creator')),
             ExportColumn::make('notes_count')

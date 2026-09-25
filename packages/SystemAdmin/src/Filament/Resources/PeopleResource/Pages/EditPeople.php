@@ -6,11 +6,11 @@ namespace Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages;
 
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
-use Filament\Resources\Pages\EditRecord;
 use Override;
+use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource;
 
-final class EditPeople extends EditRecord
+final class EditPeople extends EditCustomerRecord
 {
     protected static string $resource = PeopleResource::class;
 

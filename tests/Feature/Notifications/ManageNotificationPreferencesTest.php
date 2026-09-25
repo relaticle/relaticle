@@ -10,7 +10,7 @@ use App\Models\User;
 use Livewire\Livewire;
 
 it('hydrates cells and the digest toggle from defaults', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageNotificationPreferences::class)
@@ -20,7 +20,7 @@ it('hydrates cells and the digest toggle from defaults', function (): void {
 });
 
 it('persists a matrix cell instantly when toggled', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageNotificationPreferences::class)
@@ -30,7 +30,7 @@ it('persists a matrix cell instantly when toggled', function (): void {
 });
 
 it('persists the digest toggle instantly', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Livewire::test(ManageNotificationPreferences::class)
@@ -40,10 +40,10 @@ it('persists the digest toggle instantly', function (): void {
 });
 
 it('renders the standalone notifications page', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($user)
-        ->get(NotificationPreferences::getUrl(tenant: $user->personalTeam()))
+        ->get(NotificationPreferences::getUrl(tenant: $user->personalWorkspace()))
         ->assertOk()
         ->assertSee('Daily digest')
         ->assertSee('Task Assignments');

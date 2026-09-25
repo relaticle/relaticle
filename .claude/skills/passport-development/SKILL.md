@@ -95,15 +95,10 @@ Create clients with the appropriate flag for the grant type:
 
 ```bash
 php artisan passport:client              # Authorization code
-
 php artisan passport:client --public     # PKCE (no secret)
-
 php artisan passport:client --client     # Client credentials
-
 php artisan passport:client --personal   # Personal access tokens
-
 php artisan passport:client --device     # Device authorization
-
 ```
 
 Additional flags: `--name=`, `--redirect_uri=`, `--provider=`.
@@ -182,11 +177,8 @@ Passport::actingAsClient($client, ['scope1']);
 
 ```bash
 php artisan passport:purge              # Purge revoked & expired
-
 php artisan passport:purge --revoked    # Only revoked
-
 php artisan passport:purge --expired    # Only expired
-
 ```
 
 Schedule `passport:purge` for regular expired token clean-up.

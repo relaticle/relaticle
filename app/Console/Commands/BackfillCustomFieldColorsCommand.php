@@ -17,7 +17,7 @@ use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 #[Description('Backfill colors for existing custom field options (Task status/priority and Opportunity stages)')]
 #[Signature('custom-fields:backfill-colors
-                            {--team= : Specific team ID to backfill (optional)}
+                            {--workspace= : Specific workspace ID to backfill (optional)}
                             {--dry-run : Show what would be updated without making changes}')]
 final class BackfillCustomFieldColorsCommand extends Command
 {
@@ -29,7 +29,7 @@ final class BackfillCustomFieldColorsCommand extends Command
         $this->info('🎨 Backfilling custom field colors...');
 
         $dryRun = $this->option('dry-run');
-        $specificTeam = $this->option('team');
+        $specificWorkspace = $this->option('workspace');
 
         if ($dryRun) {
             $this->warn('🔍 DRY RUN MODE - No changes will be made');
@@ -41,8 +41,8 @@ final class BackfillCustomFieldColorsCommand extends Command
             ->whereIn('entity_type', [Task::class, Opportunity::class])
             ->where('type', 'select');
 
-        if ($specificTeam) {
-            $query->where('tenant_id', $specificTeam);
+        if ($specificWorkspace) {
+            $query->where('tenant_id', $specificWorkspace);
         }
 
         $fields = $query->get();
@@ -59,7 +59,7 @@ final class BackfillCustomFieldColorsCommand extends Command
                 continue;
             }
 
-            $this->info("Processing: {$field->name} for {$field->entity_type} (Team {$field->tenant_id})");
+            $this->info("Processing: {$field->name} for {$field->entity_type} (Workspace {$field->tenant_id})");
 
             // Enable colors on the field if not already enabled
             if (! $field->settings->enable_option_colors) {

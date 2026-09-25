@@ -12,12 +12,12 @@ mutates(ProposalDisplayBuilder::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
-    $this->user = User::factory()->withPersonalTeam()->create();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
 });
 
 it('builds company display with title, name row, and custom link rows', function (): void {
     $linkedinField = CustomField::query()
-        ->where('tenant_id', $this->user->currentTeam->getKey())
+        ->where('tenant_id', $this->user->currentWorkspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'linkedin')
         ->first();
@@ -86,12 +86,12 @@ it('does not duplicate custom rows when existingFields already has a type-bearin
 
     $linkedinRows = collect($display['fields'])->filter(fn (array $r): bool => ($r['label'] ?? '') === 'LinkedIn')->values()->all();
 
-    expect($linkedinRows)->toHaveCount(0);
+    expect($linkedinRows)->toBeEmpty();
 });
 
 it('does not duplicate a custom row when the stored display row carries no type key', function (): void {
     $linkedinField = CustomField::query()
-        ->where('tenant_id', $this->user->currentTeam->getKey())
+        ->where('tenant_id', $this->user->currentWorkspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'linkedin')
         ->first();

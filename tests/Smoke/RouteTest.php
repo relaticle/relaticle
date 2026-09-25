@@ -32,7 +32,6 @@ const SMOKE_EXCLUDED_ROUTES = [
     'email-verification/verify/*',
     'filament/exports/*/download',
     'filament/imports/*/failed-rows/download',
-    'team-invitations/*',
     'password-reset/*',
     'reset-password/*',
     'discord',
@@ -111,7 +110,7 @@ it('smoke: all GET routes return non-500 response', function (string $uri): void
         'api.github.com/*' => Http::response(['stargazers_count' => 0], 200),
     ]);
 
-    $this->actingAs(User::factory()->withTeam()->create());
+    $this->actingAs(User::factory()->withWorkspace()->create());
 
     $this->get($uri)->assertNotServerError();
 })->with(smokeTestableRoutes());

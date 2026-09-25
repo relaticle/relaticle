@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Http\Resources\V1\NoteResource;
 use App\Http\Resources\V1\OpportunityResource;
 use App\Http\Resources\V1\PeopleResource;
 use App\Http\Resources\V1\TaskResource;
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
-use App\Models\Task;
+use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\User;
 use App\Support\CanonicalRecordUrl;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -24,28 +22,16 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Name;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
 #[Name('fetch')]
+#[Title('Fetch CRM Record')]
 #[Description('Fetch a single CRM record by its canonical URL. Pair with the search tool for ChatGPT Company Knowledge citations.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class FetchTool extends Tool
 {
-    use Concerns\ChecksTokenAbility;
-
-    /** @var array<string, array{0: class-string<Model>, 1: class-string<JsonResource>}> */
-    private const array TYPE_MAP = [
-        'company' => [Company::class, CompanyResource::class],
-        'person' => [People::class, PeopleResource::class],
-        'opportunity' => [Opportunity::class, OpportunityResource::class],
-        'task' => [Task::class, TaskResource::class],
-        'note' => [Note::class, NoteResource::class],
-    ];
+    use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}
 
@@ -53,6 +39,15 @@ final class FetchTool extends Tool
     {
         return [
             'url' => $schema->string()->description('Canonical record URL produced by the search tool, or any Relaticle record URL copied from the browser.')->required(),
+        ];
+    }
+
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'type' => $schema->string()->required(),
+            'url' => $schema->string()->required(),
+            'data' => $schema->object()->required(),
         ];
     }
 
@@ -71,15 +66,22 @@ final class FetchTool extends Tool
 
         $parsed = $this->urls->parse((string) $validated['url']);
 
-        if ($parsed === null || ! isset(self::TYPE_MAP[$parsed['type']])) {
+        if ($parsed === null) {
             return Response::error("URL [{$validated['url']}] is not a recognized record URL.");
         }
 
-        $type = $parsed['type'];
+        $entity = $parsed['entity'];
         $id = $parsed['id'];
-        [$modelClass, $resourceClass] = self::TYPE_MAP[$type];
 
-        /** @var class-string<Model> $modelClass */
+        $resourceClass = match ($entity) {
+            CrmEntity::Company => CompanyResource::class,
+            CrmEntity::People => PeopleResource::class,
+            CrmEntity::Opportunity => OpportunityResource::class,
+            CrmEntity::Task => TaskResource::class,
+            CrmEntity::Note => NoteResource::class,
+        };
+
+        $modelClass = $entity->model();
         $model = $modelClass::query()->find($id);
 
         if (! $model instanceof Model) {
@@ -96,13 +98,12 @@ final class FetchTool extends Tool
         $resource = new $resourceClass($model);
 
         /** @var array<string, mixed> $envelope */
-        $envelope = json_decode((string) $resource->toJson(), true);
+        $envelope = (array) json_decode((string) $resource->toJson(), flags: JSON_THROW_ON_ERROR);
 
-        /** @var array<string, mixed> $data */
-        $data = $envelope['data'] ?? $envelope;
+        $data = $envelope['data'] ?? (object) $envelope;
 
         return Response::structured([
-            'type' => $type,
+            'type' => $entity->urlType(),
             'url' => $validated['url'],
             'data' => $data,
         ]);

@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\WhoAmiTool;
 use App\Models\User;
+use Illuminate\Testing\Fluent\AssertableJson;
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->personalTeam();
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->personalWorkspace();
 });
 
 it('returns current user info', function (): void {
@@ -19,16 +21,31 @@ it('returns current user info', function (): void {
         ->assertSee($this->user->email);
 });
 
-it('returns current team info', function (): void {
+it('returns current workspace info', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(WhoAmiTool::class)
         ->assertOk()
-        ->assertSee($this->team->name);
+        ->assertSee($this->workspace->name);
 });
 
-it('returns team members', function (): void {
+it('returns the caller\'s role and what it allows in the workspace', function (): void {
     $member = User::factory()->create();
-    $this->team->users()->attach($member);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+
+    RelaticleServer::actingAs($member->fresh())
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('workspace.role', 'Member')
+            ->where('workspace.capabilities', fn (mixed $capabilities): bool => collect($capabilities)->contains('records.create')
+                && ! collect($capabilities)->contains('members.manage'))
+            ->etc());
+});
+
+it('returns workspace members', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member);
 
     RelaticleServer::actingAs($this->user)
         ->tool(WhoAmiTool::class)

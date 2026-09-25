@@ -30,11 +30,9 @@ trait WithImportStore
 
     protected function import(): Import
     {
-        if ($this->import === null) {
-            $this->import = Import::query()
-                ->forTeam($this->getCurrentTeamId() ?? '')
-                ->findOrFail($this->storeId);
-        }
+        $this->import ??= Import::query()
+            ->forWorkspace($this->getCurrentWorkspaceId() ?? '')
+            ->findOrFail($this->storeId);
 
         return $this->import;
     }
@@ -55,7 +53,7 @@ trait WithImportStore
         return $store;
     }
 
-    private function getCurrentTeamId(): ?string
+    private function getCurrentWorkspaceId(): ?string
     {
         $tenant = filament()->getTenant();
 

@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Stripe\ApiRequestor;
@@ -17,7 +17,7 @@ mutates(Billing::class);
 /**
  * Stripe's SDK talks HTTP directly, so the only way to exercise the real
  * checkout path offline is to hand it a client that answers with a canned
- * session. Everything above it — Cashier, the action, the Livewire method —
+ * session. Everything above it (Cashier, the action, the Livewire method)
  * runs for real.
  */
 function fakeStripeCheckoutSession(string $url): void
@@ -58,19 +58,19 @@ beforeEach(function (): void {
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
-    /** @var Team $team */
-    $team = $user->currentTeam;
-    $team->forceFill([
+    /** @var Workspace $workspace */
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill([
         'hosted_free_grandfathered_at' => now(),
         'plan' => Plan::Free,
         'stripe_id' => 'cus_test_fake',
     ])->save();
 
     $this->actingAs($user);
-    Filament::setTenant($team);
-    $this->team = $team;
+    Filament::setTenant($workspace);
+    $this->workspace = $workspace;
 });
 
 afterEach(function (): void {
@@ -97,7 +97,7 @@ it('redirects the owner to the Stripe checkout url when buying a credit pack', f
 
 it('redirects the owner to the Stripe billing portal', function (): void {
     fakeStripeCheckoutSession('https://billing.stripe.com/p/session/test');
-    $this->team->forceFill(['plan' => Plan::Pro])->save();
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
 
     livewire(Billing::class)
         ->call('managePortal')

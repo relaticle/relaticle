@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Features\Billing;
 use App\Http\Requests\ContactRequest;
 use App\Mail\NewContactSubmissionMail;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\View\View;
+use Laravel\Pennant\Feature;
 
 final readonly class ContactController
 {
-    public function show(): View
+    public function show(Request $request): View
     {
-        return view('contact');
+        return view('contact', [
+            'enterpriseInquiry' => $request->query('plan') === 'enterprise' && Feature::active(Billing::class),
+        ]);
     }
 
     public function store(ContactRequest $request): RedirectResponse

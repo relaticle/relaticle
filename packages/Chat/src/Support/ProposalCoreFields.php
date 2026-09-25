@@ -8,17 +8,22 @@ namespace Relaticle\Chat\Support;
  * Single source of truth for which keys are "core" (first-class entity columns,
  * not custom fields) on a chat create-proposal record, per entity type. Both the
  * server-side editor (ProposalEditor) and the docked card (ProposalCard) split
- * core from custom fields the same way — keep that knowledge here so the two
+ * core from custom fields the same way, so keep that knowledge here and the two
  * sites can never drift.
  */
 final readonly class ProposalCoreFields
 {
     /**
-     * The entity's primary title column: `title` for task/note, `name` otherwise.
+     * The entity's primary title column: `title` for task/note, `email` for an
+     * invitation (which has no name at all), `name` otherwise.
      */
     public static function titleKey(string $entityType): string
     {
-        return in_array($entityType, ['task', 'note'], true) ? 'title' : 'name';
+        return match (true) {
+            in_array($entityType, ['task', 'note'], true) => 'title',
+            $entityType === 'workspace_invitations' => 'email',
+            default => 'name',
+        };
     }
 
     /**
@@ -32,6 +37,10 @@ final readonly class ProposalCoreFields
 
         if ($entityType === 'company') {
             return [$titleKey, 'account_owner_id'];
+        }
+
+        if ($entityType === 'workspace_invitations') {
+            return [$titleKey, 'role'];
         }
 
         return [$titleKey];

@@ -13,7 +13,7 @@ use Filament\Widgets\WidgetConfiguration;
 use Relaticle\SystemAdmin\Filament\Widgets\PlatformGrowthStatsWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\RecordDistributionChartWidget;
 use Relaticle\SystemAdmin\Filament\Widgets\SignupTrendChartWidget;
-use Relaticle\SystemAdmin\Filament\Widgets\TopTeamsTableWidget;
+use Relaticle\SystemAdmin\Filament\Widgets\TopWorkspacesTableWidget;
 
 final class Dashboard extends BaseDashboard
 {
@@ -38,7 +38,7 @@ final class Dashboard extends BaseDashboard
             PlatformGrowthStatsWidget::class,
             SignupTrendChartWidget::class,
             RecordDistributionChartWidget::class,
-            TopTeamsTableWidget::class,
+            TopWorkspacesTableWidget::class,
         ];
     }
 

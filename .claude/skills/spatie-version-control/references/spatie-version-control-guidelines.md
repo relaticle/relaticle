@@ -74,7 +74,6 @@ Create the new branch before resetting and checking it out. Do not do this to pu
 ```bash
 git branch my-branch
 git reset --hard HEAD~3 # OR git reset --hard <commit>
-
 git checkout my-branch
 ```
 

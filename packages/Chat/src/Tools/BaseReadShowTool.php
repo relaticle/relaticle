@@ -6,13 +6,17 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\CustomFieldType;
 use App\Models\User;
+use App\Support\PlainText;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
+use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
 use Relaticle\CustomFields\Models\CustomFieldValue;
@@ -41,7 +45,7 @@ abstract class BaseReadShowTool implements Tool
      * Custom field types whose values are free-form prose that can run to
      * kilobytes of markup (rich text) or long paragraphs (plain long text).
      * Values on these fields are stripped of markup and capped for included
-     * (related) records — everything else (numbers, dates, booleans, choice
+     * (related) records. Everything else (numbers, dates, booleans, choice
      * labels, short text) passes through untouched. Mirrors the old
      * `RecordContextBuilder::stripHtml()` behaviour.
      *
@@ -49,11 +53,21 @@ abstract class BaseReadShowTool implements Tool
      */
     private const array FREE_TEXT_FIELD_TYPES = [
         CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::MARKDOWN_EDITOR->value,
         CustomFieldType::TEXTAREA->value,
     ];
 
+    /**
+     * Characters kept per free-text value. Shared by the included-record strip
+     * and the record card, so the same field never reads shorter in the payload
+     * the model sees than in the card the user reads.
+     */
     private const int FREE_TEXT_LIMIT = 500;
+
+    /**
+     * Fields carried by the `record_card` display block. The model still reads
+     * the full `attributes`/`included` payload; the card is a summary.
+     */
+    private const int CARD_FIELD_LIMIT = 8;
 
     /** @return class-string<Model> */
     abstract protected function modelClass(): string;
@@ -92,6 +106,8 @@ abstract class BaseReadShowTool implements Tool
             'id' => $schema->string()->description("The {$label} ID to retrieve.")->required(),
         ];
 
+        $fields['lookup'] = $schema->boolean()->description('Set true when you call this only to get ids for another tool call: the user then sees no card. Leave unset when the user asked to see the record.');
+
         $includes = array_keys($this->availableIncludes());
 
         if ($includes !== []) {
@@ -117,16 +133,16 @@ abstract class BaseReadShowTool implements Tool
         $id = $request->string('id');
         $modelClass = $this->modelClass();
         $model = $modelClass::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($id)
             ->first();
 
         if (! $model instanceof Model) {
-            return (string) json_encode(['error' => "{$this->entityLabel()} with ID [{$id}] not found."]);
+            return (string) json_encode(['error' => "{$this->entityLabel()} with ID [{$id}] not found."], JSON_UNESCAPED_SLASHES);
         }
 
         if ($user->cannot('view', $model)) {
-            return (string) json_encode(['error' => "You do not have permission to view this {$this->entityLabel()}."]);
+            return (string) json_encode(['error' => "You do not have permission to view this {$this->entityLabel()}."], JSON_UNESCAPED_SLASHES);
         }
 
         $model->loadMissing($this->eagerLoad());
@@ -140,7 +156,7 @@ abstract class BaseReadShowTool implements Tool
 
             return (string) json_encode([
                 'error' => 'Unknown include(s): '.implode(', ', $unknown).'. Valid values for this tool: '.($valid === '' ? '(none)' : $valid).'.',
-            ]);
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         /** @var class-string<JsonResource> $resourceClass */
@@ -149,20 +165,85 @@ abstract class BaseReadShowTool implements Tool
         $payload = $this->flattenResource(new $resourceClass($model));
 
         $id = (string) $model->getKey();
-        $ref = resolve(RecordReferenceResolver::class)->resolve($this->citationType(), $id);
+        $resolver = resolve(RecordReferenceResolver::class);
+        $ref = $resolver->resolve($this->citationType(), $id);
+        $url = $ref !== null ? $resolver->referenceUrl($this->citationType(), $id) : null;
 
         return (string) json_encode(
             $this->localiseDatetimes(
                 array_merge(
                     $payload,
                     $this->extraPayload($model),
-                    ['url' => $ref['url'] ?? null],
+                    ['url' => $url],
                     $this->buildIncluded($model, $requestedIncludes, $user),
+                    filter_var($request['lookup'] ?? false, FILTER_VALIDATE_BOOL)
+                        ? []
+                        : ['display_block' => $this->buildDisplayBlock($user, $model, $url)],
                 ),
                 $user,
             ),
-            JSON_PRETTY_PRINT,
+            JSON_UNESCAPED_SLASHES,
         );
+    }
+
+    /**
+     * The presentation envelope the chat UI renders as a record card. Mirrors
+     * what the Filament VIEW page shows for this tenant, so chat and the CRM
+     * never disagree about which fields represent a record. Presentation only:
+     * SupersededAwareConversationStore strips it from the replayed history.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildDisplayBlock(User $user, Model $model, ?string $url): array
+    {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
+            $model,
+            resolve(DisplayFieldSelector::class)->cardFields($user->currentWorkspace, $this->citationType()),
+            self::FREE_TEXT_LIMIT,
+        );
+
+        return [
+            'block' => 'record_card',
+            'title' => $this->cardTitle($model),
+            'type' => $this->citationType(),
+            'url' => $url,
+            'fields' => array_map(
+                static function (array $row): array {
+                    $field = [
+                        'label' => $row['label'],
+                        'value' => $row['value'],
+                        'type' => $row['type'],
+                    ];
+
+                    // Choice and link fields carry their members as a list so the
+                    // card paints real chips and real hrefs rather than splitting
+                    // the joined string back apart in the browser.
+                    if (isset($row['values'])) {
+                        $field['values'] = $row['values'];
+                    }
+
+                    return $field;
+                },
+                array_slice($rows, 0, self::CARD_FIELD_LIMIT),
+            ),
+        ];
+    }
+
+    /**
+     * The card heading. Every CRM entity labels itself with `name` or `title`;
+     * the entity label is the last resort for a record with neither set.
+     */
+    private function cardTitle(Model $model): string
+    {
+        foreach (['name', 'title'] as $attribute) {
+            $value = $model->getAttribute($attribute);
+
+            if (is_string($value) && $value !== '') {
+                return $value;
+            }
+        }
+
+        return $this->entityLabel();
     }
 
     /**
@@ -229,11 +310,16 @@ abstract class BaseReadShowTool implements Tool
         $included = [];
 
         foreach ($includes as $relationName) {
-            $model->loadCount($relationName);
+            // Scoped like the load below it: an unscoped count would report a
+            // cross-workspace related record the items list then omits, so the same
+            // relation would show two different totals here and in a list row.
+            $model->loadCount([$relationName => function (Builder $query) use ($user): void {
+                $query->whereBelongsTo($user->currentWorkspace);
+            }]);
             $model->load([$relationName => function (Relation $query) use ($user): void {
                 $orderColumn = $query->getRelated()->getQualifiedCreatedAtColumn();
 
-                $query->whereBelongsTo($user->currentTeam)
+                $query->whereBelongsTo($user->currentWorkspace)
                     ->with(self::CUSTOM_FIELD_RELATION)
                     ->latest($orderColumn)
                     ->limit(self::INCLUDE_LIMIT);
@@ -270,10 +356,10 @@ abstract class BaseReadShowTool implements Tool
      * Strip HTML and cap the length of free-text custom field values on an
      * included (related) record. Ten related notes with kilobytes of
      * rich-text body each would otherwise blow up the tool payload that gets
-     * persisted to `tool_results` and replayed on every subsequent turn.
+     * persisted with the turn and replayed on every subsequent turn.
      *
      * Only applied to included records, not the primary record a tool call
-     * targets — a direct "get this note" call is the user asking for that
+     * targets. A direct "get this note" call is the user asking for that
      * note's full content, and should return it verbatim.
      *
      * @param  array<string, mixed>  $payload
@@ -327,8 +413,6 @@ abstract class BaseReadShowTool implements Tool
 
     private function truncateFreeText(string $html): string
     {
-        $text = strip_tags($html);
-
-        return Str::limit(trim((string) preg_replace('/\s+/', ' ', $text)), self::FREE_TEXT_LIMIT);
+        return Str::limit(PlainText::fromHtml($html), self::FREE_TEXT_LIMIT);
     }
 }

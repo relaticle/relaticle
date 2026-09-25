@@ -1,19 +1,19 @@
 # Relaticle agent skills
 
-Repo-local skills for Claude Code (and compatible agents). Loaded on demand — only the
+Repo-local skills for Claude Code (and compatible agents). They load on demand, so only the
 one-line description rides in session context.
 
 ## The business-review suite
 
 | Skill | Role |
 |---|---|
-| `business-review` | **The active reviewer (v3)** — panel-of-QAs engine: environment discovery, capability preflight, blast-radius tiering, journey synthesis, persona walks, regression-ledger sweep, adversarial verification, substance-gated verdict, fix mode. Invoked via `/business-review`. |
+| `business-review` | **The active reviewer (v3).** A panel-of-QAs engine: environment discovery, capability preflight, blast-radius tiering, journey synthesis, persona walks, regression-ledger sweep, adversarial verification, substance-gated verdict, fix mode. Invoked via `/business-review`. |
 | `agent-browser-relaticle` | Browser cookbook for this app (panel URL derivation, login flows, Filament/Livewire `$wire` patterns, env hazards). All facts are dated cached hints that self-heal. |
 | `screenshot-with-callout` | Evidence-quality screenshot discipline (annotate → verify-crop → shoot → read-back). Vendored from the maintainer's dotfiles so every contributor has it; keep in sync when the upstream copy improves. |
 
 ### Prerequisites (machine setup)
 
-- **`agent-browser` CLI** on PATH — the browser automation driver every review uses
+- **`agent-browser` CLI** on PATH, the browser automation driver every review uses
   (`agent-browser --help` to verify).
 - **Laravel Herd** serving this checkout (`herd sites`), with the seeded local logins
   (`php artisan db:seed --class=LocalSeeder`).

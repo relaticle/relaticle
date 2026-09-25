@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Models;
 
-use App\Models\Concerns\HasTeam;
+use App\Models\Concerns\HasWorkspace;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
@@ -17,7 +17,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 
 /**
  * @property string $id
- * @property string $team_id
+ * @property string $workspace_id
  * @property string $user_id
  * @property string|null $conversation_id
  * @property string|null $idempotency_key
@@ -29,7 +29,7 @@ use Relaticle\Chat\Enums\AiCreditType;
  * @property array<string, mixed>|null $metadata
  */
 #[Fillable([
-    'team_id',
+    'workspace_id',
     'user_id',
     'conversation_id',
     'idempotency_key',
@@ -47,8 +47,8 @@ final class AiCreditTransaction extends Model
     /** @use HasFactory<Factory<static>> */
     use HasFactory;
 
-    use HasTeam;
     use HasUlids;
+    use HasWorkspace;
 
     /** @return array<string, string> */
     protected function casts(): array

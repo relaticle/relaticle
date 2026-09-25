@@ -18,8 +18,8 @@ mutates(BaseWriteDeleteTool::class);
 beforeEach(function (): void {
     Bus::fake();
 
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->user->switchTeam($this->user->ownedTeams()->first());
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
     $this->actingAs($this->user);
 
     config(['chat.max_batch_size' => 3]);
@@ -54,7 +54,7 @@ it('accepts a create request exactly at the batch cap', function (): void {
 });
 
 it('rejects a delete request that exceeds the batch cap and creates no PendingAction', function (): void {
-    $tasks = Task::factory()->count(4)->for($this->user->currentTeam)->create();
+    $tasks = Task::factory()->count(4)->for($this->user->currentWorkspace)->create();
     $ids = $tasks->pluck('id')->map(fn (mixed $id): string => (string) $id)->all();
 
     $json = app(DeleteTaskTool::class)->handle(new Request(['ids' => $ids]));
@@ -66,7 +66,7 @@ it('rejects a delete request that exceeds the batch cap and creates no PendingAc
 });
 
 it('accepts a delete request exactly at the batch cap', function (): void {
-    $tasks = Task::factory()->count(3)->for($this->user->currentTeam)->create();
+    $tasks = Task::factory()->count(3)->for($this->user->currentWorkspace)->create();
     $ids = $tasks->pluck('id')->map(fn (mixed $id): string => (string) $id)->all();
 
     $json = app(DeleteTaskTool::class)->handle(new Request(['ids' => $ids]));

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
-use Laravel\Jetstream\Events\TeamCreated;
 use Relaticle\ImportWizard\Commands\CleanupImportsCommand;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -15,10 +15,10 @@ use Relaticle\ImportWizard\Store\ImportStore;
 mutates(CleanupImportsCommand::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
 
-    $this->user = User::factory()->withTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->imports = [];
 });
 
@@ -31,8 +31,8 @@ afterEach(function (): void {
 
 function createTestImport(object $context, ImportStatus $status, string $updatedAt): Import
 {
-    $import = Import::create([
-        'team_id' => (string) $context->team->id,
+    $import = Import::factory()->create([
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => ImportEntityType::People,
         'file_name' => 'test.csv',

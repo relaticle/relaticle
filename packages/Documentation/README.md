@@ -26,10 +26,10 @@ php artisan vendor:publish --tag=documentation-config
 
 # Install dependencies
 cd packages/Documentation
-npm install
+pnpm install
 
 # Build assets
-npm run build
+pnpm run build
 ```
 
 ## Development
@@ -39,7 +39,7 @@ To work on the Documentation package's frontend:
 ```bash
 # Start the Vite development server
 cd packages/Documentation
-npm run dev
+pnpm run dev
 ```
 
 ## Asset Architecture

@@ -22,7 +22,7 @@ final class ActivationRateWidget extends StatsOverviewWidget
 
     protected int|string|array $columnSpan = 'full';
 
-    protected ?string $pollingInterval = null;
+    protected ?string $pollingInterval = '60s';
 
     protected function getStats(): array
     {
@@ -106,14 +106,11 @@ final class ActivationRateWidget extends StatsOverviewWidget
      */
     private function buildSignupsSparkline(CarbonImmutable $start, CarbonImmutable $end): array
     {
-        $days = (int) $start->diffInDays($end);
-        $points = min($days, 7);
+        [$points, $segmentSeconds] = $this->getSparklineSegments($start, $end);
 
         if ($points <= 0) {
             return [0];
         }
-
-        $segmentSeconds = ($days / $points) * 86400;
         $bucketExpr = $this->bucketExpression();
 
         $rows = User::query()
@@ -134,14 +131,11 @@ final class ActivationRateWidget extends StatsOverviewWidget
      */
     private function buildActivatedSparkline(CarbonImmutable $start, CarbonImmutable $end): array
     {
-        $days = (int) $start->diffInDays($end);
-        $points = min($days, 7);
+        [$points, $segmentSeconds] = $this->getSparklineSegments($start, $end);
 
         if ($points <= 0) {
             return [0];
         }
-
-        $segmentSeconds = ($days / $points) * 86400;
         $unionParts = [];
         $bindings = [];
 

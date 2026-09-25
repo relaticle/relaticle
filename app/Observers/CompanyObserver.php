@@ -33,8 +33,10 @@ final readonly class CompanyObserver
             return;
         }
 
+        // The custom-fields package registers the tenant relation under the name
+        // `team`, so the relation has to be named rather than guessed.
         $domainField = $company->customFields()
-            ->whereBelongsTo($company->team)
+            ->whereBelongsTo($company->workspace, 'team')
             ->where('code', CompanyField::DOMAINS->value)
             ->first();
 

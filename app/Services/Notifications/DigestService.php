@@ -6,13 +6,14 @@ namespace App\Services\Notifications;
 
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
-use App\Data\DigestTeamSection;
+use App\Data\DigestWorkspaceSection;
+use App\Enums\CreationSource;
 use App\Filament\Resources\TaskResource;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
@@ -26,8 +27,8 @@ final readonly class DigestService
 
         $sections = [];
 
-        foreach ($user->allTeams() as $team) {
-            $section = $this->sectionForTeam($user, $team, $startOfToday, $windowEnd);
+        foreach ($user->allWorkspaces() as $workspace) {
+            $section = $this->sectionForWorkspace($user, $workspace, $startOfToday, $windowEnd);
 
             if (! $section->isEmpty()) {
                 $sections[] = $section;
@@ -37,12 +38,12 @@ final readonly class DigestService
         return new DigestPayload($sections);
     }
 
-    private function sectionForTeam(User $user, Team $team, Carbon $startOfToday, Carbon $windowEnd): DigestTeamSection
+    private function sectionForWorkspace(User $user, Workspace $workspace, CarbonImmutable $startOfToday, CarbonImmutable $windowEnd): DigestWorkspaceSection
     {
-        $meta = $this->resolveFieldMetadata($team);
+        $meta = $this->resolveFieldMetadata($workspace);
 
         if ($meta['due_field_id'] === null) {
-            return new DigestTeamSection($team->name, [], []);
+            return new DigestWorkspaceSection($workspace->name, [], []);
         }
 
         $rows = DB::table('tasks as t')
@@ -52,9 +53,10 @@ final readonly class DigestService
                     ->where('due.entity_type', '=', 'task')
                     ->where('due.custom_field_id', '=', $meta['due_field_id']);
             })
-            ->where('t.team_id', $team->getKey())
+            ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
+            ->where('t.creation_source', '!=', CreationSource::SYSTEM->value)
             ->whereNotNull('due.datetime_value')
             ->where('due.datetime_value', '<', $windowEnd)
             ->when($meta['done_option_id'] !== null, function (Builder $query) use ($meta): void {
@@ -71,7 +73,7 @@ final readonly class DigestService
             ->select(['t.id', 't.title', 'due.datetime_value as due_at'])
             ->get();
 
-        $tasksIndexUrl = TaskResource::getUrl(name: 'index', parameters: ['tenant' => $team], panel: 'app');
+        $tasksIndexUrl = TaskResource::getUrl(name: 'index', parameters: ['tenant' => $workspace], panel: 'app');
 
         $overdue = [];
         $upcoming = [];
@@ -95,20 +97,20 @@ final readonly class DigestService
             }
         }
 
-        return new DigestTeamSection($team->name, $overdue, $upcoming);
+        return new DigestWorkspaceSection($workspace->name, $overdue, $upcoming);
     }
 
     /**
      * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string}
      */
-    private function resolveFieldMetadata(Team $team): array
+    private function resolveFieldMetadata(Workspace $workspace): array
     {
         $row = DB::table('custom_fields as cf')
             ->leftJoin('custom_field_options as opt', function (JoinClause $join): void {
                 $join->on('opt.custom_field_id', '=', 'cf.id')
                     ->where('opt.name', '=', 'Done');
             })
-            ->where('cf.tenant_id', $team->getKey())
+            ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')
             ->whereIn('cf.code', ['due_date', 'status'])
             ->selectRaw(implode(', ', [

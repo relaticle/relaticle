@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
+use App\Filament\Components\Tables\RecordChipColumn;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -14,7 +15,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Relaticle\CustomFields\Facades\CustomFields;
 
@@ -50,7 +50,7 @@ final class PeopleRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
-                TextColumn::make('name'),
+                RecordChipColumn::make('name'),
 
                 ...CustomFields::table()->forModel($table->getModel())->columns(),
             ])

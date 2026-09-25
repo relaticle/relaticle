@@ -4,11 +4,13 @@
     /** @var \Relaticle\ActivityLog\Timeline\TimelineEntry $entry */
     /** @var \Relaticle\ActivityLog\Support\ActivityLogSummary $summary */
     /** @var list<array{label: string, old: string, new: string}> $rows */
+    /** @var string|null $importFile */
+    /** @var string|null $viaSource */
 
     $count = count($rows);
     // Only updates (and custom-field-only saves, whose event isn't a known operation)
     // read as "changed" with a diff. Created/deleted/restored keep their own verb and
-    // never dump the row's attribute set — on create that is every logged column,
+    // never dump the row's attribute set. On create that is every logged column,
     // including internal system fields the user never touched.
     $isChange = $summary->operation === ActivityLogOperation::Updated
         || ($summary->operation === null && $count > 0);
@@ -53,6 +55,14 @@
                 {{ \Illuminate\Support\Str::of($summary->summarySentence)->after($summary->causerName)->trim() }}
             @endif
         </p>
+
+        @if (filled($importFile ?? null))
+            <p class="text-[12px] leading-5 text-gray-500 dark:text-gray-400">{{ __('workspaces.activity.via_import', ['file' => $importFile]) }}</p>
+        @endif
+
+        @if (filled($viaSource ?? null))
+            <p class="text-[12px] leading-5 text-gray-500 dark:text-gray-400">{{ $viaSource }}</p>
+        @endif
 
         @if ($hasDiff)
             <div x-show="open" x-cloak x-collapse class="mt-2">

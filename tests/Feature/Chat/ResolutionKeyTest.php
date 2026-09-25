@@ -6,15 +6,15 @@ use App\Models\User;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 
 it('derives a stable resolution key from the turn id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
 
     $job = new ProcessChatMessage(
         user: $user,
-        team: $team,
+        workspace: $workspace,
         message: 'hi',
         conversationId: 'c-1',
-        resolved: ['provider' => null, 'model' => 'auto'],
+        resolved: ['provider' => null, 'model' => 'auto', 'id' => null, 'source' => 'auto'],
         turnId: '01TURNAAAAAAAAAAAAAAAAAAAA',
     );
 

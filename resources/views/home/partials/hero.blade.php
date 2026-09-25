@@ -1,6 +1,6 @@
-<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-20 md:pt-40 md:pb-32 bg-white dark:bg-gray-950 overflow-hidden">
+<section x-data="heroTabs()" x-init="init()" @resize.window="positionIndicator()" class="relative pt-32 pb-16 md:pt-40 md:pb-20 bg-white dark:bg-gray-950 overflow-hidden">
 
-    {{-- Background system — layered depth --}}
+    {{-- Background system: layered depth --}}
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]"></div>
 
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative">
@@ -9,11 +9,31 @@
             {{-- ── Badge (GitHub) ── --}}
             <div class="flex justify-center">
                 <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
+                   aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
                    class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
                     <x-ri-github-fill class="h-3.5 w-3.5"/>
-                    <span class="text-gray-900 dark:text-white font-semibold">{{ $formattedGithubStars }}+ stars</span>
-                    <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
                     <span>Open Source</span>
+                    <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
+                    <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
+                        <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
+                            <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
+                            <span class="col-start-1 row-start-1 inline-flex justify-self-end">
+                                @foreach(str_split($formattedGithubStars) as $character)
+                                    @if(ctype_digit($character))
+                                        <span class="inline-block h-[1em] w-[1ch] overflow-hidden">
+                                            <span data-github-star-digit="{{ $character }}" class="flex flex-col text-center leading-none" style="transform: translateY(-{{ (int) $character }}em)">
+                                                @for($digit = 0; $digit <= (int) $character; $digit++)
+                                                    <span class="block h-[1em] leading-none">{{ $digit }}</span>
+                                                @endfor
+                                            </span>
+                                        </span>
+                                    @else
+                                        <span>{{ $character }}</span>
+                                    @endif
+                                @endforeach
+                            </span>
+                        </span>+ stars
+                    </span>
                     <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
                 </a>
             </div>
@@ -27,13 +47,13 @@
 
                 <p class="mt-6 sm:mt-7 text-[15px] sm:text-lg text-gray-500 dark:text-gray-400 max-w-xl mx-auto leading-relaxed tracking-[-0.01em]">
                     Open-source, self-hosted, and human-first.<br class="hidden sm:block"/>
-                    Built-in AI chat plus 32 MCP tools for external agents.
+                    Built-in AI chat plus 39 MCP tools for external agents.
                 </p>
             </div>
 
             {{-- ── CTA Buttons ── --}}
             <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto max-w-sm sm:max-w-none mx-auto -mt-2 px-2 sm:px-0">
-                <x-marketing.button href="{{ route('register') }}" class="group">
+                <x-marketing.button href="{{ route('login') }}" class="group">
                     Start for free
                 </x-marketing.button>
 
@@ -116,58 +136,73 @@
                             </div>
                         </div>
 
-                        {{-- Tab panels — grid stacking for Safari-smooth crossfade.
-                             min-height matches the live chat panel so switching to a
-                             shorter (16:10) image tab can't collapse the mockup frame. --}}
+                        {{-- Tab panels use grid stacking for a Safari-smooth crossfade.
+                             min-height matches the live chat panel so switching to an
+                             image tab can't collapse the mockup frame.
+
+                             The image tabs FILL that frame (object-cover) rather than
+                             sitting in it at their own aspect: the frame is a constant
+                             826x640 from `lg` up, so the screenshots are captured at
+                             that ratio and land pixel-exact there. Below `lg` the frame
+                             narrows and finally turns portrait, and cover crops the
+                             right edge instead of leaving the dead band under the
+                             image that a plain `h-auto` used to (measured: 124px at
+                             desktop, over half the frame on a phone). object-left-top
+                             keeps the crop predictable -- you always see the app from
+                             its top-left corner, which is what the alt text
+                             describes. --}}
                         <div class="relative grid overflow-hidden min-h-[520px] sm:min-h-[580px] md:min-h-[640px]">
-                            {{-- AI Agent tab (default — featured) --}}
-                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1">
+                            {{-- AI Agent tab (default, featured) --}}
+                            {{-- min-w-0: a grid item defaults to min-width:auto, so the
+                                 chat panel's own table would size the column to its
+                                 intrinsic width and push the transcript past the frame. --}}
+                            <div id="panel-ai-agent" role="tabpanel" aria-labelledby="tab-ai-agent" x-ref="panel-ai-agent" class="col-start-1 row-start-1 min-w-0">
                                 @include('home.partials.hero-agent-preview')
                             </div>
 
                             {{-- Pipeline tab --}}
                             <div id="panel-pipeline" role="tabpanel" aria-labelledby="tab-pipeline" x-ref="panel-pipeline" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
                                             data-dark-srcset="{{ asset('images/app-pipeline-preview-dark-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-dark-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-dark-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview-dark.webp') }} 1440w"
                                             srcset="{{ asset('images/app-pipeline-preview-380w.webp') }} 380w, {{ asset('images/app-pipeline-preview-640w.webp') }} 640w, {{ asset('images/app-pipeline-preview-832w.webp') }} 832w, {{ asset('images/app-pipeline-preview.webp') }} 1440w"
-                                            sizes="(max-width: 640px) 380px, (max-width: 1024px) 640px, 832px"
+                                            sizes="(max-width: 640px) 750px, 842px"
                                             type="image/webp">
                                     <img data-light-src="{{ asset('images/app-pipeline-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-pipeline-preview-dark.png') }}"
                                          src="{{ asset('images/app-pipeline-preview.png') }}"
                                          alt="{{ __('Relaticle opportunities board with deals grouped into pipeline stages, showing deal value and close date') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-companies" role="tabpanel" aria-labelledby="tab-companies" x-ref="panel-companies" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-companies-preview.webp') }}" data-dark-srcset="{{ asset('images/app-companies-preview-dark.webp') }}" srcset="{{ asset('images/app-companies-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-companies-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-companies-preview-dark.png') }}"
                                          src="{{ asset('images/app-companies-preview.png') }}"
                                          alt="{{ __('Relaticle companies list showing account owner, ICP status, and website domain for each company') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
 
                             <div id="panel-custom-fields" role="tabpanel" aria-labelledby="tab-custom-fields" x-ref="panel-custom-fields" class="col-start-1 row-start-1 invisible absolute inset-0 w-full">
-                                <picture>
+                                <picture class="block h-full w-full">
                                     <source data-light-srcset="{{ asset('images/app-custom-fields-preview.webp') }}" data-dark-srcset="{{ asset('images/app-custom-fields-preview-dark.webp') }}" srcset="{{ asset('images/app-custom-fields-preview.webp') }}" type="image/webp">
                                     <img data-light-src="{{ asset('images/app-custom-fields-preview.png') }}"
                                          data-dark-src="{{ asset('images/app-custom-fields-preview-dark.png') }}"
                                          src="{{ asset('images/app-custom-fields-preview.png') }}"
                                          alt="{{ __('Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities') }}"
-                                         class="hero-preview-image w-full h-auto"
+                                         class="hero-preview-image h-full w-full object-cover object-left-top"
                                          width="1440"
-                                         height="900"
+                                         height="1116"
                                          loading="lazy">
                                 </picture>
                             </div>
@@ -192,15 +227,68 @@
             ease: [0.16, 1, 0.3, 1],
             duration: 0.35,
             slideDistance: 40,
+            githubStarsAnimationState: 'idle',
+            githubStarsAnimationRequestedAt: null,
 
             init() {
                 this.positionIndicator();
                 this.updateImages();
                 this.observeDarkMode();
+                this.animateGithubStars();
                 if (this.activeTab === 'ai-agent') {
                     var self = this;
                     setTimeout(function() { self.$dispatch('hero-chat-animate'); }, 50);
                 }
+            },
+
+            animateGithubStars() {
+                if (this.githubStarsAnimationState === 'complete') return;
+
+                var element = this.$refs.githubStars;
+                if (!element) {
+                    this.githubStarsAnimationState = 'complete';
+                    return;
+                }
+
+                if (this.githubStarsAnimationRequestedAt === null) {
+                    this.githubStarsAnimationRequestedAt = performance.now();
+                }
+
+                if (this.reducedMotion || document.visibilityState !== 'visible') {
+                    this.githubStarsAnimationState = 'complete';
+                    return;
+                }
+
+                if (typeof window.animate !== 'function') {
+                    if (this.githubStarsAnimationState === 'waiting') return;
+
+                    this.githubStarsAnimationState = 'waiting';
+                    window.addEventListener('motion-ready', () => {
+                        if (performance.now() - this.githubStarsAnimationRequestedAt > 250) {
+                            this.githubStarsAnimationState = 'complete';
+                            return;
+                        }
+
+                        this.githubStarsAnimationState = 'idle';
+                        this.animateGithubStars();
+                    }, { once: true });
+                    return;
+                }
+
+                this.githubStarsAnimationState = 'complete';
+                element.querySelectorAll('[data-github-star-digit]').forEach(function(reel, index) {
+                    var digit = Number(reel.dataset.githubStarDigit);
+                    if (digit === 0) return;
+
+                    window.animate(reel, {
+                        transform: ['translateY(0em)', 'translateY(-' + digit + 'em)'],
+                    }, {
+                        type: 'spring',
+                        visualDuration: 0.48,
+                        bounce: 0,
+                        delay: index * 0.03,
+                    });
+                });
             },
 
             positionIndicator() {

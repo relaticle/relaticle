@@ -46,16 +46,16 @@ final class ChatConversation extends Page
 
     public function getTitle(): string
     {
-        return $this->conversationTitle ?? 'New chat';
+        return $this->conversationTitle ?? __('New chat');
     }
 
     public function getHeading(): string
     {
-        return $this->conversationTitle ?? 'New chat';
+        return $this->conversationTitle ?? __('New chat');
     }
 
     public static function getNavigationLabel(): string
     {
-        return 'Chat';
+        return __('Chat');
     }
 }

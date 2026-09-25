@@ -12,9 +12,12 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
+use App\Support\LikePattern;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -23,35 +26,43 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\ListConversations;
+use Relaticle\Chat\Actions\MarkAttachmentSent;
 use Relaticle\Chat\Actions\RenameConversation;
+use Relaticle\Chat\Actions\StoreImportHandoff;
 use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
-use Relaticle\Chat\Support\LikePattern;
+use Relaticle\Chat\Support\AttachedRows;
+use Relaticle\Chat\Support\ChatAttachment;
+use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
-use Relaticle\Chat\Support\TitleSanitizer;
+use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class ChatController
 {
     /**
-     * How many of a conversation's opening user messages may trigger a titling
-     * attempt. More than one because an opener like "hey" carries no topic to
-     * name — the titler declines it and the next message gets a turn.
+     * Cap on in-conversation search hits. Deliberately small: the overlay is a
+     * jump-to affordance, not a results page.
      */
-    private const int TITLE_ATTEMPT_TURNS = 3;
+    private const int SEARCH_MATCH_LIMIT = 20;
 
     public function __construct(
         private CreditService $creditService,
         private AiModelResolver $modelResolver,
         private ModelRegistry $registry,
         private TipTapDocumentParser $documentParser,
+        private StoreImportHandoff $importHandoffs,
+        private MarkAttachmentSent $markAttachmentSent,
+        private CreateConversation $createConversation,
     ) {}
 
     /** @return list<string> */
@@ -65,13 +76,13 @@ final readonly class ChatController
      * Resolved through the panel route so it stays correct whether the app panel
      * is served from a path prefix or its own subdomain.
      */
-    private function billingUrl(Team $team): ?string
+    private function billingUrl(Workspace $workspace): ?string
     {
         if (! Feature::active(Billing::class)) {
             return null;
         }
 
-        return BillingPage::getUrl(panel: 'app', tenant: $team);
+        return BillingPage::getUrl(panel: 'app', tenant: $workspace);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -80,6 +91,7 @@ final readonly class ChatController
             'document' => ['required', 'array'],
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
+            'attachment_id' => ['nullable', 'string', 'uuid'],
             'page_context' => ['nullable', 'array'],
             'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
             'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
@@ -87,11 +99,16 @@ final readonly class ChatController
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        $parsed = $this->documentParser->parse($validated['document'], $team);
+        $conversation ??= $validated['conversation_id'] ?? null;
 
-        if ($parsed['text'] === '') {
+        abort_if($conversation === null, 422, 'conversation_id is required.');
+
+        $parsed = $this->documentParser->parse($validated['document'], $workspace);
+        $attachment = $this->resolveAttachment($validated['attachment_id'] ?? null, $user, $conversation);
+
+        if ($parsed['text'] === '' && ! $attachment instanceof ChatAttachment) {
             throw ValidationException::withMessages([
                 'document' => 'Message is empty.',
             ]);
@@ -103,10 +120,6 @@ final readonly class ChatController
             ]);
         }
 
-        $conversation ??= $validated['conversation_id'] ?? null;
-
-        abort_if($conversation === null, 422, 'conversation_id is required.');
-
         $existing = DB::table('agent_conversations')->where('id', $conversation)->first();
 
         abort_if($existing === null, 404);
@@ -114,53 +127,71 @@ final readonly class ChatController
         abort_if(
             $existing->participant_type !== $user->getMorphClass()
                 || $existing->participant_id !== (string) $user->getKey()
-                || ($existing->team_id !== null && $existing->team_id !== $team->getKey()),
+                || ($existing->workspace_id !== null && $existing->workspace_id !== $workspace->getKey()),
             403
         );
 
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($team->plan)) {
-                $isFree = $team->plan === Plan::Free;
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($workspace->plan)) {
+                $isFree = $workspace->plan === Plan::Free;
 
                 return response()->json([
                     'error' => 'model_not_allowed',
-                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $team->plan->label()]),
-                    'plan' => $team->plan->value,
+                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
+                    'plan' => $workspace->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
+                    'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
                 ], 403);
             }
         }
 
+        $message = $attachment instanceof ChatAttachment
+            ? AttachedRows::inline($parsed['text'], $attachment)
+            : $parsed['text'];
+
+        if ($message === null) {
+            $stored = $this->importHandoffs->execute($user, $workspace, $conversation, $attachment, $parsed['text'], $validated['document']);
+
+            return response()->json([
+                'status' => 'stored',
+                'conversation_id' => $conversation,
+                'title' => $existing->title,
+                ...$stored,
+            ]);
+        }
+
         $turnId = (string) Str::ulid();
 
-        if (! $this->creditService->reserveCredit($team, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
+        if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
             $balance = AiCreditBalance::query()
-                ->where('team_id', $team->getKey())
+                ->where('workspace_id', $workspace->getKey())
                 ->first();
 
-            $isFree = $team->plan === Plan::Free;
+            $isFree = $workspace->plan === Plan::Free;
             $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
+            // Not $workspace->plan->credits(): a past-due workspace refills at the
+            // Free allowance, so the plan's figure would name credits it never got.
+            $allowance = $this->creditService->allowanceFor($workspace);
 
             return response()->json([
                 'error' => 'credits_exhausted',
-                'message' => "You have used all {$team->plan->credits()} credits for this {$team->plan->label()} plan period.",
-                'plan' => $team->plan->value,
-                'allowance' => $team->plan->credits(),
+                'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
+                'plan' => $workspace->plan->value,
+                'allowance' => $allowance,
                 'reset_at' => $balance?->period_ends_at?->toIso8601String(),
                 'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? $this->billingUrl($team) : null,
-                // A top-up is only offered when a pack can actually be bought —
+                'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
+                // A top-up is only offered when a pack can actually be bought;
                 // otherwise the CTA lands on a billing page with nothing to buy.
                 'top_up_available' => $canTopUp,
-                'top_up_url' => $canTopUp ? $this->billingUrl($team) : null,
+                'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
             ], 402);
         }
 
-        DB::transaction(function () use ($conversation, $user, $team): void {
+        DB::transaction(function () use ($conversation, $user, $workspace): void {
             $row = DB::table('agent_conversations')
                 ->where('id', $conversation)
                 ->lockForUpdate()
@@ -176,30 +207,50 @@ final readonly class ChatController
                 403
             );
 
-            if ($row->team_id !== null) {
+            if ($row->workspace_id !== null) {
                 return;
             }
 
             DB::table('agent_conversations')
                 ->where('id', $conversation)
-                ->update(['team_id' => $team->getKey(), 'updated_at' => now()]);
+                ->update(['workspace_id' => $workspace->getKey(), 'updated_at' => now()]);
         });
 
         $resolved = $this->modelResolver->resolve($user, $validated['model'] ?? null);
+        $pageContext = $this->resolvePageContext($validated['page_context'] ?? null, $user);
 
-        $this->maybeTitleConversation($conversation, (string) $existing->title, $parsed['text'], $resolved['provider']);
+        $this->maybeTitleConversation(
+            $conversation,
+            $attachment instanceof ChatAttachment && $parsed['text'] === '' ? $attachment->name() : $parsed['text'],
+            $resolved['provider'],
+            $pageContext,
+        );
+
+        TurnPresence::begin(
+            $conversation,
+            turnId: $turnId,
+            message: $parsed['text'],
+            document: $validated['document'],
+            mentions: $parsed['mentions'],
+            pageContext: $pageContext,
+        );
 
         dispatch(new ProcessChatMessage(
             user: $user,
-            team: $team,
-            message: $parsed['text'],
+            workspace: $workspace,
+            message: $message,
             conversationId: $conversation,
             resolved: $resolved,
             mentions: $parsed['mentions'],
             document: $validated['document'],
-            pageContext: $this->resolvePageContext($validated['page_context'] ?? null, $user),
+            pageContext: $pageContext,
             turnId: $turnId,
+            attachment: $attachment?->meta(),
         ));
+
+        if ($attachment instanceof ChatAttachment) {
+            $this->markAttachmentSent->execute($attachment);
+        }
 
         return response()->json([
             'status' => 'processing',
@@ -207,34 +258,50 @@ final readonly class ChatController
         ]);
     }
 
-    /**
-     * Title the conversation from the message that just arrived, racing the turn
-     * rather than waiting for it — a chat that streams for a minute should not sit
-     * in the sidebar under a truncated sentence for that whole minute.
-     *
-     * The dispatch is gated on the stored title still being the provisional one
-     * (the opening message, sanitized). That single condition carries two rules:
-     * a chat the user has named is never re-titled — renaming BEFORE the first
-     * turn used to lose the name, because the current title was passed as the
-     * "provisional" and then matched its own compare-and-swap — and a chat whose
-     * opener carried no topic stays eligible, so the next few messages get a
-     * chance to name it instead of it being stuck on "hey" forever.
-     */
-    private function maybeTitleConversation(string $conversationId, string $currentTitle, string $message, ?string $provider): void
+    // An upload is bound to the conversation it was made in; a message in
+    // another conversation cannot pick it up.
+    private function resolveAttachment(?string $attachmentId, User $user, ?string $conversation = null): ?ChatAttachment
     {
-        $userMessages = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $conversationId)
-            ->where('role', 'user')
-            ->orderBy('id')
-            ->pluck('content');
-
-        if ($userMessages->count() >= self::TITLE_ATTEMPT_TURNS) {
-            return;
+        if ($attachmentId === null) {
+            return null;
         }
 
-        $provisional = TitleSanitizer::clean((string) ($userMessages->first() ?? $message));
+        $attachment = ChatAttachment::find($user, $attachmentId);
 
-        if ($currentTitle !== $provisional) {
+        $usable = $attachment instanceof ChatAttachment
+            && ! $attachment->isSent()
+            && $attachment->fileExists()
+            && ($conversation === null || $attachment->conversationId() === $conversation);
+
+        if (! $usable) {
+            throw ValidationException::withMessages([
+                'attachment_id' => __('That attachment is no longer available. Attach the file again.'),
+            ]);
+        }
+
+        return $attachment;
+    }
+
+    /**
+     * Title the conversation from the message that just arrived, racing the turn
+     * rather than waiting for it. A chat that streams for a minute should not sit
+     * in the sidebar under a truncated sentence for that whole minute.
+     *
+     * ConversationTitleGate decides whether there is anything to do: it returns
+     * the provisional title (the opening message, sanitized) only while the
+     * stored title still IS that, and only for the conversation's first few typed
+     * messages. That single condition carries two rules, a chat the user has
+     * named is never re-titled, and a chat whose opener carried no topic stays
+     * eligible, so the next few messages get a chance to name it instead of it
+     * being stuck on "hey" forever.
+     *
+     * @param  array{type: string, id: string, label: string}|null  $pageContext
+     */
+    private function maybeTitleConversation(string $conversationId, string $message, ?string $provider, ?array $pageContext): void
+    {
+        $provisional = ConversationTitleGate::beforeTurn($conversationId, $message);
+
+        if ($provisional === null) {
             return;
         }
 
@@ -243,6 +310,7 @@ final readonly class ChatController
             provisionalTitle: $provisional,
             message: $message,
             provider: $provider,
+            pageContext: $pageContext,
         ));
     }
 
@@ -250,8 +318,8 @@ final readonly class ChatController
      * Resolve the record the user was viewing when they sent the message.
      *
      * The client payload is untrusted: it names a type and id, and nothing
-     * more. Both are re-resolved here under team scope and the view policy,
-     * exactly as BaseReadShowTool does, so a forged id for another team's
+     * more. Both are re-resolved here under workspace scope and the view policy,
+     * exactly as BaseReadShowTool does, so a forged id for another workspace's
      * record yields null rather than leaking a label.
      *
      * @param  array<string, mixed>|null  $payload
@@ -270,21 +338,17 @@ final readonly class ChatController
             return null;
         }
 
-        $modelClass = match ($type) {
-            'company' => Company::class,
-            'people' => People::class,
-            'opportunity' => Opportunity::class,
-            'task' => Task::class,
-            'note' => Note::class,
-            default => null,
-        };
+        /** @var class-string<Model>|null $modelClass */
+        $modelClass = in_array($type, RecordReferenceResolver::CHIP_TYPES, true)
+            ? Relation::getMorphedModel($type)
+            : null;
 
         if ($modelClass === null) {
             return null;
         }
 
         $record = $modelClass::query()
-            ->whereBelongsTo($user->currentTeam)
+            ->whereBelongsTo($user->currentWorkspace)
             ->whereKey($id)
             ->first();
 
@@ -306,17 +370,19 @@ final readonly class ChatController
         $validated = $request->validate([
             'document' => ['required', 'array'],
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
+            'attachment_id' => ['nullable', 'string', 'uuid'],
         ]);
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
-        abort_if($team === null, 403);
+        abort_if($workspace === null, 403);
 
-        $parsed = $this->documentParser->parse($validated['document'], $team);
+        $parsed = $this->documentParser->parse($validated['document'], $workspace);
+        $attachment = $this->resolveAttachment($validated['attachment_id'] ?? null, $user);
 
-        if ($parsed['text'] === '') {
+        if ($parsed['text'] === '' && ! $attachment instanceof ChatAttachment) {
             throw ValidationException::withMessages([
                 'document' => 'Message is empty.',
             ]);
@@ -328,26 +394,20 @@ final readonly class ChatController
             ]);
         }
 
-        $conversationId = (string) Str::uuid7();
+        $title = $attachment instanceof ChatAttachment && $parsed['text'] === ''
+            ? $attachment->name()
+            : $parsed['text'];
 
-        DB::table('agent_conversations')->insert([
-            'id' => $conversationId,
-            'participant_type' => $user->getMorphClass(),
-            'participant_id' => (string) $user->getKey(),
-            'team_id' => $team->getKey(),
-            'title' => TitleSanitizer::clean($parsed['text']),
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        $conversation = $this->createConversation->execute($user, $workspace, $title, $attachment);
 
-        return response()->json(['conversation_id' => $conversationId]);
+        return response()->json(['conversation_id' => (string) $conversation->getKey()]);
     }
 
     public function cancel(Request $request, string $conversationId): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $row = DB::table('agent_conversations')->where('id', $conversationId)->first();
 
@@ -355,7 +415,7 @@ final readonly class ChatController
         abort_if(
             $row->participant_type !== $user->getMorphClass()
                 || $row->participant_id !== (string) $user->getKey()
-                || ($row->team_id !== null && $row->team_id !== $team->getKey()),
+                || ($row->workspace_id !== null && $row->workspace_id !== $workspace->getKey()),
             404,
         );
 
@@ -369,13 +429,13 @@ final readonly class ChatController
     }
 
     /**
-     * Mark a turn (and everything after it) superseded — the server-truth side
+     * Mark a turn (and everything after it) superseded. This is the server-truth side
      * of Regenerate/Edit. Without this the client splice is a lie: reload
      * resurrects the replaced turns and the model keeps them in its history.
      *
      * anchor_id targets a persisted user message; when the client only has an
      * optimistic (not yet persisted) message it sends anchor_content instead,
-     * which must match the latest user row — a mismatch means that row belongs
+     * which must match the latest typed user row. A mismatch means that row belongs
      * to an OLDER turn (the optimistic one never persisted), and superseding it
      * would hide a good turn, so we refuse and supersede nothing.
      */
@@ -395,7 +455,7 @@ final readonly class ChatController
             $conversation === null
                 || $conversation->participant_type !== $user->getMorphClass()
                 || $conversation->participant_id !== (string) $user->getKey()
-                || ($conversation->team_id !== null && $conversation->team_id !== $user->currentTeam->getKey()),
+                || ($conversation->workspace_id !== null && $conversation->workspace_id !== $user->currentWorkspace->getKey()),
             404,
         );
 
@@ -408,13 +468,18 @@ final readonly class ChatController
                 ->first();
 
             abort_if($anchor === null, 404);
-            abort_if((string) $anchor->role !== 'user', 422, 'Only user messages can anchor a supersede.');
+            abort_unless(
+                AgentConversationMessage::query()->typed()->whereKey($anchorId)->exists(),
+                422,
+                'Only user messages can anchor a supersede.',
+            );
         } else {
-            $anchor = DB::table('agent_conversation_messages')
+            $anchor = AgentConversationMessage::query()
+                ->typed()
                 ->where('conversation_id', $conversationId)
-                ->where('role', 'user')
                 ->whereNull('superseded_at')
                 ->orderByDesc('id')
+                ->toBase()
                 ->first();
 
             if ($anchor === null) {
@@ -437,6 +502,75 @@ final readonly class ChatController
         return response()->json(['superseded' => $superseded]);
     }
 
+    /**
+     * Search within one conversation.
+     *
+     * Scoped through AgentConversationMessage::visibleTo(), the same predicate
+     * set the pager applies, so every id returned here is one the transcript can
+     * actually reach. A hit the pager could never render would send the client's
+     * load-until-found loop all the way to the top of the history and then
+     * report nothing.
+     *
+     * `q` is a user-supplied pattern, so it goes through LikePattern::escape
+     * before the ILIKE: a literal `%` or `_` typed into the search box must
+     * match that character, not act as a wildcard.
+     */
+    public function searchMessages(Request $request, string $conversationId): JsonResponse
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'min:2', 'max:100'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $conversation = DB::table('agent_conversations')->where('id', $conversationId)->first();
+
+        abort_if(
+            $conversation === null
+                || $conversation->participant_type !== $user->getMorphClass()
+                || $conversation->participant_id !== (string) $user->getKey()
+                || ($conversation->workspace_id !== null && $conversation->workspace_id !== $user->current_workspace_id),
+            404,
+        );
+
+        $escaped = LikePattern::escape($validated['q']);
+
+        $matches = AgentConversationMessage::query()
+            ->visibleTo($user, $conversationId)
+            ->where('content', 'ilike', "%{$escaped}%")
+            ->orderByDesc('id')
+            ->limit(self::SEARCH_MATCH_LIMIT)
+            ->toBase()
+            ->get(['id', 'content']);
+
+        return response()->json([
+            'matches' => $matches
+                ->map(fn (object $row): array => [
+                    'message_id' => (string) $row->id,
+                    'snippet' => $this->snippet((string) $row->content, $validated['q']),
+                ])
+                ->values()
+                ->all(),
+        ]);
+    }
+
+    /**
+     * A one-line excerpt centred on the match, for the result row in the search
+     * overlay. Markdown syntax is stripped and whitespace collapsed so a
+     * multi-paragraph assistant answer renders as one readable line instead of
+     * leaking **bold** markers and [label](/r/...) link syntax.
+     */
+    private function snippet(string $content, string $needle): string
+    {
+        $text = preg_replace('/\[([^\]]*)\]\([^)]*\)/', '$1', $content) ?? $content;
+        $text = preg_replace('/[*_`~#]+/', '', $text) ?? $text;
+        $text = Str::squish($text);
+
+        return Str::excerpt($text, Str::squish($needle), ['radius' => 60, 'omission' => '…'])
+            ?? Str::limit($text, 160, '…');
+    }
+
     public function mentions(Request $request, RecordReferenceResolver $resolver): JsonResponse
     {
         $validated = $request->validate([
@@ -448,79 +582,31 @@ final readonly class ChatController
 
         /** @var User $user */
         $user = $request->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $results = collect();
 
-        $results = $results->merge(
-            People::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (People $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (People $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'people', 'url' => $resolver->urlFor('people', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Company::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (Company $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Company $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'company', 'url' => $resolver->urlFor('company', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Opportunity::query()
-                ->whereBelongsTo($team)
-                ->where('name', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN name ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(name) ASC')
-                ->orderBy('name')
-                ->limit($limit)
-                ->get(['id', 'name', 'team_id'])
-                ->filter(fn (Opportunity $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Opportunity $r): array => ['id' => $r->id, 'name' => $r->name, 'type' => 'opportunity', 'url' => $resolver->urlFor('opportunity', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Task::query()
-                ->whereBelongsTo($team)
-                ->where('title', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN title ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(title) ASC')
-                ->orderBy('title')
-                ->limit($limit)
-                ->get(['id', 'title', 'team_id'])
-                ->filter(fn (Task $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Task $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'task', 'url' => $resolver->urlFor('task', (string) $r->id)])
-        );
-
-        $results = $results->merge(
-            Note::query()
-                ->whereBelongsTo($team)
-                ->where('title', 'ilike', "%{$search}%")
-                ->orderByRaw('CASE WHEN title ilike ? THEN 0 ELSE 1 END', ["{$search}%"])
-                ->orderByRaw('LENGTH(title) ASC')
-                ->orderBy('title')
-                ->limit($limit)
-                ->get(['id', 'title', 'team_id'])
-                ->filter(fn (Note $r): bool => $user->can('view', $r))
-                ->values()
-                ->map(fn (Note $r): array => ['id' => $r->id, 'name' => $r->title, 'type' => 'note', 'url' => $resolver->urlFor('note', (string) $r->id)])
-        );
+        foreach ([
+            [People::class, 'name', 'people'],
+            [Company::class, 'name', 'company'],
+            [Opportunity::class, 'name', 'opportunity'],
+            [Task::class, 'title', 'task'],
+            [Note::class, 'title', 'note'],
+        ] as [$modelClass, $column, $type]) {
+            $results = $results->merge(
+                $modelClass::query()
+                    ->whereBelongsTo($workspace)
+                    ->where($column, 'ilike', "%{$search}%")
+                    ->orderByRaw("CASE WHEN {$column} ilike ? THEN 0 ELSE 1 END", ["{$search}%"])
+                    ->orderByRaw("LENGTH({$column}) ASC")
+                    ->orderBy($column)
+                    ->limit($limit)
+                    ->get(['id', $column, 'workspace_id'])
+                    ->filter(fn (Model $r): bool => $user->can('view', $r))
+                    ->values()
+                    ->map(fn (Model $r): array => ['id' => $r->getKey(), 'name' => $r->getAttribute($column), 'type' => $type, 'url' => $resolver->urlFor($type, (string) $r->getKey())])
+            );
+        }
 
         return response()->json(['data' => $results->take(15)->values()]);
     }

@@ -21,7 +21,7 @@ use PHPStan\Type\ObjectType;
  * Keeps authorization off the authorized record's relations.
  *
  * A policy runs once per row, so resolving a relation there costs a query per
- * row — and throws outright once a query hydrates more than one row, because
+ * row, and throws outright once a query hydrates more than one row, because
  * Eloquent only arms its strict lazy-loading guard at that point
  * (Builder::hydrate sets it when count($items) > 1). That makes the defect
  * invisible in any single-record test and fatal on a populated table.
@@ -30,7 +30,7 @@ use PHPStan\Type\ObjectType;
  * authenticated user, which is hydrated on its own and therefore never carries
  * the guard.
  *
- * Nullsafe access (`$record?->team`) is covered too: PHPStan desugars it into a
+ * Nullsafe access (`$record?->workspace`) is covered too: PHPStan desugars it into a
  * plain property fetch on the non-null branch.
  *
  * @implements Rule<PropertyFetch>
@@ -119,7 +119,7 @@ final readonly class RelationAccessInPolicyRule implements Rule
         $shortName = basename(str_replace('\\', '/', $className));
 
         return RuleErrorBuilder::message(
-            "Policy resolves the `{$property}` relation on {$shortName} — authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row."
+            "Policy resolves the `{$property}` relation on {$shortName}: authorize on the foreign key instead. A policy runs once per row, so this costs a query per row and throws once a query hydrates more than one row."
         )
             ->identifier('app.architecture.relationAccessInPolicy')
             ->build();

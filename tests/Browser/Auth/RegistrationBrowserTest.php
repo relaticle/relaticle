@@ -2,30 +2,87 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\Auth\Register;
+use App\Filament\Pages\Auth\Login;
 use App\Models\User;
+use Illuminate\Support\Facades\Http;
+use Laravel\Pennant\Feature;
 
-mutates(Register::class);
+mutates(Login::class);
 
-it('completes a registration after arriving via the login page link', function (): void {
+it('completes a signup from the unified login page', function (): void {
+    config(['honeypot.enabled' => true]);
+
+    $email = 'jane-spa-signup-'.uniqid().'@gmail.com';
+
     $page = $this->visit('/app/login')
-        ->click('a[href*="register"]')
-        ->assertPathContains('/register')
-        ->type('[id="form.name"]', 'Jane Doe')
-        ->type('[id="form.email"]', 'jane-spa-register@gmail.com')
+        ->type('[id="form.email"]', $email);
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->type('[id="form.password"]', 'Password123!');
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertPathIs('/app/email-verification/prompt');
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('completes a signup through the turnstile challenge without showing a widget', function (): void {
+    config([
+        'honeypot.enabled' => true,
+        'relaticle.features.signup_challenge' => true,
+        'services.turnstile.key' => '1x00000000000000000000AA',
+        'services.turnstile.secret' => '1x0000000000000000000000000000000AA',
+    ]);
+    Feature::flushCache();
+    Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true])]);
+
+    $email = 'jane-turnstile-signup-'.uniqid().'@gmail.com';
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $email);
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript('document.querySelector(\'[x-ref="widget"]\').closest(\'.fi-grid-col\').classList.contains(\'fi-hidden\')', true)
+        ->type('[id="form.password"]', 'Password123!');
+
+    $page->wait(3);
+
+    $page->click('button[type="submit"]')
+        ->assertPathIs('/app/email-verification/prompt');
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('holds a submit made before the turnstile token exists and replays it', function (): void {
+    config([
+        'honeypot.enabled' => true,
+        'relaticle.features.signup_challenge' => true,
+        'services.turnstile.key' => '1x00000000000000000000AA',
+        'services.turnstile.secret' => '1x0000000000000000000000000000000AA',
+    ]);
+    Feature::flushCache();
+    Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => true])]);
+
+    $email = 'jane-turnstile-race-'.uniqid().'@gmail.com';
+
+    $page = $this->visit('/app/login')
+        ->type('[id="form.email"]', $email);
+
+    $page->wait(2);
+
+    $page->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
         ->type('[id="form.password"]', 'Password123!')
-        ->type('[id="form.passwordConfirmation"]', 'Password123!');
+        ->click('button[type="submit"]')
+        ->assertPathIs('/app/email-verification/prompt');
 
-    $page->click('button[type="submit"]');
-
-    foreach (range(1, 30) as $attempt) {
-        if ($page->script('window.location.pathname') !== '/app/register') {
-            break;
-        }
-
-        $page->wait(0.5);
-    }
-
-    expect($page->script('window.location.pathname'))->not->toBe('/app/register')
-        ->and(User::where('email', 'jane-spa-register@gmail.com')->exists())->toBeTrue();
+    expect(User::where('email', $email)->exists())->toBeTrue();
 });

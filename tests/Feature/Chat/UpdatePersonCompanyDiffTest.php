@@ -14,15 +14,15 @@ use Relaticle\Chat\Tools\People\UpdatePersonTool;
 mutates(UpdatePersonTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 
     DB::table('agent_conversations')->insert([
         'id' => '019df800-4444-7000-8000-000000000099',
         'participant_type' => 'user',
         'participant_id' => (string) $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -30,20 +30,20 @@ beforeEach(function (): void {
 });
 
 it('proposal display_data contains a Company field when company_id is changed', function (): void {
-    $oldCompany = Company::factory()->for($this->team)->create(['name' => 'Old Corp']);
-    $newCompany = Company::factory()->for($this->team)->create(['name' => 'New Corp']);
-    $person = People::factory()->for($this->team)->for($oldCompany)->create(['name' => 'Jane Doe']);
+    $oldCompany = Company::factory()->for($this->workspace)->create(['name' => 'Old Corp']);
+    $newCompany = Company::factory()->for($this->workspace)->create(['name' => 'New Corp']);
+    $person = People::factory()->for($this->workspace)->for($oldCompany)->create(['name' => 'Jane Doe']);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'company_id' => (string) $newCompany->getKey(),
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -59,19 +59,19 @@ it('proposal display_data contains a Company field when company_id is changed', 
 });
 
 it('proposal display_data does not include Company field when company_id is not changed', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Same Corp']);
-    $person = People::factory()->for($this->team)->for($company)->create(['name' => 'Bob Smith']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Same Corp']);
+    $person = People::factory()->for($this->workspace)->for($company)->create(['name' => 'Bob Smith']);
 
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'name' => 'Robert Smith',
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 
@@ -82,8 +82,8 @@ it('proposal display_data does not include Company field when company_id is not 
 });
 
 it('shows empty old company when person had no company and a new one is assigned', function (): void {
-    $newCompany = Company::factory()->for($this->team)->create(['name' => 'First Corp']);
-    $person = People::factory()->for($this->team)->create([
+    $newCompany = Company::factory()->for($this->workspace)->create(['name' => 'First Corp']);
+    $person = People::factory()->for($this->workspace)->create([
         'name' => 'No Company Person',
         'company_id' => null,
     ]);
@@ -91,13 +91,13 @@ it('shows empty old company when person had no company and a new one is assigned
     $tool = resolve(UpdatePersonTool::class);
     $tool->setConversationId('019df800-4444-7000-8000-000000000099');
 
-    $tool->handle(new Request([
+    $tool->handle(new Request(['records' => [[
         'id' => (string) $person->getKey(),
         'company_id' => (string) $newCompany->getKey(),
-    ]));
+    ]]]));
 
     $pending = PendingAction::query()
-        ->where('team_id', $this->team->getKey())
+        ->where('workspace_id', $this->workspace->getKey())
         ->latest()
         ->firstOrFail();
 

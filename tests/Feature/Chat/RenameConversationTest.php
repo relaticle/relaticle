@@ -10,14 +10,14 @@ use Relaticle\Chat\Http\Controllers\ChatController;
 mutates(RenameConversation::class, ChatController::class);
 
 it('renames a conversation', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-1',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Old title',
         'created_at' => now(),
         'updated_at' => now(),
@@ -34,14 +34,14 @@ it('renames a conversation', function (): void {
 });
 
 it('rejects rename of conversation belonging to another user', function (): void {
-    $owner = User::factory()->withPersonalTeam()->create();
-    $other = User::factory()->withPersonalTeam()->create();
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $other = User::factory()->withPersonalWorkspace()->create();
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-2',
         'participant_type' => 'user',
         'participant_id' => $owner->getKey(),
-        'team_id' => $owner->currentTeam->getKey(),
+        'workspace_id' => $owner->currentWorkspace->getKey(),
         'title' => 'Owner title',
         'created_at' => now(),
         'updated_at' => now(),
@@ -57,14 +57,14 @@ it('rejects rename of conversation belonging to another user', function (): void
 });
 
 it('validates title length', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     DB::table('agent_conversations')->insert([
         'id' => 'conv-rename-3',
         'participant_type' => 'user',
         'participant_id' => $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => 'Title',
         'created_at' => now(),
         'updated_at' => now(),

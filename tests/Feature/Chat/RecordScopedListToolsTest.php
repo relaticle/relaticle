@@ -15,17 +15,17 @@ mutates(ListNotesTool::class);
 mutates(ListTasksTool::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     Auth::guard('web')->setUser($this->user);
 });
 
 it('scopes notes to the record they are attached to', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $globex = Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $globex = Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
 
-    $acmeNote = Note::factory()->for($this->team)->create(['title' => 'Acme discovery call']);
-    $globexNote = Note::factory()->for($this->team)->create(['title' => 'Globex renewal']);
+    $acmeNote = Note::factory()->for($this->workspace)->create(['title' => 'Acme discovery call']);
+    $globexNote = Note::factory()->for($this->workspace)->create(['title' => 'Globex renewal']);
 
     $acme->notes()->attach($acmeNote);
     $globex->notes()->attach($globexNote);
@@ -35,18 +35,18 @@ it('scopes notes to the record they are attached to', function (): void {
         'notable_id' => (string) $acme->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)
         ->toContain('Acme discovery call')
         ->not->toContain('Globex renewal');
 });
 
 it('scopes tasks to the company they are attached to', function (): void {
-    $acme = Company::factory()->for($this->team)->create(['name' => 'Acme']);
-    $globex = Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $globex = Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
 
-    $acmeTask = Task::factory()->for($this->team)->create(['title' => 'Send Acme proposal']);
-    $globexTask = Task::factory()->for($this->team)->create(['title' => 'Chase Globex invoice']);
+    $acmeTask = Task::factory()->for($this->workspace)->create(['title' => 'Send Acme proposal']);
+    $globexTask = Task::factory()->for($this->workspace)->create(['title' => 'Chase Globex invoice']);
 
     $acme->tasks()->attach($acmeTask);
     $globex->tasks()->attach($globexTask);
@@ -55,21 +55,21 @@ it('scopes tasks to the company they are attached to', function (): void {
         'company_id' => (string) $acme->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)
         ->toContain('Send Acme proposal')
         ->not->toContain('Chase Globex invoice');
 });
 
-it('does not leak another team notes through the notable filter', function (): void {
-    $mine = Company::factory()->for($this->team)->create(['name' => 'Mine']);
-    $mineNote = Note::factory()->for($this->team)->create(['title' => 'My note']);
+it('does not leak another workspace notes through the notable filter', function (): void {
+    $mine = Company::factory()->for($this->workspace)->create(['name' => 'Mine']);
+    $mineNote = Note::factory()->for($this->workspace)->create(['title' => 'My note']);
     $mine->notes()->attach($mineNote);
 
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    $otherTeam = $otherUser->currentTeam;
-    $theirs = Company::factory()->for($otherTeam)->create(['name' => 'Theirs']);
-    $theirNote = Note::factory()->for($otherTeam)->create(['title' => 'Their secret note']);
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $otherWorkspace = $otherUser->currentWorkspace;
+    $theirs = Company::factory()->for($otherWorkspace)->create(['name' => 'Theirs']);
+    $theirNote = Note::factory()->for($otherWorkspace)->create(['title' => 'Their secret note']);
     $theirs->notes()->attach($theirNote);
 
     $payload = json_decode(resolve(ListNotesTool::class)->handle(new Request([
@@ -77,6 +77,6 @@ it('does not leak another team notes through the notable filter', function (): v
         'notable_id' => (string) $theirs->getKey(),
     ])), true);
 
-    $titles = array_column(array_column($payload, 'attributes'), 'title');
+    $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
     expect($titles)->not->toContain('Their secret note');
 });

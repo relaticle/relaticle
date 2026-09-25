@@ -35,7 +35,7 @@ final readonly class ChatContextService
      * Livewire XHRs, where request()->route() is Livewire's own update
      * endpoint and never the record page the user is looking at.
      *
-     * The URL is client-supplied, so the resolved record is team-scoped and
+     * The URL is client-supplied, so the resolved record is workspace-scoped and
      * policy-checked here. The send path re-validates independently.
      *
      * @return array{record_type: string|null, record_id: string|null, record_name: string|null}
@@ -51,7 +51,7 @@ final readonly class ChatContextService
         /** @var User|null $user */
         $user = auth()->user();
 
-        if (! $user instanceof User || $user->currentTeam === null) {
+        if (! $user instanceof User || $user->currentWorkspace === null) {
             return $context;
         }
 
@@ -86,7 +86,7 @@ final readonly class ChatContextService
             $modelClass = $info['class'];
 
             $model = $modelClass::query()
-                ->whereBelongsTo($user->currentTeam)
+                ->whereBelongsTo($user->currentWorkspace)
                 ->whereKey($recordId)
                 ->first();
 
@@ -108,49 +108,5 @@ final readonly class ChatContextService
     private function extractRecordId(mixed $recordParam): ?string
     {
         return is_string($recordParam) && $recordParam !== '' ? $recordParam : null;
-    }
-
-    /**
-     * @param  array{record_type: string|null, record_id: string|null, record_name: string|null}  $context
-     * @return array<int, array{label: string, prompt: string}>
-     */
-    public function getSuggestedPrompts(array $context): array
-    {
-        $prompts = [
-            ['label' => 'CRM overview', 'prompt' => 'Give me a summary of my CRM data'],
-            ['label' => 'Overdue tasks', 'prompt' => 'Show my overdue tasks'],
-            ['label' => 'Recent companies', 'prompt' => 'List companies added this week'],
-            ['label' => 'Pipeline summary', 'prompt' => 'Show my opportunity pipeline summary'],
-        ];
-
-        $name = $context['record_name'];
-
-        if (is_string($name) && $name !== '') {
-            $recordPrompts = match ($context['record_type']) {
-                'company' => [
-                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the company {$name}"],
-                    ['label' => 'Find contacts', 'prompt' => "Find contacts at {$name}"],
-                ],
-                'people' => [
-                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the contact {$name}"],
-                    ['label' => 'Recent activity', 'prompt' => "What has happened recently with {$name}?"],
-                ],
-                'opportunity' => [
-                    ['label' => "Summarize {$name}", 'prompt' => "Summarize the opportunity {$name}"],
-                    ['label' => 'Next steps', 'prompt' => "What are the next steps to move {$name} forward?"],
-                ],
-                default => [],
-            };
-
-            array_unshift($prompts, ...$recordPrompts);
-        }
-
-        if ($context['record_type'] === 'task') {
-            array_unshift($prompts,
-                ['label' => 'My tasks', 'prompt' => 'Show all my assigned tasks'],
-            );
-        }
-
-        return array_slice($prompts, 0, 6);
     }
 }

@@ -46,7 +46,7 @@ final class TaskImporter extends BaseImporter
                     'to do', 'todo item', 'activity',
                 ])
                 ->example('Follow up with client')
-                ->icon('heroicon-o-check-circle'),
+                ->icon('heroicon-o-clipboard-document-check'),
         ]);
     }
 

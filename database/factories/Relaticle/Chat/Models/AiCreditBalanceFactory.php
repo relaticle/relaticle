@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories\Relaticle\Chat\Models;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\Chat\Models\AiCreditBalance;
 
@@ -20,14 +20,14 @@ final class AiCreditBalanceFactory extends Factory
      */
     public function definition(): array
     {
-        $team = Team::factory()->create();
-        $allowance = $team->plan->credits();
+        $workspace = Workspace::factory()->create();
+        $allowance = $workspace->plan->credits();
         $used = fake()->numberBetween(0, $allowance);
 
-        $team->aiCreditBalance()->delete();
+        $workspace->aiCreditBalance()->delete();
 
         return [
-            'team_id' => $team->getKey(),
+            'workspace_id' => $workspace->getKey(),
             'credits_remaining' => $allowance - $used,
             'credits_used' => $used,
             'purchased_credits' => 0,

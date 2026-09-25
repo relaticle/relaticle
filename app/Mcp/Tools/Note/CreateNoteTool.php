@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Note;
 
 use App\Actions\Note\CreateNote;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
-use App\Rules\ArrayExistsForTeam;
+use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Create Note')]
 #[Description('Create a new note in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsOpenWorld(false)]
 final class CreateNoteTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreateNote::class;
@@ -27,9 +31,9 @@ final class CreateNoteTool extends BaseCreateTool
         return NoteResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'note';
+        return CrmEntity::Note;
     }
 
     protected function entitySchema(JsonSchema $schema): array
@@ -44,16 +48,16 @@ final class CreateNoteTool extends BaseCreateTool
 
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'title' => ['required', 'string', 'max:255'],
             'company_ids' => ['sometimes', 'array'],
-            'company_ids.*' => ['string', new ArrayExistsForTeam('companies', 'company_ids', $teamId)],
+            'company_ids.*' => ['string', new ArrayExistsForWorkspace('companies', 'company_ids', $workspaceId)],
             'people_ids' => ['sometimes', 'array'],
-            'people_ids.*' => ['string', new ArrayExistsForTeam('people', 'people_ids', $teamId)],
+            'people_ids.*' => ['string', new ArrayExistsForWorkspace('people', 'people_ids', $workspaceId)],
             'opportunity_ids' => ['sometimes', 'array'],
-            'opportunity_ids.*' => ['string', new ArrayExistsForTeam('opportunities', 'opportunity_ids', $teamId)],
+            'opportunity_ids.*' => ['string', new ArrayExistsForWorkspace('opportunities', 'opportunity_ids', $workspaceId)],
         ];
     }
 }

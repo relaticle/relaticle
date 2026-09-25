@@ -63,7 +63,7 @@ return [
             ],
             'infolist' => [
                 'fields' => [
-                    'logo' => [
+                    'name' => [
                         'label' => '',
                     ],
                     'creator' => [

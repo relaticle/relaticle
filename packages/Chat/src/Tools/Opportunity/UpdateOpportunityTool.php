@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\Opportunity;
 
 use App\Actions\Opportunity\UpdateOpportunity;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Models\Company;
-use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Team;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -17,14 +17,16 @@ use Relaticle\Chat\Tools\BaseWriteUpdateTool;
 
 final class UpdateOpportunityTool extends BaseWriteUpdateTool
 {
+    use OperatesOnCrmEntity;
+
     public function description(): string
     {
         return 'Propose updating an existing opportunity/deal, including its linked company and primary contact.';
     }
 
-    protected function modelClass(): string
+    protected function entity(): CrmEntity
     {
-        return Opportunity::class;
+        return CrmEntity::Opportunity;
     }
 
     protected function actionClass(): string
@@ -32,39 +34,41 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         return UpdateOpportunity::class;
     }
 
-    protected function entityType(): string
+    protected function ownedForeignKeys(): array
     {
-        return 'opportunity';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Opportunity';
+        return [
+            'company_id' => Company::class,
+            'contact_id' => People::class,
+        ];
     }
 
     protected function entitySchema(JsonSchema $schema): array
     {
         return [
             'name' => $schema->string()->description('The new opportunity name.'),
-            'company_id' => $schema->string()->description('The new linked company ULID.'),
-            'contact_id' => $schema->string()->description('The new linked primary contact (people) ULID.'),
+            'company_id' => $schema->string()->description('The new linked company ULID. Pass null to unlink the company.'),
+            'contact_id' => $schema->string()->description('The new linked primary contact (people) ULID. Pass null to unlink the contact.'),
         ];
     }
 
     protected function extractActionData(Request $request): array
     {
-        return array_filter([
-            'name' => $request['name'] ?? null,
-            'company_id' => $request['company_id'] ?? null,
-            'contact_id' => $request['contact_id'] ?? null,
-        ], static fn (mixed $v): bool => $v !== null && $v !== '');
+        $data = array_filter(['name' => $request['name'] ?? null], static fn (mixed $v): bool => $v !== null && $v !== '');
+
+        foreach (['company_id', 'contact_id'] as $key) {
+            if (array_key_exists($key, $request->all())) {
+                $data[$key] = $this->stringOrNull($request, $key);
+            }
+        }
+
+        return $data;
     }
 
     protected function buildDisplayData(Request $request, Model $model): array
     {
         /** @var User $user */
         $user = auth()->user();
-        $team = $user->currentTeam;
+        $workspace = $user->currentWorkspace;
 
         $fields = [];
 
@@ -76,21 +80,25 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
             ];
         }
 
-        $newCompanyId = $this->stringOrNull($request, 'company_id');
-        if ($newCompanyId !== null) {
+        if (array_key_exists('company_id', $request->all())) {
+            $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
                 'label' => 'Company',
-                'old' => $this->nameForId($model->getAttribute('company_id'), Company::class, 'name', $team),
-                'new' => $this->nameForId($newCompanyId, Company::class, 'name', $team),
+                'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $workspace),
+                'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $workspace),
+                '_oldValue' => $model->getAttribute('company_id'),
+                '_newValue' => $newCompanyId,
             ];
         }
 
-        $newContactId = $this->stringOrNull($request, 'contact_id');
-        if ($newContactId !== null) {
+        if (array_key_exists('contact_id', $request->all())) {
+            $newContactId = $this->stringOrNull($request, 'contact_id');
             $fields[] = [
                 'label' => 'Contact',
-                'old' => $this->nameForId($model->getAttribute('contact_id'), People::class, 'name', $team),
-                'new' => $this->nameForId($newContactId, People::class, 'name', $team),
+                'old' => $this->recordNames()->name($model->getAttribute('contact_id'), People::class, $workspace),
+                'new' => $newContactId === null ? __('(none)') : $this->recordNames()->name($newContactId, People::class, $workspace),
+                '_oldValue' => $model->getAttribute('contact_id'),
+                '_newValue' => $newContactId,
             ];
         }
 
@@ -106,22 +114,5 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         $value = $request[$key] ?? null;
 
         return is_string($value) && $value !== '' ? $value : null;
-    }
-
-    /**
-     * @param  class-string<Model>  $modelClass
-     */
-    private function nameForId(?string $id, string $modelClass, string $nameAttribute, ?Team $team): string
-    {
-        if ($id === null || $id === '') {
-            return '';
-        }
-
-        $query = $modelClass::query()->whereKey($id);
-        if ($team instanceof Team) {
-            $query->where('team_id', $team->getKey());
-        }
-
-        return (string) ($query->value($nameAttribute) ?? '');
     }
 }

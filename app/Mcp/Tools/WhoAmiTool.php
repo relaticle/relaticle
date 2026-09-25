@@ -5,32 +5,41 @@ declare(strict_types=1);
 namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
+use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\PersonalAccessToken;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
+use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Get information about the authenticated user, current team, team members, and token abilities.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
+#[Title('Get Account Context')]
+#[Description('Get information about the authenticated user, current workspace with their role and what it allows, workspace members, and token abilities.')]
 final class WhoAmiTool extends Tool
 {
     use ChecksTokenAbility;
+    use HasReadOnlyToolAnnotations;
 
     public function schema(JsonSchema $schema): array
     {
         return [];
     }
 
-    public function handle(Request $request): Response
+    public function outputSchema(JsonSchema $schema): array
+    {
+        return [
+            'user' => $schema->object()->required(),
+            'workspace' => $schema->object()->required(),
+            'workspace_members' => $schema->array()->items($schema->object())->required(),
+            'token_abilities' => $schema->array()->items($schema->string())->required(),
+        ];
+    }
+
+    public function handle(Request $request): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenCannot('read')) instanceof Response) {
             return $denied;
@@ -39,8 +48,8 @@ final class WhoAmiTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
-        /** @var Team $team */
-        $team = $user->currentTeam;
+        /** @var Workspace $workspace */
+        $workspace = $user->currentWorkspace;
 
         $tokenAbilities = ['*'];
         $token = $user->currentAccessToken();
@@ -49,7 +58,7 @@ final class WhoAmiTool extends Tool
             $tokenAbilities = $token->abilities;
         }
 
-        $teamMembers = $team->allUsers()->map(fn (User $member): array => [
+        $workspaceMembers = $workspace->allUsers()->map(fn (User $member): array => [
             'id' => $member->id,
             'name' => $member->name,
             'email' => $member->email,
@@ -61,14 +70,16 @@ final class WhoAmiTool extends Tool
                 'name' => $user->name,
                 'email' => $user->email,
             ],
-            'team' => [
-                'id' => $team->id,
-                'name' => $team->name,
+            'workspace' => [
+                'id' => $workspace->id,
+                'name' => $workspace->name,
+                'role' => $user->workspaceRoleLabel($workspace->id),
+                'capabilities' => array_column($user->workspaceCapabilities($workspace->id), 'value'),
             ],
-            'team_members' => $teamMembers,
+            'workspace_members' => $workspaceMembers,
             'token_abilities' => $tokenAbilities,
         ];
 
-        return Response::text(json_encode($result, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        return Response::structured($result);
     }
 }

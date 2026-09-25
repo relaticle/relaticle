@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\TeamInvitation;
+use App\Models\WorkspaceInvitation;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Database\Query\Builder;
 
-#[Description('Delete team invitations that have been expired for a specified number of days')]
+#[Description('Delete workspace invitations that have been expired for a specified number of days')]
 #[Signature('invitations:cleanup
                             {--days=30 : Delete invitations expired more than this many days ago}')]
 final class CleanupExpiredInvitationsCommand extends Command
@@ -21,7 +21,7 @@ final class CleanupExpiredInvitationsCommand extends Command
 
         $cutoff = now()->subDays($days);
 
-        $deleted = TeamInvitation::query()
+        $deleted = WorkspaceInvitation::query()
             ->where(function (Builder $query) use ($cutoff): void {
                 $query->where('expires_at', '<', $cutoff)
                     ->orWhere(function (Builder $query) use ($cutoff): void {

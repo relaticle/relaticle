@@ -6,11 +6,11 @@ namespace Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages;
 
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
-use Filament\Resources\Pages\EditRecord;
 use Override;
+use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource;
 
-final class EditTask extends EditRecord
+final class EditTask extends EditCustomerRecord
 {
     protected static string $resource = TaskResource::class;
 

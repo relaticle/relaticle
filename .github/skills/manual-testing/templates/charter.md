@@ -8,10 +8,10 @@ Fill every <placeholder>. Definition of Done items must be machine-checkable. --
 
 ## Definition of Done
 
-- [ ] <DoD item 1 — specific, measurable>
+- [ ] <DoD item 1: specific, measurable>
 - [ ] <DoD item 2>
 - [ ] <DoD item 3>
-- [ ] <DoD item 4 — at least 3 items required, more if surfaces span Filament + REST + MCP>
+- [ ] <DoD item 4: at least 3 items required, more if surfaces span Filament + REST + MCP>
 
 ## Personas selected
 
@@ -27,8 +27,8 @@ Fill every <placeholder>. Definition of Done items must be machine-checkable. --
 
 ## Surfaces
 
-- <Filament UI / Livewire / REST API / MCP> — <which pages/endpoints/tools>
+- <Filament UI / Livewire / REST API / MCP>: <which pages/endpoints/tools>
 
 ## Excluded (and why)
 
-- <persona/tour/surface> — <reason for not running>
+- <persona/tour/surface>: <reason for not running>

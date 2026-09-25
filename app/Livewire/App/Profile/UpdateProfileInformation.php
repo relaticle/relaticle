@@ -6,13 +6,16 @@ namespace App\Livewire\App\Profile;
 
 use App\Actions\Fortify\UpdateUserProfileInformation as UpdateUserProfileInformationAction;
 use App\Actions\Profile\RemoveUserProfilePhoto;
+use App\Actions\Profile\RequestEmailChange;
+use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
+use App\Models\User;
+use App\Support\Auth\AuthenticationSession;
+use App\Support\EmailAddress;
 use App\Support\SameOriginUrl;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use DateTimeZone;
 use Filament\Actions\Action;
-use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
-use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -25,9 +28,8 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Notification as NotificationFacade;
+use Illuminate\Validation\ValidationException;
 use League\Flysystem\UnableToCheckFileExistence;
-use League\Uri\Components\Query;
 use Throwable;
 
 final class UpdateProfileInformation extends BaseLivewireComponent
@@ -38,6 +40,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
     public function mount(): void
     {
         $data = $this->authUser()->only(['name', 'email', 'timezone']);
+        $data['email'] = $this->confirmedEmailTarget() ?? $data['email'];
 
         $this->form->fill($data);
     }
@@ -66,16 +69,16 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         return $schema
             ->schema([
                 Section::make(__('profile.sections.update_profile_information.title'))
-                    ->aside()
                     ->description(__('profile.sections.update_profile_information.description'))
                     ->schema([
                         FileUpload::make('profile_photo_path')
                             ->label(__('profile.form.profile_photo.label'))
                             ->avatar()
                             ->image()
+                            ->acceptedFileTypes(User::PROFILE_PHOTO_MIME_TYPES)
                             ->imageEditor()
                             ->disk(config('jetstream.profile_photo_disk'))
-                            ->directory('profile-photos')
+                            ->directory(User::PROFILE_PHOTO_DIRECTORY)
                             ->visibility('public')
                             ->formatStateUsing(fn () => auth('web')->user()?->profile_photo_path)
                             ->getUploadedFileUsing($this->resolveProfilePhotoUploadInfo(...)),
@@ -95,6 +98,8 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                         TextInput::make('email')
                             ->label(__('profile.form.email.label'))
                             ->email()
+                            ->mutateStateForValidationUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
+                            ->dehydrateStateUsing(fn (?string $state): string => EmailAddress::canonicalize((string) $state))
                             ->required()
                             ->unique(Filament::auth()->user() !== null ? Filament::auth()->user()::class : self::class, ignorable: $this->authUser()),
                         Select::make('timezone')
@@ -125,16 +130,35 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $data = $this->form->getState();
-
-        if (Filament::hasEmailChangeVerification() && array_key_exists('email', $data)) {
-            $this->sendEmailChangeVerification($data);
-
-            $data['email'] = $this->authUser()->email;
-        }
+        $newEmail = $data['email'];
+        $data['email'] = $this->authUser()->email;
 
         resolve(UpdateUserProfileInformationAction::class)->update($this->authUser(), $data);
 
+        if ($newEmail !== $this->authUser()->email) {
+            $this->mountAction('confirmEmailChange');
+
+            return;
+        }
+
         $this->sendNotification();
+    }
+
+    public function confirmEmailChangeAction(): ConfirmIdentityAction
+    {
+        return ConfirmIdentityAction::make('confirmEmailChange')
+            ->modalHeading(__('auth.confirm.heading'))
+            ->modalDescription(fn (): string => __('auth.confirm.email_change_description', [
+                'email' => AuthenticationSession::pendingOperation()['target_id'] ?? '',
+            ]))
+            ->alwaysConfirm()
+            ->operation('change_email', fn (): string => EmailAddress::canonicalize((string) ($this->data['email'] ?? '')))
+            ->beforeFormFilled(function (): void {
+                $this->form->validate();
+            })
+            ->confirmedUsing(function (?string $operationTarget): void {
+                $this->sendEmailChangeVerification((string) $operationTarget);
+            });
     }
 
     public function removeProfilePhoto(): void
@@ -219,32 +243,11 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         ];
     }
 
-    /**
-     * @param  array<string, mixed>  $data
-     */
-    private function sendEmailChangeVerification(array $data): void
+    private function sendEmailChangeVerification(string $newEmail): void
     {
         $user = $this->authUser();
-        $newEmail = $data['email'];
 
-        if ($user->email === $newEmail) {
-            return;
-        }
-
-        $notification = resolve(VerifyEmailChange::class);
-        $notification->url = Filament::getVerifyEmailChangeUrl($user, $newEmail);
-
-        $verificationSignature = Query::new($notification->url)->get('signature');
-
-        cache()->put($verificationSignature, true, ttl: now()->addHour());
-
-        $user->notify(resolve(NoticeOfEmailChangeRequest::class, [
-            'blockVerificationUrl' => Filament::getBlockEmailChangeVerificationUrl($user, $newEmail, $verificationSignature),
-            'newEmail' => $newEmail,
-        ]));
-
-        NotificationFacade::route('mail', $newEmail)
-            ->notify($notification);
+        resolve(RequestEmailChange::class)->execute($user, $newEmail);
 
         Notification::make()
             ->success()
@@ -253,6 +256,23 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             ->send();
 
         $this->data['email'] = $user->email;
+    }
+
+    private function confirmedEmailTarget(): ?string
+    {
+        $operation = AuthenticationSession::pendingOperation();
+
+        if ($operation === [] || $operation['operation'] !== 'change_email' || $operation['target_id'] === null) {
+            return null;
+        }
+
+        try {
+            AuthenticationSession::requireOperation($this->authUser(), 'change_email', $operation['target_id']);
+        } catch (ValidationException) {
+            return null;
+        }
+
+        return $operation['target_id'];
     }
 
     public function render(): View

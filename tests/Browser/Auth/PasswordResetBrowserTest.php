@@ -12,9 +12,11 @@ use Illuminate\Support\Facades\Password;
 mutates(RequestPasswordReset::class, ResetPassword::class);
 
 it('can navigate to forgot password from login and request a reset link', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
 
     $this->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
         ->click('a[href*="password-reset"]')
         ->assertPathContains('/password-reset/request')
         ->assertSee('Forgot password?')
@@ -25,7 +27,7 @@ it('can navigate to forgot password from login and request a reset link', functi
 });
 
 it('can reset password using a valid reset link', function (): void {
-    $user = User::factory()->withTeam()->create();
+    $user = User::factory()->withWorkspace()->create();
     $token = Password::broker('users')->createToken($user);
 
     $resetUrl = Filament::getPanel('app')->getResetPasswordUrl($token, $user);

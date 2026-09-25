@@ -16,8 +16,8 @@ beforeEach(function () {
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
 
-    $this->teamOwner = User::factory()->withTeam()->create();
-    $this->team = $this->teamOwner->currentTeam;
+    $this->workspaceOwner = User::factory()->withWorkspace()->create();
+    $this->workspace = $this->workspaceOwner->currentWorkspace;
 });
 
 it('can render the user retention chart widget', function () {
@@ -28,24 +28,24 @@ it('can render the user retention chart widget', function () {
 it('classifies new active vs returning users correctly', function () {
     $this->travelTo(now()->startOfWeek()->addDays(3));
 
-    $newUser = User::factory()->withTeam()->create([
+    $newUser = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(2),
     ]);
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create([
             'creator_id' => $newUser->id,
             'creation_source' => CreationSource::WEB,
             'created_at' => now()->subDay(),
         ]));
 
-    $returningUser = User::factory()->withTeam()->create([
+    $returningUser = User::factory()->withWorkspace()->create([
         'created_at' => now()->subDays(30),
     ]);
 
     Company::withoutEvents(fn () => Company::factory()
-        ->for($this->team)
+        ->for($this->workspace)
         ->create([
             'creator_id' => $returningUser->id,
             'creation_source' => CreationSource::WEB,

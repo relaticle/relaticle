@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
+use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
 use Illuminate\Contracts\View\View;
 use Relaticle\ActivityLog\Contracts\TimelineRenderer;
 use Relaticle\ActivityLog\Support\ActivityLogSummary;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 /**
- * Renders one same-save group — native column changes and custom-field changes
- * that shared a `batch_uuid` — as a single timeline entry. The package's
+ * Renders one same-save group (native column changes and custom-field changes
+ * that shared a `batch_uuid`) as a single timeline entry. The package's
  * batch-merge unions every grouped row's payload into `$entry->properties`, so
  * both the native `attributes`/`old` maps and the `custom_field_changes` list
  * arrive here together.
@@ -22,11 +24,28 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
     {
         $summary = ActivityLogSummary::from($entry);
 
+        $importFile = $entry->properties['import_file'] ?? null;
+
         return view('activity-log.merged-activity', [
             'entry' => $entry,
             'summary' => $summary,
             'rows' => $this->rows($entry, $summary),
+            'importFile' => is_string($importFile) ? $importFile : null,
+            'viaSource' => $this->viaSource(Activity::sourceFrom($entry->properties)),
         ]);
+    }
+
+    private function viaSource(?CreationSource $source): ?string
+    {
+        if (! $source instanceof CreationSource) {
+            return null;
+        }
+
+        if (in_array($source, [CreationSource::WEB, CreationSource::IMPORT], true)) {
+            return null;
+        }
+
+        return __('workspaces.activity.via_source', ['source' => $source->getLabel()]);
     }
 
     /**
@@ -42,8 +61,8 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
         foreach ($summary->diffRows as $row) {
             $rows[] = [
                 'label' => $row->label,
-                'old' => $row->formattedOld(),
-                'new' => $row->formattedNew(),
+                'old' => ActivityValue::display($row->formattedOld()),
+                'new' => ActivityValue::display($row->formattedNew()),
             ];
         }
 
@@ -54,18 +73,11 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
             $label = $change['label'] ?? $change['code'] ?? '';
             $rows[] = [
                 'label' => is_string($label) ? $label : '',
-                'old' => $this->customFieldLabel($change['old'] ?? null),
-                'new' => $this->customFieldLabel($change['new'] ?? null),
+                'old' => ActivityValue::display($change['old'] ?? null),
+                'new' => ActivityValue::display($change['new'] ?? null),
             ];
         }
 
         return $rows;
-    }
-
-    private function customFieldLabel(mixed $side): string
-    {
-        $label = is_array($side) ? ($side['label'] ?? null) : null;
-
-        return is_string($label) && $label !== '' ? $label : '—';
     }
 }

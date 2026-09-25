@@ -1,0 +1,490 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Filament\Pages;
+
+use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
+use App\Actions\User\UpdateUserName;
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
+use App\Models\User;
+use App\Models\Workspace;
+use App\Rules\ValidWorkspaceSlug;
+use App\Support\WorkspaceUrlPrefix;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Notifications\Notification;
+use Filament\Pages\Tenancy\RegisterTenant;
+use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Flex;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
+use Filament\Schemas\Components\Wizard;
+use Filament\Schemas\Components\Wizard\Step;
+use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
+use Filament\Support\Enums\VerticalAlignment;
+use Filament\Support\Enums\Width;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Number;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Unique;
+use Override;
+
+final class CreateWorkspace extends RegisterTenant
+{
+    protected string $view = 'filament.pages.create-workspace';
+
+    protected array $extraBodyAttributes = [
+        'class' => 'fi-onboarding-wizard',
+    ];
+
+    public function getMaxContentWidth(): Width
+    {
+        return Width::FiveExtraLarge;
+    }
+
+    #[Override]
+    public function mount(): void
+    {
+        // Filament answers an over-cap visit with a bare 404, which reads as a broken
+        // link rather than a limit the user can act on.
+        if (! self::canView()) {
+            Notification::make()
+                ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_limit_reached.title'))
+                ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_limit_reached.body'))
+                ->warning()
+                ->send();
+
+            $this->redirect($this->getCancelUrl() ?? Filament::getUrl());
+
+            return;
+        }
+
+        parent::mount();
+    }
+
+    #[Override]
+    public static function getLabel(): string
+    {
+        return __('filament/pages/workspaces.create_workspace.label');
+    }
+
+    #[Override]
+    public function getHeading(): string
+    {
+        return '';
+    }
+
+    #[Override]
+    public function getSubheading(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Where "Cancel" returns to when the user backs out of creating another
+     * workspace. Null during first-run onboarding: a user with no workspace
+     * has nowhere to go back to, so no cancel affordance is offered.
+     */
+    public function getCancelUrl(): ?string
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+        $tenant = Filament::getUserDefaultTenant($user);
+
+        return $tenant instanceof Workspace
+            ? Dashboard::getUrl(['tenant' => $tenant])
+            : null;
+    }
+
+    public function getCancelLabel(): string
+    {
+        return __('filament/pages/workspaces.create_workspace.actions.cancel');
+    }
+
+    #[Override]
+    public function form(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Wizard::make([
+                    $this->getWorkspaceStep(),
+                    $this->getAttributionStep(),
+                    $this->getUseCaseStep(),
+                ])
+                    ->view('components.onboarding.wizard')
+                    ->hiddenHeader()
+                    ->contained(false)
+                    ->nextAction(
+                        fn (Action $action): Action => $action
+                            ->label(__('filament/pages/workspaces.create_workspace.actions.continue'))
+                            ->size(Size::Large)
+                            ->extraAttributes(['class' => 'w-full'])
+                    )
+                    ->submitAction(
+                        Action::make('register')
+                            ->label(__('filament/pages/workspaces.create_workspace.actions.get_started'))
+                            ->size(Size::Large)
+                            ->submit('register')
+                            ->extraAttributes(['class' => 'w-full'])
+                    ),
+            ]);
+    }
+
+    private function getWorkspaceStep(): Step
+    {
+        return Step::make(__('filament/pages/workspaces.create_workspace.steps.workspace'))
+            ->schema([
+                Placeholder::make('workspace_heading')
+                    ->label(__('filament/pages/workspaces.create_workspace.headings.workspace'))
+                    ->hiddenLabel()
+                    ->content($this->stepHeading(__('filament/pages/workspaces.create_workspace.headings.workspace')))
+                    ->dehydrated(false),
+                ...$this->getWorkspaceFormComponents(),
+            ]);
+    }
+
+    private function getAttributionStep(): Step
+    {
+        return Step::make(__('filament/pages/workspaces.create_workspace.steps.attribution'))
+            ->schema([
+                Placeholder::make('attribution_heading')
+                    ->label(__('filament/pages/workspaces.create_workspace.headings.attribution'))
+                    ->hiddenLabel()
+                    ->content($this->stepHeading(
+                        __('filament/pages/workspaces.create_workspace.headings.attribution'),
+                        __('filament/pages/workspaces.create_workspace.headings.attribution_description'),
+                    ))
+                    ->dehydrated(false),
+
+                ToggleButtons::make('onboarding_referral_source')
+                    ->label(__('filament/pages/workspaces.create_workspace.headings.attribution'))
+                    ->hiddenLabel()
+                    ->options(
+                        collect(OnboardingReferralSource::cases())
+                            ->mapWithKeys(fn (OnboardingReferralSource $source): array => [
+                                $source->value => $source->getLabel(),
+                            ])
+                            ->all()
+                    )
+                    ->icons(
+                        collect(OnboardingReferralSource::cases())
+                            ->mapWithKeys(fn (OnboardingReferralSource $source): array => [
+                                $source->value => $source->getIcon(),
+                            ])
+                            ->all()
+                    )
+                    ->inline(),
+            ]);
+    }
+
+    private function getUseCaseStep(): Step
+    {
+        return Step::make(__('filament/pages/workspaces.create_workspace.steps.use_case'))
+            ->key('onboarding-use-case')
+            ->schema([
+                Placeholder::make('use_case_heading')
+                    ->label(__('filament/pages/workspaces.create_workspace.headings.use_case'))
+                    ->hiddenLabel()
+                    ->content($this->stepHeading(
+                        __('filament/pages/workspaces.create_workspace.headings.use_case'),
+                        __('filament/pages/workspaces.create_workspace.headings.use_case_description'),
+                        __('filament/pages/workspaces.create_workspace.headings.use_case_hint'),
+                    ))
+                    ->dehydrated(false),
+
+                ToggleButtons::make('onboarding_use_case')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.use_case_label'))
+                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.use_case_validation_attribute'))
+                    ->required()
+                    ->options(
+                        collect(OnboardingUseCase::cases())
+                            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
+                                $case->value => $case->getLabel(),
+                            ])
+                            ->all()
+                    )
+                    ->icons(
+                        collect(OnboardingUseCase::cases())
+                            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
+                                $case->value => $case->getIcon(),
+                            ])
+                            ->all()
+                    )
+                    ->inline()
+                    ->live()
+                    // Stale sub-options from the previous use case are invisible yet
+                    // fail validation, stranding the wizard on this step.
+                    ->afterStateUpdated(function (Set $set): void {
+                        $set('onboarding_context', []);
+                    }),
+
+                ToggleButtons::make('onboarding_context')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.use_case_context_label'))
+                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.use_case_context_validation_attribute'))
+                    ->required()
+                    ->options(function (Get $get): array {
+                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
+
+                        if (! $useCase instanceof OnboardingUseCase) {
+                            return [];
+                        }
+
+                        return $useCase->getSubOptions();
+                    })
+                    ->inline()
+                    ->multiple()
+                    ->visible(function (Get $get): bool {
+                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
+
+                        return $useCase instanceof OnboardingUseCase && $useCase->getSubOptions() !== [];
+                    }),
+
+                TextInput::make('onboarding_other_use_case')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.other_use_case_label'))
+                    ->placeholder(__('filament/pages/workspaces.create_workspace.form.other_use_case_placeholder'))
+                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.other_use_case_validation_attribute'))
+                    ->maxLength(120)
+                    ->visible(fn (Get $get): bool => $get('onboarding_use_case') === OnboardingUseCase::Other->value),
+            ]);
+    }
+
+    private function stepHeading(string $title, string ...$paragraphs): HtmlString
+    {
+        $html = '<h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">'.e($title).'</h3>';
+
+        foreach ($paragraphs as $index => $paragraph) {
+            $spacing = $index === 0 ? 'mt-1' : 'mt-2';
+
+            $html .= '<p class="'.$spacing.' text-sm text-gray-500 dark:text-gray-400">'.e($paragraph).'</p>';
+        }
+
+        return new HtmlString($html);
+    }
+
+    private function logoHint(): HtmlString
+    {
+        $title = __('filament/pages/workspaces.create_workspace.form.company_logo.label');
+        $description = __('filament/pages/workspaces.create_workspace.form.company_logo.description', [
+            'max' => Number::fileSize(Workspace::LOGO_MAX_KILOBYTES * 1024),
+        ]);
+
+        return new HtmlString(
+            '<p class="text-base font-semibold text-gray-950 dark:text-white">'.e($title).'</p>'
+            .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">'.e($description).'</p>'
+        );
+    }
+
+    private function handleIsDerived(Get $get): bool
+    {
+        $slug = $get('slug');
+
+        return blank($slug) || $slug === $get('slug_derived');
+    }
+
+    private function isFirstWorkspace(): bool
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        return ! Filament::getUserDefaultTenant($user) instanceof Workspace;
+    }
+
+    /**
+     * @return array<Component>
+     */
+    private function getWorkspaceFormComponents(): array
+    {
+        return [
+            Flex::make([
+                SpatieMediaLibraryFileUpload::make('logo')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
+                    ->hiddenLabel()
+                    ->collection(Workspace::LOGO_MEDIA_COLLECTION)
+                    ->imageEditor()
+                    ->avatar()
+                    // Last in the chain on purpose: avatar() calls image(),
+                    // which resets the allowlist back to `image/*`.
+                    ->acceptedFileTypes(Workspace::LOGO_MIME_TYPES)
+                    ->maxSize(Workspace::LOGO_MAX_KILOBYTES)
+                    ->grow(false),
+
+                Placeholder::make('company_logo_hint')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
+                    ->hiddenLabel()
+                    ->content($this->logoHint())
+                    ->dehydrated(false),
+            ])->verticalAlignment(VerticalAlignment::Center),
+
+            TextInput::make('user_name')
+                ->label(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('filament/pages/workspaces.create_workspace.form.your_name.placeholder'))
+                ->autofocus()
+                ->visible(fn (): bool => $this->isFirstWorkspace())
+                ->default(function (): string {
+                    /** @var User $user */
+                    $user = auth('web')->user();
+
+                    return $user->name;
+                }),
+
+            TextInput::make('name')
+                ->label(__('filament/pages/workspaces.create_workspace.form.workspace_name.label'))
+                ->required()
+                ->maxLength(255)
+                ->placeholder(__('filament/pages/workspaces.create_workspace.form.workspace_name.placeholder'))
+                // Typed, not blurred: the handle has to track the name as it is written.
+                // That unanchors the derive from focus, so ownership is decided by
+                // comparing the handle to the last value this derived, never by which
+                // field's update Livewire happens to process first.
+                ->live(debounce: 400)
+                ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
+                    if (! $this->handleIsDerived($get)) {
+                        return;
+                    }
+
+                    $derived = Workspace::availableSlugFor($state);
+
+                    $set('slug', $derived);
+                    $set('slug_derived', $derived);
+                }),
+
+            TextInput::make('slug')
+                ->label(__('filament/pages/workspaces.create_workspace.form.workspace_handle.label'))
+                ->required()
+                ->maxLength(255)
+                ->rules([new ValidWorkspaceSlug])
+                ->rules(
+                    [fn (): Unique => Rule::unique(Workspace::class, 'slug')],
+                    condition: fn (Get $get): bool => ! $this->handleIsDerived($get),
+                )
+                ->prefix(WorkspaceUrlPrefix::get())
+                ->placeholder(__('filament/pages/workspaces.create_workspace.form.workspace_handle.placeholder'))
+                ->helperText(__('filament/pages/workspaces.create_workspace.form.workspace_handle.helper_text'))
+                // Undebounced so a typed handle reaches the server before the name's
+                // own debounce fires; a pending update is invisible to the name's hook.
+                ->live(),
+
+            Hidden::make('slug_derived')
+                ->dehydrated(false),
+        ];
+    }
+
+    protected function afterRegister(): void
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        // Flagged here, not inside CreateWorkspaceAction: getRedirectUrl() sends the user to
+        // the dashboard next, so this one event marks the workspace as created AND the
+        // user as landed.
+        //
+        // First workspace only. A later one is expansion, not conversion: its
+        // referrer is whatever brought the user back that day rather than the
+        // channel that acquired them, so counting it would misattribute the
+        // channel AND push signup-to-workspace above 100%. How many workspaces
+        // a user owns is a question the workspaces table already answers exactly.
+        if ($user->ownedWorkspaces()->count() === 1) {
+            session()->put('fathom.track_workspace_created', true);
+        }
+
+        /** @var Workspace $tenant */
+        $tenant = $this->tenant;
+
+        Notification::make()
+            ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $tenant->name]))
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Signup ends on the setup conversation, where the assistant greets the
+     * owner and asks for their data. The listener that seeds it runs
+     * synchronously on WorkspaceCreated; a workspace without one (feature off,
+     * or an additional non-personal workspace) still lands on the dashboard.
+     */
+    #[Override]
+    protected function getRedirectUrl(): string
+    {
+        /** @var Workspace $tenant */
+        $tenant = $this->tenant;
+
+        $setupConversationId = $tenant->setupConversation()->value('id');
+
+        return is_string($setupConversationId)
+            ? ChatConversation::getUrl(['conversationId' => $setupConversationId, 'tenant' => $tenant])
+            : Dashboard::getUrl(['tenant' => $tenant]);
+    }
+
+    #[Override]
+    protected function handleRegistration(array $data): Model
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        $this->updateUserNameIfChanged($user, $data);
+
+        if (($this->data['slug_derived'] ?? null) === $data['slug'] && Workspace::query()->where('slug', $data['slug'])->exists()) {
+            $data['slug'] = null;
+        }
+
+        return resolve(CreateWorkspaceAction::class)->create($user, $data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function updateUserNameIfChanged(User $user, array $data): void
+    {
+        $name = $data['user_name'] ?? null;
+
+        if (! is_string($name) || $name === $user->name) {
+            return;
+        }
+
+        resolve(UpdateUserName::class)->execute($user, $name);
+    }
+
+    /**
+     * @return array<Action|ActionGroup>
+     */
+    #[Override]
+    protected function getFormActions(): array
+    {
+        return [];
+    }
+
+    #[Override]
+    public function getRegisterFormAction(): Action
+    {
+        return Action::make('register')
+            ->size(Size::Large)
+            ->label(__('filament/pages/workspaces.create_workspace.actions.get_started'))
+            ->submit('register')
+            ->extraAttributes(['class' => 'w-full']);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getUseCaseLabelsForPreview(): array
+    {
+        return collect(OnboardingUseCase::cases())
+            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
+                $case->value => $case->getLabel(),
+            ])
+            ->all();
+    }
+}

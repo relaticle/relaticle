@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Policies;
 
-use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
-use Relaticle\SystemAdmin\Models\SystemAdministrator;
-
 final class AiCreditBalancePolicy
 {
     public function viewAny(): bool
@@ -24,9 +21,9 @@ final class AiCreditBalancePolicy
         return false;
     }
 
-    public function update(SystemAdministrator $admin): bool
+    public function update(): bool
     {
-        return $admin->role === SystemAdministratorRole::SuperAdministrator;
+        return true;
     }
 
     public function delete(): bool

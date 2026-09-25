@@ -45,7 +45,7 @@ agent-browser errors                # capture page errors
 
 Same browser harness as Filament. Specific watches:
 
-- After every navigation, re-snapshot — Livewire DOM updates won't reflect in stale snapshots.
+- After every navigation, re-snapshot. Livewire DOM updates won't reflect in stale snapshots.
 - After actions that update the URL, verify `agent-browser get url` matches expected.
 - For polling components (`wire:poll`), watch the network tab via `agent-browser eval`:
 
@@ -91,7 +91,7 @@ curl -sS -H "Authorization: Bearer $TOKEN" \
 **Specific watches:**
 - Error envelope is consistent: 422 for validation, 401 unauth, 403 forbidden, 404 not found, 500 server error.
 - Pagination metadata present on list endpoints (`data`, `links`, `meta`).
-- Encrypted custom fields are returned only to the owner — see `references/multi-tenant-checklist.md`.
+- Encrypted custom fields are returned only to the owner. See `references/multi-tenant-checklist.md`.
 
 ---
 

@@ -5,24 +5,25 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\People;
 
 use App\Actions\People\UpdatePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\PeopleResource;
 use App\Mcp\Tools\BaseUpdateTool;
-use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Update Person')]
 #[Description('Update an existing person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class UpdatePeopleTool extends BaseUpdateTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return People::class;
+        return CrmEntity::People;
     }
 
     protected function actionClass(): string
@@ -35,16 +36,6 @@ final class UpdatePeopleTool extends BaseUpdateTool
         return PeopleResource::class;
     }
 
-    protected function entityType(): string
-    {
-        return 'people';
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'person';
-    }
-
     protected function entitySchema(JsonSchema $schema): array
     {
         return [
@@ -55,11 +46,11 @@ final class UpdatePeopleTool extends BaseUpdateTool
 
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'name' => ['sometimes', 'string', 'max:255'],
-            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('workspace_id', $workspaceId)],
         ];
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Models;
 
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,10 +13,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * One user's rating of one assistant message — the quality signal pipeline.
+ * One user's rating of one assistant message, feeding the quality signal pipeline.
  *
  * @property string $id
- * @property string $team_id
+ * @property string $workspace_id
  * @property string $user_id
  * @property string $conversation_id
  * @property string $message_id
@@ -41,7 +41,7 @@ final class ChatMessageFeedback extends Model
     protected $table = 'chat_message_feedback';
 
     protected $fillable = [
-        'team_id',
+        'workspace_id',
         'user_id',
         'conversation_id',
         'message_id',
@@ -51,10 +51,10 @@ final class ChatMessageFeedback extends Model
         'model',
     ];
 
-    /** @return BelongsTo<Team, $this> */
-    public function team(): BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Workspace::class);
     }
 
     /** @return BelongsTo<User, $this> */

@@ -17,35 +17,24 @@ Use `search-docs` for detailed Livewire 4 patterns and documentation.
 ### Creating Components
 
 ```bash
-
 # Single-file component (SFC - default in v4)
-
 # Creates: resources/views/components/⚡create-post.blade.php
-
 php artisan make:livewire create-post
 
 # Page component (SFC - Full Page in v4)
-
 # Creates: resources/views/pages/⚡create-post.blade.php
-
 php artisan make:livewire pages::create-post
 
 # Multi-file component (MFC)
-
 # Creates: resources/views/components/⚡create-post/create-post.php
-
 #          resources/views/components/⚡create-post/create-post.blade.php
-
 php artisan make:livewire create-post --mfc
 
 # Class-based component (v3 style)
-
 # Creates: app/Livewire/CreatePost.php AND resources/views/livewire/create-post.blade.php
-
 php artisan make:livewire create-post --class
 
 # With namespace
-
 php artisan make:livewire Posts/CreatePost
 ```
 

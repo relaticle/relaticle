@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\CreateProCheckout;
 use App\Mail\ProTrialEndingSoonMail;
-use App\Models\Team;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
@@ -18,12 +18,12 @@ beforeEach(function (): void {
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 });
 
-function checkoutTeam(): Team
+function checkoutWorkspace(): Workspace
 {
-    /** @var Team $team */
-    $team = User::factory()->withPersonalTeam()->create()->currentTeam;
+    /** @var Workspace $workspace */
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
-    return $team;
+    return $workspace;
 }
 
 /**
@@ -43,7 +43,7 @@ it('builds monthly checkout options with managed payments enabled', function ():
     config()->set('services.stripe.managed_payments', true);
 
     expect(invokeCheckout('priceId', ['monthly']))->toBe('price_pro_monthly_test')
-        ->and(invokeCheckout('sessionOptions', [checkoutTeam()]))->toHaveKey('managed_payments.enabled', true);
+        ->and(invokeCheckout('sessionOptions', [checkoutWorkspace()]))->toHaveKey('managed_payments.enabled', true);
 });
 
 it('rejects an interval that is not a configured billing period', function (): void {
@@ -54,7 +54,7 @@ it('rejects an interval that is not a configured billing period', function (): v
 it('omits managed payments when the switch is off', function (): void {
     config()->set('services.stripe.managed_payments', false);
 
-    $options = invokeCheckout('sessionOptions', [checkoutTeam()]);
+    $options = invokeCheckout('sessionOptions', [checkoutWorkspace()]);
 
     expect($options)->not->toHaveKey('managed_payments');
 });
@@ -63,14 +63,14 @@ it('selects the yearly price for the yearly interval', function (): void {
     expect(invokeCheckout('priceId', ['yearly']))->toBe('price_pro_yearly_test');
 });
 
-it('points success and cancel urls at the team billing page', function (): void {
-    $team = checkoutTeam();
+it('points success and cancel urls at the workspace billing page', function (): void {
+    $workspace = checkoutWorkspace();
 
-    $options = invokeCheckout('sessionOptions', [$team]);
+    $options = invokeCheckout('sessionOptions', [$workspace]);
 
-    expect($options['success_url'])->toContain("/app/{$team->slug}/billing")
+    expect($options['success_url'])->toContain("/app/{$workspace->slug}/billing")
         ->and($options['success_url'])->toContain('checkout=success')
-        ->and($options['cancel_url'])->toContain("/app/{$team->slug}/billing");
+        ->and($options['cancel_url'])->toContain("/app/{$workspace->slug}/billing");
 });
 
 /** @param array<int, mixed> $args */
@@ -84,11 +84,11 @@ it('builds pack checkout options with metadata and managed payments', function (
     config()->set('services.stripe.managed_payments', true);
     config()->set('services.stripe.credit_packs.small.price', 'price_credits_1k_test');
 
-    $team = checkoutTeam();
-    $options = invokePackCheckout('sessionOptions', [$team, 'price_credits_1k_test']);
+    $workspace = checkoutWorkspace();
+    $options = invokePackCheckout('sessionOptions', [$workspace, 'price_credits_1k_test']);
 
     expect($options)->toHaveKey('managed_payments.enabled', true)
-        ->and($options['metadata']['team_id'])->toBe((string) $team->getKey())
+        ->and($options['metadata']['team_id'])->toBe((string) $workspace->getKey())
         ->and($options['metadata']['credit_pack_price'])->toBe('price_credits_1k_test')
         ->and($options['success_url'])->toContain('credits=success');
 });
@@ -109,17 +109,17 @@ it('rejects a pack whose price is not configured', function (): void {
  * The domain-mode block below rebuilds the application so the panel registers its
  * routes against a domain. That reboot drops Laravel's parallel-testing database
  * override, pointing the fresh app at the base test database instead of this
- * worker's — so these cases must not touch the database at all. An in-memory Team
+ * worker's, so these cases must not touch the database at all. An in-memory Workspace
  * is enough: the URL builders only read the tenant slug.
  */
-function unsavedTeam(): Team
+function unsavedWorkspace(): Workspace
 {
-    return new Team(['slug' => 'acme', 'name' => 'Acme']);
+    return new Workspace(['slug' => 'acme', 'name' => 'Acme']);
 }
 
 /**
  * A subdomain-routed app panel (APP_PANEL_DOMAIN, as production runs) serves the
- * billing page at {domain}/{slug}/billing — there is no "/app" path prefix. Any
+ * billing page at {domain}/{slug}/billing. There is no "/app" path prefix. Any
  * URL handed to Stripe has to follow the registered route, otherwise returning
  * from Checkout lands on a 404.
  */
@@ -143,21 +143,21 @@ describe('domain-routed app panel', function (): void {
     });
 
     it('returns from pro checkout to the billing route without a panel path prefix', function (): void {
-        $options = invokeCheckout('sessionOptions', [unsavedTeam()]);
+        $options = invokeCheckout('sessionOptions', [unsavedWorkspace()]);
 
         expect($options['cancel_url'])->toBe('http://app.example.com/acme/billing')
             ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?checkout=success');
     });
 
     it('returns from credit pack checkout to the billing route without a panel path prefix', function (): void {
-        $options = invokePackCheckout('sessionOptions', [unsavedTeam(), 'price_credits_1k_test']);
+        $options = invokePackCheckout('sessionOptions', [unsavedWorkspace(), 'price_credits_1k_test']);
 
         expect($options['cancel_url'])->toBe('http://app.example.com/acme/billing')
             ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?credits=success');
     });
 
     it('links the trial reminder email at the billing route without a panel path prefix', function (): void {
-        expect((string) (new ProTrialEndingSoonMail(unsavedTeam()))->render())
+        expect((string) (new ProTrialEndingSoonMail(unsavedWorkspace()))->render())
             ->toContain('http://app.example.com/acme/billing')
             ->not->toContain('/app/acme/billing');
     });

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Filament\Pages\Billing;
-use App\Models\Team;
+use App\Models\Workspace;
 use InvalidArgumentException;
 
 final readonly class CreateProCheckout
@@ -15,21 +15,21 @@ final readonly class CreateProCheckout
 
     /**
      * Create the hosted Stripe Checkout session and return its redirect URL.
-     * Stripe round-trip — covered by the staging E2E checklist, not unit tests.
+     * Stripe round-trip, covered by the staging E2E checklist, not unit tests.
      */
-    public function execute(Team $team, string $interval): string
+    public function execute(Workspace $workspace, string $interval): string
     {
-        $checkout = $team
+        $checkout = $workspace
             ->newSubscription('default', $this->priceId($interval))
             ->allowPromotionCodes()
-            ->checkout($this->sessionOptions($team));
+            ->checkout($this->sessionOptions($workspace));
 
         return (string) $checkout->asStripeCheckoutSession()->url;
     }
 
     private function priceId(string $interval): string
     {
-        // $interval arrives from the browser — pin it to the known intervals so
+        // $interval arrives from the browser, so pin it to the known intervals and
         // an arbitrary string never reaches a config lookup.
         throw_unless(in_array($interval, self::INTERVALS, true), InvalidArgumentException::class, "Unsupported billing interval [{$interval}].");
 
@@ -41,14 +41,14 @@ final readonly class CreateProCheckout
     }
 
     /** @return array<string, mixed> */
-    private function sessionOptions(Team $team): array
+    private function sessionOptions(Workspace $workspace): array
     {
-        $billingUrl = Billing::getUrl(panel: 'app', tenant: $team);
+        $billingUrl = Billing::getUrl(panel: 'app', tenant: $workspace);
 
         $options = [
             'success_url' => "{$billingUrl}?checkout=success",
             'cancel_url' => $billingUrl,
-            'client_reference_id' => (string) $team->getKey(),
+            'client_reference_id' => (string) $workspace->getKey(),
         ];
 
         if (config('services.stripe.managed_payments')) {

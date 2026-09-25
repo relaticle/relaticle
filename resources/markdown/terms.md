@@ -1,6 +1,4 @@
-# Terms of Service
-
-**Effective date:** March 20, 2026
+**Effective date:** August 26, 2026
 
 These Terms of Service ("Terms") govern your use of Relaticle, an open-source CRM platform provided by Relaticle ("we", "us", "our"). By accessing or using our services, you agree to these Terms.
 
@@ -25,8 +23,10 @@ You must be at least 16 years old to use our services.
 
 You own your data. We do not claim any intellectual property rights over the data you store in Relaticle.
 
-- **Cloud users:** Your data is stored on our servers. You can export your data at any time via the application or the REST API. If you delete your account, we will delete your data within 30 days.
+- **Cloud users:** Your data is stored on our servers. You can export your data at any time via the application or the REST API. To request account deletion, email privacy@relaticle.com or contact us.
 - **Self-hosted users:** Your data never touches our servers. You have full control.
+
+Account deletion uses a 30-day grace period once scheduled. Signing in before the deletion date lets you cancel. Records in shared workspaces remain after your account is removed.
 
 ## 4. Acceptable Use
 
@@ -42,11 +42,11 @@ We reserve the right to suspend or terminate accounts that violate these terms.
 
 ## 5. API and MCP Access
 
-Access to the REST API and MCP server is governed by API tokens scoped to specific teams and permissions. You are responsible for keeping your API tokens secure. Revoke any token you believe has been compromised.
+Access to the REST API and MCP server is governed by API tokens scoped to specific workspaces and permissions. You are responsible for keeping your API tokens secure. Revoke any token you believe has been compromised.
 
 ## 6. Pricing
 
-Relaticle is free to use. Both the Cloud and Self-Hosted options are available at no cost. We may introduce paid features in the future, but existing free functionality will remain free.
+Self-hosted software has no license fee under AGPL-3.0. The hosted Cloud service may offer trial, free, and paid plans. Current pricing and included features appear on the pricing page or during checkout. Charges apply only after you accept the displayed paid terms. Price changes apply prospectively after notice.
 
 ## 7. Availability
 

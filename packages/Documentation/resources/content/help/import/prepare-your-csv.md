@@ -21,7 +21,7 @@ clicks.
 | Maximum size | 10MB |
 | Headers | Required in the first row |
 
-In Excel, use **Save As → CSV UTF-8 (Comma delimited)** — Excel's default CSV
+In Excel, use **Save As → CSV UTF-8 (Comma delimited)**. Excel's default CSV
 encoding breaks accented characters.
 
 ## Required columns
@@ -36,7 +36,7 @@ Only one column is required per record type:
 | Tasks | Title |
 | Notes | Title |
 
-Every other column is optional — a blank cell simply leaves that field empty.
+Every other column is optional; a blank cell simply leaves that field empty.
 
 ## Custom field columns
 
@@ -50,8 +50,8 @@ custom_fields_website
 ```
 
 Find each field's code in **Settings → Custom Fields**, under the **Code**
-column. The wizard also auto-maps close names — a column called "Industry"
-usually lands on the Industry field without the prefix — but the prefix makes
+column. The wizard also auto-maps close names, so a column called "Industry"
+usually lands on the Industry field without the prefix. The prefix makes
 the match exact.
 
 ## Format values by field type
@@ -70,18 +70,18 @@ the match exact.
 
 - Include headers in the first row.
 - Quote values that contain commas: `"Last, First"`.
-- Keep one consistent format within each column — especially dates.
+- Keep one consistent format within each column, especially dates.
 - Test with a small sample (5-10 rows) before importing the full file.
 
 ## Don't
 
-- Use Excel's default encoding — pick "CSV UTF-8".
+- Use Excel's default encoding; pick "CSV UTF-8".
 - Mix date formats in the same column (`2024-03-15` and `03/15/2024`).
-- Include currency symbols in numbers — use `50000`, not `$50,000`.
+- Include currency symbols in numbers; use `50000`, not `$50,000`.
 - Leave empty rows at the end of the file.
 
 ## Get a ready-made template
 
-Export a few existing records from any list — the exported file includes the
+Export a few existing records from any list. The exported file includes the
 `id` column and every custom field your workspace uses, already named
 correctly. Delete the rows, keep the headers, and fill in your data.

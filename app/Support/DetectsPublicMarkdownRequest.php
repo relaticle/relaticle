@@ -11,7 +11,7 @@ use Spatie\MarkdownResponse\Enums\DetectionMethod;
 
 /**
  * ProvideMarkdownResponse returns a cached body without calling $next(), so every
- * middleware behind it — including the signature check on the draft preview — is
+ * middleware behind it, including the signature check on the draft preview, is
  * skipped on a cache hit. Its cache is also identity-blind, so one response is
  * replayed to whoever requests the same URL next.
  *

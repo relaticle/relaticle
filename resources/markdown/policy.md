@@ -1,6 +1,4 @@
-# Privacy Policy
-
-**Effective date:** March 20, 2026
+**Effective date:** August 26, 2026
 
 This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.
 
@@ -11,14 +9,14 @@ This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, a
 ### Cloud Users (app.relaticle.com)
 
 - **Account information:** Name, email address, and password (hashed)
-- **Profile data:** Avatar, team name, and role
+- **Profile data:** Avatar, workspace name, and role
 - **CRM data:** Companies, people, opportunities, tasks, notes, and custom fields you create
 - **Usage data:** Login timestamps, feature usage, and error reports
 - **Technical data:** IP address, browser type, and device information
 
 ### Self-Hosted Users
 
-We do not collect any data from self-hosted installations. Your data stays entirely on your servers.
+Data from a self-hosted installation stays on your servers unless you configure an external integration. That integration may send authorized data to its provider.
 
 ### Website Visitors (relaticle.com)
 
@@ -30,8 +28,8 @@ We do not collect any data from self-hosted installations. Your data stays entir
 We use your data to:
 
 - Provide and maintain the CRM service
-- Authenticate your account and enforce team-level access controls
-- Send transactional emails (password resets, team invitations)
+- Authenticate your account and enforce workspace-level access controls
+- Send transactional emails (password resets, workspace invitations)
 - Improve the service based on aggregated, anonymized usage patterns
 - Respond to support inquiries
 
@@ -50,7 +48,7 @@ The Cloud service uses the following third-party providers:
 - **Email delivery:** For transactional emails (password resets, invitations)
 - **Error monitoring:** For detecting and fixing bugs (anonymized error reports)
 
-We do not share your CRM data with any third party.
+Relaticle does not sell CRM data. Relaticle does not use CRM data for advertising. Relaticle does not train AI models on CRM data.
 
 ## 4. Data Security
 
@@ -58,14 +56,14 @@ We protect your data with:
 
 - Encrypted connections (TLS/HTTPS) for all data in transit
 - Encrypted database storage for sensitive fields
-- Team-based access isolation (multi-tenancy)
+- Workspace-based access isolation (multi-tenancy)
 - API token authentication with scoped permissions
 - Regular security updates and dependency audits
 
 ## 5. Data Retention
 
 - **Active accounts:** Data is retained as long as your account is active
-- **Deleted accounts:** Data is deleted within 30 days of account deletion
+- **Scheduled account deletions:** Accounts and their personal data are removed after a 30-day grace period. Records in shared workspaces remain.
 - **Contact form submissions:** Retained for up to 12 months
 - **Server logs:** Retained for up to 90 days
 
@@ -76,10 +74,12 @@ You have the right to:
 - **Access** your personal data at any time through the application
 - **Export** your data via the application or REST API
 - **Correct** inaccurate personal data through your profile settings
-- **Delete** your account and associated data
+- **Request deletion** of your account and personal data
 - **Object** to data processing for specific purposes
 
-To exercise these rights, contact us at [Contact Us](/contact). We will respond within 15 business days.
+To exercise these rights, email privacy@relaticle.com or use [Contact Us](/contact). We will respond within 15 business days.
+
+To request account deletion, email privacy@relaticle.com or contact us. If **Delete Account** is available in your profile settings, you can schedule deletion there.
 
 ## 7. Cookies
 
@@ -97,11 +97,27 @@ Our services are not directed to children under 16. We do not knowingly collect 
 
 ## 9. AI Connectors / MCP Server
 
-When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protocol (MCP) client, the connector accesses the same CRM data you can already see in your account.
+You can authorize an MCP client or AI provider to access your CRM data. The provider receives only data requested through authorized tools. The provider processes that data under its own terms and privacy policy. Disconnecting the provider or revoking its token stops future access.
 
-**What the connector can read.** Companies, people, opportunities, tasks, notes, custom-field values, and team-member metadata for the team you authorize. The connector cannot read other teams' data or any user files outside the CRM.
+Relaticle enforces workspace and token scope on every tool request.
 
-**What the connector can write.** Create, update, delete, and link/unlink companies, people, opportunities, tasks, and notes — the same actions you can perform in the Relaticle UI. Writes are scoped to the team you authorize.
+**Data tool responses can include:**
+
+- User names, email addresses, and identifiers.
+- Workspace names and identifiers.
+- Workspace-member names, emails, and identifiers.
+- Token ability names.
+- Companies, people, opportunities, tasks, and notes.
+- Record identifiers and canonical record URLs.
+- Contact details.
+- Custom-field definitions, options, and values.
+- Relationships between records.
+- Opportunity stages and amounts.
+- Activity actors, field changes, and timestamps.
+- Record creation and update timestamps.
+- Pagination and count metadata.
+
+**What the connector can write.** MCP write tools can change CRM records. They can create, update, delete, and link or unlink companies, people, opportunities, tasks, and notes. Task assignment operations can send transactional notifications.
 
 **OAuth tokens.** When you connect via OAuth (Claude Connectors Directory, ChatGPT App Directory), Relaticle stores an access token and refresh token in the `oauth_access_tokens` and `oauth_refresh_tokens` tables. Access tokens expire after 30 days and refresh tokens after 90 days. You can revoke any connector at any time from **Settings → Access Tokens → AI Connectors**; revocation immediately invalidates both the access and refresh token.
 
@@ -109,7 +125,15 @@ When you connect Relaticle to Claude, ChatGPT, or any other Model Context Protoc
 
 **Conversation data.** The MCP server does not log, store, or process the conversation context of your AI assistant. It only sees the specific tool arguments your assistant sends and the records it requests.
 
-**Telemetry.** Relaticle does not include telemetry, request IDs, internal timestamps, or session identifiers in MCP tool responses. Tool outputs are limited to fields documented in the public MCP guide.
+**Response metadata.** Tool responses can include record identifiers, timestamps, pagination metadata, and count metadata.
+
+Tool responses exclude:
+
+- Access tokens.
+- Refresh tokens.
+- Passwords.
+- API keys.
+- Authentication secrets.
 
 ## 10. Changes to This Policy
 
@@ -117,4 +141,4 @@ We may update this Privacy Policy from time to time. We will notify registered u
 
 ## 11. Contact
 
-Questions about this Privacy Policy? Reach us at [Contact Us](/contact).
+Questions about this Privacy Policy? Email privacy@relaticle.com or reach us at [Contact Us](/contact).

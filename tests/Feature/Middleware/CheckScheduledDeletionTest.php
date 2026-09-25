@@ -10,7 +10,7 @@ use Filament\Facades\Filament;
 mutates(CheckScheduledDeletion::class, ScheduledDeletionInterstitial::class);
 
 test('user with scheduled deletion is redirected to interstitial from panel', function () {
-    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $this->actingAs($user)
         ->get('/app')
@@ -18,7 +18,7 @@ test('user with scheduled deletion is redirected to interstitial from panel', fu
 });
 
 test('user without scheduled deletion is not redirected to interstitial', function () {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $response = $this->actingAs($user)->get('/app');
 
@@ -26,30 +26,44 @@ test('user without scheduled deletion is not redirected to interstitial', functi
 });
 
 test('interstitial component renders for user with scheduled deletion', function () {
-    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $this->actingAs($user);
 
     livewire(ScheduledDeletionInterstitial::class)
         ->assertSuccessful()
-        ->assertSee('Your account is being deleted');
+        ->assertSee('Your account is scheduled for deletion')
+        ->assertSee('Your profile and sign-in account will be permanently deleted.')
+        ->assertSee('1 sole-owned workspace and its CRM data will also be deleted.')
+        ->assertSee('Records in shared workspaces will remain without your profile.');
+});
+
+test('cancel confirmation explains that account access will be restored', function () {
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
+
+    $this->actingAs($user);
+
+    livewire(ScheduledDeletionInterstitial::class)
+        ->mountAction('cancelDeletion')
+        ->assertMountedActionModalSee('Your scheduled deletion will be cancelled.')
+        ->assertMountedActionModalSee('You will regain access to your account and workspaces.');
 });
 
 test('interstitial redirects non-scheduled user to home', function () {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
     livewire(ScheduledDeletionInterstitial::class)
         ->assertRedirect(Filament::getHomeUrl());
 });
 
 test('user can cancel deletion from interstitial', function () {
-    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $this->actingAs($user);
-    Filament::setTenant($user->personalTeam());
+    Filament::setTenant($user->personalWorkspace());
 
     livewire(ScheduledDeletionInterstitial::class)
         ->call('cancelDeletion')
@@ -70,7 +84,7 @@ test('interstitial route lives under panel path in path mode', function () {
 });
 
 test('middleware redirect targets same host as interstitial route', function () {
-    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $response = $this->actingAs($user)->get('/app');
 
@@ -82,7 +96,7 @@ test('middleware redirect targets same host as interstitial route', function () 
 });
 
 test('user can logout from interstitial', function () {
-    $user = User::factory()->withPersonalTeam()->scheduledForDeletion()->create();
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $this->actingAs($user);
 

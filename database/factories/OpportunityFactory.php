@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\Opportunity;
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Str;
@@ -20,8 +20,8 @@ final class OpportunityFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->sentence(),
-            'team_id' => Team::factory(),
+            'name' => fake()->sentence(),
+            'workspace_id' => Workspace::factory(),
         ];
     }
 
@@ -34,7 +34,7 @@ final class OpportunityFactory extends Factory
         ]);
 
         if (config('scribe.generating')) {
-            return $factory->state(['team_id' => (string) Str::ulid()]);
+            return $factory->state(['workspace_id' => (string) Str::ulid()]);
         }
 
         return $factory;

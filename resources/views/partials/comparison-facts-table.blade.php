@@ -2,7 +2,7 @@
     /**
      * List layout kept for responsive styling (a real <table> doesn't stack
      * cleanly on narrow viewports); tables DO convert to markdown since the
-     * TableAwareLeagueDriver landed (see app/Support/Markdown) — this is a
+     * TableAwareLeagueDriver landed (see app/Support/Markdown). This is a
      * presentation choice, not a markdown-conversion workaround. See the
      * same pattern in press.blade.php.
      */
@@ -19,7 +19,7 @@
 
     $formatContributors = function (array $facts): string {
         if (! is_int($facts['contributors'])) {
-            return __('Not applicable — closed-source, no public repository');
+            return __('Not applicable: closed-source, no public repository');
         }
 
         return __(':count contributors (as of :date)', [

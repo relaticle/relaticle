@@ -6,7 +6,7 @@ updated: "2026-08-13"
 related: [help/ai-assistant/ai-credits-and-limits, help/ai-assistant/ask-questions-about-your-data]
 ---
 
-The model picker sits in the message box — click it to see which AI models
+The model picker sits in the message box. Click it to see which AI models
 your workspace can use. **Auto** is the default and picks a sensible model for
 you; you only need this menu when you want to trade speed against depth
 yourself.
@@ -26,7 +26,7 @@ what the operator has configured. On Relaticle Cloud:
 | GPT-5 class models | Pro | 1.5x |
 
 Models marked with an amber **Pro** badge need a Pro workspace. The
-multiplier scales what a message costs in credits — see
+multiplier scales what a message costs in credits. See
 [AI credits and rate limits](/help/ai-assistant/ai-credits-and-limits).
 
 Self-hosted workspaces can also point the assistant at their own models
@@ -36,5 +36,5 @@ once configured.
 ## How the choice behaves
 
 Your selection is remembered in the browser you made it in and applies to the
-messages you send from then on. It's a per-person choice — teammates pick
-their own — and switching back to **Auto** at any time is always safe.
+messages you send from then on. It's a per-person choice, so teammates pick
+their own. Switching back to **Auto** at any time is always safe.

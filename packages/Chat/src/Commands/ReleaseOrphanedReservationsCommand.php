@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Commands;
 
-use App\Models\Team;
+use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -17,7 +17,7 @@ use Relaticle\Chat\Services\CreditService;
  * Refund credit reservations whose turn died between reserve and settle
  * (worker crash, deploy kill, lost job). The refund uses the turn's RESOLUTION
  * key, so if the original job somehow settles later the unique
- * (team_id, idempotency_key) index makes that settle a silent no-op — refund
+ * (workspace_id, idempotency_key) index makes that settle a silent no-op, so refund
  * and settle can never both apply.
  */
 #[Description('Refund credit reservations that were never settled or refunded')]
@@ -35,7 +35,7 @@ final class ReleaseOrphanedReservationsCommand extends Command
             ->whereNotExists(function (Builder $query): void {
                 $query->selectRaw('1')
                     ->from('ai_credit_transactions as resolved')
-                    ->whereColumn('resolved.team_id', 'ai_credit_transactions.team_id')
+                    ->whereColumn('resolved.workspace_id', 'ai_credit_transactions.workspace_id')
                     ->whereRaw("resolved.idempotency_key = replace(ai_credit_transactions.idempotency_key, 'reserve-', 'resolve-')");
             })->oldest()
             ->limit(500)
@@ -44,16 +44,16 @@ final class ReleaseOrphanedReservationsCommand extends Command
         $refunded = 0;
 
         foreach ($orphans as $orphan) {
-            $this->info("Refunding orphaned reservation `{$orphan->idempotency_key}` for team `{$orphan->team_id}`...");
+            $this->info("Refunding orphaned reservation `{$orphan->idempotency_key}` for workspace `{$orphan->workspace_id}`...");
 
-            $team = Team::query()->find($orphan->team_id);
+            $workspace = Workspace::query()->find($orphan->workspace_id);
 
-            if ($team === null) {
+            if ($workspace === null) {
                 continue;
             }
 
             $creditService->refundReservation(
-                team: $team,
+                workspace: $workspace,
                 resolutionKey: str_replace('reserve-', 'resolve-', (string) $orphan->idempotency_key),
                 conversationId: $orphan->conversation_id === null ? null : (string) $orphan->conversation_id,
             );

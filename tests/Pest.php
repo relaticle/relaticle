@@ -15,12 +15,17 @@ declare(strict_types=1);
  */
 
 use App\Models\User;
+use App\Support\Http\HostResolver;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
+
+PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
@@ -70,7 +75,7 @@ function chatChannelAuth(User $user, string $conversationId): bool
 /**
  * Invoke the App.Models.User.{id} broadcast channel authorization callback.
  *
- * Mirrors chatChannelAuth — retrieves the registered closure via reflection
+ * Mirrors chatChannelAuth. Retrieves the registered closure via reflection
  * and invokes it directly, so tests exercise the real production callback.
  */
 function userChannelAuth(User $user, string $id): bool
@@ -90,4 +95,58 @@ function userChannelAuth(User $user, string $id): bool
     }
 
     return (bool) $callback($user, $id);
+}
+
+/**
+ * Log in through the real two-step login form: type the email and submit to
+ * reveal the password field, then type the password and submit again.
+ */
+function loginViaBrowser(User $user): AwaitableWebpage
+{
+    return test()->visit('/app/login')
+        ->type('[id="form.email"]', $user->email)
+        ->click('button[type="submit"]')
+        ->type('[id="form.password"]', 'password')
+        ->click('button[type="submit"]');
+}
+
+function pdfBytes(): string
+{
+    return "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n";
+}
+
+function onePixelPng(): string
+{
+    return (string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true);
+}
+
+function signedUrlSignature(string $url): string
+{
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+    return (string) ($query['signature'] ?? '');
+}
+
+/** @param list<string> $addresses */
+function resolveHostsTo(array $addresses, int &$calls = 0): void
+{
+    $calls = 0;
+
+    app()->instance(HostResolver::class, new HostResolver(function (string $host) use ($addresses, &$calls): array {
+        $calls++;
+
+        return $addresses;
+    }));
+}
+
+/** @param list<array<string, mixed>> $toolResults */
+function storedToolSteps(array $toolResults, string $content = ''): string
+{
+    return json_encode([[
+        'content' => $content,
+        'tool_calls' => array_map(static fn (array $toolResult): array => ['arguments' => [], ...$toolResult], $toolResults),
+        'reasoning' => '',
+        'replay_blocks' => [],
+        'provider_tool_calls' => [],
+    ]], JSON_THROW_ON_ERROR);
 }

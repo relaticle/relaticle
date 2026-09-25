@@ -9,7 +9,7 @@ false-rejects. Spec §5.2 stage 5 + §5.7 gate #5.
 
 - A **persona REPORTS** bugs (in its `bugs[]`).
 - The **verifier CONFIRMS** them, from scratch, in a fresh session.
-- Only **confirmed** bugs gate the verdict — they become `confirmed_blockers` and can
+- Only **confirmed** bugs gate the verdict. They become `confirmed_blockers` and can
   flip the label to `ai-rejected`.
 - **Unconfirmed** bugs are reported as `unconfirmed_findings` and **never reject**.
   They are surfaced to the human as "persona-reported, not reproduced", not buried.
@@ -35,7 +35,7 @@ the persona's reasoning. For each bug it:
 
 ## 3. Output contract
 
-The verifier writes **`verifier/confirmations.json`**, keyed by bug id — the EXACT
+The verifier writes **`verifier/confirmations.json`**, keyed by bug id, with the EXACT
 shape `aggregate_verdicts.py` reads (Plan 1 Task 5):
 
 ```json
@@ -65,14 +65,14 @@ about the rest.
 
 The verifier must **not "trust" the persona's screenshot** or take the persona's word.
 It reproduces from scratch, every time. A bug it cannot independently reproduce is
-`confirmed: false` — **even if the persona's evidence looks convincing.** Convincing
+`confirmed: false`, **even if the persona's evidence looks convincing.** Convincing
 evidence is not reproduction. The whole point is a second, independent pair of eyes;
 inheriting the first agent's state defeats it.
 
 ## 6. Self-review boxing (mandatory independence)
 
 If the reviewing session AUTHORED the diff (same conversation wrote the code), the
-verifier MUST run as a fresh subagent — the author cold-reproducing its own bugs is not
+verifier MUST run as a fresh subagent. The author cold-reproducing its own bugs is not
 independent. If no independent pass is possible (subagent capacity exhausted), say so in
 the report and cap Tier ≥ 2 verdicts at `ai-needs-human` with that reason in
 `decision_needed`. Field evidence: two consecutive self-authored runs (PR 326/332) lost

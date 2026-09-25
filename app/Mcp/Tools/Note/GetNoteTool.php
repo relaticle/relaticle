@@ -4,35 +4,29 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Note;
 
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
 use App\Mcp\Tools\BaseShowTool;
-use App\Models\Note;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
-use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Get Note')]
 #[Description('Get a single note by ID with full details and relationships.')]
-#[IsReadOnly]
-#[IsIdempotent]
-#[IsOpenWorld(false)]
 final class GetNoteTool extends BaseShowTool
 {
-    protected function modelClass(): string
+    use OperatesOnCrmEntity;
+
+    protected function entity(): CrmEntity
     {
-        return Note::class;
+        return CrmEntity::Note;
     }
 
     /** @return class-string<JsonResource> */
     protected function resourceClass(): string
     {
         return NoteResource::class;
-    }
-
-    protected function entityLabel(): string
-    {
-        return 'Note';
     }
 
     /** @return array<int, string> */

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Events\WorkspaceCreated;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
-use Laravel\Jetstream\Events\TeamCreated;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -19,14 +19,14 @@ use Relaticle\ImportWizard\Store\ImportStore;
 mutates(ImportWizard::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([TeamCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class]);
     Bus::fake();
 
-    $this->user = User::factory()->withTeam()->create();
+    $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
-    $this->team = $this->user->currentTeam;
+    $this->workspace = $this->user->currentWorkspace;
 
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     $this->createdStoreIds = [];
 });
@@ -48,8 +48,8 @@ function mountImportWizard(object $context, ?string $returnUrl = null): Testable
 
 function createFullTestStore(object $context): ImportStore
 {
-    $import = Import::create([
-        'team_id' => (string) $context->team->id,
+    $import = Import::factory()->create([
+        'workspace_id' => (string) $context->workspace->id,
         'user_id' => (string) $context->user->id,
         'entity_type' => ImportEntityType::People,
         'file_name' => 'test.csv',
@@ -289,12 +289,12 @@ it('rejects path traversal storeId values', function (string $maliciousId): void
     str_repeat('A', 27),
 ]);
 
-it('resets storeId when store belongs to different team', function (): void {
-    $otherUser = User::factory()->withTeam()->create();
-    $otherTeam = $otherUser->currentTeam;
+it('resets storeId when store belongs to different workspace', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $otherWorkspace = $otherUser->currentWorkspace;
 
-    $import = Import::create([
-        'team_id' => (string) $otherTeam->id,
+    $import = Import::factory()->create([
+        'workspace_id' => (string) $otherWorkspace->id,
         'user_id' => (string) $otherUser->id,
         'entity_type' => ImportEntityType::People,
         'file_name' => 'test.csv',

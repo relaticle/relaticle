@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\User;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 
 /**
  * Rebuilds a proposal item's display_data from a clean action_data record.
@@ -17,7 +17,7 @@ use Relaticle\Chat\Support\TeamMembersContext;
 final readonly class ProposalDisplayBuilder
 {
     /**
-     * Per-entity title/summary literals — must match each Create*Tool::buildRecordDisplay()
+     * Per-entity title/summary literals. Must match each Create*Tool::buildRecordDisplay()
      * exactly so the card heading is stable across an edit.
      *
      * @var array<string, array{title: string, nameKey: string, label: string, summaryPrefix: string}>
@@ -28,6 +28,7 @@ final readonly class ProposalDisplayBuilder
         'opportunity' => ['title' => 'Create Opportunity', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create opportunity'],
         'task' => ['title' => 'Create Task', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create task'],
         'note' => ['title' => 'Create Note', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create note'],
+        'workspace_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
     ];
 
     public function __construct(
@@ -91,7 +92,7 @@ final readonly class ProposalDisplayBuilder
                 $rows[] = [
                     'label' => 'Account Owner',
                     'code' => 'account_owner_id',
-                    'value' => TeamMembersContext::nameOf($ownerId) ?? $ownerId,
+                    'value' => WorkspaceMembersContext::nameOf($ownerId) ?? $ownerId,
                 ];
             }
         }
@@ -102,7 +103,7 @@ final readonly class ProposalDisplayBuilder
     /**
      * Keep rows from existingFields that:
      * - have a 'label' key
-     * - whose label is not already produced by the builder — i.e. not a core row and not
+     * - whose label is not already produced by the builder, i.e. not a core row and not
      *   a re-derived custom-field row (not in $reservedLabels)
      * - do NOT have a 'type' key (defensive: a custom-field row always carries type)
      *

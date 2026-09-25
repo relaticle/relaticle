@@ -6,7 +6,7 @@ updated: "2026-08-13"
 related: [help/import/what-each-record-type-needs, help/import/fix-import-errors]
 ---
 
-When a CSV column uniquely identifies a record — an ID, an email, a domain —
+When a CSV column uniquely identifies a record (an ID, an email, a domain),
 the import wizard matches rows to your existing data and updates those records
 instead of duplicating them. You choose the match method while mapping
 columns, and the preview shows exactly what will be created versus updated
@@ -20,7 +20,7 @@ before anything changes.
 | **Domain** | Finds the existing company by domain, or creates a new one | Companies |
 | **Email** | Finds the existing person by email, or creates a new one | People |
 | **Phone** | Finds the existing person by phone, or creates a new one | People |
-| **Name** | Always creates a new record — names aren't unique | Companies, People |
+| **Name** | Always creates a new record; names aren't unique | Companies, People |
 
 The preview step then labels every row:
 
@@ -34,7 +34,7 @@ will be created as new. You can go back and map one, or continue anyway.
 ## How updates behave
 
 - **Blank cells are ignored.** An empty CSV cell preserves the existing value
-  — include only the columns you want to change.
+  Include only the columns you want to change.
 - **Multi-value fields merge.** Emails, phone numbers, tags, and multi-select
   values are added to what's already on the record, not replaced.
 - **Duplicates within the file collapse.** If two rows resolve to the same
@@ -45,10 +45,10 @@ will be created as new. You can go back and map one, or continue anyway.
 
 For precise updates, start from an export:
 
-1. **Export** the records you want to change — the file includes an `id`
+1. **Export** the records you want to change. The file includes an `id`
    column.
 2. **Edit** the CSV, keeping the `id` column intact.
-3. **Re-import** — rows with a valid ID update those exact records.
+3. **Re-import**. Rows with a valid ID update those exact records.
 
 ```
 id,name,custom_fields_industry

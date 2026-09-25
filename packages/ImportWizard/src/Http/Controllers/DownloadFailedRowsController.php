@@ -18,7 +18,7 @@ final class DownloadFailedRowsController
         $user = $request->user();
 
         abort_unless(
-            (string) $import->team_id === (string) $user->currentTeam?->getKey(),
+            (string) $import->workspace_id === (string) $user->currentWorkspace?->getKey(),
             403,
         );
 

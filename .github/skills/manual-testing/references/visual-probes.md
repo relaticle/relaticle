@@ -2,7 +2,7 @@
 
 Deterministic checks the skill runs via `agent-browser eval` to catch concrete visual failures that don't depend on Claude's judgment. Screenshots and the Image oracle (`oracles.md`) cover the subjective layer; these probes cover the measurable one.
 
-Each probe is a self-contained IIFE that returns a JSON object: `{ type, viewport, count, offenders[] }`. Run them at every viewport in the Supermodel sweep. Findings with `count > 0` become reportable observations — Claude must still decide if the offending element is in-scope (changed in the diff or downstream of it). Out-of-scope offenders go in the "neutral notes" section, not as findings.
+Each probe is a self-contained IIFE that returns a JSON object: `{ type, viewport, count, offenders[] }`. Run them at every viewport in the Supermodel sweep. Findings with `count > 0` become reportable observations. Claude must still decide whether the offending element is in scope (changed in the diff or downstream of it). Out-of-scope offenders go in the "neutral notes" section, not as findings.
 
 ## How to run
 
@@ -26,7 +26,7 @@ Aggregate the results and merge same-element duplicates across viewports (an ele
 
 ---
 
-## P1 — Horizontal overflow
+## P1: Horizontal overflow
 
 Any element extending past the viewport's right edge. Catches sidebar bleed, tables that don't wrap, fixed-width buttons.
 
@@ -52,9 +52,9 @@ Any element extending past the viewport's right edge. Catches sidebar bleed, tab
 })()
 ```
 
-## P2 — Text clipping
+## P2: Text clipping
 
-Leaf elements where `scrollWidth > clientWidth` — text is being cut off or hidden by `overflow: hidden` without an ellipsis.
+Leaf elements where `scrollWidth > clientWidth`. Text is being cut off or hidden by `overflow: hidden` without an ellipsis.
 
 ```javascript
 (() => {
@@ -80,9 +80,9 @@ Leaf elements where `scrollWidth > clientWidth` — text is being cut off or hid
 })()
 ```
 
-## P3 — Undersized tap targets
+## P3: Undersized tap targets
 
-Interactive elements smaller than 44×44 CSS pixels (WCAG 2.5.5 AA). False positives are common (icon-only buttons inside larger hit areas) — Claude must verify by clicking the element in the screenshot.
+Interactive elements smaller than 44×44 CSS pixels (WCAG 2.5.5 AA). False positives are common (icon-only buttons inside larger hit areas), so Claude must verify by clicking the element in the screenshot.
 
 ```javascript
 (() => {
@@ -106,7 +106,7 @@ Interactive elements smaller than 44×44 CSS pixels (WCAG 2.5.5 AA). False posit
 })()
 ```
 
-## P4 — Stuck loading indicators
+## P4: Stuck loading indicators
 
 Spinners, progressbars, or `wire:loading` elements still visible after the page has settled. Run after `agent-browser wait --load networkidle` plus a 1s pause.
 
@@ -130,7 +130,7 @@ Spinners, progressbars, or `wire:loading` elements still visible after the page 
 })()
 ```
 
-## P5 — Image hygiene
+## P5: Image hygiene
 
 `<img>` without `alt`, with broken `src`, or rendering at zero natural size. Decorative images need `alt=""` AND `aria-hidden="true"` to pass.
 
@@ -156,7 +156,7 @@ Spinners, progressbars, or `wire:loading` elements still visible after the page 
 })()
 ```
 
-## P6 — Focus visibility
+## P6: Focus visibility
 
 Tab through interactive elements; report any whose computed `outline-width` is `0px` and `box-shadow` doesn't change on `:focus-visible`. Run from a fresh page load.
 
@@ -187,9 +187,9 @@ Tab through interactive elements; report any whose computed `outline-width` is `
 })()
 ```
 
-## P7 — Color contrast spot-check
+## P7: Color contrast spot-check
 
-For every text node larger than 12px, compute foreground vs background color contrast and flag anything below WCAG AA (4.5:1 for normal text, 3:1 for ≥18pt or bold ≥14pt). Background detection is naive (walks ancestors until a non-transparent color is found) — false positives expected on text over images or gradients.
+For every text node larger than 12px, compute foreground vs background color contrast and flag anything below WCAG AA (4.5:1 for normal text, 3:1 for ≥18pt or bold ≥14pt). Background detection is naive (walks ancestors until a non-transparent color is found), so expect false positives on text over images or gradients.
 
 ```javascript
 (() => {
@@ -259,7 +259,7 @@ For every text node larger than 12px, compute foreground vs background color con
 })()
 ```
 
-## P8 — Layout shift sample
+## P8: Layout shift sample
 
 Watch CLS for 2 seconds after page settle. Anything > 0.1 is a poor Core Web Vitals score; > 0.25 is "Poor."
 
@@ -300,7 +300,7 @@ For every page that the diff plausibly touched, exercise each state and capture 
 | **Focus** | Tab through page; screenshot at each stop | Focus ring visible (run P6 to flag missing rings) |
 | **Dark mode** | Toggle theme (if app supports it; check `<html class="dark">` toggle) | All custom-token colors flip correctly; no hardcoded white-on-white |
 
-A page that doesn't have a state listed (e.g., a static settings page has no "many rows" state) skips that row — record `N/A` in the matrix.
+A page that doesn't have a state listed (e.g., a static settings page has no "many rows" state) skips that row. Record `N/A` in the matrix.
 
 ## Viewport sweep
 
@@ -309,10 +309,10 @@ Each probe runs at all five viewports unless the diff is desktop-only:
 | Viewport | When to skip |
 |---|---|
 | 320×568 (small phone) | Skip if diff is admin-only / `/sysadmin/*` |
-| 375×812 (standard phone) | Never skip — covers iPhone SE through 14 |
+| 375×812 (standard phone) | Never skip. Covers iPhone SE through 14 |
 | 768×1024 (tablet portrait) | Skip if Filament panel doesn't ship a tablet layout |
 | 1024×768 (tablet landscape / small laptop) | Never skip |
-| 1440×900 (laptop) | Default — assume this is what was developed against |
+| 1440×900 (laptop) | Default. Assume this is what was developed against |
 
 Re-walk the changed pages at each viewport. Probe results from one viewport that don't reproduce at others are kept (it's a real bug at that viewport), but record the viewport in the offender's record.
 
@@ -323,7 +323,7 @@ The skill aggregates probe results into one block per page:
 ```
 ### Page: /app/<team>/companies (1440×900)
 - P1 horizontal-overflow: 0
-- P2 text-clipping: 2 (`.fi-ta-cell-name` clips "Acme Corporation Holdings International" — see screenshot)
+- P2 text-clipping: 2 (`.fi-ta-cell-name` clips "Acme Corporation Holdings International", see screenshot)
 - P3 tap-target-undersize: 0
 - P4 stuck-loading: 0
 - P5 image-hygiene: 1 (avatar.jpg missing alt)

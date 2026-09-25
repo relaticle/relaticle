@@ -9,7 +9,6 @@ use App\Enums\Notifications\NotificationType;
 use App\Enums\SubscriberTagEnum;
 use App\Models\User;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
@@ -28,14 +27,18 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Laravel\Jetstream\Contracts\DeletesUsers;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedTeamsRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\TeamsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
 final class UserResource extends Resource
 {
@@ -69,19 +72,24 @@ final class UserResource extends Resource
                     ->required()
                     ->maxLength(255),
                 TextInput::make('email')
+                    ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
+                    ->dehydrated()
                     ->email()
                     ->required()
                     ->maxLength(255)
                     ->unique(ignoreRecord: true),
-                DateTimePicker::make('email_verified_at'),
+                DateTimePicker::make('email_verified_at')
+                    ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
+                    ->dehydrated(),
                 TextInput::make('password')
+                    ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
                     ->password()
                     ->maxLength(255)
                     ->dehydrated(fn (?string $state): bool => filled($state))
                     ->required(fn (string $operation): bool => $operation === 'create'),
-                Select::make('current_team_id')
+                Select::make('current_workspace_id')
                     ->searchable()
-                    ->relationship('currentTeam', 'name'),
+                    ->relationship('currentWorkspace', 'name'),
                 Section::make('Notifications')
                     ->description('Overrides what this user receives. Mirrors their own notification settings page.')
                     ->schema(self::notificationPreferenceFields())
@@ -122,16 +130,17 @@ final class UserResource extends Resource
                     IconEntry::make('email_verified_at')
                         ->label('Verified')
                         ->boolean(),
-                    TextEntry::make('currentTeam.name')
-                        ->label('Current Team')
+                    TextEntry::make('currentWorkspace.name')
+                        ->label('Current Workspace')
                         ->color('primary')
-                        ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
+                        ->url(RecordLink::to(WorkspaceResource::class, 'currentWorkspace')),
                     TextEntry::make('last_login_at')
                         ->label('Last Login')
                         ->dateTime()
                         ->placeholder('Never'),
-                    TextEntry::make('subscriber_recency_bucket')
+                    TextEntry::make('engagement')
                         ->label('Engagement')
+                        ->state(self::engagementBadge(...))
                         ->badge()
                         ->placeholder('—'),
                     TextEntry::make('created_at')
@@ -160,23 +169,39 @@ final class UserResource extends Resource
                     ->boolean()
                     ->trueIcon('heroicon-o-check-badge')
                     ->falseIcon('heroicon-o-x-mark'),
-                TextColumn::make('currentTeam.name')
-                    ->label('Current Team')
+                TextColumn::make('currentWorkspace.name')
+                    ->label('Current Workspace')
                     ->sortable()
                     ->color('primary')
-                    ->url(RecordLink::to(TeamResource::class, 'currentTeam')),
+                    ->url(RecordLink::to(WorkspaceResource::class, 'currentWorkspace')),
                 TextColumn::make('last_login_at')
                     ->label('Last Login')
                     ->dateTime()
                     ->sortable()
                     ->toggleable()
                     ->placeholder('Never'),
-                TextColumn::make('subscriber_recency_bucket')
+                TextColumn::make('engagement')
                     ->label('Engagement')
+                    ->state(self::engagementBadge(...))
                     ->badge()
-                    ->sortable()
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('last_login_at', $direction))
                     ->toggleable()
                     ->placeholder('—'),
+                IconColumn::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->state(fn (User $record): bool => $record->rejected_subscriber_profile_hash !== null)
+                    ->boolean()
+                    ->trueIcon('heroicon-o-exclamation-triangle')
+                    ->trueColor('warning')
+                    ->falseIcon('heroicon-o-minus-small')
+                    ->falseColor('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('No'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -188,23 +213,47 @@ final class UserResource extends Resource
                 TernaryFilter::make('email_verified_at')
                     ->label('Email Verified')
                     ->nullable(),
-                SelectFilter::make('subscriber_recency_bucket')
+                TernaryFilter::make('rejected_subscriber_profile_hash')
+                    ->label('Mailcoach Rejected')
+                    ->placeholder('All users')
+                    ->trueLabel('Rejected by Mailcoach')
+                    ->falseLabel('Not rejected')
+                    ->nullable(),
+                TernaryFilter::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->placeholder('All users')
+                    ->trueLabel('Bounced')
+                    ->falseLabel('Not bounced')
+                    ->nullable(),
+                SelectFilter::make('engagement')
                     ->label('Engagement')
                     ->options([
                         SubscriberTagEnum::Active7d->value => 'Active (7d)',
                         SubscriberTagEnum::Active30d->value => 'Active (30d)',
                         SubscriberTagEnum::Dormant->value => 'Dormant',
-                    ]),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => SubscriberTagEnum::applyRecencyWindow(
+                        $query,
+                        $data['value'] ?? null,
+                    )),
             ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
+                EditAction::make()->action(null),
+                Impersonate::user(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    SafeDelete::bulkAction(function (User $record): void {
+                        resolve(DeletesUsers::class)->delete($record);
+                    }),
                 ]),
             ]);
+    }
+
+    public static function engagementBadge(User $record): ?string
+    {
+        return SubscriberTagEnum::recencyBucketFor($record->last_login_at)?->value;
     }
 
     /**
@@ -213,15 +262,16 @@ final class UserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['currentTeam', 'ownedTeams']);
+            ->with(['currentWorkspace', 'ownedWorkspaces']);
     }
 
     #[Override]
     public static function getRelations(): array
     {
         return [
-            OwnedTeamsRelationManager::class,
-            TeamsRelationManager::class,
+            OwnedWorkspacesRelationManager::class,
+            WorkspacesRelationManager::class,
+            SocialAccountsRelationManager::class,
         ];
     }
 

@@ -1,6 +1,6 @@
 # Multi-Tenant Cross-Tenant Spy Protocol (5 Checks)
 
-Run as a single block whenever any model/policy/scope path is touched. **Never reduced away** while the skill is running. The skip conditions in `SKILL.md` are the only escape — comment-only / doc-only diffs where the skill itself doesn't run.
+Run as a single block whenever any model/policy/scope path is touched. **Never reduced away** while the skill is running. The skip conditions in `SKILL.md` are the only escape: comment-only and doc-only diffs where the skill itself doesn't run.
 
 Each failure is **Critical** severity. Hard block. No auto-fix. Halt and report.
 
@@ -65,7 +65,7 @@ done
 
 ## Check 3: MCP tool probe
 
-Call the Show / Update / Delete tool with another team's record ID. The harness depends on how MCP tools are tested — typical flow is to invoke them through the AI route or directly through the MCP class with Team A's auth context.
+Call the Show / Update / Delete tool with another team's record ID. The harness depends on how MCP tools are tested. The typical flow is to invoke them through the AI route or directly through the MCP class with Team A's auth context.
 
 ```bash
 php artisan tinker --execute '
@@ -105,7 +105,7 @@ Open a list view as Team A, identify a bulk-action endpoint. Use `agent-browser 
 # Inspect the bulk-action form
 agent-browser eval "document.querySelector('form[action*=bulk]').outerHTML"
 
-# Forge a request — typical Filament pattern uses Livewire over a /livewire/update endpoint.
+# Forge a request. The typical Filament pattern uses Livewire over a /livewire/update endpoint.
 # Substitute the actual endpoint and CSRF token from the page.
 curl -sS -X POST -H "Cookie: <session-cookie>" \
     -H "X-CSRF-TOKEN: <token>" \

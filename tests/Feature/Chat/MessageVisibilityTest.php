@@ -9,8 +9,8 @@ use Tests\Helpers\ChatDocument;
 
 mutates(ListConversationMessages::class);
 
-it('hides synthetic [approval] user messages from the visible message list', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+it('hides synthetic user messages from the visible message list', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $convId = '019df800-2222-7000-8000-000000000001';
@@ -18,7 +18,7 @@ it('hides synthetic [approval] user messages from the visible message list', fun
         'id' => $convId,
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(),
-        'team_id' => $user->currentTeam->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
         'title' => '',
         'created_at' => now(),
         'updated_at' => now(),
@@ -31,16 +31,16 @@ it('hides synthetic [approval] user messages from the visible message list', fun
         'agent' => 'crm',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
+        'origin' => 'typed',
     ];
 
     DB::table('agent_conversation_messages')->insert([
         ['id' => '019df800-2222-7000-8000-000000000010', 'role' => 'user', 'content' => 'Create task for Angel', 'created_at' => now()->subSeconds(30), 'updated_at' => now()->subSeconds(30)] + $base,
         ['id' => '019df800-2222-7000-8000-000000000011', 'role' => 'assistant', 'content' => 'I have proposed creating a person.', 'created_at' => now()->subSeconds(20), 'updated_at' => now()->subSeconds(20)] + $base,
-        ['id' => '019df800-2222-7000-8000-000000000012', 'role' => 'user', 'content' => "[approval]\nstatus: approved\nentity_type: people\nrecord_id: 01abc\n", 'created_at' => now()->subSeconds(10), 'updated_at' => now()->subSeconds(10)] + $base,
+        ['id' => '019df800-2222-7000-8000-000000000012', 'role' => 'user', 'content' => "[approval]\nstatus: approved\nentity_type: people\nrecord_id: 01abc\n", 'origin' => 'resume', 'created_at' => now()->subSeconds(10), 'updated_at' => now()->subSeconds(10)] + $base,
         ['id' => '019df800-2222-7000-8000-000000000013', 'role' => 'assistant', 'content' => 'Now proposing the linked task.', 'created_at' => now(), 'updated_at' => now()] + $base,
     ]);
 
@@ -52,7 +52,5 @@ it('hides synthetic [approval] user messages from the visible message list', fun
     expect(implode("\n", $contents))->toContain('I have proposed creating a person.');
     expect(implode("\n", $contents))->toContain('Now proposing the linked task.');
 
-    foreach ($contents as $content) {
-        expect($content)->not->toStartWith('[approval]');
-    }
+    expect(array_column($messages, 'id'))->not->toContain('019df800-2222-7000-8000-000000000012');
 });

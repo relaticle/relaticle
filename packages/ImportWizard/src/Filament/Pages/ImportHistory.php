@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Pages;
 
+use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -20,6 +21,7 @@ use Relaticle\ImportWizard\Models\Import;
 
 final class ImportHistory extends Page implements HasTable
 {
+    use HasWorkspaceSettingsNavigation;
     use InteractsWithTable;
 
     protected string $view = 'import-wizard-new::filament.pages.import-history';
@@ -46,7 +48,7 @@ final class ImportHistory extends Page implements HasTable
         return $table
             ->query(
                 Import::query()
-                    ->forTeam((string) filament()->getTenant()?->getKey())
+                    ->forWorkspace((string) filament()->getTenant()?->getKey())
                     ->whereIn('status', [ImportStatus::Completed, ImportStatus::Failed, ImportStatus::Importing])
                     ->latest()
             )

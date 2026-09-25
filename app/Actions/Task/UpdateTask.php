@@ -37,32 +37,37 @@ final readonly class UpdateTask
 
         TenantFkValidator::assertUsersInWorkspace($user, $data, ['assignee_ids']);
 
-        $attributes = Arr::only($data, ['title', 'custom_fields']);
+        $attributeData = Arr::only($data, ['title', 'custom_fields']);
+        /** @var array<int, string> $newAssigneeIds */
+        $newAssigneeIds = [];
 
-        $attributes = CustomFieldMerger::merge($task, $attributes);
+        $task = DB::transaction(function () use ($task, $attributeData, $data, &$newAssigneeIds): Task {
+            $lockedTask = Task::query()
+                ->whereKey($task->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $previousAssigneeIds = $task->assignees()->pluck('users.id')->all();
-
-        $task = DB::transaction(function () use ($task, $attributes, $data): Task {
-            $task->update($attributes);
+            $attributes = CustomFieldMerger::merge($lockedTask, $attributeData);
+            $lockedTask->update($attributes);
 
             if (array_key_exists('company_ids', $data)) {
-                $task->companies()->sync($data['company_ids']);
+                $lockedTask->companies()->sync($data['company_ids']);
             }
             if (array_key_exists('people_ids', $data)) {
-                $task->people()->sync($data['people_ids']);
+                $lockedTask->people()->sync($data['people_ids']);
             }
             if (array_key_exists('opportunity_ids', $data)) {
-                $task->opportunities()->sync($data['opportunity_ids']);
+                $lockedTask->opportunities()->sync($data['opportunity_ids']);
             }
             if (array_key_exists('assignee_ids', $data)) {
-                $task->assignees()->sync($data['assignee_ids']);
+                $changes = $lockedTask->assignees()->sync($data['assignee_ids']);
+                $newAssigneeIds = $changes['attached'];
             }
 
-            return $task->refresh();
+            return $lockedTask->refresh();
         });
 
-        $this->notifyAssignees->execute($task, $previousAssigneeIds);
+        $this->notifyAssignees->execute($task, $newAssigneeIds);
 
         return $task->load('customFieldValues.customField.options');
     }

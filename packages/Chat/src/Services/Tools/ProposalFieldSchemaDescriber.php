@@ -8,10 +8,11 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use Relaticle\Chat\Support\ProposalCoreFields;
-use Relaticle\Chat\Support\TeamMembersContext;
+use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Services\ValidationService;
 
 /**
  * Produces the structured, editable field schema for a single create-proposal
@@ -62,7 +63,7 @@ final readonly class ProposalFieldSchemaDescriber
                 'value' => $owner === null ? null : (string) $owner,
                 'options' => array_map(
                     fn (array $member): array => ['id' => $member['id'], 'label' => $member['name']],
-                    TeamMembersContext::for($user),
+                    WorkspaceMembersContext::for($user),
                 ),
                 'required' => false,
             ];
@@ -80,7 +81,7 @@ final readonly class ProposalFieldSchemaDescriber
         $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
 
         $fields = CustomField::query()
-            ->where('tenant_id', $user->currentTeam->getKey())
+            ->where('tenant_id', $user->currentWorkspace->getKey())
             ->where('entity_type', $entityType)
             ->active()
             ->orderBy('code')
@@ -153,15 +154,15 @@ final readonly class ProposalFieldSchemaDescriber
     }
 
     /**
-     * A field is required when its validation_rules collection carries a
-     * `['name' => 'required']` entry. Seeded fields currently have no rules,
-     * so this resolves to false for them — the PATCH validator stays the
-     * authoritative gate (LOCKED DECISION 2).
+     * Delegated to the custom-fields package rather than re-derived here.
+     * `validation_rules` casts to a key-value collection (`['required' => true]`),
+     * so the old `['name' => 'required']` scan matched nothing and marked every
+     * field optional. The dock then built its schema without ->required(), and a
+     * cleared value was refused at the action layer after the card called it
+     * optional. Commit 5e43ca287 fixed the same predicate on the MCP path.
      */
     private function isRequired(CustomField $field): bool
     {
-        return collect($field->validation_rules)->contains(
-            fn (mixed $rule): bool => is_array($rule) && ($rule['name'] ?? null) === 'required',
-        );
+        return resolve(ValidationService::class)->isRequired($field);
     }
 }

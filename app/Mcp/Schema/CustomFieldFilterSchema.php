@@ -21,7 +21,6 @@ final readonly class CustomFieldFilterSchema
         CustomFieldType::RECORD->value,
         CustomFieldType::TEXTAREA->value,
         CustomFieldType::RICH_EDITOR->value,
-        CustomFieldType::MARKDOWN_EDITOR->value,
     ];
 
     /** @var array<int, string> */
@@ -45,7 +44,7 @@ final readonly class CustomFieldFilterSchema
         $schema = [];
 
         foreach ($fields as $field) {
-            $operators = $this->operatorsForType($field->type);
+            $operators = self::operatorsForType($field->type);
 
             if ($operators === []) {
                 continue;
@@ -74,7 +73,7 @@ final readonly class CustomFieldFilterSchema
     /**
      * @return array<string, array<string, string|array<string, mixed>>>
      */
-    private function operatorsForType(string $type): array
+    public static function operatorsForType(string $type): array
     {
         $fieldType = CustomFieldType::tryFrom($type);
 
@@ -83,17 +82,18 @@ final readonly class CustomFieldFilterSchema
         }
 
         return match ($fieldType) {
-            CustomFieldType::TEXT, CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => $this->buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::CURRENCY => $this->buildOperators(self::NUMERIC_OPERATORS, 'number'),
-            CustomFieldType::NUMBER => $this->buildOperators(self::NUMERIC_OPERATORS, 'integer'),
-            CustomFieldType::DATE => $this->buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::DATE_TIME => $this->buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => $this->buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
+            CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
+            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
+            CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
+            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
             CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
-                $this->buildOperators(['eq'], 'string'),
+                self::buildOperators(['eq'], 'string'),
                 ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
             ),
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => $this->buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(self::MULTI_OPERATORS, 'string'),
             default => [],
         };
     }
@@ -102,7 +102,7 @@ final readonly class CustomFieldFilterSchema
      * @param  array<int, string>  $operators
      * @return array<string, array<string, string>>
      */
-    private function buildOperators(array $operators, string $jsonType): array
+    private static function buildOperators(array $operators, string $jsonType): array
     {
         $result = [];
 
@@ -114,34 +114,17 @@ final readonly class CustomFieldFilterSchema
     }
 
     /**
-     * Drop the memoised schema for one tenant + entity.
-     *
-     * Callers must not rebuild this key themselves — the TTL is long enough that a
-     * missed invalidation reads as "that field doesn't exist" right after the
-     * assistant created it.
-     */
-    public static function forget(int|string $tenantId, string $entityType): void
-    {
-        Cache::forget(self::cacheKey($tenantId, $entityType));
-    }
-
-    private static function cacheKey(int|string $tenantId, string $entityType): string
-    {
-        return "custom_fields_filter_schema_{$tenantId}_{$entityType}";
-    }
-
-    /**
      * @return Collection<int, CustomField>
      */
     private function resolveFilterableFields(User $user, string $entityType): Collection
     {
-        $teamId = $user->currentTeam->getKey();
-        $cacheKey = self::cacheKey($teamId, $entityType);
+        $workspaceId = $user->currentWorkspace->getKey();
+        $cacheKey = McpSchemaCache::filterSchemaKey($workspaceId, $entityType);
 
         /** @var Collection<int, CustomField> */
-        return Cache::remember($cacheKey, 60, fn (): Collection => CustomField::query()
+        return Cache::remember($cacheKey, McpSchemaCache::TTL, fn (): Collection => CustomField::query()
             ->withoutGlobalScopes()
-            ->where('tenant_id', $teamId)
+            ->where('tenant_id', $workspaceId)
             ->where('entity_type', $entityType)
             ->whereNotIn('type', self::EXCLUDED_TYPES)
             ->where(fn (Builder $q) => $q->whereNull('settings->encrypted')->orWhere('settings->encrypted', false))

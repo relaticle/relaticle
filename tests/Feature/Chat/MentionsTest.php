@@ -11,10 +11,10 @@ use Relaticle\Chat\Http\Controllers\ChatController;
 mutates(ChatController::class);
 
 beforeEach(function () {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
     RateLimiter::clear('60|'.request()->ip());
 });
 
@@ -37,8 +37,8 @@ it('rejects q shorter than 2 characters', function (): void {
 });
 
 it('does not treat % as a LIKE wildcard', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
-    Company::factory()->for($this->team)->create(['name' => 'Globex']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Inc']);
+    Company::factory()->for($this->workspace)->create(['name' => 'Globex']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => '%%']))
         ->assertOk();
@@ -46,11 +46,11 @@ it('does not treat % as a LIKE wildcard', function (): void {
     expect($response->json('data'))->toBe([]);
 });
 
-it('returns matching companies for current team only', function (): void {
-    Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
+it('returns matching companies for current workspace only', function (): void {
+    Company::factory()->for($this->workspace)->create(['name' => 'Acme Inc']);
 
-    $otherUser = User::factory()->withPersonalTeam()->create();
-    Company::factory()->for($otherUser->currentTeam)->create(['name' => 'Acme Corp']);
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    Company::factory()->for($otherUser->currentWorkspace)->create(['name' => 'Acme Corp']);
 
     $response = $this->getJson(route('chat.mentions', ['q' => 'Acme']))
         ->assertOk();
@@ -63,7 +63,7 @@ it('returns matching companies for current team only', function (): void {
 });
 
 it('includes a resolved record url for each result', function (): void {
-    $company = Company::factory()->for($this->team)->create(['name' => 'Acme Inc']);
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme Inc']);
 
     $data = collect(
         $this->getJson(route('chat.mentions', ['q' => 'Acme']))

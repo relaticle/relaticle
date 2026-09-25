@@ -10,46 +10,46 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Laravel\Sanctum\PersonalAccessToken as SanctumPersonalAccessToken;
 use LogicException;
 
-/** Cannot be final — Sanctum::actingAs() uses Mockery to mock this class in tests */
+/** Cannot be final; Sanctum::actingAs() uses Mockery to mock this class in tests */
 #[ObservedBy(PersonalAccessTokenObserver::class)]
 #[\Illuminate\Database\Eloquent\Attributes\Fillable([
     'name',
     'abilities',
     'expires_at',
-    'team_id',
+    'workspace_id',
 ])]
 class PersonalAccessToken extends SanctumPersonalAccessToken
 {
     protected static function booted(): void
     {
         self::creating(function (PersonalAccessToken $token): void {
-            if ($token->team_id && $token->tokenable instanceof User) {
+            if ($token->workspace_id && $token->tokenable instanceof User) {
                 abort_unless(
-                    $token->tokenable->belongsToTeamId($token->team_id),
+                    $token->tokenable->belongsToWorkspaceId($token->workspace_id),
                     403,
-                    'Token team_id must belong to the tokenable user.',
+                    'Token workspace_id must belong to the tokenable user.',
                 );
             }
         });
 
         self::updating(function (PersonalAccessToken $token): void {
-            if ($token->isDirty('team_id')) {
-                throw_if($token->getOriginal('team_id') !== null, LogicException::class, 'The team_id attribute cannot be changed after it has been set.');
+            if ($token->isDirty('workspace_id')) {
+                throw_if($token->getOriginal('workspace_id') !== null, LogicException::class, 'The workspace_id attribute cannot be changed after it has been set.');
 
-                if ($token->team_id && $token->tokenable instanceof User) {
+                if ($token->workspace_id && $token->tokenable instanceof User) {
                     abort_unless(
-                        $token->tokenable->belongsToTeamId($token->team_id),
+                        $token->tokenable->belongsToWorkspaceId($token->workspace_id),
                         403,
-                        'Token team_id must belong to the tokenable user.',
+                        'Token workspace_id must belong to the tokenable user.',
                     );
                 }
             }
         });
     }
 
-    /** @return BelongsTo<Team, $this> */
-    public function team(): BelongsTo
+    /** @return BelongsTo<Workspace, $this> */
+    public function workspace(): BelongsTo
     {
-        return $this->belongsTo(Team::class);
+        return $this->belongsTo(Workspace::class);
     }
 }

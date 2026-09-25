@@ -3,21 +3,26 @@
 declare(strict_types=1);
 
 use App\Features\OnboardSeed;
+use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
+use Relaticle\CustomFields\Services\TenantContextService;
+
+mutates(CustomFieldsDisplayFormatter::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
 });
 
 it('formats a single-choice field with the option label, not the id', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $teamId = $user->currentTeam->getKey();
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
     $statusField = CustomField::query()
-        ->where('tenant_id', $teamId)
+        ->where('tenant_id', $workspaceId)
         ->where('entity_type', 'task')
         ->where('code', 'status')
         ->firstOrFail();
@@ -31,7 +36,7 @@ it('formats a single-choice field with the option label, not the id', function (
 });
 
 it('formats a date-time field as a localized date string', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: ['due_date' => '2026-05-20T14:00:00Z'], oldModel: null);
@@ -41,7 +46,7 @@ it('formats a date-time field as a localized date string', function (): void {
 });
 
 it('formats rich-text fields by stripping HTML for the proposal card', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: ['description' => '<p>Hello <strong>world</strong></p>'], oldModel: null);
@@ -49,13 +54,22 @@ it('formats rich-text fields by stripping HTML for the proposal card', function 
     expect($rows[0]['new'])->toBe('Hello world');
 });
 
+it('keeps the paragraphs of a rich-text field apart and decodes its entities', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'task', cleanFields: ['description' => '<p>Send the quote &amp; terms.</p><p>Loop in finance.</p>'], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('Send the quote & terms. Loop in finance.');
+});
+
 it('includes the old value for updates with a current value on the model', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
-    $team = $user->currentTeam;
-    $task = Task::factory()->for($team)->create(['title' => 'T']);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $task = Task::factory()->for($workspace)->create(['title' => 'T']);
 
     $descField = CustomField::query()
-        ->where('tenant_id', $team->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'task')
         ->where('code', 'description')
         ->firstOrFail();
@@ -72,11 +86,130 @@ it('includes the old value for updates with a current value on the model', funct
     ]);
 });
 
+/**
+ * The old side of a multi-value diff. `json_value` is cast to a Collection, so
+ * every is_array() branch in the formatter misses it and the raw Collection
+ * stringifies to its own JSON: without the unwrap, this row reads
+ * `["old.example.com"]` before the arrow and `new.example.com` after it, in the
+ * same proposal card. The stored path already unwraps; this pins the proposed
+ * path so the two cannot diverge again.
+ */
+it('renders the old value of a multi-value field as its members, not raw json', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $company = Company::factory()->for($workspace)->create(['name' => 'Acme']);
+
+    $domains = CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    $company->saveCustomFieldValue($domains, ['old.example.com']);
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'company', cleanFields: ['domains' => ['new.example.com']], oldModel: $company->fresh());
+
+    expect($rows[0])->toMatchArray([
+        'label' => 'Domains',
+        'old' => 'old.example.com',
+        'new' => 'new.example.com',
+    ]);
+});
+
 it('returns an empty array when no custom_fields are submitted', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     $rows = resolve(CustomFieldsDisplayFormatter::class)
         ->format($user, 'task', cleanFields: [], oldModel: null);
 
     expect($rows)->toBe([]);
+});
+
+it('renders a record custom field on the proposal card as the record name, not its id', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Globex']);
+
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Links',
+        'code' => 'links',
+        'type' => 'section',
+        'sort_order' => 98,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)
+            ->format($user, 'task', [$field->code => [$company->getKey()]], null);
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['new'])->toBe('Globex')
+        ->and($rows[0]['values'])->toBe(['Globex']);
+});
+
+it('names the record on a stored record card, not its id', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $company = Company::factory()->create(['workspace_id' => $user->currentWorkspace->getKey(), 'name' => 'Initech']);
+
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'entity_type' => 'task',
+        'name' => 'Links',
+        'code' => 'links',
+        'type' => 'section',
+        'sort_order' => 97,
+        'active' => true,
+    ]);
+
+    $field = CustomField::query()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $task = Task::factory()->create(['workspace_id' => $user->currentWorkspace->getKey()]);
+    $task->saveCustomFieldValue($field, [$company->getKey()]);
+
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
+
+    try {
+        $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
+            $task->fresh('customFieldValues.customField.options'),
+            [$field->fresh('options')],
+            200,
+        );
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+
+    expect($rows)->toHaveCount(1)
+        ->and($rows[0]['value'])->toBe('Initech')
+        ->and($rows[0]['values'])->toBe(['Initech']);
 });

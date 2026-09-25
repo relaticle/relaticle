@@ -11,16 +11,16 @@ use Tests\Helpers\ChatDocument;
 mutates(ListConversationMessages::class);
 
 beforeEach(function (): void {
-    $this->user = User::factory()->withPersonalTeam()->create();
-    $this->team = $this->user->currentTeam;
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
-    Filament::setTenant($this->team);
+    Filament::setTenant($this->workspace);
 
     DB::table('agent_conversations')->insert([
         'id' => 'c-page',
         'participant_type' => 'user',
         'participant_id' => $this->user->getKey(),
-        'team_id' => $this->team->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
         'title' => 'Page',
         'created_at' => now(),
         'updated_at' => now(),
@@ -37,8 +37,7 @@ beforeEach(function (): void {
             'content' => "msg {$i}",
             'document' => ChatDocument::emptyJson(),
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
+            'steps' => '[]',
             'usage' => '{}',
             'meta' => '{}',
             'created_at' => now()->subSeconds(100 - $i),
@@ -59,4 +58,15 @@ it('returns earlier messages with beforeMessageId cursor', function (): void {
     expect($result)->toHaveCount(25);
     expect($result[0]['content'])->toContain('msg 1');
     expect($result[24]['content'])->toContain('msg 25');
+});
+
+it('still fills a whole page when an approval marker sits inside the window', function (): void {
+    DB::table('agent_conversation_messages')
+        ->where('id', 'm-050')
+        ->update(['role' => 'user', 'origin' => 'resume', 'content' => 'The user decided the proposals above.']);
+
+    $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page');
+
+    expect($result)->toHaveCount(50)
+        ->and(array_column($result, 'id'))->not->toContain('m-050');
 });

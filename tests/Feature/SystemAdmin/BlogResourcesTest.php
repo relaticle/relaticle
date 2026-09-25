@@ -59,7 +59,7 @@ it('keeps published posts when the account that authored them is deleted', funct
     // Ink ships author_id as ON DELETE CASCADE. Users are hard-deleted (no SoftDeletes)
     // by app:purge-scheduled-deletions on a daily schedule, so an author closing their
     // account silently took the company's marketing content with it.
-    $author = User::factory()->withPersonalTeam()->create();
+    $author = User::factory()->withPersonalWorkspace()->create();
     $post = Post::factory()->published()->create(['author_id' => $author->id]);
 
     app(DeletesUsers::class)->delete($author);
@@ -92,7 +92,7 @@ it('denies blog authoring to a signed-in customer', function (): void {
     // denies rather than handing the customer the company's marketing content.
     Filament::setCurrentPanel('app');
 
-    $customer = User::factory()->withPersonalTeam()->create();
+    $customer = User::factory()->withPersonalWorkspace()->create();
     $post = Post::factory()->published()->create();
 
     expect($customer->can('viewAny', Post::class))->toBeFalse()

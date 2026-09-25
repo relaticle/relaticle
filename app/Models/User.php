@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\WorkspaceCapability;
+use App\Enums\WorkspaceRole;
 use App\Models\Concerns\HasProfilePhoto;
+use App\Models\Concerns\HasWorkspaces;
+use App\Notifications\Auth\ResetPassword;
+use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
+use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
+use DateTimeZone;
 use Exception;
+use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Models\Contracts\HasDefaultTenant;
@@ -31,10 +40,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
+use Laravel\Fortify\Contracts\PasskeyUser;
+use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use Laravel\Jetstream\HasTeams;
 use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
@@ -47,17 +57,22 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $password
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
- * @property Carbon|null $email_verified_at
- * @property Carbon|null $last_login_at
+ * @property CarbonImmutable|null $email_verified_at
+ * @property CarbonImmutable|null $email_sign_in_enabled_at
+ * @property CarbonImmutable|null $last_login_at
+ * @property CarbonImmutable|null $email_bounced_at
  * @property string|null $mailcoach_subscriber_uuid
- * @property string|null $subscriber_recency_bucket
+ * @property string|null $subscriber_profile_hash
+ * @property string|null $rejected_subscriber_profile_hash
  * @property string|null $remember_token
- * @property Carbon|null $scheduled_deletion_at
+ * @property CarbonImmutable|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
- * @property-read Team|null $currentTeam
+ * @property-read Workspace|null $currentWorkspace
+ * @property-read Membership|null $membership the `workspace_user` row, populated only when the user was
+ *     loaded through `Workspace::users()`; null on a user reached any other way
  */
 #[Appends([
     'profile_photo_url',
@@ -76,10 +91,11 @@ use Laravel\Sanctum\HasApiTokens;
     'two_factor_recovery_codes',
     'two_factor_secret',
     'mailcoach_subscriber_uuid',
-    'subscriber_recency_bucket',
+    'subscriber_profile_hash',
+    'rejected_subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -87,10 +103,18 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use HasFactory;
 
     use HasProfilePhoto;
-    use HasTeams;
     use HasUlids;
+    use HasWorkspaces;
     use Notifiable;
+    use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
+
+    public const string PROFILE_PHOTO_DIRECTORY = 'profile-photos';
+
+    public const array PROFILE_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /** @var array<string, bool> */
+    private array $ownershipByWorkspaceId = [];
 
     /**
      * Get the attributes that should be cast.
@@ -100,8 +124,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function casts(): array
     {
         return [
+            'email' => AsCanonicalEmail::class,
             'email_verified_at' => 'datetime',
+            'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'email_bounced_at' => 'datetime',
             'password' => 'hashed',
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
@@ -119,8 +146,24 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
         return $this->notificationPreferences()->wants($type, $channel);
     }
 
+    public function sendEmailVerificationNotification(): void
+    {
+        $notification = resolve(VerifyEmail::class);
+        $notification->url = Filament::getVerifyEmailUrl($this);
+
+        $this->notify($notification);
+    }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $notification = resolve(ResetPassword::class, ['token' => $token]);
+        $notification->url = Filament::getResetPasswordUrl($token, $this);
+
+        $this->notify($notification);
+    }
+
     /**
-     * The zone this user's calendar is expressed in. `timezone` is nullable — a user
+     * The zone this user's calendar is expressed in. `timezone` is nullable: a user
      * who never chose one and whose browser was never detected falls back to the app
      * default, so every caller that turns a stored UTC value into a wall clock reads
      * it from here rather than repeating the fallback.
@@ -141,6 +184,11 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function hasPassword(): bool
     {
         return $this->password !== null;
+    }
+
+    public function hasPasskey(): bool
+    {
+        return $this->passkeys()->exists();
     }
 
     public function isScheduledForDeletion(): bool
@@ -170,6 +218,40 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function memberOf(Builder $query, Workspace $workspace): Builder
+    {
+        return $query->where(function (Builder $members) use ($workspace): void {
+            $members->whereKey($workspace->user_id)
+                ->orWhereHas('workspaces', fn (Builder $workspaces): Builder => $workspaces->whereKey($workspace->getKey()));
+        });
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function atLocalHour(Builder $query, int $hour): Builder
+    {
+        $timezones = array_values(array_filter(
+            DateTimeZone::listIdentifiers(),
+            fn (string $timezone): bool => (int) Date::now($timezone)->format('G') === $hour,
+        ));
+
+        return $query->where(function (Builder $local) use ($timezones): void {
+            $local->whereIn('timezone', $timezones);
+
+            if (in_array((string) config('app.timezone'), $timezones, true)) {
+                $local->orWhereNull('timezone');
+            }
+        });
+    }
+
+    /**
      * @return BelongsToMany<Task, $this>
      */
     public function tasks(): BelongsToMany
@@ -187,7 +269,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function getDefaultTenant(Panel $panel): ?Model
     {
-        return $this->currentTeam;
+        return $this->currentWorkspace;
     }
 
     /**
@@ -200,7 +282,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     /**
      * Self-hosters who set REQUIRE_EMAIL_VERIFICATION=false treat every user as
-     * verified — every framework, Filament, and policy check that reads
+     * verified, so every framework, Filament, and policy check that reads
      * hasVerifiedEmail() honors the flag uniformly through this single override.
      */
     public function hasVerifiedEmail(): bool
@@ -213,16 +295,16 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * @return Collection<int, Team>
+     * @return Collection<int, Workspace>
      */
     public function getTenants(Panel $panel): Collection
     {
-        return $this->allTeams();
+        return $this->allWorkspaces();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->belongsToTeam($tenant);
+        return $this->belongsToWorkspace($tenant);
     }
 
     /**
@@ -239,87 +321,100 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * Typed override of the Jetstream relation, which resolves its model from
-     * runtime config and so returns an untyped collection.
+     * The ids of every workspace the user can reach, owned or joined.
      *
-     * @return HasMany<Team, $this>
-     */
-    public function ownedTeams(): HasMany
-    {
-        return $this->hasMany(Team::class);
-    }
-
-    /**
-     * Typed override of the Jetstream relation, which resolves its model from
-     * runtime config and so returns an untyped collection.
-     *
-     * @return BelongsToMany<Team, $this, Membership, 'membership'>
-     */
-    public function teams(): BelongsToMany
-    {
-        return $this->belongsToMany(Team::class, Membership::class)
-            ->withPivot('role')
-            ->withTimestamps()
-            ->as('membership');
-    }
-
-    /**
-     * The ids of every team the user can reach, owned or joined.
-     *
-     * Authorization runs once per table row, so resolving a record's `team`
-     * relation inside a policy costs a query per row — and throws once a query
+     * Authorization runs once per table row, so resolving a record's `workspace`
+     * relation inside a policy costs a query per row, and throws once a query
      * hydrates more than one row, because that is when Eloquent arms its strict
      * lazy-loading guard. Matching the record's foreign key against this set
      * keeps authorization off the record's relations entirely.
      *
-     * Both relations are the ones Jetstream already defines and that
-     * `allTeams()` loads for the panel's tenant switcher, so inside a panel
+     * Both relations are the ones HasWorkspaces defines and that
+     * `allWorkspaces()` loads for the panel's tenant switcher, so inside a panel
      * request this set costs nothing beyond what is already in memory.
      *
      * @return list<string>
      */
-    public function accessibleTeamIds(): array
+    public function accessibleWorkspaceIds(): array
     {
-        $this->loadMissing(['ownedTeams', 'teams']);
+        $this->loadMissing(['ownedWorkspaces', 'workspaces']);
 
         return array_map(
             strval(...),
-            [...$this->ownedTeams->modelKeys(), ...$this->teams->modelKeys()],
+            [...$this->ownedWorkspaces->modelKeys(), ...$this->workspaces->modelKeys()],
         );
     }
 
-    public function belongsToTeamId(?string $teamId): bool
+    public function belongsToWorkspaceId(?string $workspaceId): bool
     {
-        return $teamId !== null && in_array($teamId, $this->accessibleTeamIds(), true);
+        return $workspaceId !== null && in_array($workspaceId, $this->accessibleWorkspaceIds(), true);
     }
 
     /**
-     * Determine whether the user holds the given role on the team owning the
-     * given foreign key.
+     * @return array<int, WorkspaceCapability>
      */
-    public function hasTeamRoleForTeamId(?string $teamId, string $role): bool
+    public function workspaceCapabilities(?string $workspaceId): array
     {
-        if ($teamId === null) {
-            return false;
+        if ($workspaceId === null) {
+            return [];
         }
 
-        $this->loadMissing('ownedTeams');
-
-        if (in_array($teamId, array_map(strval(...), $this->ownedTeams->modelKeys()), true)) {
-            return true;
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return WorkspaceCapability::forOwner();
         }
 
-        $this->loadMissing('teams');
+        return $this->membershipRoleFor($workspaceId)?->capabilities() ?? [];
+    }
 
-        $membershipRole = $this->teams
-            ->first(fn (Team $team): bool => $team->getKey() === $teamId)
+    public function workspaceRoleLabel(?string $workspaceId): ?string
+    {
+        if ($workspaceId === null) {
+            return null;
+        }
+
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return __('workspaces.roles.owner.label');
+        }
+
+        return $this->membershipRoleFor($workspaceId)?->label();
+    }
+
+    // An unpinned token follows whichever workspace a request names, so only a
+    // pinned one is bounded by the holder's role there.
+    /** @return list<string> */
+    public function grantableTokenPermissions(?string $workspaceId): array
+    {
+        if ($workspaceId === null || $workspaceId === '') {
+            return array_values(Jetstream::$permissions);
+        }
+
+        return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
+    }
+
+    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
+    {
+        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+    }
+
+    private function membershipRoleFor(string $workspaceId): ?WorkspaceRole
+    {
+        $this->loadMissing('workspaces');
+
+        $role = $this->workspaces
+            ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
             ?->membership
             ?->role;
 
-        if ($membershipRole === null) {
-            return false;
-        }
+        return WorkspaceRole::tryFrom((string) $role);
+    }
 
-        return Jetstream::findRole($membershipRole)?->key === $role;
+    // Memoised per request. The sysadmin panel can reassign an owner, which is safe only
+    // because no User instance lives in that request; a user-facing transfer must clear this.
+    private function isWorkspaceOwner(string $workspaceId): bool
+    {
+        return $this->ownershipByWorkspaceId[$workspaceId] ??= Workspace::query()
+            ->whereKey($workspaceId)
+            ->where($this->getForeignKey(), $this->getKey())
+            ->exists();
     }
 }

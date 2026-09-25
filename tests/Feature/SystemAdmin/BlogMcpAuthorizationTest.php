@@ -25,7 +25,7 @@ it('denies regular users blog gates', function (): void {
 });
 
 it('does not interfere with a non-blog gate for a regular user', function (): void {
-    $user = User::factory()->withPersonalTeam()->create();
+    $user = User::factory()->withPersonalWorkspace()->create();
 
     expect(Gate::forUser($user)->allows('viewAny', Company::class))->toBeTrue();
 });

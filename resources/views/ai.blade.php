@@ -1,14 +1,64 @@
 @php
     $assistantName = (string) config('chat.assistant_name');
 
-    $toolCapableCloudModels = collect(config('chat.models', []))
-        ->filter(fn (array $model): bool => ($model['supports_tools'] ?? false) === true && ($model['self_hosted'] ?? false) === false);
+    // offered(), not available(): this page describes what a plan includes, so it must
+    // not change because this install is missing a provider key. It still drops models
+    // a probe measured as unable to call tools, which the assistant could never run.
+    $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
+        ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
+            'label' => $model->displayLabel(),
+            'min_plan' => $model->minPlan->value,
+        ]);
     $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
     $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
 
+    // Independent sentences rather than one with two holes in it: the catalog is editable at
+    // runtime, and a tier with no model rendered " is free on every plan".
+    $selfHostedNote = __('A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.');
+
+    $whichModelsAnswer = trim(implode(' ', array_filter([
+        $freeCloudModels === ''
+            ? __('Every plan can use any self-hosted model you connect yourself.')
+            : __(':freeModels on every plan.', ['freeModels' => $freeCloudModels]),
+        $paidCloudModels === ''
+            ? ''
+            : __('A paid plan additionally unlocks :paidModels, which cost more credits per reply.', ['paidModels' => $paidCloudModels]),
+        $selfHostedNote,
+    ])));
+
+    $modelChoiceLine = trim(implode(' ', array_filter([
+        $freeCloudModels === ''
+            ? __('Any self-hosted model you connect is free on every plan.')
+            : __(':freeModels is free on every plan.', ['freeModels' => $freeCloudModels]),
+        $paidCloudModels === ''
+            ? ''
+            : __('Switch to :paidModels on a paid plan when a harder question calls for it.', ['paidModels' => $paidCloudModels]),
+    ])));
+
+    $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
+    $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+    $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
-    $pendingActionExpiry = (int) config('chat.pending_action_expiry_minutes');
+    // Rendered as a human duration so raising the config never leaks "1440 minutes" into the page.
+    $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))
+        ->cascade()
+        ->forHumans(short: false, parts: 1);
+    $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
+
+    if ($billingActive) {
+        $includedPlanQuestion = __('Is :name included with Relaticle Cloud?', ['name' => $assistantName]);
+        $includedPlanAnswer = __(
+            'Yes. New Cloud workspaces include :name during a :days-day Cloud Pro trial. Cloud Pro includes a :credits-credit monthly allowance and every supported cloud model. If the trial ends without a subscription, hosted access pauses. Self-hosted installs use the Free plan\'s :freeCredits-credit monthly allowance and require your own provider key or local model.',
+            ['name' => $assistantName, 'days' => $trialDays, 'credits' => $proCredits, 'freeCredits' => $freeCredits]
+        );
+    } else {
+        $includedPlanQuestion = __('Is :name included in the free plan?', ['name' => $assistantName]);
+        $includedPlanAnswer = __(
+            'Yes. Every Relaticle Cloud workspace gets :name with a :credits-credit monthly allowance on the free-tier model. A self-hosted install ships without a provider. You add your own key or local model, and pay that provider directly.',
+            ['name' => $assistantName, 'credits' => $freeCredits]
+        );
+    }
 
     $title = __(':name: AI Assistant for Relaticle CRM', ['name' => $assistantName]).' - Relaticle';
     $description = __(
@@ -33,17 +83,11 @@
         ],
         [
             __('Which models power :name?', ['name' => $assistantName]),
-            __(
-                ':freeModels on every plan. A paid plan additionally unlocks :paidModels, which cost more credits per reply. A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.',
-                ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels]
-            ),
+            $whichModelsAnswer,
         ],
         [
-            __('Is :name included in the free plan?', ['name' => $assistantName]),
-            __(
-                'Yes. On Relaticle Cloud every workspace, free or paid, gets :name with a :credits-credit monthly allowance on the free-tier model, and upgrading raises the allowance and unlocks the higher-tier models. A self-hosted install ships with no provider configured, so you add your own key or point it at a local model, and you pay that provider directly.',
-                ['name' => $assistantName, 'credits' => $freeCredits]
-            ),
+            $includedPlanQuestion,
+            $includedPlanAnswer,
         ],
     ];
 @endphp
@@ -78,13 +122,18 @@
             </p>
 
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="#demo">
                     {{ __('See it work') }}
                 </x-marketing.button>
             </div>
+
+            <a href="{{ route('aiNativeCrm') }}" class="group mt-6 inline-flex items-center gap-1 text-sm font-medium text-primary dark:text-primary-400 hover:gap-1.5 transition-all">
+                {{ __('What makes a CRM AI-native?') }}
+                <x-ri-arrow-right-line class="w-3.5 h-3.5"/>
+            </a>
         </div>
     </section>
 
@@ -128,7 +177,10 @@
                         {{ __('Step 1: you ask') }}
                     </p>
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        <div class="rounded-lg bg-primary/[0.08] dark:bg-primary/[0.15] px-3.5 py-2.5">
+                        {{-- Neutral gray, like the shipped user bubble
+                             (_transcript.blade.php): in the transcript the brand
+                             color belongs to the docked proposal alone. --}}
+                        <div class="rounded-lg bg-gray-100 px-3.5 py-2.5 dark:bg-white/10">
                             <p class="text-sm text-gray-900 dark:text-gray-100 leading-relaxed">
                                 {{ __('Mark the Northwind renewal as won and set the close date to today') }}
                             </p>
@@ -145,30 +197,47 @@
                     <p class="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-3">
                         {{ __('Step 2: :name proposes', ['name' => $assistantName]) }}
                     </p>
-                    <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
-                        <div class="flex items-start gap-3">
-                            <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-400/10 dark:text-amber-400">
-                                <x-ri-pencil-line class="h-4 w-4"/>
-                            </div>
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ __('Update Northwind renewal') }}
-                                </p>
-                                <p class="text-xs text-gray-400 dark:text-gray-500">{{ __('Opportunity') }}</p>
-                            </div>
+                    {{-- The docked proposal card, as _dock-step.blade.php and
+                         proposal-card.blade.php ship it: a primary halo marks the
+                         one card asking for a decision, the operation title leads
+                         as a muted eyebrow, and the record identity sits under it
+                         behind an operation-tinted entity tile. --}}
+                    <div class="flex-1 overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
+                        <div class="flex items-center gap-2 px-4 pt-3 text-xs font-medium text-gray-500 dark:text-gray-400">
+                            <span class="min-w-0 flex-1 truncate">{{ __('Update Opportunity') }}</span>
                         </div>
 
-                        <dl class="mt-3 space-y-1.5">
+                        <div class="flex min-w-0 items-center gap-2.5 px-4 pb-2.5 pt-1.5" data-proposal-record-chip data-record-type="opportunity">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-amber-500 text-white" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="h-3.5 w-3.5" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
+                                </svg>
+                            </span>
+                            <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</p>
+                        </div>
+
+                        <dl class="divide-y divide-gray-100 border-t border-gray-100 dark:divide-white/5 dark:border-white/5">
+                            <div class="flex items-center gap-3 px-4 py-2 text-xs font-medium text-gray-400 dark:text-gray-500">
+                                <x-home.hero-dock-checkbox/>
+                                <dt class="w-20 shrink-0 sm:w-24">{{ __('Attribute') }}</dt>
+                                <dd>{{ __('New value') }}</dd>
+                            </div>
+
                             @foreach([
                                 [__('Stage'), __('Negotiation'), __('Won')],
                                 [__('Close date'), __('Not set'), __('Today')],
                             ] as [$field, $before, $after])
-                                <div class="flex items-center gap-2 text-xs">
-                                    <dt class="w-20 shrink-0 text-gray-400 dark:text-gray-500">{{ $field }}</dt>
-                                    <dd class="flex items-center gap-1.5 min-w-0">
-                                        <span class="text-gray-400 dark:text-gray-500 line-through truncate">{{ $before }}</span>
+                                {{-- items-start + a wrapping value column, like
+                                     _proposal-field.blade.php: an old -> new pair
+                                     in a third of the row wraps onto two lines
+                                     rather than truncating both halves away. --}}
+                                <div class="flex items-start gap-3 px-4 py-2.5 text-sm">
+                                    <x-home.hero-dock-checkbox class="mt-0.5"/>
+                                    <dt class="w-20 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-24 dark:text-gray-300">{{ $field }}</dt>
+                                    <dd class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                        <span class="text-gray-400 line-through dark:text-gray-500">{{ $before }}</span>
                                         <x-ri-arrow-right-line class="h-3 w-3 shrink-0 text-gray-300 dark:text-gray-600"/>
-                                        <span class="font-medium text-gray-900 dark:text-white truncate">{{ $after }}</span>
+                                        <span class="text-gray-700 dark:text-gray-300">{{ $after }}</span>
                                     </dd>
                                 </div>
                             @endforeach
@@ -183,13 +252,16 @@
                         {{ __('Step 3: you decide') }}
                     </p>
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-4 flex-1">
+                        {{-- The dock's own footer, in its order and its weights
+                             (proposal-card.blade.php): a plain-text discard beside
+                             a brand-colored confirm whose label follows the
+                             operation -- an update reads "Save changes". --}}
                         <div class="flex items-center gap-2">
-                            <span class="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-white">
-                                <x-ri-check-line class="h-3.5 w-3.5"/>
-                                {{ __('Approve') }}
+                            <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
+                                {{ __('Discard') }}
                             </span>
-                            <span class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-white/[0.08] px-3 py-1.5 text-xs font-medium text-gray-500 dark:text-gray-400">
-                                {{ __('Reject') }}
+                            <span class="inline-flex h-7 items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm">
+                                {{ __('Save changes') }}
                             </span>
                         </div>
 
@@ -202,7 +274,7 @@
                         </div>
 
                         <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                            {{ __('Reject and nothing is written. The proposal expires on its own after :minutes minutes.', ['minutes' => $pendingActionExpiry]) }}
+                            {{ __('Discard and nothing is written. The proposal expires on its own after :duration.', ['duration' => $pendingActionExpiry]) }}
                         </p>
                     </div>
                 </li>
@@ -269,7 +341,7 @@
                             {{ __('Nothing writes without your approval') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :minutes minutes.', ['minutes' => $pendingActionExpiry]) }}
+                            {{ __('Every proposed create, update, or delete renders as a card showing the old value and the new one. You approve or reject it; nothing saves until you do. An unanswered proposal expires after :duration.', ['duration' => $pendingActionExpiry]) }}
                         </p>
                     </div>
                 </div>
@@ -297,7 +369,7 @@
                             {{ __('Transparent credits, your choice of model') }}
                         </h3>
                         <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                            {{ __(':freeModels is free on every plan. Switch to :paidModels on a paid plan when a harder question calls for it.', ['freeModels' => $freeCloudModels, 'paidModels' => $paidCloudModels]) }}
+                            {{ $modelChoiceLine }}
                         </p>
                     </div>
                 </div>
@@ -380,7 +452,7 @@
                 {{ __('Free to start, no credit card required. Self-host it yourself whenever you want.') }}
             </p>
             <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <x-marketing.button href="{{ route('register') }}">
+                <x-marketing.button href="{{ route('login') }}">
                     {{ __('Start for free') }}
                 </x-marketing.button>
                 <x-marketing.button variant="secondary" href="{{ route('pricing') }}">

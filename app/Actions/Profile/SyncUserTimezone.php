@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 /**
  * Seeds `users.timezone` from the browser's detected zone.
  *
- * Only ever fills a null value: once a timezone is on the record — whether it was
- * detected earlier or chosen explicitly on the profile page — the browser must not
+ * Only ever fills a null value. Once a timezone is on the record, whether it was
+ * detected earlier or chosen explicitly on the profile page, the browser must not
  * overwrite it, or a deliberate choice would be undone on the next page load from a
  * travelling laptop or a VPN.
  */
@@ -26,7 +26,7 @@ final readonly class SyncUserTimezone
 
         /**
          * "Fill only if still null" is a check followed by a write, so two first-page
-         * loads racing each other both passed the check and both wrote — last one won.
+         * loads racing each other both passed the check and both wrote, and the last one won.
          * Re-read the row under a lock inside the transaction so the check and the write
          * cannot be separated. Mirrors StartProTrial, which guards the same write-once
          * shape the same way.

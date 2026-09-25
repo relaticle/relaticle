@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\People;
 
 use App\Actions\People\CreatePeople;
+use App\Concerns\OperatesOnCrmEntity;
+use App\Enums\CrmEntity;
 use App\Http\Resources\V1\PeopleResource;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Server\Attributes\Description;
-use Laravel\Mcp\Server\Tools\Annotations\IsOpenWorld;
+use Laravel\Mcp\Server\Attributes\Title;
 
+#[Title('Create Person')]
 #[Description('Create a new person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
-#[IsOpenWorld(false)]
 final class CreatePeopleTool extends BaseCreateTool
 {
+    use OperatesOnCrmEntity;
+
     protected function actionClass(): string
     {
         return CreatePeople::class;
@@ -27,9 +31,9 @@ final class CreatePeopleTool extends BaseCreateTool
         return PeopleResource::class;
     }
 
-    protected function entityType(): string
+    protected function entity(): CrmEntity
     {
-        return 'people';
+        return CrmEntity::People;
     }
 
     protected function entitySchema(JsonSchema $schema): array
@@ -42,11 +46,11 @@ final class CreatePeopleTool extends BaseCreateTool
 
     protected function entityRules(User $user): array
     {
-        $teamId = $user->currentTeam->getKey();
+        $workspaceId = $user->currentWorkspace->getKey();
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('team_id', $teamId)],
+            'company_id' => ['sometimes', 'nullable', 'string', Rule::exists('companies', 'id')->where('workspace_id', $workspaceId)],
         ];
     }
 }
