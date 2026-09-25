@@ -77,12 +77,12 @@ Owns which channel applies now.
 
 | Member | Behaviour |
 |---|---|
-| `set(CreationSource)` | Adds the hidden Context value for the rest of the request |
 | `during(CreationSource, Closure)` | Runs the callback under `Context::scope()`, restoring the previous value after |
 | `get(): CreationSource` | The hidden Context value, or `WEB` when none is set |
 
-`set()` is for middleware, whose request ends with the value. Everything else uses `during()`,
-because a sync-queue job runs inside a request that keeps writing afterwards.
+Every setter uses `during()`, the API middleware included. A value that outlived its request would
+stamp every later write in a long-lived process, and a sync-queue job runs inside a request that
+keeps writing afterwards.
 
 ### `App\Models\ActivityLog\Activity`
 
@@ -109,7 +109,7 @@ only entry) leaves `Company`, `People`, `Opportunity`, `Task`, and `Note`.
 
 | Where | Change |
 |---|---|
-| `SetCurrentSource` (new middleware) | `handle(Request, Closure, string $source)` calls `CurrentSource::set(CreationSource::from($source))` |
+| `SetCurrentSource` (new middleware) | `handle(Request, Closure, string $source)` runs the rest of the request inside `CurrentSource::during(CreationSource::from($source), ...)` |
 | `routes/api.php` | `SetCurrentSource::class.':api'` in the v1 stack |
 | `RelaticleServer` | Overrides `runMethodHandle()` to run the parent inside `during(CreationSource::MCP)`. No tool streams a generator result, which would otherwise run after the scope closes |
 | `PendingActionService` | The single call sites of `executeAction()` (in `approve()`) and `executeBatchItem()` (in `approveItem()`) run inside `during(CreationSource::CHAT)`. `ProposalPlanService` and `RemoveSampleDataTool` reach these too |

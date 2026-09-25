@@ -96,6 +96,18 @@ it('stamps a delete through the api as api', function (): void {
     expect($row->properties[Activity::SOURCE_PROPERTY])->toBe('api');
 });
 
+it('stamps a panel write after an api request in the same process as web', function (): void {
+    Sanctum::actingAs($this->user);
+    $this->putJson("/api/v1/companies/{$this->company->getKey()}", ['name' => 'Via Api'])->assertOk();
+
+    $this->actingAs($this->user, 'web');
+    livewire(ListCompanies::class)
+        ->callAction(TestAction::make('edit')->table($this->company), data: ['name' => 'Via Panel'])
+        ->assertHasNoActionErrors();
+
+    expect(sourcesOfCompanyUpdates($this->company))->toBe(['api', 'web']);
+});
+
 it('stamps an mcp call that arrives over http', function (): void {
     Sanctum::actingAs($this->user, ['*']);
 

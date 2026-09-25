@@ -12,11 +12,6 @@ final readonly class CurrentSource
 {
     private const string KEY = 'current_source';
 
-    public static function set(CreationSource $source): void
-    {
-        Context::addHidden(self::KEY, $source->value);
-    }
-
     /**
      * @template TReturn
      *

@@ -14,8 +14,6 @@ final readonly class SetCurrentSource
 {
     public function handle(Request $request, Closure $next, string $source): Response
     {
-        CurrentSource::set(CreationSource::from($source));
-
-        return $next($request);
+        return CurrentSource::during(CreationSource::from($source), fn (): Response => $next($request));
     }
 }
