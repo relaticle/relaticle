@@ -1,0 +1,351 @@
+{
+  "sources": {
+    "logomark.svg": "ba855319cc85e9b93d7a6053294f1ac559bf06366803974fc61c826689684809",
+    "wordmark.svg": "7995c6ef612f644077424168a492f3487ce4ccb7aca75657dfbf143a0ac5b43a"
+  },
+  "avatars": [
+    {
+      "id": "purple",
+      "svg": "avatars/purple.svg",
+      "png": "avatars/purple-1024.png",
+      "largePng": "avatars/purple-2048.png"
+    },
+    {
+      "id": "light",
+      "svg": "avatars/light.svg",
+      "png": "avatars/light-1024.png",
+      "largePng": "avatars/light-2048.png"
+    },
+    {
+      "id": "dark",
+      "svg": "avatars/dark.svg",
+      "png": "avatars/dark-1024.png",
+      "largePng": "avatars/dark-2048.png"
+    }
+  ],
+  "logos": [
+    {
+      "id": "lockup-color",
+      "variant": "color",
+      "kind": "lockup",
+      "svg": "logos/lockup-color.svg",
+      "png": "logos/lockup-color-2520.png"
+    },
+    {
+      "id": "symbol-color",
+      "variant": "color",
+      "kind": "symbol",
+      "svg": "logos/symbol-color.svg",
+      "png": "logos/symbol-color-2048.png"
+    },
+    {
+      "id": "lockup-white",
+      "variant": "white",
+      "kind": "lockup",
+      "svg": "logos/lockup-white.svg",
+      "png": "logos/lockup-white-2520.png"
+    },
+    {
+      "id": "symbol-white",
+      "variant": "white",
+      "kind": "symbol",
+      "svg": "logos/symbol-white.svg",
+      "png": "logos/symbol-white-2048.png"
+    }
+  ],
+  "platforms": [
+    {
+      "name": "YouTube",
+      "id": "youtube",
+      "size": 800,
+      "files": {
+        "purple": "platforms/purple/youtube-800.png",
+        "light": "platforms/light/youtube-800.png",
+        "dark": "platforms/dark/youtube-800.png"
+      }
+    },
+    {
+      "name": "X",
+      "id": "x",
+      "size": 400,
+      "files": {
+        "purple": "platforms/purple/x-400.png",
+        "light": "platforms/light/x-400.png",
+        "dark": "platforms/dark/x-400.png"
+      }
+    },
+    {
+      "name": "LinkedIn",
+      "id": "linkedin",
+      "size": 400,
+      "files": {
+        "purple": "platforms/purple/linkedin-400.png",
+        "light": "platforms/light/linkedin-400.png",
+        "dark": "platforms/dark/linkedin-400.png"
+      }
+    },
+    {
+      "name": "Instagram",
+      "id": "instagram",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/instagram-1080.png",
+        "light": "platforms/light/instagram-1080.png",
+        "dark": "platforms/dark/instagram-1080.png"
+      }
+    },
+    {
+      "name": "Facebook",
+      "id": "facebook",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/facebook-1080.png",
+        "light": "platforms/light/facebook-1080.png",
+        "dark": "platforms/dark/facebook-1080.png"
+      }
+    },
+    {
+      "name": "Threads",
+      "id": "threads",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/threads-1080.png",
+        "light": "platforms/light/threads-1080.png",
+        "dark": "platforms/dark/threads-1080.png"
+      }
+    },
+    {
+      "name": "TikTok",
+      "id": "tiktok",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/tiktok-1080.png",
+        "light": "platforms/light/tiktok-1080.png",
+        "dark": "platforms/dark/tiktok-1080.png"
+      }
+    },
+    {
+      "name": "Reddit",
+      "id": "reddit",
+      "size": 512,
+      "files": {
+        "purple": "platforms/purple/reddit-512.png",
+        "light": "platforms/light/reddit-512.png",
+        "dark": "platforms/dark/reddit-512.png"
+      }
+    },
+    {
+      "name": "Discord",
+      "id": "discord",
+      "size": 512,
+      "files": {
+        "purple": "platforms/purple/discord-512.png",
+        "light": "platforms/light/discord-512.png",
+        "dark": "platforms/dark/discord-512.png"
+      }
+    },
+    {
+      "name": "Pinterest",
+      "id": "pinterest",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/pinterest-1080.png",
+        "light": "platforms/light/pinterest-1080.png",
+        "dark": "platforms/dark/pinterest-1080.png"
+      }
+    },
+    {
+      "name": "Bluesky",
+      "id": "bluesky",
+      "size": 1000,
+      "files": {
+        "purple": "platforms/purple/bluesky-1000.png",
+        "light": "platforms/light/bluesky-1000.png",
+        "dark": "platforms/dark/bluesky-1000.png"
+      }
+    },
+    {
+      "name": "Mastodon",
+      "id": "mastodon",
+      "size": 400,
+      "files": {
+        "purple": "platforms/purple/mastodon-400.png",
+        "light": "platforms/light/mastodon-400.png",
+        "dark": "platforms/dark/mastodon-400.png"
+      }
+    },
+    {
+      "name": "GitHub",
+      "id": "github",
+      "size": 500,
+      "files": {
+        "purple": "platforms/purple/github-500.png",
+        "light": "platforms/light/github-500.png",
+        "dark": "platforms/dark/github-500.png"
+      }
+    },
+    {
+      "name": "Telegram",
+      "id": "telegram",
+      "size": 512,
+      "files": {
+        "purple": "platforms/purple/telegram-512.png",
+        "light": "platforms/light/telegram-512.png",
+        "dark": "platforms/dark/telegram-512.png"
+      }
+    },
+    {
+      "name": "WhatsApp",
+      "id": "whatsapp",
+      "size": 1080,
+      "files": {
+        "purple": "platforms/purple/whatsapp-1080.png",
+        "light": "platforms/light/whatsapp-1080.png",
+        "dark": "platforms/dark/whatsapp-1080.png"
+      }
+    },
+    {
+      "name": "Twitch",
+      "id": "twitch",
+      "size": 800,
+      "files": {
+        "purple": "platforms/purple/twitch-800.png",
+        "light": "platforms/light/twitch-800.png",
+        "dark": "platforms/dark/twitch-800.png"
+      }
+    },
+    {
+      "name": "Slack",
+      "id": "slack",
+      "size": 512,
+      "files": {
+        "purple": "platforms/purple/slack-512.png",
+        "light": "platforms/light/slack-512.png",
+        "dark": "platforms/dark/slack-512.png"
+      }
+    },
+    {
+      "name": "Medium",
+      "id": "medium",
+      "size": 400,
+      "files": {
+        "purple": "platforms/purple/medium-400.png",
+        "light": "platforms/light/medium-400.png",
+        "dark": "platforms/dark/medium-400.png"
+      }
+    },
+    {
+      "name": "Substack",
+      "id": "substack",
+      "size": 1024,
+      "files": {
+        "purple": "platforms/purple/substack-1024.png",
+        "light": "platforms/light/substack-1024.png",
+        "dark": "platforms/dark/substack-1024.png"
+      }
+    },
+    {
+      "name": "Product Hunt",
+      "id": "product-hunt",
+      "size": 240,
+      "files": {
+        "purple": "platforms/purple/product-hunt-240.png",
+        "light": "platforms/light/product-hunt-240.png",
+        "dark": "platforms/dark/product-hunt-240.png"
+      }
+    }
+  ],
+  "watermarks": [
+    {
+      "id": "white",
+      "png": "watermarks/white-150.png"
+    },
+    {
+      "id": "purple",
+      "png": "watermarks/purple-150.png"
+    }
+  ],
+  "files": {
+    "avatars/purple.svg": "e8a1f70db3aea6f26aee5627405f5dee51116abc0fc11c00a47a8d925d25c4f4",
+    "avatars/purple-1024.png": "c42db3928e90bef349458185ae28735a2f112310321512d37e68e3f7d68ae144",
+    "avatars/purple-2048.png": "cefe36cca815afaeee31baeec800f28c8104e3f4b48c89f95fe2dc0c61f98a3d",
+    "platforms/purple/youtube-800.png": "5e34c5b0e1c979185bdb8a0f8727871155136cbbf2216d2f96bbdbaffadda031",
+    "platforms/purple/x-400.png": "c891e98acbac56c760ccc269d94cc72855d5211627528068b71ae37a4f1fefc9",
+    "platforms/purple/linkedin-400.png": "c891e98acbac56c760ccc269d94cc72855d5211627528068b71ae37a4f1fefc9",
+    "platforms/purple/instagram-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/facebook-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/threads-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/tiktok-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/reddit-512.png": "c610006a3a9413fcd3412e65018d2c4ee198db067c87dd74136b384a6e93ef40",
+    "platforms/purple/discord-512.png": "c610006a3a9413fcd3412e65018d2c4ee198db067c87dd74136b384a6e93ef40",
+    "platforms/purple/pinterest-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/bluesky-1000.png": "7633ffcd87b0696d227c4a6ce3108e35a172a468623dd700327c032f6acff957",
+    "platforms/purple/mastodon-400.png": "c891e98acbac56c760ccc269d94cc72855d5211627528068b71ae37a4f1fefc9",
+    "platforms/purple/github-500.png": "378c4c1a72acd154ae89861e405f51a1d8eb2b10a61cc0b47cd23a51f81f3ac0",
+    "platforms/purple/telegram-512.png": "c610006a3a9413fcd3412e65018d2c4ee198db067c87dd74136b384a6e93ef40",
+    "platforms/purple/whatsapp-1080.png": "28cc8e6e2a201e88c1e380c5385ef5fbdc44b241ecb1760dd0522d18c1466b89",
+    "platforms/purple/twitch-800.png": "5e34c5b0e1c979185bdb8a0f8727871155136cbbf2216d2f96bbdbaffadda031",
+    "platforms/purple/slack-512.png": "c610006a3a9413fcd3412e65018d2c4ee198db067c87dd74136b384a6e93ef40",
+    "platforms/purple/medium-400.png": "c891e98acbac56c760ccc269d94cc72855d5211627528068b71ae37a4f1fefc9",
+    "platforms/purple/substack-1024.png": "c42db3928e90bef349458185ae28735a2f112310321512d37e68e3f7d68ae144",
+    "platforms/purple/product-hunt-240.png": "d4124101d661b9e95ec28343547031b049e1d4b1df4930c403a4e88c7a15e1aa",
+    "avatars/light.svg": "e81798d239a7425933a7f3a3037674464720bab93485815b47c668e73462b374",
+    "avatars/light-1024.png": "c130d76c26e2f018606637d4dfb344b674e759883dfdbff68c0b825ae62de78a",
+    "avatars/light-2048.png": "dd59887f2f61d8f401fd203fb9c20b3c1acd05b12dbbd48f449883f81f456eba",
+    "platforms/light/youtube-800.png": "cc18ca4a6575a84aafd6a7f8fa3f53db0f7aac1ef69ec2fc05d9f969420ec035",
+    "platforms/light/x-400.png": "e9f2e1bf5c4d420e22ed5bae967f2b531da3d6e87a0e3f0cd8acd144b350b52d",
+    "platforms/light/linkedin-400.png": "e9f2e1bf5c4d420e22ed5bae967f2b531da3d6e87a0e3f0cd8acd144b350b52d",
+    "platforms/light/instagram-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/facebook-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/threads-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/tiktok-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/reddit-512.png": "c1fac39765b7caa546a71b31082d1ce2d80f25f7de89b4c7b9ef8da4e8e0c1cb",
+    "platforms/light/discord-512.png": "c1fac39765b7caa546a71b31082d1ce2d80f25f7de89b4c7b9ef8da4e8e0c1cb",
+    "platforms/light/pinterest-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/bluesky-1000.png": "8da513ae0af5c985841e538a050e4e58bee83d0cff3fbd7c3ba0b8771c7d6255",
+    "platforms/light/mastodon-400.png": "e9f2e1bf5c4d420e22ed5bae967f2b531da3d6e87a0e3f0cd8acd144b350b52d",
+    "platforms/light/github-500.png": "8eb2e7f76773db397c1455831e7c884537b1a6328c0c478110fb204766116249",
+    "platforms/light/telegram-512.png": "c1fac39765b7caa546a71b31082d1ce2d80f25f7de89b4c7b9ef8da4e8e0c1cb",
+    "platforms/light/whatsapp-1080.png": "4bda13cae264575f8ad8971508a29f4373d17af0a80a5590360888d3c316164d",
+    "platforms/light/twitch-800.png": "cc18ca4a6575a84aafd6a7f8fa3f53db0f7aac1ef69ec2fc05d9f969420ec035",
+    "platforms/light/slack-512.png": "c1fac39765b7caa546a71b31082d1ce2d80f25f7de89b4c7b9ef8da4e8e0c1cb",
+    "platforms/light/medium-400.png": "e9f2e1bf5c4d420e22ed5bae967f2b531da3d6e87a0e3f0cd8acd144b350b52d",
+    "platforms/light/substack-1024.png": "c130d76c26e2f018606637d4dfb344b674e759883dfdbff68c0b825ae62de78a",
+    "platforms/light/product-hunt-240.png": "1d58f14dd8c8046da917d73de675b57efd2a51974cc362cb4bf98d49df83efed",
+    "avatars/dark.svg": "388ae6a8bd5e8cba805f2e385a5ead6e36669c3cf740bcd59e189894aacb6ef1",
+    "avatars/dark-1024.png": "a884f0ab20e21dcc14b66e9743086a437b911fd97f54fd840a2a9ecb0e6d6083",
+    "avatars/dark-2048.png": "7f7c9dd68302ea141d1df7fe7d5654ff6229041f1b7e4b9fab5a8a7f5031ae02",
+    "platforms/dark/youtube-800.png": "a4036ffd855321bd675d77c39a961b2a46928b1c42c9166917ebc8f14d330e06",
+    "platforms/dark/x-400.png": "fd39a8d11e0c3be7a5e0cbdbdd1876d3ad7179bcfc5d9c9b4c5da41523b6fce4",
+    "platforms/dark/linkedin-400.png": "fd39a8d11e0c3be7a5e0cbdbdd1876d3ad7179bcfc5d9c9b4c5da41523b6fce4",
+    "platforms/dark/instagram-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/facebook-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/threads-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/tiktok-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/reddit-512.png": "b6ddee698ac4c14f3c04e46d337f2c5ec3488cf1ea527077ae995701ffc2b961",
+    "platforms/dark/discord-512.png": "b6ddee698ac4c14f3c04e46d337f2c5ec3488cf1ea527077ae995701ffc2b961",
+    "platforms/dark/pinterest-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/bluesky-1000.png": "36abe70a44783251299cf0a8798546b7c50031e69440d692be8aee702b1215aa",
+    "platforms/dark/mastodon-400.png": "fd39a8d11e0c3be7a5e0cbdbdd1876d3ad7179bcfc5d9c9b4c5da41523b6fce4",
+    "platforms/dark/github-500.png": "74626e722d2ea06dc12d4807c0892a48f12d2ce96223a1faa1f97c473ae1e161",
+    "platforms/dark/telegram-512.png": "b6ddee698ac4c14f3c04e46d337f2c5ec3488cf1ea527077ae995701ffc2b961",
+    "platforms/dark/whatsapp-1080.png": "d214bdf2ddd4b6eabf562a8e65978615b524c096b602ce64644c95f4066c4f66",
+    "platforms/dark/twitch-800.png": "a4036ffd855321bd675d77c39a961b2a46928b1c42c9166917ebc8f14d330e06",
+    "platforms/dark/slack-512.png": "b6ddee698ac4c14f3c04e46d337f2c5ec3488cf1ea527077ae995701ffc2b961",
+    "platforms/dark/medium-400.png": "fd39a8d11e0c3be7a5e0cbdbdd1876d3ad7179bcfc5d9c9b4c5da41523b6fce4",
+    "platforms/dark/substack-1024.png": "a884f0ab20e21dcc14b66e9743086a437b911fd97f54fd840a2a9ecb0e6d6083",
+    "platforms/dark/product-hunt-240.png": "7b3f096d3d6f590f944203944ce3b1bcf58421386dab01cb07691880d248d807",
+    "logos/symbol-color.svg": "8532b5611924c46bb187a697bee57e8f94e9b13f2eeb84aed34d32f20479ad8e",
+    "logos/lockup-color.svg": "79e6d53bc211fa622880c6829bf19500f77b86995ff8838ccd779bf6d380c208",
+    "logos/lockup-color-2520.png": "2b16ce7abf7a640971273c4fe8242f0ad3ac602637cb57e9707a68285f28a6c4",
+    "logos/symbol-color-2048.png": "f1340ab91f29a12341d658ef75d44d6dbe03410db7119aa2583c5aea7573f5bb",
+    "logos/symbol-white.svg": "5760317f17f2ad7bcb1cdfc992e9dac54d12f94a3d615e38840a9425970e3724",
+    "logos/lockup-white.svg": "aeb0802e52c01402d148d7f32005935b8925e30e548dfbc1e5202678fecfa100",
+    "logos/lockup-white-2520.png": "d71a8240d2288ae4bff99192eb96be9c664a91989c250ccb4f24d1a97c1f7c86",
+    "logos/symbol-white-2048.png": "0edf37cf389f89b49f6a2ef3e0edd0e113d496f3dc42a3882209b27e6c24e14b",
+    "watermarks/white.svg": "e9df9ab7237732663ec51f9349e91d8e9eeb3e169d5cf87792fc8a681b991a20",
+    "watermarks/white-150.png": "ca40620e50a72cd444e01d613f0519dc3a0057bc41e79f6061e00be71fbc8591",
+    "watermarks/purple-150.png": "9ce2a0b23c87d7407bce7d0eab4216eeb9d52af3e87961a4cb865b7a1c87dd87",
+    "README.txt": "71637aeedac3ab8ef27a61344afe0442d9abc42c89b3814ca65e0d9ba1fd9eb7"
+  }
+}
