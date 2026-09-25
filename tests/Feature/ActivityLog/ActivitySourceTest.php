@@ -71,16 +71,16 @@ it('stamps each channel that edits one record with its own source', function ():
         ->callAction(TestAction::make('edit')->table($this->company), data: ['name' => 'Via Panel'])
         ->assertHasNoActionErrors();
 
+    Sanctum::actingAs($this->user);
+    $this->putJson("/api/v1/companies/{$this->company->getKey()}", ['name' => 'Via Api'])->assertOk();
+
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateCompanyTool::class, ['id' => $this->company->getKey(), 'name' => 'Via Mcp'])
         ->assertOk();
 
     approveCompanyRenameInChat($this->user, $this->company, 'Via Chat');
 
-    Sanctum::actingAs($this->user);
-    $this->putJson("/api/v1/companies/{$this->company->getKey()}", ['name' => 'Via Api'])->assertOk();
-
-    expect(sourcesOfCompanyUpdates($this->company))->toBe(['web', 'mcp', 'chat', 'api']);
+    expect(sourcesOfCompanyUpdates($this->company))->toBe(['web', 'api', 'mcp', 'chat']);
 });
 
 it('stamps a delete through the api as api', function (): void {

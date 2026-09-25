@@ -31,6 +31,22 @@ it('uses current workspace by default', function (): void {
     expect($ids)->toContain($company->id);
 });
 
+it('keeps each workspace to itself across sequential requests in one process', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $ownCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherCompany = Company::factory()->recycle([$otherUser, $otherUser->personalWorkspace()])->create();
+
+    Sanctum::actingAs($this->user);
+    $this->getJson("/api/v1/companies/{$ownCompany->id}")->assertOk();
+    $this->getJson("/api/v1/companies/{$otherCompany->id}")->assertNotFound();
+
+    Sanctum::actingAs($otherUser);
+    $this->getJson("/api/v1/companies/{$otherCompany->id}")->assertOk();
+    $this->getJson("/api/v1/companies/{$ownCompany->id}")->assertNotFound();
+
+    expect(Company::query()->whereKey([$ownCompany->id, $otherCompany->id])->count())->toBe(2);
+});
+
 it('can switch workspace via X-Workspace-Id header', function (): void {
     $otherWorkspace = Workspace::factory()->create();
     $this->user->workspaces()->attach($otherWorkspace, ['role' => WorkspaceRole::Member->value]);

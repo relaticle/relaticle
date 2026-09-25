@@ -10,12 +10,14 @@ use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasWorkspace;
+use App\Models\Scopes\WorkspaceScope;
 use App\Observers\OpportunityObserver;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\OpportunityFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +40,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property CreationSource $creation_source
  */
 #[ObservedBy(OpportunityObserver::class)]
+#[ScopedBy(WorkspaceScope::class)]
 #[Fillable([
     'creation_source',
 ])]
