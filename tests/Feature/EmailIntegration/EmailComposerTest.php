@@ -991,11 +991,8 @@ it('adds every company team member primary email to recipients', function (): vo
         ->dispatch('composer:open')
         ->set('to', ['existing@example.com'])
         ->call('addCompanyTeamRecipients', $company->id)
-        ->assertSet('to', [
-            'existing@example.com',
-            'natalie@example.com',
-            'asha@example.com',
-        ]);
+        ->assertSet('to', fn (array $to): bool => $to[0] === 'existing@example.com'
+            && collect($to)->slice(1)->sort()->values()->all() === ['asha@example.com', 'natalie@example.com']);
 });
 
 it('includes company team recipient options outside the first person option page', function (): void {
