@@ -44,6 +44,10 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        // A controller's set_time_limit() outlives its request in a test worker and kills
+        // whichever test is running once the worker has used that much CPU.
+        set_time_limit(0);
+
         Http::preventStrayRequests();
         $this->app->instance(HostResolver::class, new HostResolver(
             fn (string $host): array => filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : [],
