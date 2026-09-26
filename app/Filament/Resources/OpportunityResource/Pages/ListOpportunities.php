@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\Pages;
 
 use App\Filament\Concerns\HasBoardViewSwitcher;
+use App\Filament\Concerns\HasRecordCountDescription;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource;
 use App\Models\Opportunity;
@@ -23,6 +24,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 final class ListOpportunities extends ListRecords
 {
     use HasBoardViewSwitcher;
+    use HasRecordCountDescription;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 

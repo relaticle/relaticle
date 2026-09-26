@@ -6,6 +6,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Filament\Concerns\HasBoardViewSwitcher;
+use App\Filament\Concerns\HasRecordCountDescription;
 use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
@@ -24,6 +25,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 final class ManageTasks extends ManageRecords
 {
     use HasBoardViewSwitcher;
+    use HasRecordCountDescription;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 

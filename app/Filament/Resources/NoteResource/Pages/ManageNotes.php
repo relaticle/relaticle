@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\NoteResource\Pages;
 
+use App\Filament\Concerns\HasRecordCountDescription;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource;
 use App\Models\Note;
@@ -21,6 +22,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 
 final class ManageNotes extends ManageRecords
 {
+    use HasRecordCountDescription;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 
