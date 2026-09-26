@@ -474,6 +474,23 @@ final class AppPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
             )
+            /**
+             * BODY_END, not the sidebar footer: a grandfathered free workspace gets
+             * no sidebar prompt but still sees an upgrade offer on the Billing page.
+             */
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                function (): string {
+                    $workspace = Filament::getTenant();
+                    $user = $this->signedInUser();
+
+                    if (! Feature::active(BillingFeature::class) || ! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
+                        return '';
+                    }
+
+                    return Blade::render('@livewire(\App\Livewire\App\Billing\UpgradeModal::class)');
+                },
+            )
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),

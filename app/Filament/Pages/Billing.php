@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Billing\CreateCreditPackCheckout;
-use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
@@ -118,22 +117,6 @@ final class Billing extends Page
         }
     }
 
-    public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
-    {
-        $workspace = $this->workspace();
-
-        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
-            return;
-        }
-
-        try {
-            $this->redirect($createCheckout->execute($workspace, $interval));
-        } catch (Throwable $exception) {
-            report($exception);
-            $this->notifyCheckoutFailed();
-        }
-    }
-
     public function managePortal(): void
     {
         $workspace = $this->workspace();
@@ -192,6 +175,7 @@ final class Billing extends Page
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
+            'onStripeTrial' => $subscription?->onTrial() ?? false,
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $workspace->subscribed() && $workspace->plan !== Plan::Enterprise,
