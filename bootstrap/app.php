@@ -24,6 +24,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,10 @@ use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
 use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
+use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
+use Spatie\MarkdownResponse\Enums\DetectionMethod;
+use Spatie\MarkdownResponse\Support\Config;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -198,7 +203,39 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
-        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson());
+        $rendersJson = fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson();
+
+        $exceptions->shouldRenderJsonWhen($rendersJson);
+
+        // Detected like every markdown page: wire:navigate fetches send Accept */*,
+        // so reading the header alone would swap the panel for this body.
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($rendersJson): ?Response {
+            if ($rendersJson($request)) {
+                return null;
+            }
+
+            if (! Config::getAction('detection.detector', DetectsMarkdownRequest::class)($request) instanceof DetectionMethod) {
+                return null;
+            }
+
+            $indexes = array_filter([
+                __('Site index') => 'llms-txt',
+                __('Help centre') => 'help.index',
+                __('Developer docs') => 'documentation.index',
+                __('REST API spec') => 'openapi.json',
+            ], Route::has(...));
+
+            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
+
+            foreach ($indexes as $label => $routeName) {
+                $lines[] = "- {$label}: ".route($routeName);
+            }
+
+            $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
+            $lines[] = '';
+
+            return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
+        });
 
         // Stale tabs and deploy boundaries produce checksum failures that
         // Livewire already renders as 419 (page expired -> client refreshes).

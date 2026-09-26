@@ -134,7 +134,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
-        'discord', 'llms.txt',
+        'discord', 'llms.txt', 'openapi.json', 'openapi.yaml',
 
         // API & developer
         'api', 'graphql', 'mcp', 'media', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
