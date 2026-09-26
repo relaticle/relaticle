@@ -236,7 +236,7 @@ return [
         ],
         'admin' => [
             'label' => 'Admin',
-            'description' => 'Manages members and custom fields, and can delete records permanently',
+            'description' => 'Manages members, custom fields, and email settings. Can delete records permanently',
         ],
         'member' => [
             'label' => 'Member',
