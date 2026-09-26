@@ -50,6 +50,7 @@ enum WorkspaceRole: string
                 WorkspaceCapability::DataExport,
                 WorkspaceCapability::MembersManage,
                 WorkspaceCapability::FieldsManage,
+                WorkspaceCapability::EmailManage,
                 WorkspaceCapability::ActivityView,
             ],
             self::Member => [

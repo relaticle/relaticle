@@ -1,0 +1,661 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\EmailIntegration\Models;
+
+use App\Models\Concerns\HasWorkspace;
+use App\Models\User;
+use App\Models\Workspace;
+use Carbon\CarbonInterface;
+use Database\Factories\ConnectedAccountFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Relaticle\EmailIntegration\Data\MailboxHistoryImportSummary;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
+use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
+
+/**
+ * @property string $id
+ * @property string $workspace_id
+ * @property string $user_id
+ * @property EmailProvider $provider
+ * @property string $provider_account_id
+ * @property string $email_address
+ * @property string|null $display_name
+ * @property bool $is_default
+ * @property bool $sync_inbox
+ * @property bool $sync_sent
+ * @property string $access_token
+ * @property string|null $refresh_token
+ * @property array{email?: bool, send?: bool, calendar?: bool}|null $capabilities
+ * @property CarbonInterface|null $token_expires_at
+ * @property int|null $hourly_send_limit
+ * @property int|null $daily_send_limit
+ * @property string|null $sync_cursor
+ * @property CarbonInterface|null $last_synced_at
+ * @property int $initial_sync_imported
+ * @property int|null $initial_sync_estimated
+ * @property int $initial_calendar_sync_imported
+ * @property string|null $calendar_sync_cursor
+ * @property CarbonInterface|null $last_calendar_synced_at
+ * @property string|null $calendar_push_channel_id
+ * @property string|null $calendar_push_resource_id
+ * @property string|null $calendar_push_verification_token
+ * @property CarbonInterface|null $calendar_push_expires_at
+ * @property EmailAccountStatus $status
+ * @property string|null $last_error
+ * @property string|null $history_import_batch_id
+ */
+final class ConnectedAccount extends Model
+{
+    /**
+     * @use HasFactory<ConnectedAccountFactory>
+     */
+    use HasFactory, HasUlids, HasWorkspace, SoftDeletes;
+
+    protected static function newFactory(): ConnectedAccountFactory
+    {
+        return ConnectedAccountFactory::new();
+    }
+
+    protected $fillable = [
+        'workspace_id',
+        'user_id',
+        'provider',
+        'provider_account_id',
+        'email_address',
+        'display_name',
+        'is_default',
+        'access_token',
+        'refresh_token',
+        'token_expires_at',
+        'capabilities',
+        'sync_cursor',
+        'last_synced_at',
+        'initial_sync_imported',
+        'initial_sync_estimated',
+        'initial_calendar_sync_imported',
+        'calendar_sync_cursor',
+        'last_calendar_synced_at',
+        'calendar_push_channel_id',
+        'calendar_push_resource_id',
+        'calendar_push_verification_token',
+        'calendar_push_expires_at',
+        'status',
+        'last_error',
+        'history_import_batch_id',
+        'sync_inbox',
+        'sync_sent',
+        'daily_send_limit',
+        'hourly_send_limit',
+    ];
+
+    // Scopes
+
+    /**
+     * Scope to accounts owned by the given user within the given team.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function ownedBy(Builder $query, User $user, Workspace $team): Builder
+    {
+        return $query
+            ->where('user_id', $user->getKey())
+            ->where('workspace_id', $team->getKey());
+    }
+
+    /**
+     * Scope to accounts that are connected and authorised (safe to sync/send through).
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function active(Builder $query): Builder
+    {
+        return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
+    /**
+     * Scope to accounts that are still connected. Sync-error and reauth-required
+     * mailboxes count: the user already added them. Disconnected ones do not.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function connected(Builder $query): Builder
+    {
+        return $query->whereNot('status', EmailAccountStatus::DISCONNECTED);
+    }
+
+    /**
+     * Scope ordering the user's default account ahead of the rest, so callers that
+     * pick a single sending account (compose, reply) land on the default first.
+     *
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function defaultFirst(Builder $query): Builder
+    {
+        return $query->orderByDesc('is_default')->oldest();
+    }
+
+    // Relations
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return HasMany<Email, $this>
+     */
+    public function emails(): HasMany
+    {
+        return $this->hasMany(Email::class);
+    }
+
+    /**
+     * @return HasMany<Email, $this>
+     */
+    public function outgoingEmails(): HasMany
+    {
+        return $this->hasMany(Email::class, 'connected_account_id')
+            ->where('direction', EmailDirection::OUTBOUND);
+    }
+
+    /**
+     * @return HasMany<EmailThread, $this>
+     */
+    public function threads(): HasMany
+    {
+        return $this->hasMany(EmailThread::class);
+    }
+
+    /**
+     * @return HasMany<ConnectedAccountSync, $this>
+     */
+    public function syncs(): HasMany
+    {
+        return $this->hasMany(ConnectedAccountSync::class);
+    }
+
+    /**
+     * @return HasMany<EmailSignature, $this>
+     */
+    public function signatures(): HasMany
+    {
+        return $this->hasMany(EmailSignature::class);
+    }
+
+    /**
+     * @return HasMany<EmailBlocklist, $this>
+     */
+    public function blocklist(): HasMany
+    {
+        return $this->hasMany(EmailBlocklist::class);
+    }
+
+    // Helpers
+
+    /**
+     * Whether the user has added a mailbox in this team. Sync-error and
+     * reauth-required accounts count. Disconnected accounts do not.
+     */
+    public static function hasConnectedFor(User $user, ?Workspace $team): bool
+    {
+        if (! $team instanceof Workspace) {
+            return false;
+        }
+
+        return self::query()->ownedBy($user, $team)->connected()->exists();
+    }
+
+    /**
+     * Whether the user has at least one account that is safe to sync or send through.
+     */
+    public static function hasActiveFor(User $user, ?Workspace $team): bool
+    {
+        if (! $team instanceof Workspace) {
+            return false;
+        }
+
+        return self::query()->ownedBy($user, $team)->active()->exists();
+    }
+
+    /**
+     * Whether the user has at least one active mailbox that can send from Relaticle.
+     * Accounts connected before send was tracked are treated as sendable.
+     */
+    public static function hasSendableFor(User $user, ?Workspace $team): bool
+    {
+        if (! $team instanceof Workspace) {
+            return false;
+        }
+
+        return self::query()
+            ->ownedBy($user, $team)
+            ->active()
+            ->get()
+            ->contains(fn (ConnectedAccount $account): bool => $account->isSendable());
+    }
+
+    public function isTokenExpired(): bool
+    {
+        return $this->token_expires_at !== null && $this->token_expires_at->isPast();
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === EmailAccountStatus::ACTIVE;
+    }
+
+    /**
+     * Mailbox-level sync problems (auth, API, incremental sync). History import store
+     * failures are import issue on the batch, not a sync error on the account.
+     */
+    public function hasSyncError(): bool
+    {
+        return filled($this->last_error)
+            && ! $this->showsMailboxHistoryImportFailureSummary();
+    }
+
+    /**
+     * True while the first mailbox or calendar backfill has not yet written a cursor.
+     */
+    public function isImportingHistory(): bool
+    {
+        if ($this->status !== EmailAccountStatus::ACTIVE) {
+            return false;
+        }
+
+        if ($this->hasEmail() && $this->sync_cursor === null) {
+            return true;
+        }
+
+        return $this->isImportingCalendarHistory();
+    }
+
+    public function mailboxHistoryImportSummary(): ?MailboxHistoryImportSummary
+    {
+        return resolve(MailboxHistoryImportService::class)->summary($this);
+    }
+
+    public function isEmailHistoryImportRunning(): bool
+    {
+        return resolve(MailboxHistoryImportService::class)->isRunning($this);
+    }
+
+    public function showsMailboxHistoryImportProgressOnAccountsPage(): bool
+    {
+        return $this->isEmailHistoryImportRunning()
+            && ! $this->showsMailboxHistoryImportFailureSummary();
+    }
+
+    public function isMailboxHistoryImportRetryQueued(): bool
+    {
+        $batchId = $this->history_import_batch_id;
+
+        if (blank($batchId)) {
+            return false;
+        }
+
+        return resolve(MailboxHistoryImportService::class)->hasAwaitingRetrySuccessNotice((string) $batchId);
+    }
+
+    public function showsMailboxHistoryImportPercent(): bool
+    {
+        if ($this->isMailboxHistoryImportRetryQueued() || $this->showsMailboxHistoryImportFailureSummary()) {
+            return false;
+        }
+
+        if ($this->isImportingHistory()) {
+            return true;
+        }
+
+        return $this->showsMailboxHistoryImportProgressOnAccountsPage();
+    }
+
+    public function showsMailboxHistoryImportFailureSummary(): bool
+    {
+        if ($this->sync_cursor === null || blank($this->history_import_batch_id)) {
+            return false;
+        }
+
+        $import = resolve(MailboxHistoryImportService::class);
+
+        $batchId = (string) $this->history_import_batch_id;
+
+        if ($import->hasAwaitingRetrySuccessNotice($batchId) || $import->calendarFailureCount($batchId) > 0) {
+            return true;
+        }
+
+        $summary = $this->mailboxHistoryImportSummary();
+
+        return $summary instanceof MailboxHistoryImportSummary
+            && $summary->finished
+            && $summary->failedJobs > 0;
+    }
+
+    public function isImportingCalendarHistory(): bool
+    {
+        if (! $this->isActive() || ! $this->hasCalendar() || $this->calendar_sync_cursor !== null) {
+            return false;
+        }
+
+        $batchId = $this->history_import_batch_id;
+
+        if (is_string($batchId) && $batchId !== '') {
+            $import = resolve(MailboxHistoryImportService::class);
+
+            if (! $import->isCalendarImportPending($batchId)
+                && $import->calendarFailureCount($batchId) > 0) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function isCalendarSyncing(): bool
+    {
+        return MailboxSyncTracker::isCalendarSyncing($this);
+    }
+
+    public function showsCalendarSyncProgress(): bool
+    {
+        return $this->isImportingCalendarHistory();
+    }
+
+    public function isEmailSyncing(): bool
+    {
+        return MailboxSyncTracker::isEmailSyncing($this);
+    }
+
+    public function showsSyncProgress(): bool
+    {
+        return $this->isImportingHistory()
+            || $this->isEmailHistoryImportRunning()
+            || $this->isCalendarSyncing()
+            || $this->isEmailSyncing();
+    }
+
+    public function showsSyncProgressOnAccountsPage(): bool
+    {
+        return $this->isImportingHistory()
+            || $this->showsMailboxHistoryImportProgressOnAccountsPage()
+            || $this->showsCalendarSyncProgress();
+    }
+
+    public function showsHomeMailboxImportProgress(): bool
+    {
+        if ($this->isImportingHistory()) {
+            return true;
+        }
+
+        return $this->showsMailboxHistoryImportProgressOnAccountsPage();
+    }
+
+    public function mailboxHistoryImportFailureDismissToken(): ?string
+    {
+        $batchId = $this->history_import_batch_id;
+
+        if (blank($batchId) || ! $this->showsMailboxHistoryImportFailureSummary()) {
+            return null;
+        }
+
+        $generation = resolve(MailboxHistoryImportService::class)->failureGeneration((string) $batchId);
+
+        return $batchId.':'.$generation;
+    }
+
+    public function isIncrementalSyncing(): bool
+    {
+        return ! $this->isImportingHistory() && ($this->isCalendarSyncing() || $this->isEmailSyncing());
+    }
+
+    public function incrementalSyncStatusLabel(): ?string
+    {
+        if ($this->isImportingHistory()) {
+            return null;
+        }
+
+        $emailSyncing = $this->isEmailSyncing();
+        $calendarSyncing = $this->isCalendarSyncing();
+
+        if ($emailSyncing && $calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_email_and_calendar');
+        }
+
+        if ($calendarSyncing) {
+            return __('filament/pages/email-accounts.importing_calendar');
+        }
+
+        if ($emailSyncing) {
+            return __('filament/pages/email-accounts.importing_email');
+        }
+
+        return null;
+    }
+
+    /**
+     * Percent of the first mailbox import. Starts at 0 until the provider
+     * gives a size estimate and imported rows start landing.
+     *
+     * @return int<0, 100>
+     */
+    public function initialSyncProgressPercent(): int
+    {
+        $estimated = $this->initial_sync_estimated;
+
+        if ($estimated === null || $estimated <= 0) {
+            return 0;
+        }
+
+        $imported = $this->initial_sync_imported;
+        $denominator = max($estimated, $imported);
+        $percent = (int) round(($imported / $denominator) * 100);
+
+        if ($this->sync_cursor === null) {
+            return min(99, max(0, $percent));
+        }
+
+        return min(100, max(0, $percent));
+    }
+
+    public function syncEmailsProcessedCount(): int
+    {
+        if ($this->isEmailSyncing()) {
+            return MailboxSyncTracker::emailProcessedCount($this);
+        }
+
+        if ($this->hasEmail() && filled($this->history_import_batch_id)) {
+            $import = resolve(MailboxHistoryImportService::class);
+
+            if ($import->isRunning($this)
+                || $this->showsMailboxHistoryImportFailureSummary()
+                || $this->isMailboxHistoryImportRetryQueued()
+                || $this->sync_cursor === null) {
+                return $import->processedJobCount($this);
+            }
+        }
+
+        if ($this->isImportingHistory() && $this->hasEmail() && $this->sync_cursor === null) {
+            return $this->initial_sync_imported;
+        }
+
+        return $this->initial_sync_imported;
+    }
+
+    public function syncMeetingsProcessedCount(): int
+    {
+        if ($this->isImportingCalendarHistory()) {
+            return $this->initial_calendar_sync_imported;
+        }
+
+        if ($this->isCalendarSyncing()) {
+            return MailboxSyncTracker::calendarProcessedCount($this);
+        }
+
+        return $this->initial_calendar_sync_imported;
+    }
+
+    public function syncDisplayPercent(): int
+    {
+        if ($this->isImportingHistory()) {
+            if ($this->hasEmail() && filled($this->history_import_batch_id)) {
+                return resolve(MailboxHistoryImportService::class)->progressPercent($this);
+            }
+
+            return $this->initialSyncProgressPercent();
+        }
+
+        if ($this->hasEmail() && filled($this->history_import_batch_id)) {
+            if ($this->showsMailboxHistoryImportPercent()) {
+                return resolve(MailboxHistoryImportService::class)->progressPercent($this);
+            }
+        }
+
+        return MailboxSyncTracker::runProgressPercent($this);
+    }
+
+    /**
+     * Whether emails of the given direction should be synced, per the user's
+     * inbox/sent toggles. The single source of truth for direction gating,
+     * consulted on the store path so it covers both providers and both the
+     * initial backfill and incremental syncs.
+     */
+    public function syncsDirection(EmailDirection $direction): bool
+    {
+        return match ($direction) {
+            EmailDirection::INBOUND => $this->sync_inbox,
+            EmailDirection::OUTBOUND => $this->sync_sent,
+        };
+    }
+
+    /**
+     * @return Attribute<string, string>
+     */
+    protected function label(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => "{$this->provider->getLabel()} - $this->email_address",
+        );
+    }
+
+    // Calendar helpers
+
+    public function hasCalendar(): bool
+    {
+        return (bool) ($this->capabilities['calendar'] ?? false);
+    }
+
+    public function hasEmail(): bool
+    {
+        return (bool) ($this->capabilities['email'] ?? true);
+    }
+
+    /**
+     * Whether this token can send mail. Missing `send` means the account was
+     * connected before Relaticle recorded the grant, so treat it as allowed.
+     */
+    public function hasSend(): bool
+    {
+        return (bool) ($this->capabilities['send'] ?? true);
+    }
+
+    /**
+     * Whether this mailbox is safe to send through Relaticle. Requires a working
+     * token and a send grant. Sync-error and reauth-required accounts are not.
+     */
+    public function isSendable(): bool
+    {
+        return $this->isActive() && $this->hasSend();
+    }
+
+    public function capabilitiesLabel(): string
+    {
+        $labels = [];
+
+        if ($this->hasEmail()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.email');
+        }
+
+        if ($this->hasCalendar()) {
+            $labels[] = __('filament/pages/email-accounts.capabilities.calendar');
+        }
+
+        if ($labels === []) {
+            return $this->provider->getLabel();
+        }
+
+        return implode(', ', $labels);
+    }
+
+    public function enableCalendar(): void
+    {
+        $capabilities = $this->capabilities ?? [];
+        $capabilities['calendar'] = true;
+        $this->update(['capabilities' => $capabilities]);
+    }
+
+    public function disableCalendar(): void
+    {
+        $capabilities = $this->capabilities ?? [];
+        $capabilities['calendar'] = false;
+        $this->update(['capabilities' => $capabilities]);
+    }
+
+    /**
+     * @return HasMany<Meeting, $this>
+     */
+    public function meetings(): HasMany
+    {
+        return $this->hasMany(Meeting::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'provider' => EmailProvider::class,
+            'status' => EmailAccountStatus::class,
+            'token_expires_at' => 'datetime',
+            'last_synced_at' => 'datetime',
+            'last_calendar_synced_at' => 'datetime',
+            'calendar_push_expires_at' => 'datetime',
+            'initial_sync_imported' => 'integer',
+            'initial_sync_estimated' => 'integer',
+            'initial_calendar_sync_imported' => 'integer',
+            'is_default' => 'boolean',
+            'sync_inbox' => 'boolean',
+            'sync_sent' => 'boolean',
+            'capabilities' => 'array',
+            'access_token' => 'encrypted',
+            'refresh_token' => 'encrypted',
+            'calendar_push_verification_token' => 'encrypted',
+            'daily_send_limit' => 'integer',
+            'hourly_send_limit' => 'integer',
+        ];
+    }
+}

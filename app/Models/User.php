@@ -49,6 +49,7 @@ use Laravel\Jetstream\Jetstream;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\HasApiTokens;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 
 /**
  * @property string $name
@@ -68,6 +69,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
  * @property-read Workspace|null $currentWorkspace
@@ -82,6 +84,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'timezone',
     'password',
+    'default_email_sharing_tier',
     'ai_preferences',
     'notification_preferences',
 ])]
@@ -130,6 +133,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'last_login_at' => 'datetime',
             'email_bounced_at' => 'datetime',
             'password' => 'hashed',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
@@ -204,6 +208,27 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');
+    }
+
+    /**
+     * Members of a workspace: the `workspace_user` pivot plus the owner, who has no
+     * pivot row: the same two sources App\Support\TenantFkValidator checks.
+     *
+     * Deliberately not `current_workspace_id`: that column is only a user's *active*
+     * workspace, so a member who is currently working in another one would drop
+     * out of member pickers and be rejected as a share target.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function inWorkspace(Builder $query, string $workspaceId): Builder
+    {
+        return $query->where(function (Builder $members) use ($workspaceId): void {
+            $members
+                ->whereHas('workspaces', fn (Builder $workspaces): Builder => $workspaces->whereKey($workspaceId))
+                ->orWhereHas('ownedWorkspaces', fn (Builder $ownedWorkspaces): Builder => $ownedWorkspaces->whereKey($workspaceId));
+        });
     }
 
     /**

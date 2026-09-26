@@ -35,6 +35,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Onboarding\ActivationSteps;
+use App\Policies\EmailPolicy;
+use App\Policies\EmailTemplatePolicy;
+use App\Policies\MeetingPolicy;
 use App\Services\Billing\HostedWorkspaceAccess;
 use App\Services\DiscordService;
 use App\Services\DockerHubService;
@@ -51,6 +54,7 @@ use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Impersonation\Impersonator;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
+use App\Support\Migrations\TenantMigration;
 use App\Support\Passport\ClientRepository;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -72,6 +76,8 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
@@ -99,12 +105,19 @@ use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Relaticle\EmailIntegration\Models\EmailThread;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use SocialiteProviders\Azure\AzureExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 use Spatie\Activitylog\Contracts\Activity as ActivityContract;
@@ -224,6 +237,7 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
         Event::listen(WorkspaceCreated::class, CreateSetupConversationListener::class);
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
+        Event::listen(SocialiteWasCalled::class, [AzureExtendSocialite::class, 'handle']);
 
         Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
@@ -276,11 +290,13 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureFilament();
         $this->configureCommunityCounts();
         $this->configureLivewire();
+        $this->configureMacros();
         $this->configureRateLimiting();
         $this->configureScribe();
 
         $this->configureActivityLog();
         $this->configureBlog();
+        $this->configureDevCommands();
     }
 
     /**
@@ -390,6 +406,10 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configurePolicies(): void
     {
+        Gate::policy(Email::class, EmailPolicy::class);
+        Gate::policy(EmailTemplate::class, EmailTemplatePolicy::class);
+        Gate::policy(Meeting::class, MeetingPolicy::class);
+
         // The impersonation routes are plain web routes, so the panel-scoped policy
         // discovery below never runs for them.
         Gate::define('impersonate', fn (Authenticatable $account): bool => $account instanceof SystemAdministrator
@@ -579,6 +599,11 @@ final class AppServiceProvider extends ServiceProvider
             'user' => User::class,
             ...CrmEntity::morphMap(),
             'system_administrator' => SystemAdministrator::class,
+            'email' => Email::class,
+            'connected_account' => ConnectedAccount::class,
+            'email_thread' => EmailThread::class,
+            'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
             'custom_field' => CustomField::class,
             'custom_field_option' => CustomFieldOption::class,
             'blog_post' => Post::class,
@@ -727,5 +752,20 @@ final class AppServiceProvider extends ServiceProvider
         Facades\View::composer('home.partials.works-with', function (View $view): void {
             $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
         });
+    }
+
+    private function configureMacros(): void
+    {
+        Blueprint::macro('teams', function (): void {
+            TenantMigration::addForeignKey($this);
+        });
+    }
+
+    private function configureDevCommands(): void
+    {
+        DevCommands::artisan(
+            'schedule:work',
+        );
+        DevCommands::except('reverb', 'queue');
     }
 }

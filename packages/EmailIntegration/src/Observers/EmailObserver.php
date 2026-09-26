@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Relaticle\EmailIntegration\Observers;
+
+use App\Models\User;
+use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Services\PrivacyService;
+
+final readonly class EmailObserver
+{
+    public function __construct(
+        private LinkEmailAction $linkEmail,
+        private PrivacyService $privacyService,
+    ) {}
+
+    public function creating(Email $email): void
+    {
+        $owner = User::query()->find($email->user_id);
+
+        if ($owner && ! $email->isDirty('privacy_tier')) {
+            $email->privacy_tier = $this->privacyService->defaultTierForUser($owner, $email->workspace);
+        } elseif ($email->isDirty('privacy_tier') && $email->creation_source !== EmailCreationSource::SYNC) {
+            $email->privacy_tier_customized = true;
+        }
+    }
+
+    public function created(Email $email): void
+    {
+        // During sync jobs, participants are stored after Email::create().
+        // StoreEmailAction calls linking manually once participants are ready.
+        if ($email->participants()->doesntExist()) {
+            return;
+        }
+
+        $this->linkEmail->execute($email);
+    }
+}

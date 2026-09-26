@@ -17,6 +17,7 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Activity\ListActivityTool;
 
 mutates(ListActivityTool::class);
+mutates(Company::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();

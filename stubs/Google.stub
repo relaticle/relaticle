@@ -1,0 +1,24 @@
+<?php
+
+namespace Google\Service\Calendar;
+
+class Event
+{
+    /**
+     * The generated client types this non-nullable, but Google omits the
+     * organizer on some events (holidays, birthdays, imported .ics) and
+     * Google\Model::__get returns null for an absent key, so it is nullable.
+     *
+     * @return EventOrganizer|null
+     */
+    public function getOrganizer();
+}
+
+class EventOrganizer
+{
+    /** @return string|null */
+    public function getEmail();
+
+    /** @return string|null */
+    public function getDisplayName();
+}

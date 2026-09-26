@@ -103,6 +103,7 @@ parameters:
             path: app/Livewire/App/AccessTokens/ManageAccessTokens.php
     stubFiles:
         - stubs/Mailcoach.stub
+        - stubs/Google.stub
 
     paths:
         - app

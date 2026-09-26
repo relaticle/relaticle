@@ -160,6 +160,7 @@ return [
         'general' => 'General',
         'members' => 'Members',
         'custom_fields' => 'Custom Fields',
+        'email' => 'Email and Calendar',
         'import_history' => 'Import History',
         'activity' => 'Activity',
         'billing' => 'Billing',
@@ -235,7 +236,7 @@ return [
         ],
         'admin' => [
             'label' => 'Admin',
-            'description' => 'Manages members and custom fields, and can delete records permanently',
+            'description' => 'Manages members, custom fields, and email settings. Can delete records permanently',
         ],
         'member' => [
             'label' => 'Member',
@@ -271,6 +272,9 @@ return [
         ],
         'workspace' => [
             'manage' => ['label' => 'Rename or delete the workspace'],
+        ],
+        'email' => [
+            'manage' => ['label' => 'Manage workspace email settings'],
         ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],

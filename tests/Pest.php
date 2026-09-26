@@ -15,13 +15,24 @@ declare(strict_types=1);
  */
 
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\Http\HostResolver;
+use Filament\Actions\Action;
+use Filament\Actions\Testing\TestAction;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -95,6 +106,113 @@ function userChannelAuth(User $user, string $id): bool
     }
 
     return (bool) $callback($user, $id);
+}
+
+function attachHistoryImportBatch(ConnectedAccount $account): string
+{
+    $batch = resolve(MailboxHistoryImportService::class)->startBatch($account);
+    $account->update(['history_import_batch_id' => $batch->id]);
+
+    return $batch->id;
+}
+
+function insertHistoryImportFailedJob(ConnectedAccount $account, string $batchId, string $uuid, string $messageId = 'failed-message'): void
+{
+    $job = new StoreEmailJob($account, $messageId);
+    $job->withBatchId($batchId);
+
+    DB::table('failed_jobs')->insert([
+        'uuid' => $uuid,
+        'connection' => config('queue.default'),
+        'queue' => 'emails-sync',
+        'payload' => json_encode([
+            'uuid' => $uuid,
+            'displayName' => StoreEmailJob::class,
+            'job' => 'Illuminate\\Queue\\CallQueuedHandler@call',
+            'data' => [
+                'commandName' => StoreEmailJob::class,
+                'command' => serialize($job),
+            ],
+        ]),
+        'exception' => 'RuntimeException: Provider unavailable',
+        'failed_at' => now(),
+    ]);
+}
+
+function fakeHistoryImportQueueRetry(string $uuid): void
+{
+    Artisan::shouldReceive('call')
+        ->once()
+        ->with('queue:retry', ['id' => $uuid])
+        ->andReturnUsing(function () use ($uuid): int {
+            DB::table('failed_jobs')->where('uuid', $uuid)->delete();
+
+            return 0;
+        });
+}
+
+function setHistoryImportBatchProgress(string $batchId, int $totalJobs, int $pendingJobs): void
+{
+    DB::table('job_batches')->where('id', $batchId)->update([
+        'total_jobs' => $totalJobs,
+        'pending_jobs' => $pendingJobs,
+        'failed_jobs' => 0,
+        'finished_at' => null,
+    ]);
+}
+
+function bindMailboxOAuthWorkspace(User $user, ?Workspace $team = null): void
+{
+    $team ??= $user->currentWorkspace;
+
+    throw_unless($team instanceof Workspace, RuntimeException::class, 'bindMailboxOAuthWorkspace requires a workspace.');
+
+    session()->put(RedirectController::WORKSPACE_SESSION_KEY, $team->getKey());
+}
+
+function mailboxOAuthRedirectUrl(string $provider, Workspace $team): string
+{
+    return MailboxOAuthWorkspace::redirectUrl($provider, $team);
+}
+
+function assertMailboxOAuthRedirectUrl(string $url, string $provider, Workspace $team): void
+{
+    expect($url)->toContain("/email-accounts/redirect/{$provider}");
+
+    parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+    expect($query['team'] ?? null)->toBe($team->getKey())
+        ->and(Request::create($url)->hasValidSignature())->toBeTrue();
+}
+
+function assertRedirectedToMailboxOAuth(Testable $component, string $provider, Workspace $team): void
+{
+    $component->assertRedirect();
+
+    /** @var string $redirect */
+    $redirect = $component->effects['redirect'];
+
+    assertMailboxOAuthRedirectUrl(url($redirect), $provider, $team);
+}
+
+function assertActionHasMailboxOAuthUrl(
+    Testable $component,
+    string|TestAction|array $action,
+    string $provider,
+    Workspace $team,
+): void {
+    $component->assertActionExists(
+        $action,
+        checkActionUsing: function (Action $resolvedAction) use ($provider, $team): bool {
+            try {
+                assertMailboxOAuthRedirectUrl((string) $resolvedAction->getUrl(), $provider, $team);
+
+                return true;
+            } catch (Throwable) {
+                return false;
+            }
+        },
+    );
 }
 
 /**

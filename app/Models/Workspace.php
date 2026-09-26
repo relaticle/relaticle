@@ -38,6 +38,8 @@ use Laravel\Cashier\Billable;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\ImportWizard\Models\Import;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -49,6 +51,9 @@ use Spatie\Sluggable\SlugOptions;
 /**
  * @property string $name
  * @property string $slug
+ * @property EmailPrivacyTier|null $default_email_sharing_tier
+ * @property ContactCreationMode $contact_creation_mode
+ * @property bool $auto_create_companies
  * @property Plan $plan
  * @property ?string $invite_link_token
  * @property ?CarbonImmutable $invite_link_token_expires_at
@@ -71,6 +76,9 @@ use Spatie\Sluggable\SlugOptions;
     'name',
     'slug',
     'personal_workspace',
+    'default_email_sharing_tier',
+    'contact_creation_mode',
+    'auto_create_companies',
     'onboarding_use_case',
     'onboarding_other_use_case',
     'onboarding_context',
@@ -160,6 +168,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
         // Misc
         'null', 'undefined', 'error', 'test', 'staging', 'preview',
+
+        // Email Integration
+        'email-accounts', 'email-attachments',
     ];
 
     /**
@@ -196,6 +207,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     {
         return [
             'personal_workspace' => 'boolean',
+            'default_email_sharing_tier' => EmailPrivacyTier::class,
+            'contact_creation_mode' => ContactCreationMode::class,
+            'auto_create_companies' => 'boolean',
             'plan' => Plan::class,
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',

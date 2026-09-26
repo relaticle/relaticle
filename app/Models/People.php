@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CreationSource;
 use App\Enums\MediaCollection;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
+use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasWorkspace;
@@ -26,11 +27,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
-use Relaticle\ActivityLog\Timeline\TimelineBuilder;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
+use Relaticle\EmailIntegration\Models\Concerns\HasEmails;
+use Relaticle\EmailIntegration\Models\Concerns\HasMeetings;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\MediaLibrary\HasMedia;
@@ -39,6 +40,13 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 /**
  * @property CarbonImmutable|null $deleted_at
  * @property CreationSource $creation_source
+ * @property CarbonImmutable|null $last_email_at
+ * @property CarbonImmutable|null $last_interaction_at
+ * @property CarbonImmutable|null $last_meeting_at
+ * @property int $email_count
+ * @property int $inbound_email_count
+ * @property int $outbound_email_count
+ * @property int $meeting_count
  */
 #[ObservedBy(PeopleObserver::class)]
 #[ScopedBy(WorkspaceScope::class)]
@@ -49,16 +57,18 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 final class People extends Model implements HasAvatar, HasCustomFields, HasMedia, HasTimeline
 {
     use BelongsToWorkspaceCreator;
+    use HasActivityTimeline;
     use HasCreator;
+    use HasEmails;
 
     /** @use HasFactory<PeopleFactory> */
     use HasFactory;
 
+    use HasMeetings;
     use HasNotes;
     use HasUlids;
     use HasWorkspace;
     use InteractsWithMedia;
-    use InteractsWithTimeline;
     use LogsActivity;
     use SoftDeletes;
     use UsesCustomFields;
@@ -72,6 +82,9 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasMedia
     {
         return [
             'creation_source' => CreationSource::class,
+            'last_email_at' => 'datetime',
+            'last_interaction_at' => 'datetime',
+            'last_meeting_at' => 'datetime',
         ];
     }
 
@@ -116,13 +129,10 @@ final class People extends Model implements HasAvatar, HasCustomFields, HasMedia
             ->logExcept([
                 'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
+                'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
+                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'company_id',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);
-    }
-
-    public function timeline(): TimelineBuilder
-    {
-        return TimelineBuilder::make($this)->fromActivityLog(mergedRenderer: 'merged-activity');
     }
 }

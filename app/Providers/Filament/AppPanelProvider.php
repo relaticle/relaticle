@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\ActivityLog\AppEventPalette;
+use App\ActivityLog\AppEventRenderer;
+use App\ActivityLog\MeetingEventPalette;
+use App\ActivityLog\MeetingEventRenderer;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
+use App\Features\EmailIntegration;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
 use App\Filament\Pages\AccessTokens;
@@ -65,6 +70,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
+use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
@@ -88,6 +94,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Throwable;
@@ -286,12 +293,15 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
+            ->sidebarWidth('67')
+            ->maxContentWidth(Width::Full)
             // The socialite entry points answer with a 302 to the provider's own
             // domain, and wire:navigate cannot follow a cross-origin redirect.
             ->spaUrlExceptions([
                 '*/auth/redirect/*',
                 '*/auth/link/redirect/*',
                 '*/auth/confirm/redirect/*',
+                '*/email-accounts/redirect/*',
             ])
             ->routes(function () use ($panel): void {
                 Route::get('/register', fn (): RedirectResponse => redirect()->to(Filament::getLoginUrl()))
@@ -369,6 +379,15 @@ final class AppPanelProvider extends PanelProvider
                     })
                     ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
+                ActivityLogPlugin::make()
+                    ->renderers(array_fill_keys(
+                        array_column(AppEventPalette::cases(), 'value'),
+                        AppEventRenderer::class,
+                    ))
+                    ->renderers(array_fill_keys(
+                        array_column(MeetingEventPalette::cases(), 'value'),
+                        MeetingEventRenderer::class,
+                    )),
             ])
             ->renderHook(
                 PanelsRenderHook::AUTH_LOGIN_FORM_AFTER,
@@ -398,6 +417,12 @@ final class AppPanelProvider extends PanelProvider
                     EmailVerificationPrompt::class,
                 ],
             );
+
+        if (Feature::for(null)->active(EmailIntegration::class)) {
+            $panel
+                ->discoverResources(in: base_path('packages/EmailIntegration/src/Filament/Resources'), for: 'Relaticle\\EmailIntegration\\Filament\\Resources')
+                ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages');
+        }
 
         $panel
             ->renderHook(
