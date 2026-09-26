@@ -25,6 +25,13 @@ it('can render the index page', function (): void {
         ->assertOk();
 });
 
+it('shows how many records the list holds', function (): void {
+    People::factory(3)->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ListPeople::class)
+        ->assertSee('3 records');
+});
+
 it('can render the view page', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 

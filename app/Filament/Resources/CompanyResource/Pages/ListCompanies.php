@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\CompanyResource\Pages;
 
+use App\Filament\Concerns\HasRecordCountDescription;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource;
 use App\Models\Company;
@@ -21,6 +22,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 
 final class ListCompanies extends ListRecords
 {
+    use HasRecordCountDescription;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 

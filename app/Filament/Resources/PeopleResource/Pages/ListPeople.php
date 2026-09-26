@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\Pages;
 
+use App\Filament\Concerns\HasRecordCountDescription;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
@@ -21,6 +22,7 @@ use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 final class ListPeople extends ListRecords
 {
+    use HasRecordCountDescription;
     use HasResizableColumn;
     use InteractsWithCustomFields;
 
