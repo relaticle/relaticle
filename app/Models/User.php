@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
+use App\Enums\LandingPage;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\WorkspaceCapability;
@@ -70,6 +71,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string|null $two_factor_secret
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
+ * @property LandingPage|null $landing_page
  * @property-read Workspace|null $currentWorkspace
  * @property-read Membership|null $membership the `workspace_user` row, populated only when the user was
  *     loaded through `Workspace::users()`; null on a user reached any other way
@@ -84,6 +86,7 @@ use Laravel\Sanctum\HasApiTokens;
     'password',
     'ai_preferences',
     'notification_preferences',
+    'landing_page',
 ])]
 #[Hidden([
     'password',
@@ -131,6 +134,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'email_bounced_at' => 'datetime',
             'password' => 'hashed',
             'ai_preferences' => 'array',
+            'landing_page' => LandingPage::class,
             'notification_preferences' => 'array',
             'scheduled_deletion_at' => 'datetime',
         ];
