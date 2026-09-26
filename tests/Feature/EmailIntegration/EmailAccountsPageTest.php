@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
@@ -145,9 +144,9 @@ it('does not delete another user\'s account on disconnect', function (): void {
         'user_id' => $otherUser->id,
     ]));
 
-    expect(fn () => livewire(EmailAccountsPage::class)
-        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id]))
-        ->toThrow(ModelNotFoundException::class);
+    livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $otherAccount->id])
+        ->assertNotFound();
 
     $this->assertNotSoftDeleted(ConnectedAccount::class, [
         'id' => $otherAccount->id,
@@ -268,9 +267,9 @@ it('does not re-import another user\'s account', function (): void {
         'user_id' => $otherUser->id,
     ]));
 
-    expect(fn () => livewire(EmailAccountsPage::class)
-        ->callAction('reimportHistory', arguments: ['account_id' => $otherAccount->id]))
-        ->toThrow(ModelNotFoundException::class);
+    livewire(EmailAccountsPage::class)
+        ->callAction('reimportHistory', arguments: ['account_id' => $otherAccount->id])
+        ->assertNotFound();
 });
 
 it('shows mailbox capabilities on each connected account', function (): void {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
@@ -15,7 +15,7 @@ final readonly class UpdateTeamEmailVisibilityEntrySubdomainsAction
     public function execute(Workspace $team, User $actor, TeamEmailBlocklist $entry, bool $includeSubdomains): void
     {
         abort_unless(
-            $actor->ownsWorkspace($team) || $actor->hasWorkspaceRole($team, WorkspaceRole::Admin->value),
+            $actor->hasWorkspaceCapability($team->getKey(), WorkspaceCapability::EmailManage),
             403,
         );
 

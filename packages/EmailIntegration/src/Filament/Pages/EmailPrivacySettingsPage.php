@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
@@ -29,7 +29,6 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Relaticle\EmailIntegration\Actions\SaveTeamEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamContactCreationSettingsAction;
-use Relaticle\EmailIntegration\Actions\UpdateTeamEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateTeamEmailVisibilityAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
@@ -46,11 +45,8 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     use InteractsWithSchemas;
 
     /**
-     * Workspace-wide privacy and record-creation settings may only be viewed
-     * and changed by the team owner or an admin. Mirrors the write guards in
-     * {@see UpdateTeamEmailPrivacySettingsAction} and
-     * {@see UpdateTeamContactCreationSettingsAction}; other roles use the
-     * per-user "My Email Privacy" page instead.
+     * Workspace email settings use the email.manage capability, which the owner
+     * and admins have. Other roles use the per-user My Email Privacy page.
      *
      * @param  array<string, mixed>  $parameters
      */
@@ -69,7 +65,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
         $team = $user->currentWorkspace;
 
         return $team instanceof Workspace
-            && ($user->ownsWorkspace($team) || $user->hasWorkspaceRole($team, WorkspaceRole::Admin->value));
+            && $user->hasWorkspaceCapability($team->getKey(), WorkspaceCapability::EmailManage);
     }
 
     protected string $view = 'email-integration::filament.pages.workspace-email-settings';

@@ -273,6 +273,9 @@ return [
         'workspace' => [
             'manage' => ['label' => 'Rename or delete the workspace'],
         ],
+        'email' => [
+            'manage' => ['label' => 'Manage workspace email settings'],
+        ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],
         ],

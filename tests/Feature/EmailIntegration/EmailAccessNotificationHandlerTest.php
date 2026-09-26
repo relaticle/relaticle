@@ -27,7 +27,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 
     $this->requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($this->requester, ['role' => 'editor']);
+    $this->workspace->users()->attach($this->requester, ['role' => 'member']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

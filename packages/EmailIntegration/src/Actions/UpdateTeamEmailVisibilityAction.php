@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
@@ -18,7 +18,7 @@ final readonly class UpdateTeamEmailVisibilityAction
     public function execute(Workspace $team, User $actor, array $entries): void
     {
         abort_unless(
-            $actor->ownsWorkspace($team) || $actor->hasWorkspaceRole($team, WorkspaceRole::Admin->value),
+            $actor->hasWorkspaceCapability($team->getKey(), WorkspaceCapability::EmailManage),
             403,
         );
 

@@ -202,7 +202,7 @@ it('does not badge private teammate mail or emails linked to another record', fu
     attachRecordEmail($this->user, $this->workspace, $owner);
 
     $coworker = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     attachRecordEmail($coworker, $this->workspace, $owner, [
         'privacy_tier' => EmailPrivacyTier::PRIVATE,
@@ -223,7 +223,7 @@ it('renders scoped communication intelligence once on the person view', function
     attachRecordEmail($this->user, $this->workspace, $person);
 
     $coworker = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     attachRecordEmail($coworker, $this->workspace, $person, [
         'privacy_tier' => EmailPrivacyTier::PRIVATE,

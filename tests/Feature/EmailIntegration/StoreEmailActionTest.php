@@ -388,7 +388,7 @@ it('cleans up stored inline files when storing the email rolls back', function (
 
 it('marks email as internal when all participants are team members', function (): void {
     $teamMember = User::factory()->create();
-    $this->workspace->users()->attach($teamMember, ['role' => 'editor']);
+    $this->workspace->users()->attach($teamMember, ['role' => 'member']);
 
     $data = makeFetchedEmailData([
         'participants' => [
@@ -423,7 +423,7 @@ it('treats a member as internal even when their active team is a different team'
     // Keying internal-detection off current_workspace_id (instead of membership) would
     // wrongly classify the email as external and leak it to other members.
     $otherTeamMember = User::factory()->withWorkspace()->create();
-    $this->workspace->users()->attach($otherTeamMember, ['role' => 'editor']);
+    $this->workspace->users()->attach($otherTeamMember, ['role' => 'member']);
 
     expect($otherTeamMember->current_workspace_id)->not->toBe($this->workspace->id);
 

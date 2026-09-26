@@ -121,7 +121,7 @@ describe('Tab switching', function (): void {
 describe('approveAccessRequest action', function (): void {
     it('approves a pending request and sends a notification', function (): void {
         $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-        $this->workspace->users()->attach($requester, ['role' => 'editor']);
+        $this->workspace->users()->attach($requester, ['role' => 'member']);
 
         $request = EmailAccessRequest::factory()->pending()->create([
             'owner_id' => $this->user->id,
@@ -350,7 +350,7 @@ describe('getNavigationBadge', function (): void {
 
     it('does not count pending requests raised in another workspace', function (): void {
         $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
-        $otherWorkspace->users()->attach($this->user, ['role' => 'editor']);
+        $otherWorkspace->users()->attach($this->user, ['role' => 'member']);
         $requester = User::factory()->create(['current_workspace_id' => $otherWorkspace->id]);
         $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
             'workspace_id' => $otherWorkspace->id,

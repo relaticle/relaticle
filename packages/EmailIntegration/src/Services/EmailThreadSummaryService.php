@@ -176,8 +176,8 @@ final readonly class EmailThreadSummaryService
             'summary' => $response->text,
             'input_hash' => $inputHash,
             'model_used' => $model,
-            'prompt_tokens' => $response->usage->promptTokens,
-            'completion_tokens' => $response->usage->completionTokens,
+            'prompt_tokens' => $response->usage->inputTokens,
+            'completion_tokens' => $response->usage->outputTokens,
         ]);
     }
 }

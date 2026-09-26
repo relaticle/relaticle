@@ -26,7 +26,7 @@ beforeEach(function (): void {
     $this->workspace = $this->owner->currentWorkspace;
 
     $this->viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($this->viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($this->viewer, ['role' => 'member']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -209,7 +209,7 @@ describe('manageSharing table action', function (): void {
 
     it('creates EmailShare rows for multiple teammates selected in one tier row', function (): void {
         $secondViewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-        $this->workspace->users()->attach($secondViewer, ['role' => 'editor']);
+        $this->workspace->users()->attach($secondViewer, ['role' => 'member']);
 
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,

@@ -8,7 +8,7 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Laravel\Ai\Responses\Data\Meta;
-use Laravel\Ai\Responses\Data\Usage;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Laravel\Ai\Responses\TextResponse;
 use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
@@ -26,7 +26,7 @@ function fakeSummary(string $text, int $promptTokens, int $completionTokens): Te
 {
     return new TextResponse(
         $text,
-        new Usage($promptTokens, $completionTokens),
+        new TextUsage($promptTokens, $completionTokens),
         new Meta(
             (string) config('services.email_summary.provider'),
             (string) config('services.email_summary.model'),
@@ -152,7 +152,7 @@ it('does not expose cached private content to a viewer of one shared message', f
     $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'creator_id' => $this->owner->id]);
     $person->emails()->attach([$shared->getKey(), $private->getKey()]);
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
     EmailShare::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email_id' => $shared->getKey(),
@@ -241,7 +241,7 @@ it('omits hidden message metadata from the summary prompt', function (): void {
         'body_text' => 'Let us schedule a pricing call next week',
     ]);
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
     EmailShare::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email_id' => $shared->getKey(),

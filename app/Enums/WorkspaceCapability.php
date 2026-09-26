@@ -18,6 +18,7 @@ enum WorkspaceCapability: string
     case FieldsManage = 'fields.manage';
     case BillingManage = 'billing.manage';
     case WorkspaceManage = 'workspace.manage';
+    case EmailManage = 'email.manage';
     case ActivityView = 'activity.view';
 
     public function label(): string

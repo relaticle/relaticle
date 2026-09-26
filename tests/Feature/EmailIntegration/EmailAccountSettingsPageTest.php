@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -267,9 +266,9 @@ it('does not touch another account\'s signature', function (): void {
         'user_id' => $this->user->id,
     ]));
 
-    expect(fn () => livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->callAction('deleteSignature', arguments: ['signature_id' => $signature->id]))
-        ->toThrow(ModelNotFoundException::class);
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->callAction('deleteSignature', arguments: ['signature_id' => $signature->id])
+        ->assertNotFound();
 
     $this->assertDatabaseHas(EmailSignature::class, ['id' => $signature->id]);
 });
@@ -314,6 +313,6 @@ it('does not open the settings page for another user\'s account', function (): v
         'user_id' => $otherUser->id,
     ]));
 
-    expect(fn () => livewire(EmailAccountSettingsPage::class, ['account' => $otherAccount->id]))
-        ->toThrow(ModelNotFoundException::class);
+    livewire(EmailAccountSettingsPage::class, ['account' => $otherAccount->id])
+        ->assertNotFound();
 });

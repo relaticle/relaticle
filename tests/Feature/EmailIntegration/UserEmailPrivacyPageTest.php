@@ -27,7 +27,7 @@ beforeEach(function (): void {
 
 it('grants any team member access to the my-privacy page regardless of role', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
@@ -36,7 +36,7 @@ it('grants any team member access to the my-privacy page regardless of role', fu
 
 it('persists the user default sharing tier when a member saves their preference', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
@@ -52,7 +52,7 @@ it('persists the user default sharing tier when a member saves their preference'
 
 it('retroactively updates non-customized emails when the user sharing preference changes', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 

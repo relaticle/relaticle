@@ -129,11 +129,11 @@ test('the tab strip hides admin-only tabs from members without the admin role', 
         ->not->toContain(__('workspaces.tabs.activity'));
 });
 
-test('a workspace editor reaches their email accounts and templates but not the workspace email privacy', function (): void {
-    $editor = User::factory()->create();
-    $this->workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+test('a workspace member reaches their email accounts and templates but not the workspace email privacy', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    $this->actingAs($editor);
+    $this->actingAs($member);
 
     expect(workspaceTabLabels(resolve(EditWorkspace::class)))->toContain(__('workspaces.tabs.email'));
 

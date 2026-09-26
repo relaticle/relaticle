@@ -32,7 +32,7 @@ mutates(
 function createMailboxOwner(Workspace $team): array
 {
     $user = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($user, ['role' => 'editor']);
+    $team->users()->attach($user, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -135,7 +135,7 @@ it('does not ask a teammate to request access when the message is already in the
 
 it('still asks a teammate without a mailbox copy to request access once', function (): void {
     $outsider = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($outsider, ['role' => 'editor']);
+    $this->workspace->users()->attach($outsider, ['role' => 'member']);
 
     $this->actingAs($outsider);
     Filament::setTenant($this->workspace);

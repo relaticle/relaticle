@@ -14,7 +14,7 @@ beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
     $this->viewer = User::factory()->create(['current_workspace_id' => $this->owner->currentWorkspace->id]);
     $this->workspace = $this->owner->currentWorkspace;
-    $this->workspace->users()->attach($this->viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($this->viewer, ['role' => 'member']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

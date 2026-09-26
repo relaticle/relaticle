@@ -1030,7 +1030,7 @@ it('does not auto-create people or companies for internal email', function (): v
     ]);
 
     $teammate = User::factory()->create();
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
 
     $peopleBefore = People::where('workspace_id', $this->workspace->id)->count();
     $companiesBefore = Company::where('workspace_id', $this->workspace->id)->count();
@@ -1057,7 +1057,7 @@ it('does not auto-create a person when Selective outbound only reaches a teammat
     $this->workspace->update(['contact_creation_mode' => ContactCreationMode::Selective]);
 
     $teammate = User::factory()->create();
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
 
     $countBefore = People::where('workspace_id', $this->workspace->id)->count();
 
@@ -1098,7 +1098,7 @@ it('creates a person in Selective mode when a teammate already sent to the addre
     $this->workspace->update(['contact_creation_mode' => ContactCreationMode::Selective]);
 
     $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
 
     $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

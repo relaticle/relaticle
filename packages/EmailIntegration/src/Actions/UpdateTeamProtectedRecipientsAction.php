@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\EmailIntegration\Models\ProtectedRecipient;
@@ -18,7 +18,7 @@ final readonly class UpdateTeamProtectedRecipientsAction
     public function execute(Workspace $team, User $actor, array $protectedEmails, array $protectedDomains): void
     {
         abort_unless(
-            $actor->ownsWorkspace($team) || $actor->hasWorkspaceRole($team, WorkspaceRole::Admin->value),
+            $actor->hasWorkspaceCapability($team->getKey(), WorkspaceCapability::EmailManage),
             403,
         );
 

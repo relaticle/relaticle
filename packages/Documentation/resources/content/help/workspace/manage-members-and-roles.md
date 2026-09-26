@@ -35,11 +35,12 @@ API or MCP.
 | Invite, remove, and change member roles | Yes | Yes | No | No |
 | Promote someone to Admin | Yes | No | No | No |
 | Manage custom fields | Yes | Yes | No | No |
+| Manage workspace email settings | Yes | Yes | No | No |
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |
 
-Admins manage members and custom fields alongside working with records. A
+Admins manage members, custom fields, and workspace email settings alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:
 promoting someone *to* Admin, renaming or deleting the workspace, and
 billing.

@@ -19,7 +19,7 @@ it('does not match hidden subject or snippet text when searching metadata-only t
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -68,7 +68,7 @@ it('does not match a teammate\'s BCC participant when searching the inbox', func
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -161,7 +161,7 @@ it('does not match hidden subject text when the viewer only has a disconnected s
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $ownerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,

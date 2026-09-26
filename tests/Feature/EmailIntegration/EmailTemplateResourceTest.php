@@ -58,7 +58,7 @@ it('bulk delete preserves a shared template created by another user', function (
 
 it('denies template writes to a creator who no longer belongs to the workspace', function (): void {
     $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
-    $otherWorkspace->users()->attach($this->user, ['role' => 'editor']);
+    $otherWorkspace->users()->attach($this->user, ['role' => 'member']);
 
     $template = EmailTemplate::factory()->create([
         'workspace_id' => $otherWorkspace->id,

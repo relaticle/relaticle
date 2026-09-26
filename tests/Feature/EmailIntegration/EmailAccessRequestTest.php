@@ -29,7 +29,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 
     $this->requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($this->requester, ['role' => 'editor']);
+    $this->workspace->users()->attach($this->requester, ['role' => 'member']);
 
     $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -194,7 +194,7 @@ describe('ApproveEmailAccessRequestAction', function (): void {
 
     it('approves when the requester switched workspaces but remains on the email team', function (): void {
         $otherTeam = Workspace::factory()->create();
-        $otherTeam->users()->attach($this->requester, ['role' => 'editor']);
+        $otherTeam->users()->attach($this->requester, ['role' => 'member']);
         $this->requester->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();
 
         $request = EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([

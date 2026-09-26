@@ -78,7 +78,7 @@ it('completes sync_email when the user has connected a mailbox', function (): vo
 
 it('does not complete sync_email for another user\'s mailbox', function (): void {
     $teammate = User::factory()->create();
-    $this->workspace->users()->attach($teammate, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($teammate, ['role' => WorkspaceRole::Member->value]);
 
     ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->getKey(),

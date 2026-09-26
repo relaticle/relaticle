@@ -373,7 +373,7 @@ it('effectiveTier hides a blocked email from its owner', function (): void {
 
 it('effectiveTier returns FULL for a teammate who already synced the same message', function (): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
     $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -401,7 +401,7 @@ it('effectiveTier returns FULL for a teammate who already synced the same messag
 
 it('effectiveTier does not treat a different message as a mailbox copy', function (): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
     $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -429,10 +429,10 @@ it('effectiveTier does not treat a different message as a mailbox copy', functio
 
 it('effectiveTier uses a share on another copy of the same message', function (): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
     $otherOwner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($otherOwner, ['role' => 'editor']);
+    $this->workspace->users()->attach($otherOwner, ['role' => 'member']);
 
     $otherAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

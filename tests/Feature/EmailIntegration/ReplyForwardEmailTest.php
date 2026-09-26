@@ -218,7 +218,7 @@ it('reply_all recipients keep the original sender and drop the user\'s own addre
 
 it('inline composer prefills the original subject only when the viewer may see it', function (EmailPrivacyTier $tier, string $expectedSubject): void {
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
     ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -656,7 +656,7 @@ it('does not list original attachments when the viewer cannot read the body', fu
     inboundStoredAttachment($this->inboundEmail, 'contract.pdf', 'signed-contract');
 
     $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($viewer, ['role' => 'editor']);
+    $this->workspace->users()->attach($viewer, ['role' => 'member']);
 
     ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

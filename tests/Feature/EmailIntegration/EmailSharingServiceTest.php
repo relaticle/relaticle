@@ -198,7 +198,7 @@ it('returns 0 when no emails are linked to the record', function (): void {
 
 it('shares with a workspace member who is currently working in another workspace', function (): void {
     $member = User::factory()->withWorkspace()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $email = makeSharingEmail();
 

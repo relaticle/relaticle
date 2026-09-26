@@ -50,7 +50,7 @@ it('updates non-customized emails for a user', function (): void {
 
 it('updates team emails only for members who follow the workspace default', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id, 'default_email_sharing_tier' => null]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $memberAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -70,7 +70,7 @@ it('updates team emails only for members who follow the workspace default', func
         'current_workspace_id' => $this->workspace->id,
         'default_email_sharing_tier' => EmailPrivacyTier::PRIVATE,
     ]);
-    $this->workspace->users()->attach($overrideMember, ['role' => 'editor']);
+    $this->workspace->users()->attach($overrideMember, ['role' => 'member']);
 
     $overrideAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

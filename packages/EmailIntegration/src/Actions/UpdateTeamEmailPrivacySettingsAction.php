@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -16,7 +16,7 @@ final readonly class UpdateTeamEmailPrivacySettingsAction
         // Team-wide sharing defaults may only be changed by the team owner or an admin,
         // regardless of which caller path reaches this action.
         abort_unless(
-            $actor->ownsWorkspace($team) || $actor->hasWorkspaceRole($team, WorkspaceRole::Admin->value),
+            $actor->hasWorkspaceCapability($team->getKey(), WorkspaceCapability::EmailManage),
             403,
         );
 

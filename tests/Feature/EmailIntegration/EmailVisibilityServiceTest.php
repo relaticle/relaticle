@@ -154,7 +154,7 @@ it('scopes communication intelligence metrics to mail the viewer can see', funct
     $person->emails()->attach($visible->getKey());
 
     $coworker = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -211,7 +211,7 @@ it('counts one preferred copy when the same rfc message is synced twice', functi
     ]));
 
     $coworker = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -257,7 +257,7 @@ it('counts one preferred copy for every viewer of the same rfc message', functio
     ]));
 
     $coworker = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     $coworkerAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,

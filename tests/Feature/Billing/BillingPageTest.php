@@ -134,7 +134,7 @@ it('keeps a member on the paused screen when they open the plan review step', fu
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     test()->actingAs($member);
     Filament::setTenant($workspace->refresh());
@@ -182,7 +182,7 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     test()->actingAs($member);
     Filament::setTenant($workspace->refresh());
@@ -196,7 +196,7 @@ it('tells a member of a paused workspace whose owner was deleted who can reopen 
     [$owner, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
     $owner->delete();
 
     test()->actingAs($member);

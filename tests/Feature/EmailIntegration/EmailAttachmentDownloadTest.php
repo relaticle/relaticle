@@ -91,7 +91,7 @@ it('streams a download when the viewer belongs to the email team but current_wor
 
 it('aborts 403 when viewer has no body access (private privacy tier)', function (): void {
     $owner = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($owner, ['role' => 'editor']);
+    $this->workspace->users()->attach($owner, ['role' => 'member']);
 
     $email = Email::factory()->create([
         'workspace_id' => $this->workspace->id,

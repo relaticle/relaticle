@@ -306,7 +306,7 @@ it('omits the emails header badge on a company whose domain is protected', funct
 
 it('hides the emails tab from a teammate when the company domain is protected', function (): void {
     $teammate = User::factory()->create();
-    $teammate->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Editor->value]);
+    $teammate->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Member->value]);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
 
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -372,7 +372,7 @@ it('hides the emails table on a protected person', function (): void {
 
 it('hides the emails table from a teammate on a protected person', function (): void {
     $teammate = User::factory()->create();
-    $teammate->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Editor->value]);
+    $teammate->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Member->value]);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
 
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -551,7 +551,7 @@ it('shows via two mailboxes using connected mailbox addresses not workspace logi
         'current_workspace_id' => $this->workspace->id,
         'email' => 'editor@relaticle.test',
     ]);
-    $this->workspace->users()->attach($coworker, ['role' => 'editor']);
+    $this->workspace->users()->attach($coworker, ['role' => 'member']);
 
     $ownerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
@@ -639,7 +639,7 @@ it('does not match hidden subject or snippet text when searching metadata-only e
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -685,7 +685,7 @@ it('does not match hidden subject or snippet text when a metadata-only share ove
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -738,7 +738,7 @@ it('does not match snippet text when a subject share overrides a full default', 
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -782,7 +782,7 @@ it('shows a request access pill on record mailbox rows without body access', fun
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,
@@ -828,7 +828,7 @@ it('shows a requested label on the list pill when an access request is pending',
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;
     $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
-    $team->users()->attach($viewer, ['role' => 'editor']);
+    $team->users()->attach($viewer, ['role' => 'member']);
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $team->id,

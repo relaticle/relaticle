@@ -279,7 +279,7 @@ it('deletes a custom visibility entry from the table', function (): void {
 
 it('forbids a non-admin member from deleting or editing a visibility entry', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
@@ -334,7 +334,7 @@ it('pre-fills default_email_sharing_tier from the team on mount', function (): v
 
 it('forbids a non-admin member from changing team privacy settings', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     expect(fn () => resolve(UpdateTeamEmailPrivacySettingsAction::class)->execute(
         $this->workspace,
@@ -376,7 +376,7 @@ it('grants an admin member access to the workspace privacy page', function (): v
 
 it('denies a non-admin member access to the workspace privacy page', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
@@ -497,7 +497,7 @@ it('renders a switch for automatic company creation', function (): void {
 
 it('forbids a non-admin member from changing record creation settings', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     expect(fn () => resolve(UpdateTeamContactCreationSettingsAction::class)->execute(
         $this->workspace,
@@ -511,7 +511,7 @@ it('forbids a non-admin member from changing record creation settings', function
 
 it('forbids a non-admin member from changing workspace email visibility', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     expect(fn () => resolve(UpdateTeamEmailVisibilityAction::class)->execute(
         $this->workspace,
