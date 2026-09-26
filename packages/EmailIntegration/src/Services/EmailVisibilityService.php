@@ -57,6 +57,21 @@ final class EmailVisibilityService
      */
     private array $accountBlocklistCache = [];
 
+    /**
+     * @var array<string, ?Workspace>
+     */
+    private array $workspaceCache = [];
+
+    /**
+     * @var array<string, array<int, lowercase-string>>
+     */
+    private array $publicDomainCache = [];
+
+    /**
+     * @var array<string, ?CustomField>
+     */
+    private array $customFieldCache = [];
+
     public function isHiddenFromOwner(Email $email): bool
     {
         $email->loadMissing('participants');
@@ -487,14 +502,20 @@ final class EmailVisibilityService
 
     private function customFieldFor(string $teamId, string $entityType, string $code): ?CustomField
     {
-        $field = CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $teamId)
-            ->where('entity_type', $entityType)
-            ->where('code', $code)
-            ->first();
+        $key = "{$teamId}:{$entityType}:{$code}";
 
-        return $field instanceof CustomField ? $field : null;
+        if (! array_key_exists($key, $this->customFieldCache)) {
+            $field = CustomField::query()
+                ->withoutGlobalScopes()
+                ->where('tenant_id', $teamId)
+                ->where('entity_type', $entityType)
+                ->where('code', $code)
+                ->first();
+
+            $this->customFieldCache[$key] = $field instanceof CustomField ? $field : null;
+        }
+
+        return $this->customFieldCache[$key];
     }
 
     /**
@@ -600,9 +621,9 @@ final class EmailVisibilityService
             return EmailVisibilityEnforcement::Protected;
         }
 
-        $team = Workspace::query()->find($teamId);
+        $team = $this->workspace($teamId);
 
-        if ($team !== null) {
+        if ($team instanceof Workspace) {
             $domain = $this->domainFromEmail($address);
 
             if ($domain !== null && in_array($domain, $this->workspaceDomains($team), true)) {
@@ -686,9 +707,9 @@ final class EmailVisibilityService
             return $this->teamMemberEmailCache[$teamId];
         }
 
-        $team = Workspace::query()->find($teamId);
+        $team = $this->workspace($teamId);
 
-        if ($team === null) {
+        if (! $team instanceof Workspace) {
             return $this->teamMemberEmailCache[$teamId] = [];
         }
 
@@ -734,10 +755,22 @@ final class EmailVisibilityService
             return true;
         }
 
-        return PublicEmailDomain::query()
+        $this->publicDomainCache[$team->getKey()] ??= PublicEmailDomain::query()
             ->where('workspace_id', $team->getKey())
-            ->whereRaw('lower(domain) = ?', [$normalized])
-            ->exists();
+            ->pluck('domain')
+            ->map(fn (mixed $value): string => strtolower((string) $value))
+            ->all();
+
+        return in_array($normalized, $this->publicDomainCache[$team->getKey()], true);
+    }
+
+    public function workspace(string $teamId): ?Workspace
+    {
+        if (! array_key_exists($teamId, $this->workspaceCache)) {
+            $this->workspaceCache[$teamId] = Workspace::query()->find($teamId);
+        }
+
+        return $this->workspaceCache[$teamId];
     }
 
     private function domainFromEmail(string $email): ?string

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Models\Scopes;
 
 use App\Models\User;
-use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -146,13 +145,13 @@ final readonly class VisibleEmailScope implements Scope
             return;
         }
 
-        $team = Workspace::query()->find($teamId);
+        $visibility = resolve(EmailVisibilityService::class);
+        $team = $visibility->workspace($teamId);
 
         if ($team === null) {
             return;
         }
 
-        $visibility = resolve(EmailVisibilityService::class);
         $memberEmails = $visibility->memberEmailsForTeam($team);
         $protectedDomains = $visibility->workspaceDomains($team);
 

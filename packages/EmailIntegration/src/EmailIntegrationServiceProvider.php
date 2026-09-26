@@ -33,6 +33,7 @@ use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
+use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\Factories\CalendarServiceFactory;
 use Relaticle\EmailIntegration\Services\Factories\MailServiceFactory;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
@@ -49,8 +50,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         // Parse the Public Suffix List once per process.
         $this->app->singleton(PublicSuffixList::class);
-        $this->app->singleton(TeamMemberDirectory::class);
-        $this->app->singleton(MailboxDisplayNameDirectory::class);
+        $this->app->scoped(TeamMemberDirectory::class);
+        $this->app->scoped(MailboxDisplayNameDirectory::class);
+        $this->app->scoped(EmailVisibilityService::class);
 
         // Not gated by the feature flag: these are inert while the feature is off, and
         // static analysis (which runs with it off) can only resolve
