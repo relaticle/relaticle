@@ -130,10 +130,10 @@ it('reports batch summary totals after the import batch finishes', function (): 
 
     DB::table('job_batches')->where('id', $batchId)->update([
         'total_jobs' => 10,
-        'pending_jobs' => 0,
+        'pending_jobs' => 2,
         'failed_jobs' => 2,
         'failed_job_ids' => json_encode(['failed-1', 'failed-2']),
-        'finished_at' => now()->getTimestamp(),
+        'finished_at' => null,
     ]);
 
     $summary = resolve(MailboxHistoryImportService::class)->summary($account->fresh());
@@ -150,7 +150,7 @@ it('counts distinct failed batch jobs for the summary not cumulative retry failu
 
     DB::table('job_batches')->where('id', $batchId)->update([
         'total_jobs' => 5,
-        'pending_jobs' => 0,
+        'pending_jobs' => 1,
         'failed_jobs' => 4,
         'failed_job_ids' => json_encode(['failed-uuid-1']),
         'finished_at' => now()->getTimestamp(),
@@ -193,6 +193,7 @@ it('treats the import batch as finished when failed jobs remain pending in job_b
         'total_jobs' => 10,
         'pending_jobs' => 2,
         'failed_jobs' => 2,
+        'failed_job_ids' => json_encode(['failed-1', 'failed-2']),
         'finished_at' => null,
     ]);
 
@@ -540,10 +541,10 @@ it('reflects successful store jobs when some batch jobs failed permanently', fun
 
     DB::table('job_batches')->where('id', $batchId)->update([
         'total_jobs' => 100,
-        'pending_jobs' => 0,
+        'pending_jobs' => 2,
         'failed_jobs' => 2,
         'failed_job_ids' => json_encode(['failed-uuid-1', 'failed-uuid-2']),
-        'finished_at' => now()->getTimestamp(),
+        'finished_at' => null,
     ]);
 
     expect(resolve(MailboxHistoryImportService::class)->progressPercent($account->fresh()))->toBe(98);

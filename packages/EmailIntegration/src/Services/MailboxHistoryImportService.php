@@ -254,10 +254,9 @@ final readonly class MailboxHistoryImportService
             return null;
         }
 
-        $pending = $batch->pendingJobs;
         $failed = $this->batchFailedJobCount($batch);
         $total = $batch->totalJobs;
-        $successful = max(0, $total - $pending - $failed);
+        $successful = max(0, $total - $batch->pendingJobs);
 
         return new MailboxHistoryImportSummary(
             totalJobs: $total,
@@ -281,7 +280,7 @@ final readonly class MailboxHistoryImportService
             return true;
         }
 
-        return ($batch->pendingJobs - $batch->failedJobs) === 0;
+        return $batch->pendingJobs === $this->batchFailedJobCount($batch);
     }
 
     public function processedJobCount(ConnectedAccount $account): int
@@ -338,10 +337,7 @@ final readonly class MailboxHistoryImportService
             return 0;
         }
 
-        return max(0, min(
-            $batch->totalJobs,
-            $batch->totalJobs - $batch->pendingJobs - $this->batchFailedJobCount($batch),
-        ));
+        return max(0, min($batch->totalJobs, $batch->totalJobs - $batch->pendingJobs));
     }
 
     /**

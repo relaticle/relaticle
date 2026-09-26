@@ -198,3 +198,42 @@ it('does not drop history import percent when more calendar events are discovere
 
     expect($import->progressPercent($account->fresh()))->toBe(99);
 });
+
+it('counts a failed store job once when reporting import progress', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'sync_cursor' => null,
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    setHistoryImportBatchProgress($batchId, 10, 4);
+    DB::table('job_batches')->where('id', $batchId)->update([
+        'failed_jobs' => 2,
+        'failed_job_ids' => json_encode(['failed-1', 'failed-2']),
+    ]);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 60]));
+});
+
+it('treats a batch whose only pending jobs failed again after a retry as complete', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'sync_cursor' => 'history-1',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    setHistoryImportBatchProgress($batchId, 10, 3);
+    DB::table('job_batches')->where('id', $batchId)->update([
+        'failed_jobs' => 7,
+        'failed_job_ids' => json_encode(['failed-1', 'failed-2', 'failed-3']),
+    ]);
+
+    expect(resolve(MailboxHistoryImportService::class)->isRunning($account->fresh()))->toBeFalse();
+});
