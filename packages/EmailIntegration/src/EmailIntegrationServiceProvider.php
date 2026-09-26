@@ -9,7 +9,6 @@ use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
@@ -88,10 +87,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             scopes: ManageEmailTemplates::class,
         );
 
-        Route::middleware('web')
-            ->group(function (): void {
-                $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-            });
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
 
         Livewire::component('email-integration.composer', EmailComposer::class);
         Livewire::component('email-integration.email-visibility-table', EmailVisibilityTable::class);
