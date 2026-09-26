@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Notifications\WorkspaceMemberRemovedNotification;
 use Illuminate\Support\Facades\Event;
@@ -46,7 +47,7 @@ test('editor cannot remove workspace members', function () {
     $user = User::factory()->withWorkspace()->create();
 
     $user->currentWorkspace->users()->attach(
-        $otherUser = User::factory()->create(), ['role' => 'editor']
+        $otherUser = User::factory()->create(), ['role' => 'member']
     );
 
     $this->actingAs($otherUser);
@@ -95,7 +96,7 @@ test('admin cannot remove a peer admin', function () {
         ->call('removeTeamMember');
 
     Event::assertNotDispatched(TeamMemberRemoved::class);
-    expect($adminB->fresh()->hasWorkspaceRole($workspace->fresh(), 'admin'))->toBeTrue();
+    expect(WorkspaceRole::keyIsAdmin($adminB->fresh()->membershipRole($workspace->fresh())))->toBeTrue();
 });
 
 test('admin can still remove an editor', function () {
@@ -106,7 +107,7 @@ test('admin can still remove an editor', function () {
     $workspace->users()->attach($admin, ['role' => 'admin']);
 
     $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => 'editor']);
+    $workspace->users()->attach($editor, ['role' => 'member']);
 
     $this->actingAs($admin);
 

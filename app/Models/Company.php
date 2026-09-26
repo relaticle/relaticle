@@ -6,11 +6,13 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Enums\MediaCollection;
+use App\Models\ActivityLog\Activity;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasNotes;
 use App\Models\Concerns\HasWorkspace;
+use App\Models\Scopes\WorkspaceScope;
 use App\Observers\CompanyObserver;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
@@ -18,6 +20,7 @@ use Database\Factories\CompanyFactory;
 use Filament\Models\Contracts\HasAvatar;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -49,6 +52,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property-read string $created_by
  */
 #[ObservedBy(CompanyObserver::class)]
+#[ScopedBy(WorkspaceScope::class)]
 #[Fillable([
     'name',
     'creation_source',
@@ -74,11 +78,14 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
 
-    /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
+    /** @var array<string, string> */
+    public const array LOGO_MIME_TYPES = [
+        'image/png' => 'png',
+        'image/jpeg' => 'jpg',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/vnd.microsoft.icon' => 'ico',
+        'image/x-icon' => 'ico',
     ];
 
     /**
@@ -116,7 +123,9 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)->useDisk('public');
+        $this->addMediaCollection(self::LOGO_MEDIA_COLLECTION)
+            ->acceptsMimeTypes(array_keys(self::LOGO_MIME_TYPES))
+            ->useDisk('public');
 
         $this->addMediaCollection(MediaCollection::Attachments->value)
             ->acceptsMimeTypes(UploadAllowlist::mimeTypes());
@@ -156,6 +165,40 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->morphToMany(Task::class, 'taskable');
     }
 
+    public function beforeActivityLogged(Activity $activity, string $eventName): void
+    {
+        $changes = $activity->attribute_changes?->toArray() ?? [];
+
+        $sidesWithOwner = array_filter(
+            ['attributes', 'old'],
+            fn (string $side): bool => is_array($changes[$side] ?? null) && array_key_exists('account_owner_id', $changes[$side]),
+        );
+
+        if ($sidesWithOwner === []) {
+            return;
+        }
+
+        $ownerIds = collect($sidesWithOwner)
+            ->map(fn (string $side): mixed => $changes[$side]['account_owner_id'])
+            ->filter(fn (mixed $id): bool => is_string($id));
+
+        $ownerNames = $ownerIds->isEmpty()
+            ? collect()
+            : User::query()->whereKey($ownerIds->all())->pluck('name', 'id');
+
+        foreach ($sidesWithOwner as $side) {
+            $ownerId = $changes[$side]['account_owner_id'];
+            unset($changes[$side]['account_owner_id']);
+            $changes[$side]['account_owner'] = is_string($ownerId) ? $ownerNames->get($ownerId) : null;
+        }
+
+        if (($changes['attributes']['account_owner'] ?? null) === null && ($changes['old']['account_owner'] ?? null) === null) {
+            unset($changes['attributes']['account_owner'], $changes['old']['account_owner']);
+        }
+
+        $activity->attribute_changes = collect($changes);
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -164,7 +207,7 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
             ->dontLogEmptyChanges()
             ->logExcept([
                 'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
-                'created_at', 'updated_at', 'deleted_at', 'account_owner_id',
+                'created_at', 'updated_at', 'deleted_at',
                 'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
                 'outbound_email_count', 'meeting_count', 'last_meeting_at',
             ])

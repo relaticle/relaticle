@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Access\HandlesAuthorization;
@@ -42,17 +42,12 @@ final readonly class WorkspacePolicy
      */
     public function update(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage);
     }
 
-    /**
-     * Owner and Admin may invite, revoke, and change member roles.
-     * Renaming, deleting, billing, and custom fields stay owner-only.
-     */
     public function manageMembers(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace)
-            || $user->hasWorkspaceRoleForWorkspaceId($workspace->id, WorkspaceRole::Admin->value);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::MembersManage);
     }
 
     /**
@@ -61,7 +56,7 @@ final readonly class WorkspacePolicy
      */
     public function promoteToAdmin(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::MembersPromoteAdmin);
     }
 
     /**
@@ -93,7 +88,7 @@ final readonly class WorkspacePolicy
      */
     public function delete(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage);
     }
 
     public function deleteAny(): bool
@@ -103,7 +98,7 @@ final readonly class WorkspacePolicy
 
     public function restore(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage);
     }
 
     public function restoreAny(): bool
@@ -113,7 +108,7 @@ final readonly class WorkspacePolicy
 
     public function forceDelete(User $user, Workspace $workspace): bool
     {
-        return $user->ownsWorkspace($workspace);
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage);
     }
 
     public function forceDeleteAny(): bool

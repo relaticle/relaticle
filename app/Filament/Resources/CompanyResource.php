@@ -129,6 +129,7 @@ final class CompanyResource extends Resource
                 BulkActionGroup::make([
                     MassSendBulkAction::forCompanies(),
                     ExportBulkAction::make()
+                        ->authorize('exportAny', Company::class)
                         ->exporter(CompanyExporter::class),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),

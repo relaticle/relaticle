@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -278,4 +279,12 @@ it('keeps the slash menu but not the document canvas on a rich-editor field adde
     expect($editor->getToolbarButtons())->toBe([])
         ->and($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
         ->and($editor->getExtraAttributes())->not->toHaveKey('class');
+});
+
+it('records a company created in the panel as created on the web', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('create', data: ['name' => 'Panel Made'])
+        ->assertHasNoActionErrors();
+
+    expect(Company::query()->where('name', 'Panel Made')->sole()->creation_source)->toBe(CreationSource::WEB);
 });

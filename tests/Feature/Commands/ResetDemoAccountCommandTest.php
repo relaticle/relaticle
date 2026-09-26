@@ -97,8 +97,7 @@ it('clears reviewer leftovers and restores credits without touching another work
             'role' => 'user',
             'content' => 'Delete everything please',
             'attachments' => json_encode([]),
-            'tool_calls' => json_encode([]),
-            'tool_results' => json_encode([]),
+            'steps' => '[]',
             'usage' => json_encode([]),
             'meta' => json_encode([]),
             'created_at' => now(),
@@ -361,7 +360,7 @@ it('removes stored logos before rebuilding the workspace', function (): void {
 
     $workspace = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->personalWorkspace();
     $company = Company::query()->where('workspace_id', $workspace->getKey())->where('name', 'Notion')->firstOrFail();
-    $company->addMediaFromString('logo-bytes')
+    $company->addMediaFromString(onePixelPng())
         ->usingFileName('logo.png')
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 
@@ -384,4 +383,31 @@ it('keeps the existing workspace slug when another workspace already holds the r
         ->and($workspace->slug)->not->toBe(ResetDemoAccountCommand::WORKSPACE_SLUG)
         ->and($workspace->slug)->not->toBeEmpty()
         ->and($incumbent->refresh()->slug)->toBe(ResetDemoAccountCommand::WORKSPACE_SLUG);
+});
+
+it('stamps the rebuilt workspace, its records and their activity, as system', function (): void {
+    Bus::fake();
+
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-seven'])->assertSuccessful();
+
+    $workspace = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->currentWorkspace;
+
+    $activitySources = Activity::query()->withoutGlobalScopes()
+        ->where('workspace_id', $workspace->getKey())
+        ->get()
+        ->pluck('properties.source')
+        ->unique()
+        ->values()
+        ->all();
+
+    $recordSources = Company::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->get()
+        ->pluck('creation_source.value')
+        ->unique()
+        ->values()
+        ->all();
+
+    expect($activitySources)->toBe(['system'])
+        ->and($recordSources)->toBe(['system']);
 });

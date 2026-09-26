@@ -65,8 +65,7 @@ function turnPresenceSeedMessage(User $user, string $conversationId, array $over
         'content' => 'earlier message',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now()->subMinutes(5),
@@ -239,7 +238,7 @@ it('never leaks another workspace conversation in-flight turn on mount', functio
 
 it('never leaks a teammate conversation in-flight turn on mount', function (): void {
     $teammate = User::factory()->create();
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
 
     $conversationId = turnPresenceSeedConversation($teammate);

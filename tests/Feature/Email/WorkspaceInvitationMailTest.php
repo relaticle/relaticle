@@ -18,7 +18,7 @@ it('renders exactly one Accept Invitation CTA in the body', function (): void {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
     $rawToken = $invitation->issueToken();
 
@@ -33,7 +33,7 @@ it('does not contain a Create Account button', function (): void {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
     $rawToken = $invitation->issueToken();
 
@@ -48,7 +48,7 @@ it('mentions the workspace name and the expires-in phrase when expires_at is set
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(7),
     ]);
     $rawToken = Str::random(40);
@@ -65,7 +65,7 @@ it('omits the expiry phrase when expires_at is null', function (): void {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => null,
     ]);
     $rawToken = Str::random(40);
@@ -81,7 +81,7 @@ it('renders an accept URL for the token route containing the raw token, not the 
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
     $rawToken = $invitation->issueToken();
     $invitation->save();
@@ -101,7 +101,7 @@ it('names the inviter in the subject and body when the invitation has an inviter
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'inviter_id' => $owner->id,
     ]);
     $rawToken = $invitation->issueToken();
@@ -111,7 +111,7 @@ it('names the inviter in the subject and body when the invitation has an inviter
     expect($mail->envelope()->subject)->toBe(
         __('mail.workspace_invitation.subject', ['inviter' => 'Ana Reyes', 'workspace' => 'Acme Co'])
     )->and($mail->render())->toContain(
-        __('mail.workspace_invitation.line_with_inviter', ['inviter' => 'Ana Reyes', 'workspace' => 'Acme Co', 'role' => 'Editor'])
+        __('mail.workspace_invitation.line_with_inviter', ['inviter' => 'Ana Reyes', 'workspace' => 'Acme Co', 'role' => 'Member'])
     );
 });
 
@@ -121,7 +121,7 @@ it('falls back to workspace-only subject and body copy when the invitation has n
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'inviter_id' => null,
     ]);
     $rawToken = $invitation->issueToken();
@@ -133,7 +133,7 @@ it('falls back to workspace-only subject and body copy when the invitation has n
             __('mail.workspace_invitation.subject_without_inviter', ['workspace' => 'Acme Co'])
         )
         ->and($mail->render())->toContain(
-            __('mail.workspace_invitation.line', ['workspace' => 'Acme Co', 'role' => 'Editor'])
+            __('mail.workspace_invitation.line', ['workspace' => 'Acme Co', 'role' => 'Member'])
         );
 });
 
@@ -145,7 +145,7 @@ it('keeps the raw token out of the queued payload at rest', function (): void {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $workspace->id,
         'email' => 'guest@example.com',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
     $rawToken = $invitation->issueToken();
     $invitation->save();

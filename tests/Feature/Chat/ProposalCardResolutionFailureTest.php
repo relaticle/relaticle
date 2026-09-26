@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Company\CreateCompany;
+use App\Enums\WorkspaceRole;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -9,12 +11,14 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -139,7 +143,7 @@ it('offers no inline-edit codes for a delete proposal', function (): void {
 
 it('surfaces a failure when the assignee left the workspace between proposal and approval', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $action = PendingAction::query()->create([
         'workspace_id' => $this->workspace->getKey(),
@@ -254,4 +258,74 @@ it('never puts a database error message on the card or in the transcript', funct
 
     expect($action->fresh()->status)->toBe(PendingActionStatus::Pending);
     expect(Company::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('leaves the winning approval untouched when a second tab approves the same proposal', function (): void {
+    Bus::fake();
+
+    $action = PendingAction::query()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => null,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Fabrikam Inc'],
+        'display_data' => ['title' => 'Create Company', 'summary' => 'Create company "Fabrikam Inc"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+    $winningResult = ['id' => '01ff0000000000000000000001', 'type' => 'company'];
+
+    $secondTab = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    $firstTabWins = true;
+    PendingAction::retrieved(function (PendingAction $loaded) use (&$firstTabWins, $action, $winningResult): void {
+        if (! $firstTabWins || $loaded->getKey() !== $action->getKey()) {
+            return;
+        }
+
+        $firstTabWins = false;
+        PendingAction::query()->whereKey($action->getKey())->update([
+            'status' => PendingActionStatus::Approved,
+            'resolved_at' => now(),
+            'result_data' => $winningResult,
+        ]);
+    });
+
+    $secondTab->call('createCurrent');
+
+    expect($firstTabWins)->toBeFalse()
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and($action->fresh()->result_data)->toBe($winningResult);
+});
+
+it('tells an approver demoted since the proposal that their role no longer allows it, and writes nothing', function (): void {
+    Bus::fake();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member->fresh());
+
+    $result = resolve(CreateCompanyTool::class)->handle(new Request(['records' => [['name' => 'Demoted Co']]]));
+
+    expect($result)->toContain('pending_action');
+
+    $action = PendingAction::query()->where('user_id', $member->getKey())->sole();
+
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    $this->actingAs($member->fresh());
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertNotDispatched('proposal:resolved');
+
+    expect($component->errors()->get('resolve'))->toBe([__('You no longer have permission to make this change.')])
+        ->and($action->fresh()->result_data['last_error'] ?? null)->toBe(__('You no longer have permission to make this change.'))
+        ->and($action->fresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and(Company::query()->where('name', 'Demoted Co')->exists())->toBeFalse();
 });

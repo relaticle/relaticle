@@ -179,6 +179,8 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->spa()
             ->colors([
                 'primary' => Color::Indigo,
+                'purple' => Color::Purple,
+                'indigo' => Color::Indigo,
             ])
             ->brandName('Relaticle System Admin')
             ->discoverResources(in: base_path('packages/SystemAdmin/src/Filament/Resources'), for: 'Relaticle\\SystemAdmin\\Filament\\Resources')

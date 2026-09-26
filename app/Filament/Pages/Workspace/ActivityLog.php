@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Workspace;
 
+use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\ActivityLog\Activity;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\ActivityLog\ActivityChangeSummary;
@@ -37,9 +41,14 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Url;
 use Override;
+use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
+use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
+use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Models\Import;
 
 /**
  * The workspace audit trail: who changed or deleted which record, and when.
@@ -108,7 +117,7 @@ final class ActivityLog extends Page implements HasTable
 
         $user = auth()->user();
 
-        return $user instanceof User && $user->hasWorkspaceRoleForWorkspaceId($tenant->getKey(), 'admin');
+        return $user instanceof User && $user->hasWorkspaceCapability($tenant->getKey(), WorkspaceCapability::ActivityView);
     }
 
     public function mount(): void
@@ -128,7 +137,7 @@ final class ActivityLog extends Page implements HasTable
 
     /**
      * The search term belongs in the URL for the same reason the filters do, but
-     * it cannot get there the same way: Filament's table trait declares
+     * it cannot get there the same way: Filament's `InteractsWithTable` declares
      * `$tableSearch` untyped, so redeclaring it here to carry a `#[Url]` is a
      * fatal property-composition conflict. Livewire's query-string map attaches
      * the same binding without touching the property.
@@ -167,6 +176,7 @@ final class ActivityLog extends Page implements HasTable
                                 '(case when sibling.event = ? then 1 else 0 end, sibling.id) < (1, activity_log.id)',
                                 [self::CUSTOM_FIELD_EVENT],
                             )))
+                    ->whereNull('activity_log.properties->import_id')
                     ->with('causer')
             )
             ->defaultSort('created_at', 'desc')
@@ -203,13 +213,17 @@ final class ActivityLog extends Page implements HasTable
                     ->label(__('workspaces.activity.columns.causer'))
                     ->weight(FontWeight::Medium)
                     ->placeholder(__('workspaces.activity.system')),
+                TextColumn::make('source')
+                    ->label(__('workspaces.activity.columns.source'))
+                    ->badge()
+                    ->placeholder(ActivityValue::EMPTY),
                 TextColumn::make('event')
                     ->label(__('workspaces.activity.columns.event'))
                     ->badge()
                     ->icon($this->eventIcon(...))
                     ->color(fn (?string $state): string => match ($state) {
-                        'created' => 'success',
-                        'deleted' => 'danger',
+                        'created', ExecuteImportJob::IMPORTED_EVENT => 'success',
+                        'deleted', ExecuteImportJob::FAILED_EVENT => 'danger',
                         'restored' => 'warning',
                         default => 'gray',
                     })
@@ -253,6 +267,10 @@ final class ActivityLog extends Page implements HasTable
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
                         ? $query->where('causer_type', 'user')->where('causer_id', $data['value'])
                         : $query),
+                SelectFilter::make('source')
+                    ->label(__('workspaces.activity.filters.source'))
+                    ->options(CreationSource::class)
+                    ->query($this->filterBySource(...)),
                 Filter::make('created_at')
                     ->schema([
                         DatePicker::make('from')->label(__('workspaces.activity.filters.from')),
@@ -335,7 +353,8 @@ final class ActivityLog extends Page implements HasTable
         $term = '%'.LikePattern::escape($search).'%';
 
         $query->where(fn (Builder $logged): Builder => $logged
-            ->whereRaw("activity_log.attribute_changes #>> '{attributes,name}' ilike ?", [$term])
+            ->whereRaw("activity_log.properties ->> 'import_file' ilike ?", [$term])
+            ->orWhereRaw("activity_log.attribute_changes #>> '{attributes,name}' ilike ?", [$term])
             ->orWhereRaw("activity_log.attribute_changes #>> '{attributes,title}' ilike ?", [$term])
             ->orWhereRaw("activity_log.attribute_changes #>> '{old,name}' ilike ?", [$term])
             ->orWhereRaw("activity_log.attribute_changes #>> '{old,title}' ilike ?", [$term]));
@@ -366,6 +385,10 @@ final class ActivityLog extends Page implements HasTable
      */
     private function recordName(Activity $record): string
     {
+        if ($record->subject_type === $this->importSubject()) {
+            return $this->importSummary($record);
+        }
+
         $changes = $record->attribute_changes?->toArray() ?? [];
 
         foreach (['attributes', 'old'] as $side) {
@@ -395,8 +418,26 @@ final class ActivityLog extends Page implements HasTable
         return '#'.$record->subject_id;
     }
 
+    private function importSummary(Activity $record): string
+    {
+        $properties = $record->properties?->toArray() ?? [];
+
+        $counts = collect(['created', 'updated', 'skipped', 'failed'])
+            ->filter(fn (string $outcome): bool => (int) ($properties[$outcome] ?? 0) > 0)
+            ->map(fn (string $outcome): string => __('workspaces.activity.import_counts.'.$outcome, ['count' => Number::format((int) $properties[$outcome])]))
+            ->implode(', ');
+
+        $file = (string) ($properties['import_file'] ?? '');
+
+        return $counts === '' ? $file : "{$file} ({$counts})";
+    }
+
     private function destroyedNotice(Activity $record): ?string
     {
+        if ($record->subject_type === $this->importSubject()) {
+            return null;
+        }
+
         if ($this->liveSubject($record) instanceof Model) {
             return null;
         }
@@ -413,6 +454,14 @@ final class ActivityLog extends Page implements HasTable
     {
         $entity = CrmEntity::tryFrom((string) $record->subject_type);
         $tenant = Filament::getTenant();
+
+        if (in_array($record->subject_type, $this->customFieldSubjects(), true) && $tenant instanceof Workspace) {
+            return CustomFields::getUrl(tenant: $tenant);
+        }
+
+        if ($record->subject_type === $this->importSubject() && $tenant instanceof Workspace) {
+            return ImportHistory::getUrl(tenant: $tenant);
+        }
 
         if (! $entity instanceof CrmEntity || ! $tenant instanceof Workspace) {
             return null;
@@ -466,7 +515,7 @@ final class ActivityLog extends Page implements HasTable
             $model = $morphMap[$type];
 
             $subjects = $model::query()
-                ->withoutGlobalScopes([SoftDeletingScope::class])
+                ->withoutGlobalScopes([SoftDeletingScope::class, CustomFieldsActivableScope::class])
                 ->whereKey(array_values(array_unique($ids)))
                 ->get();
 
@@ -496,6 +545,23 @@ final class ActivityLog extends Page implements HasTable
             'new' => Str::limit($state['new'], self::VALUE_LENGTH),
             'title' => Str::limit($state['label'].': '.$state['old'].' → '.$state['new'], self::TITLE_LENGTH),
         ])->render());
+    }
+
+    /**
+     * @param  Builder<Activity>  $query
+     * @param  array<string, mixed>  $data
+     * @return Builder<Activity>
+     */
+    private function filterBySource(Builder $query, array $data): Builder
+    {
+        $value = $data['value'] ?? null;
+        $source = is_string($value) ? CreationSource::tryFrom($value) : null;
+
+        if (! $source instanceof CreationSource) {
+            return $query;
+        }
+
+        return $query->fromSource($source);
     }
 
     /**
@@ -550,6 +616,8 @@ final class ActivityLog extends Page implements HasTable
             'created' => Heroicon::PlusCircle,
             'deleted' => Heroicon::Trash,
             'restored' => Heroicon::ArrowUturnLeft,
+            ExecuteImportJob::IMPORTED_EVENT => Heroicon::ArrowUpTray,
+            ExecuteImportJob::FAILED_EVENT => Heroicon::ExclamationTriangle,
             default => Heroicon::PencilSquare,
         };
     }
@@ -565,6 +633,14 @@ final class ActivityLog extends Page implements HasTable
 
     private function typeIcon(?string $state): ?Heroicon
     {
+        if (in_array($state, $this->customFieldSubjects(), true)) {
+            return Heroicon::AdjustmentsHorizontal;
+        }
+
+        if ($state === $this->importSubject()) {
+            return Heroicon::ArrowUpTray;
+        }
+
         return match (CrmEntity::tryFrom((string) $state)) {
             CrmEntity::Company => Heroicon::BuildingOffice,
             CrmEntity::People => Heroicon::User,
@@ -585,6 +661,8 @@ final class ActivityLog extends Page implements HasTable
             'updated' => __('workspaces.activity.events.updated'),
             'deleted' => __('workspaces.activity.events.deleted'),
             'restored' => __('workspaces.activity.events.restored'),
+            ExecuteImportJob::IMPORTED_EVENT => __('workspaces.activity.events.imported'),
+            ExecuteImportJob::FAILED_EVENT => __('workspaces.activity.events.import_failed'),
         ];
     }
 
@@ -597,11 +675,27 @@ final class ActivityLog extends Page implements HasTable
     {
         $labels = [];
 
-        foreach (CrmEntity::cases() as $entity) {
-            $labels[$entity->value] = __('workspaces.activity.types.'.$entity->value);
+        foreach ([...array_map(fn (CrmEntity $entity): string => $entity->value, CrmEntity::cases()), ...$this->customFieldSubjects(), $this->importSubject()] as $type) {
+            $labels[$type] = __('workspaces.activity.types.'.$type);
         }
 
         return $labels;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function customFieldSubjects(): array
+    {
+        return [
+            (string) Relation::getMorphAlias(CustomField::class),
+            (string) Relation::getMorphAlias(CustomFieldOption::class),
+        ];
+    }
+
+    private function importSubject(): string
+    {
+        return (string) Relation::getMorphAlias(Import::class);
     }
 
     /**

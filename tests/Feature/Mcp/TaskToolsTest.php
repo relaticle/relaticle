@@ -25,10 +25,10 @@ use App\Mcp\Tools\Task\GetTaskTool;
 use App\Mcp\Tools\Task\ListTasksTool;
 use App\Mcp\Tools\Task\UpdateTaskTool;
 use App\Models\Company;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Events\TransactionCommitted;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -63,10 +63,6 @@ mutates(
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function (): void {
-    Task::clearBootedModels();
 });
 
 it('can create a task with assignees and company', function (): void {
@@ -201,7 +197,7 @@ it('notifies assignees added through the MCP attach tool', function (): void {
     $member = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(AttachTaskToEntitiesTool::class, [
@@ -225,7 +221,7 @@ it('only notifies assignees attached by its own write', function (): void {
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'member']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($task, $concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -263,7 +259,7 @@ it('only notifies assignees added by its own update', function (): void {
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'member']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($task, $concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -301,7 +297,7 @@ it('does not re-notify an assignee the update kept in place', function (): void 
     $newAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach([$existingAssignee->id, $newAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$existingAssignee->id, $newAssignee->id], ['role' => 'member']);
     $task->assignees()->attach($existingAssignee);
 
     RelaticleServer::actingAs($this->user)
@@ -326,7 +322,7 @@ it('only notifies assignees added by its own create', function (): void {
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'member']);
 
     $concurrentAssignmentAdded = false;
     Event::listen(TransactionCommitted::class, function (TransactionCommitted $event) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {
@@ -367,7 +363,7 @@ it('does not duplicate assignees or notifications when an attachment is repeated
     $member = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     foreach (range(1, 2) as $attempt) {
         RelaticleServer::actingAs($this->user)
@@ -464,7 +460,7 @@ it('waits for a concurrent task row lock before attaching relationships', functi
 it('can detach a former workspace member from a task', function (): void {
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $formerMember = User::factory()->create();
-    $this->workspace->users()->attach($formerMember, ['role' => 'editor']);
+    $this->workspace->users()->attach($formerMember, ['role' => 'member']);
     $task->assignees()->attach($formerMember);
     $this->workspace->users()->detach($formerMember);
 
@@ -535,7 +531,7 @@ it('can filter tasks by company_id', function (): void {
 
 describe('workspace scoping', function (): void {
     beforeEach(function (): void {
-        Task::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes tasks to current workspace', function (): void {

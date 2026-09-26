@@ -222,7 +222,7 @@ it('completes the invite step while an invitation is pending', function (): void
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     livewire(ActivationChecklist::class)
@@ -251,8 +251,7 @@ it('completes the assistant step once the user has sent a chat message', functio
         'content' => 'hi',
         'agent' => 'crm',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -285,8 +284,7 @@ it('leaves the assistant step open for a prompt the user never typed', function 
         'content' => MessageOrigin::Greeting->opener(),
         'agent' => 'crm',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '[]',
         'origin' => MessageOrigin::Greeting->value,
@@ -330,7 +328,7 @@ it('disappears once every step is done', function (): void {
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     $conversationId = (string) Str::ulid();
@@ -354,8 +352,7 @@ it('disappears once every step is done', function (): void {
         'content' => 'hi',
         'agent' => 'crm',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -385,7 +382,7 @@ it('stays hidden after the owner dismisses it', function (): void {
 
 it('stays hidden for a member who cannot manage the workspace', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
@@ -481,19 +478,17 @@ it('asks about the pipeline once the workspace holds records, seeded ones includ
         ->assertSee(__('filament/pages/dashboard.activation.steps.ask_rela.label'));
 });
 
-it('shows the invite row to a workspace admin and hides it from an editor', function (): void {
+it('shows the invite row to the owner and hides it from a member', function (): void {
     $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertSee(__('filament/pages/dashboard.activation.invite_members'));
 
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);
 
-    // Members::canAccess() is can('update', $tenant), so this row would link an
-    // editor straight to a 403.
     $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));
@@ -604,7 +599,7 @@ it('refuses the removeSampleData call from a member through the component', func
     ]);
 
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($member);
     Filament::setTenant($this->workspace);

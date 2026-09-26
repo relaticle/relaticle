@@ -38,18 +38,9 @@
              to the dock (Attio-style): this is the one card on screen asking
              for a decision, and the halo is what separates it from the passive
              data blocks above without shouting. --}}
-        {{-- While a field is being edited the card must NOT clip: a Select renders
-             its panel as an absolutely-positioned child (Filament positions it
-             itself, there is no teleport to opt into), so `overflow-hidden` here
-             and `overflow-y-auto` on the steps below cut the options list off --
-             measured: a panel spanning 497-737 inside a card starting at 638 lost
-             141px, leaving the list unreadable above the input. Clipping returns
-             the moment the edit closes, so the rounded corners and the tall-plan
-             scroller behave normally the rest of the time. --}}
-        <div @class([
-            'flex min-h-0 flex-col rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10',
-            'overflow-hidden' => $editingFieldCode === null,
-        ])>
+        {{-- fi-fixed-positioning-context makes a Select open its options with
+             position: fixed, so the steps scroller below cannot clip them. --}}
+        <div class="fi-fixed-positioning-context flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
             @if ($isPlan)
                 {{-- Plan header: the card is one decision over several writes, so it
                      says how many and in what order they run. --}}
@@ -76,8 +67,7 @@
             {{-- A plan can be taller than the dock: the steps scroll, so the
                  decision buttons never leave the viewport. --}}
             <div @class([
-                'min-h-0 flex-1',
-                'overflow-y-auto overscroll-contain' => $editingFieldCode === null,
+                'min-h-0 flex-1 overflow-y-auto overscroll-contain',
                 'divide-y divide-gray-100 dark:divide-white/5' => $isPlan,
             ])>
                 @foreach ($steps as $step)

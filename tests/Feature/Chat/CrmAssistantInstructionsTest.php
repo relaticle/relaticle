@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceCapability;
+use App\Enums\WorkspaceRole;
 use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
 use App\Models\People;
@@ -123,19 +125,62 @@ it('routes export requests to the export destinations', function (): void {
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
-        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination.')
+        ->toContain('Exporting records to a CSV or XLSX file -> the matching "export_*" destination, when their capabilities include `data.export`.')
         ->toContain('(custom field definitions, bulk imports, exports, workspace members)');
 });
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {
     $instructions = (new CrmAssistant)
-        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'owner'])
+        ->withCurrentUser(['name' => 'Manuk <b>Minasyan</b>', 'id' => '01USER', 'role' => 'Owner', 'capabilities' => []])
         ->instructions();
 
     expect($instructions)
         ->toContain('## Current user')
-        ->toContain('Manuk bMinasyan/b (user id: 01USER, workspace owner)')
+        ->toContain('Manuk bMinasyan/b (user id: 01USER, workspace role: Owner)')
         ->toContain('"me", "my", "mine" and "I" refer to this user');
+});
+
+it('omits the role clause when the membership carries no role instead of printing an empty one', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser(['name' => 'Rory', 'id' => '01RORY', 'role' => '', 'capabilities' => []])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('Rory (user id: 01RORY).')
+        ->not->toContain('workspace role: )');
+});
+
+it('names the capabilities the role holds so the model does not promise what the user cannot do', function (): void {
+    $instructions = (new CrmAssistant)
+        ->withCurrentUser([
+            'name' => 'Sam Viewer',
+            'id' => '01VIEWER',
+            'role' => WorkspaceRole::Viewer->label(),
+            'capabilities' => array_map(
+                fn (WorkspaceCapability $capability): string => $capability->value,
+                WorkspaceRole::Viewer->capabilities(),
+            ),
+        ])
+        ->instructions();
+
+    expect($instructions)
+        ->toContain('workspace role: Viewer')
+        ->toContain('What this role may do: records.view')
+        ->not->toContain('records.create');
+});
+
+it('keeps the role-error rule in the cached prefix and gates invites on members.manage', function (): void {
+    $agent = (new CrmAssistant)->withCurrentUser([
+        'name' => 'Sam Viewer',
+        'id' => '01VIEWER',
+        'role' => WorkspaceRole::Viewer->label(),
+        'capabilities' => [WorkspaceCapability::RecordsView->value],
+    ]);
+
+    expect($agent->staticInstructions())
+        ->toContain('A tool that answers with a role error is telling you the truth.')
+        ->toContain('Inviting a new workspace member by email -> when their capabilities include `members.manage`')
+        ->and($agent->dynamicInstructions())->not->toContain('role error');
 });
 
 it('marks the context blocks as internal so the model never names them to the user', function (): void {
@@ -157,7 +202,7 @@ it('routes bulk updates through one records[] call instead of one approval per r
 });
 
 it('carries the grounding, join, and formatting rules', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('Never state a count, a total, or an absence')
@@ -167,13 +212,13 @@ it('carries the grounding, join, and formatting rules', function (): void {
 });
 
 it('tells the model to name only the records its answer turns on', function (): void {
-    expect(app(CrmAssistant::class)->staticInstructions())
+    expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('Name only the records the answer turns on')
         ->toContain('Walking every row to show your work is re-listing');
 });
 
 it('tells the model to reach for include when asked for related records', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('pass `include` to the list tool')
@@ -188,7 +233,7 @@ it('tells the model to reach for include when asked for related records', functi
  * model to distrust a table that is now trustworthy.
  */
 it('no longer warns that showing can exceed what the table prints', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->not->toContain('can exceed the rows the table under your reply prints')
@@ -205,7 +250,7 @@ it('no longer warns that showing can exceed what the table prints', function ():
  * so that case is spelled out with the sentence to write instead.
  */
 it('forbids repeating a page size the user named', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('even when the user named a page size')
@@ -220,14 +265,14 @@ it('forbids repeating a page size the user named', function (): void {
  * silently truncate the user's request to the first page.
  */
 it('tells the model how to fetch the next page of a list result', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('page` set to the result\'s `next_page`');
 });
 
 it('tells the model to end every answer with exactly one offered next action', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('exactly one concrete offered next action or question')
@@ -235,11 +280,19 @@ it('tells the model to end every answer with exactly one offered next action', f
 });
 
 it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
-    $instructions = app(CrmAssistant::class)->staticInstructions();
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
 
     expect($instructions)
         ->toContain('<workspace_state>')
         ->toContain('must say plainly that these are seeded sample data');
+});
+
+it('removes all sample data in one approval but lets a partial removal use the creation source filter', function (): void {
+    $instructions = resolve(CrmAssistant::class)->staticInstructions();
+
+    expect($instructions)
+        ->toContain('wants all the sample data gone, call RemoveSampleDataTool')
+        ->toContain('To remove only part of it ("just the sample contacts"), list those records with `creation_source: "system"`');
 });
 
 it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {
@@ -378,7 +431,7 @@ it('strips prompt punctuation from a stage a user renamed', function (): void {
     $workspace = $owner->currentWorkspace;
     $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Sales])->save();
 
-    $stageField = CustomField::withoutGlobalScopes()
+    $stageField = CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $workspace->getKey())
         ->where('code', 'stage')
         ->sole();
@@ -398,7 +451,7 @@ it('omits the stages line for a workspace with no stage field', function (): voi
     $workspace = $owner->currentWorkspace;
     $workspace->forceFill(['onboarding_use_case' => OnboardingUseCase::Recruiting])->save();
 
-    CustomField::withoutGlobalScopes()
+    CustomField::query()->withoutGlobalScopes()
         ->where('tenant_id', $workspace->getKey())
         ->where('code', 'stage')
         ->delete();
@@ -489,10 +542,29 @@ it('marks the proposals the resumed turn just decided', function (): void {
     $block = $agent->instructions();
 
     expect($block)
-        ->toContain('JUST DECIDED, approved: create workspace_invitations')
-        ->not->toContain('JUST DECIDED, approved: create companies')
+        ->toContain('JUST DECIDED, APPROVED (written): create workspace_invitations')
+        ->not->toContain('JUST DECIDED, APPROVED (written): create companies')
         ->not->toContain('already decided by the user earlier in this conversation')
-        ->toContain('Never call it already done, already sent, already invited');
+        ->toContain('Never call it already done, already sent');
+});
+
+it('names what a rejected decision did not do', function (): void {
+    $agent = resolve(CrmAssistant::class);
+    $agent->resolvedActions = [
+        [
+            'operation' => 'delete', 'entity_type' => 'sample_data', 'status' => 'rejected',
+            'label' => 'All sample records', 'record_id' => null, 'record_ids' => [],
+            'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
+            'just_decided' => true,
+        ],
+    ];
+
+    $instructions = $agent->instructions();
+
+    expect($instructions)
+        ->toContain('- JUST DECIDED, REJECTED (nothing was written): delete sample_data "All sample records"')
+        ->toContain('REJECTED and EXPIRED mean nothing was written')
+        ->not->toContain('Report it as just completed ("Invited X", "Created Y"). Never');
 });
 
 /**
@@ -504,7 +576,7 @@ it('does not tell the model the request is already approved without qualifying w
 
     expect($instructions)
         ->not->toContain('When everything requested is already approved')
-        ->toContain('If those approvals arrived on THIS turn');
+        ->toContain('reporting each decision as the Resuming section says');
 });
 
 /**

@@ -41,7 +41,7 @@ test('renames the legacy member role to editor without touching other roles', fu
 
     $roles = DB::table('team_user')->where('team_id', $teamId)->pluck('role', 'user_id');
 
-    expect($roles[$legacy])->toBe(WorkspaceRole::Editor->value)
+    expect($roles[$legacy])->toBe('editor')
         ->and($roles[$admin])->toBe(WorkspaceRole::Admin->value)
         ->and($roles[$viewer])->toBe(WorkspaceRole::Viewer->value);
 });
@@ -51,10 +51,10 @@ test('leaves a database with no legacy rows untouched', function (): void {
 
     $teamId = (string) Str::ulid();
 
-    insertLegacyMembership($teamId, WorkspaceRole::Editor->value);
+    insertLegacyMembership($teamId, 'editor');
 
     runBackfillLegacyMemberRoleMigration();
 
     expect(DB::table('team_user')->where('team_id', $teamId)->value('role'))
-        ->toBe(WorkspaceRole::Editor->value);
+        ->toBe('editor');
 });

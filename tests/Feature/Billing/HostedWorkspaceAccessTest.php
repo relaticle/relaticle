@@ -11,6 +11,7 @@ use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\StoreChatAttachment;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -96,6 +97,36 @@ it('pauses an expired trial before the daily cleanup command runs', function ():
 
 it('preserves hosted access for a grandfathered Free workspace', function (): void {
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('pauses a workspace whose subscription ended', function (): void {
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('keeps a trial paused after the nightly downgrade', function (): void {
+    $this->workspace->forceFill(['plan' => Plan::Free, 'pro_trial_used_at' => now()->subDays(15)])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('allows a cancelled subscriber that a sysadmin granted Pro', function (): void {
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('keeps a grandfathered workspace open after its subscription ended', function (): void {
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save();
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();

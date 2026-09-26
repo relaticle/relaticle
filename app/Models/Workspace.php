@@ -142,7 +142,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
-        'discord', 'llms.txt',
+        'discord', 'llms.txt', 'openapi.json', 'openapi.yaml',
 
         // API & developer
         'api', 'graphql', 'mcp', 'media', 'webhooks', 'developer', 'developers', 'connect', 'user', 'users',
@@ -195,7 +195,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      * @var array<string, string>
      */
     protected $attributes = [
-        'invite_link_default_role' => WorkspaceRole::Editor->value,
+        'invite_link_default_role' => WorkspaceRole::Member->value,
     ];
 
     /**
@@ -446,7 +446,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function hasUser(User $user): bool
     {
-        return $this->users->contains($user) || $user->ownsWorkspace($this);
+        return $user->belongsToWorkspace($this);
     }
 
     public function hasUserWithEmail(string $email): bool

@@ -56,14 +56,18 @@ final readonly class CreateWorkspaceCustomFields
             ? $workspace->onboarding_use_case->stagePreset()
             : null;
 
-        DB::transaction(function () use ($stagePreset): void {
-            foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
-                foreach ($enumClass::cases() as $enum) {
-                    $optionColors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
+        // The defaults every workspace starts with are not an edit anyone made, so
+        // seeding them writes nothing to the audit log.
+        activity()->withoutLogging(function () use ($stagePreset): void {
+            DB::transaction(function () use ($stagePreset): void {
+                foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
+                    foreach ($enumClass::cases() as $enum) {
+                        $optionColors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
 
-                    $this->createCustomField($modelClass, $enum, $optionColors);
+                        $this->createCustomField($modelClass, $enum, $optionColors);
+                    }
                 }
-            }
+            });
         });
 
         if ($workspace->isPersonalWorkspace() && Feature::active(OnboardSeed::class)) {

@@ -414,6 +414,32 @@ it('shows both rejected and healthy users when the Mailcoach filter is unset', f
     livewire(ListUsers::class)->assertCanSeeTableRecords([$rejected, $healthy]);
 });
 
+it('filters to exactly the users whose email bounced', function (): void {
+    $bounced = User::factory()->create(['email_bounced_at' => now()]);
+    $deliverable = User::factory()->create(['email_bounced_at' => null]);
+
+    livewire(ListUsers::class)
+        ->filterTable('email_bounced_at', true)
+        ->assertCanSeeTableRecords([$bounced])
+        ->assertCanNotSeeTableRecords([$deliverable]);
+
+    livewire(ListUsers::class)
+        ->filterTable('email_bounced_at', false)
+        ->assertCanSeeTableRecords([$deliverable])
+        ->assertCanNotSeeTableRecords([$bounced]);
+});
+
+it('shows when a user email bounced in the bounced column', function (): void {
+    $this->travelTo(Date::parse('2026-09-22 14:30:00'));
+
+    $bounced = User::factory()->create(['email_bounced_at' => now()]);
+    $deliverable = User::factory()->create(['email_bounced_at' => null]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('email_bounced_at', $bounced->email_bounced_at, record: $bounced)
+        ->assertTableColumnStateNotSet('email_bounced_at', $bounced->email_bounced_at, record: $deliverable);
+});
+
 it('lists exactly the users whose engagement badge matches the selected filter', function (): void {
     $this->travelTo(Date::parse('2026-08-30 12:00:00'));
 

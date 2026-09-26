@@ -88,10 +88,11 @@ html.fi:has(body.fi-panel-app) {
 /* Sidebar Enhancements */
 .fi-sidebar {
     @apply bg-gray-50 border-r border-gray-200 dark:bg-gray-800 dark:border-gray-800;
+}
 
-    .fi-dropdown-list-item-image {
-        @apply rounded-md;
-    }
+.fi-sidebar .fi-dropdown-list-item-image,
+[data-workspace-switcher] .fi-dropdown-list-item-image {
+    @apply rounded-md;
 }
 
 /* Search row (AppSidebar): the search field and the notifications trigger,

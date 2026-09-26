@@ -40,8 +40,7 @@ function seedResolvedAssistantMsg(string $conversationId, User $user, DateTimeIn
         'role' => 'assistant',
         'content' => 'ok',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => $at,
@@ -339,11 +338,7 @@ it('replays proposal tool results unmutated after a decision', function (): void
         'id' => (string) Str::ulid(), 'conversation_id' => 'conv-R', 'participant_type' => 'user',
         'participant_id' => $user->getKey(), 'agent' => 'crm', 'role' => 'assistant', 'content' => 'Review the proposals below.',
         'attachments' => '[]',
-        'tool_calls' => json_encode([
-            ['id' => 'call-1', 'name' => 'CreateTaskTool', 'arguments' => [], 'result_id' => 'call-1'],
-            ['id' => 'call-2', 'name' => 'CreateTaskTool', 'arguments' => [], 'result_id' => 'call-2'],
-        ]),
-        'tool_results' => json_encode([$toolResult($approved, 'call-1'), $toolResult($pending, 'call-2')]),
+        'steps' => storedToolSteps([$toolResult($approved, 'call-1'), $toolResult($pending, 'call-2')]),
         'usage' => '{}', 'meta' => '{}', 'created_at' => now(), 'updated_at' => now(),
     ]);
 

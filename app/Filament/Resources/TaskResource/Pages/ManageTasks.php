@@ -58,7 +58,7 @@ final class ManageTasks extends ManageRecords
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportTasks::getUrl())
                     ->visible(ImportTasks::canAccess(...)),
-                ExportAction::make()->exporter(TaskExporter::class),
+                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')

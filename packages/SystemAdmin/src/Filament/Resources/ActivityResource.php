@@ -368,6 +368,7 @@ final class ActivityResource extends Resource
         }
 
         return collect($properties)
+            ->except(Activity::SOURCE_PROPERTY)
             ->map(fn (mixed $value, string $key): string => Str::headline($key).': '.self::stringifyValue($value))
             ->values()
             ->all();

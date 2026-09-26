@@ -21,6 +21,8 @@ use App\Mcp\Tools\Task\ListTasksTool;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
+use Laravel\Sanctum\Sanctum;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -212,6 +214,18 @@ it('can read the CRM overview prompt', function (): void {
         ->assertSee('CRM Overview');
 });
 
+it('keeps the CRM overview prompt to the current workspace', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Own Company']);
+    Company::factory()->for(Workspace::factory())->create(['name' => 'Foreign Company']);
+
+    RelaticleServer::actingAs($this->user)
+        ->prompt(CrmOverviewPrompt::class)
+        ->assertOk()
+        ->assertSee('Own Company')
+        ->assertSee('companies: 1')
+        ->assertDontSee('Foreign Company');
+});
+
 it('returns error when updating non-existent company', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(UpdateCompanyTool::class, [
@@ -227,4 +241,48 @@ it('returns error when deleting non-existent company', function (): void {
             'id' => 'non-existent-id',
         ])
         ->assertHasErrors(['not found']);
+});
+
+it('shows the relaticle mark on the legacy initialize handshake', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-11-25',
+            'capabilities' => (object) [],
+            'clientInfo' => ['name' => 'test', 'version' => '1.0.0'],
+        ],
+    ])
+        ->assertOk()
+        ->assertJsonPath('result.serverInfo.icons', [
+            ['src' => asset('brand/logomark.svg'), 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
+            ['src' => asset('web-app-manifest-512x512.png'), 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+        ]);
+});
+
+it('shows the relaticle mark on the server discover handshake', function (): void {
+    Sanctum::actingAs($this->user, ['*']);
+
+    $response = $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'server/discover',
+        'params' => [
+            '_meta' => [
+                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities' => (object) [],
+            ],
+        ],
+    ], [
+        'MCP-Protocol-Version' => '2026-07-28',
+        'Mcp-Method' => 'server/discover',
+    ])->assertOk();
+
+    expect($response->json('result._meta')['io.modelcontextprotocol/serverInfo']['icons'])->toBe([
+        ['src' => asset('brand/logomark.svg'), 'mimeType' => 'image/svg+xml', 'sizes' => ['any']],
+        ['src' => asset('web-app-manifest-512x512.png'), 'mimeType' => 'image/png', 'sizes' => ['512x512']],
+    ]);
 });

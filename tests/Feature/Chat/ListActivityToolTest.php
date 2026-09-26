@@ -6,10 +6,13 @@ use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\CreationSource;
+use App\Enums\WorkspaceRole;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\CurrentSource;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Activity\ListActivityTool;
 
@@ -205,7 +208,7 @@ it('collapses one save\'s native and custom-field rows into a single entry', fun
 
     $payload = activityPayload();
 
-    expect(Activity::withoutGlobalScopes()->count())->toBe(3)
+    expect(Activity::withoutGlobalScopes()->where('subject_type', 'company')->count())->toBe(3)
         ->and($payload['data'])->toHaveCount(2)
         ->and($payload['data'][0]['event'])->toBe('updated')
         ->and($payload['data'][0]['changes'])->toBe([
@@ -456,4 +459,47 @@ it('returns a second page of activity entries', function (): void {
     expect($second['data'])->not->toBeEmpty()
         ->and($second['data'])->not->toEqual($first['data'])
         ->and($second['next_page'])->toBeNull();
+});
+
+it('refuses the workspace-wide feed to a member without activity access, but still reads one record', function (): void {
+    $company = resolve(CreateCompany::class)->execute($this->user, ['name' => 'Acme']);
+
+    $member = User::factory()->create();
+    $this->user->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->user->currentWorkspace);
+    $this->actingAs($member->fresh());
+
+    expect(activityPayload())->toHaveKey('error')
+        ->and(activityPayload(['record_type' => 'company']))->toHaveKey('error')
+        ->and(activityPayload(['record_type' => 'company', 'record_id' => (string) $company->getKey()]))->not->toHaveKey('error');
+});
+
+it('names the channel of each change, and none for a row that predates it', function (): void {
+    $user = $this->user;
+
+    $company = app(CreateCompany::class)->execute($user, ['name' => 'Old Co']);
+
+    nextActivityRequest();
+
+    CurrentSource::during(CreationSource::API, fn (): Company => app(UpdateCompany::class)->execute($user, $company, ['name' => 'New Co']));
+
+    $payload = activityPayload(['record_type' => 'company', 'record_id' => (string) $company->getKey()]);
+
+    expect(array_column($payload['data'], 'source'))->toBe(['api', 'web']);
+
+    Activity::withoutGlobalScopes()->where('subject_id', $company->getKey())->update(['properties' => '{}']);
+
+    $legacy = activityPayload(['record_type' => 'company', 'record_id' => (string) $company->getKey()]);
+
+    expect(array_column($legacy['data'], 'source'))->toBe([null, null]);
+});
+
+it('names every known channel and null in its description', function (): void {
+    $description = app(ListActivityTool::class)->description();
+
+    foreach (CreationSource::values() as $value) {
+        expect($description)->toContain($value);
+    }
+
+    expect($description)->toContain('null');
 });

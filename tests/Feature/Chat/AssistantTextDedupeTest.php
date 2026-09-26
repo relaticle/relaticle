@@ -9,7 +9,7 @@ use Laravel\Ai\Ai;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Responses\AgentResponse;
 use Laravel\Ai\Responses\Data\Meta;
-use Laravel\Ai\Responses\Data\Usage;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AssistantText;
@@ -34,7 +34,7 @@ function storeAssistantTextFixture(User $user, string $text): string
     $provider = Ai::textProviderFor($agent);
 
     $prompt = new AgentPrompt($agent, 'x', [], $provider, $provider->defaultTextModel());
-    $response = new AgentResponse('inv-'.Str::random(8), $text, new Usage, new Meta);
+    $response = new AgentResponse('inv-'.Str::random(8), $text, new TextUsage, new Meta);
 
     resolve(SupersededAwareConversationStore::class)
         ->storeAssistantMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt, $response);
@@ -47,6 +47,20 @@ it('collapses a fully-repeated assistant text down to a single copy when persist
     $this->actingAs($user);
 
     $conversationId = storeAssistantTextFixture($user, 'Review the proposal below.Review the proposal below.');
+
+    $content = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->value('content');
+
+    expect($content)->toBe('Review the proposal below.');
+});
+
+it('collapses an acknowledgment echoed in two steps down to a single copy when persisting', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $conversationId = storeAssistantTextFixture($user, "Review the proposal below.\n\nReview the proposal below.");
 
     $content = DB::table('agent_conversation_messages')
         ->where('conversation_id', $conversationId)
@@ -74,5 +88,7 @@ it('keeps only the text written after the last tool call, and everything when no
     expect(AssistantText::finalReply("Let me look that up.\n\nHere is the note.", "\n\nHere is the note.", true))->toBe('Here is the note.')
         ->and(AssistantText::finalReply('Review the proposal below.', '', true))->toBe('Review the proposal below.')
         ->and(AssistantText::finalReply('Plain answer.', 'Plain answer.', false))->toBe('Plain answer.')
-        ->and(AssistantText::finalReply('Done.Done.', 'Done.Done.', true))->toBe('Done.');
+        ->and(AssistantText::finalReply('Done.Done.', 'Done.Done.', true))->toBe('Done.')
+        ->and(AssistantText::finalReply("Done.\n\nDone.", '', true))->toBe('Done.')
+        ->and(AssistantText::finalReply("First point.\n\nSecond point.", '', true))->toBe("First point.\n\nSecond point.");
 });

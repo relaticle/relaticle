@@ -25,7 +25,7 @@
         "filament/spatie-laravel-media-library-plugin": "^5.7",
         "google/apiclient": "^2.19",
         "knuckleswtf/scribe": "^5.8",
-        "laravel/ai": "~0.11.0",
+        "laravel/ai": "^1.0",
         "laravel/cashier": "^16.5",
         "laravel/fortify": "^1.37",
         "laravel/framework": "^13.0",

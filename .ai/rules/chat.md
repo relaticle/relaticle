@@ -11,8 +11,8 @@ Two related limits: StreamErrorException is not a FailoverableException, and Str
 Provider failover therefore lives in the job, not the attribute. When resolution came from `auto` (resolve() tags it `source`), nothing has streamed yet, and transient retries are exhausted, ProcessChatMessage re-dispatches itself once against the next entry in `ModelRegistry::autoChain()` (failoverDepth bounds it to one hop). An EXPLICIT model pick never fails over: users pay per-model credit multipliers, so a silent swap is worse than an error.
 
 ## Anthropic prompt caching rides on providerOptions() overriding the request body
-laravel/ai still has no native prompt-cache API (v0.11.0; PR #860 closed, #869 open). CrmAssistant::anthropicCachedSystemBlocks() works only because Gateway\Anthropic\Concerns\BuildsTextRequests ends with array_merge($body, $providerOptions), so the returned 'system' array of content blocks replaces Anthropic's plain-string system prompt and carries the cache_control breakpoint. Tool schemas render before system in Anthropic's cache prefix, so the one breakpoint covers all of them plus the static instructions; per-turn context must stay in the second, uncached block.
-If that merge order ever changes upstream nothing throws - turns just silently cost full price. tests/Feature/Chat/AnthropicPromptCachingTest.php asserts the built request body; keep it green on every laravel/ai upgrade. Also: Usage::promptTokens is the UNCACHED remainder only, so any cost figure priced off it understates the real prompt.
+laravel/ai has no native prompt-cache API (still true on v1.0.0). CrmAssistant::anthropicCachedSystemBlocks() works only because Gateway\Anthropic\Concerns\BuildsTextRequests ends with array_merge($body, $providerOptions), so the returned 'system' array of content blocks replaces Anthropic's plain-string system prompt and carries the cache_control breakpoint. Tool schemas render before system in Anthropic's cache prefix, so the one breakpoint covers all of them plus the static instructions; per-turn context must stay in the second, uncached block.
+If that merge order ever changes upstream nothing throws - turns just silently cost full price. tests/Feature/Chat/AnthropicPromptCachingTest.php asserts the built request body; keep it green on every laravel/ai upgrade. Also: since v1.0, `Usage::$inputTokens` INCLUDES cache reads and writes. `ai_credit_transactions.input_tokens` stores `uncachedInputTokens()`, so a cost figure priced off it understates the real prompt.
 
 ## A chained turn is one plan, grouped by turn_id
 Proposals created in the same turn share `pending_actions.turn_id` and are presented
@@ -63,9 +63,13 @@ request. Four invariants keep it bounded, and all four are load-bearing:
 - It costs a credit like any other turn. Out of credits means no resume, not a queued
   one, the user can still type.
 The turn runs on a synthetic user message (the provider needs a final user turn). Who
-authored a message is its `origin` column, owned by `MessageOrigin`: the saved row holds
-only the enum's short `opener()`, and the instructions for the turn travel in a `<turn>`
-block of `dynamicInstructions()`, so they are never stored or replayed. The job hands the
+authored a message is its `origin` column, owned by `MessageOrigin`. For a resume the
+saved row is the outcome itself, `ResolvedActionText::resumeOpener()` built at dispatch
+from the just-decided proposals ("REJECTED (nothing was written): delete ..."), because a
+rejection stated only in the `<resolved_actions>` system block was reported as done in
+three of five production turns (2026-09). The greeting row holds the enum's short
+`opener()`. The instructions for either turn travel in a `<turn>` block of
+`dynamicInstructions()`, so they are never stored or replayed. The job hands the
 origin to the store through `Context::scope()`, and `SupersededAwareConversationStore`
 writes it in the same insert as the row. "Typed by the user" is the `typed()` scope on
 `AgentConversationMessage`, and "not synthetic" is `withoutSynthetic()`; the transcript
@@ -180,7 +184,7 @@ state how many rows the user can see, and if a payload field is ever wanted for 
 it must be the SERVER telling the model the paint budget, not the model guessing.
 Prompt constraints are probabilistic: this narrows the tail, it does not close it.
 
-## Never put a sampling attribute on an Anthropic agent
+## Never put a sampling attribute on an agent
 Anthropic removed `temperature`, `top_p` and `top_k` on Opus 4.7 and every model
 released after it (Opus 4.8/5, Sonnet 5, Fable 5). A request carrying one is rejected
 with a flat 400 and the body `` `temperature` is deprecated for this model ``. Sonnet
@@ -195,9 +199,11 @@ The replacement dial is `output_config.effort` (low/medium/high/xhigh/max), sent
 thinking is on by default, so a turn spends output tokens before writing a word.
 An unrecognised value sends nothing rather than forwarding the typo to the provider.
 `AnthropicPromptCachingTest` asserts the built body carries no sampling key; keep that
-green, and never reintroduce `#[Temperature]`/`#[TopP]` on an agent that can run on a
-current Anthropic model. `ConversationTitler` and `NextStepSuggester` still carry one
-only because `#[UseCheapestModel]` pins them to Haiku 4.5, which still accepts it.
+green, and never put `#[Temperature]`/`#[TopP]` on any agent. OpenAI's reasoning models
+reject them too: `ConversationTitler` and `NextStepSuggester` run on the cheapest model of
+the provider that served the turn, and `gpt-5.6-luna` answered their `temperature` with a 400.
+Both jobs swallow errors, so GPT turns silently lost their titles and next steps until #837.
+`ConversationTitleGenerationTest` and `NextStepSuggestionTest` fake OpenAI rejecting the key.
 
 ## Retiring a model id silently re-prices it at 1x
 `ModelRegistry::multiplierFor()` matches on the `model` string and returns 1.0 when
@@ -325,3 +331,17 @@ did not, so `composer test:pest:full`, the merge gate CLAUDE.md tells you to run
 started aborting on the clock rather than on a test once the suite crossed five minutes.
 Every script that can run the whole suite or a slow subset now carries it. Add it to any
 new one.
+
+## Conversation storage on laravel/ai 1.0: steps, not tool columns
+Since v1.0 an assistant row stores its turn in `steps` (one entry per model round trip, each tool
+result on its call) plus a `status` column. The SDK replays an assistant row ONLY from `steps[].content`,
+never from `content`, so a raw-inserted assistant row with `steps = '[]'` is invisible to the model.
+Write raw rows through `StoredSteps::text()` (the failure note, the import handoff) and read tool
+results through `StoredSteps::toolResults()`. `ProcessChatMessageFailureTest` and
+`ChatAttachmentSendTest` assert both replays.
+v1 also records a failed turn itself; `SupersededAwareConversationStore::storeAssistantMessage()` opts
+out, because `ProcessChatMessage` owns a dead turn (retry, failover, failure note). Keeping both
+duplicated the user message on retry and hid the note.
+Credits settle on the model the job requested (`$this->resolved['model']`), never `meta->model`: v1
+overwrites it with the provider's own id, and a dated snapshot misses the multiplier lookup and bills
+1.0x. `ProcessChatMessageSettlementTest` pins it.

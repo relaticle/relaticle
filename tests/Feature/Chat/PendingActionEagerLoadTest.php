@@ -38,8 +38,7 @@ beforeEach(function (): void {
             'content' => "message {$i}",
             'document' => ChatDocument::emptyJson(),
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => json_encode([[
+            'steps' => storedToolSteps([[
                 'result' => json_encode([
                     'type' => 'pending_action',
                     'pending_action_id' => "pa-{$i}",

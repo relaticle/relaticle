@@ -12,6 +12,7 @@ use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Spatie\MediaLibrary\MediaCollections\Exceptions\FileUnacceptableForCollection;
 
 mutates(FetchFaviconForCompany::class);
 
@@ -146,4 +147,73 @@ test('downloads the favicon when the company carries several custom field values
     (new FetchFaviconForCompany($company->fresh()))->handle();
 
     expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
+});
+
+test('refuses a favicon whose body is not a raster image', function (string $url, string $body): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
+
+    CustomFieldValue::forceCreate([
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => CustomField::query()->where('code', CompanyField::DOMAINS->value)->forEntity(Company::class)->firstOrFail()->getKey(),
+        'json_value' => ['example.com'],
+    ]);
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn($url);
+    $favicon->shouldReceive('getIconSize')->andReturn(180);
+    $favicon->shouldReceive('getIconType')->andReturn('icon');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+
+    Http::fake([$url => Http::response($body, 200)]);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    expect($company->fresh()->getMedia('logo'))->toBeEmpty();
+})->with([
+    'svg with script' => ['https://1.1.1.1/favicon.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>'],
+    'html page named png' => ['https://1.1.1.1/favicon.png', '<!DOCTYPE html><html><body><script>alert(1)</script></body></html>'],
+]);
+
+test('names the stored logo after its content rather than its url', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
+
+    CustomFieldValue::forceCreate([
+        'tenant_id' => $this->user->currentWorkspace->getKey(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => CustomField::query()->where('code', CompanyField::DOMAINS->value)->forEntity(Company::class)->firstOrFail()->getKey(),
+        'json_value' => ['example.com'],
+    ]);
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://1.1.1.1/favicon.svg');
+    $favicon->shouldReceive('getIconSize')->andReturn(180);
+    $favicon->shouldReceive('getIconType')->andReturn('icon');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+
+    $pngBytes = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
+    Http::fake(['https://1.1.1.1/favicon.svg' => Http::response($pngBytes, 200)]);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    expect($company->fresh()->getFirstMedia('logo')?->file_name)->toBe('logo.png');
+});
+
+test('the company logo collection refuses svg content from any writer', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
+
+    expect(fn () => $company->addMediaFromString('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')
+        ->usingFileName('logo.svg')
+        ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION))
+        ->toThrow(FileUnacceptableForCollection::class);
 });

@@ -4,28 +4,37 @@ declare(strict_types=1);
 
 namespace App\Listeners\Mcp;
 
+use Illuminate\Contracts\Encryption\Encrypter;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Laravel\Passport\Events\AccessTokenCreated;
+use Laravel\Passport\Passport;
+use League\OAuth2\Server\CryptTrait;
 
-/**
- * Bind a freshly minted access token to the workspace chosen during OAuth consent.
- *
- * The workspace is picked in ApproveAuthorizationController and stored on the auth
- * code. The access token is minted in a separate POST /oauth/token request with
- * no session, and the `code` parameter there is league's encrypted payload
- * rather than the auth code's id, so the token has to be matched back to its
- * consent by user and client instead.
- */
+// The token endpoint has no session, so the workspace is traced through the grant's own
+// encrypted payload: the auth code it redeems, or the access token its refresh replaces.
 final class CopyWorkspaceIdToAccessToken
 {
+    use CryptTrait;
+
+    public function __construct(
+        private readonly Request $request,
+        Encrypter $encrypter,
+    ) {
+        $this->setEncryptionKey(Passport::tokenEncryptionKey($encrypter));
+    }
+
     public function handle(AccessTokenCreated $event): void
     {
         if ($event->userId === null) {
             return;
         }
 
-        $workspaceId = $this->consentedWorkspaceId($event->userId, $event->clientId)
-            ?? $this->inheritedWorkspaceId($event->userId, $event->clientId, $event->tokenId);
+        $workspaceId = match ($this->request->input('grant_type')) {
+            'authorization_code' => $this->workspaceIdOf('oauth_auth_codes', $this->grantedId('code', 'auth_code_id'), $event),
+            'refresh_token' => $this->workspaceIdOf('oauth_access_tokens', $this->grantedId('refresh_token', 'access_token_id'), $event),
+            default => null,
+        };
 
         if ($workspaceId === null) {
             return;
@@ -36,40 +45,29 @@ final class CopyWorkspaceIdToAccessToken
             ->update(['workspace_id' => $workspaceId]);
     }
 
-    /**
-     * The workspace bound to this client's most recent consent.
-     *
-     * League revokes the auth code only after the access token is persisted, so
-     * during an authorization_code grant the row backing this exchange is still
-     * present and unrevoked.
-     */
-    private function consentedWorkspaceId(string $userId, string $clientId): ?string
+    private function grantedId(string $parameter, string $key): ?string
     {
-        $workspaceId = DB::table('oauth_auth_codes')
-            ->where('user_id', $userId)
-            ->where('client_id', $clientId)
-            ->whereNotNull('workspace_id')
-            ->latest('expires_at')
-            ->value('workspace_id');
+        $encrypted = $this->request->string($parameter)->value();
 
-        return is_string($workspaceId) ? $workspaceId : null;
+        if ($encrypted === '') {
+            return null;
+        }
+
+        $id = data_get(json_decode($this->decrypt($encrypted), true), $key);
+
+        return is_string($id) ? $id : null;
     }
 
-    /**
-     * The workspace carried by the token this one replaces.
-     *
-     * A refresh_token grant has no auth code of its own, and `passport:purge`
-     * may already have removed the one from the original consent, so fall back
-     * to the binding the previous token for this client was issued with.
-     */
-    private function inheritedWorkspaceId(string $userId, string $clientId, string $tokenId): ?string
+    private function workspaceIdOf(string $table, ?string $id, AccessTokenCreated $event): ?string
     {
-        $workspaceId = DB::table('oauth_access_tokens')
-            ->where('user_id', $userId)
-            ->where('client_id', $clientId)
-            ->where('id', '!=', $tokenId)
-            ->whereNotNull('workspace_id')
-            ->latest()
+        if ($id === null) {
+            return null;
+        }
+
+        $workspaceId = DB::table($table)
+            ->where('id', $id)
+            ->where('user_id', $event->userId)
+            ->where('client_id', $event->clientId)
             ->value('workspace_id');
 
         return is_string($workspaceId) ? $workspaceId : null;

@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFieldSettingsSchema;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Ai\Contracts\Tool;
@@ -64,6 +65,7 @@ final class ListCustomFieldsTool implements Tool
                     'active' => (bool) $field->active,
                     'system_defined' => $field->isSystemDefined(),
                     'options' => $field->options->pluck('name')->values()->all(),
+                    'settings' => CustomFieldSettingsSchema::current($field),
                 ];
             }
         } finally {
@@ -72,7 +74,7 @@ final class ListCustomFieldsTool implements Tool
 
         return (string) json_encode([
             'custom_fields' => $data,
-            'note' => 'System-defined fields cannot be modified from chat. To update or add options to a field, use its entity_type + code.',
+            'note' => 'System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. `settings` holds each field\'s current values for exactly the settings it accepts. To update a field, its options or its settings, use its entity_type + code.',
         ], JSON_UNESCAPED_SLASHES);
     }
 }

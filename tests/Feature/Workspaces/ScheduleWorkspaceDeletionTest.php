@@ -31,7 +31,7 @@ test('workspace owner is notified when workspace is scheduled for deletion', fun
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace);
 
@@ -46,7 +46,7 @@ test('pending invitations are cancelled when workspace deletion is scheduled', f
     $workspace = $user->currentWorkspace;
     $workspace->workspaceInvitations()->create([
         'email' => 'invited@example.com',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(7),
     ]);
 
@@ -73,7 +73,7 @@ test('non-owner cannot schedule workspace deletion', function () {
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     expect(fn () => resolve(ScheduleWorkspaceDeletion::class)->schedule($member, $workspace))
         ->toThrow(AuthorizationException::class);
@@ -86,7 +86,7 @@ test('workspace owner can cancel workspace deletion', function () {
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     resolve(CancelWorkspaceDeletion::class)->cancel($user, $workspace);
 

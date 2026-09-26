@@ -70,7 +70,11 @@ final class ValidateColumnJob implements ShouldQueue
 
     private function validateEntityLink(Import $import, ImportStore $store, Connection $connection, string $jsonPath): void
     {
-        $uniqueValues = $this->fetchUncorrectedUniqueValues($store, $jsonPath);
+        $uniqueValues = $store->query()
+            ->selectRaw('DISTINCT COALESCE(json_extract(corrections, ?), json_extract(raw_data, ?)) as value', [$jsonPath, $jsonPath])
+            ->pluck('value')
+            ->filter(fn (mixed $value): bool => $value !== null)
+            ->all();
 
         if ($uniqueValues === []) {
             return;
@@ -129,7 +133,7 @@ final class ValidateColumnJob implements ShouldQueue
             $inserts = [];
 
             foreach ($resolvedMap as $value => $resolvedId) {
-                if ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly) {
+                if (blank($value) || ($resolvedId === null && $matcher->behavior === MatchBehavior::MatchOnly)) {
                     continue;
                 }
 
@@ -137,28 +141,31 @@ final class ValidateColumnJob implements ShouldQueue
                     ? RelationshipMatch::existing($link->key, (string) $resolvedId, $matcher->behavior, $matcher->field)
                     : RelationshipMatch::create($link->key, (string) $value, $matcher->behavior, $matcher->field);
 
-                $inserts[] = [
-                    'lookup_value' => (string) $value,
-                    'relationship_json' => json_encode($match->toArray()),
-                ];
+                $inserts[(string) $value] = json_encode($match->toArray());
             }
 
-            if ($inserts === []) {
-                return;
-            }
-
-            $connection->table('temp_relationships')->insert($inserts);
+            $connection->table('temp_relationships')->insert(array_map(fn (string $value): array => [
+                'lookup_value' => $value,
+                'relationship_json' => $inserts[$value] ?? null,
+            ], $uniqueValues));
 
             $connection->statement("
                 UPDATE import_rows
-                SET relationships = json_insert(
-                    COALESCE(relationships, '[]'),
-                    '\$[#]',
-                    json(temp.relationship_json)
-                )
+                SET relationships = NULLIF((
+                    SELECT json_group_array(json(value))
+                    FROM (
+                        SELECT value FROM json_each(import_rows.relationships)
+                        WHERE json_extract(value, '\$.relationship') != ?
+                           OR json_extract(value, '\$.matchField') IS NOT ?
+                        UNION ALL
+                        SELECT temp.relationship_json
+                        WHERE temp.relationship_json IS NOT NULL
+                          AND COALESCE(json_extract(import_rows.skipped, ?), 0) = 0
+                    )
+                ), '[]')
                 FROM temp_relationships AS temp
-                WHERE json_extract(import_rows.raw_data, ?) = temp.lookup_value
-            ", [$jsonPath]);
+                WHERE COALESCE(json_extract(import_rows.corrections, ?), json_extract(import_rows.raw_data, ?)) = temp.lookup_value
+            ", [$link->key, $matcher->field, $jsonPath, $jsonPath, $jsonPath]);
         } finally {
             $connection->statement('DROP TABLE IF EXISTS temp_relationships');
         }
@@ -243,6 +250,10 @@ final class ValidateColumnJob implements ShouldQueue
             try {
                 $connection->table('temp_validation')->insert($results);
 
+                $valueCondition = $this->column->isEntityLinkMapping()
+                    ? 'COALESCE(json_extract(import_rows.corrections, ?), json_extract(import_rows.raw_data, ?)) = temp.raw_value'
+                    : 'json_extract(import_rows.raw_data, ?) = temp.raw_value AND json_extract(import_rows.corrections, ?) IS NULL';
+
                 $connection->statement("
                     UPDATE import_rows
                     SET validation = CASE
@@ -252,8 +263,7 @@ final class ValidateColumnJob implements ShouldQueue
                             json_set(COALESCE(validation, '{}'), ?, temp.validation_error)
                     END
                     FROM temp_validation AS temp
-                    WHERE json_extract(import_rows.raw_data, ?) = temp.raw_value
-                      AND json_extract(import_rows.corrections, ?) IS NULL
+                    WHERE {$valueCondition}
                 ", [$jsonPath, $jsonPath, $jsonPath, $jsonPath]);
             } finally {
                 $connection->statement('DROP TABLE IF EXISTS temp_validation');

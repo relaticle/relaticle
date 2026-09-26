@@ -7,7 +7,9 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\User;
+use App\Support\ActivityLog\ActivityValue;
 use Filament\Facades\Filament;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -150,4 +152,47 @@ it('still logs a genuine link value change', function (): void {
     expect($activity)->not->toBeNull()
         ->and($activity->properties['custom_field_changes'][0]['old']['label'])->toBe('airbnb.com')
         ->and($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('google.com');
+});
+
+it('logs a first value of false on a toggle, where normalizing alone would read it as empty', function (): void {
+    $toggle = CustomField::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'is_partner',
+        'name' => 'Is partner',
+        'type' => 'toggle',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    $company = Company::factory()->for($this->workspace)->create();
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFieldValue($toggle, false);
+
+    $activity = Activity::query()->where('event', 'custom_field_changes')->latest('id')->firstOrFail();
+
+    expect($activity->properties['custom_field_changes'][0]['new']['label'])->toBe('No');
+});
+
+it('never writes the plaintext of an encrypted field value', function (): void {
+    $this->field->update(['settings' => new CustomFieldSettingsData(encrypted: true)]);
+    $company = Company::factory()->for($this->workspace)->create();
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFields(['lead_source' => 'first secret']);
+    $company->refresh()->saveCustomFields(['lead_source' => 'second secret']);
+
+    $changes = Activity::withoutGlobalScopes()
+        ->where('event', 'custom_field_changes')
+        ->oldest('id')
+        ->get()
+        ->map(fn (Activity $activity): array => $activity->properties['custom_field_changes'][0]);
+
+    expect($changes)->toHaveCount(2)
+        ->and(json_encode($changes))->not->toContain('first secret')->not->toContain('second secret')
+        ->and($changes[1]['old']['label'])->toBe(ActivityValue::REDACTED)
+        ->and($changes[1]['new']['label'])->toBe(ActivityValue::REDACTED);
 });

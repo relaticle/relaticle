@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceDeletionCancelledNotification;
@@ -13,7 +14,7 @@ final readonly class CancelWorkspaceDeletion
 {
     public function cancel(User $user, Workspace $workspace): void
     {
-        throw_unless($user->ownsWorkspace($workspace), AuthorizationException::class);
+        throw_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), AuthorizationException::class);
 
         $workspace->forceFill(['scheduled_deletion_at' => null])->save();
 

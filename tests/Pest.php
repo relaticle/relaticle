@@ -256,3 +256,15 @@ function resolveHostsTo(array $addresses, int &$calls = 0): void
         return $addresses;
     }));
 }
+
+/** @param list<array<string, mixed>> $toolResults */
+function storedToolSteps(array $toolResults, string $content = ''): string
+{
+    return json_encode([[
+        'content' => $content,
+        'tool_calls' => array_map(static fn (array $toolResult): array => ['arguments' => [], ...$toolResult], $toolResults),
+        'reasoning' => '',
+        'replay_blocks' => [],
+        'provider_tool_calls' => [],
+    ]], JSON_THROW_ON_ERROR);
+}

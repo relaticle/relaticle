@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Company\CreateCompany;
+use App\Actions\People\CreatePeople;
 use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Models\User;
@@ -63,7 +65,7 @@ function continuationProposal(User $user, string $conversationId, string $turnId
         'user_id' => $user->getKey(),
         'conversation_id' => $conversationId,
         'turn_id' => $turnId,
-        'action_class' => 'App\\Actions\\Company\\CreateCompany',
+        'action_class' => CreateCompany::class,
         'operation' => PendingActionOperation::Create,
         'entity_type' => 'company',
         'action_data' => ['name' => $name],
@@ -90,7 +92,8 @@ it('resumes the assistant when an approval leaves nothing pending', function ():
     Queue::assertPushed(
         ProcessChatMessage::class,
         fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume
-            && $job->conversationId === $this->convId,
+            && $job->conversationId === $this->convId
+            && $job->message === "The user decided the proposals above:\n- APPROVED (written): create company \"Continuation Co\"",
     );
 });
 
@@ -104,7 +107,96 @@ it('resumes after a rejection too, so a discarded card is not a dead end', funct
         ->dispatch('proposal:set-active', id: (string) $proposal->getKey(), context: 'conversation')
         ->call('discardCurrent', resolve(PendingActionService::class));
 
-    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume);
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume
+            && $job->message === "The user decided the proposals above:\n- REJECTED (nothing was written): create company \"Rejected Co\"",
+    );
+});
+
+it('opens the resumed turn with every decision of the turn, skipped records included', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    continuationProposal($this->user, $this->convId, $turnId, 'Decided Co')
+        ->forceFill(['status' => PendingActionStatus::Approved, 'resolved_at' => now(), 'result_data' => ['id' => '01cc0000000000000000000000', 'type' => 'company']])
+        ->save();
+    PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $turnId,
+        'action_class' => CreatePeople::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'people',
+        'action_data' => ['_batch' => true, 'records' => [['name' => 'Ivan Zhao'], ['name' => 'Simon Last']]],
+        'display_data' => ['title' => 'Create 2 people', 'summary' => 'Create 2 people', 'items' => []],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now()->addSecond(),
+        'result_data' => [
+            'items' => ['0' => ['status' => 'approved', 'id' => '01aa0000000000000000000000'], '1' => ['status' => 'rejected']],
+            'ids' => ['01aa0000000000000000000000'],
+            'type' => 'people',
+            'count' => 1,
+        ],
+    ]);
+    continuationProposal($this->user, $this->convId, (string) Str::ulid(), 'Earlier Co')
+        ->forceFill(['status' => PendingActionStatus::Rejected, 'resolved_at' => now()->subMinute()])
+        ->save();
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId);
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => $job->message === implode("\n", [
+            'The user decided the proposals above:',
+            '- APPROVED (written): create company "Decided Co"',
+            '- APPROVED (written): create 1 people records:',
+            '    - "Ivan Zhao"',
+            '    - skipped by the user, NOT created: "Simon Last"',
+        ]),
+    );
+});
+
+it('falls back to a plain opener when the resumed turn has no decided proposals', function (): void {
+    Queue::fake();
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, (string) Str::ulid());
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => $job->message === 'The user decided the proposals above.',
+    );
+});
+
+it('names an approved delete in the resumed turn by label, without the ids it removed', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $turnId,
+        'action_class' => CreateCompany::class,
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'company',
+        'action_data' => ['_record_ids' => ['01dd0000000000000000000001', '01dd0000000000000000000002']],
+        'display_data' => ['title' => 'Delete 2 companies', 'summary' => 'Delete 2 companies'],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['ids' => ['01dd0000000000000000000001', '01dd0000000000000000000002'], 'type' => 'company'],
+    ]);
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId);
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => str_starts_with($job->message, "The user decided the proposals above:\n- APPROVED (written): delete company ")
+            && ! str_contains($job->message, '01dd0000000000000000000001'),
+    );
 });
 
 it('does not resume while another step of the plan is still pending', function (): void {
@@ -196,7 +288,7 @@ it('hides the resumed turn prompt from the transcript but keeps every other mess
     $rows = [
         ['role' => 'user', 'content' => 'Create a company', 'origin' => MessageOrigin::Typed],
         ['role' => 'assistant', 'content' => 'Review the proposal below.', 'origin' => MessageOrigin::Typed],
-        ['role' => 'user', 'content' => MessageOrigin::Resume->opener(), 'origin' => MessageOrigin::Resume],
+        ['role' => 'user', 'content' => 'The user decided the proposals above.', 'origin' => MessageOrigin::Resume],
         ['role' => 'assistant', 'content' => 'Created it.', 'origin' => MessageOrigin::Typed],
     ];
 
@@ -206,12 +298,11 @@ it('hides the resumed turn prompt from the transcript but keeps every other mess
             'conversation_id' => $this->convId,
             'participant_type' => 'user',
             'participant_id' => (string) $this->user->getKey(),
-            'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+            'agent' => CrmAssistant::class,
             'role' => $row['role'],
             'content' => $row['content'],
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
+            'steps' => '[]',
             'usage' => '[]',
             'meta' => '[]',
             'origin' => $row['origin']->value,
@@ -224,7 +315,7 @@ it('hides the resumed turn prompt from the transcript but keeps every other mess
 
     expect($messages)->toHaveCount(3)
         ->and(array_column($messages, 'role'))->toBe(['user', 'assistant', 'assistant'])
-        ->and(collect($messages)->pluck('content')->implode(' '))->not->toContain(MessageOrigin::Resume->opener());
+        ->and(collect($messages)->pluck('content')->implode(' '))->not->toContain('decided the proposals above');
 });
 
 it('leaves the next job on the worker to store its own question as the user typed it', function (): void {
@@ -245,33 +336,32 @@ it('leaves the next job on the worker to store its own question as the user type
 
     // A resumed turn that never reaches its own write.
     try {
-        (new ProcessChatMessage(
+        new ProcessChatMessage(
             user: $this->user,
             workspace: $workspace,
-            message: '',
+            message: 'The user decided the proposals above.',
             conversationId: $this->convId,
             resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
             turnId: (string) Str::ulid(),
             origin: MessageOrigin::Resume,
-        ))->handle(resolve(CreditService::class));
+        )->handle(resolve(CreditService::class));
     } catch (Throwable) {
         // Premise, not subject.
     }
 
     // The very next job the worker picks up, with its own question.
-    (new ProcessChatMessage(
+    new ProcessChatMessage(
         user: $this->user,
         workspace: $workspace,
         message: 'What did we agree with Acme?',
         conversationId: $this->convId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
-    ))->handle(resolve(CreditService::class));
+    )->handle(resolve(CreditService::class));
 
     $stored = DB::table('agent_conversation_messages')
         ->where('conversation_id', $this->convId)
-        ->where('role', 'user')
-        ->orderByDesc('created_at')
+        ->where('role', 'user')->latest()
         ->first();
 
     expect($stored)->not->toBeNull()
@@ -290,15 +380,15 @@ it('saves a resumed turn as its opener with a resume origin and keeps it out of 
     CrmAssistant::fake(['Created it.']);
     Queue::fake();
 
-    (new ProcessChatMessage(
+    new ProcessChatMessage(
         user: $this->user,
         workspace: $workspace,
-        message: '',
+        message: "The user decided the proposals above:\n- REJECTED (nothing was written): create company \"Rejected Co\"",
         conversationId: $this->convId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         turnId: (string) Str::ulid(),
         origin: MessageOrigin::Resume,
-    ))->handle(resolve(CreditService::class));
+    )->handle(resolve(CreditService::class));
 
     $row = DB::table('agent_conversation_messages')
         ->where('conversation_id', $this->convId)
@@ -306,7 +396,10 @@ it('saves a resumed turn as its opener with a resume origin and keeps it out of 
         ->sole();
 
     expect($row->origin)->toBe(MessageOrigin::Resume->value)
-        ->and($row->content)->toBe(MessageOrigin::Resume->opener())
+        ->and($row->content)->toBe("The user decided the proposals above:\n- REJECTED (nothing was written): create company \"Rejected Co\"")
         ->and(array_column(resolve(ListConversationMessages::class)->execute($this->user, $this->convId), 'role'))
         ->toBe(['assistant']);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->prompt === $row->content
+        && str_contains($prompt->agent->dynamicInstructions(), "The latest user message is the system's record of each decision"));
 });

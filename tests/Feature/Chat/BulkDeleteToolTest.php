@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\Task;
 use App\Models\User;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\JsonSchema\Serializer;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Models\PendingAction;
@@ -122,4 +124,10 @@ it('fails only the item whose record vanished, leaving siblings deletable', func
     $service->approveItem($pending, $this->user, 2);
 
     expect(Task::query()->whereIn('id', [$records[0]['_record_id'], $records[2]['_record_id']])->count())->toBe(0);
+});
+
+it('tells the model a delete never removes the records linked to it', function (): void {
+    $ids = (new Serializer)->serialize(app(DeleteTaskTool::class)->schema(new JsonSchemaTypeFactory)['ids']);
+
+    expect($ids['description'])->toContain('Deleting a task never deletes the records linked to it.');
 });

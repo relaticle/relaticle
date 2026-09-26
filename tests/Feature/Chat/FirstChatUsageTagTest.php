@@ -8,8 +8,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use Laravel\Ai\Ai;
-use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Messages\UserMessage;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversationMessage;
@@ -20,13 +19,8 @@ mutates(FirstChatUsageTagger::class, SupersededAwareConversationStore::class, Ag
 
 function storeChatUserMessage(User $user, string $conversationId, string $text): string
 {
-    $agent = resolve(CrmAssistant::class);
-    $provider = Ai::textProviderFor($agent);
-
-    $prompt = new AgentPrompt($agent, $text, [], $provider, $provider->defaultTextModel());
-
     return resolve(SupersededAwareConversationStore::class)
-        ->storeUserMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt);
+        ->storeUserMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), CrmAssistant::class, new UserMessage($text));
 }
 
 function seedChatConversation(User $user): string
@@ -116,8 +110,7 @@ test('an assistant reply is not counted as the user having used chat', function 
         'role' => 'assistant',
         'content' => 'hi there',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),

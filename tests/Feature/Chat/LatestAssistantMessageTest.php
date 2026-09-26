@@ -43,8 +43,7 @@ function latestAssistantSeedMessage(User $user, string $conversationId, array $o
         'content' => '',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -110,7 +109,7 @@ it('does not return resolved or expired cards for reconciliation', function (): 
         'participant_type' => 'user',
         'participant_id' => (string) $user->getKey(), 'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'role' => 'assistant', 'content' => 'x', 'document' => ChatDocument::emptyJson(),
-        'attachments' => '[]', 'tool_calls' => '[]', 'tool_results' => '[]', 'usage' => '{}', 'meta' => '{}',
+        'attachments' => '[]', 'steps' => '[]', 'usage' => '{}', 'meta' => '{}',
         'created_at' => now(), 'updated_at' => now(),
     ]);
     $base = [
@@ -141,8 +140,7 @@ it('returns the most recent assistant message when several exist', function (): 
         'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
     ];
@@ -186,8 +184,7 @@ it('returns null when the conversation has no assistant message', function (): v
         'content' => 'A question',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -232,8 +229,7 @@ it('does not leak another tenant assistant message (cross-tenant scoping)', func
         'content' => 'Confidential answer',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -268,8 +264,7 @@ it('returns display blocks from a client-supplied id when the server property is
         'content' => 'Here are your companies and contacts.',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => (string) json_encode([
+        'steps' => storedToolSteps([
             ['id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => [], 'result' => json_encode([
                 'data' => [],
                 'display_block' => ['block' => 'records_table', 'title' => 'Companies'],
@@ -316,8 +311,7 @@ it('does not leak another tenant assistant message via a client-supplied id', fu
         'content' => 'Confidential answer',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),

@@ -196,6 +196,12 @@ final class UserResource extends Resource
                     ->falseIcon('heroicon-o-minus-small')
                     ->falseColor('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('No'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -212,6 +218,12 @@ final class UserResource extends Resource
                     ->placeholder('All users')
                     ->trueLabel('Rejected by Mailcoach')
                     ->falseLabel('Not rejected')
+                    ->nullable(),
+                TernaryFilter::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->placeholder('All users')
+                    ->trueLabel('Bounced')
+                    ->falseLabel('Not bounced')
                     ->nullable(),
                 SelectFilter::make('engagement')
                     ->label('Engagement')

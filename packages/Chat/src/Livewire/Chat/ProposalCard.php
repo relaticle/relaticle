@@ -6,6 +6,8 @@ namespace Relaticle\Chat\Livewire\Chat;
 
 use App\Livewire\BaseLivewireComponent;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
@@ -26,6 +28,7 @@ use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
@@ -230,6 +233,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 TextInput::make($titleKey)
                     ->label($titleKey === 'title' ? __('Title') : __('Name'))
+                    ->hiddenLabel()
                     ->required(),
             ];
         }
@@ -238,6 +242,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 Select::make('account_owner_id')
                     ->label(__('Account Owner'))
+                    ->hiddenLabel()
                     ->options(collect(WorkspaceMembersContext::for($this->authUser()))
                         ->pluck('name', 'id')
                         ->all())
@@ -245,12 +250,16 @@ final class ProposalCard extends BaseLivewireComponent
             ];
         }
 
-        return [
-            CustomFields::form()
-                ->forModel($this->modelClass())
-                ->only([$code])
-                ->build(),
-        ];
+        return CustomFields::form()
+            ->forModel($this->modelClass())
+            ->withoutSections()
+            ->only([$code])
+            ->values()
+            // The package spans each field across its own 12-column grid; this schema has one column.
+            ->map(fn (Field $field): Field => $field->hiddenLabel()->columnSpan(['default' => 'full', 'lg' => 'full']))
+            // Filament's date panel cannot leave the card's scroller; the browser's picker can.
+            ->map(fn (Field $field): Field => $field instanceof DateTimePicker ? $field->native() : $field)
+            ->all();
     }
 
     /**
@@ -898,7 +907,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($anchor, $exception->getMessage());
+            $this->reportResolveFailure($anchor, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -959,7 +968,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, $exception->getMessage());
+            $this->reportResolveFailure($step, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -1102,11 +1111,10 @@ final class ProposalCard extends BaseLivewireComponent
             // ValidationException is thrown by the action's tenant guards when a
             // referenced record or assignee stopped being reachable between the
             // proposal and the approval. HttpException (from abort_*() inside an
-            // action, e.g. the owner-only guard) is a RuntimeException too, and its
-            // message is written for the user, so it renders as-is. Livewire would
-            // otherwise absorb these into an error bag nothing renders, leaving the
-            // button a permanent no-op.
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            // action, e.g. a capability guard) is a RuntimeException too. Livewire
+            // would otherwise absorb these into an error bag nothing renders,
+            // leaving the button a permanent no-op.
+            $this->reportResolveFailure($pendingAction, ApprovalFailureMessage::for($exception));
 
             return;
         }
@@ -1156,7 +1164,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, $exception->getMessage()));
+            $this->reportResolveFailure($pendingAction, $this->itemFailureMessage($pendingAction, $index, ApprovalFailureMessage::for($exception)));
             $this->cursor = $this->firstUnresolvedIndex($pendingAction->fresh() ?? $pendingAction);
 
             return;

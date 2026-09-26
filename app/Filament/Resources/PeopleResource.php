@@ -158,6 +158,7 @@ final class PeopleResource extends Resource
                 BulkActionGroup::make([
                     MassSendBulkAction::make(),
                     ExportBulkAction::make()
+                        ->authorize('exportAny', People::class)
                         ->exporter(PeopleExporter::class),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),

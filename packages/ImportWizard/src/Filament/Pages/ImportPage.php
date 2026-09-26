@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Pages;
 
+use App\Enums\WorkspaceCapability;
+use App\Models\User;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Override;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
@@ -23,20 +26,12 @@ abstract class ImportPage extends Page
 
     protected static bool $shouldRegisterNavigation = false;
 
-    /**
-     * Check if the user can access the import page.
-     *
-     * Delegates to the resource's canCreate authorization if available.
-     */
     public static function canAccess(): bool
     {
-        $resourceClass = static::getResourceClass();
+        $user = auth()->user();
 
-        if (method_exists($resourceClass, 'canCreate')) {
-            return $resourceClass::canCreate();
-        }
-
-        return true;
+        return $user instanceof User
+            && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::DataImport);
     }
 
     /**

@@ -8,7 +8,6 @@ use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
 use App\Actions\Opportunity\ListOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
-use App\Enums\CreationSource;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreOpportunityRequest;
 use App\Http\Requests\Api\V1\UpdateOpportunityRequest;
@@ -48,7 +47,7 @@ final readonly class OpportunitiesController
     #[BodyParam('contact_id', 'string', required: false, example: null)]
     public function store(StoreOpportunityRequest $request, CreateOpportunity $action, #[CurrentUser] User $user): JsonResponse
     {
-        $opportunity = $action->execute($user, $request->validated(), CreationSource::API);
+        $opportunity = $action->execute($user, $request->validated());
 
         return new OpportunityResource($opportunity)
             ->response()

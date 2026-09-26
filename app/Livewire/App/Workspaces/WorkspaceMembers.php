@@ -13,6 +13,7 @@ use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use App\Support\Workspaces\RoleOptions;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
@@ -34,7 +35,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
-use Laravel\Jetstream\Jetstream;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use stdClass;
@@ -287,7 +287,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             return __('workspaces.roles.owner.label');
         }
 
-        return WorkspaceRole::label((string) $record['role']);
+        return WorkspaceRole::labelFor($record['role']);
     }
 
     /**
@@ -360,15 +360,11 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     }
 
     /**
-     * Only the owner may change or remove another Administrator, so those
-     * actions are hidden on a peer Admin's row rather than offered and then
-     * refused, matching how the owner row hides Leave.
-     *
      * @param  array<string, mixed>  $record
      */
     private function canActOnRole(array $record): bool
     {
-        if ((string) $record['role'] !== WorkspaceRole::Admin->value) {
+        if (! WorkspaceRole::keyIsAdmin((string) $record['role'])) {
             return true;
         }
 
@@ -385,22 +381,26 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
                 && $this->canActOnRole($record)
                 && Gate::check('updateWorkspaceMember', $this->workspace))
             ->modalHeading(__('workspaces.actions.update_workspace_role'))
+            ->modalDescription(fn (array $record): string => __('workspaces.modals.update_workspace_role.description', [
+                'name' => $record['name'],
+                'email' => $record['email'],
+            ]))
             ->modalWidth('lg')
+            ->modalSubmitActionLabel(__('workspaces.actions.save'))
             ->schema([
                 Radio::make('role')
-                    ->hiddenLabel()
+                    ->label(__('workspaces.form.role.label'))
                     ->required()
-                    ->options(fn (): array => $this->assignableRoles())
-                    ->in(fn (): array => array_keys($this->assignableRoles()))
-                    ->descriptions(fn (): array => collect(Jetstream::$roles)
-                        ->only(array_keys($this->assignableRoles()))
-                        ->pluck('description', 'key')
-                        ->all())
+                    ->markAsRequired(false)
+                    ->options(fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace))
+                    ->in(fn (): array => array_keys(RoleOptions::assignable($this->authUser(), $this->workspace)))
+                    ->descriptions(RoleOptions::descriptions())
+                    ->hintAction(RoleOptions::compareAction())
                     ->default(fn (array $record): string => (string) $record['role'])
                     ->rules([
                         fn (array $record): Closure => function (string $attribute, mixed $value, Closure $fail) use ($record): void {
-                            $touchesAdminStatus = $value === WorkspaceRole::Admin->value
-                                || $record['role'] === WorkspaceRole::Admin->value;
+                            $touchesAdminStatus = WorkspaceRole::keyIsAdmin(is_string($value) ? $value : null)
+                                || WorkspaceRole::keyIsAdmin((string) $record['role']);
 
                             if ($touchesAdminStatus && ! Gate::check('promoteToAdmin', $this->workspace)) {
                                 $fail(__('workspaces.validation.only_owner_promotes_admins'));
@@ -429,20 +429,6 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
 
                 $this->resetTable();
             });
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function assignableRoles(): array
-    {
-        $roles = collect(Jetstream::$roles)->pluck('name', 'key');
-
-        if (! Gate::check('promoteToAdmin', $this->workspace)) {
-            $roles = $roles->except(WorkspaceRole::Admin->value);
-        }
-
-        return $roles->all();
     }
 
     private function removeWorkspaceMemberAction(): Action

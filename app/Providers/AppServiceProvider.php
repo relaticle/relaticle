@@ -14,6 +14,7 @@ use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\CreateSetupConversationListener;
+use App\Listeners\Email\DropBouncedRecipientsListener;
 use App\Listeners\Email\NewSubscriberListener;
 use App\Listeners\Email\RecordLoginTimestampListener;
 use App\Listeners\Email\WorkspaceCreatedTagListener;
@@ -42,9 +43,12 @@ use App\Services\DiscordService;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
 use App\Support\BrandColors;
+use App\Support\CurrentSource;
+use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Impersonation\Impersonator;
@@ -54,6 +58,7 @@ use App\Support\Migrations\TenantMigration;
 use App\Support\Passport\ClientRepository;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
+use Filament\Actions\Exports\ExportColumn;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
@@ -76,6 +81,7 @@ use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Context;
@@ -105,6 +111,7 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\ImportWizard\Models\Import;
 use Relaticle\Ink\Filament\Resources\PostResource;
 use Relaticle\Ink\Ink;
 use Relaticle\Ink\Models\Category;
@@ -152,6 +159,8 @@ final class AppServiceProvider extends ServiceProvider
         // One batch_uuid per request/job, lazily generated and forgotten between
         // them. It is the key the activity timeline groups a single save's rows on.
         $this->app->scoped(RequestActivityBatch::class);
+        $this->app->scoped(CurrentImport::class);
+        $this->app->scoped(CurrentWorkspace::class);
 
         // Caches creation-source facts per workspace for the lifetime of a
         // request/job, scoped so a queue worker resets it between jobs.
@@ -222,6 +231,7 @@ final class AppServiceProvider extends ServiceProvider
 
         Event::listen(Login::class, RecordLoginTimestampListener::class);
         Event::listen(Verified::class, NewSubscriberListener::class);
+        Event::listen(MessageSending::class, DropBouncedRecipientsListener::class);
         Event::listen(TeamMemberAdded::class, WorkspaceMemberAddedListener::class);
         Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);
         Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
@@ -262,6 +272,7 @@ final class AppServiceProvider extends ServiceProvider
 
             $parameters['workspaces'] = $workspaces;
             $parameters['pausedWorkspaceIds'] = $pausedWorkspaceIds;
+            $parameters['redirectHost'] = $this->consentRedirectHost($parameters);
 
             // Never preselect a workspace the connector could not use. The user would
             // approve a token that answers 402 on every call.
@@ -342,6 +353,17 @@ final class AppServiceProvider extends ServiceProvider
                 $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
             }
 
+            $import = $this->app->make(CurrentImport::class);
+
+            if ($import->id() !== null && $activity->getAttribute('subject_type') !== Relation::getMorphAlias(Import::class)) {
+                $activity->properties = ($activity->properties ?? new Collection)
+                    ->put('import_id', $import->id())
+                    ->put('import_file', $import->fileName());
+            }
+
+            $activity->properties = ($activity->properties ?? new Collection)
+                ->put(ActivityModel::SOURCE_PROPERTY, CurrentSource::get()->value);
+
             // The causer stays the impersonated user because the record is theirs.
             $administratorId = $this->app->make(Impersonator::class)->administratorId(request())
                 ?? Context::getHidden('impersonated_by');
@@ -361,6 +383,25 @@ final class AppServiceProvider extends ServiceProvider
         });
 
         Timeline::registerRenderer('merged-activity', MergedActivityRenderer::class);
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     */
+    private function consentRedirectHost(array $parameters): ?string
+    {
+        $request = $parameters['request'] ?? null;
+        $redirectUri = $request instanceof Request ? $request->string('redirect_uri')->value() : '';
+
+        if ($redirectUri === '') {
+            $redirectUri = data_get($parameters, 'client.redirect_uris.0');
+        }
+
+        if (! is_string($redirectUri)) {
+            return null;
+        }
+
+        return parse_url($redirectUri, PHP_URL_HOST) ?: $redirectUri;
     }
 
     private function configurePolicies(): void
@@ -564,9 +605,11 @@ final class AppServiceProvider extends ServiceProvider
             'email_access_request' => EmailAccessRequest::class,
             'meeting' => Meeting::class,
             'custom_field' => CustomField::class,
+            'custom_field_option' => CustomFieldOption::class,
             'blog_post' => Post::class,
             'blog_category' => Category::class,
             'workspace_invitation' => WorkspaceInvitation::class,
+            'import' => Import::class,
         ]);
 
         // Use custom models for custom-fields package
@@ -632,6 +675,8 @@ final class AppServiceProvider extends ServiceProvider
      */
     private function configureFilament(): void
     {
+        ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
+
         $slideOverActions = ['create', 'edit', 'view'];
 
         Action::configureUsing(function (Action $action) use ($slideOverActions): Action {
@@ -689,7 +734,7 @@ final class AppServiceProvider extends ServiceProvider
 
     private function configureCommunityCounts(): void
     {
-        Facades\View::composer(['components.layout.community-links', 'home.partials.hero'], function (View $view): void {
+        Facades\View::composer(['components.layout.community-links', 'home.partials.hero', 'press'], function (View $view): void {
             $gitHubService = resolve(GitHubService::class);
             $starsCount = $gitHubService->getStarsCount();
             $formattedStarsCount = $gitHubService->getFormattedStarsCount();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
@@ -18,6 +19,7 @@ use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\ResolvesRecordNames;
 use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
@@ -26,6 +28,7 @@ abstract class BaseWriteUpdateTool implements Tool
 {
     use GuardsRecordNames;
     use LimitsPlanSteps;
+    use RequiresWorkspaceCapability;
     use ResolvesRecordNames;
     use ValidatesOwnedForeignKeys;
     use WithConversationContext;
@@ -99,6 +102,12 @@ abstract class BaseWriteUpdateTool implements Tool
     {
         /** @var User $user */
         $user = auth()->user();
+
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::RecordsUpdate);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
+        }
 
         $planLimitError = $this->planStepLimitError();
 

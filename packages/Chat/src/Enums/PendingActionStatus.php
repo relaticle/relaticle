@@ -35,4 +35,15 @@ enum PendingActionStatus: string implements HasColor, HasLabel
             self::Superseded => 'Superseded',
         };
     }
+
+    public function promptWord(): string
+    {
+        return match ($this) {
+            self::Pending => 'PENDING',
+            self::Approved => 'APPROVED (written)',
+            self::Rejected => 'REJECTED (nothing was written)',
+            self::Expired => 'EXPIRED (nothing was written)',
+            self::Superseded => 'SUPERSEDED (nothing was written)',
+        };
+    }
 }

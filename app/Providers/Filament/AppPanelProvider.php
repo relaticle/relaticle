@@ -10,6 +10,7 @@ use App\ActivityLog\MeetingEventPalette;
 use App\ActivityLog\MeetingEventRenderer;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
+use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Features\SupportMenu;
@@ -66,6 +67,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
@@ -85,7 +87,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -280,6 +281,8 @@ final class AppPanelProvider extends PanelProvider
             )
             ->colors([
                 'primary' => BrandColors::primary(),
+                'purple' => Color::Purple,
+                'indigo' => Color::Indigo,
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
@@ -368,7 +371,12 @@ final class AppPanelProvider extends PanelProvider
             )
             ->plugins([
                 CustomFieldsPlugin::make()
-                    ->authorize(fn () => Gate::check('update', Filament::getTenant()))
+                    ->authorize(function (): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::FieldsManage);
+                    })
                     ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
                 ActivityLogPlugin::make()

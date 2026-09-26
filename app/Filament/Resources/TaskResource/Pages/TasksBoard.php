@@ -210,7 +210,7 @@ final class TasksBoard extends BoardResourcePage
 
         abort_unless(Gate::allows('update', $card), 403);
 
-        // Calculate new position using DecimalPosition (via v3 trait helper)
+        // Calculate new position using DecimalPosition (via the v3 helper)
         $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
 
         // Use transaction for data consistency

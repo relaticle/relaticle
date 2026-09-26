@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Models\Company;
-use App\Models\Note;
-use App\Models\Opportunity;
-use App\Models\People;
 use App\Models\PersonalAccessToken;
-use App\Models\Scopes\WorkspaceScope;
-use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -26,23 +21,13 @@ use Symfony\Component\HttpFoundation\Response;
  * Sets the workspace context for API/MCP requests using the token's workspace_id,
  * X-Workspace-Id header, or user's current workspace as fallback.
  *
- * WARNING: Not Octane-safe. This middleware uses addGlobalScope() on static
- * model state and clearBootedModels() in terminate(). Under Octane, if
- * terminate() fails to run, scopes from the previous request leak into the
- * next request, potentially exposing cross-tenant data. The auth guard state
- * (setUser/forgetUser) has the same leakage risk. Safe under FPM only.
+ * WARNING: the User `tenant` scope and the web guard user are process-wide state that
+ * terminate() resets. If terminate() were skipped under Octane, both would leak into the
+ * next request. The CRM models' WorkspaceScope reads the request-scoped CurrentWorkspace.
  */
 final readonly class SetApiWorkspaceContext
 {
-    /** @var list<class-string<Model>> */
-    private const array SCOPED_MODELS = [
-        User::class,
-        Company::class,
-        People::class,
-        Opportunity::class,
-        Task::class,
-        Note::class,
-    ];
+    private const string USER_SCOPE = 'tenant';
 
     public function handle(Request $request, Closure $next): Response
     {
@@ -74,13 +59,14 @@ final readonly class SetApiWorkspaceContext
 
         TenantContextService::setTenantId($workspace->getKey());
 
-        // Override to web guard because Filament policies, observers, and the WorkspaceScope
-        // global scope all check auth('web')->user(). Without this, API requests through
-        // Sanctum would not be recognized by the existing authorization layer.
+        // Override to web guard because Filament policies and observers check
+        // auth('web')->user(). Without this, API requests through Sanctum would not be
+        // recognized by the existing authorization layer.
         auth()->guard('web')->setUser($user);
         auth()->shouldUse('web');
 
-        $this->applyTenantScopes($workspace);
+        User::addGlobalScope(self::USER_SCOPE, fn (Builder $query): Builder => $query->memberOf($workspace));
+        resolve(CurrentWorkspace::class)->set($workspace);
 
         return $next($request);
     }
@@ -89,9 +75,11 @@ final readonly class SetApiWorkspaceContext
     {
         auth()->guard('web')->forgetUser();
         TenantContextService::setTenantId(null);
-        foreach (self::SCOPED_MODELS as $model) {
-            $model::clearBootedModels();
-        }
+        resolve(CurrentWorkspace::class)->forget();
+
+        $scopes = Model::getAllGlobalScopes();
+        unset($scopes[User::class][self::USER_SCOPE]);
+        Model::setAllGlobalScopes($scopes);
     }
 
     private function resolveWorkspace(Request $request, User $user): ?Workspace
@@ -125,16 +113,5 @@ final readonly class SetApiWorkspaceContext
         }
 
         return $user->currentWorkspace;
-    }
-
-    private function applyTenantScopes(Workspace $workspace): void
-    {
-        User::addGlobalScope('tenant', fn (Builder $query): Builder => $query->memberOf($workspace));
-
-        Company::addGlobalScope(new WorkspaceScope);
-        People::addGlobalScope(new WorkspaceScope);
-        Opportunity::addGlobalScope(new WorkspaceScope);
-        Task::addGlobalScope(new WorkspaceScope);
-        Note::addGlobalScope(new WorkspaceScope);
     }
 }

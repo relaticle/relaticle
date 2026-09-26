@@ -75,7 +75,7 @@ it('returns 404 when a teammate (same workspace, different user) tries to cancel
     $workspace = $owner->currentWorkspace;
 
     $teammate = User::factory()->create();
-    $workspace->users()->attach($teammate, ['role' => 'editor']);
+    $workspace->users()->attach($teammate, ['role' => 'member']);
     $teammate->switchWorkspace($workspace);
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [

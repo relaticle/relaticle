@@ -19,6 +19,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Relaticle\Chat\Support\TurnPresence;
 
@@ -305,6 +306,7 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
+    #[Renderless]
     public function latestAssistantMessage(?string $conversationId = null): ?array
     {
         $conversationId ??= $this->conversationId;
@@ -321,7 +323,7 @@ final class ChatInterface extends BaseLivewireComponent
             ->latest()
             ->orderByDesc('id')
             ->toBase()
-            ->first(['id', 'content', 'tool_results', 'meta']);
+            ->first(['id', 'content', 'steps', 'meta']);
 
         if ($row === null) {
             return null;
@@ -331,9 +333,7 @@ final class ChatInterface extends BaseLivewireComponent
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
-            'display_blocks' => DisplayBlocks::collect(
-                $row->tool_results === null ? null : (string) $row->tool_results,
-            ),
+            'display_blocks' => DisplayBlocks::collect(StoredSteps::toolResults($row->steps)),
             'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }
@@ -390,6 +390,7 @@ final class ChatInterface extends BaseLivewireComponent
      * therefore passes its own id, scoped to the authed user and workspace by
      * FindConversation.
      */
+    #[Renderless]
     public function conversationTitle(?string $conversationId = null): ?string
     {
         $conversationId ??= $this->conversationId;

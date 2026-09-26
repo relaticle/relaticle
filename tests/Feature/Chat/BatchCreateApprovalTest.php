@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
+use App\Enums\CreationSource;
 use App\Features\OnboardSeed;
 use App\Models\Task;
 use App\Models\User;
@@ -467,4 +468,12 @@ it('gives the user a full day to decide a proposal', function (): void {
     );
 
     expect($action->expires_at->format('Y-m-d H:i:s'))->toBe(now()->addMinutes(1440)->format('Y-m-d H:i:s'));
+});
+
+it('records tasks created by approved proposals as created through chat', function (): void {
+    resolve(PendingActionService::class)->approve(makeSingleProposal($this->convId, $this->user, 'Single From Chat'), $this->user);
+    resolve(PendingActionService::class)->approveItem(makeBatchProposal($this->convId, $this->user, [['title' => 'Batch From Chat']]), $this->user, 0);
+
+    expect(Task::query()->where('title', 'Single From Chat')->sole()->creation_source)->toBe(CreationSource::CHAT)
+        ->and(Task::query()->where('title', 'Batch From Chat')->sole()->creation_source)->toBe(CreationSource::CHAT);
 });

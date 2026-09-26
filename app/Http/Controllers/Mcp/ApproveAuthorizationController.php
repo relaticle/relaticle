@@ -49,6 +49,10 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
 
         $request->session()->put('mcp.oauth.workspace_id', $workspace->getKey());
 
-        return parent::approve($request, $psrResponse);
+        try {
+            return parent::approve($request, $psrResponse);
+        } finally {
+            $request->session()->forget('mcp.oauth.workspace_id');
+        }
     }
 }

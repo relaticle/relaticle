@@ -151,6 +151,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'update_note' => __('Preparing note changes…'),
             'delete_note' => __('Preparing note deletion…'),
             'invite_workspace_member' => __('Preparing a workspace invitation…'),
+            'remove_sample_data' => __('Preparing sample data removal…'),
             'create_custom_field' => __('Drafting a custom field…'),
             'update_custom_field' => __('Preparing custom field changes…'),
             'add_custom_field_options' => __('Preparing new field options…'),

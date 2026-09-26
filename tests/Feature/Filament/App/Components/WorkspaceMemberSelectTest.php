@@ -21,7 +21,7 @@ function workspaceMemberSelectWorkspace(): array
     $owner = User::factory()->create(['name' => 'Zoe Zimmer']);
     $workspace = Workspace::factory()->create(['user_id' => $owner->getKey()]);
     $member = User::factory()->create(['name' => 'Alice Anderson']);
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     test()->actingAs($owner);
     Filament::setTenant($workspace);

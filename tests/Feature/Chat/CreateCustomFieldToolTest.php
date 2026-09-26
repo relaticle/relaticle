@@ -120,13 +120,13 @@ it('executes the approved proposal and creates the field + options in the databa
     expect($optionNames)->toBe(['High', 'Low']);
 });
 
-it('returns error and creates no proposal when a non-owner invokes the tool', function (): void {
-    $nonOwner = User::factory()->create();
-    $nonOwner->workspaces()->attach($this->workspace, ['role' => 'editor']);
-    $nonOwner->switchWorkspace($this->workspace);
+it('refuses a member with the role error and creates no proposal', function (): void {
+    $member = User::factory()->create();
+    $member->workspaces()->attach($this->workspace, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
 
-    Auth::guard('web')->setUser($nonOwner);
-    $this->actingAs($nonOwner);
+    Auth::guard('web')->setUser($member);
+    $this->actingAs($member);
 
     $tool = makeCreateFieldTool($this->convId);
     $result = $tool->handle(new Request([
@@ -138,8 +138,36 @@ it('returns error and creates no proposal when a non-owner invokes the tool', fu
 
     $decoded = json_decode($result, true);
 
-    expect($decoded)->toHaveKey('error')
+    expect($decoded['error'])->toContain('workspace role does not allow that')
+        ->and($decoded['error'])->toContain('Do not link to any page')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('lets an admin propose a field that lands on approval', function (): void {
+    $admin = User::factory()->create();
+    $admin->workspaces()->attach($this->workspace, ['role' => 'admin']);
+    $admin->switchWorkspace($this->workspace);
+
+    Auth::guard('web')->setUser($admin);
+    $this->actingAs($admin);
+
+    $result = makeCreateFieldTool($this->convId)->handle(new Request([
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'type' => 'text',
+    ]));
+
+    expect(json_decode($result, true)['type'])->toBe('pending_action');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $admin);
+
+    expect(CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('name', 'Region')
+        ->exists())->toBeTrue();
 });
 
 it('returns error for a non-allowlisted field type', function (): void {

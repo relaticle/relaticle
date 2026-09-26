@@ -105,7 +105,7 @@ it('completes invite for a pending invitation', function (): void {
     WorkspaceInvitation::query()->create([
         'workspace_id' => $this->workspace->getKey(),
         'email' => 'teammate@example.com',
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
     ]);
 
     expect(stepByKey($this->workspace, 'invite')->complete())->toBeTrue();
@@ -129,8 +129,7 @@ it('completes ask_rela only when a user-role message exists, not for an assistan
         'participant_id' => (string) $this->owner->getKey(),
         'agent' => 'crm',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),

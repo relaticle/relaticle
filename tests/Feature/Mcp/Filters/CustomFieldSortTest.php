@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Mcp\Filters\CustomFieldSort;
 use App\Models\CustomField;
 use App\Models\Opportunity;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -15,11 +15,7 @@ beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
     $this->actingAs($this->user);
-    Opportunity::addGlobalScope(new WorkspaceScope);
-});
-
-afterEach(function (): void {
-    Opportunity::clearBootedModels();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
 });
 
 it('sorts opportunities by custom field value ascending', function (): void {

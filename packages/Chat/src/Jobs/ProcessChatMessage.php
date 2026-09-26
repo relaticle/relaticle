@@ -52,6 +52,7 @@ use Relaticle\Chat\Support\ChatTelemetry;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
+use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Relaticle\Chat\Support\TurnPresence;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -214,7 +215,8 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
-                'role' => $this->user->ownsWorkspace($this->workspace) ? 'owner' : 'member',
+                'role' => $this->user->workspaceRoleLabel($this->workspace->getKey()) ?? '',
+                'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
@@ -322,12 +324,11 @@ final class ProcessChatMessage implements ShouldQueue
             }
 
             $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
-                // promptTokens is the UNCACHED remainder only, so it understates the
-                // real prompt on a cached turn. Record the cache legs next to it;
-                // credits are still priced on model + tool calls, not tokens.
+                // input_tokens stays the UNCACHED remainder, with the cache legs next
+                // to it; credits are still priced on model + tool calls, not tokens.
                 ChatTelemetry::breadcrumb('stream.completed', [
-                    'input_tokens' => $streamedResponse->usage->promptTokens,
-                    'output_tokens' => $streamedResponse->usage->completionTokens,
+                    'input_tokens' => $streamedResponse->usage->uncachedInputTokens(),
+                    'output_tokens' => $streamedResponse->usage->outputTokens,
                     'cache_read_tokens' => $streamedResponse->usage->cacheReadInputTokens,
                     'cache_write_tokens' => $streamedResponse->usage->cacheWriteInputTokens,
                 ]);
@@ -341,17 +342,17 @@ final class ProcessChatMessage implements ShouldQueue
                     workspace: $this->workspace,
                     user: $this->user,
                     type: AiCreditType::Chat,
-                    model: $streamedResponse->meta->model ?? 'unknown',
-                    inputTokens: $streamedResponse->usage->promptTokens,
-                    outputTokens: $streamedResponse->usage->completionTokens,
+                    model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
+                    inputTokens: $streamedResponse->usage->uncachedInputTokens(),
+                    outputTokens: $streamedResponse->usage->outputTokens,
                     toolCallsCount: $streamedResponse->toolCalls->count(),
                     conversationId: $streamedResponse->conversationId,
                     resolutionKey: $this->resolutionKey(),
                 );
 
-                $this->persistMentions();
-                $this->persistUserDocument();
-                $this->persistUserAttachment();
+                $this->persistMentions($streamedResponse->userMessageId);
+                $this->persistUserDocument($streamedResponse->userMessageId);
+                $this->persistUserAttachment($streamedResponse->userMessageId);
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
                 $this->suggestNextSteps($streamedResponse);
@@ -653,8 +654,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'role' => 'user',
                 'content' => $content,
                 'attachments' => '[]',
-                'tool_calls' => '[]',
-                'tool_results' => '[]',
+                'steps' => '[]',
                 'usage' => '[]',
                 'meta' => json_encode($this->failedTurnUserMeta(), JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
@@ -676,8 +676,7 @@ final class ProcessChatMessage implements ShouldQueue
             'role' => 'assistant',
             'content' => $text,
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
+            'steps' => StoredSteps::text($text),
             'usage' => '[]',
             'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
             'document' => json_encode($document, JSON_THROW_ON_ERROR),
@@ -758,25 +757,11 @@ final class ProcessChatMessage implements ShouldQueue
         return $ledger;
     }
 
-    private function latestMessageId(string $role): ?string
-    {
-        $id = DB::table('agent_conversation_messages')
-            ->where('conversation_id', $this->conversationId)
-            ->where('role', $role)
-            ->latest()
-            ->orderByDesc('id')
-            ->value('id');
-
-        return is_string($id) ? $id : null;
-    }
-
-    private function persistMentions(): void
+    private function persistMentions(?string $userMessageId): void
     {
         if ($this->mentions === [] && $this->pageContext === null) {
             return;
         }
-
-        $userMessageId = $this->latestMessageId('user');
 
         if ($userMessageId === null) {
             return;
@@ -810,50 +795,46 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     /**
-     * Update the latest user message row with the editor's document JSON.
+     * Update the turn's user message row with the editor's document JSON.
      *
      * Runs in the post-stream `then()` callback after the agent's ConversationStore
      * has inserted the user message row. If this UPDATE fails (DB blip), the row
      * keeps its column DEFAULT of `{"type":"doc","content":[]}`. The user message
      * is still readable, just without mention-chip rendering.
      */
-    private function persistUserDocument(): void
+    private function persistUserDocument(?string $userMessageId): void
     {
-        $latestId = $this->latestMessageId('user');
-
-        if ($latestId === null) {
+        if ($userMessageId === null) {
             return;
         }
 
         DB::table('agent_conversation_messages')
-            ->where('id', $latestId)
+            ->where('id', $userMessageId)
             ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
     }
 
-    private function persistUserAttachment(): void
+    private function persistUserAttachment(?string $userMessageId): void
     {
         if ($this->attachment === null) {
             return;
         }
 
-        $latestId = $this->latestMessageId('user');
-
-        if ($latestId === null) {
+        if ($userMessageId === null) {
             return;
         }
 
-        $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $userMessageId)->value('meta'), associative: true);
         $meta = is_array($existing) ? $existing : [];
         $meta['attachment'] = $this->attachment;
 
         DB::table('agent_conversation_messages')
-            ->where('id', $latestId)
+            ->where('id', $userMessageId)
             ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
     }
 
     /**
      * Materialize the assistant's response as a TipTap document on the
-     * latest assistant message row. Runs after the agent's ConversationStore
+     * turn's assistant message row. Runs after the agent's ConversationStore
      * has persisted the assistant message with its plain text `content`.
      *
      * v1 emits no mention chips in assistant prose. Future work can extract
@@ -872,18 +853,18 @@ final class ProcessChatMessage implements ShouldQueue
 
         $document = $this->getParser()->buildFromText($assistantContent, [], $this->workspace);
 
-        $latestId = $this->latestMessageId('assistant');
+        $assistantMessageId = $streamedResponse->assistantMessageId;
 
-        if ($latestId === null) {
+        if ($assistantMessageId === null) {
             return;
         }
 
-        $existingMeta = json_decode((string) DB::table('agent_conversation_messages')->where('id', $latestId)->value('meta'), associative: true);
+        $existingMeta = json_decode((string) DB::table('agent_conversation_messages')->where('id', $assistantMessageId)->value('meta'), associative: true);
         $meta = is_array($existingMeta) ? $existingMeta : [];
         $meta['duration_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
 
         DB::table('agent_conversation_messages')
-            ->where('id', $latestId)
+            ->where('id', $assistantMessageId)
             ->update([
                 'content' => $assistantContent,
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
@@ -965,7 +946,7 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
-        $messageId = $this->latestMessageId('assistant');
+        $messageId = $streamedResponse->assistantMessageId;
 
         if ($messageId === null) {
             return;
@@ -1013,6 +994,11 @@ final class ProcessChatMessage implements ShouldQueue
 
     private function bindAuth(): void
     {
+        // In memory only: the user may have switched workspace since dispatch, and the
+        // tools scope every query through currentWorkspace. Mirrors SetApiWorkspaceContext.
+        $this->user->forceFill(['current_workspace_id' => $this->workspace->getKey()]);
+        $this->user->setRelation('currentWorkspace', $this->workspace);
+
         Auth::guard('web')->setUser($this->user);
 
         // The job runs with no Filament panel request, so the custom-fields

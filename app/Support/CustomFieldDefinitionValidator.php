@@ -10,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use Closure;
 use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -76,13 +77,44 @@ final readonly class CustomFieldDefinitionValidator
      *
      * @throws ValidationException
      */
-    public static function forRename(User $user, CustomField $field, array $data): array
+    public static function forUpdate(User $user, CustomField $field, array $data): array
     {
+        $data = self::normalize($data);
         $entityType = (string) $field->entity_type;
+        $settings = $data['settings'] ?? [];
 
-        return Validator::make(self::normalize($data), [
+        if ($field->isSystemDefined() && (array_key_exists('name', $data) || ($data['active'] ?? null) === false)) {
+            throw ValidationException::withMessages([
+                'name' => 'System-defined fields keep their name and cannot be deactivated. Their settings can change, and an inactive one can be reactivated.',
+            ]);
+        }
+
+        if (! is_array($settings)) {
+            throw ValidationException::withMessages(['settings' => 'Pass `settings` as an object of setting names to values.']);
+        }
+
+        if (! array_key_exists('name', $data) && ! array_key_exists('active', $data) && $settings === []) {
+            throw ValidationException::withMessages(['name' => 'Provide at least one of: name, active, settings.']);
+        }
+
+        $settingRules = CustomFieldSettingsSchema::rules($field, $settings);
+        $prefixedSettingRules = Arr::prependKeysWith($settingRules, 'settings.');
+        $unsupported = array_diff(array_keys($settings), array_keys($settingRules));
+
+        if ($unsupported !== []) {
+            throw ValidationException::withMessages([
+                'settings' => sprintf(
+                    'This %s field cannot change: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, list_toggleable_hidden needs visible_in_list set to true, and searchable is unavailable on encrypted fields.',
+                    $field->type,
+                    implode(', ', $unsupported),
+                    implode(', ', array_keys($settingRules)),
+                ),
+            ]);
+        }
+
+        $validated = Validator::make($data, [
             'name' => [
-                'required_without:active', 'string', 'max:50',
+                'sometimes', 'string', 'max:50',
                 self::uniqueNameIgnoringCase(
                     $user->currentWorkspace->getKey(),
                     $entityType,
@@ -90,13 +122,22 @@ final readonly class CustomFieldDefinitionValidator
                     $field->getKey(),
                 ),
             ],
-            // Only `name` carries required_without: with the rule on both, an empty
-            // payload failed twice and the assistant was handed the same sentence twice.
-            'active' => ['nullable', 'boolean'],
+            'active' => ['sometimes', 'boolean'],
+            'settings' => ['sometimes', 'array'],
+            ...$prefixedSettingRules,
         ], [
-            'name.required_without' => 'Provide at least one of: name, active.',
             'name.max' => 'Field names must be 50 characters or fewer.',
-        ])->validate();
+            ...CustomFieldSettingsSchema::messages(),
+        ], array_combine(array_keys($prefixedSettingRules), array_keys($settingRules)))->validate();
+
+        if (isset($validated['settings'])) {
+            $validated['settings'] = CustomFieldSettingsSchema::withImpliedChanges(
+                $field,
+                CustomFieldSettingsSchema::cast($validated['settings'], $settingRules),
+            );
+        }
+
+        return $validated;
     }
 
     /**

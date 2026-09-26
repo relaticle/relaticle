@@ -163,7 +163,7 @@ it('keeps the upper-bound caveat alongside the unpriced list in a mixed month', 
 
     livewire(AiSpendStatsWidget::class)
         ->assertSee('$21.00')
-        ->assertSee('Upper bound')
+        ->assertSee('Lower bound')
         ->assertSee('Unpriced models: gpt-5.5');
 });
 

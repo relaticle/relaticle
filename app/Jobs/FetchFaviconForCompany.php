@@ -8,11 +8,13 @@ use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Support\Http\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
+use finfo;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -70,27 +72,22 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 return;
             }
 
-            $path = parse_url($url, PHP_URL_PATH);
-            $extension = $path ? pathinfo($path, PATHINFO_EXTENSION) : '';
-
-            $filename = match ($extension) {
-                'svg' => 'logo.svg',
-                'webp' => 'logo.webp',
-                'jpg', 'jpeg' => 'logo.jpg',
-                default => 'logo.png',
-            };
-
-            $response = SsrfGuard::guardedHttpClient()
-                ->timeout(15)
-                ->get($url);
+            $response = SsrfGuard::guard(Http::timeout(15))->get($url);
 
             if (! $response->successful()) {
                 return;
             }
 
+            $body = $response->body();
+            $extension = Company::LOGO_MIME_TYPES[new finfo(FILEINFO_MIME_TYPE)->buffer($body)] ?? null;
+
+            if ($extension === null) {
+                return;
+            }
+
             $logo = $this->company
-                ->addMediaFromString($response->body())
-                ->usingFileName($filename)
+                ->addMediaFromString($body)
+                ->usingFileName("logo.{$extension}")
                 ->usingName('company_logo')
                 ->withCustomProperties([
                     'domain' => $domainName,
