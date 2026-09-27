@@ -16,7 +16,10 @@ final class NativeFormField
         return match ($code) {
             'name' => TextInput::make('name')
                 ->required()
-                ->maxLength(255),
+                ->maxLength(255)
+                ->extraInputAttributes([
+                    'x-on:keydown.enter.prevent' => 'Alpine.$data($event.target.closest(\'.fi-inline-field-editor\')).saveFromEnter()',
+                ]),
             'account_owner_id' => WorkspaceMemberSelect::make('account_owner_id')
                 ->relationship('accountOwner', 'name')
                 ->label(__('filament/resources/company.fields.account_owner_id.label'))

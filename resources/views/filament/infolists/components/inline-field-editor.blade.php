@@ -17,6 +17,7 @@
         pendingSwitch: null,
         blockingSwitch: false,
         lastDraftToastAt: 0,
+        holdUntil: 0,
         selectWasOpen: false,
         selectInitialValue: '',
         overlaySelector: '[role=listbox], [role=dialog], [role=option], [role=combobox], .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, hex-color-picker, [id*=country-listbox]',
@@ -94,10 +95,11 @@
             const nodes = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
             return nodes.some((node) => this.isPhoneCountryUi(node));
         },
+        holdOpen(ms) {
+            this.holdUntil = Date.now() + ms;
+        },
         holdPhoneCountry() {
-            $el.dataset.inlineOpening = 'true';
-            clearTimeout(this._phoneHoldTimer);
-            this._phoneHoldTimer = setTimeout(() => { delete $el.dataset.inlineOpening }, 500);
+            this.holdOpen(500);
         },
         isOverlay(node) {
             return Boolean(node?.closest?.(this.overlaySelector)) || this.isPhoneCountryUi(node) || this.isColorPickerUi(node);
@@ -201,7 +203,7 @@
         },
         shouldHold() {
             return this.committing
-                || $el.dataset.inlineOpening === 'true'
+                || Date.now() < this.holdUntil
                 || this.isPhoneCountryOpen()
                 || this.isColorPickerOpen();
         },
@@ -300,7 +302,7 @@
             new FilamentNotification().title(message).danger().send();
         },
         saveFromEnter() {
-            if (this.isPhoneCountryOpen()) {
+            if (this.committing || this.isPhoneCountryOpen()) {
                 return;
             }
             const active = document.activeElement;
@@ -314,10 +316,13 @@
                     return;
                 }
             }
-            this.save(true);
+            this.save(true, true);
         },
-        save(dismiss = false) {
-            if (this.shouldHold()) {
+        save(dismiss = false, fromEnter = false) {
+            if (this.committing) {
+                return;
+            }
+            if (! fromEnter && this.shouldHold()) {
                 return;
             }
             if (this.commitDrafts() === false) {
@@ -326,6 +331,10 @@
                 }
                 return;
             }
+            $el.querySelectorAll('input:not([type=hidden]), textarea').forEach((input) => {
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            });
             this.committing = true;
             Promise.resolve($wire.saveInlineField())
                 .catch(() => {})
@@ -478,9 +487,8 @@
                             }
                             return;
                         }
-                        $el.dataset.inlineOpening = 'true';
+                        holdOpen(300);
                         data.openPanel();
-                        setTimeout(() => { delete $el.dataset.inlineOpening }, 300);
                         return;
                     }
                 }
@@ -533,8 +541,7 @@
                 }
             };
 
-            $el.dataset.inlineOpening = 'true';
-            setTimeout(() => { delete $el.dataset.inlineOpening }, 400);
+            holdOpen(400);
             $nextTick(() => activate());
         "
     @endif
