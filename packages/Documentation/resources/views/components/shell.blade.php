@@ -126,6 +126,8 @@
             </a>
 
             <div class="ml-auto flex items-center gap-2">
+                <x-layout.community-links class="hidden sm:flex"/>
+
                 <button type="button"
                         x-on:click="openSearch()"
                         x-on:mouseenter="warm()"

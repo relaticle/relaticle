@@ -157,7 +157,7 @@ it('previews a stored logo from the requesting host so the panel subdomain can f
 
 it('refuses a logo change from a member who does not own the workspace', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     $this->actingAs($member);
 

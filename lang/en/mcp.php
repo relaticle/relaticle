@@ -6,6 +6,7 @@ return [
     'consent' => [
         'title' => 'Authorize :client',
         'intro' => ':client is asking to connect to your Relaticle workspace.',
+        'redirect' => 'After you authorize, you go back to :host. Continue only if you trust that site.',
         'signed_in_as' => 'Signed in as',
 
         'workspace' => [

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
+use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
 use Illuminate\Contracts\View\View;
 use Relaticle\ActivityLog\Contracts\TimelineRenderer;
 use Relaticle\ActivityLog\Support\ActivityLogSummary;
@@ -22,11 +24,28 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
     {
         $summary = ActivityLogSummary::from($entry);
 
+        $importFile = $entry->properties['import_file'] ?? null;
+
         return view('activity-log.merged-activity', [
             'entry' => $entry,
             'summary' => $summary,
             'rows' => $this->rows($entry, $summary),
+            'importFile' => is_string($importFile) ? $importFile : null,
+            'viaSource' => $this->viaSource(Activity::sourceFrom($entry->properties)),
         ]);
+    }
+
+    private function viaSource(?CreationSource $source): ?string
+    {
+        if (! $source instanceof CreationSource) {
+            return null;
+        }
+
+        if (in_array($source, [CreationSource::WEB, CreationSource::IMPORT], true)) {
+            return null;
+        }
+
+        return __('workspaces.activity.via_source', ['source' => $source->getLabel()]);
     }
 
     /**

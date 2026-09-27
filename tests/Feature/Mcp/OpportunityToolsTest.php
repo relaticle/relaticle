@@ -11,17 +11,13 @@ use App\Mcp\Tools\Opportunity\UpdateOpportunityTool;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function () {
-    Opportunity::clearBootedModels();
 });
 
 it('can get an opportunity by ID', function (): void {
@@ -78,7 +74,7 @@ it('can filter opportunities by contact_id', function (): void {
 
 describe('workspace scoping', function () {
     beforeEach(function () {
-        Opportunity::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes opportunities to current workspace', function (): void {

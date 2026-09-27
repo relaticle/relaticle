@@ -10,6 +10,7 @@ use App\Data\DigestWorkspaceSection;
 use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\NotificationPreferences;
 use App\Filament\Resources\TaskResource;
+use App\Mail\Concerns\ParksBouncedRecipients;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,7 +23,7 @@ use Illuminate\Support\Facades\URL;
 
 final class TaskDigestMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use ParksBouncedRecipients, Queueable, SerializesModels;
 
     public function __construct(
         public User $user,

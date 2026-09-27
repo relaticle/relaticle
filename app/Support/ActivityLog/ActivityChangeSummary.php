@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\ActivityLog;
 
 use App\Models\ActivityLog\Activity;
+use App\Support\CustomFieldSettingsSchema;
 use Illuminate\Support\Str;
 
 /**
@@ -45,6 +46,12 @@ final readonly class ActivityChangeSummary
         $rows = [];
 
         foreach ($new as $key => $value) {
+            if ($key === 'settings' && is_array($value)) {
+                array_push($rows, ...self::settingsChanges(is_array($old[$key] ?? null) ? $old[$key] : [], $value));
+
+                continue;
+            }
+
             $before = ActivityValue::display($old[$key] ?? null);
             $after = ActivityValue::display($value);
 
@@ -56,6 +63,40 @@ final readonly class ActivityChangeSummary
                 'label' => Str::headline((string) $key),
                 'old' => $before,
                 'new' => $after,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @param  array<string, mixed>  $old
+     * @param  array<string, mixed>  $new
+     * @return list<array{label: string, old: string, new: string}>
+     */
+    private static function settingsChanges(array $old, array $new): array
+    {
+        $flatten = fn (array $settings): array => [
+            ...array_filter($settings, fn (mixed $value, string $key): bool => $key !== 'additional' && ! is_array($value), ARRAY_FILTER_USE_BOTH),
+            ...(is_array($settings['additional'] ?? null) ? $settings['additional'] : []),
+        ];
+
+        $before = $flatten($old);
+        $after = $flatten($new);
+        $rows = [];
+
+        foreach ($after as $key => $value) {
+            $oldDisplay = CustomFieldSettingsSchema::displayValue((string) $key, $before[$key] ?? null);
+            $newDisplay = CustomFieldSettingsSchema::displayValue((string) $key, $value);
+
+            if ($oldDisplay === $newDisplay) {
+                continue;
+            }
+
+            $rows[] = [
+                'label' => CustomFieldSettingsSchema::label((string) $key),
+                'old' => $oldDisplay,
+                'new' => $newDisplay,
             ];
         }
 

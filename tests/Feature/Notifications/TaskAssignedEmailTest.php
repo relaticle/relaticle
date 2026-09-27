@@ -20,7 +20,7 @@ beforeEach(function (): void {
 it('emails a newly assigned user when their email channel is on', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'member']);
     $assignee->update(['notification_preferences' => ['task_assigned' => ['email' => true]]]);
 
     $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'Follow up']);
@@ -35,7 +35,7 @@ it('emails a newly assigned user when their email channel is on', function (): v
 it('does not email when the email channel is off (default)', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'member']);
 
     $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'Follow up']);
     $task->assignees()->attach($assignee);
@@ -49,7 +49,7 @@ it('does not email when the email channel is off (default)', function (): void {
 it('skips the in-app notification when the in-app channel is off', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $assignee = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'editor']);
+    $owner->currentWorkspace->users()->attach($assignee, ['role' => 'member']);
     $assignee->update(['notification_preferences' => ['task_assigned' => ['in_app' => false]]]);
 
     $task = Task::factory()->for($owner->currentWorkspace)->create(['title' => 'X']);

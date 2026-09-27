@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Filament\Pages\Billing;
+use App\Mail\Concerns\ParksBouncedRecipients;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Bus\Queueable;
@@ -16,7 +17,7 @@ use Illuminate\Queue\SerializesModels;
 
 final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use ParksBouncedRecipients, Queueable, SerializesModels;
 
     public function __construct(
         public Workspace $workspace,

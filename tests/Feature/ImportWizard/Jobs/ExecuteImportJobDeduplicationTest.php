@@ -17,6 +17,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -35,7 +36,7 @@ beforeEach(function (): void {
 });
 
 afterEach(function (): void {
-    if (isset($this->import)) {
+    if (property_exists($this, 'import') && $this->import !== null) {
         ImportStore::load($this->import->id)?->destroy();
         $this->import->delete();
     }
@@ -59,7 +60,7 @@ it('deduplicates Create rows with same matchable email value', function (): void
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['Lay', 'Ray'])->get();
+    $people = People::query()->where('workspace_id', $this->workspace->id)->whereIn('name', ['Lay', 'Ray'])->get();
     expect($people)->toHaveCount(1)
         ->and($people->first()->name)->toBe('Ray');
 
@@ -82,7 +83,7 @@ it('does not dedup Create rows with different matchable values', function (): vo
     expect($import->created_rows)->toBe(2)
         ->and($import->updated_rows)->toBe(0);
 
-    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['Alice', 'Bob'])->get();
+    $people = People::query()->where('workspace_id', $this->workspace->id)->whereIn('name', ['Alice', 'Bob'])->get();
     expect($people)->toHaveCount(2);
 });
 
@@ -102,7 +103,7 @@ it('deduplicates Create rows with multi-value matchable field', function (): voi
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $people = People::where('workspace_id', $this->workspace->id)->whereIn('name', ['First', 'Second'])->get();
+    $people = People::query()->where('workspace_id', $this->workspace->id)->whereIn('name', ['First', 'Second'])->get();
     expect($people)->toHaveCount(1)
         ->and($people->first()->name)->toBe('Second');
 });
@@ -123,10 +124,60 @@ it('deduplicates company Create rows by domain', function (): void {
         ->and($import->updated_rows)->toBe(1)
         ->and($import->failed_rows)->toBe(0);
 
-    $companies = Company::where('workspace_id', $this->workspace->id)->whereIn('name', ['Acme Inc', 'Acme Corp'])->get();
+    $companies = Company::query()->where('workspace_id', $this->workspace->id)->whereIn('name', ['Acme Inc', 'Acme Corp'])->get();
     expect($companies)->toHaveCount(1)
         ->and($companies->first()->name)->toBe('Acme Corp');
 });
+
+it('updates the live record when a deleted record shares its import identity', function (ImportEntityType $entityType, string $fieldCode, string $value, bool $deletedFirst): void {
+    $modelClass = $entityType->importer((string) $this->workspace->id)->modelClass();
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', $entityType->value)
+        ->where('code', $fieldCode)
+        ->firstOrFail();
+
+    $records = $modelClass::factory()->count(2)->create(['workspace_id' => $this->workspace->id]);
+
+    foreach ($records as $record) {
+        CustomFieldValue::factory()->withJsonValue([$value])->create([
+            'custom_field_id' => $field->id,
+            'entity_type' => $entityType->value,
+            'entity_id' => $record->id,
+            'tenant_id' => $this->workspace->id,
+        ]);
+    }
+
+    $deleted = $records[$deletedFirst ? 0 : 1];
+    $live = $records[$deletedFirst ? 1 : 0];
+    $deleted->delete();
+
+    ImportExecutionFixture::readyStore($this, ['Name', 'Identity'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Updated import record', 'Identity' => $value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Identity', target: "custom_fields_{$fieldCode}"),
+    ], $entityType);
+
+    new ResolveMatchesJob($this->import->id)->handle();
+
+    $row = $this->store->query()->firstOrFail();
+    expect($row->match_action)->toBe(RowMatchAction::Update)
+        ->and($row->matched_id)->toBe((string) $live->id);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->created_rows->toBe(0)
+        ->updated_rows->toBe(1)
+        ->failed_rows->toBe(0)
+        ->and($live->fresh()->name)->toBe('Updated import record')
+        ->and($modelClass::query()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
+})->with([
+    'contact email' => [ImportEntityType::People, 'emails', 'maya@northline.example'],
+    'contact phone' => [ImportEntityType::People, 'phone_number', '+14155550127'],
+    'company domain' => [ImportEntityType::Company, 'domains', 'northline.example'],
+])->with(['deleted first' => true, 'deleted last' => false]);
 
 // --- Multi-Choice Merge Tests ---
 
@@ -193,7 +244,7 @@ it('merges multi-choice custom field values during dedup', function (): void {
     expect($import->created_rows)->toBe(1)
         ->and($import->updated_rows)->toBe(1);
 
-    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'Dedup B')->first();
+    $person = People::query()->where('workspace_id', $this->workspace->id)->where('name', 'Dedup B')->first();
     expect($person)->not->toBeNull();
 
     $cfv = ImportExecutionFixture::customFieldValue($this, (string) $person->id, (string) $emailField->id);
@@ -255,7 +306,7 @@ it('populates matching custom field when auto-creating person via email MatchOrC
 
     ImportExecutionFixture::run($this);
 
-    $person = People::where('workspace_id', $this->workspace->id)->where('name', 'john@example.com')->first();
+    $person = People::query()->where('workspace_id', $this->workspace->id)->where('name', 'john@example.com')->first();
     expect($person)->not->toBeNull();
 
     $emailField = CustomField::query()
@@ -290,7 +341,7 @@ it('populates matching custom field when auto-creating company via domain MatchO
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'example.com')->first();
+    $company = Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'example.com')->first();
     expect($company)->not->toBeNull();
 
     $domainField = CustomField::query()
@@ -327,7 +378,7 @@ it('does not populate custom field when auto-creating via name matcher', functio
 
     ImportExecutionFixture::run($this);
 
-    $company = Company::where('workspace_id', $this->workspace->id)->where('name', 'New Corp')->first();
+    $company = Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'New Corp')->first();
     expect($company)->not->toBeNull();
 
     $cfCountAfter = DB::table(config('custom-fields.database.table_names.custom_field_values'))->count();
@@ -355,7 +406,7 @@ it('deduplicates auto-created records while still populating matching custom fie
 
     ImportExecutionFixture::run($this);
 
-    $people = People::where('workspace_id', $this->workspace->id)->where('name', 'jane@example.com')->get();
+    $people = People::query()->where('workspace_id', $this->workspace->id)->where('name', 'jane@example.com')->get();
     expect($people)->toHaveCount(1);
 
     $emailField = CustomField::query()
@@ -382,7 +433,7 @@ it('does not auto-create record for custom field entity link', function (): void
         $this->markTestSkipped('No record-type custom field configured for people');
     }
 
-    $companyCountBefore = Company::where('workspace_id', $this->workspace->id)->count();
+    $companyCountBefore = Company::query()->where('workspace_id', $this->workspace->id)->count();
 
     $relationships = json_encode([
         ['relationship' => "cf_{$recordCf->code}", 'action' => 'create', 'id' => null, 'name' => 'Nonexistent Corp', 'behavior' => MatchBehavior::MatchOrCreate->value],
@@ -400,6 +451,6 @@ it('does not auto-create record for custom field entity link', function (): void
 
     ImportExecutionFixture::run($this);
 
-    $companyCountAfter = Company::where('workspace_id', $this->workspace->id)->count();
+    $companyCountAfter = Company::query()->where('workspace_id', $this->workspace->id)->count();
     expect($companyCountAfter)->toBe($companyCountBefore);
 });

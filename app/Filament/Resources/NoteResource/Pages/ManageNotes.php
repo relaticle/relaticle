@@ -7,6 +7,7 @@ namespace App\Filament\Resources\NoteResource\Pages;
 use App\Filament\Concerns\UsesRecordIndexLayout;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource;
+use App\Models\Note;
 use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -37,7 +38,7 @@ final class ManageNotes extends ManageRecords
                     ->icon('heroicon-o-arrow-up-tray')
                     ->url(ImportNotes::getUrl())
                     ->visible(ImportNotes::canAccess(...)),
-                ExportAction::make()->exporter(NoteExporter::class),
+                ExportAction::make()->exporter(NoteExporter::class)->authorize('exportAny', Note::class),
             ])
                 ->icon('heroicon-o-arrows-up-down')
                 ->color('gray')

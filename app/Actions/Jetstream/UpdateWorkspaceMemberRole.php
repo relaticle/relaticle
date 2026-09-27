@@ -30,8 +30,8 @@ final readonly class UpdateWorkspaceMemberRole
 
         abort_if($membership === null, 404);
 
-        $touchesAdminStatus = $role === WorkspaceRole::Admin->value
-            || $membership->role === WorkspaceRole::Admin->value;
+        $touchesAdminStatus = WorkspaceRole::keyIsAdmin($role)
+            || WorkspaceRole::keyIsAdmin($membership->role);
 
         if ($touchesAdminStatus) {
             Gate::forUser($user)->authorize('promoteToAdmin', $workspace);

@@ -74,18 +74,21 @@ class CanvasFitView {
         this.content = view.dom.closest('.fi-fo-rich-editor-seamless .fi-fo-rich-editor-content')
         this.fit = this.fit.bind(this)
 
-        if (! this.content) {
+        // Only a modal form has slack to fill. Outside one (the chat proposal dock) the
+        // viewport is no limit, and filling it overflows the card the editor sits in.
+        const container = this.content?.closest('.fi-modal-content')
+
+        if (! container) {
             return
         }
 
         // The modal body is `flex: 1`, so its own box already spans the panel and
         // reports no slack. The form schema inside it is sized to its content.
-        const container = this.content.closest('.fi-modal-content')
-        this.extent = container?.lastElementChild ?? container ?? this.content
+        this.extent = container.lastElementChild ?? container
 
         // The gap below the canvas is the container's own bottom padding, which sits
         // outside `extent`. Counting it is what keeps the panel from scrolling by it.
-        this.gap = container ? parseFloat(getComputedStyle(container).paddingBottom) || 0 : 0
+        this.gap = parseFloat(getComputedStyle(container).paddingBottom) || 0
 
         // The sticky footer's top is the bottom of the usable area, and it does not
         // move when the canvas grows, so it is a stable limit to measure against.

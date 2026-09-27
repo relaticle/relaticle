@@ -46,6 +46,7 @@ final readonly class ListNotes
                 CustomFieldFilter::allowedFilter('note'),
                 AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '>=', $value)),
                 AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '<=', $value)),
+                AllowedFilter::exact('creation_source', 'notes.creation_source'),
             )
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(

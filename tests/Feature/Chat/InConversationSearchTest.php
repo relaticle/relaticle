@@ -28,8 +28,7 @@ function seedSearchableMessage(User $participant, string $conversationId, string
         'content' => $content,
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -121,7 +120,7 @@ it('excludes superseded messages', function (): void {
 it('excludes approval bookkeeping messages the transcript never renders', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     seedSearchableConversation($user, 'conv-approval');
-    seedSearchableMessage($user, 'conv-approval', 'm-1', '[approval] approved the Northwind update');
+    seedSearchableMessage($user, 'conv-approval', 'm-1', '[approval] approved the Northwind update', ['origin' => 'resume']);
 
     actingAs($user);
 

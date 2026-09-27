@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\AgentConversation;
@@ -117,8 +118,7 @@ it('has the assistant speak first when the owner opens the setup conversation', 
         ->assertSet('messages', []);
 
     Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $workspace->setupConversation->id
-        && $job->message === StartSetupGreeting::PROMPT
-        && $job->isContinuation);
+        && $job->origin === MessageOrigin::Greeting);
 });
 
 it('charges the greeting turn a credit', function (): void {
@@ -164,8 +164,7 @@ it('does not greet a thread that already holds messages', function (): void {
         'role' => 'assistant',
         'content' => 'Welcome.',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '[]',
         'meta' => '[]',
         'created_at' => now(),

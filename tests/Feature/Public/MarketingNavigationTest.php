@@ -72,17 +72,23 @@ it('renders the same items in desktop and mobile navigation', function (): void 
 
     expect($html)->toContain('aria-label="'.__('Main').'"')
         ->and($html)->toContain('aria-label="'.__('Mobile menu').'"')
-        ->and(substr_count($html, route('discord')))->toBeGreaterThanOrEqual(3);
+        ->and(substr_count(extractNavRegion($html, __('Main')), route('pricing')))->toBe(1)
+        ->and(substr_count(extractNavRegion($html, __('Mobile menu')), route('pricing')))->toBe(1);
 });
 
-it('marks external header links with rel noopener', function (): void {
+it('opens the GitHub and Discord links from the header and mobile menu in a new tab', function (): void {
     $html = $this->get('/')->assertOk()->getContent();
-    $header = extractNavRegion($html, __('Main'));
+    preg_match('/<header\b.*?<\/header>/s', $html, $header);
+    preg_match_all('/<a[^>]*href="'.preg_quote(route('discord'), '/').'"[^>]*>/s', $header[0], $discordAnchors);
 
-    preg_match('/<a[^>]*href="'.preg_quote(route('discord'), '/').'"[^>]*>/s', $header, $discordAnchor);
+    expect($discordAnchors[0])->toHaveCount(2)
+        ->each->toContain('rel="noopener noreferrer"');
+});
 
-    expect($header)->not->toBeEmpty()
-        ->and($discordAnchor[0] ?? '')->toContain('rel="noopener noreferrer"');
+it('keeps Discord out of the main navigation now that the header links it with a member count', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    expect(extractNavRegion($html, __('Main')))->not->toContain(route('discord'));
 });
 
 it('marks the current page in the navigation', function (): void {
@@ -121,16 +127,36 @@ it('draws a distinct icon for every name the navigation declares', function (): 
         ->and($drawings->unique())->toHaveCount($icons->count());
 });
 
-it('keeps the star count to the hero, not the header', function (): void {
+it('shows the GitHub star and Discord member counts in the header', function (): void {
     Cache::put('github_stars_Relaticle_relaticle', 1517, 60);
+    config()->set('services.discord.invite_url', 'https://discord.gg/abc123');
+    Cache::put('discord_members_abc123', 157, 60);
 
     $html = $this->get('/')->assertOk()->getContent();
     preg_match('/<header\b.*?<\/header>/s', $html, $header);
 
-    // The hero carries the social proof. A copy in the header would duplicate
-    // it in the sticky chrome.
-    expect($html)->toContain('1.5K')
-        ->and($header[0])->not->toContain('1.5K');
+    expect($header[0])->toContain('aria-label="GitHub, 1.5K stars"')
+        ->and($header[0])->toContain('aria-label="Discord, 157 members"');
+});
+
+it('shows the GitHub star and Discord member counts in the help center header', function (): void {
+    Cache::put('github_stars_Relaticle_relaticle', 1517, 60);
+    config()->set('services.discord.invite_url', 'https://discord.gg/abc123');
+    Cache::put('discord_members_abc123', 157, 60);
+
+    $html = $this->get(route('help.index'))->assertOk()->getContent();
+    preg_match('/<header\b.*?<\/header>/s', $html, $header);
+
+    expect($header[0])->toContain('aria-label="GitHub, 1.5K stars"')
+        ->and($header[0])->toContain('aria-label="Discord, 157 members"');
+});
+
+it('links GitHub and Discord without a count when the counts are unavailable', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+    preg_match('/<header\b.*?<\/header>/s', $html, $header);
+
+    expect($header[0])->toContain('aria-label="GitHub"')
+        ->and($header[0])->toContain('aria-label="Discord"');
 });
 
 it('drops nav groups that feature flags emptied instead of rendering a dead link', function (): void {

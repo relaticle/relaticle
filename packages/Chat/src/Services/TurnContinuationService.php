@@ -7,9 +7,11 @@ namespace Relaticle\Chat\Services;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\TurnPresence;
 
 /**
@@ -34,20 +36,12 @@ use Relaticle\Chat\Support\TurnPresence;
  */
 final readonly class TurnContinuationService
 {
-    /**
-     * The synthetic prompt the resumed turn runs on. It is stored as a user
-     * message (that is the only shape the provider accepts as the final turn)
-     * but stamped as a continuation so the transcript never renders it as
-     * something the user typed. What actually happened travels, as always, in
-     * the <resolved_actions> block rather than in this text.
-     */
-    public const string PROMPT = 'The proposals from your last turn have just been decided. Their outcome is in <resolved_actions>. Confirm what happened in one short sentence, naming each record as a link. If a step of the request is still outstanding and you can act on it now, do it in this turn. If nothing is left, say so and stop.';
-
     private const int DEDUPE_TTL_SECONDS = 3600;
 
     public function __construct(
         private CreditService $credits,
         private AiModelResolver $models,
+        private PendingActionService $pendingActions,
     ) {}
 
     /**
@@ -81,6 +75,7 @@ final readonly class TurnContinuationService
         }
 
         $turnId = (string) Str::ulid();
+        $message = ResolvedActionText::resumeOpener($this->justDecided($conversationId, $resolvedTurnId));
 
         if (! $this->credits->reserveCredit(
             $workspace,
@@ -93,20 +88,31 @@ final readonly class TurnContinuationService
             return false;
         }
 
-        TurnPresence::begin($conversationId, turnId: $turnId, message: '', isContinuation: true);
+        TurnPresence::begin($conversationId, turnId: $turnId, message: '', origin: MessageOrigin::Resume);
 
         dispatch(new ProcessChatMessage(
             user: $user,
             workspace: $workspace,
-            message: self::PROMPT,
+            message: $message,
             conversationId: $conversationId,
             resolved: $this->models->resolve($user, $model),
             turnId: $turnId,
-            isContinuation: true,
+            origin: MessageOrigin::Resume,
             resumesTurnId: $resolvedTurnId,
         ));
 
         return true;
+    }
+
+    /**
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null, just_decided: bool}>
+     */
+    private function justDecided(string $conversationId, string $resolvedTurnId): array
+    {
+        return array_values(array_filter(
+            $this->pendingActions->resolvedForConversation($conversationId, $resolvedTurnId),
+            static fn (array $action): bool => $action['just_decided'],
+        ));
     }
 
     /**

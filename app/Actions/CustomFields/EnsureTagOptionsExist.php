@@ -53,11 +53,13 @@ final readonly class EnsureTagOptionsExist
             }
 
             try {
-                $field->options()->create([
+                // Promoting a typed tag is not a schema edit: the record's own change row
+                // already names the value, so the option it implies stays out of the log.
+                activity()->withoutLogging(fn (): mixed => $field->options()->create([
                     $tenantKey => $field->{$tenantKey},
                     'name' => $value,
                     'sort_order' => ++$sortOrder,
-                ]);
+                ]));
             } catch (UniqueConstraintViolationException) {
                 // A concurrent import/edit created this option first. The option
                 // now exists, so treat it as a no-op rather than failing the row.

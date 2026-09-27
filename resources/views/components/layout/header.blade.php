@@ -55,7 +55,8 @@
                     $dropdownSlugs[$index] => collect($item->children)->contains(fn ($child) => $child->url === null && count($child->children) > 0),
                 ]))
 
-                <nav aria-label="{{ __('Main') }}" class="relative hidden md:flex items-center gap-1"
+                <div class="hidden md:flex items-center">
+                    <nav aria-label="{{ __('Main') }}" class="relative flex items-center gap-1"
                      x-data="{
                          openDropdown: null,
                          // The dropdown a swap is animating away from. Kept mounted (and shown)
@@ -191,14 +192,8 @@
                             <a href="{{ $item->url }}"
                                @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                                @if(url()->current() === $item->url) aria-current="page" @endif
-                               class="group px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary @if($item->external) flex items-center gap-1.5 @endif">
-                                @if($item->external)
-                                    <x-ri-discord-fill class="w-4 h-4"/>
-                                    <span>{{ $item->label }}</span>
-                                    <x-ri-arrow-right-up-line class="h-3 w-3 text-gray-400 dark:text-gray-500 transition-colors duration-200 group-hover:text-gray-600 dark:group-hover:text-gray-300"/>
-                                @else
-                                    {{ $item->label }}
-                                @endif
+                               class="px-4 py-1.5 rounded-full text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] text-[13px] font-medium transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">
+                                {{ $item->label }}
                             </a>
                         @endif
                     @endforeach
@@ -295,7 +290,10 @@
                             @endforeach
                         </div>
                     </div>
-                </nav>
+                    </nav>
+
+                    <x-layout.community-links variant="nav" class="hidden lg:flex"/>
+                </div>
 
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                     <div class="hidden md:flex items-center gap-2">

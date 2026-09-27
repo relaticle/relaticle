@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -11,6 +12,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentColor;
+use Filament\Support\View\Components\BadgeComponent;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
@@ -244,4 +247,21 @@ it('does not link a relation column when the related record is missing', functio
     livewire(ListCompanies::class)
         ->assertOk()
         ->assertDontSee(UserResource::getUrl('view', ['record' => $this->workspaceOwner->id]), escape: false);
+});
+
+it('renders every source badge with real shade classes on the companies list', function () {
+    $this->get(ListCompanies::getUrl())->assertSuccessful();
+
+    foreach (CreationSource::cases() as $source) {
+        $classes = FilamentColor::getComponentClasses(BadgeComponent::class, $source->getColor());
+
+        if ($source->getColor() === 'gray') {
+            expect($classes)->toBe([]);
+
+            continue;
+        }
+
+        expect(array_filter($classes, fn (string $class): bool => str_starts_with($class, 'fi-text-color-')))
+            ->not->toBeEmpty();
+    }
 });

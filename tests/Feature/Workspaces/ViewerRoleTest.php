@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -31,9 +32,9 @@ beforeEach(function (): void {
     $this->workspace->users()->attach($this->viewer, ['role' => WorkspaceRole::Viewer->value]);
     $this->viewer->switchWorkspace($this->workspace);
 
-    $this->editor = User::factory()->create();
-    $this->workspace->users()->attach($this->editor, ['role' => WorkspaceRole::Editor->value]);
-    $this->editor->switchWorkspace($this->workspace);
+    $this->member = User::factory()->create();
+    $this->workspace->users()->attach($this->member, ['role' => WorkspaceRole::Member->value]);
+    $this->member->switchWorkspace($this->workspace);
 });
 
 test('viewer cannot create, update, delete, or restore records, but can view them', function (string $modelClass): void {
@@ -63,18 +64,18 @@ test('viewer cannot bulk delete or bulk restore companies', function (): void {
         ->and($this->viewer->can('restoreAny', Company::class))->toBeFalse();
 });
 
-test('editor keeps write access to companies', function (): void {
-    $this->actingAs($this->editor);
+test('member keeps write access to companies', function (): void {
+    $this->actingAs($this->member);
     Filament::setTenant($this->workspace);
 
     $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
 
-    expect($this->editor->can('create', Company::class))->toBeTrue()
-        ->and($this->editor->can('update', $company))->toBeTrue();
+    expect($this->member->can('create', Company::class))->toBeTrue()
+        ->and($this->member->can('update', $company))->toBeTrue();
 });
 
 test('owner is never treated as a viewer', function (): void {
-    expect($this->owner->isViewerOnWorkspaceId($this->workspace->id))->toBeFalse();
+    expect($this->owner->hasWorkspaceCapability($this->workspace->id, WorkspaceCapability::RecordsCreate))->toBeTrue();
 });
 
 test('viewer is not offered an import action it would be refused', function (string $page): void {
@@ -90,11 +91,55 @@ test('viewer is not offered an import action it would be refused', function (str
     'notes' => [ManageNotes::class],
 ]);
 
-test('editor is still offered the import action', function (): void {
-    $this->actingAs($this->editor);
+test('member is still offered the import action', function (): void {
+    $this->actingAs($this->member);
     Filament::setTenant($this->workspace);
 
     livewire(ListCompanies::class)->assertActionVisible('import');
+});
+
+test('viewer is not offered the header export action', function (string $page): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    livewire($page)->assertActionHidden('export');
+})->with([
+    'companies' => [ListCompanies::class],
+    'people' => [ListPeople::class],
+    'opportunities' => [ListOpportunities::class],
+    'tasks' => [ManageTasks::class],
+    'notes' => [ManageNotes::class],
+]);
+
+test('member is still offered the header export action', function (string $page): void {
+    $this->actingAs($this->member);
+    Filament::setTenant($this->workspace);
+
+    livewire($page)->assertActionVisible('export');
+})->with([
+    'companies' => [ListCompanies::class],
+    'people' => [ListPeople::class],
+    'opportunities' => [ListOpportunities::class],
+    'tasks' => [ManageTasks::class],
+    'notes' => [ManageNotes::class],
+]);
+
+test('viewer is not offered the export bulk action', function (): void {
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    livewire(ListCompanies::class)->assertTableBulkActionHidden('export');
+});
+
+test('member is still offered the export bulk action', function (): void {
+    $this->actingAs($this->member);
+    Filament::setTenant($this->workspace);
+
+    Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    livewire(ListCompanies::class)->assertTableBulkActionVisible('export');
 });
 
 test('viewer is read-only through the API too', function (): void {
@@ -151,8 +196,8 @@ test('viewer is read-only through an MCP tool too', function (): void {
     expect(Company::query()->where('name', 'Blocked Co')->exists())->toBeFalse();
 });
 
-test('editor is not blocked through the same MCP tool', function (): void {
-    RelaticleServer::actingAs($this->editor)
+test('member is not blocked through the same MCP tool', function (): void {
+    RelaticleServer::actingAs($this->member)
         ->tool(CreateCompanyTool::class, ['name' => 'Allowed Co'])
         ->assertOk();
 });

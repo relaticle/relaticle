@@ -2,11 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Exceptions\SsrfGuardException;
 use App\Services\Favicon\Drivers\HighQualityDriver;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Utils;
+use App\Support\Http\HostResolver;
+use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Http;
 
 mutates(HighQualityDriver::class);
@@ -127,14 +125,29 @@ test('refuses to fetch from private addresses', function (): void {
         ->and($driver->fetch('http://169.254.169.254/'))->toBeNull();
 });
 
-test('routes favicon requests through the SSRF-guarded redirect client', function (): void {
-    $driver = new HighQualityDriver;
+test('never follows a page redirect to a non-public host', function (): void {
+    Http::fake([
+        'https://1.1.1.1' => Http::response('', 302, ['Location' => 'http://169.254.169.254/latest/meta-data/']),
+        '*' => Http::response('<link rel="apple-touch-icon" href="/apple-touch-icon.png">'),
+    ]);
 
-    $onRedirect = invade($driver)->guardedHttpClient()->getOptions()['allow_redirects']['on_redirect'];
+    (new HighQualityDriver)->fetch('https://1.1.1.1');
 
-    $request = new Request('GET', 'https://1.1.1.1');
-    $response = new Response(302);
+    Http::assertNotSent(fn (HttpClientRequest $request): bool => str_contains($request->url(), '169.254.169.254'));
+});
 
-    expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
-        ->toThrow(SsrfGuardException::class);
+test('sends nothing when a host resolves to a private address at send time', function (): void {
+    $lookups = 0;
+
+    app()->instance(HostResolver::class, new HostResolver(function () use (&$lookups): array {
+        $lookups++;
+
+        return $lookups === 1 ? ['93.184.216.34'] : ['169.254.169.254'];
+    }));
+
+    Http::fake(['*' => Http::response('<link rel="apple-touch-icon" href="/apple-touch-icon.png">')]);
+
+    expect((new HighQualityDriver)->fetch('https://rebind.example.com'))->toBeNull();
+
+    Http::assertNothingSent();
 });

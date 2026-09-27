@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Mcp\Prompts\CrmOverviewPrompt;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
@@ -12,6 +13,15 @@ use App\Models\User;
 use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\Passport;
 
+function listedResourceUris(User $user, array $abilities): array
+{
+    return test()
+        ->withToken($user->createToken('test', $abilities)->plainTextToken)
+        ->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'resources/list'])
+        ->assertOk()
+        ->json('result.resources.*.uri');
+}
+
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
@@ -21,6 +31,19 @@ describe('read-only token', function (): void {
     beforeEach(function (): void {
         $token = $this->user->createToken('test', ['read']);
         $this->user->withAccessToken($token->accessToken);
+    });
+
+    it('lists the schema resources, the summary and the overview prompt', function (): void {
+        expect(listedResourceUris($this->user, ['read']))->toEqualCanonicalizing([
+            'relaticle://schema/company',
+            'relaticle://schema/people',
+            'relaticle://schema/opportunity',
+            'relaticle://schema/task',
+            'relaticle://schema/note',
+            'relaticle://summary/crm',
+        ]);
+
+        RelaticleServer::actingAs($this->user)->prompts()->assertRegistered(CrmOverviewPrompt::class);
     });
 
     it('can list companies', function (): void {
@@ -61,6 +84,12 @@ describe('create-only token', function (): void {
     beforeEach(function (): void {
         $token = $this->user->createToken('test', ['create']);
         $this->user->withAccessToken($token->accessToken);
+    });
+
+    it('hides the schema resources, the summary and the overview prompt', function (): void {
+        expect(listedResourceUris($this->user, ['create']))->toBe([]);
+
+        RelaticleServer::actingAs($this->user)->prompts()->assertNotRegistered(CrmOverviewPrompt::class);
     });
 
     it('cannot list companies', function (): void {

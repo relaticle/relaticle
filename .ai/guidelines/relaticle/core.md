@@ -37,6 +37,11 @@ months two copies of the same field vocabulary drifted apart.
   either way. Never `Artisan::call()` in `up()`: the container entrypoint runs under `set -e`, so
   a throw there crash-loops the app and takes Horizon down with it. `tests/Arch/ConventionsTest.php`
   fails when a migration names a command that no longer exists
+- A migration that drops a column queued jobs still read or write ships with a deploy step:
+  `php artisan horizon:pause` before `migrate`, `php artisan horizon:terminate` after. Otherwise a
+  job still running the old code hits the missing column and fails with no retry.
+  `2026_09_24_100100_backfill_agent_conversation_message_steps` is the precedent. A self-hosted
+  upgrade needs nothing extra, because `up -d` stops the old container before migrating
 - Every datetime column is `timestamp without time zone` holding **UTC**. Never write one from
   the database clock. That rules out `DB::raw('now()')`, `CURRENT_TIMESTAMP`, and `->useCurrent()` /
   `->useCurrentOnUpdate()` column defaults. Those resolve against the *session* timezone and

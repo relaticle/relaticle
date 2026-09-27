@@ -129,6 +129,10 @@ arch('avoid mutation')
         // Request-scoped batch_uuid holder, mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
+        // Job-scoped holder of the running import, set and cleared by ExecuteImportJob.
+        'App\Support\ActivityLog\CurrentImport',
+        // Request-scoped holder of the workspace WorkspaceScope filters by, set by the tenant middleware.
+        'App\Support\CurrentWorkspace',
         // Request-scoped media lookup cache, same shape: filled as list endpoints
         // prime it, reset per request via the scoped container binding.
         'App\Support\Media\MediaLookup',
@@ -148,6 +152,9 @@ arch('avoid mutation')
         'App\Support\Media\UploadPathGenerator',
         // Same for DefaultUrlGenerator.
         'App\Support\Media\MediaUrlGenerator',
+        // Stands in for Passport's own ClientRepository singleton; PHP forbids a
+        // readonly class extending a non-readonly one.
+        'App\Support\Passport\ClientRepository',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -196,6 +203,9 @@ arch('avoid inheritance')
         'App\Support\Media\UploadPathGenerator',
         // Same for DefaultUrlGenerator.
         'App\Support\Media\MediaUrlGenerator',
+        // Rebound over Passport's self-bound ClientRepository singleton, so it must
+        // extend the class every OAuth endpoint type-hints.
+        'App\Support\Passport\ClientRepository',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by
@@ -221,8 +231,10 @@ arch('package service layers avoid mutation')
     ->classes()
     ->toBeReadonly()
     ->ignoring([
+        // laravel/ai's Promptable trait holds mutable state; PHP forbids a
+        // readonly class using a trait with a non-readonly property.
+        'Relaticle\Chat\Agents',
         // Grandfathered (2026-06-12). Make each readonly, then unlist:
-        'Relaticle\Chat\Agents\CrmAssistant',
         'Relaticle\Chat\Services\TipTapDocumentParser',
         'Relaticle\Chat\Support\ChatTelemetry',
         'Relaticle\Chat\Support\PromptText',

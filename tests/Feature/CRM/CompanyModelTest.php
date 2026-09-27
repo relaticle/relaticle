@@ -93,7 +93,7 @@ test('company logo is null until one is uploaded', function () {
 
     expect($company->logo)->toBeNull();
 
-    $company->addMediaFromString('logo-bytes')
+    $company->addMediaFromString(onePixelPng())
         ->usingFileName('logo.png')
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 

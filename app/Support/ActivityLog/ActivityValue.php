@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
-use Illuminate\Support\Str;
+use App\Support\PlainText;
 
 /**
  * Renders one side of a logged change as the short plain-text value a reader sees.
@@ -18,11 +18,7 @@ final readonly class ActivityValue
 {
     public const string EMPTY = '—';
 
-    /**
-     * Block boundaries carry the only whitespace in `<p>a</p><p>b</p>`, so they
-     * become a space before the tags go. Otherwise two paragraphs read as "ab".
-     */
-    private const string BLOCK_BOUNDARY = '/<\s*br\s*\/?\s*>|<\s*\/\s*(?:p|div|li|tr|h[1-6]|blockquote)\s*>/i';
+    public const string REDACTED = '••••••';
 
     public static function display(mixed $value): string
     {
@@ -38,9 +34,7 @@ final readonly class ActivityValue
             return self::EMPTY;
         }
 
-        $text = (string) preg_replace(self::BLOCK_BOUNDARY, ' ', (string) $value);
-        $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5);
-        $text = Str::squish(str_replace("\u{00A0}", ' ', $text));
+        $text = PlainText::fromHtml((string) $value);
 
         if ($text === '') {
             return self::EMPTY;

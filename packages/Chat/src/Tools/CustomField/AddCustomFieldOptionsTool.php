@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
@@ -16,12 +17,14 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
+use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 use Relaticle\Chat\Tools\CustomField\Concerns\ResolvesOwnedCustomField;
 
 final class AddCustomFieldOptionsTool implements Tool
 {
     use ReportsValidationFailures;
+    use RequiresWorkspaceCapability;
     use ResolvesOwnedCustomField;
     use WithConversationContext;
 
@@ -58,10 +61,10 @@ final class AddCustomFieldOptionsTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        if (! $user->ownsWorkspace($user->currentWorkspace)) {
-            return (string) json_encode([
-                'error' => 'Only workspace owners can manage custom field options.',
-            ], JSON_UNESCAPED_SLASHES);
+        $capabilityError = $this->capabilityError($user, WorkspaceCapability::FieldsManage);
+
+        if ($capabilityError !== null) {
+            return $capabilityError;
         }
 
         $entityType = (string) ($request['entity_type'] ?? '');

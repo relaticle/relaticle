@@ -193,6 +193,21 @@ it('renders the view page for a deleted activity with an itemized old→new diff
         ->assertDontSee('{"name"');
 });
 
+it('keeps the channel stamp out of a summary row change list', function (): void {
+    $activity = seedActivity($this->workspaceA, $this->ownerA, [
+        'event' => 'imported',
+        'description' => 'imported',
+        'properties' => ['import_file' => 'leads.csv', 'created' => 3, 'source' => 'import'],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Import File: leads.csv')
+        ->assertDontSee('Source: import');
+});
+
 it('does not error when sorting by the polymorphic user column', function (): void {
     seedActivity($this->workspaceA, $this->ownerA);
 

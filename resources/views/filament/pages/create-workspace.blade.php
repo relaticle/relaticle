@@ -29,6 +29,7 @@
                         class="mt-3 text-center"
                     >
                         <a
+                            data-testid="workspace-cancel-link"
                             href="{{ $cancelUrl }}"
                             wire:navigate
                             class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"

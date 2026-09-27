@@ -8,7 +8,6 @@ use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
 use App\Actions\Note\ListNotes;
 use App\Actions\Note\UpdateNote;
-use App\Enums\CreationSource;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreNoteRequest;
 use App\Http\Requests\Api\V1\UpdateNoteRequest;
@@ -44,7 +43,7 @@ final readonly class NotesController
     #[ResponseFromApiResource(NoteResource::class, Note::class, status: 201)]
     public function store(StoreNoteRequest $request, CreateNote $action, #[CurrentUser] User $user): JsonResponse
     {
-        $note = $action->execute($user, $request->validated(), CreationSource::API);
+        $note = $action->execute($user, $request->validated());
 
         return new NoteResource($note)
             ->response()

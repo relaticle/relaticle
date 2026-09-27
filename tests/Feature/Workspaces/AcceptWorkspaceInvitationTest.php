@@ -30,7 +30,7 @@ test('valid invitation can be accepted', function () {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $this->user->email,
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $raw = rawTokenFor($invitation);
@@ -51,7 +51,7 @@ test('valid invitation can be accepted', function () {
 });
 
 test('accepting an invitation lands the user in the app panel with a visible confirmation', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -131,7 +131,7 @@ test('invitation with wrong email shows the wrong-account screen, not a 403', fu
 test('every accept-invitation exit link points into the app panel, not the marketing homepage', function (): void {
     $appUrl = url()->getAppUrl();
 
-    $readyInvitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $readyInvitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $readyInvitation->issueToken();
     $readyInvitation->save();
     $readyInvitee = User::factory()->create(['email' => 'invitee@example.test']);
@@ -199,7 +199,7 @@ test('user with scheduled deletion cannot accept invitation', function () {
     /** @var WorkspaceInvitation $invitation */
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => $user->email,
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(7),
     ]);
 
@@ -219,7 +219,7 @@ test('a workspace scheduled for deletion cannot be joined', function (): void {
     /** @var WorkspaceInvitation $invitation */
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => $this->user->email,
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(7),
     ]);
 
@@ -234,7 +234,7 @@ test('a workspace scheduled for deletion cannot be joined', function (): void {
 });
 
 test('a GET on the accept link never joins the workspace', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -249,7 +249,7 @@ test('a GET on the accept link never joins the workspace', function (): void {
 });
 
 test('the token accept route never leaks the token via the Referer header', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -273,7 +273,7 @@ test('unauthenticated attempts against the token accept route are rate limited',
 });
 
 test('a POST joins the workspace', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -288,7 +288,7 @@ test('a POST joins the workspace', function (): void {
 });
 
 test('a mismatched email gets the wrong-account screen not a 403', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -304,7 +304,7 @@ test('a mismatched email gets the wrong-account screen not a 403', function (): 
 });
 
 test('email matching is case insensitive', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -318,7 +318,7 @@ test('email matching is case insensitive', function (): void {
 });
 
 test('an expired invitation shows the expired state', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->expires_at = now()->subDay();
     $invitation->save();
@@ -332,7 +332,7 @@ test('an expired invitation shows the expired state', function (): void {
 });
 
 test('a replayed accept attaches exactly one membership', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -345,7 +345,7 @@ test('a replayed accept attaches exactly one membership', function (): void {
 });
 
 test('an invitation revoked in flight refuses instead of reporting a join that did not happen', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $invitation->issueToken();
     $invitation->save();
 
@@ -361,7 +361,7 @@ test('an invitation revoked in flight refuses instead of reporting a join that d
 });
 
 test('a revoked invitation shows the expired state rather than a false success banner', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -378,7 +378,7 @@ test('a revoked invitation shows the expired state rather than a false success b
 });
 
 test('an expired-in-flight invitation refuses even though the caller saw it as valid', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $invitation->issueToken();
     $invitation->save();
 
@@ -395,7 +395,7 @@ test('an expired-in-flight invitation refuses even though the caller saw it as v
 test('the legacy signed-URL routes are gone', function (): void {
     $invitation = $this->workspace->workspaceInvitations()->create([
         'email' => 'legacy@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(3),
     ]);
 
@@ -411,12 +411,12 @@ test('the legacy signed-URL routes are gone', function (): void {
 });
 
 test('a GET when the user already belongs to the workspace redirects without erroring', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
     $invitee = User::factory()->create(['email' => 'invitee@example.test']);
-    $this->workspace->users()->attach($invitee, ['role' => 'editor']);
+    $this->workspace->users()->attach($invitee, ['role' => 'member']);
 
     $this->actingAs($invitee)
         ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
@@ -426,12 +426,12 @@ test('a GET when the user already belongs to the workspace redirects without err
 });
 
 test('a POST for an already-member user cleans up the stale invitation without erroring', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
     $invitee = User::factory()->create(['email' => 'invitee@example.test']);
-    $this->workspace->users()->attach($invitee, ['role' => 'editor']);
+    $this->workspace->users()->attach($invitee, ['role' => 'member']);
 
     $this->actingAs($invitee)
         ->post(route('workspace-invitations.token.join', ['token' => $raw]))
@@ -445,7 +445,7 @@ test('viewing the invitation page does not spend the allowance the join POST nee
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $this->user->email,
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $rawToken = rawTokenFor($invitation);
@@ -504,7 +504,7 @@ test('an invitation whose stored email kept its original case still matches the 
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $this->user->email,
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $rawToken = rawTokenFor($invitation);
@@ -525,7 +525,7 @@ test('accepting re-reads the invitation under a row lock so concurrent accepts s
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $this->user->email,
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $statements = [];
@@ -548,7 +548,7 @@ test('switching account from the wrong-account screen returns to the invitation'
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => 'invited@example.test',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $rawToken = rawTokenFor($invitation);
@@ -564,7 +564,7 @@ test('the wrong-account screen offers the switch route, not a bare logout', func
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => 'invited@example.test',
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $rawToken = rawTokenFor($invitation);
@@ -582,7 +582,7 @@ test('after switching, the invitation link sends a guest to login and back again
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $invitee->email,
-        'role' => 'editor',
+        'role' => 'member',
     ]);
 
     $rawToken = rawTokenFor($invitation);
@@ -611,7 +611,7 @@ test('the accept page explains what the invited role allows', function (): void 
 });
 
 test('the accept page counts the people already in the workspace', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'editor']);
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 

@@ -173,3 +173,28 @@ it('still labels an updated event as changed with its diff', function (): void {
         ->toContain(__('activity-log::messages.entry.changed'))
         ->toContain('New name');
 })->mutates(MergedActivityRenderer::class);
+
+it('reads a company owner change by name on the record timeline', function (): void {
+    $seller = User::factory()->create(['name' => 'Bea Seller']);
+    Activity::withoutGlobalScopes()->delete();
+
+    $this->company->update(['account_owner_id' => $seller->getKey()]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)
+        ->toContain('Account Owner')
+        ->toContain('Bea Seller')
+        ->not->toContain((string) $seller->getKey());
+});
+
+it('does not log an empty account owner on a company created without one', function (): void {
+    Activity::withoutGlobalScopes()->delete();
+
+    Company::factory()->for($this->company->workspace)->create(['name' => 'Ownerless Co', 'account_owner_id' => null]);
+
+    $created = Activity::withoutGlobalScopes()->where('event', 'created')->latest('id')->firstOrFail();
+
+    expect($created->attribute_changes['attributes'] ?? [])->not->toHaveKey('account_owner');
+});

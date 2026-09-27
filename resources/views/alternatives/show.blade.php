@@ -5,28 +5,6 @@
      * @var string $competitorSlug
      */
     $copy = [
-        'attio' => [
-            'badge' => __('Alternative'),
-            'opening' => __('Attio is a well-regarded closed-source SaaS CRM with strong data-model flexibility. There is no self-hosting option, though, and its AI is a proprietary, Cloud-only feature. If you want to own your data and self-host the same AI and MCP tooling your team uses in production, Relaticle is the alternative. If you specifically need Attio\'s enrichment and research features today, they\'re more mature there than anywhere Relaticle currently offers.'),
-            'sections' => [
-                [
-                    'heading' => __('License & pricing'),
-                    'body' => __('Attio is closed-source (:attioPricing). Relaticle is AGPL-3.0: self-host free forever, or pay a flat :relaticlePricing on the hosted plan.', ['attioPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
-                ],
-                [
-                    'heading' => __('AI capabilities'),
-                    'body' => __('Attio\'s AI: :attioAi, available only on their SaaS. Relaticle\'s AI: :relaticleAi.', ['attioAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
-                ],
-                [
-                    'heading' => __('Data ownership & deployment'),
-                    'body' => __('Attio: :attioSelfHost, so your data lives on their infrastructure. Relaticle: :relaticleStack. :relaticleSelfHost.', ['attioSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
-                ],
-                [
-                    'heading' => __('Extensibility'),
-                    'body' => __('Attio\'s extensibility: :attioExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['attioExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
-                ],
-            ],
-        ],
         'hubspot' => [
             'badge' => __('Alternative'),
             'opening' => __('HubSpot\'s free CRM works for very small teams, and its paid Hubs bundle marketing, sales, and service automation well beyond core CRM. That breadth is real, and if you need an integrated marketing or service suite today, HubSpot\'s is more mature. If you want a self-hosted, open-source CRM with built-in AI and flat pricing that doesn\'t grow with every seat you add, Relaticle is the alternative.'),
@@ -52,7 +30,6 @@
     ][$competitorSlug];
 
     $titles = [
-        'attio' => __('Attio Alternative'),
         'hubspot' => __('HubSpot Alternative'),
     ];
 
@@ -63,7 +40,6 @@
      * Kept under ~60 characters so Google does not truncate it.
      */
     $metaTitles = [
-        'attio' => __('Open Source Attio Alternative, Self-Hosted | Relaticle'),
         'hubspot' => __('Open Source HubSpot Alternative, Self-Hosted | Relaticle'),
     ];
 
@@ -72,7 +48,6 @@
      * competitor-facts.php so `gtm:stale-facts` can age them out.
      */
     $descriptions = [
-        'attio' => __('Attio is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
         'hubspot' => __('HubSpot is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
     ];
 

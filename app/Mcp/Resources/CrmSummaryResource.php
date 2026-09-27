@@ -7,8 +7,11 @@ namespace App\Mcp\Resources;
 use App\Actions\Crm\GetCrmSummary;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use Laravel\Mcp\Enums\Role;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
+use Laravel\Mcp\Server\Annotations\Audience;
+use Laravel\Mcp\Server\Annotations\Priority;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
@@ -17,6 +20,8 @@ use Laravel\Mcp\Server\Resource;
 #[Description('CRM summary with record counts, pipeline breakdown by stage, and task status. Use for overview and analytics questions.')]
 #[Uri('relaticle://summary/crm')]
 #[MimeType('application/json')]
+#[Audience([Role::User, Role::Assistant])]
+#[Priority(0.5)]
 final class CrmSummaryResource extends Resource
 {
     public function __construct(

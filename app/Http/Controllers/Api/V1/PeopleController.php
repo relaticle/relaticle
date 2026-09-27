@@ -8,7 +8,6 @@ use App\Actions\People\CreatePeople;
 use App\Actions\People\DeletePeople;
 use App\Actions\People\ListPeople;
 use App\Actions\People\UpdatePeople;
-use App\Enums\CreationSource;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StorePeopleRequest;
 use App\Http\Requests\Api\V1\UpdatePeopleRequest;
@@ -47,7 +46,7 @@ final readonly class PeopleController
     #[BodyParam('company_id', 'string', required: false, example: null)]
     public function store(StorePeopleRequest $request, CreatePeople $action, #[CurrentUser] User $user): JsonResponse
     {
-        $person = $action->execute($user, $request->validated(), CreationSource::API);
+        $person = $action->execute($user, $request->validated());
 
         return new PeopleResource($person)
             ->response()

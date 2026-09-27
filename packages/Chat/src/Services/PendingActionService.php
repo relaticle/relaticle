@@ -13,6 +13,7 @@ use App\Actions\CustomFields\UpdateCustomField;
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
 use App\Actions\Note\UpdateNote;
+use App\Actions\Onboarding\RemoveSampleData;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
 use App\Actions\Opportunity\UpdateOpportunity;
@@ -32,6 +33,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentSource;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
@@ -83,6 +86,7 @@ final readonly class PendingActionService
         UpdateCustomField::class,
         AddCustomFieldOptions::class,
         CreateWorkspaceInvitation::class,
+        RemoveSampleData::class,
     ];
 
     /**
@@ -162,12 +166,16 @@ final readonly class PendingActionService
     public function recordResolveFailure(PendingAction $pendingAction, string $message): void
     {
         try {
-            $pendingAction->update([
-                'result_data' => [
-                    ...(is_array($pendingAction->result_data) ? $pendingAction->result_data : []),
-                    'last_error' => $message,
-                ],
-            ]);
+            DB::transaction(function () use ($pendingAction, $message): void {
+                $locked = PendingAction::query()->whereKey($pendingAction->getKey())->pending()->lockForUpdate()->first();
+
+                $locked?->update([
+                    'result_data' => [
+                        ...(is_array($locked->result_data) ? $locked->result_data : []),
+                        'last_error' => $message,
+                    ],
+                ]);
+            });
         } catch (Throwable $e) {
             report($e);
         }
@@ -214,7 +222,7 @@ final readonly class PendingActionService
                     'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
                 );
 
-                $result = $this->executeAction($pendingAction, $user, $excludedFields);
+                $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
 
                 $resultData = $result instanceof Model
                     ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
@@ -341,7 +349,7 @@ final readonly class PendingActionService
                     return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
                 }
 
-                $model = $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type));
+                $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
 
                 // A failure remembered from an earlier attempt is history the
                 // moment an item commits; leaving it would report a stale error
@@ -501,7 +509,7 @@ final readonly class PendingActionService
         }
 
         /** @var Model */
-        return $action->execute($user, $record, CreationSource::CHAT);
+        return $action->execute($user, $record);
     }
 
     private function makeBatchItemAction(PendingAction $pendingAction): object
@@ -590,7 +598,7 @@ final readonly class PendingActionService
      * proposals are left out: they travel in their own block (see
      * supersededForConversation()) and were never decided by the user.
      *
-     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null}>
+     * @return list<array{operation: string, entity_type: string, status: string, label: string|null, record_id: string|null, record_ids: list<string>, records: list<array{id: string, label: string|null, url: string}>, skipped: list<string>, excluded: list<array{record: string|null, fields: list<string>}>, failure: string|null, just_decided: bool}>
      */
     public function resolvedForConversation(string $conversationId, ?string $justDecidedTurnId): array
     {
@@ -973,7 +981,7 @@ final readonly class PendingActionService
         );
 
         /** @var Model */
-        return $action->execute($user, $data, CreationSource::CHAT);
+        return $action->execute($user, $data);
     }
 
     /**
@@ -1058,6 +1066,10 @@ final readonly class PendingActionService
     {
         if (! method_exists($action, 'execute')) {
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
+        }
+
+        if ($action instanceof RemoveSampleData) {
+            return $action->execute($user, Workspace::query()->findOrFail($pendingAction->workspace_id), allowEmptyWorkspace: true);
         }
 
         foreach ($this->resolveDeleteModels($pendingAction) as $model) {

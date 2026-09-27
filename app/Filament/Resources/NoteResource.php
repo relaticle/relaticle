@@ -120,6 +120,7 @@ final class NoteResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     ExportBulkAction::make()
+                        ->authorize('exportAny', Note::class)
                         ->exporter(NoteExporter::class),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),

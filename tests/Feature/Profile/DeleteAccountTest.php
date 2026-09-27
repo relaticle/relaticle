@@ -313,7 +313,7 @@ test('user cannot schedule deletion when owning workspace with members', functio
     session()->put('auth.password_confirmed_at', time());
 
     $workspace = $user->currentWorkspace;
-    $workspace->users()->attach(User::factory()->create(), ['role' => 'editor']);
+    $workspace->users()->attach(User::factory()->create(), ['role' => 'member']);
 
     Livewire::test(DeleteAccount::class)
         ->callAction('deleteAccount', ['confirm_email' => $user->email, 'password' => 'password'])

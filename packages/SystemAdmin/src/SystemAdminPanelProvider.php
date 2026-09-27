@@ -30,6 +30,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Livewire\Component;
+use Livewire\Livewire;
+use Livewire\Mechanisms\HandleComponents\ComponentContext;
 use Relaticle\Ink\InkPlugin;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
@@ -39,6 +42,7 @@ use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyLoginController;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyRegistrationController;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
+use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Relaticle\SystemAdmin\Http\Middleware\RequireSecondFactor;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Relaticle\SystemAdmin\Models\SystemAdministratorPasskey;
@@ -71,6 +75,23 @@ final class SystemAdminPanelProvider extends PanelProvider
      * itself, is what would break incident correlation.
      */
     private const string DATE_TIME_FORMAT = 'M j, Y H:i:s T';
+
+    public function register(): void
+    {
+        parent::register();
+
+        // Lazy mount-parameter snapshots bypass component lifecycle hooks.
+        Livewire::listen('dehydrate', function (Component $component, ComponentContext $context): void {
+            $context->addMemo('authContext', IsolateAuthenticationSession::context(request()));
+        });
+
+        Livewire::listen('snapshot-verified', function (array $snapshot): void {
+            abort_unless(
+                ($snapshot['memo']['authContext'] ?? null) === IsolateAuthenticationSession::context(request()),
+                419,
+            );
+        });
+    }
 
     public function boot(): void
     {
@@ -158,6 +179,8 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->spa()
             ->colors([
                 'primary' => Color::Indigo,
+                'purple' => Color::Purple,
+                'indigo' => Color::Indigo,
             ])
             ->brandName('Relaticle System Admin')
             ->discoverResources(in: base_path('packages/SystemAdmin/src/Filament/Resources'), for: 'Relaticle\\SystemAdmin\\Filament\\Resources')
@@ -205,6 +228,7 @@ final class SystemAdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                'auth.context',
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
@@ -216,7 +240,7 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 RequireSecondFactor::class,
-            ])
+            ], isPersistent: true)
             ->routes(function () use ($panel): void {
                 Route::prefix('passkeys')
                     ->name('passkeys.')

@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Ai\Contracts\ConversationStore;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
@@ -274,6 +275,21 @@ it('stores a handoff reply for a large file without running the model or spendin
         ->and($response->json('user_message_id'))->toBe((string) $rows[0]->id);
 
     expect(ChatAttachment::find($this->user, $attachmentId)?->isSent())->toBeTrue();
+});
+
+it('replays the handoff reply to the model on the next turn', function (): void {
+    Queue::fake();
+    $attachmentId = attachCsv(26);
+
+    $this->postJson(route('chat.send', ['conversation' => $this->conversationId]), [
+        'document' => ChatDocument::fromText('Import these please'),
+        'attachment_id' => $attachmentId,
+    ])->assertOk();
+
+    $history = resolve(ConversationStore::class)->getLatestConversationMessages($this->conversationId, 100);
+
+    expect($history->last()->role->value)->toBe('assistant')
+        ->and($history->last()->content)->toContain("That's 26 rows.");
 });
 
 it('supersedes a pending proposal on the conversation when a large file is handed off', function (): void {

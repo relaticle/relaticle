@@ -55,6 +55,9 @@ return [
         'anthropic' => [
             'driver' => 'anthropic',
             'key' => env('ANTHROPIC_API_KEY'),
+            'models' => [
+                'text' => ['cheapest' => 'claude-haiku-4-5-20251001'],
+            ],
         ],
 
         'azure' => [
@@ -118,6 +121,9 @@ return [
             'key' => env('OPENAI_API_KEY'),
             'url' => env('OPENAI_URL', 'https://api.openai.com/v1'),
             'apps_challenge_token' => env('OPENAI_APPS_CHALLENGE_TOKEN'),
+            'models' => [
+                'text' => ['cheapest' => 'gpt-5.6-luna'],
+            ],
         ],
 
         'openrouter' => [

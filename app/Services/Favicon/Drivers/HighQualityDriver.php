@@ -65,13 +65,9 @@ final class HighQualityDriver implements Fetcher
         throw new \Exception('fetchAll not supported by HighQualityDriver');
     }
 
-    /**
-     * The favicon-fetcher HTTP client, hardened so every redirect hop is
-     * re-validated against {@see SsrfGuard} (SSRF, CWE-918).
-     */
     private function guardedHttpClient(): PendingRequest
     {
-        return $this->httpClient()->withOptions(SsrfGuard::redirectGuardOptions());
+        return SsrfGuard::guard($this->httpClient());
     }
 
     private function tryAppleTouchIcon(string $url): ?Favicon

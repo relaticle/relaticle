@@ -70,14 +70,7 @@ final class WorkspaceMemberSelect extends Select
             return self::orderByCurrentUserFirst($query->whereIn('users.id', []));
         }
 
-        // The owner is not a `workspace_user` row, so membership is the pivot plus the owner,
-        // the same two sources App\Support\TenantFkValidator checks on the API side.
-        $query->where(function (Builder $members) use ($workspace): void {
-            $members->whereKey($workspace->user_id)
-                ->orWhereHas('workspaces', fn (Builder $workspaces): Builder => $workspaces->whereKey($workspace->getKey()));
-        });
-
-        return self::orderByCurrentUserFirst($query);
+        return self::orderByCurrentUserFirst($query->memberOf($workspace));
     }
 
     /**

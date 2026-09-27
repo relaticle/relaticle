@@ -92,9 +92,7 @@ final readonly class TenantFkValidator
             throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
-        $memberIds = $workspace->users()->pluck('users.id')->all();
-        $memberIds[] = $workspace->user_id;
-        $memberIds = array_map(strval(...), $memberIds);
+        $memberIds = array_map(strval(...), User::query()->memberOf($workspace)->pluck('id')->all());
 
         foreach ($fields as $field) {
             $values = $data[$field] ?? null;
@@ -133,9 +131,7 @@ final readonly class TenantFkValidator
             throw ValidationException::withMessages(['workspace' => 'No active workspace.']);
         }
 
-        $memberIds = $workspace->users()->pluck('users.id')->all();
-        $memberIds[] = $workspace->user_id;
-        $memberIds = array_map(strval(...), $memberIds);
+        $memberIds = array_map(strval(...), User::query()->memberOf($workspace)->pluck('id')->all());
 
         foreach ($fields as $field) {
             $value = $data[$field] ?? null;

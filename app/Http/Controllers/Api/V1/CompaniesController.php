@@ -8,7 +8,6 @@ use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\ListCompanies;
 use App\Actions\Company\UpdateCompany;
-use App\Enums\CreationSource;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreCompanyRequest;
 use App\Http\Requests\Api\V1\UpdateCompanyRequest;
@@ -44,7 +43,7 @@ final readonly class CompaniesController
     #[ResponseFromApiResource(CompanyResource::class, Company::class, status: 201)]
     public function store(StoreCompanyRequest $request, CreateCompany $action, #[CurrentUser] User $user): JsonResponse
     {
-        $company = $action->execute($user, $request->validated(), CreationSource::API);
+        $company = $action->execute($user, $request->validated());
 
         return new CompanyResource($company)
             ->response()

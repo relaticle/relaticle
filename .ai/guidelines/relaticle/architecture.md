@@ -90,6 +90,16 @@ a per-entity copy: API form request, MCP tool, chat tool, MCP schema resource. A
 writable field or a relation include to one of them fails that test until the others
 follow.
 
+A query predicate over one model's columns has one owner too: a `#[Scope]` on that model,
+such as `AgentConversation::ownedBy()` or `AgentConversationMessage::typed()`. Every
+reader goes through it. A `DB::table` reader that wants plain rows keeps them with
+`Model::query()->ownedBy($user)->toBase()` and never copies the `where` clauses. Readers
+that each wrote their own filter drifted: `sentBy()` skipped the typed check and tagged
+users `has-ai-usage` who had never typed. Scoped queries take no table alias, because
+`whereKey()` and `whereRelation()` qualify columns with the table name, which Postgres
+rejects under an alias. `tests/Arch/ConventionsTest.php` fails when a public method
+outside a model, enum, or `Scope` class takes a query builder.
+
 ## i18n enforcement
 
 Two custom PHPStan rules (`app/PHPStan/Rules/`) forbid hardcoded user-facing

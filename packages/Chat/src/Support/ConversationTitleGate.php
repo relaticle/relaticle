@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversationMessage;
 
 /**
  * The single definition of "this conversation may still be auto-titled".
@@ -100,19 +101,11 @@ final readonly class ConversationTitleGate
      * The user messages a person actually typed, oldest first.
      *
      * Some rows stored with `role = user` were never typed by anyone: the
-     * approval echo the dock writes when a proposal is decided, and the prompt a
-     * turn resumed by that decision runs on. Counting those against the attempt
-     * window burns it on a conversation where the user said one thing and then
-     * clicked approve twice, leaving the chat stuck under its opening message
-     * forever. Worse, the newest of them would become the text handed to the
-     * titler.
-     *
-     * A system-authored row carries a `meta->kind`; a typed one has none. Match
-     * on the ABSENCE of any kind rather than on a known list of them, so a kind
-     * added later is excluded by default: the failure that matters is naming a
-     * chat after machinery the user never saw. Use coalesce, not a bare
-     * `meta->>'kind'` comparison, on a row with no meta the comparison is NULL,
-     * the enclosing AND is NULL, and the row silently drops out.
+     * setup greeting and the prompt a turn resumed by an approval decision runs
+     * on. Counting those against the attempt window burns it on a conversation
+     * where the user said one thing and then clicked approve twice, leaving the
+     * chat stuck under its opening message forever. Worse, the newest of them
+     * would become the text handed to the titler.
      *
      * Superseded rows are deliberately still counted. Editing the opening
      * message supersedes it but leaves the stored title on the original text,
@@ -128,12 +121,11 @@ final readonly class ConversationTitleGate
      */
     private static function typedMessages(string $conversationId): Collection
     {
-        return DB::table('agent_conversation_messages')
+        return AgentConversationMessage::query()
+            ->typed()
             ->where('conversation_id', $conversationId)
-            ->where('role', 'user')
-            ->where('content', 'not like', '[approval]%')
-            ->whereRaw("coalesce(meta->>'kind', '') = ''")
             ->orderBy('id')
+            ->toBase()
             ->get(['content', 'meta'])
             ->map(function (object $row): string {
                 $meta = $row->meta === null ? null : json_decode((string) $row->meta, true);

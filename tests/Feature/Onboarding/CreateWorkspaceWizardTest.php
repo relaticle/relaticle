@@ -17,6 +17,8 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -118,11 +120,52 @@ it('resolves every wizard form label from translations', function (): void {
 
     livewire(CreateWorkspace::class)
         ->assertSuccessful()
+        ->assertSee(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.workspace_name.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.workspace_handle.label'))
         ->assertSee(__('filament/pages/workspaces.create_workspace.form.use_case_label'))
         ->assertDontSee('filament/pages/workspaces.create_workspace.form');
+});
+
+it('stores the optional company logo picked during onboarding', function (): void {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'logo' => UploadedFile::fake()->image('logo.png', 200, 200),
+            'name' => 'Logo Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = Workspace::query()->where('name', 'Logo Corp')->sole();
+
+    expect($workspace->getFirstMedia(Workspace::LOGO_MEDIA_COLLECTION))->not->toBeNull();
+});
+
+it('creates the workspace when no company logo is picked', function (): void {
+    Storage::fake('public');
+
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Logoless Corp',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect(Workspace::query()->where('name', 'Logoless Corp')->sole()->getMedia(Workspace::LOGO_MEDIA_COLLECTION))
+        ->toHaveCount(0);
 });
 
 it('prefills the workspace step with the current user name', function (): void {
@@ -146,7 +189,7 @@ it('hides your name for a user who already has a workspace', function (): void {
 it('hides your name for an invited member who owns no workspace yet', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $member = User::factory()->create();
-    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $member->forceFill(['current_workspace_id' => $owner->currentWorkspace->getKey()])->save();
 
     $this->actingAs($member);
@@ -184,6 +227,34 @@ it('derives the handle from the name as it is typed', function (): void {
     livewire(CreateWorkspace::class)
         ->fillForm(['name' => 'Acme Corp'])
         ->assertFormSet(['slug' => 'acme-corp']);
+});
+
+it('leaves a handle the user typed alone when the name changes afterwards', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['slug' => 'my-own-handle'])
+        ->fillForm(['name' => 'Contoso Industries'])
+        ->assertFormSet(['slug' => 'my-own-handle']);
+});
+
+it('saves the handle the user typed rather than the one derived from the name', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm(['slug' => 'my-own-handle'])
+        ->fillForm([
+            'name' => 'Contoso Industries',
+            'onboarding_use_case' => OnboardingUseCase::Other->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    expect($user->fresh()->personalWorkspace()->slug)->toBe('my-own-handle');
 });
 
 it('picks the lowest free suffix, skipping the ones already in use', function (): void {
@@ -352,7 +423,7 @@ it('offers a way back to the current workspace for users who already have one', 
     expect($component->instance()->getCancelUrl())
         ->toBe(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 
-    $component->assertSee(__('filament/pages/workspaces.create_workspace.actions.cancel'));
+    $component->assertSee('workspace-cancel-link');
 });
 
 it('offers no way back for workspaceless users, who have nowhere to go', function (): void {
@@ -364,7 +435,7 @@ it('offers no way back for workspaceless users, who have nowhere to go', functio
 
     expect($component->instance()->getCancelUrl())->toBeNull();
 
-    $component->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.cancel'));
+    $component->assertDontSee('workspace-cancel-link');
 });
 
 it('creates a workspace with onboarding fields', function (): void {

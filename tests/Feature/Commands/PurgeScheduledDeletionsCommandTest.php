@@ -30,7 +30,7 @@ test('purging a user anonymises their chat participation in workspaces that surv
     $workspace = $owner->currentWorkspace;
 
     $member = User::factory()->scheduledForDeletion(-1)->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     $conversationId = (string) Str::uuid7();
 
@@ -53,8 +53,7 @@ test('purging a user anonymises their chat participation in workspaces that surv
         'role' => 'user',
         'content' => 'hello',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '[]',
         'meta' => '[]',
         'created_at' => now(),
@@ -116,7 +115,7 @@ test('day 25 reminder is sent to workspace owner only', function () {
     $workspace = $owner->currentWorkspace;
     $workspace->update(['scheduled_deletion_at' => now()->addDays(5)]);
     $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'editor']);
+    $workspace->users()->attach($member, ['role' => 'member']);
 
     $this->artisan('app:purge-scheduled-deletions')
         ->assertExitCode(0);

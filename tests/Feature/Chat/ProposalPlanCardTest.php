@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\People;
@@ -201,4 +202,26 @@ it('never resolves a dock read from a client-supplied id, so another tenant cann
         ->assertReturned(fn (array $fields): bool => collect($fields)->contains(
             fn (array $row): bool => ($row['value'] ?? null) === 'Acme Corp',
         ));
+});
+
+it('tells an approver demoted since the plan was proposed that their role no longer allows it', function (): void {
+    Bus::fake();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member->fresh());
+    [$company] = ProposalCardFixture::planSteps($member->fresh());
+
+    $this->workspace->users()->updateExistingPivot($member->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    $this->actingAs($member->fresh());
+
+    $component = Livewire::test(ProposalCard::class)
+        ->call('setActive', $company->getKey())
+        ->call('approveAll');
+
+    expect($component->errors()->get('resolve'))->toBe([
+        __('Step :step could not be completed: :message', ['step' => 1, 'message' => __('You no longer have permission to make this change.')]),
+    ])
+        ->and(Company::query()->where('name', 'Northwind Traders')->exists())->toBeFalse();
 });

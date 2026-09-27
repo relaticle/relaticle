@@ -41,7 +41,7 @@ it('does not render the banner when the intended url is unrelated', function ():
 test('a token invitation link shows the workspace banner on login', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
 
-    $invitation = $workspace->workspaceInvitations()->make(['email' => 'guest@example.test', 'role' => 'editor']);
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'guest@example.test', 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 
@@ -60,7 +60,7 @@ test('a guest is sent to login whether or not the invited email has an account',
         User::factory()->create(['email' => $email]);
     }
 
-    $invitation = $workspace->workspaceInvitations()->make(['email' => $email, 'role' => 'editor']);
+    $invitation = $workspace->workspaceInvitations()->make(['email' => $email, 'role' => 'member']);
     $raw = $invitation->issueToken();
     $invitation->save();
 

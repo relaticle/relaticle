@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\People;
 
-use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
@@ -17,7 +16,7 @@ final readonly class CreatePeople
     /**
      * @param  array<string, mixed>  $data
      */
-    public function execute(User $user, array $data, CreationSource $source = CreationSource::WEB): People
+    public function execute(User $user, array $data): People
     {
         abort_unless($user->can('create', People::class), 403);
 
@@ -26,7 +25,6 @@ final readonly class CreatePeople
         ]);
 
         $attributes = Arr::only($data, ['name', 'company_id', 'custom_fields']);
-        $attributes['creation_source'] = $source;
 
         $person = DB::transaction(fn (): People => People::query()->create($attributes));
 

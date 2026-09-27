@@ -111,7 +111,7 @@ it('groups tasks by workspace for multi-workspace users', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspaceA = $user->currentWorkspace;
     $workspaceB = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $workspaceB->users()->attach($user, ['role' => 'editor']);
+    $workspaceB->users()->attach($user, ['role' => 'member']);
 
     $a = Task::factory()->for($workspaceA)->create(['title' => 'a']);
     $a->assignees()->attach($user);

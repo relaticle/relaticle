@@ -564,7 +564,7 @@
 
         {{-- Pre-token streaming indicator: flat shimmer label where the
              assistant's text will land --}}
-        <template x-if="isStreaming && !currentToolStatus && (messages.length === 0 || messages[messages.length-1].role !== 'assistant' || !messages[messages.length-1].content)">
+        <template x-if="showThinkingIndicator()">
             <div class="flex justify-start" aria-label="{{ __('Assistant is thinking') }}" role="status">
                 <div data-chat-loading-indicator class="flex items-center gap-2 px-1 py-2 text-sm text-gray-600 dark:text-gray-300">
                     <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>

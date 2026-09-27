@@ -450,6 +450,17 @@ it('refuses to approve an update whose every change is unchecked', function (): 
         ->and($company->fresh()->account_owner_id)->toBeNull();
 });
 
+it('shows the old value in the dock when a setting changes from zero', function (): void {
+    $action = ProposalCardFixture::proposal($this->user,
+        ['name' => 'Acme Corp'],
+        ['title' => 'Update Custom Field', 'summary' => 'Update custom field "Amount"', 'fields' => [['label' => 'Decimal Places', 'old' => '0', 'new' => '2']]],
+    );
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->assertSeeHtml('dark:decoration-gray-600">0</span>');
+});
+
 it('renders a single (non-batch) proposal without a stepper', function (): void {
     $action = ProposalCardFixture::proposal($this->user, ['name' => 'Solo Inc'], ['title' => 'Create Company', 'summary' => 'Solo Inc', 'fields' => [['label' => 'Name', 'value' => 'Solo Inc']]]);
 

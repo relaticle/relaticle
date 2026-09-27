@@ -23,8 +23,15 @@ it('indexes workspace_id + participant + updated_at on agent_conversations', fun
 it('exposes polymorphic participant columns on both conversation tables', function (): void {
     expect(Schema::hasColumns('agent_conversations', ['participant_type', 'participant_id']))->toBeTrue()
         ->and(Schema::hasColumn('agent_conversations', 'user_id'))->toBeFalse()
-        ->and(Schema::hasColumns('agent_conversation_messages', ['participant_type', 'participant_id', 'approval_state']))->toBeTrue()
+        ->and(Schema::hasColumns('agent_conversation_messages', ['participant_type', 'participant_id']))->toBeTrue()
         ->and(Schema::hasColumn('agent_conversation_messages', 'user_id'))->toBeFalse();
+});
+
+it('stores each turn as steps with a status instead of flat tool call columns', function (): void {
+    expect(Schema::hasColumns('agent_conversation_messages', ['steps', 'status']))->toBeTrue()
+        ->and(Schema::hasColumn('agent_conversation_messages', 'tool_calls'))->toBeFalse()
+        ->and(Schema::hasColumn('agent_conversation_messages', 'tool_results'))->toBeFalse()
+        ->and(Schema::hasColumn('agent_conversation_messages', 'approval_state'))->toBeFalse();
 });
 
 it('drops the user foreign keys so a polymorphic participant is storable', function (): void {

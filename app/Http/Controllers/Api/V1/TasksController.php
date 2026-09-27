@@ -8,7 +8,6 @@ use App\Actions\Task\CreateTask;
 use App\Actions\Task\DeleteTask;
 use App\Actions\Task\ListTasks;
 use App\Actions\Task\UpdateTask;
-use App\Enums\CreationSource;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
 use App\Http\Requests\Api\V1\UpdateTaskRequest;
@@ -44,7 +43,7 @@ final readonly class TasksController
     #[ResponseFromApiResource(TaskResource::class, Task::class, status: 201)]
     public function store(StoreTaskRequest $request, CreateTask $action, #[CurrentUser] User $user): JsonResponse
     {
-        $task = $action->execute($user, $request->validated(), CreationSource::API);
+        $task = $action->execute($user, $request->validated());
 
         return new TaskResource($task)
             ->response()

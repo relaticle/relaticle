@@ -33,12 +33,17 @@ return [
                 'label' => 'Your name',
                 'placeholder' => 'Jane Doe',
             ],
+            'company_logo' => [
+                'label' => 'Company logo',
+                'description' => 'We support PNGs, JPEGs and WebPs under :max. Recommended size is 400x400px.',
+            ],
             'workspace_name' => [
-                'label' => 'Workspace name',
-                'placeholder' => 'Acme Corp',
+                'label' => 'Company name',
+                'placeholder' => 'Enter your company name',
             ],
             'workspace_handle' => [
                 'label' => 'Workspace handle',
+                'placeholder' => 'my-workspace',
                 'helper_text' => 'Only lowercase letters, numbers, and hyphens are allowed.',
             ],
             'use_case_label' => 'What will you be using Relaticle for?',

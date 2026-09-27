@@ -21,7 +21,7 @@ beforeEach(function (): void {
 
 it('still saves task assignees through the pivot after the migration', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->workspace->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'member']);
 
     livewire(ManageTasks::class)
         ->callAction('create', [
@@ -37,7 +37,7 @@ it('still saves task assignees through the pivot after the migration', function 
 
 it('keeps the assignee filter usable and bounded on the tasks list', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->workspace->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'member']);
 
     $assignedToMate = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $assignedToMate->assignees()->attach($mate);
@@ -64,7 +64,7 @@ it('keeps the assignee filter usable and bounded on the tasks list', function ()
 
 it('runs the bounded assignee filter query on the tasks board without a Postgres distinct/order-by conflict', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
-    $this->workspace->users()->attach($mate, ['role' => 'editor']);
+    $this->workspace->users()->attach($mate, ['role' => 'member']);
 
     DB::enableQueryLog();
 

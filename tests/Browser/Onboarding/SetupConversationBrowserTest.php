@@ -13,6 +13,7 @@ use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -64,8 +65,7 @@ it('opens the setup conversation with the assistant already speaking', function 
     expect(TurnPresence::current($conversationId))->not->toBeNull();
 
     Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->conversationId === $conversationId
-        && $job->message === StartSetupGreeting::PROMPT
-        && $job->isContinuation);
+        && $job->origin === MessageOrigin::Greeting);
 });
 
 it('approves a seeded proposal in the setup thread and completes the first-record step', function (): void {

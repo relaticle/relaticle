@@ -384,6 +384,41 @@ describe('photo upload', function () {
             ->profile_photo_path->toBe($photoPath);
     });
 
+    test('refuses a photo path another user owns, leaving their file in place', function () {
+        Storage::fake('public');
+        Storage::disk('public')->put('profile-photos/victim.png', onePixelPng());
+        User::factory()->create(['profile_photo_path' => 'profile-photos/victim.png']);
+
+        $this->actingAs($this->user)
+            ->put('/user/profile-information', [
+                'name' => 'John Doe',
+                'email' => 'john@example.com',
+                'profile_photo_path' => 'profile-photos/victim.png',
+            ])
+            ->assertSessionHasErrorsIn('updateProfileInformation', 'profile_photo_path');
+
+        expect($this->user->fresh()->profile_photo_path)->toBeNull()
+            ->and(Storage::disk('public')->exists('profile-photos/victim.png'))->toBeTrue();
+    });
+
+    test('refuses a photo path that is not an uploaded raster photo', function (string $path, string $contents) {
+        Storage::fake('public');
+        Storage::disk('public')->put($path, $contents);
+
+        expect(fn () => $this->action->update($this->user, [
+            'name' => 'John Doe',
+            'email' => 'john@example.com',
+            'profile_photo_path' => $path,
+        ]))->toThrow(ValidationException::class);
+
+        expect($this->user->fresh()->profile_photo_path)->toBeNull()
+            ->and(Storage::disk('public')->exists($path))->toBeTrue();
+    })->with([
+        'a company logo' => ['12/logo.png', onePixelPng()],
+        'a traversal out of the photo directory' => ['profile-photos/../12/logo.png', onePixelPng()],
+        'an svg in the photo directory' => ['profile-photos/avatar.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
+    ]);
+
     test('null profile_photo_path does not delete existing photo', function () {
         Storage::fake('public');
 
@@ -495,6 +530,28 @@ describe('photo upload', function () {
             ->name->toBe('Updated Name')
             ->email->toBe('photo-test@example.com')
             ->profile_photo_path->not->toBeNull();
+    });
+
+    test('refuses an svg profile photo', function () {
+        Storage::fake('public');
+        $user = User::factory()->withWorkspace()->create(['email' => 'svg-photo@example.com']);
+        $this->actingAs($user);
+
+        $svg = UploadedFile::fake()->createWithContent(
+            'avatar.svg',
+            '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(document.domain)</script></svg>',
+        );
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm([
+                'name' => 'Updated Name',
+                'email' => 'svg-photo@example.com',
+                'profile_photo_path' => $svg,
+            ])
+            ->call('updateProfile')
+            ->assertHasFormErrors(['profile_photo_path']);
+
+        expect($user->fresh()->profile_photo_path)->toBeNull();
     });
 });
 

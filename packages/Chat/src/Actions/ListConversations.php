@@ -6,7 +6,7 @@ namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Support\TitleSanitizer;
 
 final readonly class ListConversations
@@ -16,12 +16,11 @@ final readonly class ListConversations
      */
     public function execute(User $user, int $limit = 50): Collection
     {
-        return DB::table('agent_conversations')
-            ->where('participant_type', $user->getMorphClass())
-            ->where('participant_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
+        return AgentConversation::query()
+            ->ownedBy($user)
             ->latest('updated_at')
             ->limit($limit)
+            ->toBase()
             ->get(['id', 'title', 'created_at', 'updated_at'])
             ->map(function (\stdClass $row): \stdClass {
                 $row->title = TitleSanitizer::clean((string) $row->title);

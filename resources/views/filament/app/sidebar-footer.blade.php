@@ -3,14 +3,17 @@
     $workspace = \Filament\Facades\Filament::getTenant();
     $user = \Filament\Facades\Filament::auth()->user();
 
-    // Every row below links somewhere only a workspace admin can act on:
-    // Members::canAccess() is can('update', $tenant), and the billing page is
-    // the same. Showing them to an editor would be a footer of 403s.
-    $canManage = $workspace instanceof \App\Models\Workspace
+    // Members::canAccess() reads MembersManage (owner and admin). Billing's page is
+    // open to every member, so the nudge follows its actions' BillingManage instead.
+    $canInviteMembers = $workspace instanceof \App\Models\Workspace
         && $user instanceof \App\Models\User
-        && $user->can('update', $workspace);
+        && $user->can('manageMembers', $workspace);
 
-    $billing = $canManage
+    $canManageBilling = $workspace instanceof \App\Models\Workspace
+        && $user instanceof \App\Models\User
+        && $user->hasWorkspaceCapability($workspace->getKey(), \App\Enums\WorkspaceCapability::BillingManage);
+
+    $billing = $canManageBilling
         ? resolve(\App\Services\Billing\SidebarBillingState::class)->for($workspace)
         : null;
 
@@ -27,7 +30,7 @@
         : 'border-gray-200 px-1.5 py-0.5 text-gray-600 group-hover:border-gray-300 group-hover:text-gray-900 dark:border-white/10 dark:text-gray-300 dark:group-hover:text-white';
 @endphp
 
-@if($canManage)
+@if($canInviteMembers || $billing !== null)
     {{-- Hidden while the sidebar is collapsed, the same way Filament gates its
          own global search. Without this the footer's intrinsic width holds the
          sidebar open and the collapse button appears to do nothing. --}}
@@ -40,10 +43,12 @@
     >
         @livewire(\App\Livewire\App\Onboarding\ActivationChecklist::class)
 
-        <a href="{{ \App\Filament\Pages\Workspace\Members::getUrl() }}" class="{{ $rowClasses }}">
-            <x-heroicon-o-user-plus class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
-            <span class="truncate">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
-        </a>
+        @if($canInviteMembers)
+            <a href="{{ \App\Filament\Pages\Workspace\Members::getUrl() }}" class="{{ $rowClasses }}">
+                <x-heroicon-o-user-plus class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                <span class="truncate">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
+            </a>
+        @endif
 
         @if($billing !== null)
             {{-- The whole row is the target, not just a button at its end: the

@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Support\TitleSanitizer;
 use RuntimeException;
 
@@ -13,14 +14,11 @@ final readonly class RenameConversation
 {
     public function execute(User $user, string $conversationId, string $title): string
     {
-        $row = DB::table('agent_conversations')
-            ->where('id', $conversationId)
-            ->where('participant_type', $user->getMorphClass())
-            ->where('participant_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
-            ->first();
-
-        throw_if($row === null, RuntimeException::class, 'Conversation not found.');
+        throw_unless(
+            AgentConversation::query()->ownedBy($user)->whereKey($conversationId)->exists(),
+            RuntimeException::class,
+            'Conversation not found.',
+        );
 
         $sanitized = TitleSanitizer::clean($title);
 

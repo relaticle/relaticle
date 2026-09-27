@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Billing;
 use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\RestoreWorkspaceTrial;
+use App\Enums\StripeSubscriptionStatus;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
@@ -14,14 +15,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class StripeWebhookController extends CashierWebhookController
 {
-    /**
-     * Stripe statuses a subscription can be created in without ever granting
-     * access: a checkout whose first payment failed or was abandoned.
-     *
-     * @var list<string>
-     */
-    private const array NON_GRANTING_STATUSES = ['incomplete', 'incomplete_expired'];
-
     /**
      * Why an invoice was raised, for the failures worth alarming a workspace
      * about: a renewal, and a plan change billed immediately. Both belong to a
@@ -52,7 +45,7 @@ final class StripeWebhookController extends CashierWebhookController
         /** @var array<string, mixed> $object */
         $object = $payload['data']['object'] ?? [];
 
-        if (! in_array($object['status'] ?? null, self::NON_GRANTING_STATUSES, true)) {
+        if (! in_array($object['status'] ?? null, StripeSubscriptionStatus::neverGranted(), true)) {
             return parent::handleCustomerSubscriptionCreated($payload);
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Enums\CreationSource;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
@@ -135,6 +136,7 @@ abstract class BaseReadListTool implements Tool
             [
                 'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
                 'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
+                'creation_source' => $schema->string()->enum(CreationSource::values())->description(CreationSource::filterDescription()),
                 'custom_fields' => $schema->object()->description($customFieldsDescription),
                 'sort' => $schema->string()->description(
                     'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
@@ -652,6 +654,26 @@ abstract class BaseReadListTool implements Tool
     /**
      * @throws ValidationException
      */
+    private function creationSourceFilter(Request $request): ?string
+    {
+        $value = $request['creation_source'] ?? null;
+
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if (! is_string($value) || ! CreationSource::tryFrom($value) instanceof CreationSource) {
+            throw ValidationException::withMessages([
+                'creation_source' => 'creation_source must be one of: '.implode(', ', CreationSource::values()).'.',
+            ]);
+        }
+
+        return $value;
+    }
+
+    /**
+     * @throws ValidationException
+     */
     private function buildHttpRequest(User $user, Request $request): HttpRequest
     {
         $input = [];
@@ -661,6 +683,7 @@ abstract class BaseReadListTool implements Tool
                 $this->searchFilterName() => $request['search'] ?? null,
                 'created_after' => $request['created_after'] ?? null,
                 'created_before' => $request['created_before'] ?? null,
+                'creation_source' => $this->creationSourceFilter($request),
             ],
             $this->additionalFilters($request),
         ));

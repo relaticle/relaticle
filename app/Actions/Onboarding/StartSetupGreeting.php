@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Services\AiModelResolver;
@@ -23,15 +24,9 @@ use Relaticle\Chat\Support\TurnPresence;
  * greeting streams in while they watch instead of arriving as text that was
  * already there. It is a real turn on a real model: what it says comes from
  * the <onboarding> block, not from a template.
- *
- * Shaped like TurnContinuationService::resume, and for the same reason: the
- * provider needs a final user turn, so the prompt below is stored as one and
- * stamped as a continuation, which keeps it out of the transcript.
  */
 final readonly class StartSetupGreeting
 {
-    public const string PROMPT = 'The user finished signing up a moment ago and just opened this conversation. Nobody has typed anything: you speak first, and they are watching this message appear. Greet them by first name. Say in one line what their workspace is ready for, naming the first and last stage from the stages line when there is one. Then ask them to bring their own data in: paste a list of contacts in any columns and any order, attach a CSV, or describe a few people they are working with right now. Three short paragraphs at most, no lists, no headings, and call no tools in this turn.';
-
     /**
      * Long enough to cover the turn's own lifetime (ProcessChatMessage times
      * out at 120 seconds and stops retrying at 3 minutes), short enough that a
@@ -88,16 +83,16 @@ final readonly class StartSetupGreeting
             return false;
         }
 
-        TurnPresence::begin($conversationId, turnId: $turnId, message: '', isContinuation: true);
+        TurnPresence::begin($conversationId, turnId: $turnId, message: '', origin: MessageOrigin::Greeting);
 
         dispatch(new ProcessChatMessage(
             user: $user,
             workspace: $workspace,
-            message: self::PROMPT,
+            message: '',
             conversationId: $conversationId,
             resolved: $this->models->resolve($user),
             turnId: $turnId,
-            isContinuation: true,
+            origin: MessageOrigin::Greeting,
         ));
 
         return true;

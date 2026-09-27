@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
-use Relaticle\Chat\Support\TranscriptScope;
+use Relaticle\Chat\Support\StoredSteps;
 use stdClass;
 
 final readonly class ListConversationMessages
@@ -28,20 +30,13 @@ final readonly class ListConversationMessages
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
-        $query = TranscriptScope::apply(
-            DB::table('agent_conversation_messages as m'),
-            $user,
-            $conversationId,
-        );
-
-        if ($beforeMessageId !== null) {
-            $query->where('m.id', '<', $beforeMessageId);
-        }
-
-        $messages = $query
-            ->orderByDesc('m.id')
+        $messages = AgentConversationMessage::query()
+            ->visibleTo($user, $conversationId)
+            ->when($beforeMessageId !== null, fn (Builder $query): Builder => $query->where('id', '<', $beforeMessageId))
+            ->orderByDesc('id')
             ->limit($limit)
-            ->get(['m.id', 'm.role', 'm.content', 'm.document', 'm.tool_results', 'm.meta', 'm.created_at'])
+            ->toBase()
+            ->get(['id', 'role', 'content', 'document', 'steps', 'meta', 'created_at'])
             ->reverse()
             ->values();
 
@@ -56,11 +51,15 @@ final readonly class ListConversationMessages
             ->get(['message_id', 'rating', 'category'])
             ->keyBy('message_id');
 
+        $toolResultsByMessage = [];
         $envelopesByMessage = [];
         $pendingIds = [];
 
         foreach ($messages as $msg) {
-            $envelopes = $this->pendingActionEnvelopes($msg->tool_results === null ? null : (string) $msg->tool_results);
+            $toolResults = StoredSteps::toolResults($msg->steps);
+            $toolResultsByMessage[(string) $msg->id] = $toolResults;
+
+            $envelopes = $this->pendingActionEnvelopes($toolResults);
             $envelopesByMessage[(string) $msg->id] = $envelopes;
 
             foreach ($envelopes as $inner) {
@@ -94,7 +93,7 @@ final readonly class ListConversationMessages
                 ])
                 ->all();
 
-        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $envelopesByMessage, $records): array {
+        return $messages->map(function (object $msg) use ($mentionsByMessage, $feedbackByMessage, $toolResultsByMessage, $envelopesByMessage, $records): array {
             $attachment = $this->attachmentFromMeta($msg->meta === null ? null : (string) $msg->meta);
 
             return [
@@ -124,9 +123,7 @@ final readonly class ListConversationMessages
                 // already reading the wrong time before this fix).
                 'created_at' => $msg->created_at === null ? null : Date::parse((string) $msg->created_at, 'UTC')->toISOString(),
                 'pending_actions' => $this->extractPendingActions($envelopesByMessage[(string) $msg->id] ?? [], $records),
-                'display_blocks' => DisplayBlocks::collect(
-                    $msg->tool_results === null ? null : (string) $msg->tool_results,
-                ),
+                'display_blocks' => DisplayBlocks::collect($toolResultsByMessage[(string) $msg->id]),
                 'next_steps' => NextSteps::fromMeta($msg->meta === null ? null : (string) $msg->meta),
                 'feedback' => isset($feedbackByMessage[$msg->id]) ? [
                     'rating' => (string) $feedbackByMessage[$msg->id]->rating,
@@ -181,27 +178,18 @@ final readonly class ListConversationMessages
     }
 
     /**
-     * The decoded `pending_action` envelopes inside a message's tool_results,
+     * The decoded `pending_action` envelopes inside a message's tool results,
      * parsed once and shared by the id collection and the card extraction.
      *
+     * @param  list<array<string, mixed>>  $toolResults
      * @return list<array<string, mixed>>
      */
-    private function pendingActionEnvelopes(?string $toolResults): array
+    private function pendingActionEnvelopes(array $toolResults): array
     {
-        if ($toolResults === null) {
-            return [];
-        }
-
-        $parsed = json_decode($toolResults, true);
-
-        if (! is_array($parsed)) {
-            return [];
-        }
-
         $envelopes = [];
 
-        foreach ($parsed as $toolResult) {
-            if (! is_array($toolResult) || ! isset($toolResult['result'])) {
+        foreach ($toolResults as $toolResult) {
+            if (! isset($toolResult['result'])) {
                 continue;
             }
 

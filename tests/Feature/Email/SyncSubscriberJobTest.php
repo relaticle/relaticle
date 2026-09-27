@@ -11,14 +11,18 @@ use App\Models\UserSocialAccount;
 use App\Support\Email\SubscriberProfile;
 use App\Support\Email\SubscriberProfileDeriver;
 use Illuminate\Contracts\Queue\Job as QueueJob;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Spatie\MailcoachSdk\Exceptions\InvalidData;
 use Spatie\MailcoachSdk\Exceptions\RateLimited;
 use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
 use Spatie\MailcoachSdk\Facades\Mailcoach;
 use Spatie\MailcoachSdk\Resources\Subscriber;
 
-mutates(SyncSubscriberJob::class, SubscriberProfileDeriver::class, SubscriberProfile::class);
+mutates(SyncSubscriberJob::class, SubscriberProfileDeriver::class, SubscriberProfile::class, AgentConversationMessage::class);
 
 beforeEach(function (): void {
     Queue::fake([SyncSubscriberJob::class]);
@@ -432,4 +436,62 @@ test('a rejected profile is offered again once it changes, and success clears th
         ->mailcoach_subscriber_uuid->toBe('new-uuid')
         ->subscriber_profile_hash->not->toBeNull()
         ->rejected_subscriber_profile_hash->toBeNull();
+});
+
+function insertChatUserRow(User $user, MessageOrigin $origin): void
+{
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'title' => 'T',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'crm',
+        'role' => 'user',
+        'origin' => $origin->value,
+        'content' => $origin->opener() ?? 'hello',
+        'attachments' => '[]',
+        'steps' => '[]',
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+}
+
+test('a user who only saw the setup greeting is not tagged has-ai-usage', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
+    insertChatUserRow($user, MessageOrigin::Greeting);
+
+    Mailcoach::shouldReceive('findByEmail')->once()->andReturnNull();
+    Mailcoach::shouldReceive('createSubscriber')
+        ->once()
+        ->with('test-list-id', Mockery::on(fn (array $data): bool => ! in_array('has-ai-usage', $data['tags'], true)))
+        ->andReturn(new Subscriber(['uuid' => 'new-uuid', 'email' => $user->email, 'tags' => []]));
+
+    syncSubscriberProfile($user);
+});
+
+test('a user who typed a chat message is tagged has-ai-usage', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email_verified_at' => now()]);
+    insertChatUserRow($user, MessageOrigin::Typed);
+
+    Mailcoach::shouldReceive('findByEmail')->once()->andReturnNull();
+    Mailcoach::shouldReceive('createSubscriber')
+        ->once()
+        ->with('test-list-id', Mockery::on(fn (array $data): bool => in_array('has-ai-usage', $data['tags'], true)))
+        ->andReturn(new Subscriber(['uuid' => 'new-uuid', 'email' => $user->email, 'tags' => []]));
+
+    syncSubscriberProfile($user);
 });

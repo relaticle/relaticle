@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Workspace\CreateWorkspaceInvitation;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
@@ -12,6 +13,7 @@ use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Mail\Events\MessageSending;
@@ -32,16 +34,16 @@ beforeEach(function () {
     Filament::setTenant($this->workspace);
 });
 
-test('an invite with only an email defaults to the editor role', function () {
+test('an invite with only an email defaults to the member role', function () {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction('invitePeople')
-        ->assertActionDataSet(['role' => WorkspaceRole::Editor->value])
+        ->assertActionDataSet(['role' => WorkspaceRole::Member->value])
         ->setActionData(['emails' => 'default-role@example.com'])
         ->callMountedAction();
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->sole();
     expect($invitation->email)->toBe('default-role@example.com')
-        ->and($invitation->role)->toBe(WorkspaceRole::Editor->value);
+        ->and($invitation->role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('workspace members can be invited to workspace', function () {
@@ -66,7 +68,7 @@ test('invitation expires_at is set based on config', function () {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'test@example.com',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->first();
@@ -113,32 +115,32 @@ test('invite returns the created invitation', function () {
 test('creates an invitation through the chat adapter action', function () {
     $invitation = resolve(CreateWorkspaceInvitation::class)->execute(
         $this->user,
-        ['email' => 'new@example.com', 'role' => WorkspaceRole::Editor->value],
+        ['email' => 'new@example.com', 'role' => WorkspaceRole::Member->value],
     );
 
     expect($invitation->email)->toBe('new@example.com')
-        ->and($invitation->role)->toBe(WorkspaceRole::Editor->value)
+        ->and($invitation->role)->toBe(WorkspaceRole::Member->value)
         ->and($invitation->workspace_id)->toBe($this->workspace->getKey());
 
     Mail::assertQueued(WorkspaceInvitationMail::class);
 });
 
-test('the chat adapter action defaults to the editor role when none is given', function () {
+test('the chat adapter action defaults to the member role when none is given', function () {
     $invitation = resolve(CreateWorkspaceInvitation::class)->execute(
         $this->user,
         ['email' => 'no-role@example.com'],
     );
 
-    expect($invitation->role)->toBe(WorkspaceRole::Editor->value);
+    expect($invitation->role)->toBe(WorkspaceRole::Member->value);
 });
 
 test('the chat adapter action rejects an invitation for an existing workspace member', function () {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Member->value]);
 
     expect(fn () => resolve(CreateWorkspaceInvitation::class)->execute(
         $this->user,
-        ['email' => $member->email, 'role' => WorkspaceRole::Editor->value],
+        ['email' => $member->email, 'role' => WorkspaceRole::Member->value],
     ))->toThrow(ValidationException::class);
 
     expect($this->workspace->fresh()->workspaceInvitations)->toBeEmpty();
@@ -161,7 +163,7 @@ test('admin cannot invite a new member as admin', function (): void {
 });
 
 test('queues the invitation mail rather than sending it inline', function () {
-    resolve(InviteWorkspaceMember::class)->invite($this->user, $this->workspace, 'queued@example.com', WorkspaceRole::Editor->value);
+    resolve(InviteWorkspaceMember::class)->invite($this->user, $this->workspace, 'queued@example.com', WorkspaceRole::Member->value);
 
     Mail::assertNotSent(WorkspaceInvitationMail::class);
     Mail::assertQueued(WorkspaceInvitationMail::class, fn (WorkspaceInvitationMail $mail): bool => $mail->afterCommit === true);
@@ -178,7 +180,7 @@ test('does not dispatch the invitation mail while the transaction is still open'
     );
 
     DB::transaction(function (): void {
-        resolve(InviteWorkspaceMember::class)->invite($this->user, $this->workspace, 'in-tx@example.com', WorkspaceRole::Editor->value);
+        resolve(InviteWorkspaceMember::class)->invite($this->user, $this->workspace, 'in-tx@example.com', WorkspaceRole::Member->value);
     });
 
     expect($levelAtDispatch)->toBeNull();
@@ -213,19 +215,19 @@ test('admin can manage members but cannot promote to admin', function (): void {
         ->and($admin->can('delete', $workspace))->toBeFalse();
 });
 
-test('editor cannot manage members', function (): void {
+test('a member cannot manage members', function (): void {
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
 
-    $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    expect($editor->can('manageMembers', $workspace))->toBeFalse()
-        ->and($editor->can('addWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('updateWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('removeWorkspaceMember', $workspace))->toBeFalse()
-        ->and($editor->can('promoteToAdmin', $workspace))->toBeFalse()
-        ->and($editor->can('update', $workspace))->toBeFalse();
+    expect($member->can('manageMembers', $workspace))->toBeFalse()
+        ->and($member->can('addWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('updateWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('removeWorkspaceMember', $workspace))->toBeFalse()
+        ->and($member->can('promoteToAdmin', $workspace))->toBeFalse()
+        ->and($member->can('update', $workspace))->toBeFalse();
 });
 
 test('viewer cannot manage members', function (): void {
@@ -247,7 +249,7 @@ test('inviting records the inviter and mints a token', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'new@example.test',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->first();
@@ -260,7 +262,7 @@ test('inviting lowercases a mixed-case email', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'Mixed-Case@Example.Test',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->first();
@@ -272,13 +274,13 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'bob@example.test',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'Bob@Example.Test',
-            'role' => 'editor',
+            'role' => 'member',
         ])
         ->assertNotified(
             Notification::make()
@@ -292,12 +294,12 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
 
 test('inviting someone who already belongs to the workspace names the workspace, not the workspace', function (): void {
     $member = User::factory()->create(['email' => 'member@example.test']);
-    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Editor->value]);
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'member@example.test',
-            'role' => 'editor',
+            'role' => 'member',
         ])
         ->assertNotified(
             Notification::make()
@@ -315,7 +317,7 @@ test('invitation email names the inviter and the role', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'new@example.test',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     Mail::assertQueued(WorkspaceInvitationMail::class, function (WorkspaceInvitationMail $mail): bool {
@@ -329,7 +331,7 @@ test('invitation email accept URL resolves to the token route and carries the ra
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [
             'emails' => 'new@example.test',
-            'role' => 'editor',
+            'role' => 'member',
         ]);
 
     $invitation = $this->workspace->fresh()->workspaceInvitations->sole();
@@ -355,7 +357,7 @@ test('an invite that loses a race to an identical concurrent invite reports it a
             'workspace_id' => $invitation->workspace_id,
             'inviter_id' => $invitation->inviter_id,
             'email' => $email,
-            'role' => WorkspaceRole::Editor->value,
+            'role' => WorkspaceRole::Member->value,
             'token' => hash('sha256', Str::random(40)),
             'expires_at' => now()->addDays(7),
             'created_at' => now(),
@@ -364,7 +366,7 @@ test('an invite that loses a race to an identical concurrent invite reports it a
     });
 
     expect(fn (): WorkspaceInvitation => resolve(InviteWorkspaceMember::class)
-        ->invite($this->user, $this->workspace, $email, WorkspaceRole::Editor->value))
+        ->invite($this->user, $this->workspace, $email, WorkspaceRole::Member->value))
         ->toThrow(
             ValidationException::class,
             __('workspaces.validation.email_already_invited'),
@@ -382,11 +384,90 @@ test('an administrator cannot invite someone straight to administrator', functio
     expect(WorkspaceInvitation::query()->where('email', 'escalate@example.com')->exists())->toBeFalse();
 });
 
-test('an administrator can invite someone as an editor', function (): void {
+test('an administrator can invite someone as a member', function (): void {
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
-    resolve(InviteWorkspaceMember::class)->invite($admin, $this->workspace, 'fine@example.com', WorkspaceRole::Editor->value);
+    resolve(InviteWorkspaceMember::class)->invite($admin, $this->workspace, 'fine@example.com', WorkspaceRole::Member->value);
 
     expect(WorkspaceInvitation::query()->where('email', 'fine@example.com')->exists())->toBeTrue();
+});
+
+test('shows a hint for every role option in the invite modal', function (): void {
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('invitePeople')
+        ->assertSchemaComponentExists('role', checkComponentUsing: function (Radio $component): bool {
+            $descriptions = $component->getDescriptions();
+
+            return $descriptions[WorkspaceRole::Admin->value] === __('workspaces.roles.admin.description')
+                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
+                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
+        });
+});
+
+test('offers an admin every role but admin in the invite modal', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($this->workspace);
+    $this->actingAs($admin->fresh());
+
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('invitePeople')
+        ->assertSchemaComponentExists('role', checkComponentUsing: fn (Radio $component): bool => array_keys($component->getOptions()) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
+});
+
+test('shows a hint for every role option in the invite-link default role picker', function (): void {
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction('manageInviteLink')
+        ->assertSchemaComponentExists('invite_link_default_role', checkComponentUsing: function (Radio $component): bool {
+            $options = $component->getOptions();
+            $descriptions = $component->getDescriptions();
+
+            return array_keys($options) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]
+                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
+                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
+        });
+});
+
+test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabilities() says, not a hand-written copy', function (): void {
+    $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction([
+            TestAction::make('invitePeople'),
+            TestAction::make('compareRoles')->schemaComponent('role'),
+        ]);
+
+    $content = (string) $component->instance()->getMountedAction()->getModalContent();
+
+    $roleCapabilities = [
+        'owner' => WorkspaceCapability::forOwner(),
+        WorkspaceRole::Admin->value => WorkspaceRole::Admin->capabilities(),
+        WorkspaceRole::Member->value => WorkspaceRole::Member->capabilities(),
+        WorkspaceRole::Viewer->value => WorkspaceRole::Viewer->capabilities(),
+    ];
+
+    foreach (WorkspaceCapability::cases() as $capability) {
+        foreach ($roleCapabilities as $roleKey => $capabilities) {
+            $cellPattern = sprintf(
+                '/data-capability="%s" data-role="%s">(.*?)<\/td>/s',
+                preg_quote($capability->value, '/'),
+                preg_quote($roleKey, '/'),
+            );
+
+            expect($content)->toMatch($cellPattern);
+
+            preg_match($cellPattern, $content, $cellMatch);
+
+            $granted = in_array($capability, $capabilities, true);
+            $expectedText = $granted
+                ? __('workspaces.role_matrix.granted')
+                : __('workspaces.role_matrix.not_granted');
+            $otherText = $granted
+                ? __('workspaces.role_matrix.not_granted')
+                : __('workspaces.role_matrix.granted');
+
+            expect($cellMatch[1])
+                ->toContain($expectedText)
+                ->not->toContain($otherText);
+        }
+    }
 });

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
-use Laravel\Ai\Ai;
-use Laravel\Ai\Prompts\AgentPrompt;
+use Laravel\Ai\Messages\UserMessage;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\FirstChatUsageTagger;
@@ -18,13 +19,8 @@ mutates(FirstChatUsageTagger::class, SupersededAwareConversationStore::class, Ag
 
 function storeChatUserMessage(User $user, string $conversationId, string $text): string
 {
-    $agent = resolve(CrmAssistant::class);
-    $provider = Ai::textProviderFor($agent);
-
-    $prompt = new AgentPrompt($agent, $text, [], $provider, $provider->defaultTextModel());
-
     return resolve(SupersededAwareConversationStore::class)
-        ->storeUserMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), $prompt);
+        ->storeUserMessage($conversationId, $user->getMorphClass(), (string) $user->getKey(), CrmAssistant::class, new UserMessage($text));
 }
 
 function seedChatConversation(User $user): string
@@ -114,8 +110,7 @@ test('an assistant reply is not counted as the user having used chat', function 
         'role' => 'assistant',
         'content' => 'hi there',
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now(),
@@ -127,4 +122,22 @@ test('an assistant reply is not counted as the user having used chat', function 
     storeChatUserMessage($user, $conversationId, 'hello');
 
     Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->id);
+});
+
+test('a greeting row never dispatches a sync, and the first typed message after it still does', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $conversationId = seedChatConversation($user);
+
+    Context::scope(
+        fn (): string => storeChatUserMessage($user, $conversationId, MessageOrigin::Greeting->opener()),
+        hidden: [MessageOrigin::CONTEXT_KEY => MessageOrigin::Greeting->value],
+    );
+
+    Queue::assertNotPushed(SyncSubscriberJob::class);
+
+    storeChatUserMessage($user, $conversationId, 'hello');
+
+    Queue::assertPushed(SyncSubscriberJob::class, 1);
 });

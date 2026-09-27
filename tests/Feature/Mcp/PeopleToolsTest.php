@@ -16,9 +16,9 @@ use App\Mcp\Tools\People\ListPeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 
 mutates(
     BaseCreateTool::class,
@@ -37,10 +37,6 @@ mutates(
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function (): void {
-    People::clearBootedModels();
 });
 
 it('can get a person by ID', function (): void {
@@ -99,7 +95,7 @@ it('can delete a person via MCP tool', function (): void {
 
 describe('workspace scoping', function (): void {
     beforeEach(function (): void {
-        People::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes people to current workspace', function (): void {

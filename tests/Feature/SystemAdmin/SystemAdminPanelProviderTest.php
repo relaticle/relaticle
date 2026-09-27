@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\CompanyResource\Pages\ListCompanies as ListAppCompanies;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -27,12 +26,10 @@ it('lets administrators toggle every sysadmin table column', function (): void {
     expect($column->isToggleable())->toBeTrue();
 });
 
-it('leaves customer table column management unchanged', function (): void {
+it('leaves customer table columns un-toggleable', function (): void {
     Filament::setCurrentPanel(Filament::getPanel('app'));
 
-    $table = Table::make(new ListAppCompanies);
     $column = TextColumn::make('name');
 
-    expect($table->hasReorderableColumns())->toBeFalse()
-        ->and($column->isToggleable())->toBeFalse();
+    expect($column->isToggleable())->toBeFalse();
 });

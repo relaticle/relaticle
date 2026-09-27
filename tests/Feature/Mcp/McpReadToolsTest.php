@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\Company\UpdateCompany;
 use App\Actions\Crm\GetCrmSummary;
 use App\Actions\Opportunity\AggregateOpportunities;
+use App\Enums\CreationSource;
+use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\AggregateOpportunitiesTool;
 use App\Mcp\Tools\BaseListTool;
@@ -17,12 +19,14 @@ use App\Mcp\Tools\Note\ListNotesTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\People\ListPeopleTool;
 use App\Mcp\Tools\Task\ListTasksTool;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentSource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\Fluent\AssertableJson;
 
@@ -221,6 +225,7 @@ it('rejects malformed list tool inputs before building the database query', func
     'created after' => [ListCompaniesTool::class, ['created_after' => 'yesterday'], 'created after'],
     'created before' => [ListCompaniesTool::class, ['created_before' => '26-08-2026'], 'created before'],
     'date range' => [ListCompaniesTool::class, ['created_after' => '2026-08-27', 'created_before' => '2026-08-26'], 'created before'],
+    'creation source' => [ListCompaniesTool::class, ['creation_source' => 'sample'], 'creation source'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
     'filter operator object' => [ListCompaniesTool::class, ['filter' => ['industry' => 'software']], 'filter.industry'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],
@@ -314,4 +319,55 @@ it('keeps custom-field definition reads scoped to the current workspace', functi
         ->tool(ListCustomFieldsTool::class)
         ->assertOk()
         ->assertDontSee($otherField->id);
+});
+
+it('refuses the workspace-wide activity feed to a member without activity access', function (): void {
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+
+    RelaticleServer::actingAs($member->fresh())
+        ->tool(ListActivityTool::class, [])
+        ->assertHasErrors();
+
+    RelaticleServer::actingAs($member->fresh())
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk();
+});
+
+it('names the channel of each change in the activity it returns', function (): void {
+    $company = Company::withoutEvents(fn (): Company => Company::factory()
+        ->recycle([$this->user, $this->workspace])
+        ->create(['name' => 'Before']));
+
+    $this->actingAs($this->user);
+    CurrentSource::during(CreationSource::API, fn (): Company => resolve(UpdateCompany::class)->execute($this->user, $company, ['name' => 'After']));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.source', 'api')
+            ->etc());
+
+    Activity::withoutGlobalScopes()->where('subject_id', $company->getKey())->update(['properties' => '{}']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.source', null)
+            ->etc());
+});
+
+it('names every known channel and null in its description', function (): void {
+    $description = resolve(ListActivityTool::class)->description();
+
+    foreach (CreationSource::values() as $value) {
+        expect($description)->toContain($value);
+    }
+
+    expect($description)->toContain('null');
 });

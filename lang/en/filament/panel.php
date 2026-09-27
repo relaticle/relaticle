@@ -16,6 +16,11 @@ return [
         'back_to_app' => 'Back to app',
     ],
 
+    'impersonation' => [
+        'banner' => 'Signed in as :name (:email) for support.',
+        'stop' => 'Stop',
+    ],
+
     'navigation_groups' => [
         'tasks' => 'Tasks',
     ],

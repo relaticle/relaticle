@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 
 #[Title('Get Account Context')]
-#[Description('Get information about the authenticated user, current workspace, workspace members, and token abilities.')]
+#[Description('Get information about the authenticated user, current workspace with their role and what it allows, workspace members, and token abilities.')]
 final class WhoAmiTool extends Tool
 {
     use ChecksTokenAbility;
@@ -73,6 +73,8 @@ final class WhoAmiTool extends Tool
             'workspace' => [
                 'id' => $workspace->id,
                 'name' => $workspace->name,
+                'role' => $user->workspaceRoleLabel($workspace->id),
+                'capabilities' => array_column($user->workspaceCapabilities($workspace->id), 'value'),
             ],
             'workspace_members' => $workspaceMembers,
             'token_abilities' => $tokenAbilities,

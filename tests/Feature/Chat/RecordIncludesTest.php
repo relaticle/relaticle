@@ -195,6 +195,25 @@ it('strips HTML and truncates a long free-text custom field value on an included
         ->and($body)->toEndWith('...');
 });
 
+it('keeps the paragraphs of a free-text custom field value apart on an included item', function (): void {
+    $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+
+    $note = Note::factory()->for($this->workspace)->create(['title' => 'Discovery call']);
+    $acme->notes()->attach($note);
+
+    resolve(UpdateNote::class)->execute($this->user, $note, [
+        'custom_fields' => ['body' => '<p>Budget &amp; timeline agreed.</p><p>Send the contract.</p>'],
+    ]);
+
+    $payload = json_decode(resolve(GetCompanyTool::class)->handle(new Request([
+        'id' => (string) $acme->getKey(),
+        'include' => ['notes'],
+    ])), true);
+
+    expect($payload['included']['notes']['items'][0]['attributes']['custom_fields']['body'])
+        ->toBe('Budget & timeline agreed. Send the contract.');
+});
+
 it('does not strip or truncate a non-text custom field value on an included item', function (): void {
     $acme = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 

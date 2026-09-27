@@ -37,8 +37,7 @@ beforeEach(function (): void {
             'content' => "msg {$i}",
             'document' => ChatDocument::emptyJson(),
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
+            'steps' => '[]',
             'usage' => '{}',
             'meta' => '{}',
             'created_at' => now()->subSeconds(100 - $i),
@@ -64,7 +63,7 @@ it('returns earlier messages with beforeMessageId cursor', function (): void {
 it('still fills a whole page when an approval marker sits inside the window', function (): void {
     DB::table('agent_conversation_messages')
         ->where('id', 'm-050')
-        ->update(['role' => 'user', 'content' => '[approval] approved']);
+        ->update(['role' => 'user', 'origin' => 'resume', 'content' => 'The user decided the proposals above.']);
 
     $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page');
 

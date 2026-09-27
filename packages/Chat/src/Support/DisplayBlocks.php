@@ -18,26 +18,17 @@ final readonly class DisplayBlocks
     private const string KEY = 'display_block';
 
     /**
-     * Every block carried by one persisted `tool_results` column.
+     * Every block carried by one message's tool results.
      *
+     * @param  list<array<string, mixed>>  $toolResults
      * @return list<array<string, mixed>>
      */
-    public static function collect(?string $toolResults): array
+    public static function collect(array $toolResults): array
     {
-        if ($toolResults === null) {
-            return [];
-        }
-
-        $parsed = json_decode($toolResults, true);
-
-        if (! is_array($parsed)) {
-            return [];
-        }
-
         $blocks = [];
 
-        foreach (array_values($parsed) as $callIndex => $toolResult) {
-            if (! is_array($toolResult) || ! isset($toolResult['result'])) {
+        foreach ($toolResults as $callIndex => $toolResult) {
+            if (! isset($toolResult['result'])) {
                 continue;
             }
 

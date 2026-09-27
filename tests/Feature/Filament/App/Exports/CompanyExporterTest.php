@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament\App\Exports;
 
 use App\Enums\CustomFields\CompanyField;
+use App\Enums\WorkspaceRole;
 use App\Events\WorkspaceCreated;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -31,7 +32,7 @@ beforeEach(function () {
 
     $this->workspace = Workspace::factory()->create();
     $this->user = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $this->user->workspaces()->attach($this->workspace);
+    $this->user->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($this->user);
     Filament::setTenant($this->workspace);
@@ -157,4 +158,19 @@ test('export values are converted out of utc into the requesting user timezone',
 
     // 23:30 UTC on the 18th is 08:30 the next morning in Tokyo, so the date rolls over.
     expect($row[0])->toBe('2026-08-19 08:30:00');
+});
+
+test('export neutralizes a value a spreadsheet would run as a formula', function () {
+    $company = Company::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'name' => '=HYPERLINK("https://evil.example","Open")',
+    ]);
+
+    Livewire::test(ListCompanies::class)
+        ->callAction('export')
+        ->assertHasNoFormErrors();
+
+    $exporter = new CompanyExporter(Export::latest()->first(), ['name' => 'Company Name'], []);
+
+    expect($exporter($company->fresh())[0])->toBe('\'=HYPERLINK("https://evil.example","Open")');
 });

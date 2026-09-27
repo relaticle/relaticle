@@ -35,7 +35,8 @@ it('waits for explicit verification after entering all six digits', function ():
     $page = loginViaBrowser($user)
         ->assertPathIs('/two-factor-challenge')
         ->assertSee($user->email)
-        ->assertVisible('input[autocomplete="one-time-code"]:focus');
+        ->assertVisible('input[autocomplete="one-time-code"]:focus')
+        ->assertScript('window.Alpine?.$data(document.querySelector(".fi-one-time-code-input-ctn"))?.inputs?.length === 6');
 
     $page->type('input[autocomplete="one-time-code"]', $code)
         ->assertSee(__('auth.mfa.switch_account'))

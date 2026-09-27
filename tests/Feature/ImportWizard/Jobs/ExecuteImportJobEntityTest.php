@@ -43,7 +43,7 @@ afterEach(function (): void {
 
 it('imports company with account_owner resolved by email via entity link', function (): void {
     $owner = User::factory()->create();
-    $this->workspace->users()->attach($owner, ['role' => 'editor']);
+    $this->workspace->users()->attach($owner, ['role' => 'member']);
 
     $relationships = json_encode([
         ['relationship' => 'account_owner', 'action' => 'update', 'id' => (string) $owner->id, 'name' => null],
@@ -107,7 +107,7 @@ it('imports company with account_owner resolved for workspace owner', function (
 
 it('imports task with assignee resolved by email via entity link', function (): void {
     $assignee = User::factory()->create();
-    $this->workspace->users()->attach($assignee, ['role' => 'editor']);
+    $this->workspace->users()->attach($assignee, ['role' => 'member']);
 
     $relationships = json_encode([
         ['relationship' => 'assignees', 'action' => 'update', 'id' => (string) $assignee->id, 'name' => null],

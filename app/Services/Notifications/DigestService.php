@@ -7,6 +7,7 @@ namespace App\Services\Notifications;
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
+use App\Enums\CreationSource;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use App\Models\Workspace;
@@ -55,6 +56,7 @@ final readonly class DigestService
             ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
+            ->where('t.creation_source', '!=', CreationSource::SYSTEM->value)
             ->whereNotNull('due.datetime_value')
             ->where('due.datetime_value', '<', $windowEnd)
             ->when($meta['done_option_id'] !== null, function (Builder $query) use ($meta): void {

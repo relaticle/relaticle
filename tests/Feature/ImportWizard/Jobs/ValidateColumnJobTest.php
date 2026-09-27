@@ -142,6 +142,44 @@ it('skips relationship for MatchOnly when no match found', function (): void {
     expect($row->relationships)->toBeNull();
 });
 
+it('validates a corrected company link by its corrected value', function (): void {
+    $company = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+    $column = ColumnData::toEntityLink(source: 'Company ID', matcherKey: 'id', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company ID'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company ID' => 'missing-company'], [
+            'corrections' => json_encode(['Company ID' => (string) $company->id]),
+            'validation' => json_encode(['Company ID' => 'No company found']),
+        ]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    $row = $this->store->query()->where('row_number', 2)->first();
+    expect($row->hasValidationError('Company ID'))->toBeFalse()
+        ->and($row->relationships->sole()->id)->toBe((string) $company->id);
+});
+
+it('writes no company link for an empty company cell', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'name', entityLinkKey: 'company');
+
+    createValidationStore($this, ['Name', 'Company'], [
+        makeValidationRow(2, ['Name' => 'John', 'Company' => '']),
+        makeValidationRow(3, ['Name' => 'Jane', 'Company' => 'Acme Corp']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+
+    (new ValidateColumnJob($this->import->id, $column))->handle();
+
+    expect($this->store->query()->where('row_number', 2)->first()->relationships)->toBeNull()
+        ->and($this->store->query()->where('row_number', 3)->first()->relationships->sole()->name)->toBe('Acme Corp');
+});
+
 it('writes validation errors for unresolvable account owner entity link', function (): void {
     $column = ColumnData::toEntityLink(source: 'Owner Email', matcherKey: 'email', entityLinkKey: 'account_owner');
 

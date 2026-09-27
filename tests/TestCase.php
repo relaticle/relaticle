@@ -6,6 +6,7 @@ namespace Tests;
 
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
+use App\Support\Http\HostResolver;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Foundation\Testing\WithCachedConfig;
@@ -44,6 +45,9 @@ abstract class TestCase extends BaseTestCase
         parent::setUp();
 
         Http::preventStrayRequests();
+        $this->app->instance(HostResolver::class, new HostResolver(
+            fn (string $host): array => filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : [],
+        ));
         Sleep::fake(syncWithCarbon: true);
         Exceptions::fake();
 

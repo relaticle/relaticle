@@ -8,6 +8,7 @@ use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\Concerns\HasProfilePhoto;
 use App\Models\Concerns\HasWorkspaces;
@@ -16,6 +17,7 @@ use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
+use DateTimeZone;
 use Exception;
 use Filament\Facades\Filament;
 use Filament\Models\Contracts\FilamentUser;
@@ -39,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -57,6 +60,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property CarbonImmutable|null $email_verified_at
  * @property CarbonImmutable|null $email_sign_in_enabled_at
  * @property CarbonImmutable|null $last_login_at
+ * @property CarbonImmutable|null $email_bounced_at
  * @property string|null $mailcoach_subscriber_uuid
  * @property string|null $subscriber_profile_hash
  * @property string|null $rejected_subscriber_profile_hash
@@ -105,6 +109,13 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     use PasskeyAuthenticatable;
     use TwoFactorAuthenticatable;
 
+    public const string PROFILE_PHOTO_DIRECTORY = 'profile-photos';
+
+    public const array PROFILE_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /** @var array<string, bool> */
+    private array $ownershipByWorkspaceId = [];
+
     /**
      * Get the attributes that should be cast.
      *
@@ -117,6 +128,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'email_verified_at' => 'datetime',
             'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
+            'email_bounced_at' => 'datetime',
             'password' => 'hashed',
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
@@ -203,6 +215,40 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     {
         return $query->whereNotNull('scheduled_deletion_at')
             ->where('scheduled_deletion_at', '<=', now());
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function memberOf(Builder $query, Workspace $workspace): Builder
+    {
+        return $query->where(function (Builder $members) use ($workspace): void {
+            $members->whereKey($workspace->user_id)
+                ->orWhereHas('workspaces', fn (Builder $workspaces): Builder => $workspaces->whereKey($workspace->getKey()));
+        });
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function atLocalHour(Builder $query, int $hour): Builder
+    {
+        $timezones = array_values(array_filter(
+            DateTimeZone::listIdentifiers(),
+            fn (string $timezone): bool => (int) Date::now($timezone)->format('G') === $hour,
+        ));
+
+        return $query->where(function (Builder $local) use ($timezones): void {
+            $local->whereIn('timezone', $timezones);
+
+            if (in_array((string) config('app.timezone'), $timezones, true)) {
+                $local->orWhereNull('timezone');
+            }
+        });
     }
 
     /**
@@ -305,49 +351,70 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     }
 
     /**
-     * Determine whether the user holds the given role on the workspace owning the
-     * given foreign key.
+     * @return array<int, WorkspaceCapability>
      */
-    public function hasWorkspaceRoleForWorkspaceId(?string $workspaceId, string $role): bool
+    public function workspaceCapabilities(?string $workspaceId): array
     {
         if ($workspaceId === null) {
-            return false;
+            return [];
         }
 
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return true;
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return WorkspaceCapability::forOwner();
         }
 
+        return $this->membershipRoleFor($workspaceId)?->capabilities() ?? [];
+    }
+
+    public function workspaceRoleLabel(?string $workspaceId): ?string
+    {
+        if ($workspaceId === null) {
+            return null;
+        }
+
+        if ($this->isWorkspaceOwner($workspaceId)) {
+            return __('workspaces.roles.owner.label');
+        }
+
+        return $this->membershipRoleFor($workspaceId)?->label();
+    }
+
+    // An unpinned token follows whichever workspace a request names, so only a
+    // pinned one is bounded by the holder's role there.
+    /** @return list<string> */
+    public function grantableTokenPermissions(?string $workspaceId): array
+    {
+        if ($workspaceId === null || $workspaceId === '') {
+            return array_values(Jetstream::$permissions);
+        }
+
+        return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
+    }
+
+    public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool
+    {
+        return in_array($capability, $this->workspaceCapabilities($workspaceId), true);
+    }
+
+    private function membershipRoleFor(string $workspaceId): ?WorkspaceRole
+    {
         $this->loadMissing('workspaces');
 
-        $membershipRole = $this->workspaces
+        $role = $this->workspaces
             ->first(fn (Workspace $workspace): bool => $workspace->getKey() === $workspaceId)
             ?->membership
             ?->role;
 
-        if ($membershipRole === null) {
-            return false;
-        }
-
-        return Jetstream::findRole($membershipRole)?->key === $role;
+        return WorkspaceRole::tryFrom((string) $role);
     }
 
-    // Ownership outranks the pivot role, so an owner row carrying a stale
-    // viewer value cannot lock them out of their own workspace.
-    public function isViewerOnWorkspaceId(?string $workspaceId): bool
+    // Memoised per request. The sysadmin panel can reassign an owner, which is safe only
+    // because no User instance lives in that request; a user-facing transfer must clear this.
+    private function isWorkspaceOwner(string $workspaceId): bool
     {
-        if ($workspaceId === null) {
-            return false;
-        }
-
-        $this->loadMissing('ownedWorkspaces');
-
-        if (in_array($workspaceId, array_map(strval(...), $this->ownedWorkspaces->modelKeys()), true)) {
-            return false;
-        }
-
-        return $this->hasWorkspaceRoleForWorkspaceId($workspaceId, WorkspaceRole::Viewer->value);
+        return $this->ownershipByWorkspaceId[$workspaceId] ??= Workspace::query()
+            ->whereKey($workspaceId)
+            ->where($this->getForeignKey(), $this->getKey())
+            ->exists();
     }
 }

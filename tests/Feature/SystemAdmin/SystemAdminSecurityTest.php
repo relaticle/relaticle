@@ -566,6 +566,20 @@ describe('Staff passkeys', function () {
             ->and($response->json('options.authenticatorSelection.residentKey'))->toBe('required');
     });
 
+    it('stores a verified staff passkey registration through the HTTP endpoint', function (): void {
+        $administrator = SystemAdministrator::factory()->create();
+        $this->actingAs($administrator, 'sysadmin')
+            ->withSession([PasskeyRegistrationRequest::GRANT_KEY => now()->addMinutes(2)]);
+
+        $options = $this->getJson('/sysadmin/passkeys/options')->assertOk()->json('options');
+        $challenge = base64_decode(strtr($options['challenge'], '-_', '+/'), true);
+        $credential = PasskeyAssertionFixture::registration($options['rp']['id'], StaffWebAuthn::allowedOrigin(), $challenge);
+
+        $this->postJson('/sysadmin/passkeys', ['name' => 'Work laptop', 'credential' => $credential])->assertCreated();
+
+        expect($administrator->passkeys()->sole()->credential_id)->toBe($credential['id']);
+    });
+
     it('removes only the administrator own credential', function () {
         $administrator = SystemAdministrator::factory()->create();
         $other = SystemAdministrator::factory()->create();

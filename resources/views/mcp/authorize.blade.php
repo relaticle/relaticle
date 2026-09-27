@@ -58,6 +58,12 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400">
                         {{ __('mcp.consent.intro', ['client' => $client->name]) }}
                     </p>
+
+                    @if($redirectHost)
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            {{ __('mcp.consent.redirect', ['host' => $redirectHost]) }}
+                        </p>
+                    @endif
                 </div>
             </div>
 

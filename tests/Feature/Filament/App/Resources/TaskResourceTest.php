@@ -177,7 +177,7 @@ it('notifies only the assignees submitted through the create action', function (
     $concurrentAssignee = User::factory()->create([
         'notification_preferences' => ['task_assigned' => ['email' => true]],
     ]);
-    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'editor']);
+    $this->workspace->users()->attach([$intendedAssignee->id, $concurrentAssignee->id], ['role' => 'member']);
 
     $concurrentAssignmentAdded = false;
     DB::listen(function (QueryExecuted $query) use ($concurrentAssignee, &$concurrentAssignmentAdded): void {

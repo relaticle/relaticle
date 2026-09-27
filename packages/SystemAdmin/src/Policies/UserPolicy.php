@@ -38,6 +38,11 @@ final class UserPolicy
         return $admin->role->canDelete();
     }
 
+    public function impersonate(SystemAdministrator $admin): bool
+    {
+        return $admin->role->canImpersonate();
+    }
+
     public function restore(): bool
     {
         return true;

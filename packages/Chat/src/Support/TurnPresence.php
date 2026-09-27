@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use Illuminate\Support\Facades\Cache;
+use Relaticle\Chat\Enums\MessageOrigin;
 
 /**
  * The in-flight turn marker: what a reload must still know about a turn that
@@ -41,17 +42,17 @@ final readonly class TurnPresence
         array $document = ['type' => 'doc', 'content' => []],
         array $mentions = [],
         ?array $pageContext = null,
-        bool $isContinuation = false,
+        MessageOrigin $origin = MessageOrigin::Typed,
     ): void {
+        $typed = $origin->isTyped();
+
         Cache::put(self::key($conversationId), [
             'turn_id' => $turnId,
-            'kind' => $isContinuation ? 'continuation' : 'message',
-            // A continuation runs on a synthetic prompt the transcript never
-            // shows, so nothing worth rendering is stored for it.
-            'message' => $isContinuation ? '' : $message,
-            'document' => $isContinuation ? ['type' => 'doc', 'content' => []] : $document,
-            'mentions' => $isContinuation ? [] : $mentions,
-            'page_context' => $isContinuation ? null : $pageContext,
+            'origin' => $origin->value,
+            'message' => $typed ? $message : '',
+            'document' => $typed ? $document : ['type' => 'doc', 'content' => []],
+            'mentions' => $typed ? $mentions : [],
+            'page_context' => $typed ? $pageContext : null,
             'started_at' => now()->toISOString(),
         ], self::TTL_SECONDS);
     }
@@ -73,18 +74,19 @@ final readonly class TurnPresence
     }
 
     /**
-     * @return array{turn_id: string, kind: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null
+     * @return array{turn_id: string, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null
      */
     public static function current(string $conversationId): ?array
     {
-        /** @var array{turn_id: string, kind: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null $value */
+        /** @var array{turn_id: string, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null $value */
         $value = Cache::get(self::key($conversationId));
 
         return is_array($value) ? $value : null;
     }
 
+    // v2: the payload stores `origin` where v1 stored `kind`.
     private static function key(string $conversationId): string
     {
-        return "chat:turn-inflight:{$conversationId}";
+        return "chat:turn-inflight:v2:{$conversationId}";
     }
 }

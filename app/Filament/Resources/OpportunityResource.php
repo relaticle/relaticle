@@ -98,6 +98,7 @@ final class OpportunityResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     ExportBulkAction::make()
+                        ->authorize('exportAny', Opportunity::class)
                         ->exporter(OpportunityExporter::class),
                     RestoreBulkAction::make(),
                     DeleteBulkAction::make(),

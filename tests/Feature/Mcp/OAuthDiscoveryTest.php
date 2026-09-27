@@ -39,12 +39,42 @@ it('accepts dynamic client registration', function (): void {
         ->assertJsonStructure(['client_id', 'redirect_uris', 'grant_types']);
 });
 
+it('registers a client that redirects to a known connector host', function (string $redirectUri): void {
+    $this->postJson('/oauth/register', [
+        'client_name' => 'Connector',
+        'redirect_uris' => [$redirectUri],
+    ])->assertCreated();
+})->with([
+    'claude' => 'https://claude.ai/api/mcp/auth_callback',
+    'chatgpt' => 'https://chatgpt.com/connector_platform_oauth_redirect',
+    'mistral' => 'https://console.mistral.ai/oauth/callback',
+    'localhost on any port' => 'http://localhost:33418/callback',
+    'ipv4 loopback' => 'http://127.0.0.1:52100/callback',
+    'cursor' => 'cursor://anysphere.cursor-mcp/oauth/callback',
+    'vscode' => 'vscode://vscode.mcp/oauth/callback',
+]);
+
+it('refuses a client that redirects anywhere else', function (string $redirectUri): void {
+    $this->postJson('/oauth/register', [
+        'client_name' => 'Connector',
+        'redirect_uris' => [$redirectUri],
+    ])
+        ->assertStatus(400)
+        ->assertJsonPath('error', 'invalid_redirect_uri');
+})->with([
+    'unknown host' => 'https://attacker.example/callback',
+    'lookalike subdomain' => 'https://claude.ai.attacker.example/callback',
+    'known host over plain http' => 'http://claude.ai/api/mcp/auth_callback',
+    'loopback over https' => 'https://localhost:33418/callback',
+    'unlisted custom scheme' => 'evil://callback.example/oauth',
+]);
+
 it('throttles dynamic client registration after the rate limit', function (): void {
     Cache::flush();
 
     $payload = [
         'client_name' => 'Throttle Probe',
-        'redirect_uris' => ['https://example.com/callback'],
+        'redirect_uris' => ['https://claude.ai/api/mcp/auth_callback'],
         'grant_types' => ['authorization_code', 'refresh_token'],
         'response_types' => ['code'],
         'token_endpoint_auth_method' => 'none',

@@ -7,7 +7,9 @@ namespace App\Filament\Pages;
 use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\CreateProCheckout;
 use App\Actions\Billing\StartProTrial;
+use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
@@ -18,6 +20,7 @@ use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Support\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
@@ -41,6 +44,9 @@ final class Billing extends Page
     #[Url]
     public ?string $credits = null;
 
+    #[Url(history: true)]
+    public ?string $step = null;
+
     #[Override]
     public static function shouldRegisterNavigation(): bool
     {
@@ -57,6 +63,28 @@ final class Billing extends Page
         abort_unless(Feature::active(BillingFeature::class), 403);
     }
 
+    #[Override]
+    public function getLayout(): string
+    {
+        return $this->isPaused() ? 'filament-panels::components.layout.base' : parent::getLayout();
+    }
+
+    #[Override]
+    public function getView(): string
+    {
+        return $this->isPaused() ? 'filament.pages.billing-paused' : parent::getView();
+    }
+
+    public function reopenWhenActive(): void
+    {
+        if ($this->isPaused()) {
+            return;
+        }
+
+        $this->skipRender();
+        $this->redirect(Filament::getUrl($this->workspace()));
+    }
+
     public function startTrial(StartProTrial $startProTrial): void
     {
         // The button is only rendered for an eligible workspace, but the
@@ -66,6 +94,8 @@ final class Billing extends Page
 
             return;
         }
+
+        $wasPaused = $this->isPaused();
 
         try {
             $started = $startProTrial->execute($this->user(), $this->workspace());
@@ -82,13 +112,17 @@ final class Billing extends Page
         }
 
         Notification::make()->title(__('billing.trial.started'))->success()->send();
+
+        if ($wasPaused) {
+            $this->reopenWhenActive();
+        }
     }
 
     public function upgrade(CreateProCheckout $createCheckout, string $interval = 'monthly'): void
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || $workspace->subscribed() || $workspace->plan === Plan::Enterprise) {
             return;
         }
 
@@ -104,7 +138,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace)) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
             return;
         }
 
@@ -120,7 +154,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->ownsWorkspace($workspace) || ! resolve(HostedWorkspaceAccess::class)->allows($workspace)) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || ! resolve(HostedWorkspaceAccess::class)->allows($workspace)) {
             return;
         }
 
@@ -153,18 +187,37 @@ final class Billing extends Page
             // Not $workspace->plan->credits(): a past-due workspace refills at the Free
             // allowance, so the plan's figure would name credits it never gets.
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
-            'isOwner' => $this->user()->ownsWorkspace($workspace),
+            'canManageBilling' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             'subscription' => $subscription,
-            'pastDue' => $subscription?->pastDue() ?? false,
+            'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
-            'hasHostedAccess' => $hasHostedAccess,
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first(),
             'activating' => $this->checkout === 'success' && ! $workspace->subscribed() && $workspace->plan !== Plan::Enterprise,
             'creditsFulfilling' => $this->credits === 'success',
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
+            ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
+    }
+
+    /** @return array{billingStatus: BillingStatus, reviewingPlan: bool, otherWorkspaces: Collection<int, Workspace>} */
+    private function pausedViewData(Workspace $workspace): array
+    {
+        return [
+            'billingStatus' => $workspace->billingStatus(),
+            'reviewingPlan' => $this->step === 'plan'
+                && $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)
+                && $this->checkout !== 'success',
+            'otherWorkspaces' => $this->user()->allWorkspaces()
+                ->reject(fn (Workspace $other): bool => $other->is($workspace))
+                ->values(),
+        ];
+    }
+
+    private function isPaused(): bool
+    {
+        return resolve(HostedWorkspaceAccess::class)->isPaused($this->workspace());
     }
 
     /**

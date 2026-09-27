@@ -38,7 +38,7 @@ final class PersonaCatalog
                 email: 'owner@'.self::DOMAIN,
                 name: 'Olivia Owner',
                 workspace: 'Acme Sales',
-                purpose: 'Full CRM data, admin and editor teammates. The daily driver.',
+                purpose: 'Full CRM data, admin and member teammates. The daily driver.',
                 // Grandfathered rather than trialing: a trial lapses and then
                 // every local login lands on /billing until someone re-seeds.
                 expect: BillingStatus::Grandfathered,
@@ -46,7 +46,7 @@ final class PersonaCatalog
                 useCase: OnboardingUseCase::Sales,
                 members: [
                     ['email' => 'admin@'.self::DOMAIN, 'role' => WorkspaceRole::Admin->value],
-                    ['email' => 'editor@'.self::DOMAIN, 'role' => WorkspaceRole::Editor->value],
+                    ['email' => 'member@'.self::DOMAIN, 'role' => WorkspaceRole::Member->value],
                 ],
             ),
 

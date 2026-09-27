@@ -8,7 +8,7 @@ related: [help/records/company-records, help/records/export-your-data]
 
 Deleting a company, person, opportunity, task, or note doesn't destroy it.
 The record is moved out of sight and can be restored. Only **Force delete**,
-which is reserved for workspace administrators, removes data permanently.
+reserved for the workspace owner and Admins, removes data permanently.
 
 ## Restore a record
 
@@ -21,9 +21,9 @@ notes, activity history. Select several rows to restore in bulk.
 
 ## Delete permanently
 
-With the deleted-records filter active, administrators also see
-**Force delete**. That removes the record for good. There is no undo, and no
-way for Relaticle support to bring it back. If there's any doubt,
+With the deleted-records filter active, the workspace owner and Admins also
+see **Force delete**. That removes the record for good. There is no undo, and
+no way for Relaticle support to bring it back. If there's any doubt,
 [export the records first](/help/records/export-your-data).
 
 ## Good to know
@@ -32,5 +32,5 @@ way for Relaticle support to bring it back. If there's any doubt,
   assistant's answers.
 - Deleting a company doesn't delete the people, tasks, or notes attached to
   it. Restoring the company brings the account view back together.
-- Everyone in the workspace can delete and restore; only administrators can
+- Everyone but Viewers can delete and restore; only the owner and Admins can
   force delete.

@@ -10,7 +10,7 @@ mutates(MailPreview::class, MailPreviewController::class);
 it('renders every registered preview to html with the layout language attribute', function (): void {
     $preview = resolve(MailPreview::class);
 
-    expect($preview->names())->toHaveCount(17);
+    expect($preview->names())->toHaveCount(19);
 
     foreach ($preview->names() as $name) {
         $html = $preview->render($name);

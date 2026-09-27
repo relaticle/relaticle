@@ -10,26 +10,37 @@ use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
 use App\Http\Middleware\SetApiWorkspaceContext;
+use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
 use Filament\Facades\Filament;
+use Filament\Http\Middleware\SetUpPanel;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 use Livewire\Exceptions\PayloadTooLargeException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
+use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
+use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Sentry\Laravel\Integration;
 use Spatie\Health\Commands\DispatchQueueCheckJobsCommand;
 use Spatie\Health\Commands\RunHealthChecksCommand;
 use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
+use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
+use Spatie\MarkdownResponse\Enums\DetectionMethod;
+use Spatie\MarkdownResponse\Support\Config;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -85,10 +96,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // api/mcp root banners are exactly the crawlable secondary-host URLs.
         $middleware->prepend(DenyIndexingOnSecondaryHosts::class);
 
-        $middleware->web(append: [
-            RedirectToPrimaryHost::class,
-            EnsureAuthenticationComplete::class,
-        ]);
+        // Controller constructors can resolve sessions before route middleware runs.
+        $middleware->append(IsolateAuthenticationSession::class);
+
+        $middleware->web(
+            append: [
+                'auth.context',
+                RedirectToPrimaryHost::class,
+                EnsureAuthenticationComplete::class,
+                StopImpersonationOnLogout::class,
+            ],
+        );
 
         // Only enforced on multi-host deployments (any *_DOMAIN configured);
         // the framework already skips TrustHosts in local and test runs.
@@ -140,7 +158,23 @@ return Application::configure(basePath: dirname(__DIR__))
             prepend: ThrottleBeforeAuthentication::class,
         );
 
+        $middleware->prependToPriorityList(
+            before: EncryptCookies::class,
+            prepend: SetUpPanel::class,
+        );
+
+        $middleware->appendToPriorityList(
+            after: StartSession::class,
+            append: EnsureAuthenticationContext::class,
+        );
+
+        $middleware->prependToPriorityList(
+            before: SetUpPanel::class,
+            prepend: RedirectToPrimaryHost::class,
+        );
+
         $middleware->alias([
+            'auth.context' => EnsureAuthenticationContext::class,
             'signed' => ValidateSignature::class,
             'no-referrer' => NoReferrer::class,
             // Fortify and Passkeys both reference this alias by name in their own
@@ -169,7 +203,39 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
-        $exceptions->shouldRenderJsonWhen(fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson());
+        $rendersJson = fn (Request $request): bool => $request->is('api/*') || $request->getHost() === config('app.api_domain') || $request->expectsJson();
+
+        $exceptions->shouldRenderJsonWhen($rendersJson);
+
+        // Detected like every markdown page: wire:navigate fetches send Accept */*,
+        // so reading the header alone would swap the panel for this body.
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) use ($rendersJson): ?Response {
+            if ($rendersJson($request)) {
+                return null;
+            }
+
+            if (! Config::getAction('detection.detector', DetectsMarkdownRequest::class)($request) instanceof DetectionMethod) {
+                return null;
+            }
+
+            $indexes = array_filter([
+                __('Site index') => 'llms-txt',
+                __('Help centre') => 'help.index',
+                __('Developer docs') => 'documentation.index',
+                __('REST API spec') => 'openapi.json',
+            ], Route::has(...));
+
+            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
+
+            foreach ($indexes as $label => $routeName) {
+                $lines[] = "- {$label}: ".route($routeName);
+            }
+
+            $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
+            $lines[] = '';
+
+            return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
+        });
 
         // Stale tabs and deploy boundaries produce checksum failures that
         // Livewire already renders as 419 (page expired -> client refreshes).

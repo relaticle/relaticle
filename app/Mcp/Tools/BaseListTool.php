@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CreationSource;
 use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
@@ -73,6 +74,7 @@ abstract class BaseListTool extends Tool
             [
                 'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
                 'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
+                'creation_source' => $schema->string()->enum(CreationSource::values())->description(CreationSource::filterDescription()),
                 'filter' => $schema->object()->description('Filter by custom field values. Keys are field codes, values are operator objects (eq, gt, gte, lt, lte, contains, in, has_any).'),
                 'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
                 'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
@@ -107,6 +109,7 @@ abstract class BaseListTool extends Tool
             'search' => ['sometimes', 'string', 'max:255'],
             'created_after' => ['sometimes', Rule::date()->format('Y-m-d')],
             'created_before' => ['sometimes', Rule::date()->format('Y-m-d'), 'after_or_equal:created_after'],
+            'creation_source' => ['sometimes', Rule::enum(CreationSource::class)],
             'filter' => ['sometimes', $this->objectRule(allowEmpty: true)],
             'filter.*' => [$this->objectRule(allowEmpty: false)],
             'sort' => ['sometimes', 'array:field,direction', 'required_array_keys:field'],
@@ -215,6 +218,7 @@ abstract class BaseListTool extends Tool
                 $this->searchFilterName() => $mcpRequest->get('search'),
                 'created_after' => $mcpRequest->get('created_after'),
                 'created_before' => $mcpRequest->get('created_before'),
+                'creation_source' => $mcpRequest->get('creation_source'),
             ],
             $this->additionalFilters($mcpRequest),
         ));

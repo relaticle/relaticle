@@ -98,7 +98,7 @@ final class AiSpendStatsWidget extends StatsOverviewWidget
                 + ($outputTokens / 1_000_000) * $rate['output_per_mtok'];
         }
 
-        $costDescription = 'Upper bound; prompt caching not deducted';
+        $costDescription = 'Lower bound; cached input tokens are not recorded';
 
         if ($unpriced !== []) {
             $costDescription .= '. Unpriced models: '.implode(', ', $unpriced);

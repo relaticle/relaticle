@@ -46,7 +46,7 @@ it('excludes an invited member attached to another workspace within 24h of regis
     DB::table('workspace_user')->insert([
         'workspace_id' => $owner->currentWorkspace->id,
         'user_id' => $invited->id,
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
         'created_at' => $invited->created_at->addMinutes(3),
         'updated_at' => $invited->created_at->addMinutes(3),
     ]);
@@ -68,7 +68,7 @@ it('still counts a user joining another workspace long after registering as orga
     DB::table('workspace_user')->insert([
         'workspace_id' => $owner->currentWorkspace->id,
         'user_id' => $laterJoiner->id,
-        'role' => WorkspaceRole::Editor->value,
+        'role' => WorkspaceRole::Member->value,
         'created_at' => $laterJoiner->created_at->addDays(2),
         'updated_at' => $laterJoiner->created_at->addDays(2),
     ]);

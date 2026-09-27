@@ -9,11 +9,13 @@ use App\Enums\MediaCollection;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasCreator;
 use App\Models\Concerns\HasWorkspace;
+use App\Models\Scopes\WorkspaceScope;
 use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,6 +40,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * @property CreationSource $creation_source
  * @property string $createdBy
  */
+#[ScopedBy(WorkspaceScope::class)]
 #[Fillable([
     'user_id',
     'title',
@@ -59,13 +62,6 @@ final class Task extends Model implements HasCustomFields, HasMedia, HasTimeline
     use SoftDeletes;
     use SortableTrait;
     use UsesCustomFields;
-
-    /**
-     * @var array<string, mixed>
-     */
-    protected $attributes = [
-        'creation_source' => CreationSource::WEB,
-    ];
 
     /**
      * The attributes that should be cast.

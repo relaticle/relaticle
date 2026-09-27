@@ -173,7 +173,7 @@ function forceDisplaySettings(User $user, string $entityType, string $code, arra
 }
 
 /**
- * A persisted tool_results column for one read-tool call carrying a block.
+ * The persisted tool results of one read-tool call carrying a block.
  *
  * @return list<array<string, mixed>>
  */
@@ -200,7 +200,7 @@ function blockToolResults(string $callId = 'toolu_block_1'): array
 /**
  * @param  list<array<string, mixed>>  $toolResults
  */
-function seedBlockConversation(User $user, array $toolResults, bool $withToolCalls = false): string
+function seedBlockConversation(User $user, array $toolResults): string
 {
     $conversationId = (string) Str::uuid7();
 
@@ -230,27 +230,17 @@ function seedBlockConversation(User $user, array $toolResults, bool $withToolCal
         'id' => (string) Str::ulid(),
         'role' => 'user',
         'content' => 'list my companies',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'created_at' => now()->subMinute(),
         'updated_at' => now()->subMinute(),
     ]);
-
-    $toolCalls = $withToolCalls
-        ? array_map(static fn (array $result): array => [
-            'id' => $result['id'],
-            'name' => $result['name'],
-            'arguments' => [],
-        ], $toolResults)
-        : [];
 
     DB::table('agent_conversation_messages')->insert([
         ...$base,
         'id' => (string) Str::ulid(),
         'role' => 'assistant',
         'content' => 'Here are your companies.',
-        'tool_calls' => (string) json_encode($toolCalls),
-        'tool_results' => (string) json_encode($toolResults),
+        'steps' => storedToolSteps($toolResults),
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -578,9 +568,9 @@ it('names record custom fields in a list table with one lookup per page, not per
         ->and($companyLookups)->toHaveCount(1);
 })->with([3, 12]);
 
-// --- (c) blocks are re-derived from persisted tool_results on reload ---
+// --- (c) blocks are re-derived from persisted tool results on reload ---
 
-it('derives display_blocks from persisted tool_results on reload', function (): void {
+it('derives display_blocks from persisted tool results on reload', function (): void {
     $user = $this->user;
 
     $conversationId = seedBlockConversation($user, blockToolResults());
@@ -753,7 +743,7 @@ it('promotes this workspace field when both workspaces share the code', function
 it('strips display_block from the replayed agent history while the row keeps it', function (): void {
     $user = $this->user;
 
-    $conversationId = seedBlockConversation($user, blockToolResults(), withToolCalls: true);
+    $conversationId = seedBlockConversation($user, blockToolResults());
 
     $store = resolve(ConversationStore::class);
     expect($store)->toBeInstanceOf(SupersededAwareConversationStore::class);
@@ -763,7 +753,7 @@ it('strips display_block from the replayed agent history while the row keeps it'
     $persisted = (string) DB::table('agent_conversation_messages')
         ->where('conversation_id', $conversationId)
         ->where('role', 'assistant')
-        ->value('tool_results');
+        ->value('steps');
 
     expect($persisted)->toContain('display_block')
         ->and($history)->toContain('Acme')

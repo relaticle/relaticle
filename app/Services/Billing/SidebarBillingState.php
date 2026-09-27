@@ -4,28 +4,22 @@ declare(strict_types=1);
 
 namespace App\Services\Billing;
 
-use App\Enums\Plan;
+use App\Enums\BillingStatus;
 use App\Features\Billing;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
 
 /**
- * The sidebar's one-line billing prompt. Derives from the same state the
- * Billing page shows, so the two cannot tell a workspace different stories.
+ * The sidebar's one-line billing prompt. Derives from `BillingStatus`, the same
+ * owner the Billing page reads, so the two cannot tell a workspace different stories.
  *
  * Returns null for every workspace with nothing to ask for: paying subscribers,
  * Enterprise, grandfathered free, and any install with billing switched off.
  */
 final readonly class SidebarBillingState
 {
-    public function __construct(private HostedWorkspaceAccess $access) {}
-
     /**
-     * `urgent` separates a failure from an offer: past due is the only state
-     * here reporting something already broken, and the row renders it in danger
-     * colours rather than the same neutral pill as an upgrade prompt.
-     *
      * @return array{label: string, action: string, urgent: bool}|null
      */
     public function for(Workspace $workspace): ?array
@@ -34,11 +28,9 @@ final readonly class SidebarBillingState
             return null;
         }
 
-        // Ranked above the valid() check for the same reason BillingStatus ranks
-        // PastDue above Subscribed: keepPastDueSubscriptionsActive() leaves
-        // valid() true throughout dunning, so asking it first returns null and
-        // leaves the one state that ends in losing the workspace unmentioned.
-        if ($workspace->subscription()?->pastDue() === true) {
+        $status = $workspace->billingStatus();
+
+        if ($status === BillingStatus::PastDue) {
             return [
                 'label' => __('billing.sidebar.past_due'),
                 'action' => __('billing.sidebar.fix'),
@@ -46,11 +38,7 @@ final readonly class SidebarBillingState
             ];
         }
 
-        if ($workspace->subscription()?->valid() === true || $workspace->plan === Plan::Enterprise) {
-            return null;
-        }
-
-        if ($workspace->onGenericTrial()) {
+        if ($status === BillingStatus::Trialing) {
             return [
                 'label' => trans_choice('billing.sidebar.trial_days_left', $this->daysLeft($workspace), [
                     'days' => $this->daysLeft($workspace),
@@ -60,10 +48,7 @@ final readonly class SidebarBillingState
             ];
         }
 
-        // A grandfathered free workspace still has access and nothing to buy,
-        // so it gets no prompt. Everything else that cannot reach the app is
-        // paused and needs the only row here that must never 403.
-        if ($this->access->allows($workspace)) {
+        if ($status->grantsAccess()) {
             return null;
         }
 

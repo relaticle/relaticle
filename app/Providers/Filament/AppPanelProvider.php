@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
+use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -29,6 +30,7 @@ use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Listeners\SwitchWorkspace;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Livewire\App\AppSidebar;
@@ -36,6 +38,7 @@ use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\BrandColors;
+use App\Support\Impersonation\Impersonator;
 use App\Support\SupportForms;
 use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
@@ -59,6 +62,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Facades\FilamentTimezone;
@@ -77,7 +81,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -152,7 +155,9 @@ final class AppPanelProvider extends PanelProvider
         // Table and Schema configuration is global, so both callbacks have to check
         // which panel is actually serving the request before they touch the format.
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
             : $table);
 
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
@@ -269,6 +274,8 @@ final class AppPanelProvider extends PanelProvider
             )
             ->colors([
                 'primary' => BrandColors::primary(),
+                'purple' => Color::Purple,
+                'indigo' => Color::Indigo,
             ])
             ->viteTheme('resources/css/filament/app/theme.css')
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
@@ -326,6 +333,7 @@ final class AppPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                'auth.context',
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
@@ -338,6 +346,7 @@ final class AppPanelProvider extends PanelProvider
             ->authPasswordBroker('users')
             ->authMiddleware([
                 Authenticate::class,
+                StopImpersonationOnLogout::class,
                 EnsureAuthenticationComplete::class,
                 CheckScheduledDeletion::class,
             ])
@@ -353,7 +362,12 @@ final class AppPanelProvider extends PanelProvider
             )
             ->plugins([
                 CustomFieldsPlugin::make()
-                    ->authorize(fn () => Gate::check('update', Filament::getTenant()))
+                    ->authorize(function (): bool {
+                        $user = auth()->user();
+
+                        return $user instanceof User
+                            && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::FieldsManage);
+                    })
                     ->managementPage(CustomFields::class),
                 ResizedColumnPlugin::make(),
             ])
@@ -390,6 +404,22 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): View|Factory => view('filament.app.analytics')
+            )
+            /**
+             * BODY_START rather than a topbar slot: the banner has to be present on
+             * every page of the panel, including the ones that render no topbar.
+             */
+            ->renderHook(
+                PanelsRenderHook::BODY_START,
+                function (): View|Factory|string {
+                    $user = $this->signedInUser();
+
+                    if (! $user instanceof User || ! resolve(Impersonator::class)->active(request())) {
+                        return '';
+                    }
+
+                    return view('filament.app.impersonation-banner', ['user' => $user]);
+                }
             )
             /**
              * The sidebar collapse toggle is panel chrome, so the panel owns it.

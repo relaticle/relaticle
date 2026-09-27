@@ -17,11 +17,12 @@ use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\Company;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Sanctum\Sanctum;
 
 mutates(
     BaseCreateTool::class,
@@ -40,10 +41,6 @@ mutates(
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
-});
-
-afterEach(function (): void {
-    Company::clearBootedModels();
 });
 
 it('can get a company by ID', function (): void {
@@ -129,7 +126,7 @@ it('returns actionable MCP errors without successful structured content', functi
 
 it('can create, update, and clear a company account owner', function (): void {
     $member = User::factory()->create();
-    $this->workspace->users()->attach($member, ['role' => 'editor']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
 
     RelaticleServer::actingAs($this->user)
         ->tool(CreateCompanyTool::class, [
@@ -168,7 +165,7 @@ it('rejects a company account owner from another workspace', function (): void {
 describe('workspace scoping', function (): void {
     beforeEach(function (): void {
         // Apply workspace scope as SetApiWorkspaceContext middleware does in production
-        Company::addGlobalScope(new WorkspaceScope);
+        resolve(CurrentWorkspace::class)->set($this->workspace);
     });
 
     it('scopes companies to current workspace', function (): void {
@@ -336,6 +333,19 @@ describe('validation', function (): void {
     });
 });
 
+describe('creation source filtering', function (): void {
+    it('filters companies by creation source', function (): void {
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Sample Corp', 'creation_source' => CreationSource::SYSTEM]);
+        Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Real Corp', 'creation_source' => CreationSource::WEB]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListCompaniesTool::class, ['creation_source' => 'system'])
+            ->assertOk()
+            ->assertSee('Sample Corp')
+            ->assertDontSee('Real Corp');
+    });
+});
+
 describe('date filtering', function (): void {
     it('filters companies by created_after', function (): void {
         $old = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ancient Corp']);
@@ -362,4 +372,26 @@ describe('date filtering', function (): void {
             ->assertSee('Ancient Corp')
             ->assertDontSee('Recent Corp');
     });
+});
+
+it('cannot read a company from another workspace over the mcp route', function (): void {
+    $otherCompany = Company::withoutEvents(fn (): Company => Company::factory()->create([
+        'workspace_id' => Workspace::factory()->create()->id,
+        'name' => 'Other Workspace Corp',
+    ]));
+
+    Sanctum::actingAs($this->user, ['*']);
+
+    $response = $this->postJson('/mcp', [
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'get-company-tool',
+            'arguments' => ['id' => $otherCompany->id],
+        ],
+    ])->assertOk();
+
+    expect($response->json('result.isError'))->toBeTrue()
+        ->and((string) $response->getContent())->not->toContain('Other Workspace Corp');
 });

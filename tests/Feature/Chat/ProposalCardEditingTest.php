@@ -9,6 +9,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Field;
 use Illuminate\Support\Facades\Bus;
 use Laravel\Ai\Tools\Request;
@@ -46,7 +47,24 @@ it('builds the real custom-field component for the edited field, prefilled from 
     $flat = $component->instance()->form->getFlatComponents();
     $built = collect($flat)->first(fn (mixed $c): bool => $c instanceof Field && $c->getName() === $expectedName);
 
-    expect($built)->not->toBeNull('the scoped Filament custom-field component should be built into the form');
+    expect($built)->not->toBeNull('the scoped Filament custom-field component should be built into the form')
+        ->and($built->isLabelHidden())->toBeTrue()
+        ->and($built->getColumnSpan('lg'))->toBe('full');
+});
+
+it('edits a date field with the browser picker, which the card scroller cannot clip', function (): void {
+    $action = ProposalCardFixture::task($this->user, ['title' => 'T', 'custom_fields' => ['due_date' => '2026-10-02 15:00:00']]);
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', 'due_date')
+        ->assertHasNoErrors();
+
+    $built = collect($component->instance()->form->getFlatComponents())
+        ->first(fn (mixed $c): bool => $c instanceof DateTimePicker && $c->getName() === 'custom_fields.due_date');
+
+    expect($built)->not->toBeNull()
+        ->and($built->isNative())->toBeTrue();
 });
 
 it('does not throw building a field with a cross-field visibility condition (fails open under ->only())', function (): void {

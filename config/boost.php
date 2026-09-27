@@ -110,4 +110,21 @@ return [
 
     'browser_log_levels' => explode(',', (string) env('BOOST_BROWSER_LOG_LEVELS', 'error,warning,info,debug')),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Agent Guideline Paths
+    |--------------------------------------------------------------------------
+    |
+    | Boost 2.10 moved Claude Code's guidelines to AGENTS.md. This repository
+    | compiles them into CLAUDE.md, which tests/Arch/ConventionsTest.php keeps
+    | in sync with the .ai/guidelines sources.
+    |
+    */
+
+    'agents' => [
+        'claude_code' => [
+            'guidelines_path' => 'CLAUDE.md',
+        ],
+    ],
+
 ];

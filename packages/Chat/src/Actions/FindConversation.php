@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Actions;
 
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
+use Relaticle\Chat\Models\AgentConversation;
 
 final readonly class FindConversation
 {
     public function execute(User $user, string $conversationId): ?\stdClass
     {
-        return DB::table('agent_conversations')
-            ->where('id', $conversationId)
-            ->where('participant_type', $user->getMorphClass())
-            ->where('participant_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
+        return AgentConversation::query()
+            ->ownedBy($user)
+            ->whereKey($conversationId)
+            ->toBase()
             ->first(['id', 'title', 'created_at', 'updated_at']);
     }
 }

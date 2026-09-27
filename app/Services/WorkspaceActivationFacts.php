@@ -7,7 +7,7 @@ namespace App\Services;
 use App\Enums\CreationSource;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Storage\SupersededAwareConversationStore;
+use Relaticle\Chat\Models\AgentConversationMessage;
 
 /**
  * Request-scoped answers to "what has this workspace done so far".
@@ -76,27 +76,31 @@ final class WorkspaceActivationFacts
      */
     public function hasUserChatMessage(Workspace $workspace): bool
     {
-        return DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('c.workspace_id', $workspace->getKey())
-            ->where('m.role', 'user')
-            ->whereRaw("coalesce(m.meta->>'kind', '') <> ?", [SupersededAwareConversationStore::CONTINUATION_KIND])
+        return AgentConversationMessage::query()
+            ->typed()
+            ->whereRelation('conversation', 'workspace_id', $workspace->getKey())
             ->exists();
     }
 
     public function sampleRecordCount(Workspace $workspace): int
     {
-        $total = 0;
+        return array_sum($this->sampleRecordCounts($workspace));
+    }
+
+    /** @return array<string, int> */
+    public function sampleRecordCounts(Workspace $workspace): array
+    {
+        $counts = [];
 
         foreach (self::ENTITY_TABLES as $table) {
-            $total += (int) DB::table($table)
+            $counts[$table] = DB::table($table)
                 ->where('workspace_id', $workspace->getKey())
                 ->where('creation_source', CreationSource::SYSTEM->value)
                 ->whereNull('deleted_at')
                 ->count();
         }
 
-        return $total;
+        return $counts;
     }
 
     public function forget(Workspace $workspace): void

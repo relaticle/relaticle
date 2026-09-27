@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\AccessTokens;
 
 use App\Livewire\BaseLivewireComponent;
+use App\Models\User;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
@@ -12,6 +13,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +79,12 @@ final class CreateAccessToken extends BaseLivewireComponent
                             ->required()
                             ->options(
                                 $this->authUser()->allWorkspaces()->pluck('name', 'id'),
-                            ),
+                            )
+                            ->live()
+                            ->afterStateUpdated(fn (Get $get, Set $set): mixed => $set(
+                                'permissions',
+                                array_values(array_intersect((array) $get('permissions'), self::grantablePermissions($get('workspace_id')))),
+                            )),
                         Select::make('expiration')
                             ->label(__('access-tokens.form.expiration'))
                             ->required()
@@ -158,7 +166,7 @@ final class CreateAccessToken extends BaseLivewireComponent
         $token = DB::transaction(function () use ($user, $state, $workspaceId, $expiresAt): NewAccessToken {
             $token = $user->createToken(
                 $state['name'],
-                Jetstream::validPermissions($state['permissions'] ?? []),
+                array_values(array_intersect($state['permissions'] ?? [], $user->grantableTokenPermissions($workspaceId))),
             );
 
             // Sanctum's createToken() does not accept extra attributes, so we update after creation
@@ -185,7 +193,7 @@ final class CreateAccessToken extends BaseLivewireComponent
             ->label(__('access-tokens.form.permissions'))
             ->required()
             ->options(
-                collect(Jetstream::$permissions)
+                fn (Get $get): array => collect(self::grantablePermissions($get('workspace_id')))
                     ->mapWithKeys(
                         fn (string $permission): array => [
                             $permission => ucfirst($permission),
@@ -194,6 +202,14 @@ final class CreateAccessToken extends BaseLivewireComponent
                     ->all(),
             )
             ->columns(2);
+    }
+
+    /** @return list<string> */
+    public static function grantablePermissions(mixed $workspaceId): array
+    {
+        $user = auth()->user();
+
+        return $user instanceof User ? $user->grantableTokenPermissions(is_string($workspaceId) ? $workspaceId : null) : [];
     }
 
     public function render(): View

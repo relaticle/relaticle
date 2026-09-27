@@ -20,6 +20,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
 use Tests\Helpers\ChatDocument;
+use Tests\Helpers\OpenAiResponses;
 
 mutates(GenerateConversationTitle::class, TitleSanitizer::class, ConversationTitleGate::class);
 
@@ -57,7 +58,7 @@ function seedTitlingConversation(string $title): string
 /**
  * @param  array<string, string>  $meta
  */
-function seedTitlingMessage(string $conversationId, string $role, string $content, array $meta = []): void
+function seedTitlingMessage(string $conversationId, string $role, string $content, array $meta = [], string $origin = 'typed'): void
 {
     DB::table('agent_conversation_messages')->insert([
         'id' => (string) Str::uuid7(),
@@ -68,10 +69,10 @@ function seedTitlingMessage(string $conversationId, string $role, string $conten
         'role' => $role,
         'content' => $content,
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '[]',
         'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
+        'origin' => $origin,
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -143,6 +144,21 @@ it('replaces the provisional title and broadcasts the new one', function (): voi
         fn (ConversationTitleGenerated $e): bool => $e->conversationId === $conversationId
             && $e->title === 'Follow Up With Acme',
     );
+});
+
+it('titles a conversation whose turn was served by OpenAI', function (): void {
+    OpenAiResponses::fakeStructured(['has_topic' => true, 'title' => 'Follow Up With Acme']);
+
+    $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        message: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        provider: 'openai',
+    ))->handle();
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('Follow Up With Acme');
 });
 
 it('never overwrites a title the user renamed while the model was thinking', function (): void {
@@ -391,14 +407,14 @@ it('does not re-title at turn end when the conversation already has a generated 
     Queue::assertNotPushed(GenerateConversationTitle::class);
 });
 
-it('does not let approval echoes and resumed turns burn the titling window', function (): void {
+it('does not let the greeting and resumed turns burn the titling window', function (): void {
     Queue::fake();
 
     $conversationId = seedTitlingConversation('hey');
     seedTitlingMessage($conversationId, 'user', 'hey');
     seedTitlingMessage($conversationId, 'assistant', 'Hi! How can I help?');
-    seedTitlingMessage($conversationId, 'user', '[approval] approved');
-    seedTitlingMessage($conversationId, 'user', 'The proposals from your last turn have just been decided.', ['kind' => 'continuation']);
+    seedTitlingMessage($conversationId, 'user', 'The user opened their setup conversation.', [], 'greeting');
+    seedTitlingMessage($conversationId, 'user', 'The user decided the proposals above.', [], 'resume');
 
     $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
         'document' => ChatDocument::fromText('Draft a renewal proposal for Globex'),
@@ -417,8 +433,8 @@ it('titles at turn end from what the user typed, not from the rows the system wr
     $conversationId = seedTitlingConversation('hey');
     seedTitlingMessage($conversationId, 'user', 'hey');
     seedTitlingMessage($conversationId, 'assistant', 'Hi! How can I help?');
-    seedTitlingMessage($conversationId, 'user', '[approval] approved');
-    seedTitlingMessage($conversationId, 'user', 'The proposals from your last turn have just been decided.', ['kind' => 'continuation']);
+    seedTitlingMessage($conversationId, 'user', 'The user opened their setup conversation.', [], 'greeting');
+    seedTitlingMessage($conversationId, 'user', 'The user decided the proposals above.', [], 'resume');
 
     (new ProcessChatMessage(
         user: $this->user,

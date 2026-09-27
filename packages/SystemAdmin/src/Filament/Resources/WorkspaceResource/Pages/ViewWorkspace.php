@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 
 final class ViewWorkspace extends ViewRecord
 {
@@ -17,6 +18,7 @@ final class ViewWorkspace extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Impersonate::workspaceOwner(),
             EditAction::make()->action(null),
         ];
     }

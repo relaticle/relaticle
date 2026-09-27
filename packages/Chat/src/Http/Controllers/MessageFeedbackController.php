@@ -7,8 +7,8 @@ namespace Relaticle\Chat\Http\Controllers;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\ChatMessageFeedback;
 use Relaticle\Chat\Support\ChatTelemetry;
 
@@ -85,13 +85,11 @@ final class MessageFeedbackController
 
     private function ownAssistantMessage(User $user, string $messageId): ?\stdClass
     {
-        return DB::table('agent_conversation_messages as m')
-            ->join('agent_conversations as c', 'c.id', '=', 'm.conversation_id')
-            ->where('m.id', $messageId)
-            ->where('m.participant_type', $user->getMorphClass())
-            ->where('m.participant_id', $user->getKey())
-            ->where('c.workspace_id', $user->current_workspace_id)
-            ->where('m.role', 'assistant')
-            ->first(['m.id', 'm.conversation_id', 'm.meta']);
+        return AgentConversationMessage::query()
+            ->ownedBy($user)
+            ->whereKey($messageId)
+            ->where('role', 'assistant')
+            ->toBase()
+            ->first(['id', 'conversation_id', 'meta']);
     }
 }

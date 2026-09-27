@@ -59,14 +59,14 @@ it('encodes empty tool_use input as JSON object, not array', function (): void {
     expect(json_encode($toolUseBlock['input']))->toBe('{}');
 });
 
-it('encodes empty tool_use input as JSON object when replaying provider content blocks', function (): void {
+it('encodes empty tool_use input as JSON object when replaying stored replay blocks', function (): void {
     $gateway = new AnthropicGateway(new Dispatcher);
 
     $message = new AssistantMessage('ok', collect([
         new ToolCall('toolu_test_id', 'GetCrmSummaryTool', [], 'toolu_test_id'),
     ]));
 
-    $message->providerContentBlocks = [
+    $message->replayBlocks = [
         ['type' => 'text', 'text' => 'ok'],
         ['type' => 'tool_use', 'id' => 'toolu_test_id', 'name' => 'GetCrmSummaryTool', 'input' => []],
     ];

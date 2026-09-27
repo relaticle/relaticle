@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Livewire\App\AccessTokens\CreateAccessToken;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Forms\Components\CheckboxList;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
 
@@ -155,4 +157,26 @@ test('workspace_id and expiration are required', function () {
         ])
         ->call('createToken')
         ->assertHasFormErrors(['workspace_id' => 'required', 'expiration' => 'required']);
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('a viewer is offered only read, and cannot create a token that writes', function () {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $viewer = User::factory()->create();
+    $workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($workspace);
+    $this->actingAs($viewer->fresh());
+
+    livewire(CreateAccessToken::class)
+        ->fillForm(['workspace_id' => $workspace->id])
+        ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['read'])
+        ->fillForm([
+            'name' => 'Viewer Token',
+            'expiration' => '30',
+            'permissions' => ['read', 'delete'],
+        ])
+        ->call('createToken')
+        ->assertHasFormErrors(['permissions.1']);
+
+    expect($viewer->fresh()->tokens)->toBeEmpty();
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');

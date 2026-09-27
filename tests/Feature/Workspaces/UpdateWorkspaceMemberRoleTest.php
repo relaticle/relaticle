@@ -21,18 +21,18 @@ test('workspace member roles can be updated', function () {
 
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->callAction(TestAction::make('updateWorkspaceRole')->table($otherUser->id), data: [
-            'role' => WorkspaceRole::Editor->value,
+            'role' => WorkspaceRole::Member->value,
         ])
         ->assertHasNoActionErrors();
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'editor'))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $otherUser->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
-test('editor cannot update workspace member roles', function () {
+test('member cannot update workspace member roles', function () {
     $user = User::factory()->withWorkspace()->create();
 
     $workspace = $user->currentWorkspace;
-    $workspace->users()->attach($otherUser = User::factory()->create(), ['role' => 'editor']);
+    $workspace->users()->attach($otherUser = User::factory()->create(), ['role' => 'member']);
 
     $this->actingAs($otherUser);
     Filament::setTenant($workspace);
@@ -40,7 +40,7 @@ test('editor cannot update workspace member roles', function () {
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $otherUser->id);
 
-    expect($otherUser->fresh()->hasWorkspaceRole($workspace->fresh(), 'editor'))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $otherUser->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('admin cannot promote another member to admin', function (): void {
@@ -50,19 +50,19 @@ test('admin cannot promote another member to admin', function (): void {
     $admin = User::factory()->create();
     $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
-    $editor = User::factory()->create();
-    $workspace->users()->attach($editor, ['role' => WorkspaceRole::Editor->value]);
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
     $this->actingAs($admin);
     Filament::setTenant($workspace);
 
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
-        ->callAction(TestAction::make('updateWorkspaceRole')->table($editor->id), data: [
+        ->callAction(TestAction::make('updateWorkspaceRole')->table($member->id), data: [
             'role' => WorkspaceRole::Admin->value,
         ])
         ->assertHasActionErrors(['role']);
 
-    expect($editor->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Editor->value))->toBeTrue();
+    expect(WorkspaceRole::tryFrom((string) $member->fresh()->membershipRole($workspace->fresh())))->toBe(WorkspaceRole::Member);
 });
 
 test('admin cannot demote another admin', function (): void {
@@ -81,7 +81,7 @@ test('admin cannot demote another admin', function (): void {
     livewire(WorkspaceMembers::class, ['workspace' => $workspace])
         ->assertTableActionHidden('updateWorkspaceRole', $adminB->id);
 
-    expect($adminB->fresh()->hasWorkspaceRole($workspace->fresh(), WorkspaceRole::Admin->value))->toBeTrue();
+    expect(WorkspaceRole::keyIsAdmin($adminB->fresh()->membershipRole($workspace->fresh())))->toBeTrue();
 });
 
 test('viewer is a registered workspace role with only read ability', function (): void {

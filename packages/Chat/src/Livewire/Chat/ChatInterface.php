@@ -8,18 +8,19 @@ use App\Actions\Onboarding\StartSetupGreeting;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Actions\FindConversation;
 use Relaticle\Chat\Actions\ListConversationMessages;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\NextSteps;
 use Relaticle\Chat\Support\RecordReferenceResolver;
+use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TitleSanitizer;
-use Relaticle\Chat\Support\TranscriptScope;
 use Relaticle\Chat\Support\TurnPresence;
 
 final class ChatInterface extends BaseLivewireComponent
@@ -144,7 +145,7 @@ final class ChatInterface extends BaseLivewireComponent
         if ($presence !== null && ! $this->turnAlreadyPersisted($presence['started_at'])) {
             $this->turnInFlight = true;
 
-            if ($presence['kind'] === 'message') {
+            if ($presence['origin'] === MessageOrigin::Typed->value) {
                 $this->messages[] = $this->inFlightUserMessage($presence);
             }
         }
@@ -198,7 +199,7 @@ final class ChatInterface extends BaseLivewireComponent
      * The in-flight user message, shaped like a ListConversationMessages row so
      * the client renders it exactly as the persisted one will after the turn.
      *
-     * @param  array{kind: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}  $presence
+     * @param  array{origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}  $presence
      * @return array{role: string, content: string, created_at: string, document: array<string, mixed>, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: null, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: ?string}|null}
      */
     private function inFlightUserMessage(array $presence): array
@@ -305,6 +306,7 @@ final class ChatInterface extends BaseLivewireComponent
      *
      * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>}|null
      */
+    #[Renderless]
     public function latestAssistantMessage(?string $conversationId = null): ?array
     {
         $conversationId ??= $this->conversationId;
@@ -315,11 +317,13 @@ final class ChatInterface extends BaseLivewireComponent
 
         $user = $this->authUser();
 
-        $row = TranscriptScope::apply(DB::table('agent_conversation_messages as m'), $user, $conversationId)
-            ->where('m.role', 'assistant')
-            ->latest('m.created_at')
-            ->orderByDesc('m.id')
-            ->first(['m.id', 'm.content', 'm.tool_results', 'm.meta']);
+        $row = AgentConversationMessage::query()
+            ->visibleTo($user, $conversationId)
+            ->where('role', 'assistant')
+            ->latest()
+            ->orderByDesc('id')
+            ->toBase()
+            ->first(['id', 'content', 'steps', 'meta']);
 
         if ($row === null) {
             return null;
@@ -329,9 +333,7 @@ final class ChatInterface extends BaseLivewireComponent
             'id' => (string) $row->id,
             'content' => (string) $row->content,
             'pending_actions' => $this->pendingActionCards($conversationId),
-            'display_blocks' => DisplayBlocks::collect(
-                $row->tool_results === null ? null : (string) $row->tool_results,
-            ),
+            'display_blocks' => DisplayBlocks::collect(StoredSteps::toolResults($row->steps)),
             'next_steps' => NextSteps::fromMeta($row->meta === null ? null : (string) $row->meta),
         ];
     }
@@ -388,6 +390,7 @@ final class ChatInterface extends BaseLivewireComponent
      * therefore passes its own id, scoped to the authed user and workspace by
      * FindConversation.
      */
+    #[Renderless]
     public function conversationTitle(?string $conversationId = null): ?string
     {
         $conversationId ??= $this->conversationId;

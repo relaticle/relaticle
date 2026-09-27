@@ -19,6 +19,7 @@ it('copies a newly created access token to the clipboard', function (): void {
         ->navigate("/app/{$workspace->slug}/settings/access-tokens")
         ->assertPathIs("/app/{$workspace->slug}/settings/access-tokens")
         ->waitForText('Create Access Token')
+        ->assertScript('document.getElementById("form.name")?._x_model !== undefined')
         ->type('[id="form.name"]', 'MCP integration')
         ->click('button[wire\\:click="createToken"]')
         ->waitForText('Please copy your new access token.');

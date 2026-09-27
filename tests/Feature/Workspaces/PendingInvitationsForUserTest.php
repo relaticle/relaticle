@@ -24,7 +24,7 @@ test('an independently registered invitee sees their pending invitation', functi
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -59,7 +59,7 @@ test('the card still renders when the inviter account is gone', function (): voi
     $workspace = $owner->currentWorkspace;
     $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'inviter_id' => null,
         'expires_at' => now()->addDays(5),
     ]);
@@ -69,7 +69,7 @@ test('the card still renders when the inviter account is gone', function (): voi
 
     livewire(PendingInvitationsForUser::class)
         ->assertSee(__('workspaces.pending_for_user.detail', [
-            'role' => Jetstream::findRole('editor')?->name,
+            'role' => Jetstream::findRole('member')?->name,
         ]));
 });
 
@@ -77,7 +77,7 @@ test('a workspaceless invitee sees the card on the tenant-registration page', fu
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -94,7 +94,7 @@ test('the card still renders exactly once on an ordinary panel page', function (
     $inviter = User::factory()->withWorkspace()->create();
     $inviter->currentWorkspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -111,7 +111,7 @@ test('accepting from the card joins the workspace', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -131,7 +131,7 @@ test('accepting still joins a workspace other than the ambient panel tenant', fu
         $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
         $invitation = $workspace->workspaceInvitations()->create([
             'email' => 'later@example.test',
-            'role' => 'editor',
+            'role' => 'member',
             'expires_at' => now()->addDays(5),
         ]);
 
@@ -158,7 +158,7 @@ test('suspending the User tenancy scope during accept does not affect other mode
         $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
         $invitation = $workspace->workspaceInvitations()->create([
             'email' => 'later@example.test',
-            'role' => 'editor',
+            'role' => 'member',
             'expires_at' => now()->addDays(5),
         ]);
 
@@ -185,7 +185,7 @@ test('declining revokes the invitation without joining', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -202,7 +202,7 @@ test('another users invitation is invisible and cannot be accepted', function ()
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'someone@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -221,7 +221,7 @@ test('another users invitation cannot be declined either', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'someone@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -237,7 +237,7 @@ test('an invitation email matching only by case can still be accepted', function
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -255,7 +255,7 @@ test('an expired invitation is neither listed nor acceptable', function (): void
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->subDay(),
     ]);
 
@@ -274,7 +274,7 @@ test('an invitation with a null expiry is neither listed nor acceptable', functi
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => null,
     ]);
 
@@ -292,7 +292,7 @@ test('a user scheduled for deletion cannot accept from the card', function (): v
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 
@@ -313,7 +313,7 @@ test('a workspace scheduled for deletion cannot be joined from the card', functi
 
     $invitation = $workspace->workspaceInvitations()->create([
         'email' => 'later@example.test',
-        'role' => 'editor',
+        'role' => 'member',
         'expires_at' => now()->addDays(5),
     ]);
 

@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalPayload;
 use RuntimeException;
@@ -183,7 +184,7 @@ final readonly class ProposalPlanService
             } catch (RuntimeException $exception) {
                 return [
                     'approved' => $approved,
-                    'failed' => ['step' => $position, 'message' => $exception->getMessage()],
+                    'failed' => ['step' => $position, 'message' => ApprovalFailureMessage::for($exception)],
                 ];
             }
 

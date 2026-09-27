@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\JsonSchema\Serializer;
@@ -65,3 +66,35 @@ it('names the access tokens and connect assistant destinations in its schema des
         ->toContain('"access_tokens"')
         ->toContain('"connect_assistant"');
 });
+
+it('refuses a page the user cannot open instead of handing over a link that would 403', function (string $destination, WorkspaceRole $role): void {
+    $workspace = $this->user->ownedWorkspaces()->first();
+    $teammate = User::factory()->create();
+    $workspace->users()->attach($teammate, ['role' => $role->value]);
+    $teammate->switchWorkspace($workspace);
+    $this->actingAs($teammate->fresh());
+
+    $payload = json_decode(app(GuideToPageTool::class)->handle(new Request(['destination' => $destination])), true);
+
+    expect($payload)->toHaveKey('error')
+        ->and($payload)->not->toHaveKey('url')
+        ->and($payload['error'])->toContain('cannot open');
+})->with([
+    'member to custom fields' => ['custom_fields', WorkspaceRole::Member],
+    'member to members' => ['workspace_members', WorkspaceRole::Member],
+    'viewer to an import' => ['import_companies', WorkspaceRole::Viewer],
+    'viewer to an export' => ['export_companies', WorkspaceRole::Viewer],
+]);
+
+it('still links an admin to the pages admins can open', function (string $destination): void {
+    $workspace = $this->user->ownedWorkspaces()->first();
+    $admin = User::factory()->create();
+    $workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($workspace);
+    $this->actingAs($admin->fresh());
+
+    $payload = json_decode(app(GuideToPageTool::class)->handle(new Request(['destination' => $destination])), true);
+
+    expect($payload)->not->toHaveKey('error')
+        ->and($payload['url'])->toBeString();
+})->with(['custom_fields', 'workspace_members', 'import_companies', 'export_companies', 'access_tokens']);

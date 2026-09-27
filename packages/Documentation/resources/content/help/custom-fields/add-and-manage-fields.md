@@ -8,7 +8,8 @@ related: [help/custom-fields/field-types-you-can-add, help/custom-fields/control
 
 Fields are managed on the **Custom Fields** page: click your workspace name at
 the top of the sidebar and choose **Custom Fields**. Only the workspace owner
-sees this page. Everyone else uses the fields; the owner shapes them.
+and Admins see this page. Everyone else uses the fields; owners and Admins
+shape them.
 
 The page shows one tab per record type (Companies, People, Opportunities,
 Tasks, Notes) with a count badge, and the fields of the selected type in a

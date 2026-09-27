@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -64,8 +65,7 @@ function turnPresenceSeedMessage(User $user, string $conversationId, array $over
         'content' => 'earlier message',
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => now()->subMinutes(5),
@@ -105,7 +105,7 @@ it('marks the turn in flight when a message is sent', function (): void {
     $presence = TurnPresence::current($conversationId);
 
     expect($presence)->not->toBeNull()
-        ->and($presence['kind'])->toBe('message')
+        ->and($presence['origin'])->toBe(MessageOrigin::Typed->value)
         ->and($presence['message'])->toBe('update categories for all contacts');
 });
 
@@ -163,7 +163,7 @@ it('shows a continuation turn without injecting a user bubble', function (): voi
     $conversationId = turnPresenceSeedConversation($this->user);
     turnPresenceSeedMessage($this->user, $conversationId, ['role' => 'assistant', 'content' => 'Created it.']);
 
-    TurnPresence::begin($conversationId, turnId: 'turn-a', message: '', isContinuation: true);
+    TurnPresence::begin($conversationId, turnId: 'turn-a', message: '', origin: MessageOrigin::Resume);
 
     $component = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
         ->assertSet('turnInFlight', true);
@@ -238,7 +238,7 @@ it('never leaks another workspace conversation in-flight turn on mount', functio
 
 it('never leaks a teammate conversation in-flight turn on mount', function (): void {
     $teammate = User::factory()->create();
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
 
     $conversationId = turnPresenceSeedConversation($teammate);
@@ -267,7 +267,7 @@ it('marks a continuation turn in flight when the assistant resumes', function ()
     $presence = TurnPresence::current($conversationId);
 
     expect($presence)->not->toBeNull()
-        ->and($presence['kind'])->toBe('continuation')
+        ->and($presence['origin'])->toBe(MessageOrigin::Resume->value)
         ->and($presence['message'])->toBe('');
 });
 

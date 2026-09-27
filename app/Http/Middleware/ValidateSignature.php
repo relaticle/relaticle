@@ -32,15 +32,26 @@ final readonly class ValidateSignature
     /** @param  string  ...$args */
     public function handle(Request $request, Closure $next, mixed ...$args): Response
     {
-        try {
-            return $this->base->handle($request, $next, ...$args);
-        } catch (InvalidSignatureException) {
-            if ($this->hasValidNormalizedSignature($request, array_values($args))) {
-                return $next($request);
-            }
+        throw_unless($this->hasValidSignature($request, array_values($args)), InvalidSignatureException::class);
 
-            throw new InvalidSignatureException;
+        return $next($request);
+    }
+
+    /**
+     * The base middleware reports its verdict only by calling $next or throwing,
+     * so it gets a throwaway continuation and the real one runs once, outside it.
+     *
+     * @param  array<int, string>  $args
+     */
+    private function hasValidSignature(Request $request, array $args): bool
+    {
+        try {
+            $this->base->handle($request, fn (): Response => new Response, ...$args);
+        } catch (InvalidSignatureException) {
+            return $this->hasValidNormalizedSignature($request, $args);
         }
+
+        return true;
     }
 
     /**

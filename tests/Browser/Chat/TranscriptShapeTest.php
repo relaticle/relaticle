@@ -34,8 +34,7 @@ function transcriptShapeInsertMessage(string $conversationId, User $user, string
         'content' => $content,
         'document' => ChatDocument::emptyJson(),
         'attachments' => '[]',
-        'tool_calls' => '[]',
-        'tool_results' => '[]',
+        'steps' => '[]',
         'usage' => '{}',
         'meta' => '{}',
         'created_at' => $at,
@@ -113,8 +112,7 @@ function transcriptShapeInsertSequencedMessages(string $conversationId, User $us
             'content' => sprintf('Seeded message %04d', $i),
             'document' => ChatDocument::emptyJson(),
             'attachments' => '[]',
-            'tool_calls' => '[]',
-            'tool_results' => '[]',
+            'steps' => '[]',
             'usage' => '{}',
             'meta' => '{}',
             'created_at' => $baseline->copy()->addMinutes($i),
@@ -859,4 +857,47 @@ it('focuses the message editor on open and grows its width with the text', funct
     JS);
 
     expect($grown)->toBeGreaterThan($opened['width']);
+});
+
+it('keeps a turn sent after paging back when the stream-end reconcile and title sync run', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
+
+    transcriptShapeInsertSequencedMessages($conversationId, $user, 120, Date::parse('2026-08-19 08:00:00', 'UTC'));
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Seeded message 0120');
+
+    $page->assertCount('[data-user-bubble]', 50);
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+            data.loadEarlier();
+            return true;
+        })();
+    JS);
+
+    $page->assertCount('[data-user-bubble]', 100);
+
+    $survived = $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+            data.mintAssistantStub({ content: 'SENT_AFTER_PAGING' });
+            await data.\$wire.latestAssistantMessage('{$conversationId}');
+            await data.\$wire.conversationTitle('{$conversationId}');
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            const liveHosts = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
+            const liveHost = liveHosts.find((el) => el.offsetParent !== null) ?? liveHosts[0];
+
+            return Alpine.\$data(liveHost).messages.some((message) => message.content === 'SENT_AFTER_PAGING');
+        })();
+    JS);
+
+    expect($survived)->toBeTrue();
 });

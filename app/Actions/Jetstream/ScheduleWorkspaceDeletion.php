@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Actions\Billing\CancelWorkspaceSubscription;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceDeletionScheduledNotification;
@@ -18,7 +19,7 @@ final readonly class ScheduleWorkspaceDeletion
 
     public function schedule(User $user, Workspace $workspace): void
     {
-        throw_unless($user->ownsWorkspace($workspace), AuthorizationException::class);
+        throw_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), AuthorizationException::class);
 
         if ($workspace->isPersonalWorkspace()) {
             throw ValidationException::withMessages([

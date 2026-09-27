@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Company\CreateCompany;
-use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -32,7 +31,6 @@ it('persists account_owner_id when CreateCompany action receives it', function (
     $company = (new CreateCompany)->execute(
         $this->user,
         ['name' => 'AI Created Co', 'account_owner_id' => $this->user->getKey()],
-        CreationSource::CHAT,
     );
 
     expect($company->account_owner_id)->toBe($this->user->getKey());

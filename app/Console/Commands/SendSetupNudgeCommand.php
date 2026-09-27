@@ -10,7 +10,6 @@ use App\Mail\SetupNudgeMail;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
-use DateTimeZone;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -28,7 +27,8 @@ final class SendSetupNudgeCommand extends Command
     {
         $sent = 0;
 
-        $this->recipientsAtLocalHour(9)
+        User::query()
+            ->atLocalHour(9)
             ->whereHas('ownedWorkspaces', fn (Builder $query): Builder => $query
                 ->where('personal_workspace', true)
                 ->whereNull('setup_nudge_sent_at')
@@ -49,38 +49,6 @@ final class SendSetupNudgeCommand extends Command
         $this->comment("Queued {$sent} setup nudge email(s).");
 
         return self::SUCCESS;
-    }
-
-    /**
-     * Users whose local time is currently at the given hour, filtered in the
-     * database (indexed on `timezone`) so the hourly run never loads the whole
-     * user table, only the ~1/24th of users currently in the 09:00 band.
-     *
-     * @return Builder<User>
-     */
-    private function recipientsAtLocalHour(int $hour): Builder
-    {
-        $timezones = $this->timezonesAtLocalHour($hour);
-        $appTimezoneMatches = in_array((string) config('app.timezone'), $timezones, true);
-
-        return User::query()->where(function (Builder $query) use ($timezones, $appTimezoneMatches): void {
-            $query->whereIn('timezone', $timezones);
-
-            if ($appTimezoneMatches) {
-                $query->orWhereNull('timezone');
-            }
-        });
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function timezonesAtLocalHour(int $hour): array
-    {
-        return array_values(array_filter(
-            DateTimeZone::listIdentifiers(),
-            fn (string $timezone): bool => (int) Date::now($timezone)->format('G') === $hour,
-        ));
     }
 
     private function sendForUser(User $user, WorkspaceActivationFacts $facts): bool

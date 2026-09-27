@@ -1,0 +1,85 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Scribe\OpenApi\ErrorResponsesGenerator;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
+use Relaticle\Documentation\Http\Controllers\OpenApiSpecController;
+
+mutates(OpenApiSpecController::class, ErrorResponsesGenerator::class);
+
+beforeEach(function (): void {
+    Storage::fake('local');
+});
+
+it('404s both spec URLs until scribe has generated the spec', function (): void {
+    $this->get('/openapi.json')->assertNotFound();
+    $this->get('/openapi.yaml')->assertNotFound();
+});
+
+it('serves the generated spec as yaml and as json', function (): void {
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\ninfo:\n  title: Relaticle\npaths: {}\n");
+
+    $this->get('/openapi.yaml')
+        ->assertOk()
+        ->assertHeader('content-type', 'application/yaml; charset=UTF-8')
+        ->assertSee('openapi: 3.1.0', false);
+
+    $this->get('/openapi.json')
+        ->assertOk()
+        ->assertHeader('content-type', 'application/json')
+        ->assertExactJson(['openapi' => '3.1.0', 'info' => ['title' => 'Relaticle'], 'paths' => []]);
+});
+
+it('keeps empty yaml maps as json objects so the spec stays valid openapi', function (): void {
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\npaths: {}\ncomponents:\n  schemas:\n    Empty:\n      type: object\n      properties: {}\n    Tags:\n      type: array\n      example: []\n");
+
+    expect($this->get('/openapi.json')->assertOk()->getContent())
+        ->toContain('"paths":{}')
+        ->toContain('"properties":{}')
+        ->toContain('"example":[]');
+});
+
+it('documents the error envelope, scoped abilities, and rate limits on every operation', function (): void {
+    $generatedView = resource_path('views/scribe/index.blade.php');
+    $committedView = File::get($generatedView);
+
+    try {
+        $this->artisan('scribe:generate', ['--no-interaction' => true, '--force' => true, '--scribe-dir' => storage_path('framework/testing/scribe')])
+            ->assertSuccessful();
+    } finally {
+        File::put($generatedView, $committedView);
+        File::deleteDirectory(storage_path('framework/testing/scribe'));
+    }
+
+    $spec = $this->get('/openapi.json')->assertOk()->json();
+
+    expect($spec['info']['description'])->toContain('Retry-After')->toContain('six months')
+        ->and($spec['components']['schemas'])->toHaveKeys(['Error', 'ValidationError'])
+        ->and($spec['components']['securitySchemes']['default']['description'])->toContain('`read` (GET)');
+
+    foreach ($spec['paths'] as $path => $operations) {
+        foreach ($operations as $method => $operation) {
+            if ($method === 'parameters') {
+                continue;
+            }
+
+            expect($operation['responses'])->toHaveKeys(['401', '402', '403', '429'], "{$method} {$path}");
+            expect($operation['responses']['403']['description'])->not->toContain('another workspace');
+            expect($operation['responses']['429']['headers'])->toHaveKey('Retry-After');
+            expect(isset($operation['responses']['404']))->toBe(str_contains($path, '{id}'), "{$method} {$path}");
+            expect(isset($operation['responses']['422']))->toBe(in_array($method, ['post', 'put', 'patch'], true), "{$method} {$path}");
+        }
+    }
+});
+
+it('serves the regenerated spec as json after the next deploy', function (): void {
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\ninfo:\n  version: 1.0.0\n");
+
+    $this->get('/openapi.json')->assertOk()->assertJsonPath('info.version', '1.0.0');
+
+    Storage::disk('local')->put('scribe/openapi.yaml', "openapi: 3.1.0\ninfo:\n  version: 1.1.0\n");
+
+    $this->get('/openapi.json')->assertOk()->assertJsonPath('info.version', '1.1.0');
+});

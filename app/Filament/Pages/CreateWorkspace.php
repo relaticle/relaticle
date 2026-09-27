@@ -17,20 +17,24 @@ use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Pages\Tenancy\RegisterTenant;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
+use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Enums\Width;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Number;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Override;
@@ -267,6 +271,26 @@ final class CreateWorkspace extends RegisterTenant
         return new HtmlString($html);
     }
 
+    private function logoHint(): HtmlString
+    {
+        $title = __('filament/pages/workspaces.create_workspace.form.company_logo.label');
+        $description = __('filament/pages/workspaces.create_workspace.form.company_logo.description', [
+            'max' => Number::fileSize(Workspace::LOGO_MAX_KILOBYTES * 1024),
+        ]);
+
+        return new HtmlString(
+            '<p class="text-base font-semibold text-gray-950 dark:text-white">'.e($title).'</p>'
+            .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">'.e($description).'</p>'
+        );
+    }
+
+    private function handleIsDerived(Get $get): bool
+    {
+        $slug = $get('slug');
+
+        return blank($slug) || $slug === $get('slug_derived');
+    }
+
     private function isFirstWorkspace(): bool
     {
         /** @var User $user */
@@ -281,6 +305,26 @@ final class CreateWorkspace extends RegisterTenant
     private function getWorkspaceFormComponents(): array
     {
         return [
+            Flex::make([
+                SpatieMediaLibraryFileUpload::make('logo')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
+                    ->hiddenLabel()
+                    ->collection(Workspace::LOGO_MEDIA_COLLECTION)
+                    ->imageEditor()
+                    ->avatar()
+                    // Last in the chain on purpose: avatar() calls image(),
+                    // which resets the allowlist back to `image/*`.
+                    ->acceptedFileTypes(Workspace::LOGO_MIME_TYPES)
+                    ->maxSize(Workspace::LOGO_MAX_KILOBYTES)
+                    ->grow(false),
+
+                Placeholder::make('company_logo_hint')
+                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
+                    ->hiddenLabel()
+                    ->content($this->logoHint())
+                    ->dehydrated(false),
+            ])->verticalAlignment(VerticalAlignment::Center),
+
             TextInput::make('user_name')
                 ->label(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
                 ->required()
@@ -300,14 +344,20 @@ final class CreateWorkspace extends RegisterTenant
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/workspaces.create_workspace.form.workspace_name.placeholder'))
-                ->live(onBlur: true)
+                // Typed, not blurred: the handle has to track the name as it is written.
+                // That unanchors the derive from focus, so ownership is decided by
+                // comparing the handle to the last value this derived, never by which
+                // field's update Livewire happens to process first.
+                ->live(debounce: 400)
                 ->afterStateUpdated(function (Get $get, Set $set, ?string $state): void {
-                    if ($get('slug_auto_generated') !== true && filled($get('slug'))) {
+                    if (! $this->handleIsDerived($get)) {
                         return;
                     }
 
-                    $set('slug', Workspace::availableSlugFor($state));
-                    $set('slug_auto_generated', true);
+                    $derived = Workspace::availableSlugFor($state);
+
+                    $set('slug', $derived);
+                    $set('slug_derived', $derived);
                 }),
 
             TextInput::make('slug')
@@ -317,17 +367,16 @@ final class CreateWorkspace extends RegisterTenant
                 ->rules([new ValidWorkspaceSlug])
                 ->rules(
                     [fn (): Unique => Rule::unique(Workspace::class, 'slug')],
-                    condition: fn (Get $get): bool => $get('slug_auto_generated') !== true,
+                    condition: fn (Get $get): bool => ! $this->handleIsDerived($get),
                 )
                 ->prefix(WorkspaceUrlPrefix::get())
+                ->placeholder(__('filament/pages/workspaces.create_workspace.form.workspace_handle.placeholder'))
                 ->helperText(__('filament/pages/workspaces.create_workspace.form.workspace_handle.helper_text'))
-                ->live(onBlur: true)
-                ->afterStateUpdated(function (Set $set): void {
-                    $set('slug_auto_generated', false);
-                }),
+                // Undebounced so a typed handle reaches the server before the name's
+                // own debounce fires; a pending update is invisible to the name's hook.
+                ->live(),
 
-            Hidden::make('slug_auto_generated')
-                ->default(true)
+            Hidden::make('slug_derived')
                 ->dehydrated(false),
         ];
     }
@@ -387,7 +436,7 @@ final class CreateWorkspace extends RegisterTenant
 
         $this->updateUserNameIfChanged($user, $data);
 
-        if (($this->data['slug_auto_generated'] ?? null) === true && Workspace::query()->where('slug', $data['slug'])->exists()) {
+        if (($this->data['slug_derived'] ?? null) === $data['slug'] && Workspace::query()->where('slug', $data['slug'])->exists()) {
             $data['slug'] = null;
         }
 

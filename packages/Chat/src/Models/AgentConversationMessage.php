@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Relaticle\Chat\Enums\MessageOrigin;
 
 /**
  * Read model over the laravel/ai message store. Backs the SystemAdmin
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $participant_id
  * @property string|null $agent
  * @property string $role
+ * @property MessageOrigin $origin
  * @property string|null $content
  * @property CarbonImmutable|null $superseded_at
  * @property CarbonImmutable|null $created_at
@@ -44,6 +46,7 @@ final class AgentConversationMessage extends Model
     {
         return [
             'superseded_at' => 'datetime',
+            'origin' => MessageOrigin::class,
         ];
     }
 
@@ -55,13 +58,55 @@ final class AgentConversationMessage extends Model
         return $this->belongsTo(AgentConversation::class, 'conversation_id');
     }
 
+    public function userOrigin(): ?MessageOrigin
+    {
+        return $this->role === 'user' ? $this->origin : null;
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function typed(Builder $query): void
+    {
+        $query->where('role', 'user')
+            ->where('origin', MessageOrigin::Typed->value);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function withoutSynthetic(Builder $query): void
+    {
+        $query->where(function (Builder $visible): void {
+            $visible->where('role', '<>', 'user')
+                ->orWhere('origin', MessageOrigin::Typed->value);
+        });
+    }
+
     /** @param Builder<self> $query */
     #[Scope]
     protected function sentBy(Builder $query, User $user): void
     {
         $query->where('participant_type', $user->getMorphClass())
             ->where('participant_id', (string) $user->getKey())
-            ->where('role', 'user');
+            ->typed();
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function ownedBy(Builder $query, User $user): void
+    {
+        $query->where('participant_type', $user->getMorphClass())
+            ->where('participant_id', (string) $user->getKey())
+            ->whereRelation('conversation', 'workspace_id', $user->current_workspace_id);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function visibleTo(Builder $query, User $user, string $conversationId): void
+    {
+        $query->where('conversation_id', $conversationId)
+            ->ownedBy($user)
+            ->whereNull('superseded_at')
+            ->withoutSynthetic();
     }
 
     /**

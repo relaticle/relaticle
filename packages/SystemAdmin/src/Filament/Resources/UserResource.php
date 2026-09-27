@@ -36,6 +36,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
 
@@ -195,6 +196,12 @@ final class UserResource extends Resource
                     ->falseIcon('heroicon-o-minus-small')
                     ->falseColor('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('No'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -212,6 +219,12 @@ final class UserResource extends Resource
                     ->trueLabel('Rejected by Mailcoach')
                     ->falseLabel('Not rejected')
                     ->nullable(),
+                TernaryFilter::make('email_bounced_at')
+                    ->label('Email Bounced')
+                    ->placeholder('All users')
+                    ->trueLabel('Bounced')
+                    ->falseLabel('Not bounced')
+                    ->nullable(),
                 SelectFilter::make('engagement')
                     ->label('Engagement')
                     ->options([
@@ -227,6 +240,7 @@ final class UserResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
+                Impersonate::user(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

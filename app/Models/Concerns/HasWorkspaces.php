@@ -121,12 +121,8 @@ trait HasWorkspaces
         return $membershipRole === null ? null : Jetstream::findRole($membershipRole);
     }
 
-    public function hasWorkspaceRole(?Model $workspace, string $role): bool
+    public function membershipRole(?Model $workspace): ?string
     {
-        if ($this->ownsWorkspace($workspace)) {
-            return true;
-        }
-
-        return $this->workspaceRole($workspace)?->key === $role;
+        return $this->workspaceRole($workspace)?->key;
     }
 }

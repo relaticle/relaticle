@@ -21,6 +21,7 @@ use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use PragmaRX\Google2FA\Google2FA;
+use Tests\Helpers\PasskeyAssertionFixture;
 
 mutates(DeletePasskey::class, ManagePasskeys::class, ConfirmIdentityAction::class, IdentityConfirmation::class, AuthenticationSession::class);
 mutates(ResumesIdentityConfirmation::class);
@@ -71,6 +72,21 @@ it('refreshes the list after loadPasskeys is called', function (): void {
 it('renders the add passkey button text', function (): void {
     livewire(ManagePasskeys::class)
         ->assertSee('Add passkey');
+});
+
+it('stores a verified customer passkey registration through the HTTP endpoint', function (): void {
+    livewire(ManagePasskeys::class)
+        ->callAction('registerPasskey', ['password' => 'password'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('passkey-register');
+
+    $options = $this->getJson(route('passkey.registration-options'))->assertOk()->json('options');
+    $challenge = base64_decode(strtr($options['challenge'], '-_', '+/'), true);
+    $credential = PasskeyAssertionFixture::registration($options['rp']['id'], config('fortify.passkeys.allowed_origins')[0], $challenge);
+
+    $this->postJson(route('passkey.store'), ['name' => 'Work laptop', 'credential' => $credential])->assertOk();
+
+    expect($this->user->passkeys()->sole()->credential_id)->toBe($credential['id']);
 });
 
 it('renders the Passkeys section heading and description', function (): void {

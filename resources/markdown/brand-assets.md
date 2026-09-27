@@ -4,7 +4,31 @@
 
 - `public/brand/logomark.svg`: Symbol-only mark.
 - `public/brand/wordmark.svg`: Lowercase `relaticle` vector wordmark.
-- `public/brand/logo-lockup.svg`: Horizontal lockup (logomark + wordmark).
+- `public/brand/kit/logos/`: Transparent full logos and symbols, in color and white, as SVG and PNG.
+- `public/brand/kit/avatars/`: Purple, light, and dark avatars as SVG and 1024/2048-pixel PNGs.
+- `public/brand/kit/platforms/`: Square PNG presets for social platforms, in all three colors.
+- `public/brand/kit/watermarks/`: Small white and purple PNGs for YouTube.
+- `public/brand/kit/manifest.json`: Generated download catalog, dimensions, and SHA-256 checksums.
+- `public/brand/kit.zip`: Complete brand kit. Product screenshots remain separate downloads on `/press`.
+
+## Regenerating Downloads
+
+`logomark.svg` and `wordmark.svg` are the original artwork. The generator preserves their paths and applies uniform scaling.
+It converts the inverse artwork to opaque white and supplies padding for circular avatar crops.
+
+Install `rsvg-convert` and `zip` before regenerating. On macOS, `brew install librsvg` provides the renderer; `zip` ships with macOS.
+On Debian or Ubuntu, install `librsvg2-bin` and `zip`.
+
+Run `pnpm brand:build` after editing either original SVG or the export definitions in `bin/build-brand-assets.mjs`.
+The command replaces only `public/brand/kit/` and `public/brand/kit.zip`. Existing email and legacy logo files remain unchanged.
+Commit the generated files alongside their sources. Production serves them directly and needs no rendering tools.
+
+Run `pnpm brand:check` to compare a temporary rebuild with every published file and the ZIP.
+Use the same librsvg version when checking byte-for-byte output; a renderer upgrade can change PNG bytes.
+Run `php artisan test --compact tests/Feature/Public/PressPageTest.php` to verify published links, source checksums, dimensions, and archive contents.
+
+The press page reads its download catalog from the generated manifest.
+Platform presets are convenient export sizes, not permanent platform requirements. Check the final crop when uploading.
 
 ## Blade Components
 

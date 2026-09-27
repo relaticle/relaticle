@@ -5,10 +5,12 @@
      localStorage (the full chat persists, the dashboard does not). --}}
 currentPlan: @js(auth()->user()?->currentWorkspace?->plan?->value ?? \App\Enums\Plan::default()->value),
 currentPlanLabel: @js(auth()->user()?->currentWorkspace?->plan?->getLabel() ?? \App\Enums\Plan::default()->getLabel()),
-{{-- Null when billing is off or no tenant is bound (tenant-less pages/tests):
-     the locked-model hint then renders without a link. --}}
+{{-- Null when billing is off, no tenant is bound, or the viewer cannot reach
+     Billing: the locked-model hint then renders without a link. --}}
 upgradeUrl: @js(
-    (\Laravel\Pennant\Feature::active(\App\Features\Billing::class) && auth()->user()?->currentWorkspace !== null)
+    (\Laravel\Pennant\Feature::active(\App\Features\Billing::class)
+        && auth()->user()?->currentWorkspace !== null
+        && auth()->user()->hasWorkspaceCapability(auth()->user()->currentWorkspace->getKey(), \App\Enums\WorkspaceCapability::BillingManage))
         ? \App\Filament\Pages\Billing::getUrl(panel: 'app', tenant: auth()->user()->currentWorkspace)
         : null
 ),

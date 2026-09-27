@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Billing;
 
 use App\Enums\Plan;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -20,7 +21,11 @@ final readonly class StartProTrial
     /** @throws AuthorizationException */
     public function execute(User $user, Workspace $workspace): bool
     {
-        throw_unless($user->ownsWorkspace($workspace), AuthorizationException::class, 'Only the workspace owner can start a trial.');
+        throw_unless(
+            $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
+            AuthorizationException::class,
+            'Only the workspace owner can start a trial.',
+        );
 
         $started = DB::transaction(function () use ($workspace): bool {
             /** @var Workspace $lockedWorkspace */

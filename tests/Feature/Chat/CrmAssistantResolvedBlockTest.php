@@ -13,9 +13,10 @@ it('renders a resolved_actions block when set', function (): void {
         ->instructions();
 
     expect($instructions)->toContain('<resolved_actions>')
-        ->and($instructions)->toContain('approved: create task "Review Q3" (id: 01ABC)')
-        ->and($instructions)->toContain('rejected: create person "Sarah"')
-        ->and($instructions)->not->toContain('rejected: create person "Sarah" (id:')
+        ->and($instructions)->toContain('APPROVED (written): create task "Review Q3" (id: 01ABC)')
+        ->and($instructions)->toContain('REJECTED (nothing was written): create person "Sarah"')
+        ->and($instructions)->not->toContain('REJECTED (nothing was written): create person "Sarah" (id:')
+        ->and($instructions)->toContain('REJECTED and EXPIRED (nothing was written) mean nothing changed.')
         ->and($instructions)->toContain('NEVER describe a decided proposal as pending')
         ->and($instructions)->toContain('when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal');
 });
@@ -41,18 +42,29 @@ it('tells the model about unchecked fields and failed approval attempts', functi
                 'excluded' => [],
                 'failure' => 'The assignee is no longer part of this workspace.',
             ],
+            [
+                'operation' => 'create',
+                'entity_type' => 'people',
+                'status' => 'approved',
+                'label' => 'Ivan, Simon',
+                'record_id' => null,
+                'records' => [
+                    ['id' => 'p-1', 'label' => 'Ivan', 'url' => '/r/people/p-1'],
+                    ['id' => 'p-2', 'label' => 'Simon', 'url' => '/r/people/p-2'],
+                ],
+                'excluded' => [['record' => 'Simon', 'fields' => ['Email']]],
+            ],
         ])
         ->instructions();
 
     expect($instructions)->toContain('fields unchecked by the user, NOT written: Job title')
-        ->and($instructions)->toContain('an approval attempt failed before this decision: "The assignee is no longer part of this workspace."');
+        ->and($instructions)->toContain('an approval attempt failed before this decision: "The assignee is no longer part of this workspace."')
+        ->and($instructions)->toContain('    - fields unchecked by the user on "Simon", NOT written: Email');
 });
 
 it('omits the resolved_actions block when empty', function (): void {
-    // The prose mentions the <resolved_actions> tag; the rendered block has a
-    // unique content marker that must be absent when there are no resolved actions.
     expect((new CrmAssistant)->instructions())
-        ->not->toContain('These proposals were already decided by the user');
+        ->not->toContain('Proposals the user has decided; their approval cards are gone.');
 });
 
 it('static instructions forbid enumerating proposal data in prose', function (): void {
@@ -80,10 +92,10 @@ it('cites each approved record by title and url so the next turn can link it', f
         ->instructions();
 
     expect($instructions)
-        ->toContain("approved: create 2 note records:\n    - \"Alpha\" (id: n-a, url: /r/note/n-a)\n    - \"Beta\" (id: n-b, url: /r/note/n-b)")
-        ->toContain('approved: update note "Alpha 🚀" (id: n-a, url: /r/note/n-a)')
-        ->toContain('expired: delete company "Acme"')
-        ->toContain('expired')
+        ->toContain("APPROVED (written): create 2 note records:\n    - \"Alpha\" (id: n-a, url: /r/note/n-a)\n    - \"Beta\" (id: n-b, url: /r/note/n-b)")
+        ->toContain('APPROVED (written): update note "Alpha 🚀" (id: n-a, url: /r/note/n-a)')
+        ->toContain('EXPIRED (nothing was written): delete company "Acme"')
+        ->toContain('EXPIRED')
         ->not->toContain('since your last reply');
 });
 

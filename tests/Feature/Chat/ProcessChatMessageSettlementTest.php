@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\AnthropicSse;
 
@@ -152,4 +153,49 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
 
     expect($balance->credits_used)->toBe(1, 'a turn the provider already billed was refunded')
         ->and($balance->credits_remaining)->toBe(99);
+});
+
+it('settles a completed turn on the model it requested and the uncached input tokens', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-4',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = '01TURNSETTLEDAAAAAAAAAAAAA';
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: 'c-4',
+        userId: (string) $user->getKey(),
+    );
+
+    AnthropicSse::fake(AnthropicSse::reply('Your pipeline holds three deals.', 'claude-opus-5-20260301'));
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user, workspace: $workspace, message: 'How is my pipeline?', conversationId: 'c-4',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-opus-5', 'id' => 'claude-opus-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle(resolve(CreditService::class));
+
+    $settlement = AiCreditTransaction::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('model', '!=', 'system')
+        ->sole();
+
+    expect($settlement->model)->toBe('claude-opus-5')
+        ->and($settlement->credits_charged)->toBe(3)
+        ->and($settlement->input_tokens)->toBe(40)
+        ->and($settlement->output_tokens)->toBe(12);
 });

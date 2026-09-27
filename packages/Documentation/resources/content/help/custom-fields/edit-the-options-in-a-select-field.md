@@ -12,7 +12,7 @@ opportunity **Stage** field (your pipeline) and the task **Status** field
 (your board columns).
 
 1. Click your workspace name at the top of the sidebar, then **Custom
-   Fields** (workspace owners only).
+   Fields** (workspace owners and Admins only).
 2. Pick the record type's tab: **Opportunities** for stages, **Tasks** for
    statuses.
 3. Open the field and edit its **Options**: rename any option in place,

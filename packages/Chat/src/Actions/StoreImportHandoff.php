@@ -12,6 +12,7 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatAttachment;
+use Relaticle\Chat\Support\StoredSteps;
 
 final readonly class StoreImportHandoff
 {
@@ -46,8 +47,7 @@ final readonly class StoreImportHandoff
                     'role' => 'user',
                     'content' => $text !== '' ? $text : __('Attached :name', ['name' => $attachment->name()]),
                     'attachments' => '[]',
-                    'tool_calls' => '[]',
-                    'tool_results' => '[]',
+                    'steps' => '[]',
                     'usage' => '[]',
                     'meta' => json_encode(['attachment' => $attachment->meta()], JSON_THROW_ON_ERROR),
                     'document' => json_encode($document, JSON_THROW_ON_ERROR),
@@ -63,8 +63,7 @@ final readonly class StoreImportHandoff
                     'role' => 'assistant',
                     'content' => $reply,
                     'attachments' => '[]',
-                    'tool_calls' => '[]',
-                    'tool_results' => '[]',
+                    'steps' => StoredSteps::text($reply),
                     'usage' => '[]',
                     'meta' => json_encode(['kind' => 'import_handoff'], JSON_THROW_ON_ERROR),
                     'document' => json_encode($this->documents->buildFromText($reply, [], $workspace), JSON_THROW_ON_ERROR),

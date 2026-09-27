@@ -1,11 +1,10 @@
 @if(app()->isProduction() && !empty(config('services.fathom.site_id')))
     <script src="https://cdn.usefathom.com/script.js"
         data-site="{{ config('services.fathom.site_id') }}"
-        data-spa="auto"
         data-auto="false"
         defer></script>
 <script>
-window.addEventListener('load', function() {
+(() => {
     function normalizeUrl(pathname) {
         // Panel-level pages carry no tenant slug, so track them as-is and the
         // auth funnel (/login, /register, …) doesn't collapse into /dashboard.
@@ -36,32 +35,18 @@ window.addEventListener('load', function() {
         }
     }
 
-    // Initial track
-    setTimeout(track, 100);
-
-    @if(session()->pull('fathom.track_signup'))
-    // One-time conversion event, flagged during registration
-    setTimeout(function () {
-        if (typeof fathom !== 'undefined') {
-            fathom.trackEvent('signup');
-        }
-    }, 150);
-    @endif
-
-    @if(session()->pull('fathom.track_workspace_created'))
-    // One-time conversion event, flagged when the onboarding wizard finishes.
-    // The workspaces table already records that a workspace exists; what this adds
-    // is the referrer still attached to the session, so a channel can be
-    // credited with an activated workspace and not just a signup.
-    setTimeout(function () {
-        if (typeof fathom !== 'undefined') {
-            fathom.trackEvent('workspace_created');
-        }
-    }, 150);
-    @endif
-
-    // SPA navigation
     document.addEventListener('livewire:navigated', track);
-});
+})();
 </script>
+@foreach (['signup', 'workspace_created'] as $event)
+    @if(session()->pull('fathom.track_'.$event))
+        <script>
+            document.addEventListener('livewire:navigated', () => {
+                if (typeof fathom !== 'undefined') {
+                    fathom.trackEvent(@js($event));
+                }
+            }, { once: true });
+        </script>
+    @endif
+@endforeach
 @endif

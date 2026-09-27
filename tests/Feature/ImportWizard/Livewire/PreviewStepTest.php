@@ -20,6 +20,7 @@ use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
@@ -628,6 +629,23 @@ it('renders skipped and invalid cells as empty', function (): void {
     $component->assertOk()
         ->assertDontSee('John')
         ->assertDontSee('bad');
+});
+
+it('shows a company it will create for an unmatched domain', function (): void {
+    $column = ColumnData::toEntityLink(source: 'Company Domain', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+    createPreviewReadyStore($this, ['Name', 'Company Domain'], [
+        makePreviewRow(2, ['Name' => 'Nina Park', 'Company Domain' => 'northline.example']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        $column,
+    ]);
+    new ValidateColumnJob($this->import->id, $column)->handle();
+
+    mountPreviewStep($this)
+        ->assertSee('northline.example')
+        ->call('startImport');
+
+    expect(People::query()->where('name', 'Nina Park')->sole()->company->name)->toBe('northline.example');
 });
 
 it('checkImportProgress detects completion', function (): void {

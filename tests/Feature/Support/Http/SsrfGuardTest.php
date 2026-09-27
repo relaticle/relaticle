@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Exceptions\SsrfGuardException;
+use App\Exceptions\UploadException;
+use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
-use GuzzleHttp\Psr7\Request;
-use GuzzleHttp\Psr7\Response;
-use GuzzleHttp\Psr7\Utils;
+use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Request as HttpClientRequest;
+use Illuminate\Support\Facades\Http;
 
 mutates(SsrfGuard::class);
 
@@ -61,6 +63,9 @@ test('rejects shared, translated and reserved ranges filter_var calls public', f
     'multicast' => ['224.0.0.1'],
     'teredo embedding loopback' => ['[2001::7f00:1]'],
     'local-use nat64' => ['[64:ff9b:1::7f00:1]'],
+    'ipv4-compatible loopback' => ['[::7f00:1]'],
+    'ipv4-compatible metadata' => ['[::a9fe:a9fe]'],
+    'deprecated site-local' => ['[fec0::1]'],
     'orchidv2' => ['[2001:20::1]'],
 ]);
 
@@ -76,19 +81,25 @@ test('accepts a clearly-public address literal', function (): void {
     expect(true)->toBeTrue();
 });
 
-test('redirect guard blocks redirects to non-public hosts but allows public ones', function (): void {
-    $onRedirect = SsrfGuard::redirectGuardOptions()['allow_redirects']['on_redirect'];
+test('guard refuses a redirect to a non-public host and follows a public one', function (string $location, bool $followed): void {
+    Http::fake(function (HttpClientRequest $request) use ($location) {
+        return $request->url() === 'https://1.1.1.1/icon.png'
+            ? Http::response('', 302, ['Location' => $location])
+            : Http::response('png');
+    });
 
-    $request = new Request('GET', 'https://1.1.1.1');
-    $response = new Response(302);
+    $send = fn () => SsrfGuard::guard(Http::timeout(5))->get('https://1.1.1.1/icon.png');
 
-    expect(fn () => $onRedirect($request, $response, Utils::uriFor('http://169.254.169.254/latest/meta-data/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://10.0.0.1/')))
-        ->toThrow(SsrfGuardException::class)
-        ->and(fn () => $onRedirect($request, $response, Utils::uriFor('http://1.1.1.1/')))
-        ->not->toThrow(SsrfGuardException::class);
-});
+    $followed
+        ? expect($send()->body())->toBe('png')
+        : expect($send)->toThrow(SsrfGuardException::class);
+
+    Http::assertSentCount($followed ? 2 : 1);
+})->with([
+    'cloud metadata' => ['http://169.254.169.254/latest/meta-data/', false],
+    'private range' => ['http://10.0.0.1/', false],
+    'public host' => ['http://1.0.0.1/icon.png', true],
+]);
 
 test('pinned client refuses plain http', function (): void {
     expect(fn (): PendingRequest => SsrfGuard::pinnedClient('http://example.com/file.pdf'))
@@ -105,14 +116,14 @@ test('pinned client refuses a private host', function (): void {
         ->toThrow(SsrfGuardException::class);
 });
 
-test('pinned client never follows redirects and pins the resolved address', function (): void {
+test('pinned client never follows redirects and leaves an address literal unpinned', function (): void {
     $client = SsrfGuard::pinnedClient('https://93.184.216.34/file.pdf');
     $options = (fn (): array => $this->options)->call($client);
 
     expect($options['allow_redirects'])->toBeFalse()
         ->and($options['decode_content'])->toBeFalse()
         ->and($options['timeout'])->toBe(30)
-        ->and($options['curl'][CURLOPT_RESOLVE])->toBe(['93.184.216.34:443:93.184.216.34']);
+        ->and($options['curl'])->toBe([]);
 });
 
 test('pinned client resolves a hostname once and pins the validated address', function (): void {
@@ -138,4 +149,79 @@ test('pinned client refuses a hostname that fails to resolve', function (): void
 
     expect(fn (): PendingRequest => SsrfGuard::pinnedClient('https://cdn.example.com/brief.pdf'))
         ->toThrow(SsrfGuardException::class);
+});
+
+test('guard pins every hop to the address it validated', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (string $host): array => match ($host) {
+        'favicon.example.com' => ['93.184.216.34'],
+        'cdn.example.com' => ['1.1.1.1'],
+        default => [],
+    }));
+
+    $pins = [];
+
+    Http::fake(function (HttpClientRequest $request, array $options) use (&$pins) {
+        $pins[] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return str_contains($request->url(), 'favicon.example.com')
+            ? Http::response('', 302, ['Location' => 'http://cdn.example.com:8080/icon.png'])
+            : Http::response('png');
+    });
+
+    SsrfGuard::guard(Http::timeout(5))->get('https://favicon.example.com/icon.png');
+
+    expect($pins)->toBe([
+        ['favicon.example.com:443:93.184.216.34'],
+        ['cdn.example.com:8080:1.1.1.1'],
+    ]);
+});
+
+test('guard refuses a host that resolves to a private address at send time', function (): void {
+    $lookups = 0;
+
+    app()->instance(HostResolver::class, new HostResolver(function () use (&$lookups): array {
+        $lookups++;
+
+        return $lookups === 1 ? ['93.184.216.34'] : ['169.254.169.254'];
+    }));
+
+    Http::fake(['*' => Http::response('secret')]);
+
+    expect(SsrfGuard::isAllowed('https://rebind.example.com/icon.png'))->toBeTrue()
+        ->and(fn () => SsrfGuard::guard(Http::timeout(5))->get('https://rebind.example.com/icon.png'))
+        ->toThrow(SsrfGuardException::class);
+
+    Http::assertNothingSent();
+});
+
+test('guard aborts a download larger than the upload limit', function (): void {
+    $options = (fn (): array => $this->options)->call(SsrfGuard::guard(Http::timeout(5)));
+
+    expect(fn () => $options['progress'](UploadAllowlist::maxBytes() + 1, 0))
+        ->toThrow(UploadException::class)
+        ->and(fn () => $options['progress'](0, UploadAllowlist::maxBytes() + 1))
+        ->toThrow(UploadException::class);
+});
+
+test('guard pins every validated address and leaves an address literal unpinned', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (string $host): array => match ($host) {
+        'cdn.example.com' => ['93.184.216.34', '2606:2800:220:1:248:1893:25c8:1946'],
+        default => [$host],
+    }));
+
+    $pins = [];
+
+    Http::fake(function (HttpClientRequest $request, array $options) use (&$pins) {
+        $pins[] = $options['curl'][CURLOPT_RESOLVE] ?? null;
+
+        return Http::response('png');
+    });
+
+    SsrfGuard::guard(Http::timeout(5))->get('https://cdn.example.com/icon.png');
+    SsrfGuard::guard(Http::timeout(5))->get('https://[2606:4700:4700::1111]/icon.png');
+
+    expect($pins)->toBe([
+        ['cdn.example.com:443:93.184.216.34,[2606:2800:220:1:248:1893:25c8:1946]'],
+        null,
+    ]);
 });

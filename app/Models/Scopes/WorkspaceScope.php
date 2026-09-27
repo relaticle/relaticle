@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models\Scopes;
 
-use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
@@ -23,14 +24,12 @@ final class WorkspaceScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $user = auth()->user();
+        $workspace = resolve(CurrentWorkspace::class)->get();
 
-        if (! $user instanceof User) {
-            $builder->whereRaw('1 = 0');
-
+        if (! $workspace instanceof Workspace) {
             return;
         }
 
-        $builder->whereBelongsTo($user->currentWorkspace);
+        $builder->whereBelongsTo($workspace);
     }
 }

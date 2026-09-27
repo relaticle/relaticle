@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
-use App\Enums\CreationSource;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
@@ -84,7 +83,7 @@ abstract class BaseCreateTool extends Tool
         $validated = $request->validate($rules);
 
         $action = app()->make($this->actionClass());
-        $model = $action->execute($user, $validated, CreationSource::MCP);
+        $model = $action->execute($user, $validated);
 
         /** @var class-string<JsonResource> $resourceClass */
         $resourceClass = $this->resourceClass();

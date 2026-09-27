@@ -231,7 +231,7 @@ it('UpdatePersonTool can repoint company_id and persist it', function (): void {
 
 it('UpdateCompanyTool proposes an account owner change with names in the display and approval persists it', function (): void {
     $teammate = User::factory()->create(['name' => 'Alex Owner']);
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
     $company = Company::factory()->for($this->workspace)->create(['name' => 'Owned Co']);
 
     $tool = resolve(UpdateCompanyTool::class);
@@ -330,7 +330,7 @@ it('UpdateTaskTool rejects a non-member assignee id before proposing', function 
 
 it('UpdateTaskTool accepts a workspace member as assignee', function (): void {
     $teammate = User::factory()->create(['name' => 'Assignable Amy']);
-    $this->workspace->users()->attach($teammate, ['role' => 'editor']);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
     $task = Task::factory()->for($this->workspace)->create(['title' => 'Assignable Task']);
 
     $tool = resolve(UpdateTaskTool::class);

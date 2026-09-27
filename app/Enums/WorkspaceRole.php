@@ -4,37 +4,63 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-use Laravel\Jetstream\Jetstream;
-
 enum WorkspaceRole: string
 {
     case Admin = 'admin';
-    case Editor = 'editor';
+    case Member = 'member';
     case Viewer = 'viewer';
 
-    /**
-     * Falls back to the raw key for a legacy or unregistered role rather than
-     * throwing. findRole()'s untyped return makes PHPStan misjudge `?->` here.
-     */
-    public static function label(string $role): string
+    public function label(): string
     {
-        $registeredRole = Jetstream::findRole($role);
-
-        if ($registeredRole === null) {
-            return $role;
-        }
-
-        return $registeredRole->name;
+        return __("workspaces.roles.{$this->value}.label");
     }
 
-    public static function description(string $role): ?string
+    public function description(): string
     {
-        $registeredRole = Jetstream::findRole($role);
+        return __("workspaces.roles.{$this->value}.description");
+    }
 
-        if ($registeredRole === null) {
-            return null;
-        }
+    /** @return list<string> */
+    public static function values(): array
+    {
+        return array_column(self::cases(), 'value');
+    }
 
-        return $registeredRole->description;
+    public static function labelFor(?string $key): string
+    {
+        return self::tryFrom((string) $key)?->label() ?? (string) $key;
+    }
+
+    public static function keyIsAdmin(?string $key): bool
+    {
+        return self::tryFrom((string) $key) === self::Admin;
+    }
+
+    /** @return array<int, WorkspaceCapability> */
+    public function capabilities(): array
+    {
+        return match ($this) {
+            self::Admin => [
+                WorkspaceCapability::RecordsView,
+                WorkspaceCapability::RecordsCreate,
+                WorkspaceCapability::RecordsUpdate,
+                WorkspaceCapability::RecordsDelete,
+                WorkspaceCapability::RecordsForceDelete,
+                WorkspaceCapability::DataImport,
+                WorkspaceCapability::DataExport,
+                WorkspaceCapability::MembersManage,
+                WorkspaceCapability::FieldsManage,
+                WorkspaceCapability::ActivityView,
+            ],
+            self::Member => [
+                WorkspaceCapability::RecordsView,
+                WorkspaceCapability::RecordsCreate,
+                WorkspaceCapability::RecordsUpdate,
+                WorkspaceCapability::RecordsDelete,
+                WorkspaceCapability::DataImport,
+                WorkspaceCapability::DataExport,
+            ],
+            self::Viewer => [WorkspaceCapability::RecordsView],
+        };
     }
 }

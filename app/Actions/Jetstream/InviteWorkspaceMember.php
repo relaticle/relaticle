@@ -40,7 +40,7 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
 
         Gate::forUser($user)->authorize('addWorkspaceMember', $workspace);
 
-        if ($role === WorkspaceRole::Admin->value) {
+        if (WorkspaceRole::keyIsAdmin($role)) {
             Gate::forUser($user)->authorize('promoteToAdmin', $workspace);
         }
 

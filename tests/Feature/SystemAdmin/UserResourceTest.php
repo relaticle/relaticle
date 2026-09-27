@@ -25,9 +25,10 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\OwnedWorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, UserResource::class);
+mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, UserResource::class, Impersonate::class);
 
 beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
@@ -413,6 +414,32 @@ it('shows both rejected and healthy users when the Mailcoach filter is unset', f
     livewire(ListUsers::class)->assertCanSeeTableRecords([$rejected, $healthy]);
 });
 
+it('filters to exactly the users whose email bounced', function (): void {
+    $bounced = User::factory()->create(['email_bounced_at' => now()]);
+    $deliverable = User::factory()->create(['email_bounced_at' => null]);
+
+    livewire(ListUsers::class)
+        ->filterTable('email_bounced_at', true)
+        ->assertCanSeeTableRecords([$bounced])
+        ->assertCanNotSeeTableRecords([$deliverable]);
+
+    livewire(ListUsers::class)
+        ->filterTable('email_bounced_at', false)
+        ->assertCanSeeTableRecords([$deliverable])
+        ->assertCanNotSeeTableRecords([$bounced]);
+});
+
+it('shows when a user email bounced in the bounced column', function (): void {
+    $this->travelTo(Date::parse('2026-09-22 14:30:00'));
+
+    $bounced = User::factory()->create(['email_bounced_at' => now()]);
+    $deliverable = User::factory()->create(['email_bounced_at' => null]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('email_bounced_at', $bounced->email_bounced_at, record: $bounced)
+        ->assertTableColumnStateNotSet('email_bounced_at', $bounced->email_bounced_at, record: $deliverable);
+});
+
 it('lists exactly the users whose engagement badge matches the selected filter', function (): void {
     $this->travelTo(Date::parse('2026-08-30 12:00:00'));
 
@@ -431,4 +458,36 @@ it('lists exactly the users whose engagement badge matches the selected filter',
             ->assertCanSeeTableRecords($matching->values())
             ->assertCanNotSeeTableRecords($users->diff($matching)->values());
     }
+});
+
+it('offers impersonation to super administrators only', function (): void {
+    $user = User::factory()->create();
+
+    livewire(ViewUser::class, ['record' => $user->getKey()])
+        ->assertActionVisible('impersonate');
+
+    livewire(ListUsers::class)
+        ->assertActionVisible(TestAction::make('impersonate')->table($user));
+
+    $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
+
+    livewire(ViewUser::class, ['record' => $user->getKey()])
+        ->assertActionHidden('impersonate');
+
+    livewire(ListUsers::class)
+        ->assertActionHidden(TestAction::make('impersonate')->table($user));
+});
+
+it('mints a single-use impersonation link addressed to the app', function (): void {
+    $user = User::factory()->create();
+
+    $link = livewire(ViewUser::class, ['record' => $user->getKey()])
+        ->callAction('impersonate')
+        ->effects['redirect'];
+
+    parse_str((string) parse_url($link, PHP_URL_QUERY), $query);
+
+    expect($link)->toStartWith(url()->getPublicUrl("impersonate/{$user->getKey()}?"))
+        ->and($query)->toHaveKeys(['administrator', 'nonce', 'expires', 'signature'])
+        ->and($query['administrator'])->toBe(Auth::guard('sysadmin')->id());
 });

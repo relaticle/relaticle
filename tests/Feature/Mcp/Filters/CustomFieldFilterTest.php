@@ -12,8 +12,8 @@ use App\Mcp\Tools\People\ListPeopleTool;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Validation\ValidationException;
@@ -32,11 +32,7 @@ beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->personalWorkspace();
     $this->actingAs($this->user);
-    Opportunity::addGlobalScope(new WorkspaceScope);
-});
-
-afterEach(function (): void {
-    Opportunity::clearBootedModels();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
 });
 
 it('filters by custom field equality', function (): void {

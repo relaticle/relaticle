@@ -7,6 +7,7 @@ namespace Tests\Helpers;
 use CBOR\ByteStringObject;
 use CBOR\MapObject;
 use CBOR\NegativeIntegerObject;
+use CBOR\TextStringObject;
 use CBOR\UnsignedIntegerObject;
 use Laravel\Passkeys\Support\WebAuthn;
 use Symfony\Component\Uid\Uuid;
@@ -22,6 +23,37 @@ final class PasskeyAssertionFixture
     public static function base64Url(string $bytes): string
     {
         return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function registration(string $rpId, string $origin, string $challenge): array
+    {
+        $assertion = self::build($rpId, $origin, $challenge);
+        $record = WebAuthn::fromJson(json_encode($assertion['storedCredential'], JSON_THROW_ON_ERROR), CredentialRecord::class);
+        $credentialId = $assertion['credentialId'];
+        $authenticatorData = hash('sha256', $rpId, true)."\x45".pack('N', 0)
+            .str_repeat("\0", 16).pack('n', strlen($credentialId)).$credentialId.$record->credentialPublicKey;
+
+        $attestation = MapObject::create()
+            ->add(TextStringObject::create('fmt'), TextStringObject::create('none'))
+            ->add(TextStringObject::create('attStmt'), MapObject::create())
+            ->add(TextStringObject::create('authData'), ByteStringObject::create($authenticatorData));
+
+        return [
+            'id' => self::base64Url($credentialId),
+            'rawId' => self::base64Url($credentialId),
+            'type' => 'public-key',
+            'response' => [
+                'clientDataJSON' => self::base64Url(json_encode([
+                    'type' => 'webauthn.create',
+                    'challenge' => self::base64Url($challenge),
+                    'origin' => $origin,
+                ], JSON_THROW_ON_ERROR)),
+                'attestationObject' => self::base64Url((string) $attestation),
+            ],
+        ];
     }
 
     /**

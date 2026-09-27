@@ -34,6 +34,7 @@ use Relaticle\Chat\Actions\RenameConversation;
 use Relaticle\Chat\Actions\StoreImportHandoff;
 use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
@@ -44,7 +45,6 @@ use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
-use Relaticle\Chat\Support\TranscriptScope;
 use Relaticle\Chat\Support\TurnPresence;
 
 final readonly class ChatController
@@ -435,7 +435,7 @@ final readonly class ChatController
      *
      * anchor_id targets a persisted user message; when the client only has an
      * optimistic (not yet persisted) message it sends anchor_content instead,
-     * which must match the latest user row. A mismatch means that row belongs
+     * which must match the latest typed user row. A mismatch means that row belongs
      * to an OLDER turn (the optimistic one never persisted), and superseding it
      * would hide a good turn, so we refuse and supersede nothing.
      */
@@ -468,13 +468,18 @@ final readonly class ChatController
                 ->first();
 
             abort_if($anchor === null, 404);
-            abort_if((string) $anchor->role !== 'user', 422, 'Only user messages can anchor a supersede.');
+            abort_unless(
+                AgentConversationMessage::query()->typed()->whereKey($anchorId)->exists(),
+                422,
+                'Only user messages can anchor a supersede.',
+            );
         } else {
-            $anchor = DB::table('agent_conversation_messages')
+            $anchor = AgentConversationMessage::query()
+                ->typed()
                 ->where('conversation_id', $conversationId)
-                ->where('role', 'user')
                 ->whereNull('superseded_at')
                 ->orderByDesc('id')
+                ->toBase()
                 ->first();
 
             if ($anchor === null) {
@@ -500,10 +505,11 @@ final readonly class ChatController
     /**
      * Search within one conversation.
      *
-     * Scoped through TranscriptScope, the same predicate set the pager applies,
-     * so every id returned here is one the transcript can actually reach. A hit
-     * the pager could never render would send the client's load-until-found
-     * loop all the way to the top of the history and then report nothing.
+     * Scoped through AgentConversationMessage::visibleTo(), the same predicate
+     * set the pager applies, so every id returned here is one the transcript can
+     * actually reach. A hit the pager could never render would send the client's
+     * load-until-found loop all the way to the top of the history and then
+     * report nothing.
      *
      * `q` is a user-supplied pattern, so it goes through LikePattern::escape
      * before the ILIKE: a literal `%` or `_` typed into the search box must
@@ -530,15 +536,13 @@ final readonly class ChatController
 
         $escaped = LikePattern::escape($validated['q']);
 
-        $matches = TranscriptScope::apply(
-            DB::table('agent_conversation_messages as m'),
-            $user,
-            $conversationId,
-        )
-            ->where('m.content', 'ilike', "%{$escaped}%")
-            ->orderByDesc('m.id')
+        $matches = AgentConversationMessage::query()
+            ->visibleTo($user, $conversationId)
+            ->where('content', 'ilike', "%{$escaped}%")
+            ->orderByDesc('id')
             ->limit(self::SEARCH_MATCH_LIMIT)
-            ->get(['m.id', 'm.content']);
+            ->toBase()
+            ->get(['id', 'content']);
 
         return response()->json([
             'matches' => $matches

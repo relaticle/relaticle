@@ -47,7 +47,6 @@ final readonly class MarketingNavigation
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
             ])),
             new NavItem(__('Pricing'), route('pricing')),
-            new NavItem(__('Discord'), route('discord'), external: true),
         ];
     }
 

@@ -80,15 +80,9 @@
                     <a href="{{ $item->url }}" @click="mobileMenu = false"
                        @if($item->external) target="_blank" rel="noopener noreferrer" @endif
                        @if(url()->current() === $item->url) aria-current="page" @endif
-                       class="mobile-nav-enter text-[2rem] leading-tight font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 active:opacity-60 transition-[color,opacity] duration-200 py-2 @if($item->external) flex items-center gap-3 @else block @endif"
+                       class="mobile-nav-enter text-[2rem] leading-tight font-semibold text-gray-950 dark:text-white hover:text-primary dark:hover:text-primary-400 active:opacity-60 transition-[color,opacity] duration-200 py-2 block"
                        style="--stagger: {{ $loop->index }}">
-                        @if($item->external)
-                            <x-ri-discord-fill class="w-7 h-7 shrink-0"/>
-                            <span>{{ $item->label }}</span>
-                            <x-ri-arrow-right-up-line class="w-5 h-5 shrink-0 text-gray-400 dark:text-gray-500"/>
-                        @else
-                            {{ $item->label }}
-                        @endif
+                        {{ $item->label }}
                     </a>
                 @endif
             @endforeach
@@ -101,6 +95,8 @@
     <div class="relative px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))] shrink-0">
         <div class="pointer-events-none absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white dark:from-gray-950"
              aria-hidden="true"></div>
+        <x-layout.community-links class="mobile-nav-enter mb-4 flex w-fit" style="--stagger: {{ count($mobileNavItems) }}"/>
+
         <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
             <x-marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]">
                 Sign In

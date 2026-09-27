@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\CustomFieldType;
 use App\Models\User;
+use App\Support\PlainText;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -355,7 +356,7 @@ abstract class BaseReadShowTool implements Tool
      * Strip HTML and cap the length of free-text custom field values on an
      * included (related) record. Ten related notes with kilobytes of
      * rich-text body each would otherwise blow up the tool payload that gets
-     * persisted to `tool_results` and replayed on every subsequent turn.
+     * persisted with the turn and replayed on every subsequent turn.
      *
      * Only applied to included records, not the primary record a tool call
      * targets. A direct "get this note" call is the user asking for that
@@ -412,6 +413,6 @@ abstract class BaseReadShowTool implements Tool
 
     private function truncateFreeText(string $html): string
     {
-        return Str::limit(Str::squish(strip_tags($html)), self::FREE_TEXT_LIMIT);
+        return Str::limit(PlainText::fromHtml($html), self::FREE_TEXT_LIMIT);
     }
 }

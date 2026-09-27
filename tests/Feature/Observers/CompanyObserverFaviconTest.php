@@ -59,7 +59,7 @@ test('observer does not dispatch favicon job when company already has a logo', f
         'json_value' => ['example.com'],
     ]);
 
-    $company->addMediaFromString('fake-png-bytes')
+    $company->addMediaFromString(onePixelPng())
         ->usingFileName('logo.png')
         ->toMediaCollection('logo');
 

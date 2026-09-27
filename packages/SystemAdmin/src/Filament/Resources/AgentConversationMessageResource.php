@@ -16,6 +16,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Override;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationMessageResource\Pages\ListAgentConversationMessages;
 use Relaticle\SystemAdmin\Filament\Resources\AgentConversationMessageResource\Pages\ViewAgentConversationMessage;
@@ -50,6 +51,10 @@ final class AgentConversationMessageResource extends Resource
             ->components([
                 Section::make([
                     TextEntry::make('role')->badge()->color(fn (string $state): string => self::ROLE_COLORS[$state] ?? 'info'),
+                    TextEntry::make('origin')
+                        ->badge()
+                        ->state(fn (AgentConversationMessage $record): ?MessageOrigin => $record->userOrigin())
+                        ->placeholder('—'),
                     TextEntry::make('agent')->placeholder('—'),
                     TextEntry::make('user.name')
                         ->label('User')
@@ -80,6 +85,10 @@ final class AgentConversationMessageResource extends Resource
                 TextColumn::make('role')
                     ->badge()
                     ->color(fn (string $state): string => self::ROLE_COLORS[$state] ?? 'info'),
+                TextColumn::make('origin')
+                    ->badge()
+                    ->state(fn (AgentConversationMessage $record): ?MessageOrigin => $record->userOrigin())
+                    ->placeholder('—'),
                 TextColumn::make('content')
                     ->limit(80)
                     ->placeholder('—')
