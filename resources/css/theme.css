@@ -64,8 +64,10 @@
     --record-details-font-size: 0.8125rem;
     --record-details-font-leading: 1.25rem;
     --record-details-field-height: 2rem;
+    --record-details-edit-padding-inline: 0.75rem;
     --record-details-edit-gutter: 1.5rem;
     --record-details-visible-fields: 8;
+    --record-textarea-overlay-height: 8.75rem;
 }
 
 .dark {
@@ -486,8 +488,8 @@
     font-weight: 500;
 }
 
-.fi-inline-field-editor .fi-fo-multi-value-input a,
-.fi-inline-field-editor .fi-fo-multi-value-input a.truncate {
+.fi-inline-field-editor .fi-fo-multi-value-input button[aria-haspopup] a,
+.fi-inline-field-editor .fi-fo-multi-value-input button[aria-haspopup] a.truncate {
     pointer-events: auto;
     cursor: pointer;
     min-width: 0;
@@ -586,16 +588,25 @@
     transition-delay: 80ms;
 }
 
+.fi-in-entry[data-inline-editing='true'] .fi-inline-edit-pencil {
+    display: none;
+}
+
 .fi-in-entry[data-inline-editing='true'] {
     position: relative;
-    z-index: 40;
+    z-index: 5;
 }
 
 .fi-in-entry[data-inline-editing='true'] .fi-dropdown-panel,
-.fi-in-entry[data-inline-editing='true'] .fi-fo-date-time-picker-panel,
-.fi-in-entry[data-inline-editing='true'] [role='dialog'],
+.fi-in-entry[data-inline-editing='true'] [role='dialog']:not(.fi-fo-multi-value-panel):not(.fi-inline-textarea-panel),
 .fi-in-entry[data-inline-editing='true'] [role='listbox'] {
-    z-index: 50;
+    z-index: 6;
+}
+
+.fi-in-entry[data-inline-editing='true'] .fi-fo-multi-value-panel,
+.fi-in-entry[data-inline-editing='true'] .fi-inline-textarea-panel,
+.fi-in-entry[data-inline-editing='true'] .fi-fo-date-time-picker-panel {
+    z-index: 30;
 }
 
 .fi-in-entry[data-inline-editing='true'] > .fi-in-entry-content-col > .fi-in-entry-content-ctn {
@@ -731,7 +742,7 @@
 .fi-inline-field-editor .fi-fo-phone-input {
     overflow: visible;
     position: relative;
-    z-index: 50;
+    z-index: 6;
     width: 100%;
     min-width: 0;
 }
@@ -763,7 +774,7 @@
 
 .fi-inline-field-editor .fi-fo-date-time-picker-panel,
 .fi-inline-field-editor .fi-fo-color-picker-panel {
-    z-index: 50;
+    z-index: 6;
 }
 
 .fi-inline-field-editor:has(textarea) {
@@ -771,7 +782,7 @@
     max-width: 100%;
 }
 
-.fi-inline-field-editor:has(textarea) textarea {
+.fi-inline-field-editor:has(textarea):not(:has(.fi-inline-textarea-panel)) textarea {
     min-height: 4.5rem;
     max-height: 16rem;
     field-sizing: content;
@@ -787,8 +798,13 @@
 .fi-inline-field-error,
 .fi-inline-field-editor .fi-fo-field-wrp-error-list,
 .fi-inline-field-editor .fi-fo-field-wrp-error-message,
-.fi-inline-field-editor .fi-fo-field-wrp-messages {
-    display: none;
+.fi-inline-field-editor .fi-fo-field-wrp-messages,
+.fi-inline-field-editor .fi-fo-multi-value-add-error {
+    display: none !important;
+    height: 0;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
 }
 
 .fi-inline-field-editor-invalid .fi-input-wrp,
@@ -1016,20 +1032,23 @@
     max-width: 100%;
 }
 
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true'] {
-    grid-template-columns: minmax(0, 1fr);
-    z-index: 40;
-}
-
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(textarea),
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-multi-value-input) {
-    align-items: start;
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-inline-textarea-anchor) {
     overflow: visible;
-    z-index: 50;
+    z-index: 5;
 }
 
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true'] > .fi-in-entry-label-col {
-    display: none;
+.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) > .fi-in-entry-content-col,
+.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor,
+.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor-main {
+    overflow: visible;
+}
+
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-multi-value-input),
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-select-input),
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-phone-input),
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-date-time-picker) {
+    overflow: visible;
+    z-index: 5;
 }
 
 .fi-record-details-rail .fi-in-entry[data-inline-editing='true'] > .fi-in-entry-content-col,
@@ -1066,12 +1085,15 @@
     inset-inline-end: 0.125rem;
 }
 
-.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-fo-tags-input)):not(:has(.fi-fo-color-picker)):not(:has(.fi-fo-multi-value-input)) .fi-input-wrp {
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-fo-tags-input)):not(:has(.fi-fo-color-picker)):not(:has(.fi-fo-multi-value-input button[aria-haspopup])):not(:has(.fi-fo-phone-input)) .fi-input-wrp {
     display: flex;
     align-items: center;
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
-    border-radius: 0.5rem;
+    max-height: var(--record-details-field-height);
+    padding: 0;
+    overflow: hidden;
+    border-radius: 0.625rem;
 }
 
 .fi-inline-radio-select .fi-select-input-option {
@@ -1113,11 +1135,11 @@
 }
 
 .fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-tags-input) .fi-input-wrp,
-.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-multi-value-input) .fi-input-wrp {
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-multi-value-input button[aria-haspopup]) .fi-input-wrp {
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    height: auto;
+    height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
     overflow: visible;
 }
@@ -1171,7 +1193,11 @@
 .fi-fo-multi-value-panel {
     display: flex;
     flex-direction: column;
-    max-height: min(14rem, calc(100dvh - 8rem));
+    z-index: 100;
+    width: max-content;
+    min-width: 20rem;
+    max-width: min(28rem, calc(100vw - 2rem));
+    max-height: min(12rem, calc(100dvh - 8rem));
     overflow: hidden;
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-font-leading);
@@ -1180,9 +1206,18 @@
 .fi-fo-multi-value-panel-list {
     min-height: 0;
     flex: 1 1 auto;
-    overflow-x: hidden;
+    overflow-x: visible;
     overflow-y: auto;
     scrollbar-width: none;
+}
+
+.fi-fo-multi-value-panel-link,
+.fi-fo-multi-value-panel a {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: nowrap;
+    min-width: auto;
+    max-width: none;
 }
 
 .fi-fo-multi-value-panel-list::-webkit-scrollbar {
@@ -1210,6 +1245,134 @@
     line-height: 1rem;
 }
 
+.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor {
+    min-height: var(--record-details-field-height);
+}
+
+.fi-inline-textarea-anchor {
+    position: relative;
+    height: 0;
+    width: 100%;
+    overflow: visible;
+}
+
+.fi-fo-multi-value-overlay-anchor {
+    position: relative;
+    height: 0;
+    overflow: visible;
+}
+
+.fi-inline-textarea-panel {
+    position: absolute;
+    top: -0.25rem;
+    left: 0;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
+    inset-inline: 0;
+    padding: 0.625rem 0.75rem;
+    border-radius: 0.75rem;
+    background-color: var(--color-white, #fff);
+    box-shadow:
+        0 0 0 2px var(--color-primary-600, #7c3aed),
+        0 10px 28px color-mix(in oklab, var(--color-gray-950) 12%, transparent);
+}
+
+.dark .fi-inline-textarea-panel {
+    background-color: var(--color-gray-900, #111827);
+    box-shadow:
+        0 0 0 2px var(--color-primary-400, #a78bfa),
+        0 10px 28px rgb(0 0 0 / 0.45);
+}
+
+.fi-inline-field-editor-invalid .fi-inline-textarea-panel {
+    box-shadow:
+        0 0 0 2px var(--color-danger-600, #e11d48),
+        0 10px 28px color-mix(in oklab, var(--color-gray-950) 12%, transparent);
+}
+
+.dark .fi-inline-field-editor-invalid .fi-inline-textarea-panel {
+    box-shadow:
+        0 0 0 2px var(--color-danger-400, #fb7185),
+        0 10px 28px rgb(0 0 0 / 0.45);
+}
+
+.fi-inline-textarea-panel .fi-fo-field-label,
+.fi-inline-textarea-panel .fi-fo-field-wrp-label,
+.fi-inline-textarea-panel .fi-fo-field-wrp-hint {
+    display: none;
+}
+
+.fi-inline-textarea-panel .fi-fo-field,
+.fi-inline-textarea-panel .fi-fo-field-content-col,
+.fi-inline-textarea-panel .fi-fo-field-wrp,
+.fi-inline-textarea-panel .fi-input-wrp-content-ctn,
+.fi-inline-textarea-panel .fi-sc {
+    width: 100%;
+    min-width: 0;
+    gap: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.fi-record-details-rail .fi-inline-textarea-panel .fi-input-wrp,
+.fi-record-details-rail .fi-inline-textarea-panel .fi-input-wrp:focus-within,
+.fi-inline-textarea-panel .fi-input-wrp,
+.fi-inline-textarea-panel .fi-input-wrp:focus-within {
+    min-height: 0;
+    align-items: stretch;
+    border-radius: 0;
+    background-color: transparent;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+.fi-record-details-rail .fi-inline-textarea-panel textarea,
+.fi-inline-textarea-panel textarea {
+    field-sizing: fixed;
+    height: var(--record-textarea-overlay-height);
+    min-height: var(--record-textarea-overlay-height);
+    max-height: var(--record-textarea-overlay-height);
+    overflow-y: scroll;
+    resize: none;
+    padding: 0;
+    padding-inline-end: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-gray-950, #030712);
+    background: transparent;
+    box-shadow: none;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklab, var(--color-gray-950) 28%, transparent) transparent;
+}
+
+.fi-inline-textarea-panel textarea::-webkit-scrollbar {
+    width: 6px;
+}
+
+.fi-inline-textarea-panel textarea::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fi-inline-textarea-panel textarea::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-gray-950) 28%, transparent);
+}
+
+.dark .fi-inline-textarea-panel textarea {
+    color: var(--color-white, #fff);
+    scrollbar-color: color-mix(in oklab, white 28%, transparent) transparent;
+}
+
+.dark .fi-inline-textarea-panel textarea::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, white 28%, transparent);
+}
+
 .fi-record-details-rail .fi-inline-field-editor textarea {
     min-height: 3.5rem;
     padding: 0.375rem 0.5rem;
@@ -1223,14 +1386,253 @@
 
 .fi-record-details-rail .fi-inline-field-editor .fi-input-wrp {
     font-size: var(--record-details-font-size);
+    background-color: var(--color-white, #fff);
+    border-radius: 0.625rem;
+    --tw-ring-color: var(--color-primary-600, #7c3aed);
+    --tw-ring-shadow: 0 0 0 1px var(--tw-ring-color);
+    --tw-ring-offset-shadow: 0 0 #0000;
+    box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow);
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel .fi-input-wrp,
+.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel .fi-input-wrp:focus-within,
+.fi-inline-textarea-panel .fi-inline-overlay-textarea,
+.fi-inline-textarea-panel .fi-inline-overlay-textarea:focus-within {
+    min-height: 0;
+    align-items: stretch;
+    border-radius: 0;
+    background-color: transparent !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+    --tw-ring-offset-shadow: 0 0 #0000 !important;
+    --tw-shadow: 0 0 #0000 !important;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel textarea {
+    field-sizing: fixed;
+    height: var(--record-textarea-overlay-height);
+    min-height: var(--record-textarea-overlay-height);
+    max-height: var(--record-textarea-overlay-height);
+    overflow-y: scroll;
+    resize: none;
+    padding: 0;
+    padding-inline-end: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.45;
+    color: var(--color-gray-950, #030712);
+    background: transparent;
+    box-shadow: none;
+}
+
+.fi-inline-textarea-panel .fi-fo-textarea > div,
+.fi-inline-textarea-panel .fi-autosizable > div {
+    height: var(--record-textarea-overlay-height) !important;
+    overflow: hidden;
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor .fi-input-wrp {
+    background-color: var(--color-gray-900, #111827);
+    --tw-ring-color: var(--color-primary-500, #8b5cf6);
+}
+
+.fi-record-details-rail .fi-inline-field-editor input[type='number'] {
+    appearance: textfield;
+    padding-inline: var(--record-details-edit-padding-inline);
+}
+
+.fi-record-details-rail .fi-inline-field-editor input[type='number']::-webkit-outer-spin-button,
+.fi-record-details-rail .fi-inline-field-editor input[type='number']::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.fi-record-details-rail .fi-inline-field-editor input[inputmode='url'],
+.fi-record-details-rail .fi-inline-field-editor input[type='url'] {
+    color: var(--color-gray-950, #030712);
+    text-decoration: none;
+}
+
+.fi-record-details-rail .fi-inline-field-editor input.fi-fo-multi-value-add-invalid,
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-add-invalid input {
+    color: var(--color-danger-600, #e11d48);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor input.fi-fo-multi-value-add-invalid,
+.dark .fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-add-invalid input {
+    color: var(--color-danger-400, #fb7185);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor input[inputmode='url'],
+.dark .fi-record-details-rail .fi-inline-field-editor input[type='url'] {
+    color: var(--color-white, #fff);
+}
+
+.fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp,
+.fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp:focus-within {
+    --tw-ring-color: var(--color-danger-600, #e11d48);
+    --tw-ring-shadow: 0 0 0 1px var(--tw-ring-color);
+    box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp,
+.dark .fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp:focus-within {
+    --tw-ring-color: var(--color-danger-500, #f43f5e);
+}
+
+.fi-record-details-rail .fi-input-wrp.fi-inline-overlay-select,
+.fi-record-details-rail .fi-input-wrp.fi-inline-overlay-select:focus-within,
+.fi-record-details-rail .fi-inline-overlay-select .fi-input-wrp,
+.fi-record-details-rail .fi-inline-overlay-select .fi-input-wrp:focus-within,
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-multi-value-input button[aria-haspopup]) .fi-input-wrp,
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-multi-value-input button[aria-haspopup]) .fi-input-wrp:focus-within {
+    background-color: transparent;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+.fi-record-details-rail .fi-in-entry:has(.fi-inline-overlay-select) .fi-inline-field-editor {
+    min-height: var(--record-details-field-height);
+}
+
+.fi-record-details-rail .fi-in-entry:has(.fi-fo-multi-value-input) .fi-inline-field-editor {
+    min-height: var(--record-details-field-height);
+}
+
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-multi-value-input button[aria-expanded='true']) .fi-input-wrp {
+    height: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input button[aria-expanded='true'] {
+    height: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-trigger-chevron {
+    display: none;
+}
+
+.fi-record-details-rail .fi-inline-overlay-select .fi-select-input-value-remove-btn {
+    display: none;
+}
+
+.fi-record-details-rail .fi-inline-overlay-select .fi-select-input-btn {
+    background-image: none;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-input-wrp.fi-fo-phone-input,
+.fi-record-details-rail .fi-inline-field-editor .fi-input-wrp.fi-fo-phone-input:focus-within {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    width: max-content;
+    min-width: 16rem;
+    height: var(--record-details-field-height);
+    min-height: var(--record-details-field-height);
+    padding-inline: 0.125rem 0.75rem;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background-color: var(--color-white, #fff);
+    --tw-ring-color: color-mix(in oklab, var(--color-gray-950) 5%, transparent);
+    --tw-ring-shadow: 0 0 0 1px var(--tw-ring-color);
+    --tw-ring-offset-shadow: 0 0 #0000;
+    box-shadow:
+        var(--tw-ring-shadow),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor .fi-input-wrp.fi-fo-phone-input,
+.dark .fi-record-details-rail .fi-inline-field-editor .fi-input-wrp.fi-fo-phone-input:focus-within {
+    background-color: var(--color-gray-900, #111827);
+    --tw-ring-color: color-mix(in oklab, white 10%, transparent);
+    box-shadow:
+        var(--tw-ring-shadow),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.fi-record-details-rail .fi-inline-field-editor.fi-inline-field-editor-invalid .fi-input-wrp.fi-fo-phone-input,
+.fi-record-details-rail .fi-inline-field-editor.fi-inline-field-editor-invalid .fi-input-wrp.fi-fo-phone-input:focus-within {
+    --tw-ring-color: var(--color-danger-600, #e11d48);
+    --tw-ring-shadow: 0 0 0 1px var(--tw-ring-color);
+    box-shadow:
+        var(--tw-ring-shadow),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp.fi-fo-phone-input,
+.dark .fi-record-details-rail .fi-inline-field-editor-invalid .fi-input-wrp.fi-fo-phone-input:focus-within {
+    --tw-ring-color: var(--color-danger-500, #f43f5e);
+    box-shadow:
+        var(--tw-ring-shadow),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.fi-record-details-rail .fi-in-entry:has(.fi-fo-phone-input) .fi-inline-field-editor,
+.fi-record-details-rail .fi-in-entry:has(.fi-fo-date-time-picker) .fi-inline-field-editor {
+    min-height: var(--record-details-field-height);
+    position: relative;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-phone-divider {
+    display: none;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-date-time-picker) .fi-input-wrp,
+.fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-date-time-picker) .fi-input-wrp:focus-within {
+    background-color: transparent;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+    --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-trigger {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-panel {
+    z-index: 100;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-input,
-.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input div[x-ref='select'] {
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-input-wrp input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='tel']),
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input div[x-ref='select'],
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-fo-date-time-picker-display-text-input {
+    box-sizing: border-box;
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
+    max-height: var(--record-details-field-height);
     padding-block: 0;
-    padding-inline: 0.5rem;
+    padding-inline: var(--record-details-edit-padding-inline);
+    font-size: var(--record-details-font-size);
+    line-height: var(--record-details-field-height);
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input input.fi-input {
+    box-sizing: border-box;
+    height: var(--record-details-field-height);
+    min-height: var(--record-details-field-height);
+    max-height: var(--record-details-field-height);
+    padding-block: 0;
+    padding-inline: var(--record-details-edit-padding-inline);
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-field-height);
 }
@@ -1239,15 +1641,136 @@
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
     padding-block: 0;
-    padding-inline-start: 0.5rem;
+    padding-inline: var(--record-details-edit-padding-inline);
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-field-height);
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-fo-tags-input)):not(:has(.fi-fo-color-picker)):not(:has(.fi-fo-multi-value-input)) .fi-input-wrp.fi-inline-overlay-select:has(.fi-select-input-btn[aria-expanded='true']) {
+    height: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-inline-overlay-select:has(.fi-select-input-btn[aria-expanded='true']) .fi-select-input-btn {
+    height: 0;
+    min-height: 0;
+    padding: 0;
+    overflow: hidden;
+    opacity: 0;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-inline-overlay-select:has(.fi-select-input-btn[aria-expanded='true']) .fi-select-input div[x-ref='select'] {
+    height: 0;
+    min-height: 0;
+    padding: 0;
+}
+
+.fi-record-details-rail .fi-select-input .fi-dropdown-panel {
+    z-index: 30;
+    width: max-content !important;
+    min-width: 20rem !important;
+    max-width: min(28rem, calc(100vw - 2rem)) !important;
+}
+
+.fi-record-details-rail .fi-select-input .fi-dropdown-panel .fi-select-input-option > span {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: nowrap;
+}
+
+.fi-record-details-rail .fi-select-input .fi-select-input-search-ctn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-gray-950) 6%, transparent);
+}
+
+.dark .fi-record-details-rail .fi-select-input .fi-select-input-search-ctn {
+    border-bottom-color: color-mix(in oklab, white 10%, transparent);
+}
+
+.fi-record-details-rail .fi-select-input .fi-select-input-search-ctn::before {
+    content: '';
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    background-color: var(--color-gray-400, #9ca3af);
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath fill-rule='evenodd' d='M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3E%3Cpath fill-rule='evenodd' d='M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z' clip-rule='evenodd'/%3E%3C/svg%3E");
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+}
+
+.fi-record-details-rail .fi-select-input .fi-select-input-search-ctn .fi-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 1.75rem;
+    min-height: 1.75rem;
+    padding-inline: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.fi-fo-phone-country-panel,
+.fi-fo-phone-panel {
+    z-index: 100;
+    width: max-content;
+    min-width: 20rem;
+    max-width: min(28rem, calc(100vw - 2rem));
+    padding: 0.25rem;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--color-gray-950) 5%, transparent),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.dark .fi-fo-phone-country-panel,
+.dark .fi-fo-phone-panel {
+    box-shadow:
+        0 0 0 1px color-mix(in oklab, white 10%, transparent),
+        0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.fi-fo-phone-country-search {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: -0.25rem -0.25rem 0.25rem;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-gray-950) 6%, transparent);
+}
+
+.dark .fi-fo-phone-country-search {
+    border-bottom-color: color-mix(in oklab, white 10%, transparent);
+}
+
+.fi-fo-phone-country-search input {
+    height: 1.75rem;
+    min-height: 1.75rem;
 }
 
 .fi-record-details-rail .fi-in-entry[data-inline-field='name'] .fi-inline-field-editor .fi-input {
     font-size: 1rem;
     font-weight: 600;
     line-height: 1.5rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor input::placeholder,
+.fi-record-details-rail .fi-inline-field-editor textarea::placeholder {
+    color: var(--color-gray-400, #9ca3af);
+}
+
+.dark .fi-record-details-rail .fi-inline-field-editor input::placeholder,
+.dark .fi-record-details-rail .fi-inline-field-editor textarea::placeholder {
+    color: var(--color-gray-500, #6b7280);
 }
 
 .fi-record-details-rail .fi-inline-field-editor input::placeholder,
@@ -1289,7 +1812,19 @@
 }
 
 .fi-record-details-rail .fi-inline-field-editor .fi-fo-phone-input button[role='combobox'] {
+    width: auto;
     white-space: nowrap;
+    border-radius: 0.5rem;
+    padding-inline: 0.75rem 0.25rem;
+    background-color: transparent;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-phone-dial-code {
+    flex-shrink: 0;
+    padding-inline-end: 0.25rem;
+    color: var(--color-gray-500, #6b7280);
+    font-size: var(--record-details-font-size);
+    line-height: var(--record-details-font-leading);
 }
 
 .fi-record-details-rail .fi-inline-field-editor .fi-fo-phone-input input[type='tel'],
@@ -1342,12 +1877,20 @@
         width: var(--record-details-rail-width);
         max-width: var(--record-details-rail-width);
         min-width: 0;
+        overflow: visible;
         position: sticky;
         top: var(--record-split-sticky-top);
         align-self: flex-start;
+        z-index: 10;
     }
 
     .fi-record-split.fi-from-lg > :has(> .fi-record-work-pane) {
+        position: relative;
         min-width: 0;
+        z-index: 0;
     }
+}
+
+html:has(.fi-modal-open) .fi-record-split.fi-from-lg > :has(> .fi-record-details-rail) {
+    z-index: auto;
 }

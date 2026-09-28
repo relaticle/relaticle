@@ -226,12 +226,14 @@
 
                         const text = (node.innerText || '').replace(/\s+/g, ' ').trim();
                         const truncated = text !== '' && node.scrollWidth > node.clientWidth + 1;
+                        const editing = node.closest('[data-inline-editing="true"]') !== null;
 
                         node.removeAttribute('title');
 
                         const tippy = node._tippy ?? node.__x_tippy;
 
-                        if (! truncated) {
+                        if (! truncated || editing) {
+                            tippy?.hide();
                             tippy?.disable();
 
                             return;

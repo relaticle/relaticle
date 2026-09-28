@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFieldType;
 use App\Enums\InlineCommit;
 use App\Filament\CustomFields\RichEditorComponent;
@@ -21,7 +22,9 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Field;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\ViewEntry;
 use Filament\Notifications\Notification;
@@ -437,6 +440,17 @@ trait EditsRecordFieldsInline
                 ->multiple();
         }
 
+        if ($field->type === CustomFieldType::TAGS_INPUT && $component instanceof TagsInput) {
+            $addTag = __('filament/inline-edit.add_tag');
+
+            return MultiValueInputComponent::make($component->getName())
+                ->allowMultiple()
+                ->maxValues(50)
+                ->inputType('text')
+                ->addLabel($addTag)
+                ->placeholder($addTag);
+        }
+
         return $component;
     }
 
@@ -454,7 +468,9 @@ trait EditsRecordFieldsInline
         }
 
         if ($component instanceof Textarea) {
-            $component->rows(2)->autosize();
+            $component
+                ->rows(7)
+                ->extraAttributes(['class' => 'fi-inline-overlay-textarea']);
         }
 
         if ($component instanceof DateTimePicker) {
@@ -464,6 +480,13 @@ trait EditsRecordFieldsInline
         if ($component instanceof Select) {
             $component->native(false);
         }
+
+        if ($component instanceof MultiValueInputComponent && $field->code === CompanyField::DOMAINS->value) {
+            $addDomain = __('filament/inline-edit.add_domain');
+            $component->addLabel($addDomain)->placeholder($addDomain);
+        }
+
+        $this->applyInlineEditorPlaceholder($component, $field);
 
         if ($field->commit !== InlineCommit::OnChange) {
             return;
@@ -669,6 +692,8 @@ trait EditsRecordFieldsInline
             'saveOnEnterOrBlur' => $field?->commit === InlineCommit::OnEnterOrBlur,
             'saveOnChange' => $field?->commit === InlineCommit::OnChange,
             'invalid' => $this->inlineEditorHasError(),
+            'textareaOverlay' => $field?->type === CustomFieldType::TEXTAREA,
+            'overlayLabel' => $field?->label ?? '',
         ])->render();
     }
 
@@ -763,6 +788,35 @@ trait EditsRecordFieldsInline
         }
 
         data_set($this->inlineEditData, $field->valuePath(), $normalized);
+    }
+
+    private function applyInlineEditorPlaceholder(Field $component, InlineField $field): void
+    {
+        if ($component instanceof MultiValueInputComponent) {
+            if (
+                $field->type === CustomFieldType::LINK
+                || $field->type === CustomFieldType::EMAIL
+                || $field->type === CustomFieldType::PHONE
+                || $field->type === CustomFieldType::TAGS_INPUT
+                || $field->code === CompanyField::DOMAINS->value
+            ) {
+                return;
+            }
+
+            $component->placeholder($this->inlineEmptyPlaceholder($field));
+
+            return;
+        }
+
+        if (
+            $component instanceof TextInput
+            || $component instanceof Textarea
+            || $component instanceof Select
+            || $component instanceof ColorPicker
+            || $component instanceof TagsInput
+        ) {
+            $component->placeholder($this->inlineEmptyPlaceholder($field));
+        }
     }
 
     private function inlineEmptyPlaceholder(InlineField $field): string

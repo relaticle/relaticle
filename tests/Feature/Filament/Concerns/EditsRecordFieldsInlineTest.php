@@ -238,14 +238,28 @@ it('does not persist a person company when inline select editing is cancelled', 
     ]);
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertSee('fi-fixed-positioning-context', false)
         ->call('startInlineEdit', 'company_id')
         ->assertSet('inlineEditingField', 'company_id')
         ->assertSee('fi-inline-field-editor', false)
+        ->assertSee('fi-inline-overlay-select', false)
+        ->assertSee(__('filament/inline-edit.search_records'))
         ->call('cancelInlineEdit')
         ->assertSet('inlineEditingField', null)
         ->assertDontSee('fi-inline-field-editor', false);
 
     expect($person->fresh()->company_id)->toBe($company->getKey());
+});
+
+it('opens a person phone editor with a searchable country overlay', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', PeopleField::PHONE_NUMBER->value)
+        ->assertSet('inlineEditingField', PeopleField::PHONE_NUMBER->value)
+        ->assertSeeHtml('fi-fo-phone-country-panel')
+        ->assertSeeHtml('fi-fo-phone-input')
+        ->assertSee(__('custom-fields::custom-fields.phone.search_country'));
 });
 
 it('does not persist when the opportunity inline edit is cancelled', function (): void {
@@ -283,7 +297,8 @@ it('renders the close date picker after click-to-edit starts', function (): void
     livewire(ViewOpportunity::class, ['record' => $record->getKey()])
         ->call('startInlineEdit', OpportunityField::CLOSE_DATE->value)
         ->assertSet('inlineEditingField', OpportunityField::CLOSE_DATE->value)
-        ->assertSee('fi-fo-date-time-picker', false);
+        ->assertSee('fi-fo-date-time-picker', false)
+        ->assertSeeHtml('fi-fo-date-time-picker-panel');
 });
 
 it('saves an opportunity close date', function (): void {
@@ -347,6 +362,19 @@ it('saves a company account owner through the update action', function (): void 
         ->assertNotNotified();
 
     expect($company->fresh()->account_owner_id)->toBe($owner->getKey());
+});
+
+it('opens company account owner as a floating search overlay', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'account_owner_id' => $this->user->id,
+    ]);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->call('startInlineEdit', 'account_owner_id')
+        ->assertSet('inlineEditingField', 'account_owner_id')
+        ->assertSeeHtml('fi-inline-overlay-select')
+        ->assertSee(__('filament/inline-edit.search_records'))
+        ->assertDontSeeHtml('fi-inline-field-done');
 });
 
 it('puts copy and delete on the company details card instead of edit all', function (): void {
@@ -431,6 +459,26 @@ it('does not show a done button for a person email list', function (): void {
         ->assertDontSee('fi-inline-field-done', false);
 });
 
+it('opens company domains as a floating overlay with an add-domain row', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $domains = CustomField::query()
+        ->forEntity(Company::class)
+        ->where('code', CompanyField::DOMAINS)
+        ->firstOrFail();
+    $company->saveCustomFieldValue($domains, ['google.com']);
+
+    livewire(ViewCompany::class, ['record' => $company->fresh()->getKey()])
+        ->call('startInlineEdit', CompanyField::DOMAINS->value)
+        ->assertSet('inlineEditingField', CompanyField::DOMAINS->value)
+        ->assertSeeHtml('fi-inline-field-editor')
+        ->assertSeeHtml('fi-fo-multi-value-panel')
+        ->assertSeeHtml('fi-fo-multi-value-panel-link')
+        ->assertSee(__('filament/inline-edit.add_domain'))
+        ->assertDontSeeHtml('fi-select-input-search-ctn')
+        ->assertDontSeeHtml('fi-inline-field-done')
+        ->assertDontSeeHtml('fi-inline-field-cancel');
+});
+
 it('does not show done or cancel below a textarea custom field', function (): void {
     $person = People::factory()->recycle([$this->user, $this->workspace])->create();
     $sectionId = peopleJobTitleField()->getAttribute('custom_field_section_id');
@@ -450,10 +498,14 @@ it('does not show done or cancel below a textarea custom field', function (): vo
         ->assertDontSeeHtml('fi-inline-field-editor-confirm')
         ->assertDontSeeHtml('fi-inline-field-done')
         ->assertDontSeeHtml('fi-inline-field-cancel')
+        ->assertSeeHtml('fi-inline-textarea-panel')
+        ->assertDontSeeHtml('fi-inline-textarea-panel-label')
+        ->assertDontSeeHtml('fi-autosizable')
+        ->assertSeeHtml('rows="7"')
         ->assertSeeHtml('<textarea');
 });
 
-it('opens a tags field as a compact input without done or cancel', function (): void {
+it('opens a tags field as a compact dropdown without done or cancel', function (): void {
     $person = People::factory()->recycle([$this->user, $this->workspace])->create();
     $sectionId = peopleJobTitleField()->getAttribute('custom_field_section_id');
     $field = CustomField::factory()->create([
@@ -469,7 +521,8 @@ it('opens a tags field as a compact input without done or cancel', function (): 
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->call('startInlineEdit', 'hobby')
-        ->assertSeeHtml('fi-fo-tags-input')
+        ->assertSeeHtml('fi-fo-multi-value-input')
+        ->assertSeeHtml('fi-fo-multi-value-panel')
         ->assertDontSeeHtml('fi-inline-field-editor-confirm')
         ->assertDontSeeHtml('fi-inline-field-done')
         ->assertDontSeeHtml('fi-inline-field-cancel')
@@ -506,6 +559,7 @@ it('renders person emails as packed links then starts edit', function (): void {
         ->assertSet('inlineEditingField', PeopleField::EMAILS->value)
         ->assertSeeHtml('fi-inline-field-editor')
         ->assertSeeHtml('fi-fo-multi-value-input')
+        ->assertSeeHtml('fi-fo-multi-value-panel-link')
         ->assertDontSeeHtml('fi-fo-multi-value-plain')
         ->assertSeeHtml('+<span x-text="hiddenCount"></span>')
         ->assertDontSeeHtml('+<span x-text="hiddenCount"></span> more');
@@ -646,6 +700,37 @@ it('shows set-field placeholders on empty person values', function (): void {
         ->assertSee('Set linkedin')
         ->assertSeeHtml('class="fi-in-placeholder"')
         ->assertDontSeeHtml('<span class="text-gray-400 dark:text-gray-500">—</span>');
+});
+
+it('shows editor placeholders on empty native and custom fields', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $sectionId = peopleJobTitleField()->getAttribute('custom_field_section_id');
+    CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'age',
+        'name' => 'age',
+        'type' => CustomFieldType::NUMBER->value,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', 'age')
+        ->assertSeeHtml('placeholder="Set age"');
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', PeopleField::JOB_TITLE->value)
+        ->assertSeeHtml('placeholder="Set job title"');
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', PeopleField::LINKEDIN->value)
+        ->assertSeeHtml('placeholder="Add URL..."');
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', 'name')
+        ->assertSeeHtml('placeholder="Set name"');
 });
 
 it('renders a live company icp switch instead of click-to-edit', function (): void {
@@ -1007,6 +1092,27 @@ it('keeps an invalid person phone in the editor', function (): void {
     expect(storedCustomFieldValue($person, $phone))->toBeEmpty();
 });
 
+it('discards an invalid person phone on cancel and keeps the previous value', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $phone = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::PHONE_NUMBER)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($phone, ['+14155550103']);
+
+    livewire(ViewPeople::class, ['record' => $person->fresh()->getKey()])
+        ->call('startInlineEdit', PeopleField::PHONE_NUMBER->value)
+        ->set('inlineEditData.custom_fields.phone_number', [['country' => 'US', 'number' => 'not-a-phone']])
+        ->call('saveInlineField')
+        ->assertHasErrors()
+        ->assertSet('inlineEditingField', PeopleField::PHONE_NUMBER->value)
+        ->call('cancelInlineEdit')
+        ->assertSet('inlineEditingField', null)
+        ->assertDontSee('fi-inline-field-editor', false);
+
+    expect(storedCustomFieldValue($person, $phone))->toBe(['+14155550103']);
+});
+
 it('keeps the phone editor from saving until enter or blur', function (): void {
     $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -1034,6 +1140,8 @@ it('saves a person phone number after a failed validation is corrected', functio
         ->call('saveInlineField')
         ->assertHasErrors()
         ->assertNotified()
+        ->assertSeeHtml('fi-inline-field-editor-invalid')
+        ->assertSeeHtml('fi-fo-phone-input')
         ->assertSet('inlineEditingField', PeopleField::PHONE_NUMBER->value)
         ->set('inlineEditData.custom_fields.phone_number', [['country' => 'US', 'number' => '4155550103']])
         ->call('saveInlineField')

@@ -55,6 +55,7 @@ it('places opportunity details beside tasks notes and activity', function (): vo
         ->assertOk()
         ->assertSee('fi-record-split', false)
         ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-fixed-positioning-context', false)
         ->assertSee('fi-record-work-pane', false)
         ->assertSee('Enterprise rollout')
         ->assertSee('Acme')

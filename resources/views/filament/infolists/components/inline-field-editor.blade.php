@@ -3,24 +3,30 @@
     /** @var bool $saveOnEnterOrBlur */
     /** @var bool $saveOnChange */
     /** @var bool $invalid */
+    /** @var bool $textareaOverlay */
+    /** @var string $overlayLabel */
     $saveOnChange ??= false;
     $invalid ??= false;
+    $textareaOverlay ??= false;
+    $overlayLabel ??= '';
 @endphp
 
 <div
     class="fi-inline-field-editor{{ $invalid ? ' fi-inline-field-editor-invalid' : '' }}"
     data-invalid-email="{{ __('filament/inline-edit.invalid_email') }}"
     data-invalid-url="{{ __('filament/inline-edit.invalid_url') }}"
+    data-invalid-domain="{{ __('filament/inline-edit.invalid_domain') }}"
     x-data="{
         committing: false,
         cancelled: false,
         pendingSwitch: null,
         blockingSwitch: false,
         lastDraftToastAt: 0,
+        discardedInvalidDraft: false,
         holdUntil: 0,
         selectWasOpen: false,
         selectInitialValue: '',
-        overlaySelector: '[role=listbox], [role=dialog], [role=option], [role=combobox], .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, hex-color-picker, [id*=country-listbox]',
+        overlaySelector: '[role=listbox], [role=dialog], [role=option], [role=combobox], .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, .fi-inline-textarea-panel, hex-color-picker, [id*=country-listbox]',
         phoneRoot() {
             const nodes = $el.querySelectorAll('.fi-fo-phone-input [x-data], .fi-fo-phone-input-wrp [x-data]');
             for (let i = 0; i < nodes.length; i++) {
@@ -103,6 +109,27 @@
         },
         isOverlay(node) {
             return Boolean(node?.closest?.(this.overlaySelector)) || this.isPhoneCountryUi(node) || this.isColorPickerUi(node);
+        },
+        isInlineControl(node) {
+            if (! node || node.nodeType !== 1) {
+                return false;
+            }
+            if (this.isPhoneCountryUi(node) || this.isColorPickerUi(node)) {
+                return true;
+            }
+
+            return Boolean(node.closest?.('input, textarea, select, [role=combobox], [role=searchbox], [role=listbox], [role=option], .fi-fo-phone-country-panel, .fi-fo-phone-country-search, .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, hex-color-picker'));
+        },
+        dismissIfInvalidOutside(event) {
+            if (! $el.classList.contains('fi-inline-field-editor-invalid')) {
+                return false;
+            }
+            if (this.isPhoneCountryEvent(event) || this.isInlineControl(event.target)) {
+                return false;
+            }
+            this.closeInvalid();
+
+            return true;
         },
         bindPhoneCountry() {
             const data = this.phoneData();
@@ -258,9 +285,10 @@
                 data.createTag();
             }
         },
-        commitDrafts() {
+        commitDrafts(strict = false) {
             this.commitPhoneDraft();
             this.commitTagsDraft();
+            this.discardedInvalidDraft = false;
             const multiValue = $el.querySelector('.fi-fo-multi-value-input [x-data]');
             if (! multiValue || ! window.Alpine) {
                 return true;
@@ -270,7 +298,16 @@
                 return true;
             }
             if (typeof data.addValue === 'function' && data.newValue?.trim()) {
-                if (data.addValue() === false) {
+                if (! data.isValidValue(data.newValue.trim())) {
+                    if (strict) {
+                        data.addInvalid = true;
+
+                        return false;
+                    }
+                    this.discardedInvalidDraft = true;
+                    data.newValue = '';
+                    data.addInvalid = false;
+                } else if (data.addValue() === false) {
                     return false;
                 }
             }
@@ -294,12 +331,16 @@
             const message = data?.inputType === 'email'
                 ? $el.dataset.invalidEmail
                 : data?.inputType === 'url'
-                    ? $el.dataset.invalidUrl
+                    ? (data.allowMultiple ? $el.dataset.invalidDomain : $el.dataset.invalidUrl)
                     : '';
             if (! message || typeof FilamentNotification !== 'function') {
                 return;
             }
             new FilamentNotification().title(message).danger().send();
+        },
+        closeInvalid() {
+            this.toastDraftInvalid();
+            this.cancelEdit();
         },
         saveFromEnter() {
             if (this.committing || this.isPhoneCountryOpen()) {
@@ -325,11 +366,23 @@
             if (! fromEnter && this.shouldHold()) {
                 return;
             }
-            if (this.commitDrafts() === false) {
-                if (dismiss) {
+            if (dismiss && ! fromEnter && $el.classList.contains('fi-inline-field-editor-invalid')) {
+                this.closeInvalid();
+                return;
+            }
+            if (this.commitDrafts(fromEnter) === false) {
+                if (fromEnter) {
+                    $el.classList.add('fi-inline-field-editor-invalid');
                     this.toastDraftInvalid();
+                    return;
+                }
+                if (dismiss) {
+                    this.closeInvalid();
                 }
                 return;
+            }
+            if (dismiss && this.discardedInvalidDraft) {
+                this.toastDraftInvalid();
             }
             $el.querySelectorAll('input:not([type=hidden]), textarea').forEach((input) => {
                 input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -337,7 +390,11 @@
             });
             this.committing = true;
             Promise.resolve($wire.saveInlineField())
-                .catch(() => {})
+                .catch(() => {
+                    if (dismiss && ! fromEnter) {
+                        this.cancelEdit();
+                    }
+                })
                 .finally(() => {
                     this.committing = false;
                 });
@@ -365,12 +422,15 @@
             pendingSwitch = null;
             return;
         }
+        if (dismissIfInvalidOutside($event)) {
+            pendingSwitch = null;
+            return;
+        }
         const next = nextEditableCode($event.target);
         if (next) {
             if (commitDrafts() === false) {
-                pendingSwitch = null;
-                blockingSwitch = true;
-                toastDraftInvalid();
+                pendingSwitch = next;
+                closeInvalid();
                 return;
             }
             pendingSwitch = next;
@@ -415,23 +475,46 @@
                 saveFromEnter();
             "
             x-on:focusout="
-                if (pendingSwitch || shouldHold() || isPhoneCountryOpen() || isColorPickerOpen() || isColorPickerUi($event.relatedTarget)) {
+                if (pendingSwitch || isPhoneCountryOpen() || isColorPickerOpen() || isColorPickerUi($event.relatedTarget)) {
+                    return;
+                }
+                if (! $event.relatedTarget && $event.target?.closest?.('.fi-fo-multi-value-panel, .fi-fo-multi-value-input')) {
                     return;
                 }
                 const next = $event.relatedTarget;
                 if ($el.contains(next) || isOverlay(next) || isPhoneCountryUi(next) || nextEditableCode(next)) {
                     return;
                 }
+                if ($el.classList.contains('fi-inline-field-editor-invalid')) {
+                    closeInvalid();
+                    return;
+                }
+                if (shouldHold()) {
+                    return;
+                }
                 save(true);
             "
             x-on:click.outside="
-                if (pendingSwitch || nextEditableCode($event.target) || shouldHold() || isOverlay($event.target) || isPhoneCountryEvent($event) || isColorPickerEvent($event)) {
+                if (! $event.target?.isConnected) {
+                    return;
+                }
+                if (pendingSwitch || nextEditableCode($event.target) || isOverlay($event.target) || isPhoneCountryEvent($event) || isColorPickerEvent($event)) {
+                    return;
+                }
+                if ($el.classList.contains('fi-inline-field-editor-invalid')) {
+                    closeInvalid();
+                    return;
+                }
+                if (shouldHold()) {
                     return;
                 }
                 save(true);
             "
         @elseif ($saveOnChange)
             x-on:click.outside="
+                if (! $event.target?.isConnected) {
+                    return;
+                }
                 if (pendingSwitch || nextEditableCode($event.target) || isOverlay($event.target) || isPhoneCountryEvent($event)) {
                     return;
                 }
@@ -481,12 +564,6 @@
                         data.maxVisibleValues = 1;
                     }
                     if (data && typeof data.openPanel === 'function') {
-                        if (! data.$refs?.trigger || ! data.$refs?.panel) {
-                            if (tries < 20) {
-                                setTimeout(() => activate(tries + 1), 16);
-                            }
-                            return;
-                        }
                         holdOpen(300);
                         data.openPanel();
                         return;
@@ -527,7 +604,8 @@
                     return;
                 }
 
-                const input = $el.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select');
+                const input = $el.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select')
+                    || $refs.textareaPanel?.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select');
                 if (input) {
                     input.focus();
                     if (typeof input.showPicker === 'function') {
@@ -547,12 +625,31 @@
     @endif
 >
     <div class="fi-inline-field-editor-main">
-        <form
-            class="fi-inline-field-editor-form"
-            novalidate
-            x-on:submit.prevent="saveFromEnter()"
-        >
-            {!! $formHtml !!}
-        </form>
+        @if ($textareaOverlay)
+            <div class="fi-inline-textarea-anchor">
+                <div
+                    x-ref="textareaPanel"
+                    role="dialog"
+                    aria-label="{{ $overlayLabel }}"
+                    class="fi-inline-textarea-panel"
+                >
+                    <form
+                        class="fi-inline-field-editor-form"
+                        novalidate
+                        x-on:submit.prevent="saveFromEnter()"
+                    >
+                        {!! $formHtml !!}
+                    </form>
+                </div>
+            </div>
+        @else
+            <form
+                class="fi-inline-field-editor-form"
+                novalidate
+                x-on:submit.prevent="saveFromEnter()"
+            >
+                {!! $formHtml !!}
+            </form>
+        @endif
     </div>
 </div>

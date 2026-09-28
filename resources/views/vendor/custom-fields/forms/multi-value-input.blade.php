@@ -18,7 +18,9 @@
     $key = $getKey();
     $invalidValueMessage = match ($inputType) {
         'email' => __('filament/inline-edit.invalid_email'),
-        'url' => __('filament/inline-edit.invalid_url'),
+        'url' => $allowMultiple
+            ? __('filament/inline-edit.invalid_domain')
+            : __('filament/inline-edit.invalid_url'),
         default => '',
     };
     $invalidValueMessage = is_string($invalidValueMessage) ? $invalidValueMessage : '';
@@ -48,6 +50,7 @@
                 state: $wire.{{ $applyStateBindingModifiers("\$entangle('{$statePath}')") }},
                 newValue: '',
                 addInvalid: false,
+                invalidMessage: @js($invalidValueMessage),
                 inputType: @js($inputType),
                 linkPrefix: @js($linkPrefix),
                 componentKey: @js($key),
@@ -57,6 +60,8 @@
                 maxVisibleValues: 3,
                 copiedIndex: null,
                 documentClickListener: null,
+                panelPlaceListener: null,
+                panelOpen: false,
 
                 init() {
                     if (!Array.isArray(this.state)) {
@@ -70,18 +75,31 @@
                         }
 
                         const target = event.target;
-                        if (this.$el.contains(target) || this.$refs.panel?.contains(target)) {
+                        if (! target?.isConnected || this.$el.contains(target) || this.$refs.panel?.contains(target)) {
                             return;
                         }
 
                         this.closePanel();
                     };
                     document.addEventListener('click', this.documentClickListener);
+                    this.panelPlaceListener = (event) => {
+                        if (event?.type === 'scroll' && this.$refs.panel?.contains(event.target)) {
+                            return;
+                        }
+
+                        this.placePanel();
+                    };
+                    window.addEventListener('resize', this.panelPlaceListener);
+                    window.addEventListener('scroll', this.panelPlaceListener, true);
                 },
 
                 destroy() {
                     if (this.documentClickListener) {
                         document.removeEventListener('click', this.documentClickListener);
+                    }
+                    if (this.panelPlaceListener) {
+                        window.removeEventListener('resize', this.panelPlaceListener);
+                        window.removeEventListener('scroll', this.panelPlaceListener, true);
                     }
                 },
 
@@ -109,7 +127,7 @@
                 },
 
                 isOpen() {
-                    return this.$refs.panel?._x_isShown === true;
+                    return this.panelOpen;
                 },
 
                 valueHref(value) {
@@ -125,39 +143,84 @@
                 },
 
                 matchPanelWidth() {
-                    if (! this.$refs.panel || ! this.$refs.trigger) {
+                    if (! this.$refs.panel) {
                         return;
                     }
 
-                    this.$refs.panel.style.width = `${this.$refs.trigger.offsetWidth}px`;
+                    this.$refs.panel.style.width = 'max-content';
+                    this.$refs.panel.style.minWidth = '20rem';
+                    this.$refs.panel.style.maxWidth = 'min(28rem, calc(100vw - 2rem))';
+                },
+
+                panelContentHeight() {
+                    const rowPx = 1.75 * 16;
+                    const addPx = this.canAddMore ? 2.25 * 16 : 0;
+
+                    return (this.state.length * rowPx) + addPx;
+                },
+
+                placePanel() {
+                    const panel = this.$refs.panel;
+                    if (! panel || ! this.panelOpen) {
+                        return;
+                    }
+
+                    const editor = this.$el.closest('.fi-inline-field-editor');
+                    const reference = editor ?? this.$refs.trigger;
+                    if (! reference) {
+                        return;
+                    }
+
+                    const box = reference.getBoundingClientRect();
+                    const viewportPad = 8;
+                    const cap = 12 * 16;
+                    const preferred = Math.min(Math.max(this.panelContentHeight(), 96), cap);
+                    const spaceBelow = window.innerHeight - box.top - viewportPad;
+                    const spaceAbove = box.bottom - viewportPad;
+                    const openUp = spaceBelow < Math.min(preferred, 160) && spaceAbove > spaceBelow;
+                    const available = openUp ? spaceAbove : spaceBelow;
+                    const maxH = Math.round(Math.max(96, Math.min(preferred, available)));
+
+                    panel.style.position = 'fixed';
+                    panel.style.left = `${Math.round(box.left)}px`;
+                    panel.style.zIndex = '100';
+                    panel.style.height = `${maxH}px`;
+                    panel.style.maxHeight = `${maxH}px`;
+                    panel.style.minHeight = `${maxH}px`;
+                    this.matchPanelWidth();
+
+                    if (openUp) {
+                        panel.style.top = 'auto';
+                        panel.style.bottom = `${Math.round(window.innerHeight - box.bottom)}px`;
+                    } else {
+                        panel.style.bottom = 'auto';
+                        panel.style.top = `${Math.round(box.top)}px`;
+                    }
                 },
 
                 togglePanel() {
                     if (this.isDisabled) return;
-                    this.$refs.panel?.toggle(this.$refs.trigger);
-                    if (this.isOpen()) {
-                        this.newValue = '';
-                        this.addInvalid = false;
-                        this.$nextTick(() => {
-                            this.matchPanelWidth();
-                            this.$refs.newInput?.focus();
-                        });
+                    if (this.panelOpen) {
+                        this.closePanel();
+                    } else {
+                        this.openPanel();
                     }
                 },
 
                 openPanel() {
                     if (this.isDisabled) return;
-                    this.$refs.panel?.open(this.$refs.trigger);
+                    this.panelOpen = true;
                     this.newValue = '';
                     this.addInvalid = false;
+                    this.placePanel();
                     this.$nextTick(() => {
-                        this.matchPanelWidth();
+                        this.placePanel();
                         this.$refs.newInput?.focus();
                     });
                 },
 
                 closePanel() {
-                    this.$refs.panel?.close();
+                    this.panelOpen = false;
                     this.newValue = '';
                     this.addInvalid = false;
                 },
@@ -185,6 +248,9 @@
 
                     if (! this.isValidValue(value)) {
                         this.addInvalid = true;
+                        if (this.invalidMessage !== '' && typeof FilamentNotification === 'function') {
+                            new FilamentNotification().title(this.invalidMessage).danger().send();
+                        }
                         this.$nextTick(() => this.$refs.newInput?.focus());
 
                         return false;
@@ -207,6 +273,7 @@
                         this.closePanel();
                     } else {
                         this.$nextTick(() => {
+                            this.placePanel();
                             this.$refs.newInput?.focus();
                         });
                     }
@@ -227,15 +294,17 @@
 
                 writeSingleValue(value) {
                     this.addInvalid = false;
+                    this.$el.closest('.fi-inline-field-editor')?.classList.remove('fi-inline-field-editor-invalid');
                     const trimmed = value.trim();
                     this.state = trimmed ? [trimmed] : [];
                 },
 
                 deleteValue(valueToDelete) {
                     this.state = this.state.filter((v) => v !== valueToDelete);
-                    if (this.state.length === 0 && !this.allowMultiple) {
-                        this.closePanel();
-                    }
+                    this.$nextTick(() => {
+                        this.placePanel();
+                        this.$refs.newInput?.focus();
+                    });
                 },
 
                 handleEnter(e) {
@@ -285,8 +354,8 @@
                         x-on:keydown.enter.prevent="setSingleValue($event.target.value)"
                         :disabled="isDisabled"
                         :aria-invalid="addInvalid"
-                        :class="{ 'fi-fo-multi-value-add-invalid': addInvalid }"
-                        class="fi-input block w-full border-none bg-transparent py-1.5 px-3 text-sm text-gray-950 outline-none transition duration-75 placeholder:text-gray-400 focus:ring-0 disabled:text-gray-500 dark:text-white dark:placeholder:text-gray-500 dark:disabled:text-gray-400"
+                        :class="{ 'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid }"
+                        class="fi-input block w-full border-none bg-transparent py-0 px-2 text-gray-950 outline-none transition duration-75 placeholder:text-gray-400 focus:ring-0 disabled:text-gray-500 dark:text-white dark:placeholder:text-gray-500 dark:disabled:text-gray-400"
                         placeholder="{{ $placeholder }}"
                     />
                     @if (filled($invalidValueMessage))
@@ -365,23 +434,21 @@
 
                         {{-- Chevron indicator --}}
                         <x-filament::icon icon="heroicon-m-chevron-down"
-                            class="size-4 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-200"
+                            class="fi-fo-multi-value-trigger-chevron size-4 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-200"
                             x-bind:class="{ 'rotate-180': isOpen() }"
                             aria-hidden="true"
                         />
                     </button>
 
+                    <div class="fi-fo-multi-value-overlay-anchor">
                     <div
-                        x-cloak
-                        x-float.placement.bottom-start.flip.shift.teleport.offset="{ offset: 4 }"
-                        x-transition:enter-start="opacity-0"
-                        x-transition:leave-end="opacity-0"
+                        x-show="panelOpen"
                         x-ref="panel"
                         x-on:keydown.esc.stop="closePanel()"
                         :id="$id('panel')"
                         role="dialog"
                         aria-label="Manage values"
-                        class="fi-fo-multi-value-panel absolute z-50 w-full rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
+                        class="fi-fo-multi-value-panel z-[100] rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
                     >
                         <div class="fi-fo-multi-value-panel-list" wire:ignore>
                             <template x-if="hasValues">
@@ -395,7 +462,7 @@
                                             :x-sortable-item="index"
                                             class="fi-fo-multi-value-panel-row group flex items-center border-b border-gray-100 dark:border-gray-800 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 first:rounded-t-lg last:rounded-b-lg transition-colors"
                                         >
-                                            <div x-sortable-handle class="shrink-0 cursor-grab active:cursor-grabbing" x-show="state.length > 1">
+                                            <div x-sortable-handle class="shrink-0 cursor-grab active:cursor-grabbing">
                                                 <svg class="size-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                                     <circle cx="7" cy="5" r="1.5"/>
                                                     <circle cx="13" cy="5" r="1.5"/>
@@ -406,11 +473,11 @@
                                                 </svg>
                                             </div>
 
-                                            <div class="group/value relative inline-flex min-w-0 items-center py-0.5">
+                                            <div class="group/value relative inline-flex shrink-0 items-center py-0.5">
                                                 @if ($isLinked)
                                                     <a
                                                         :href="valueHref(value)"
-                                                        class="min-w-0 truncate text-sm text-primary-600 dark:text-primary-400 underline decoration-gray-300 dark:decoration-gray-600 decoration-1 underline-offset-2"
+                                                        class="fi-fo-multi-value-panel-link whitespace-nowrap text-sm text-primary-600 dark:text-primary-400 underline decoration-gray-300 dark:decoration-gray-600 decoration-1 underline-offset-2"
                                                         x-text="value"
                                                     ></a>
                                                     <button
@@ -440,6 +507,7 @@
 
                                             <button
                                                 type="button"
+                                                x-on:mousedown.stop
                                                 x-on:click.stop="deleteValue(value)"
                                                 :aria-label="'Delete ' + value"
                                                 class="opacity-0 group-hover:opacity-100 focus:opacity-100 shrink-0 rounded p-1 text-gray-400 hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-500/10 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
@@ -456,7 +524,7 @@
                             <div class="fi-fo-multi-value-panel-add">
                                 <div
                                     class="flex items-center gap-2 px-2 py-1.5 border-t border-gray-100 dark:border-gray-800"
-                                    :class="{ 'fi-fo-multi-value-add-invalid': addInvalid }"
+                                    :class="{ 'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid }"
                                 >
                                 {{-- Plus Icon (Left) --}}
                                 <x-filament::icon icon="heroicon-m-plus" class="size-3.5 text-gray-400 shrink-0" aria-hidden="true" />
@@ -474,6 +542,7 @@
                                     x-on:keydown.enter="handleEnter($event)"
                                     aria-label="{{ $addLabel }}"
                                     :aria-invalid="addInvalid"
+                                    :class="{ 'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid }"
                                     class="flex-1 bg-transparent border-0 p-0 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-0 focus:outline-none"
                                     placeholder="{{ $addLabel }}..."
                                 />
@@ -497,6 +566,7 @@
                                 @endif
                             </div>
                         </template>
+                    </div>
                     </div>
                 </div>
             </template>

@@ -48,6 +48,7 @@ it('places person details beside tasks notes and activity', function (): void {
         ->assertOk()
         ->assertSee('fi-record-split', false)
         ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-fixed-positioning-context', false)
         ->assertSee('fi-record-work-pane', false)
         ->assertSeeHtml('x-data="recordRailOverflowTooltips"')
         ->assertSee('Ilya Pashayan')

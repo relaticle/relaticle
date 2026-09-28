@@ -48,6 +48,7 @@ it('places company details beside people tasks notes and activity', function ():
         ->assertOk()
         ->assertSee('fi-record-split', false)
         ->assertSee('fi-record-details-rail', false)
+        ->assertSee('fi-fixed-positioning-context', false)
         ->assertSee('fi-record-work-pane', false)
         ->assertSee('Northwind')
         ->assertSee(__('filament/resources/company.pages.view.infolist.fields.account_owner.label'))

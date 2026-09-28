@@ -432,39 +432,37 @@
                             :disabled="isDisabled"
                             class="flex items-center gap-1 py-1.5 pl-3 pr-1.5 text-sm text-gray-950 dark:text-white hover:bg-gray-50 dark:hover:bg-white/5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed rounded-l-lg w-23"
                         >
-                            <span x-text="getCountryLabel(state[0]?.country)" class="font-medium text-xs"></span>
+                            <span x-text="state[0]?.country" class="font-medium text-xs uppercase"></span>
                             <x-filament::icon icon="heroicon-m-chevron-down" class="size-3.5 text-gray-400" x-bind:class="{ 'rotate-180': activeCountryDropdown === 0 }" aria-hidden="true" />
                         </button>
 
                         {{-- Country Dropdown --}}
                         <div
                             x-cloak
-                            x-float.placement.bottom-start.flip.teleport.offset="{ offset: 4 }"
+                            x-float.placement.bottom-start.flip.teleport.offset="{ offset: 8 }"
                             x-on:click.outside="closeCountryDropdown()"
                             x-transition:enter-start="opacity-0"
                             x-transition:leave-end="opacity-0"
                             x-ref="countryPanelSingle"
-                            class="absolute z-50 w-64 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
+                            class="fi-fo-phone-country-panel rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
                         >
-                            <div class="border-b border-gray-100 dark:border-gray-800">
-                                <div class="relative">
-                                    <x-filament::icon icon="heroicon-m-magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" aria-hidden="true" />
-                                    <input
-                                        type="text"
-                                        role="searchbox"
-                                        x-model="countrySearch"
-                                        x-on:click.stop
-                                        x-on:keydown="handleSearchKeydown($event, 0)"
-                                        x-ref="singleCountrySearch"
-                                        x-init="$watch('activeCountryDropdown', value => { if (value === 0) $nextTick(() => $refs.singleCountrySearch?.focus()) })"
-                                        :aria-controls="getListboxId(0)"
-                                        :aria-activedescendant="highlightedOptionId"
-                                        aria-label="{{ __('custom-fields::custom-fields.phone.search_country') }}"
-                                        aria-autocomplete="list"
-                                        placeholder="{{ __('custom-fields::custom-fields.phone.search_country') }}"
-                                        class="w-full border-0 bg-transparent py-2.5 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-gray-500"
-                                    />
-                                </div>
+                            <div class="fi-fo-phone-country-search">
+                                <x-filament::icon icon="heroicon-m-magnifying-glass" class="size-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                <input
+                                    type="text"
+                                    role="searchbox"
+                                    x-model="countrySearch"
+                                    x-on:click.stop
+                                    x-on:keydown="handleSearchKeydown($event, 0)"
+                                    x-ref="singleCountrySearch"
+                                    x-init="$watch('activeCountryDropdown', value => { if (value === 0) $nextTick(() => $refs.singleCountrySearch?.focus()) })"
+                                    :aria-controls="getListboxId(0)"
+                                    :aria-activedescendant="highlightedOptionId"
+                                    aria-label="{{ __('custom-fields::custom-fields.phone.search_country') }}"
+                                    aria-autocomplete="list"
+                                    placeholder="{{ __('custom-fields::custom-fields.phone.search_country') }}"
+                                    class="min-w-0 flex-1 border-0 bg-transparent py-0 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-gray-500"
+                                />
                             </div>
                             <ul
                                 :id="getListboxId(0)"
@@ -485,15 +483,13 @@
                                             x-on:click.stop="selectCountry(0, code)"
                                             x-on:mouseenter="highlightedIndex = optIndex"
                                             x-on:focus="highlightedIndex = optIndex"
-                                            class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus:outline-none"
+                                            class="fi-fo-phone-country-option flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-gray-950 focus:outline-none dark:text-white"
                                             :class="{
-                                                'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400': state[0]?.country === code,
-                                                'bg-gray-100 dark:bg-gray-800': highlightedIndex === optIndex && state[0]?.country !== code,
-                                                'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5': state[0]?.country !== code && highlightedIndex !== optIndex
+                                                'bg-gray-50 dark:bg-white/5': highlightedIndex === optIndex
                                             }"
                                         >
-                                            <span x-text="label" class="truncate"></span>
-                                            <x-filament::icon icon="heroicon-m-check" x-show="state[0]?.country === code" class="ml-auto size-4 shrink-0 text-primary-600 dark:text-primary-400" x-cloak aria-hidden="true" />
+                                            <span x-text="label" class="min-w-0 flex-1 truncate"></span>
+                                            <x-filament::icon icon="heroicon-m-check" x-show="state[0]?.country === code" class="size-4 shrink-0 text-gray-400" x-cloak aria-hidden="true" />
                                         </button>
                                     </li>
                                 </template>
@@ -506,7 +502,12 @@
                         </div>
                     </div>
 
-                    <div class="h-5 w-px bg-gray-200 dark:bg-gray-700 shrink-0" aria-hidden="true"></div>
+                    <div class="fi-fo-phone-divider h-5 w-px bg-gray-200 dark:bg-gray-700 shrink-0" aria-hidden="true"></div>
+
+                    <span
+                        class="fi-fo-phone-dial-code shrink-0 text-xs text-gray-500 dark:text-gray-400"
+                        x-text="state[0]?.country ? '+' + getCallingCode(state[0].country) : ''"
+                    ></span>
 
                     <input
                         type="tel"
@@ -577,14 +578,14 @@
                     {{-- Popover Panel --}}
                     <div
                         x-cloak
-                        x-float.placement.bottom-start.flip.offset="{ offset: 4 }"
+                        x-float.placement.bottom-start.flip.teleport.offset="{ offset: 12 }"
                         x-transition:enter-start="opacity-0"
                         x-transition:leave-end="opacity-0"
                         x-ref="panel"
                         :id="$id('panel')"
                         role="dialog"
                         aria-label="{{ __('custom-fields::custom-fields.phone.edit_phone_numbers') }}"
-                        class="absolute z-50 w-full rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
+                        class="fi-fo-phone-panel rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
                     >
                         <div wire:ignore>
                             <div
@@ -687,27 +688,25 @@
                                         x-transition:enter-start="opacity-0"
                                         x-transition:leave-end="opacity-0"
                                         x-ref="countryPanelNew"
-                                        class="absolute z-50 w-64 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
+                                        class="fi-fo-phone-country-panel rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 transition dark:bg-gray-900 dark:ring-white/10"
                                     >
-                                        <div class="border-b border-gray-100 dark:border-gray-800">
-                                            <div class="relative">
-                                                <x-filament::icon icon="heroicon-m-magnifying-glass" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" aria-hidden="true" />
-                                                <input
-                                                    type="text"
-                                                    role="searchbox"
-                                                    x-model="countrySearch"
-                                                    x-on:click.stop
-                                                    x-on:keydown="handleSearchKeydown($event, 'new')"
-                                                    x-ref="newCountrySearch"
-                                                    x-init="$watch('activeCountryDropdown', value => { if (value === 'new') $nextTick(() => $refs.newCountrySearch?.focus()) })"
-                                                    :aria-controls="getListboxId('new')"
-                                                    :aria-activedescendant="highlightedOptionId"
-                                                    aria-label="{{ __('custom-fields::custom-fields.phone.search_country') }}"
-                                                    aria-autocomplete="list"
-                                                    placeholder="{{ __('custom-fields::custom-fields.phone.search_country') }}"
-                                                    class="w-full border-0 bg-transparent py-2.5 pl-9 pr-3 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-gray-500"
-                                                />
-                                            </div>
+                                        <div class="fi-fo-phone-country-search">
+                                            <x-filament::icon icon="heroicon-m-magnifying-glass" class="size-4 shrink-0 text-gray-400" aria-hidden="true" />
+                                            <input
+                                                type="text"
+                                                role="searchbox"
+                                                x-model="countrySearch"
+                                                x-on:click.stop
+                                                x-on:keydown="handleSearchKeydown($event, 'new')"
+                                                x-ref="newCountrySearch"
+                                                x-init="$watch('activeCountryDropdown', value => { if (value === 'new') $nextTick(() => $refs.newCountrySearch?.focus()) })"
+                                                :aria-controls="getListboxId('new')"
+                                                :aria-activedescendant="highlightedOptionId"
+                                                aria-label="{{ __('custom-fields::custom-fields.phone.search_country') }}"
+                                                aria-autocomplete="list"
+                                                placeholder="{{ __('custom-fields::custom-fields.phone.search_country') }}"
+                                                class="min-w-0 flex-1 border-0 bg-transparent py-0 text-sm text-gray-900 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-gray-500"
+                                            />
                                         </div>
                                         <ul
                                             :id="getListboxId('new')"
@@ -728,15 +727,13 @@
                                                         x-on:click.stop="selectCountry('new', code)"
                                                         x-on:mouseenter="highlightedIndex = optIndex"
                                                         x-on:focus="highlightedIndex = optIndex"
-                                                        class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors focus:outline-none"
+                                                        class="fi-fo-phone-country-option flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-gray-950 focus:outline-none dark:text-white"
                                                         :class="{
-                                                            'bg-primary-50 text-primary-700 dark:bg-primary-500/10 dark:text-primary-400': newEntry.country === code,
-                                                            'bg-gray-100 dark:bg-gray-800': highlightedIndex === optIndex && newEntry.country !== code,
-                                                            'text-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5': newEntry.country !== code && highlightedIndex !== optIndex
+                                                            'bg-gray-50 dark:bg-white/5': highlightedIndex === optIndex
                                                         }"
                                                     >
-                                                        <span x-text="label" class="truncate"></span>
-                                                        <x-filament::icon icon="heroicon-m-check" x-show="newEntry.country === code" class="ml-auto size-4 shrink-0 text-primary-600 dark:text-primary-400" x-cloak aria-hidden="true" />
+                                                        <span x-text="label" class="min-w-0 flex-1 truncate"></span>
+                                                        <x-filament::icon icon="heroicon-m-check" x-show="newEntry.country === code" class="size-4 shrink-0 text-gray-400" x-cloak aria-hidden="true" />
                                                     </button>
                                                 </li>
                                             </template>

@@ -205,8 +205,438 @@ it('opens the person email editor from the packed field', function (): void {
         ->assertSee(__('filament/inline-edit.show_n_more', ['count' => 2]))
         ->click('[data-inline-field="emails"] .fi-in-entry-label')
         ->assertVisible('[data-inline-field="emails"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="emails"] .fi-in-entry-label')
         ->assertAttribute('[data-inline-field="emails"]', 'data-inline-editing', 'true')
         ->assertNoJavaScriptErrors();
+});
+
+it('paints the email overlay above the work pane', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ilya Pashayan',
+    ]);
+    $emails = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::EMAILS)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($emails, [
+        'first@example.test',
+        'second@example.test',
+        'third@example.test',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="emails"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="emails"] .fi-inline-field-editor');
+
+    $page->script(<<<'JS'
+        (() => {
+            const trigger = document.querySelector('[data-inline-field="emails"] button[aria-haspopup="dialog"]');
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+                trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+            }
+            return true;
+        })();
+    JS);
+
+    $hitsPanel = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            const work = document.querySelector('.fi-record-work-pane');
+            if (! panel || ! work) {
+                return false;
+            }
+
+            const box = panel.getBoundingClientRect();
+            const workBox = work.getBoundingClientRect();
+            const x = Math.min(box.right - 8, workBox.left + 12);
+            const y = box.top + Math.min(24, box.height / 2);
+            const hit = document.elementFromPoint(x, y);
+
+            return Boolean(hit?.closest('.fi-fo-multi-value-panel'));
+        })();
+    JS);
+
+    expect($hitsPanel)->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens company domains as a covering overlay', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Northwind',
+    ]);
+    $domains = CustomField::query()
+        ->forEntity(Company::class)
+        ->where('code', CompanyField::DOMAINS)
+        ->firstOrFail();
+    $company->saveCustomFieldValue($domains, ['google.com']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->click('[data-inline-field="domains"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="domains"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="domains"] .fi-in-entry-label');
+
+    $page->script(<<<'JS'
+        (() => {
+            const trigger = document.querySelector('[data-inline-field="domains"] button[aria-haspopup="dialog"]');
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+                trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+            }
+            return true;
+        })();
+    JS);
+
+    $page->assertVisible('.fi-fo-multi-value-panel');
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const wrp = document.querySelector('[data-inline-field="domains"] .fi-input-wrp');
+            const trigger = document.querySelector('[data-inline-field="domains"] button[aria-haspopup="dialog"]');
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            if (! rail || ! wrp || ! trigger || ! panel) {
+                return { ok: false };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const wrpBox = wrp.getBoundingClientRect();
+            const panelBox = panel.getBoundingClientRect();
+            const wrpStyle = getComputedStyle(wrp);
+            const triggerStyle = getComputedStyle(trigger);
+            const addInput = panel.querySelector('input[placeholder]');
+            const search = panel.querySelector('.fi-select-input-search-ctn, input[placeholder*="Search"]');
+
+            return {
+                ok: true,
+                panelWidth: panelBox.width,
+                extendsPastRail: panelBox.right > railBox.right + 8,
+                coversTrigger: panelBox.top <= wrpBox.top + 12,
+                triggerHidden: Number.parseFloat(triggerStyle.opacity) === 0,
+                hasTriggerRing: wrpStyle.boxShadow.includes('1px'),
+                addPlaceholder: addInput?.getAttribute('placeholder') ?? '',
+                hasSearch: search !== null,
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['panelWidth'])->toBeGreaterThanOrEqual(300)
+        ->and($overlay['extendsPastRail'])->toBeTrue()
+        ->and($overlay['coversTrigger'])->toBeTrue()
+        ->and($overlay['triggerHidden'])->toBeTrue()
+        ->and($overlay['hasTriggerRing'])->toBeFalse()
+        ->and($overlay['addPlaceholder'])->toBe(__('filament/inline-edit.add_domain').'...')
+        ->and($overlay['hasSearch'])->toBeFalse();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens the company picker as a floating search overlay', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Escrow',
+    ]);
+    Company::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Northwind',
+    ]);
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ilya Pashayan',
+        'company_id' => $company->getKey(),
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="company_id"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="company_id"] .fi-inline-field-editor')
+        ->assertVisible('.fi-select-input-search-ctn input')
+        ->assertAttribute('.fi-select-input-search-ctn input', 'placeholder', __('filament/inline-edit.search_records'));
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const panel = document.querySelector('[data-inline-field="company_id"] .fi-dropdown-panel');
+            const wrp = document.querySelector('[data-inline-field="company_id"] .fi-input-wrp');
+            if (! rail || ! panel || ! wrp || panel.style.display === 'none') {
+                return { ok: false };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const panelBox = panel.getBoundingClientRect();
+            const btn = document.querySelector('[data-inline-field="company_id"] .fi-select-input-btn');
+            const wrpStyle = getComputedStyle(wrp);
+            const btnStyle = btn ? getComputedStyle(btn) : null;
+            const wrpBox = wrp.getBoundingClientRect();
+
+            const clear = document.querySelector('[data-inline-field="company_id"] .fi-select-input-value-remove-btn');
+
+            return {
+                ok: true,
+                panelWidth: panelBox.width,
+                extendsPastRail: panelBox.right > railBox.right + 8,
+                coversTrigger: panelBox.top <= wrpBox.top + 12,
+                triggerHidden: btnStyle !== null && Number.parseFloat(btnStyle.opacity) === 0,
+                hasTriggerRing: wrpStyle.boxShadow.includes('1px'),
+                clearHidden: clear === null || getComputedStyle(clear).display === 'none',
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['panelWidth'])->toBeGreaterThanOrEqual(300)
+        ->and($overlay['extendsPastRail'])->toBeTrue()
+        ->and($overlay['coversTrigger'])->toBeTrue()
+        ->and($overlay['triggerHidden'])->toBeTrue()
+        ->and($overlay['hasTriggerRing'])->toBeFalse()
+        ->and($overlay['clearHidden'])->toBeTrue();
+
+    $showsPickedName = $page->script(<<<'JS'
+        (async () => {
+            const option = [...document.querySelectorAll('[data-inline-field="company_id"] .fi-select-input-option')]
+                .find((el) => (el.textContent || '').includes('Northwind'));
+            option?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+            await Promise.resolve();
+            await Promise.resolve();
+            const field = document.querySelector('[data-inline-field="company_id"]');
+
+            return Boolean(field?.innerText.includes('Northwind'));
+        })();
+    JS);
+
+    expect($showsPickedName)->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens the account owner picker as a floating search overlay', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Northwind',
+        'account_owner_id' => $user->id,
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->click('[data-inline-field="account_owner_id"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="account_owner_id"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="account_owner_id"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="account_owner_id"] .fi-select-input-search-ctn input')
+        ->assertAttribute(
+            '[data-inline-field="account_owner_id"] .fi-select-input-search-ctn input',
+            'placeholder',
+            __('filament/inline-edit.search_records'),
+        );
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const panel = document.querySelector('[data-inline-field="account_owner_id"] .fi-dropdown-panel');
+            const wrp = document.querySelector('[data-inline-field="account_owner_id"] .fi-input-wrp');
+            if (! rail || ! panel || ! wrp || panel.style.display === 'none') {
+                return { ok: false };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const panelBox = panel.getBoundingClientRect();
+            const btn = document.querySelector('[data-inline-field="account_owner_id"] .fi-select-input-btn');
+            const wrpStyle = getComputedStyle(wrp);
+            const btnStyle = btn ? getComputedStyle(btn) : null;
+            const wrpBox = wrp.getBoundingClientRect();
+            const clear = document.querySelector('[data-inline-field="account_owner_id"] .fi-select-input-value-remove-btn');
+
+            return {
+                ok: true,
+                panelWidth: panelBox.width,
+                extendsPastRail: panelBox.right > railBox.right + 8,
+                coversTrigger: panelBox.top <= wrpBox.top + 12,
+                triggerHidden: btnStyle !== null && Number.parseFloat(btnStyle.opacity) === 0,
+                hasTriggerRing: wrpStyle.boxShadow.includes('1px'),
+                clearHidden: clear === null || getComputedStyle(clear).display === 'none',
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['panelWidth'])->toBeGreaterThanOrEqual(300)
+        ->and($overlay['extendsPastRail'])->toBeTrue()
+        ->and($overlay['coversTrigger'])->toBeTrue()
+        ->and($overlay['triggerHidden'])->toBeTrue()
+        ->and($overlay['hasTriggerRing'])->toBeFalse()
+        ->and($overlay['clearHidden'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens a textarea custom field as a floating overlay', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $sectionId = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::JOB_TITLE)
+        ->firstOrFail()
+        ->getAttribute('custom_field_section_id');
+    CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'bio',
+        'name' => 'Bio',
+        'type' => CustomFieldType::TEXTAREA->value,
+        'active' => true,
+        'sort_order' => 0,
+        'validation_rules' => [],
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="bio"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="bio"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="bio"] .fi-in-entry-label');
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const field = document.querySelector('[data-inline-field="bio"]');
+            const panel = document.querySelector('.fi-inline-textarea-panel');
+            const wrp = panel?.querySelector('.fi-input-wrp');
+            const editor = document.querySelector('[data-inline-field="bio"] .fi-inline-field-editor');
+            if (! rail || ! field || ! panel || ! wrp) {
+                return {
+                    ok: false,
+                    hasPanel: Boolean(panel),
+                    hasWrp: Boolean(wrp),
+                    editorHtml: editor?.innerHTML?.slice(0, 400) ?? null,
+                    bodyPanel: Boolean(document.body.querySelector('.fi-inline-textarea-panel')),
+                };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const fieldBox = field.getBoundingClientRect();
+            const panelBox = panel.getBoundingClientRect();
+            const panelStyle = getComputedStyle(panel);
+            const wrpStyle = getComputedStyle(wrp);
+
+            const textarea = panel.querySelector('textarea');
+            const textareaStyle = textarea ? getComputedStyle(textarea) : null;
+            const textareaHeight = textareaStyle ? Number.parseFloat(textareaStyle.height) : 0;
+            const textareaMinHeight = textareaStyle ? Number.parseFloat(textareaStyle.minHeight) : 0;
+
+            return {
+                ok: true,
+                panelWidth: panelBox.width,
+                staysInRail: panelBox.right <= railBox.right + 4,
+                coversField: panelBox.top <= fieldBox.top + 12,
+                hasCardRing: panelStyle.boxShadow !== 'none' && panelStyle.boxShadow !== '',
+                hasInnerInputBorder: wrpStyle.boxShadow !== 'none' && wrpStyle.boxShadow !== '',
+                textareaOverflows: textareaStyle?.overflowY === 'auto' || textareaStyle?.overflowY === 'scroll',
+                textareaHeightLocked: textareaHeight > 0 && Math.abs(textareaHeight - textareaMinHeight) < 1,
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['panelWidth'])->toBeGreaterThan(120)
+        ->and($overlay['staysInRail'])->toBeTrue()
+        ->and($overlay['coversField'])->toBeTrue()
+        ->and($overlay['hasCardRing'])->toBeTrue()
+        ->and($overlay['hasInnerInputBorder'])->toBeFalse()
+        ->and($overlay['textareaOverflows'])->toBeTrue()
+        ->and($overlay['textareaHeightLocked'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps compact field labels vertically aligned while editing', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $linkedin = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::LINKEDIN)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($linkedin, ['www.linkedin.com/in/ada']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertSee('Ada Lovelace');
+
+    $before = $page->script(<<<'JS'
+        document.querySelector('[data-inline-field="linkedin"] .fi-in-entry-label')?.getBoundingClientRect().top ?? null
+    JS);
+
+    $page->click('[data-inline-field="linkedin"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="linkedin"] .fi-inline-field-editor');
+
+    $after = $page->script(<<<'JS'
+        (() => {
+            const label = document.querySelector('[data-inline-field="linkedin"] .fi-in-entry-label');
+            const wrp = document.querySelector('[data-inline-field="linkedin"] .fi-input-wrp');
+            const input = document.querySelector('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input');
+            const shadow = wrp ? getComputedStyle(wrp).boxShadow : '';
+            const ring = wrp ? getComputedStyle(wrp).getPropertyValue('--tw-ring-color') : '';
+            const inputStyle = input ? getComputedStyle(input) : null;
+
+            return {
+                top: label?.getBoundingClientRect().top ?? null,
+                hasInputBorder: shadow !== 'none' && shadow !== '',
+                hasPrimaryRing: /293|0\.247|7c3aed|8b5cf6|124,\s*58,\s*237|139,\s*92,\s*246/i.test(`${shadow} ${ring}`),
+                isGrayFill: wrp ? /243,\s*244,\s*246|0\.967/.test(getComputedStyle(wrp).backgroundColor) : false,
+                urlLooksLikeLink: Boolean(inputStyle && (inputStyle.textDecorationLine.includes('underline') || /124,\s*58,\s*237|139,\s*92,\s*246/.test(inputStyle.color))),
+                wrpHeight: wrp ? wrp.getBoundingClientRect().height : 0,
+                inputPad: inputStyle ? Number.parseFloat(inputStyle.paddingInlineStart) : 0,
+            };
+        })();
+    JS);
+
+    expect($before)->toBeNumeric()
+        ->and($after['top'])->toBeNumeric()
+        ->and(abs($after['top'] - $before))->toBeLessThan(2)
+        ->and($after['hasInputBorder'])->toBeTrue()
+        ->and($after['hasPrimaryRing'])->toBeTrue()
+        ->and($after['isGrayFill'])->toBeFalse()
+        ->and($after['urlLooksLikeLink'])->toBeFalse()
+        ->and($after['wrpHeight'])->toBeGreaterThanOrEqual(30)
+        ->and($after['wrpHeight'])->toBeLessThanOrEqual(34)
+        ->and($after['inputPad'])->toBeGreaterThanOrEqual(6)
+        ->and($after['inputPad'])->toBeLessThanOrEqual(10);
+
+    $page->assertNoJavaScriptErrors();
 });
 
 it('opens the company from the chip and edits from the rest of the field', function (): void {
@@ -239,6 +669,240 @@ it('opens the company from the chip and edits from the rest of the field', funct
         ->assertNoJavaScriptErrors();
 });
 
+it('opens a person phone editor as a covering overlay', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $phone = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::PHONE_NUMBER)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($phone, ['+14155550103']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="phone_number"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-in-entry-label');
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const wrp = document.querySelector('[data-inline-field="phone_number"] .fi-fo-phone-input');
+            const tel = document.querySelector('[data-inline-field="phone_number"] input[type=tel]');
+            if (! rail || ! wrp || ! tel) {
+                return { ok: false };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const wrpBox = wrp.getBoundingClientRect();
+            const wrpStyle = getComputedStyle(wrp);
+            const radius = Number.parseFloat(wrpStyle.borderRadius);
+
+            return {
+                ok: true,
+                wrpWidth: wrpBox.width,
+                extendsPastRail: wrpBox.right > railBox.right + 8,
+                coversField: wrpBox.top <= rail.querySelector('[data-inline-field="phone_number"]').getBoundingClientRect().top + 12,
+                hasTriggerRing: /293|0\.247|7c3aed|8b5cf6|124,\s*58,\s*237|139,\s*92,\s*246/i.test(`${wrpStyle.boxShadow} ${wrpStyle.getPropertyValue('--tw-ring-color')}`),
+                fieldRadius: radius,
+                overlayShadow: wrpStyle.boxShadow.includes('10px') && ! wrpStyle.boxShadow.includes('32px'),
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['wrpWidth'])->toBeGreaterThanOrEqual(240)
+        ->and($overlay['extendsPastRail'])->toBeTrue()
+        ->and($overlay['coversField'])->toBeTrue()
+        ->and($overlay['hasTriggerRing'])->toBeFalse()
+        ->and($overlay['fieldRadius'])->toBeGreaterThanOrEqual(8)
+        ->and($overlay['fieldRadius'])->toBeLessThan(14)
+        ->and($overlay['overlayShadow'])->toBeTrue();
+
+    $page->click('[data-inline-field="phone_number"] button[role="combobox"]')
+        ->assertVisible('.fi-fo-phone-country-panel');
+
+    $country = $page->script(<<<'JS'
+        (() => {
+            const wrp = document.querySelector('[data-inline-field="phone_number"] .fi-fo-phone-input');
+            const panel = document.querySelector('.fi-fo-phone-country-panel');
+            const selected = document.querySelector('.fi-fo-phone-country-panel [aria-selected="true"] button');
+            if (! wrp || ! panel) {
+                return { ok: false };
+            }
+
+            const wrpBox = wrp.getBoundingClientRect();
+            const panelBox = panel.getBoundingClientRect();
+            const panelStyle = getComputedStyle(panel);
+            const selectedStyle = selected ? getComputedStyle(selected) : null;
+
+            return {
+                ok: true,
+                fieldVisible: wrpBox.height >= 28,
+                panelBelowField: panelBox.top >= wrpBox.bottom - 4,
+                panelRadius: Number.parseFloat(panelStyle.borderRadius),
+                fieldDropShadow: getComputedStyle(wrp).boxShadow.includes('10px') && ! getComputedStyle(wrp).boxShadow.includes('32px'),
+                panelDropShadow: panelStyle.boxShadow.includes('10px') && ! panelStyle.boxShadow.includes('32px'),
+                selectedPurple: selectedStyle !== null && /124,\s*58,\s*237|139,\s*92,\s*246|167,\s*139,\s*250/.test(selectedStyle.backgroundColor + selectedStyle.color),
+            };
+        })();
+    JS);
+
+    expect($country['ok'])->toBeTrue()
+        ->and($country['fieldVisible'])->toBeTrue()
+        ->and($country['panelBelowField'])->toBeTrue()
+        ->and($country['panelRadius'])->toBeGreaterThanOrEqual(6)
+        ->and($country['panelRadius'])->toBeLessThan(12)
+        ->and($country['fieldDropShadow'])->toBeTrue()
+        ->and($country['panelDropShadow'])->toBeTrue()
+        ->and($country['selectedPurple'])->toBeFalse();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps the person phone overlay after a failed enter save', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $phone = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::PHONE_NUMBER)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($phone, ['+14155550103']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="phone_number"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->clear('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->type('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]', 'not-a-phone')
+        ->keys('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]', 'Enter')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor-invalid input[type=tel]');
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const rail = document.querySelector('.fi-record-details-rail');
+            const wrp = document.querySelector('[data-inline-field="phone_number"] .fi-fo-phone-input');
+            const tel = document.querySelector('[data-inline-field="phone_number"] input[type=tel]');
+            if (! rail || ! wrp || ! tel) {
+                return { ok: false };
+            }
+
+            const railBox = rail.getBoundingClientRect();
+            const wrpBox = wrp.getBoundingClientRect();
+            const wrpStyle = getComputedStyle(wrp);
+
+            return {
+                ok: true,
+                value: tel.value,
+                wrpWidth: wrpBox.width,
+                extendsPastRail: wrpBox.right > railBox.right + 8,
+                coversField: wrpBox.top <= rail.querySelector('[data-inline-field="phone_number"]').getBoundingClientRect().top + 12,
+                fieldRadius: Number.parseFloat(wrpStyle.borderRadius),
+                overlayShadow: wrpStyle.boxShadow.includes('10px') && ! wrpStyle.boxShadow.includes('32px'),
+                hasTriggerRing: /293|0\.247|7c3aed|8b5cf6|124,\s*58,\s*237|139,\s*92,\s*246/i.test(`${wrpStyle.boxShadow} ${wrpStyle.getPropertyValue('--tw-ring-color')}`),
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['value'])->toBe('not-a-phone')
+        ->and($overlay['wrpWidth'])->toBeGreaterThanOrEqual(240)
+        ->and($overlay['extendsPastRail'])->toBeTrue()
+        ->and($overlay['coversField'])->toBeTrue()
+        ->and($overlay['fieldRadius'])->toBeGreaterThanOrEqual(8)
+        ->and($overlay['overlayShadow'])->toBeTrue()
+        ->and($overlay['hasTriggerRing'])->toBeFalse();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('closes an invalid person phone editor on click outside without saving', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $phone = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::PHONE_NUMBER)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($phone, ['+14155550103']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="phone_number"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->clear('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->type('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]', 'not-a-phone')
+        ->keys('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]', 'Enter')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor-invalid input[type=tel]');
+
+    $page->script(<<<'JS'
+        (() => {
+            const wrp = document.querySelector('[data-inline-field="phone_number"] .fi-input-wrp.fi-fo-phone-input');
+            if (! wrp) {
+                return;
+            }
+            wrp.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+        })();
+    JS);
+
+    $page->assertMissing('[data-inline-field="phone_number"] .fi-inline-field-editor')
+        ->assertSee('+14155550103');
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('saves a valid person phone on click outside', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $phone = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::PHONE_NUMBER)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($phone, ['+14155550103']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="phone_number"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->clear('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
+        ->type('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]', '4155550199')
+        ->wait(1);
+
+    $page->script('document.body.click();');
+
+    $page->assertMissing('[data-inline-field="phone_number"] .fi-inline-field-editor')
+        ->assertSee('+14155550199');
+
+    $page->assertNoJavaScriptErrors();
+});
+
 it('does not save a person phone when only the country is chosen', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
@@ -261,7 +925,7 @@ it('does not save a person phone when only the country is chosen', function (): 
         ->assertNoJavaScriptErrors();
 
     $page->script(<<<'JS'
-        document.querySelector('[id*="country-option"][id$="-AM"]')?.click();
+        document.querySelector('[id*="country-option"][id$="-AM"] button')?.click();
     JS);
 
     $page->assertVisible('[data-inline-field="phone_number"] .fi-inline-field-editor input[type=tel]')
@@ -340,7 +1004,69 @@ it('does not add an invalid email from the inline editor', function (): void {
     expect($stored instanceof Collection ? $stored->all() : $stored)->toBe(['ada@example.test']);
 });
 
-it('toasts an invalid linkedin url when the editor is dismissed', function (): void {
+it('toasts an invalid domain then closes on click outside', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Northwind',
+    ]);
+    $domains = CustomField::query()
+        ->forEntity(Company::class)
+        ->where('code', CompanyField::DOMAINS)
+        ->firstOrFail();
+    $company->saveCustomFieldValue($domains, ['google.com']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+        ->assertSee('Northwind')
+        ->click('[data-inline-field="domains"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="domains"] .fi-inline-field-editor input[inputmode="url"]')
+        ->type('[data-inline-field="domains"] .fi-inline-field-editor input[inputmode="url"]', 'a')
+        ->keys('[data-inline-field="domains"] .fi-inline-field-editor input[inputmode="url"]', 'Enter')
+        ->assertSee(__('filament/inline-edit.invalid_domain'))
+        ->assertVisible('[data-inline-field="domains"] .fi-inline-field-editor')
+        ->assertSee('google.com');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const input = document.querySelector('[data-inline-field="domains"] .fi-inline-field-editor input[inputmode="url"]');
+            const error = document.querySelector('[data-inline-field="domains"] .fi-fo-multi-value-add-error');
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            const inputStyle = input ? getComputedStyle(input) : null;
+            const errorStyle = error ? getComputedStyle(error) : null;
+
+            return {
+                typedValue: input?.value ?? '',
+                typedRed: inputStyle !== null && /oklch\(0\.577|225,\s*29,\s*72|e11d48|fb7185|27\.3/i.test(inputStyle.color),
+                inlineErrorHidden: errorStyle === null || errorStyle.display === 'none',
+                panelOpen: panel !== null && getComputedStyle(panel).display !== 'none',
+            };
+        })();
+    JS);
+
+    expect($chrome['typedValue'])->toBe('a')
+        ->and($chrome['typedRed'])->toBeTrue()
+        ->and($chrome['inlineErrorHidden'])->toBeTrue()
+        ->and($chrome['panelOpen'])->toBeTrue();
+
+    $page->wait(1)
+        ->script(<<<'JS'
+            document.body.click();
+        JS);
+
+    $page->assertMissing('[data-inline-field="domains"] .fi-inline-field-editor')
+        ->assertSee('google.com')
+        ->assertSee(__('filament/inline-edit.invalid_domain'))
+        ->assertNoJavaScriptErrors();
+});
+
+it('toasts an invalid linkedin url then closes on click outside', function (): void {
+    $this->withVite();
+
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     $person = People::factory()->recycle([$user, $workspace])->create([
@@ -360,15 +1086,244 @@ it('toasts an invalid linkedin url when the editor is dismissed', function (): v
         ->click('[data-inline-field="linkedin"] .fi-in-entry-label')
         ->assertVisible('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input')
         ->clear('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input')
-        ->type('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input', 'a')
+        ->type('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input', 'asas')
         ->keys('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input', 'Enter')
         ->assertSee(__('filament/inline-edit.invalid_url'))
-        ->assertAttribute('[data-inline-field="linkedin"]', 'data-inline-editing', 'true')
+        ->assertVisible('[data-inline-field="linkedin"] .fi-inline-field-editor-invalid');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const wrp = document.querySelector('[data-inline-field="linkedin"] .fi-input-wrp');
+            const error = document.querySelector('[data-inline-field="linkedin"] .fi-fo-multi-value-add-error');
+            const wrpStyle = wrp ? getComputedStyle(wrp) : null;
+            const errorStyle = error ? getComputedStyle(error) : null;
+            const ring = wrpStyle ? `${wrpStyle.boxShadow} ${wrpStyle.getPropertyValue('--tw-ring-color')}` : '';
+
+            return {
+                inlineErrorHidden: errorStyle === null || errorStyle.display === 'none',
+                hasDangerRing: wrpStyle !== null && wrpStyle.boxShadow.includes('1px') && ! /293|0\.247|7c3aed/i.test(ring),
+            };
+        })();
+    JS);
+
+    expect($chrome['inlineErrorHidden'])->toBeTrue()
+        ->and($chrome['hasDangerRing'])->toBeTrue();
+
+    $page->script(<<<'JS'
+        (() => {
+            const wrp = document.querySelector('[data-inline-field="linkedin"] .fi-input-wrp');
+            wrp?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+        })();
+    JS);
+
+    $page->assertMissing('[data-inline-field="linkedin"] .fi-inline-field-editor')
+        ->assertSee('www.linkedin.com/in/ada')
+        ->assertSee(__('filament/inline-edit.invalid_url'))
         ->assertNoJavaScriptErrors();
+});
 
-    $stored = $person->fresh()->customFieldValues()
-        ->where('custom_field_id', $linkedin->getKey())
-        ->value($linkedin->getValueColumn());
+it('toasts an invalid linkedin url on click outside without enter', function (): void {
+    $this->withVite();
 
-    expect($stored instanceof Collection ? $stored->all() : $stored)->toBe(['www.linkedin.com/in/ada']);
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $linkedin = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::LINKEDIN)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($linkedin, ['www.linkedin.com/in/ada']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertSee('Ada Lovelace')
+        ->click('[data-inline-field="linkedin"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input')
+        ->clear('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input')
+        ->type('[data-inline-field="linkedin"] .fi-inline-field-editor input.fi-input', 'asas')
+        ->wait(1);
+
+    $page->script(<<<'JS'
+        document.body.click();
+    JS);
+
+    $page->assertSee(__('filament/inline-edit.invalid_url'))
+        ->assertMissing('[data-inline-field="linkedin"] .fi-inline-field-editor')
+        ->assertSee('www.linkedin.com/in/ada')
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the tags overlay open after deleting a tag', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $sectionId = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::JOB_TITLE)
+        ->value('custom_field_section_id');
+    $hobby = CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'hobby',
+        'name' => 'Hobby',
+        'type' => CustomFieldType::TAGS_INPUT->value,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+    $person->saveCustomFieldValue($hobby, ['alpha', 'beta', 'gamma']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertSee('Ada Lovelace')
+        ->click('[data-inline-field="hobby"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="hobby"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="hobby"] input[placeholder="'.__('filament/inline-edit.add_tag').'..."]');
+
+    $page->script(<<<'JS'
+        document.querySelector('[data-inline-field="hobby"] [aria-label="Delete alpha"]')?.click();
+    JS);
+
+    $page->assertVisible('[data-inline-field="hobby"] .fi-inline-field-editor')
+        ->assertVisible('[data-inline-field="hobby"] input[placeholder="'.__('filament/inline-edit.add_tag').'..."]')
+        ->assertSee('beta')
+        ->assertDontSee('Delete alpha')
+        ->assertNoJavaScriptErrors();
+});
+
+it('caps the tags overlay height and keeps the add field in view', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $sectionId = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::JOB_TITLE)
+        ->value('custom_field_section_id');
+    $hobby = CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'hobby',
+        'name' => 'Hobby',
+        'type' => CustomFieldType::TAGS_INPUT->value,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+    $person->saveCustomFieldValue($hobby, ['s', 'k', 'ds', 'sds', 'dsd', 'sa', 'a', 'sasas', 'more', 'tags']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="hobby"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="hobby"] input[placeholder="'.__('filament/inline-edit.add_tag').'..."]');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            const add = document.querySelector('[data-inline-field="hobby"] input[placeholder]');
+            if (! panel || ! add) {
+                return { ok: false };
+            }
+
+            const panelBox = panel.getBoundingClientRect();
+            const addBox = add.getBoundingClientRect();
+            const maxH = Number.parseFloat(getComputedStyle(panel).maxHeight);
+
+            return {
+                ok: true,
+                height: panelBox.height,
+                maxHeight: maxH,
+                rowCount: panel.querySelectorAll('.fi-fo-multi-value-panel-row').length,
+                addVisible: addBox.bottom <= window.innerHeight && addBox.top >= 0,
+                opensUp: getComputedStyle(panel).bottom !== 'auto' && panel.style.top === 'auto',
+            };
+        })();
+    JS);
+
+    expect($chrome['ok'])->toBeTrue()
+        ->and($chrome['height'])->toBeGreaterThan(150)
+        ->and($chrome['height'])->toBeLessThanOrEqual(208)
+        ->and($chrome['maxHeight'])->toBeLessThanOrEqual(208)
+        ->and($chrome['addVisible'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens the tags overlay tall enough to show every tag before scrolling', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $sectionId = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::JOB_TITLE)
+        ->value('custom_field_section_id');
+    $hobby = CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'hobby',
+        'name' => 'Hobby',
+        'type' => CustomFieldType::TAGS_INPUT->value,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+    $person->saveCustomFieldValue($hobby, ['hi', 'how are u', 'tets']);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="hobby"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="hobby"] input[placeholder="'.__('filament/inline-edit.add_tag').'..."]');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            if (! panel) {
+                return { ok: false };
+            }
+
+            const rows = [...panel.querySelectorAll('.fi-fo-multi-value-panel-row')];
+            const panelBox = panel.getBoundingClientRect();
+            const allVisible = rows.every((row) => {
+                const box = row.getBoundingClientRect();
+
+                return box.top >= panelBox.top - 1 && box.bottom <= panelBox.bottom + 1;
+            });
+
+            return {
+                ok: true,
+                height: panelBox.height,
+                rowCount: rows.length,
+                allVisible,
+            };
+        })();
+    JS);
+
+    expect($chrome['ok'])->toBeTrue()
+        ->and($chrome['rowCount'])->toBe(3)
+        ->and($chrome['allVisible'])->toBeTrue()
+        ->and($chrome['height'])->toBeGreaterThan(100)
+        ->and($chrome['height'])->toBeLessThan(180);
+
+    $page->assertNoJavaScriptErrors();
 });

@@ -37,7 +37,7 @@ trait RendersRecordSplitView
                         $this->getInfolistContentComponent(),
                     ])
                         ->extraAttributes(fn (): array => [
-                            'class' => 'fi-record-details-rail',
+                            'class' => 'fi-record-details-rail fi-fixed-positioning-context',
                             'x-data' => 'recordRailOverflowTooltips',
                             'data-details-expanded' => $this->recordDetailsExpanded ? 'true' : 'false',
                             'data-details-visible-limit' => (string) self::DETAILS_VISIBLE_FIELD_LIMIT,

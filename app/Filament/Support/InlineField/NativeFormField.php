@@ -23,17 +23,23 @@ final class NativeFormField
             'account_owner_id' => WorkspaceMemberSelect::make('account_owner_id')
                 ->relationship('accountOwner', 'name')
                 ->label(__('filament/resources/company.fields.account_owner_id.label'))
-                ->nullable(),
+                ->searchPrompt(__('filament/inline-edit.search_records'))
+                ->nullable()
+                ->extraAttributes(['class' => 'fi-inline-overlay-select']),
             'company_id' => RecordSelect::make('company_id')
                 ->relationship('company', 'name')
                 ->searchable()
                 ->preload()
-                ->nullable(),
+                ->searchPrompt(__('filament/inline-edit.search_records'))
+                ->nullable()
+                ->extraAttributes(['class' => 'fi-inline-overlay-select']),
             'contact_id' => RecordSelect::make('contact_id')
                 ->relationship('contact', 'name')
                 ->searchable()
                 ->preload()
-                ->nullable(),
+                ->searchPrompt(__('filament/inline-edit.search_records'))
+                ->nullable()
+                ->extraAttributes(['class' => 'fi-inline-overlay-select']),
             default => abort(404),
         };
     }
