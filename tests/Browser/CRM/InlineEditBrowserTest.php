@@ -429,6 +429,8 @@ it('paints the email overlay above the work pane', function (): void {
         })();
     JS);
 
+    $page->assertVisible('.fi-fo-multi-value-panel');
+
     $hitsPanel = $page->script(<<<'JS'
         (() => {
             const panel = document.querySelector('.fi-fo-multi-value-panel');
@@ -702,7 +704,8 @@ it('opens a textarea at field size then grows over following rows up to a max he
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}");
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertVisible('[data-inline-field="bio"] .fi-in-entry-content');
 
     $before = $page->script(<<<'JS'
         (() => {
