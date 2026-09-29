@@ -640,6 +640,10 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/10;
 }
 
+.fi-dropdown-panel:not(.fi-dropdown-list) > .fi-dropdown-list:not(:last-child) {
+    @apply border-b-0;
+}
+
 .fi-dropdown-list-item {
     @apply flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm;
 }
