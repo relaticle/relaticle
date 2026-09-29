@@ -98,6 +98,63 @@ it('opens company name click-to-edit and saves from the keyboard', function (): 
     expect($company->fresh()->name)->toBe('Contoso');
 });
 
+it('edits the person name in place beside its avatar and ignores clicks beside the name', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertSee('Ada')
+        ->assertNoJavaScriptErrors();
+
+    $idle = $page->script(<<<'JS'
+        (() => {
+            const field = document.querySelector('[data-inline-field="name"]');
+            const box = field.getBoundingClientRect();
+            const pencil = field.querySelector('.fi-inline-edit-pencil');
+            document.elementFromPoint(box.right - 60, box.top + box.height / 2)?.click();
+
+            return {
+                pencilHidden: ! pencil || getComputedStyle(pencil).display === 'none',
+                textLeft: field.querySelector('.fi-record-chip > .truncate').getBoundingClientRect().left,
+                fieldHeight: box.height,
+            };
+        })();
+    JS);
+
+    $page->wait(1)
+        ->assertAttribute('[data-inline-field="name"]', 'data-inline-editing', 'false')
+        ->click('[data-inline-field="name"] .fi-in-entry-content')
+        ->assertVisible('[data-inline-field="name"] .fi-inline-field-editor input.fi-input');
+
+    $editing = $page->script(<<<'JS'
+        (() => {
+            const field = document.querySelector('[data-inline-field="name"]');
+            const avatar = field.querySelector('.fi-record-chip > :first-child').getBoundingClientRect();
+            const input = field.querySelector('.fi-inline-field-editor input.fi-input');
+            const inputBox = input.getBoundingClientRect();
+
+            return {
+                avatarVisible: avatar.width > 0,
+                gapAfterAvatar: inputBox.left - avatar.right,
+                textLeft: inputBox.left + parseFloat(getComputedStyle(input).paddingInlineStart),
+                fieldHeight: field.getBoundingClientRect().height,
+            };
+        })();
+    JS);
+
+    expect($idle['pencilHidden'])->toBeTrue()
+        ->and($editing['avatarVisible'])->toBeTrue()
+        ->and($editing['gapAfterAvatar'])->toBeGreaterThan(0)
+        ->and(abs($editing['textLeft'] - $idle['textLeft']))->toBeLessThanOrEqual(1)
+        ->and($editing['fieldHeight'])->toBe($idle['fieldHeight']);
+});
+
 it('stacks the opportunity name above company and contact chips', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

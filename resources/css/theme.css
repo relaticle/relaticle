@@ -674,6 +674,10 @@
     margin-inline-start: -0.5rem;
 }
 
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true']:has(.fi-record-chip) .fi-inline-field-editor {
+    --record-details-edit-padding-inline: 0.25rem;
+}
+
 .fi-in-entry[data-inline-field='name'][data-inline-editing='true'] .fi-record-chip > .truncate {
     display: none;
 }
