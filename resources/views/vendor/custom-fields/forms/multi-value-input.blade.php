@@ -6,6 +6,7 @@
     $allowMultiple = $getAllowMultiple();
     $maxValues = $getMaxValues();
     $addLabel = $getAddLabel();
+    $addPlaceholder = \App\Filament\Support\MultiValueAddPlaceholder::make($inputType, $addLabel);
     $emptyStateLabel = $getEmptyStateLabel();
     $placeholder = $getPlaceholder();
     $inputmode = match($inputType) { 'email' => 'email', 'url' => 'url', default => 'text' };
@@ -154,7 +155,7 @@
 
                 panelContentHeight() {
                     const rowPx = 1.75 * 16;
-                    const addPx = this.canAddMore ? 2.25 * 16 : 0;
+                    const addPx = this.canAddMore ? 2 * 16 : 0;
 
                     return (this.state.length * rowPx) + addPx;
                 },
@@ -174,19 +175,19 @@
                     const box = reference.getBoundingClientRect();
                     const viewportPad = 8;
                     const cap = 12 * 16;
-                    const preferred = Math.min(Math.max(this.panelContentHeight(), 96), cap);
+                    const preferred = Math.min(Math.max(this.panelContentHeight(), 36), cap);
                     const spaceBelow = window.innerHeight - box.top - viewportPad;
                     const spaceAbove = box.bottom - viewportPad;
                     const openUp = spaceBelow < Math.min(preferred, 160) && spaceAbove > spaceBelow;
                     const available = openUp ? spaceAbove : spaceBelow;
-                    const maxH = Math.round(Math.max(96, Math.min(preferred, available)));
+                    const maxH = Math.round(Math.max(36, Math.min(cap, available)));
 
                     panel.style.position = 'fixed';
                     panel.style.left = `${Math.round(box.left)}px`;
                     panel.style.zIndex = '100';
-                    panel.style.height = `${maxH}px`;
+                    panel.style.height = 'auto';
+                    panel.style.minHeight = '0';
                     panel.style.maxHeight = `${maxH}px`;
-                    panel.style.minHeight = `${maxH}px`;
                     this.matchPanelWidth();
 
                     if (openUp) {
@@ -448,6 +449,7 @@
                         :id="$id('panel')"
                         role="dialog"
                         aria-label="Manage values"
+                        :class="{ 'fi-fo-multi-value-panel-empty': !hasValues }"
                         class="fi-fo-multi-value-panel z-[100] rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
                     >
                         <div class="fi-fo-multi-value-panel-list" wire:ignore>
@@ -473,7 +475,7 @@
                                                 </svg>
                                             </div>
 
-                                            <div class="group/value relative inline-flex shrink-0 items-center py-0.5">
+                                            <div class="group/value relative inline-flex min-w-0 items-center py-0.5">
                                                 @if ($isLinked)
                                                     <a
                                                         :href="valueHref(value)"
@@ -523,10 +525,12 @@
                         <template x-if="canAddMore">
                             <div class="fi-fo-multi-value-panel-add">
                                 <div
-                                    class="flex items-center gap-2 px-2 py-1.5 border-t border-gray-100 dark:border-gray-800"
-                                    :class="{ 'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid }"
+                                    class="flex items-center gap-2 px-3 py-1.5"
+                                    :class="{
+                                        'border-t border-gray-100 dark:border-gray-800': hasValues,
+                                        'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid,
+                                    }"
                                 >
-                                {{-- Plus Icon (Left) --}}
                                 <x-filament::icon icon="heroicon-m-plus" class="size-3.5 text-gray-400 shrink-0" aria-hidden="true" />
 
                                 <input
@@ -540,17 +544,19 @@
                                     x-ref="newInput"
                                     x-on:input="addInvalid = false"
                                     x-on:keydown.enter="handleEnter($event)"
-                                    aria-label="{{ $addLabel }}"
+                                    aria-label="{{ $addPlaceholder }}"
                                     :aria-invalid="addInvalid"
                                     :class="{ 'fi-fo-multi-value-add-invalid !text-danger-600 dark:!text-danger-400': addInvalid }"
-                                    class="flex-1 bg-transparent border-0 p-0 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-0 focus:outline-none"
-                                    placeholder="{{ $addLabel }}..."
+                                    class="min-w-0 flex-1 bg-transparent border-0 p-0 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-0 focus:outline-none"
+                                    placeholder="{{ $addPlaceholder }}"
                                 />
                                 <button
                                     type="button"
+                                    x-show="newValue.trim()"
+                                    x-cloak
                                     x-on:click.stop="addValue()"
                                     :disabled="!newValue.trim()"
-                                    aria-label="Add value"
+                                    aria-label="{{ $addPlaceholder }}"
                                     class="shrink-0 rounded p-1 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
                                 >
                                     <x-filament::icon icon="heroicon-m-arrow-right" class="size-3.5" aria-hidden="true" />

@@ -5,6 +5,7 @@
     $allowMultiple = $getAllowMultiple();
     $maxValues = $getMaxValues();
     $addLabel = $getAddLabel();
+    $addPlaceholder = \App\Filament\Support\MultiValueAddPlaceholder::make('tel', $addLabel);
     $emptyStateLabel = $getEmptyStateLabel();
     $placeholder = $getPlaceholder() ?? '(555) 123-4567';
     $defaultCountry = $getDefaultCountry();
@@ -599,7 +600,7 @@
                                 <template x-for="(entry, index) in filledEntries" :key="`${entry.number}-${index}`">
                                     <div
                                         :x-sortable-item="index"
-                                        class="group flex items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 first:rounded-t-lg last:rounded-b-lg transition-colors"
+                                        class="group flex min-w-0 items-center gap-2 px-3 py-2 border-b border-gray-100 dark:border-gray-800 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-800/50 first:rounded-t-lg last:rounded-b-lg transition-colors"
                                         role="listitem"
                                     >
                                         {{-- Drag Handle --}}
@@ -615,7 +616,7 @@
                                         </div>
 
                                         {{-- Formatted Phone with tel link and copy button --}}
-                                        <div class="group/value relative inline-flex items-center py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                        <div class="group/value relative inline-flex min-w-0 items-center py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                                             <a
                                                 :href="getTelLink(entry)"
                                                 class="text-sm text-primary-600 dark:text-primary-400 underline decoration-gray-300 dark:decoration-gray-600 decoration-1 underline-offset-2"
@@ -755,7 +756,7 @@
                                     x-on:keydown.enter.prevent="addEntry()"
                                     :disabled="isDisabled"
                                     class="flex-1 bg-transparent border-0 p-0 text-xs text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-0 focus:outline-none"
-                                    placeholder="{{ $addLabel }}..."
+                                    placeholder="{{ $addPlaceholder }}"
                                 />
 
                                 {{-- Add Button --}}

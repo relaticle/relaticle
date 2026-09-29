@@ -64,10 +64,10 @@
     --record-details-font-size: 0.8125rem;
     --record-details-font-leading: 1.25rem;
     --record-details-field-height: 2rem;
-    --record-details-edit-padding-inline: 0.75rem;
+    --record-textarea-max-height: 8rem;
+    --record-details-edit-padding-inline: 0.5rem;
     --record-details-edit-gutter: 1.5rem;
     --record-details-visible-fields: 8;
-    --record-textarea-overlay-height: 8.75rem;
 }
 
 .dark {
@@ -562,13 +562,6 @@
     background-color: var(--surface-inline-hover);
 }
 
-.fi-inline-editable[data-inline-field='name']:hover > .fi-in-entry-content-col > .fi-in-entry-content-ctn,
-.fi-inline-editable[data-inline-field='name']:focus-within > .fi-in-entry-content-col > .fi-in-entry-content-ctn,
-.fi-inline-editable[data-inline-field='name'] .fi-in-entry-content-ctn:hover,
-.fi-inline-editable[data-inline-field='name'] .fi-in-entry-content-ctn:focus-within {
-    background-color: transparent;
-}
-
 .fi-inline-edit-pencil {
     position: absolute;
     inset-inline-end: 0.25rem;
@@ -598,13 +591,12 @@
 }
 
 .fi-in-entry[data-inline-editing='true'] .fi-dropdown-panel,
-.fi-in-entry[data-inline-editing='true'] [role='dialog']:not(.fi-fo-multi-value-panel):not(.fi-inline-textarea-panel),
+.fi-in-entry[data-inline-editing='true'] [role='dialog']:not(.fi-fo-multi-value-panel),
 .fi-in-entry[data-inline-editing='true'] [role='listbox'] {
     z-index: 6;
 }
 
 .fi-in-entry[data-inline-editing='true'] .fi-fo-multi-value-panel,
-.fi-in-entry[data-inline-editing='true'] .fi-inline-textarea-panel,
 .fi-in-entry[data-inline-editing='true'] .fi-fo-date-time-picker-panel {
     z-index: 30;
 }
@@ -623,6 +615,12 @@
     min-width: 0;
     width: 100%;
     max-width: 100%;
+}
+
+.fi-inline-editable[data-inline-field='name'],
+.fi-inline-editable[data-inline-field='name'] > .fi-in-entry-content-col {
+    pointer-events: none;
+    cursor: default;
 }
 
 .fi-in-entry[data-inline-field='name'] > .fi-in-entry-content-col {
@@ -647,8 +645,42 @@
     gap: 0;
 }
 
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true'] > .fi-in-entry-content-col {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
 .fi-in-entry[data-inline-field='name'][data-inline-editing='true'] > .fi-in-entry-content-col > .fi-in-entry-content-ctn {
     display: none;
+}
+
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true'] > .fi-in-entry-content-col > .fi-in-entry-content-ctn:has(.fi-record-chip) {
+    display: flex;
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 0;
+    background-color: transparent;
+}
+
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true'] .fi-in-entry-content {
+    padding: 0;
+}
+
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true']:not(:has(.fi-record-chip)) .fi-inline-field-editor {
+    width: calc(100% + 0.5rem);
+    max-width: none;
+    margin-inline-start: -0.5rem;
+}
+
+.fi-in-entry[data-inline-field='name'][data-inline-editing='true'] .fi-record-chip > .truncate {
+    display: none;
+}
+
+.fi-in-entry[data-inline-field='name']:has(.fi-inline-field-editor) > .fi-in-entry-content-col > .fi-sc.fi-inline:has(.fi-inline-field-editor) {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .fi-in-entry[data-inline-field='name'] .fi-in-entry-content,
@@ -778,17 +810,38 @@
 }
 
 .fi-inline-field-editor:has(textarea) {
+    position: relative;
     width: 100%;
     max-width: 100%;
+    height: var(--record-details-field-height);
+    min-height: var(--record-details-field-height);
 }
 
-.fi-inline-field-editor:has(textarea):not(:has(.fi-inline-textarea-panel)) textarea {
-    min-height: 4.5rem;
-    max-height: 16rem;
-    field-sizing: content;
-    resize: vertical;
-    padding-block: 0.5rem;
-    line-height: 1.4;
+.fi-inline-field-editor:has(textarea) .fi-inline-field-editor-main {
+    align-items: stretch;
+    height: var(--record-details-field-height);
+}
+
+.fi-inline-field-editor:has(textarea) textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: var(--record-details-field-height);
+    max-height: var(--record-textarea-max-height);
+    overflow-y: hidden;
+    resize: none;
+    field-sizing: fixed;
+    padding-block: calc((var(--record-details-field-height) - var(--record-details-font-leading)) / 2);
+    padding-inline: var(--record-details-edit-padding-inline);
+    line-height: var(--record-details-font-leading);
+    overflow-wrap: anywhere;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.fi-inline-field-editor:has(textarea) textarea::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .fi-in-entry:has(.fi-inline-field-editor:has(textarea)) > .fi-in-entry-content-col > .fi-sc.fi-inline {
@@ -1032,21 +1085,11 @@
     max-width: 100%;
 }
 
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-inline-textarea-anchor) {
-    overflow: visible;
-    z-index: 5;
-}
-
-.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) > .fi-in-entry-content-col,
-.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor,
-.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor-main {
-    overflow: visible;
-}
-
 .fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-multi-value-input),
 .fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-select-input),
 .fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-phone-input),
-.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-date-time-picker) {
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(.fi-fo-date-time-picker),
+.fi-record-details-rail .fi-in-entry[data-inline-editing='true']:has(textarea) {
     overflow: visible;
     z-index: 5;
 }
@@ -1062,10 +1105,12 @@
     padding-inline-end: 2.25rem;
 }
 
-.fi-record-details-rail .fi-in-entry[data-inline-field='name'] > .fi-in-entry-content-col > .fi-in-entry-content-ctn {
+.fi-record-details-rail .fi-in-entry[data-inline-field='name']:not([data-inline-editing='true']) > .fi-in-entry-content-col > .fi-in-entry-content-ctn {
     width: max-content;
-    max-width: 100%;
-    padding-inline: 0.125rem 0.25rem;
+    max-width: calc(100% + 0.375rem);
+    margin-inline-start: -0.375rem;
+    padding-inline: 0.375rem;
+    cursor: text;
 }
 
 .fi-record-details-rail .fi-in-entry[data-inline-field='name']:not([data-inline-editing='true']) .fi-in-entry-content {
@@ -1073,7 +1118,7 @@
     align-items: center;
     width: auto;
     max-width: 100%;
-    padding-inline: 0 var(--record-details-edit-gutter);
+    padding-inline: 0;
     padding-block: 0;
     min-height: 1.75rem;
     font-size: 1rem;
@@ -1081,8 +1126,8 @@
     line-height: 1.5rem;
 }
 
-.fi-record-details-rail .fi-in-entry[data-inline-field='name'] .fi-inline-edit-pencil {
-    inset-inline-end: 0.125rem;
+.fi-in-entry[data-inline-field='name'] .fi-inline-edit-pencil {
+    display: none;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-fo-tags-input)):not(:has(.fi-fo-color-picker)):not(:has(.fi-fo-multi-value-input button[aria-haspopup])):not(:has(.fi-fo-phone-input)) .fi-input-wrp {
@@ -1194,30 +1239,46 @@
     display: flex;
     flex-direction: column;
     z-index: 100;
+    box-sizing: border-box;
     width: max-content;
     min-width: 20rem;
     max-width: min(28rem, calc(100vw - 2rem));
+    height: auto;
+    min-height: 0;
     max-height: min(12rem, calc(100dvh - 8rem));
     overflow: hidden;
+    border-radius: 0.75rem;
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-font-leading);
+}
+
+.fi-fo-multi-value-panel-empty,
+.fi-fo-multi-value-panel:not(:has(.fi-fo-multi-value-panel-row)) {
+    border-radius: 9999px;
+}
+
+.fi-record-details-rail .fi-fo-multi-value-panel {
+    box-sizing: border-box;
+    width: auto;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .fi-fo-multi-value-panel-list {
     min-height: 0;
     flex: 1 1 auto;
-    overflow-x: visible;
+    overflow-x: hidden;
     overflow-y: auto;
     scrollbar-width: none;
 }
 
 .fi-fo-multi-value-panel-link,
 .fi-fo-multi-value-panel a {
-    overflow: visible;
-    text-overflow: unset;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: auto;
-    max-width: none;
 }
 
 .fi-fo-multi-value-panel-list::-webkit-scrollbar {
@@ -1226,13 +1287,30 @@
 
 .fi-fo-multi-value-panel-row {
     gap: 0.375rem;
+    min-width: 0;
     min-height: 1.75rem;
     padding-block: 0.25rem;
     padding-inline: 0.5rem;
 }
 
+.fi-fo-multi-value-panel-row .group\/value {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+}
+
+.fi-fo-multi-value-panel-row > button {
+    flex-shrink: 0;
+}
+
 .fi-fo-multi-value-panel-add {
     flex-shrink: 0;
+}
+
+.fi-fo-multi-value-panel-add input {
+    overflow: visible;
+    text-overflow: clip;
 }
 
 .fi-fo-multi-value-panel input {
@@ -1245,139 +1323,61 @@
     line-height: 1rem;
 }
 
-.fi-record-details-rail .fi-in-entry:has(.fi-inline-textarea-anchor) .fi-inline-field-editor {
-    min-height: var(--record-details-field-height);
-}
-
-.fi-inline-textarea-anchor {
-    position: relative;
-    height: 0;
-    width: 100%;
-    overflow: visible;
-}
-
 .fi-fo-multi-value-overlay-anchor {
     position: relative;
     height: 0;
     overflow: visible;
 }
 
-.fi-inline-textarea-panel {
+.fi-record-details-rail .fi-inline-field-editor:has(textarea) .fi-input-wrp,
+.fi-record-details-rail .fi-inline-field-editor:has(textarea) .fi-input-wrp:focus-within {
     position: absolute;
-    top: -0.25rem;
-    left: 0;
-    z-index: 30;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-    width: auto;
-    min-width: 0;
-    max-width: 100%;
     inset-inline: 0;
-    padding: 0.625rem 0.75rem;
-    border-radius: 0.75rem;
-    background-color: var(--color-white, #fff);
-    box-shadow:
-        0 0 0 2px var(--color-primary-600, #7c3aed),
-        0 10px 28px color-mix(in oklab, var(--color-gray-950) 12%, transparent);
-}
-
-.dark .fi-inline-textarea-panel {
-    background-color: var(--color-gray-900, #111827);
-    box-shadow:
-        0 0 0 2px var(--color-primary-400, #a78bfa),
-        0 10px 28px rgb(0 0 0 / 0.45);
-}
-
-.fi-inline-field-editor-invalid .fi-inline-textarea-panel {
-    box-shadow:
-        0 0 0 2px var(--color-danger-600, #e11d48),
-        0 10px 28px color-mix(in oklab, var(--color-gray-950) 12%, transparent);
-}
-
-.dark .fi-inline-field-editor-invalid .fi-inline-textarea-panel {
-    box-shadow:
-        0 0 0 2px var(--color-danger-400, #fb7185),
-        0 10px 28px rgb(0 0 0 / 0.45);
-}
-
-.fi-inline-textarea-panel .fi-fo-field-label,
-.fi-inline-textarea-panel .fi-fo-field-wrp-label,
-.fi-inline-textarea-panel .fi-fo-field-wrp-hint {
-    display: none;
-}
-
-.fi-inline-textarea-panel .fi-fo-field,
-.fi-inline-textarea-panel .fi-fo-field-content-col,
-.fi-inline-textarea-panel .fi-fo-field-wrp,
-.fi-inline-textarea-panel .fi-input-wrp-content-ctn,
-.fi-inline-textarea-panel .fi-sc {
+    top: 0;
+    z-index: 6;
+    display: flex;
+    align-items: flex-start;
+    box-sizing: border-box;
     width: 100%;
-    min-width: 0;
-    gap: 0;
-    margin: 0;
+    height: max-content;
+    min-height: var(--record-details-field-height);
+    max-height: var(--record-textarea-max-height);
+    overflow: hidden;
     padding: 0;
 }
 
-.fi-record-details-rail .fi-inline-textarea-panel .fi-input-wrp,
-.fi-record-details-rail .fi-inline-textarea-panel .fi-input-wrp:focus-within,
-.fi-inline-textarea-panel .fi-input-wrp,
-.fi-inline-textarea-panel .fi-input-wrp:focus-within {
-    min-height: 0;
-    align-items: stretch;
-    border-radius: 0;
-    background-color: transparent;
-    box-shadow: none;
-    --tw-ring-shadow: 0 0 #0000;
-    --tw-ring-offset-shadow: 0 0 #0000;
-}
-
-.fi-record-details-rail .fi-inline-textarea-panel textarea,
-.fi-inline-textarea-panel textarea {
-    field-sizing: fixed;
-    height: var(--record-textarea-overlay-height);
-    min-height: var(--record-textarea-overlay-height);
-    max-height: var(--record-textarea-overlay-height);
-    overflow-y: scroll;
-    resize: none;
-    padding: 0;
-    padding-inline-end: 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.45;
-    color: var(--color-gray-950, #030712);
-    background: transparent;
-    box-shadow: none;
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklab, var(--color-gray-950) 28%, transparent) transparent;
-}
-
-.fi-inline-textarea-panel textarea::-webkit-scrollbar {
-    width: 6px;
-}
-
-.fi-inline-textarea-panel textarea::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.fi-inline-textarea-panel textarea::-webkit-scrollbar-thumb {
-    border-radius: 9999px;
-    background: color-mix(in oklab, var(--color-gray-950) 28%, transparent);
-}
-
-.dark .fi-inline-textarea-panel textarea {
-    color: var(--color-white, #fff);
-    scrollbar-color: color-mix(in oklab, white 28%, transparent) transparent;
-}
-
-.dark .fi-inline-textarea-panel textarea::-webkit-scrollbar-thumb {
-    background: color-mix(in oklab, white 28%, transparent);
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-textarea {
+    display: flex;
+    width: 100%;
+    height: auto;
+    min-height: var(--record-details-field-height);
+    max-height: var(--record-textarea-max-height);
+    overflow: hidden;
 }
 
 .fi-record-details-rail .fi-inline-field-editor textarea {
-    min-height: 3.5rem;
-    padding: 0.375rem 0.5rem;
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    height: auto;
+    min-height: var(--record-details-field-height);
+    max-height: var(--record-textarea-max-height);
+    overflow-y: hidden;
+    resize: none;
+    field-sizing: fixed;
+    padding-block: calc((var(--record-details-field-height) - var(--record-details-font-leading)) / 2);
+    padding-inline: var(--record-details-edit-padding-inline);
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-font-leading);
+    overflow-wrap: anywhere;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.fi-record-details-rail .fi-inline-field-editor textarea::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .fi-record-details-rail .fi-inline-field-editor {
@@ -1392,42 +1392,6 @@
     --tw-ring-shadow: 0 0 0 1px var(--tw-ring-color);
     --tw-ring-offset-shadow: 0 0 #0000;
     box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow);
-}
-
-.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel .fi-input-wrp,
-.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel .fi-input-wrp:focus-within,
-.fi-inline-textarea-panel .fi-inline-overlay-textarea,
-.fi-inline-textarea-panel .fi-inline-overlay-textarea:focus-within {
-    min-height: 0;
-    align-items: stretch;
-    border-radius: 0;
-    background-color: transparent !important;
-    box-shadow: none !important;
-    --tw-ring-shadow: 0 0 #0000 !important;
-    --tw-ring-offset-shadow: 0 0 #0000 !important;
-    --tw-shadow: 0 0 #0000 !important;
-}
-
-.fi-record-details-rail .fi-inline-field-editor .fi-inline-textarea-panel textarea {
-    field-sizing: fixed;
-    height: var(--record-textarea-overlay-height);
-    min-height: var(--record-textarea-overlay-height);
-    max-height: var(--record-textarea-overlay-height);
-    overflow-y: scroll;
-    resize: none;
-    padding: 0;
-    padding-inline-end: 0.5rem;
-    font-size: 0.875rem;
-    line-height: 1.45;
-    color: var(--color-gray-950, #030712);
-    background: transparent;
-    box-shadow: none;
-}
-
-.fi-inline-textarea-panel .fi-fo-textarea > div,
-.fi-inline-textarea-panel .fi-autosizable > div {
-    height: var(--record-textarea-overlay-height) !important;
-    overflow: hidden;
 }
 
 .dark .fi-record-details-rail .fi-inline-field-editor .fi-input-wrp {
@@ -1518,7 +1482,7 @@
     display: none;
 }
 
-.fi-record-details-rail .fi-inline-overlay-select .fi-select-input-value-remove-btn {
+.fi-record-details-rail .fi-inline-field-editor .fi-select-input-value-remove-btn {
     display: none;
 }
 
@@ -1610,40 +1574,93 @@
 
 .fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-panel {
     z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+    width: max-content;
+    padding: 0.5rem 0.625rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-panel > * + * {
+    margin-top: 0;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-calendar-header {
+    gap: 0.125rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-calendar {
+    grid-template-columns: repeat(7, 1.75rem);
+    grid-auto-rows: 1.75rem;
+    justify-content: start;
+    gap: 0.125rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-calendar-day {
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    line-height: 1.75rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-input-wrp.fi-fo-multi-value-input,
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input > *,
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input .relative {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 0;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-input,
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-input-wrp input:not([type='hidden']):not([type='checkbox']):not([type='radio']):not([type='tel']),
-.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input div[x-ref='select'],
-.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-fo-date-time-picker-display-text-input {
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-fo-date-time-picker-display-text-input,
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input input.fi-input {
     box-sizing: border-box;
+    width: 100%;
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
     max-height: var(--record-details-field-height);
     padding-block: 0;
     padding-inline: var(--record-details-edit-padding-inline);
+    text-align: start;
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-field-height);
 }
 
-.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input input.fi-input {
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input div[x-ref='select'] {
     box-sizing: border-box;
+    width: max-content;
+    max-width: 100%;
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
     max-height: var(--record-details-field-height);
-    padding-block: 0;
-    padding-inline: var(--record-details-edit-padding-inline);
-    font-size: var(--record-details-font-size);
-    line-height: var(--record-details-field-height);
+    padding: 0;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-inline-overlay-select)) .fi-input-wrp:has(.fi-select-input-btn) {
+    width: max-content;
+    max-width: 100%;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input-btn {
+    width: max-content;
+    max-width: 100%;
     height: var(--record-details-field-height);
     min-height: var(--record-details-field-height);
     padding-block: 0;
-    padding-inline: var(--record-details-edit-padding-inline);
+    padding-inline: 0.5rem;
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-field-height);
+}
+
+.fi-record-details-rail .fi-inline-field-editor .fi-select-input .fi-select-input-ctn-clearable .fi-select-input-btn {
+    padding-inline-end: 0.5rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-select-input-value-ctn,
+.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-select-input-value-label {
+    width: auto;
+    flex: 0 1 auto;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-fo-tags-input)):not(:has(.fi-fo-color-picker)):not(:has(.fi-fo-multi-value-input)) .fi-input-wrp.fi-inline-overlay-select:has(.fi-select-input-btn[aria-expanded='true']) {
@@ -1669,15 +1686,34 @@
 
 .fi-record-details-rail .fi-select-input .fi-dropdown-panel {
     z-index: 30;
+}
+
+.fi-record-details-rail .fi-inline-overlay-select .fi-dropdown-panel {
     width: max-content !important;
     min-width: 20rem !important;
     max-width: min(28rem, calc(100vw - 2rem)) !important;
 }
 
-.fi-record-details-rail .fi-select-input .fi-dropdown-panel .fi-select-input-option > span {
+.fi-record-details-rail .fi-inline-overlay-select .fi-dropdown-panel .fi-select-input-option > span {
     overflow: visible;
     text-overflow: unset;
     white-space: nowrap;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-dropdown-panel {
+    box-sizing: border-box;
+    width: max-content !important;
+    min-width: 12rem !important;
+    max-width: min(20rem, calc(100vw - 2rem)) !important;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-select-input-btn {
+    background-image: none;
+    padding-inline-end: 0.5rem;
+}
+
+.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-select-input-ctn-clearable .fi-select-input-btn {
+    padding-inline-end: 0.5rem;
 }
 
 .fi-record-details-rail .fi-select-input .fi-select-input-search-ctn {
@@ -1729,6 +1765,29 @@
         0 0 0 1px color-mix(in oklab, var(--color-gray-950) 5%, transparent),
         0 10px 15px -3px rgb(0 0 0 / 0.1),
         0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.fi-fo-phone-panel [role='listitem'] {
+    min-width: 0;
+}
+
+.fi-fo-phone-panel [role='listitem'] .group\/value {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: none;
+    overflow: hidden;
+}
+
+.fi-fo-phone-panel [role='listitem'] a {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fi-fo-phone-panel [role='listitem'] > button {
+    flex-shrink: 0;
 }
 
 .dark .fi-fo-phone-country-panel,

@@ -3,12 +3,8 @@
     /** @var bool $saveOnEnterOrBlur */
     /** @var bool $saveOnChange */
     /** @var bool $invalid */
-    /** @var bool $textareaOverlay */
-    /** @var string $overlayLabel */
     $saveOnChange ??= false;
     $invalid ??= false;
-    $textareaOverlay ??= false;
-    $overlayLabel ??= '';
 @endphp
 
 <div
@@ -26,7 +22,7 @@
         holdUntil: 0,
         selectWasOpen: false,
         selectInitialValue: '',
-        overlaySelector: '[role=listbox], [role=dialog], [role=option], [role=combobox], .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, .fi-inline-textarea-panel, hex-color-picker, [id*=country-listbox]',
+        overlaySelector: '[role=listbox], [role=dialog], [role=option], [role=combobox], .fi-dropdown-panel, .fi-fo-date-time-picker-panel, .fi-fo-color-picker-panel, hex-color-picker, [id*=country-listbox]',
         phoneRoot() {
             const nodes = $el.querySelectorAll('.fi-fo-phone-input [x-data], .fi-fo-phone-input-wrp [x-data]');
             for (let i = 0; i < nodes.length; i++) {
@@ -399,8 +395,40 @@
                     this.committing = false;
                 });
         },
+        growTextarea() {
+            if (this._growingTextarea) {
+                return;
+            }
+            const textarea = $el.querySelector('textarea');
+            if (! textarea) {
+                return;
+            }
+            if (textarea.clientWidth < 8) {
+                requestAnimationFrame(() => this.growTextarea());
+                return;
+            }
+            this._growingTextarea = true;
+            const styles = getComputedStyle(textarea);
+            const min = Number.parseFloat(styles.minHeight) || 30;
+            const cap = Number.parseFloat(styles.maxHeight) || 128;
+            textarea.style.height = `${min}px`;
+            const content = textarea.scrollHeight;
+            const next = Math.min(Math.max(content, min), cap);
+            textarea.style.height = `${next}px`;
+            textarea.style.overflowY = content > cap + 1 ? 'auto' : 'hidden';
+            const wrp = textarea.closest('.fi-input-wrp');
+            if (wrp) {
+                wrp.style.height = `${next}px`;
+            }
+            this._growingTextarea = false;
+        },
     }"
     x-on:click.stop
+    x-on:input="
+        if ($event.target.tagName === 'TEXTAREA') {
+            growTextarea();
+        }
+    "
     x-on:submit.capture.window="
         if (! $el.contains(document.activeElement) && ! ($event.submitter && $el.contains($event.submitter))) {
             return;
@@ -538,6 +566,11 @@
             $nextTick(() => {
                 bindPhoneCountry();
                 bindSelect();
+                const textarea = $el.querySelector('textarea');
+                if (textarea) {
+                    growTextarea();
+                    new ResizeObserver(() => growTextarea()).observe(textarea);
+                }
             });
 
             const activate = (tries = 0) => {
@@ -604,10 +637,13 @@
                     return;
                 }
 
-                const input = $el.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select')
-                    || $refs.textareaPanel?.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select');
+                const input = $el.querySelector('input.fi-input:not([type=hidden]):not([readonly]), textarea, select');
                 if (input) {
                     input.focus();
+                    if (input.tagName === 'TEXTAREA') {
+                        growTextarea();
+                        requestAnimationFrame(() => growTextarea());
+                    }
                     if (typeof input.showPicker === 'function') {
                         try { input.showPicker(); } catch (e) {}
                     }
@@ -625,31 +661,12 @@
     @endif
 >
     <div class="fi-inline-field-editor-main">
-        @if ($textareaOverlay)
-            <div class="fi-inline-textarea-anchor">
-                <div
-                    x-ref="textareaPanel"
-                    role="dialog"
-                    aria-label="{{ $overlayLabel }}"
-                    class="fi-inline-textarea-panel"
-                >
-                    <form
-                        class="fi-inline-field-editor-form"
-                        novalidate
-                        x-on:submit.prevent="saveFromEnter()"
-                    >
-                        {!! $formHtml !!}
-                    </form>
-                </div>
-            </div>
-        @else
-            <form
-                class="fi-inline-field-editor-form"
-                novalidate
-                x-on:submit.prevent="saveFromEnter()"
-            >
-                {!! $formHtml !!}
-            </form>
-        @endif
+        <form
+            class="fi-inline-field-editor-form"
+            novalidate
+            x-on:submit.prevent="saveFromEnter()"
+        >
+            {!! $formHtml !!}
+        </form>
     </div>
 </div>

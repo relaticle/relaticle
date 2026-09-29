@@ -15,7 +15,9 @@ return [
     'invalid_url' => 'You have entered an invalid URL.',
     'invalid_domain' => 'You have entered an invalid domain.',
     'add_tag' => 'Add tag',
+    'add_email' => 'Add email',
     'add_domain' => 'Add domain',
+    'add_value' => 'Add',
     'search_records' => 'Search records...',
     'fields' => [
         'name' => 'name',

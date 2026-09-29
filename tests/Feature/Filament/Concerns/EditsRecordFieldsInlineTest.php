@@ -24,6 +24,7 @@ use App\Filament\Support\InlineField\FieldState;
 use App\Filament\Support\InlineField\InlineField;
 use App\Filament\Support\InlineField\NativeFormField;
 use App\Filament\Support\InlineField\RecordWriter;
+use App\Filament\Support\MultiValueAddPlaceholder;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -50,6 +51,7 @@ mutates(
     FieldState::class,
     NativeFormField::class,
     RecordWriter::class,
+    MultiValueAddPlaceholder::class,
     CustomFieldType::class,
     EmailEntry::class,
     EmailFieldType::class,
@@ -498,10 +500,9 @@ it('does not show done or cancel below a textarea custom field', function (): vo
         ->assertDontSeeHtml('fi-inline-field-editor-confirm')
         ->assertDontSeeHtml('fi-inline-field-done')
         ->assertDontSeeHtml('fi-inline-field-cancel')
-        ->assertSeeHtml('fi-inline-textarea-panel')
-        ->assertDontSeeHtml('fi-inline-textarea-panel-label')
+        ->assertDontSeeHtml('fi-inline-textarea-panel')
         ->assertDontSeeHtml('fi-autosizable')
-        ->assertSeeHtml('rows="7"')
+        ->assertSeeHtml('rows="1"')
         ->assertSeeHtml('<textarea');
 });
 
@@ -561,6 +562,8 @@ it('renders person emails as packed links then starts edit', function (): void {
         ->assertSeeHtml('fi-fo-multi-value-input')
         ->assertSeeHtml('fi-fo-multi-value-panel-link')
         ->assertDontSeeHtml('fi-fo-multi-value-plain')
+        ->assertSee(__('filament/inline-edit.add_email'))
+        ->assertDontSee('Add email address...')
         ->assertSeeHtml('+<span x-text="hiddenCount"></span>')
         ->assertDontSeeHtml('+<span x-text="hiddenCount"></span> more');
 });
@@ -726,7 +729,12 @@ it('shows editor placeholders on empty native and custom fields', function (): v
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->call('startInlineEdit', PeopleField::LINKEDIN->value)
-        ->assertSeeHtml('placeholder="Add URL..."');
+        ->assertSeeHtml('placeholder="Set linkedin"')
+        ->assertDontSeeHtml('placeholder="Add URL..."');
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('startInlineEdit', PeopleField::EMAILS->value)
+        ->assertSeeHtml('placeholder="Set emails"');
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->call('startInlineEdit', 'name')
@@ -871,6 +879,7 @@ it('renders selected option-list values as chips', function (CustomFieldType $ty
         ->assertSet('inlineEditingField', 'regions')
         ->assertSeeHtml('fi-inline-field-editor')
         ->assertSeeHtml('fi-select-input')
+        ->assertDontSeeHtml('fi-inline-overlay-select')
         ->assertDontSeeHtml('fi-inline-choice-dropdown')
         ->assertDontSeeHtml('fi-fo-checkbox-list')
         ->assertSee('SMB')

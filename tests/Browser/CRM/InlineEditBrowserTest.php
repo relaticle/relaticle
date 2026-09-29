@@ -9,6 +9,7 @@ use App\Filament\Concerns\EditsRecordFieldsInline;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Support\MultiValueAddPlaceholder;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -16,7 +17,7 @@ use App\Models\People;
 use App\Models\User;
 use Illuminate\Support\Collection;
 
-mutates(EditsRecordFieldsInline::class, ViewCompany::class, ViewOpportunity::class, ViewPeople::class);
+mutates(EditsRecordFieldsInline::class, ViewCompany::class, ViewOpportunity::class, ViewPeople::class, MultiValueAddPlaceholder::class);
 
 it('toggles company icp from the record view', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -208,6 +209,132 @@ it('opens the person email editor from the packed field', function (): void {
         ->assertVisible('[data-inline-field="emails"] .fi-in-entry-label')
         ->assertAttribute('[data-inline-field="emails"]', 'data-inline-editing', 'true')
         ->assertNoJavaScriptErrors();
+});
+
+it('keeps email overlay delete buttons inside the panel', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ilya Pashayan',
+    ]);
+    $emails = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::EMAILS)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($emails, [
+        'first@example.test',
+        'very-long-address-that-should-not-push-the-delete-icon-out@example.test',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="emails"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="emails"] .fi-inline-field-editor');
+
+    $page->script(<<<'JS'
+        (() => {
+            const trigger = document.querySelector('[data-inline-field="emails"] button[aria-haspopup="dialog"]');
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+                trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+            }
+            return true;
+        })();
+    JS);
+
+    $inside = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            if (! panel) {
+                return { ok: false };
+            }
+
+            const panelBox = panel.getBoundingClientRect();
+            const deletes = [...panel.querySelectorAll('button[aria-label^="Delete"]')];
+            const allInside = deletes.length > 0 && deletes.every((button) => {
+                const box = button.getBoundingClientRect();
+
+                return box.right <= panelBox.right + 1 && box.left >= panelBox.left - 1;
+            });
+
+            return {
+                ok: true,
+                count: deletes.length,
+                allInside,
+            };
+        })();
+    JS);
+
+    expect($inside['ok'])->toBeTrue()
+        ->and($inside['count'])->toBe(2)
+        ->and($inside['allInside'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('hugs the empty email overlay to the add row', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ilya Pashayan',
+    ]);
+    $emails = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::EMAILS)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($emails, []);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="emails"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="emails"] .fi-inline-field-editor');
+
+    $page->script(<<<'JS'
+        (() => {
+            const trigger = document.querySelector('[data-inline-field="emails"] button[aria-haspopup="dialog"]');
+            if (trigger && trigger.getAttribute('aria-expanded') !== 'true') {
+                trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+            }
+            return true;
+        })();
+    JS);
+
+    $overlay = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-multi-value-panel');
+            const add = panel?.querySelector('input[placeholder]');
+            if (! panel || ! add) {
+                return { ok: false };
+            }
+
+            const panelBox = panel.getBoundingClientRect();
+            const addBox = add.getBoundingClientRect();
+
+            return {
+                ok: true,
+                height: panelBox.height,
+                rows: panel.querySelectorAll('.fi-fo-multi-value-panel-row').length,
+                placeholder: add.getAttribute('placeholder') ?? '',
+                addFits: addBox.top >= panelBox.top - 1 && addBox.bottom <= panelBox.bottom + 1,
+            };
+        })();
+    JS);
+
+    expect($overlay['ok'])->toBeTrue()
+        ->and($overlay['rows'])->toBe(0)
+        ->and($overlay['height'])->toBeGreaterThan(28)
+        ->and($overlay['height'])->toBeLessThan(56)
+        ->and($overlay['placeholder'])->toBe(__('filament/inline-edit.add_email').'...')
+        ->and($overlay['addFits'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
 });
 
 it('paints the email overlay above the work pane', function (): void {
@@ -490,7 +617,7 @@ it('opens the account owner picker as a floating search overlay', function (): v
     $page->assertNoJavaScriptErrors();
 });
 
-it('opens a textarea custom field as a floating overlay', function (): void {
+it('opens a textarea at field size then grows over following rows up to a max height', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -518,62 +645,125 @@ it('opens a textarea custom field as a floating overlay', function (): void {
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
-        ->click('[data-inline-field="bio"] .fi-in-entry-label')
-        ->assertVisible('[data-inline-field="bio"] .fi-inline-field-editor')
-        ->assertVisible('[data-inline-field="bio"] .fi-in-entry-label');
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}");
 
-    $overlay = $page->script(<<<'JS'
+    $before = $page->script(<<<'JS'
         (() => {
-            const rail = document.querySelector('.fi-record-details-rail');
             const field = document.querySelector('[data-inline-field="bio"]');
-            const panel = document.querySelector('.fi-inline-textarea-panel');
-            const wrp = panel?.querySelector('.fi-input-wrp');
-            const editor = document.querySelector('[data-inline-field="bio"] .fi-inline-field-editor');
-            if (! rail || ! field || ! panel || ! wrp) {
-                return {
-                    ok: false,
-                    hasPanel: Boolean(panel),
-                    hasWrp: Boolean(wrp),
-                    editorHtml: editor?.innerHTML?.slice(0, 400) ?? null,
-                    bodyPanel: Boolean(document.body.querySelector('.fi-inline-textarea-panel')),
-                };
-            }
-
-            const railBox = rail.getBoundingClientRect();
-            const fieldBox = field.getBoundingClientRect();
-            const panelBox = panel.getBoundingClientRect();
-            const panelStyle = getComputedStyle(panel);
-            const wrpStyle = getComputedStyle(wrp);
-
-            const textarea = panel.querySelector('textarea');
-            const textareaStyle = textarea ? getComputedStyle(textarea) : null;
-            const textareaHeight = textareaStyle ? Number.parseFloat(textareaStyle.height) : 0;
-            const textareaMinHeight = textareaStyle ? Number.parseFloat(textareaStyle.minHeight) : 0;
+            const label = field?.querySelector('.fi-in-entry-label');
+            const content = field?.querySelector('.fi-in-entry-content');
 
             return {
-                ok: true,
-                panelWidth: panelBox.width,
-                staysInRail: panelBox.right <= railBox.right + 4,
-                coversField: panelBox.top <= fieldBox.top + 12,
-                hasCardRing: panelStyle.boxShadow !== 'none' && panelStyle.boxShadow !== '',
-                hasInnerInputBorder: wrpStyle.boxShadow !== 'none' && wrpStyle.boxShadow !== '',
-                textareaOverflows: textareaStyle?.overflowY === 'auto' || textareaStyle?.overflowY === 'scroll',
-                textareaHeightLocked: textareaHeight > 0 && Math.abs(textareaHeight - textareaMinHeight) < 1,
+                labelTop: label?.getBoundingClientRect().top ?? null,
+                contentHeight: content?.getBoundingClientRect().height ?? 0,
             };
         })();
     JS);
 
-    expect($overlay['ok'])->toBeTrue()
-        ->and($overlay['panelWidth'])->toBeGreaterThan(120)
-        ->and($overlay['staysInRail'])->toBeTrue()
-        ->and($overlay['coversField'])->toBeTrue()
-        ->and($overlay['hasCardRing'])->toBeTrue()
-        ->and($overlay['hasInnerInputBorder'])->toBeFalse()
-        ->and($overlay['textareaOverflows'])->toBeTrue()
-        ->and($overlay['textareaHeightLocked'])->toBeTrue();
+    $page->click('[data-inline-field="bio"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="bio"] .fi-inline-field-editor textarea')
+        ->assertVisible('[data-inline-field="bio"] .fi-in-entry-label')
+        ->assertMissing('.fi-inline-textarea-panel');
 
-    $page->assertNoJavaScriptErrors();
+    $empty = $page->script(<<<'JS'
+        (() => {
+            const wrp = document.querySelector('[data-inline-field="bio"] .fi-input-wrp');
+            const textarea = document.querySelector('[data-inline-field="bio"] textarea');
+            if (! wrp || ! textarea) {
+                return { ok: false };
+            }
+
+            const wrpStyle = getComputedStyle(wrp);
+            const ring = `${wrpStyle.boxShadow} ${wrpStyle.getPropertyValue('--tw-ring-color')}`;
+
+            const field = document.querySelector('[data-inline-field="bio"]');
+            const label = field?.querySelector('.fi-in-entry-label');
+            const taStyle = getComputedStyle(textarea);
+
+            return {
+                ok: true,
+                height: wrp.getBoundingClientRect().height,
+                fieldHeight: field?.getBoundingClientRect().height ?? 0,
+                labelTop: label?.getBoundingClientRect().top ?? null,
+                padTop: Number.parseFloat(taStyle.paddingTop),
+                coversNext: (() => {
+                    const next = field?.nextElementSibling?.getBoundingClientRect();
+                    const box = wrp.getBoundingClientRect();
+
+                    return Boolean(next && box.bottom > next.top + 4);
+                })(),
+                hasPrimaryRing: /293|0\.247|7c3aed|8b5cf6/i.test(ring),
+                hasDropShadow: wrpStyle.boxShadow.includes('10px') || wrpStyle.boxShadow.includes('28px'),
+                radius: Number.parseFloat(wrpStyle.borderRadius),
+            };
+        })();
+    JS);
+
+    expect($empty['ok'])->toBeTrue()
+        ->and($empty['height'])->toBeGreaterThanOrEqual(30)
+        ->and($empty['height'])->toBeLessThanOrEqual(34)
+        ->and(abs($empty['height'] - $before['contentHeight']))->toBeLessThan(2)
+        ->and($empty['fieldHeight'])->toBeLessThanOrEqual(34)
+        ->and(abs($empty['labelTop'] - $before['labelTop']))->toBeLessThan(2)
+        ->and($empty['padTop'])->toBeGreaterThanOrEqual(5)
+        ->and($empty['padTop'])->toBeLessThanOrEqual(7)
+        ->and($empty['coversNext'])->toBeFalse()
+        ->and($empty['hasPrimaryRing'])->toBeTrue()
+        ->and($empty['hasDropShadow'])->toBeFalse()
+        ->and($empty['radius'])->toBeGreaterThanOrEqual(8)
+        ->and($empty['radius'])->toBeLessThanOrEqual(12);
+
+    $grown = $page->script(<<<'JS'
+        (() => {
+            const editor = document.querySelector('[data-inline-field="bio"] .fi-inline-field-editor');
+            const textarea = editor?.querySelector('textarea');
+            const wrp = editor?.querySelector('.fi-input-wrp');
+            if (! editor || ! textarea || ! wrp || ! window.Alpine) {
+                return { ok: false };
+            }
+
+            textarea.value = "line one\nline two\nline three\nline four\nline five";
+            Alpine.$data(editor).growTextarea();
+
+            const field = document.querySelector('[data-inline-field="bio"]');
+            const next = field?.nextElementSibling;
+            const wrpBox = wrp.getBoundingClientRect();
+            const nextBox = next?.getBoundingClientRect();
+            const fieldBox = field?.getBoundingClientRect();
+
+            textarea.value = Array.from({ length: 20 }, (_, index) => `line ${index}`).join('\n');
+            Alpine.$data(editor).growTextarea();
+            const capped = wrp.getBoundingClientRect();
+
+            return {
+                ok: true,
+                height: wrpBox.height,
+                fieldHeight: fieldBox?.height ?? 0,
+                coversNext: Boolean(nextBox && wrpBox.bottom > nextBox.top + 4),
+                cappedHeight: capped.height,
+                overflow: getComputedStyle(textarea).overflowY,
+            };
+        })();
+    JS);
+
+    expect($grown['ok'])->toBeTrue()
+        ->and($grown['height'])->toBeGreaterThan(40)
+        ->and($grown['height'])->toBeLessThan(136)
+        ->and($grown['fieldHeight'])->toBeLessThanOrEqual(40)
+        ->and($grown['coversNext'])->toBeTrue()
+        ->and($grown['cappedHeight'])->toBeGreaterThanOrEqual(120)
+        ->and($grown['cappedHeight'])->toBeLessThanOrEqual(136)
+        ->and($grown['overflow'])->toBe('auto');
+
+    $jsErrors = $page->script(<<<'JS'
+        (window.__pestBrowser?.jsErrors || []).filter((error) => {
+            const message = typeof error === 'string' ? error : String(error?.message ?? '');
+
+            return ! message.includes('ResizeObserver loop');
+        });
+    JS);
+
+    expect($jsErrors)->toBeEmpty();
 });
 
 it('keeps compact field labels vertically aligned while editing', function (): void {
@@ -1324,6 +1514,163 @@ it('opens the tags overlay tall enough to show every tag before scrolling', func
         ->and($chrome['allVisible'])->toBeTrue()
         ->and($chrome['height'])->toBeGreaterThan(100)
         ->and($chrome['height'])->toBeLessThan(180);
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('keeps compact right padding on an inline select trigger', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Enterprise rollout',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}")
+        ->click('[data-inline-field="stage"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="stage"] .fi-select-input-btn');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const field = document.querySelector('[data-inline-field="stage"]');
+            const wrp = field?.querySelector('.fi-input-wrp');
+            const btn = field?.querySelector('.fi-select-input-btn');
+            if (! wrp || ! btn) {
+                return { ok: false };
+            }
+
+            const wrpBox = wrp.getBoundingClientRect();
+            const colBox = field.querySelector('.fi-in-entry-content-col')?.getBoundingClientRect();
+
+            return {
+                ok: true,
+                paddingEnd: Number.parseFloat(getComputedStyle(btn).paddingInlineEnd),
+                hugsContent: ! colBox || wrpBox.width <= colBox.width - 8,
+            };
+        })();
+    JS);
+
+    expect($chrome['ok'])->toBeTrue()
+        ->and($chrome['paddingEnd'])->toBeLessThanOrEqual(10)
+        ->and($chrome['hugsContent'])->toBeTrue();
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('aligns a custom select placeholder with idle set-field padding', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ada Lovelace',
+    ]);
+    $sectionId = CustomField::query()
+        ->forEntity(People::class)
+        ->where('code', PeopleField::JOB_TITLE)
+        ->firstOrFail()
+        ->getAttribute('custom_field_section_id');
+    CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'code',
+        'name' => 'code',
+        'type' => CustomFieldType::TEXT->value,
+        'active' => true,
+        'sort_order' => 0,
+        'validation_rules' => [],
+    ]);
+    CustomField::factory()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $sectionId,
+        'entity_type' => 'people',
+        'code' => 'pick',
+        'name' => 'pick',
+        'type' => CustomFieldType::SELECT->value,
+        'active' => true,
+        'sort_order' => 1,
+        'validation_rules' => [],
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->click('[data-inline-field="pick"] .fi-in-entry-label')
+        ->assertVisible('[data-inline-field="pick"] .fi-select-input-placeholder');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const idle = document.querySelector('[data-inline-field="code"] .fi-in-placeholder');
+            const wrap = document.querySelector('[data-inline-field="pick"] .fi-select-input div[x-ref="select"]');
+            const btn = document.querySelector('[data-inline-field="pick"] .fi-select-input-btn');
+            const placeholder = document.querySelector('[data-inline-field="pick"] .fi-select-input-placeholder');
+            if (! idle || ! wrap || ! btn || ! placeholder) {
+                return { ok: false };
+            }
+
+            return {
+                ok: true,
+                wrapPad: Number.parseFloat(getComputedStyle(wrap).paddingInlineStart),
+                btnPad: Number.parseFloat(getComputedStyle(btn).paddingInlineStart),
+                shift: Math.abs(placeholder.getBoundingClientRect().left - idle.getBoundingClientRect().left),
+            };
+        })();
+    JS);
+
+    expect($chrome['ok'])->toBeTrue()
+        ->and($chrome['wrapPad'])->toBe(0)
+        ->and($chrome['btnPad'])->toBeGreaterThanOrEqual(6)
+        ->and($chrome['btnPad'])->toBeLessThanOrEqual(10)
+        ->and($chrome['shift'])->toBeLessThan(3);
+
+    $page->assertNoJavaScriptErrors();
+});
+
+it('opens the close date calendar without extra space under the days', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Enterprise rollout',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}")
+        ->click('[data-inline-field="close_date"] .fi-in-entry-label')
+        ->assertVisible('.fi-fo-date-time-picker-panel');
+
+    $chrome = $page->script(<<<'JS'
+        (() => {
+            const panel = document.querySelector('.fi-fo-date-time-picker-panel');
+            const days = [...(panel?.querySelectorAll('.fi-fo-date-time-picker-calendar-day') ?? [])];
+            if (! panel || days.length === 0) {
+                return { ok: false, dayCount: days.length };
+            }
+
+            const panelBox = panel.getBoundingClientRect();
+            const last = days.at(-1).getBoundingClientRect();
+            const style = getComputedStyle(panel);
+
+            return {
+                ok: true,
+                padBottom: Number.parseFloat(style.paddingBottom),
+                gapBelowDays: panelBox.bottom - last.bottom,
+            };
+        })();
+    JS);
+
+    expect($chrome['ok'])->toBeTrue()
+        ->and($chrome['padBottom'])->toBeLessThanOrEqual(10)
+        ->and($chrome['gapBelowDays'])->toBeLessThanOrEqual(16);
 
     $page->assertNoJavaScriptErrors();
 });

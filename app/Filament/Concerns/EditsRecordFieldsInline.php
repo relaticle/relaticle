@@ -46,6 +46,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Filament\Integration\Components\Forms\MultiValueInput\MultiValueInputComponent;
+use Relaticle\CustomFields\Filament\Integration\Components\Forms\PhoneInput\PhoneInputComponent;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 
 /**
@@ -441,14 +442,11 @@ trait EditsRecordFieldsInline
         }
 
         if ($field->type === CustomFieldType::TAGS_INPUT && $component instanceof TagsInput) {
-            $addTag = __('filament/inline-edit.add_tag');
-
             return MultiValueInputComponent::make($component->getName())
                 ->allowMultiple()
                 ->maxValues(50)
                 ->inputType('text')
-                ->addLabel($addTag)
-                ->placeholder($addTag);
+                ->addLabel(__('filament/inline-edit.add_tag'));
         }
 
         return $component;
@@ -468,9 +466,7 @@ trait EditsRecordFieldsInline
         }
 
         if ($component instanceof Textarea) {
-            $component
-                ->rows(7)
-                ->extraAttributes(['class' => 'fi-inline-overlay-textarea']);
+            $component->rows(1);
         }
 
         if ($component instanceof DateTimePicker) {
@@ -482,8 +478,7 @@ trait EditsRecordFieldsInline
         }
 
         if ($component instanceof MultiValueInputComponent && $field->code === CompanyField::DOMAINS->value) {
-            $addDomain = __('filament/inline-edit.add_domain');
-            $component->addLabel($addDomain)->placeholder($addDomain);
+            $component->addLabel(__('filament/inline-edit.add_domain'));
         }
 
         $this->applyInlineEditorPlaceholder($component, $field);
@@ -692,8 +687,6 @@ trait EditsRecordFieldsInline
             'saveOnEnterOrBlur' => $field?->commit === InlineCommit::OnEnterOrBlur,
             'saveOnChange' => $field?->commit === InlineCommit::OnChange,
             'invalid' => $this->inlineEditorHasError(),
-            'textareaOverlay' => $field?->type === CustomFieldType::TEXTAREA,
-            'overlayLabel' => $field?->label ?? '',
         ])->render();
     }
 
@@ -792,18 +785,16 @@ trait EditsRecordFieldsInline
 
     private function applyInlineEditorPlaceholder(Field $component, InlineField $field): void
     {
-        if ($component instanceof MultiValueInputComponent) {
-            if (
-                $field->type === CustomFieldType::LINK
-                || $field->type === CustomFieldType::EMAIL
-                || $field->type === CustomFieldType::PHONE
-                || $field->type === CustomFieldType::TAGS_INPUT
-                || $field->code === CompanyField::DOMAINS->value
-            ) {
-                return;
-            }
+        $placeholder = $this->inlineEmptyPlaceholder($field);
 
-            $component->placeholder($this->inlineEmptyPlaceholder($field));
+        if ($component instanceof MultiValueInputComponent) {
+            $component->placeholder($placeholder)->emptyStateLabel($placeholder);
+
+            return;
+        }
+
+        if ($component instanceof PhoneInputComponent) {
+            $component->placeholder($placeholder);
 
             return;
         }
@@ -815,7 +806,7 @@ trait EditsRecordFieldsInline
             || $component instanceof ColorPicker
             || $component instanceof TagsInput
         ) {
-            $component->placeholder($this->inlineEmptyPlaceholder($field));
+            $component->placeholder($placeholder);
         }
     }
 
