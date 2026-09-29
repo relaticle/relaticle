@@ -23,7 +23,7 @@
     @if ($showCopy)
         <button
             type="button"
-            class="fi-multi-value-copy shrink-0 rounded p-0.5 text-primary-500 opacity-70 hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
+            class="fi-multi-value-copy shrink-0 rounded p-0.5 text-primary-500 opacity-70 hover:opacity-100 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1"
             x-on:click.stop="copyToClipboard(@js($copy), {{ $index }}, $event)"
             x-on:keydown.enter.stop
             x-on:keydown.space.stop

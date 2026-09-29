@@ -408,7 +408,7 @@
                                             type="button"
                                             x-on:click.stop="copyToClipboard(value, 'trigger-' + index)"
                                             :aria-label="'Copy ' + value + ' to clipboard'"
-                                            class="absolute right-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-opacity duration-300 py-0.5 pl-2 pr-1 rounded-r bg-gradient-to-r from-gray-100/90 via-gray-100/100 to-gray-100 dark:from-gray-700/0 dark:via-gray-700/70 dark:to-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
+                                            class="absolute right-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100 transition-opacity duration-300 py-0.5 pl-2 pr-1 rounded-r bg-gradient-to-r from-gray-100/90 via-gray-100/100 to-gray-100 dark:from-gray-700/0 dark:via-gray-700/70 dark:to-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1"
                                         >
                                             <x-filament::icon icon="heroicon-m-clipboard-document"
                                                 x-show="copiedIndex !== 'trigger-' + index"
@@ -485,7 +485,7 @@
                                                         type="button"
                                                         x-on:click.stop="copyToClipboard(value, index)"
                                                         :aria-label="'Copy ' + value + ' to clipboard'"
-                                                        class="absolute right-0 opacity-0 group-hover/value:opacity-100 focus:opacity-100 transition-opacity duration-300 py-0.5 pl-2 pr-1 rounded-r bg-gradient-to-r from-gray-100/90 via-gray-100/100 to-gray-100 dark:from-gray-700/0 dark:via-gray-700/70 dark:to-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1"
+                                                        class="absolute right-0 opacity-0 group-hover/value:opacity-100 focus:opacity-100 transition-opacity duration-300 py-0.5 pl-2 pr-1 rounded-r bg-gradient-to-r from-gray-100/90 via-gray-100/100 to-gray-100 dark:from-gray-700/0 dark:via-gray-700/70 dark:to-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-1"
                                                     >
                                                         <x-filament::icon icon="heroicon-m-clipboard-document"
                                                             x-show="copiedIndex !== index"
