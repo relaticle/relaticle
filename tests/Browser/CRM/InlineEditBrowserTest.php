@@ -744,7 +744,7 @@ it('opens a textarea at field size then grows over following rows up to a max he
                 labelTop: label?.getBoundingClientRect().top ?? null,
                 padTop: Number.parseFloat(taStyle.paddingTop),
                 coversNext: (() => {
-                    const next = field?.nextElementSibling?.getBoundingClientRect();
+                    const next = [...document.querySelectorAll('[data-inline-field]')].find((candidate) => field?.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING)?.getBoundingClientRect();
                     const box = wrp.getBoundingClientRect();
 
                     return Boolean(next && box.bottom > next.top + 4);
@@ -783,7 +783,7 @@ it('opens a textarea at field size then grows over following rows up to a max he
             Alpine.$data(editor).growTextarea();
 
             const field = document.querySelector('[data-inline-field="bio"]');
-            const next = field?.nextElementSibling;
+            const next = [...document.querySelectorAll('[data-inline-field]')].find((candidate) => field?.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING);
             const wrpBox = wrp.getBoundingClientRect();
             const nextBox = next?.getBoundingClientRect();
             const fieldBox = field?.getBoundingClientRect();
