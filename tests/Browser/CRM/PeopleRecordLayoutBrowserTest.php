@@ -91,3 +91,53 @@ it('places person details in a left rail beside tasks', function (): void {
         'railAlignedWithTabs' => true,
     ]);
 });
+
+it('stacks a work pane modal above the sidebar and topbar', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $person = People::factory()->recycle([$user, $workspace])->create([
+        'name' => 'Ilya Pashayan',
+    ]);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+        ->assertVisible('.fi-record-work-pane')
+        ->click(__('filament-actions::create.single.label', ['label' => __('filament/resources/task.label')]));
+
+    $stacking = $page->script(<<<'JS'
+        (async () => {
+            const deadline = Date.now() + 5000;
+            let modal = null;
+
+            while (! modal && Date.now() < deadline) {
+                modal = [...document.querySelectorAll('.fi-modal-open .fi-modal-window')].find((window) => window.getClientRects().length > 0) ?? null;
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            if (! modal) {
+                return { ok: false };
+            }
+
+            const sidebar = document.querySelector('.fi-sidebar').getBoundingClientRect();
+            const topbar = document.querySelector('.fi-topbar').getBoundingClientRect();
+            const modalBox = modal.getBoundingClientRect();
+            const ownsPoint = (x, y) => Boolean(document.elementFromPoint(x, y)?.closest('.fi-modal'));
+
+            return {
+                ok: true,
+                coversSidebar: ownsPoint(sidebar.left + sidebar.width / 2, sidebar.top + sidebar.height / 2),
+                coversTopbar: ownsPoint(topbar.left + topbar.width / 2, topbar.top + topbar.height / 2),
+                headerVisible: ownsPoint(modalBox.left + 24, modalBox.top + 16),
+            };
+        })();
+    JS);
+
+    expect($stacking)->toMatchArray([
+        'ok' => true,
+        'coversSidebar' => true,
+        'coversTopbar' => true,
+        'headerVisible' => true,
+    ]);
+});

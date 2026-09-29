@@ -1952,6 +1952,7 @@
     }
 }
 
-html:has(.fi-modal-open) .fi-record-split.fi-from-lg > :has(> .fi-record-details-rail) {
+html:has(.fi-modal-open) .fi-record-split.fi-from-lg > :has(> .fi-record-details-rail),
+html:has(.fi-modal-open) .fi-record-split.fi-from-lg > :has(> .fi-record-work-pane) {
     z-index: auto;
 }
