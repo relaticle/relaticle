@@ -154,7 +154,7 @@
                 },
 
                 panelContentHeight() {
-                    const rowPx = 1.75 * 16;
+                    const rowPx = 2 * 16;
                     const addPx = this.canAddMore ? 2 * 16 : 0;
 
                     return (this.state.length * rowPx) + addPx;
@@ -449,7 +449,6 @@
                         :id="$id('panel')"
                         role="dialog"
                         aria-label="Manage values"
-                        :class="{ 'fi-fo-multi-value-panel-empty': !hasValues }"
                         class="fi-fo-multi-value-panel z-[100] rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
                     >
                         <div class="fi-fo-multi-value-panel-list" wire:ignore>

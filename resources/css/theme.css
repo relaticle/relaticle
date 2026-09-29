@@ -1220,8 +1220,8 @@
 }
 
 .fi-record-details-rail .fi-inline-field-editor:has(.fi-fo-tags-input) .fi-badge,
-.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input a,
-.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input span {
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input button[aria-haspopup] a,
+.fi-record-details-rail .fi-inline-field-editor .fi-fo-multi-value-input button[aria-haspopup] span {
     min-height: 1.25rem;
     font-size: 0.75rem;
     line-height: 1rem;
@@ -1251,14 +1251,9 @@
     min-height: 0;
     max-height: min(12rem, calc(100dvh - 8rem));
     overflow: hidden;
-    border-radius: 0.75rem;
+    border-radius: 0.5rem;
     font-size: var(--record-details-font-size);
     line-height: var(--record-details-font-leading);
-}
-
-.fi-fo-multi-value-panel-empty,
-.fi-fo-multi-value-panel:not(:has(.fi-fo-multi-value-panel-row)) {
-    border-radius: 9999px;
 }
 
 .fi-record-details-rail .fi-fo-multi-value-panel {
@@ -1277,12 +1272,15 @@
 }
 
 .fi-fo-multi-value-panel-link,
-.fi-fo-multi-value-panel a {
+.fi-fo-multi-value-panel a,
+.fi-fo-multi-value-panel .fi-multi-value-chip {
     min-width: 0;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
 }
 
 .fi-fo-multi-value-panel-list::-webkit-scrollbar {
@@ -1292,9 +1290,9 @@
 .fi-fo-multi-value-panel-row {
     gap: 0.375rem;
     min-width: 0;
-    min-height: 1.75rem;
-    padding-block: 0.25rem;
-    padding-inline: 0.5rem;
+    min-height: 2rem;
+    padding-block: 0.375rem;
+    padding-inline: 0.75rem;
 }
 
 .fi-fo-multi-value-panel-row .group\/value {
@@ -1323,8 +1321,8 @@
 }
 
 .fi-fo-multi-value-panel .fi-multi-value-chip {
-    font-size: 0.75rem;
-    line-height: 1rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
 }
 
 .fi-fo-multi-value-overlay-anchor {
@@ -1770,6 +1768,7 @@
 
 .fi-fo-phone-panel [role='listitem'] {
     min-width: 0;
+    min-height: 2rem;
 }
 
 .fi-fo-phone-panel [role='listitem'] .group\/value {
@@ -1785,6 +1784,8 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
 }
 
 .fi-fo-phone-panel [role='listitem'] > button {
