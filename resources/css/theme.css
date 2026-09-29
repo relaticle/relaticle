@@ -1568,6 +1568,9 @@
 
 .fi-record-details-rail .fi-inline-field-editor .fi-fo-date-time-picker-trigger {
     position: absolute;
+    /* Cancels the panel's x-float offset of 8px so the calendar opens flush with the field top. */
+    top: calc(-0.5rem - 1px);
+    inset-inline-start: 0;
     width: 1px;
     height: 1px;
     padding: 0;

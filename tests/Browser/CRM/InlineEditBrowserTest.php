@@ -1693,7 +1693,7 @@ it('aligns a custom select placeholder with idle set-field padding', function ()
     $page->assertNoJavaScriptErrors();
 });
 
-it('opens the close date calendar without extra space under the days', function (): void {
+it('opens the close date calendar flush with the field without extra space under the days', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -1720,9 +1720,11 @@ it('opens the close date calendar without extra space under the days', function 
             const panelBox = panel.getBoundingClientRect();
             const last = days.at(-1).getBoundingClientRect();
             const style = getComputedStyle(panel);
+            const fieldBox = document.querySelector('[data-inline-field="close_date"] .fi-in-entry-content-col').getBoundingClientRect();
 
             return {
                 ok: true,
+                panelOffsetFromField: panelBox.top - fieldBox.top,
                 padBottom: Number.parseFloat(style.paddingBottom),
                 gapBelowDays: panelBox.bottom - last.bottom,
             };
@@ -1730,6 +1732,7 @@ it('opens the close date calendar without extra space under the days', function 
     JS);
 
     expect($chrome['ok'])->toBeTrue()
+        ->and(abs($chrome['panelOffsetFromField']))->toBeLessThanOrEqual(2)
         ->and($chrome['padBottom'])->toBeLessThanOrEqual(10)
         ->and($chrome['gapBelowDays'])->toBeLessThanOrEqual(16);
 
