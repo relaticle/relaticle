@@ -469,6 +469,12 @@
     cursor: pointer;
 }
 
+button[x-on\:click^='copyToClipboard']:focus:not(:focus-visible),
+button[x-on\:click\.stop^='copyToClipboard']:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
 .fi-multi-value-chip {
     display: inline-flex;
     max-width: 100%;
