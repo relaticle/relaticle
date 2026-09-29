@@ -302,6 +302,8 @@ it('keeps email overlay delete buttons inside the panel', function (): void {
         })();
     JS);
 
+    $page->assertVisible('.fi-fo-multi-value-panel');
+
     $inside = $page->script(<<<'JS'
         (() => {
             const panel = document.querySelector('.fi-fo-multi-value-panel');
@@ -362,6 +364,8 @@ it('hugs the empty email overlay to the add row', function (): void {
             return true;
         })();
     JS);
+
+    $page->assertVisible('.fi-fo-multi-value-panel');
 
     $overlay = $page->script(<<<'JS'
         (() => {
@@ -596,14 +600,36 @@ it('opens the company picker as a floating search overlay', function (): void {
 
     $showsPickedName = $page->script(<<<'JS'
         (async () => {
-            const option = [...document.querySelectorAll('[data-inline-field="company_id"] .fi-select-input-option')]
-                .find((el) => (el.textContent || '').includes('Northwind'));
-            option?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
-            await Promise.resolve();
-            await Promise.resolve();
-            const field = document.querySelector('[data-inline-field="company_id"]');
+            const waitFor = async (check) => {
+                const deadline = Date.now() + 5000;
 
-            return Boolean(field?.innerText.includes('Northwind'));
+                while (Date.now() < deadline) {
+                    const result = check();
+                    if (result) {
+                        return result;
+                    }
+
+                    await new Promise((resolve) => setTimeout(resolve, 50));
+                }
+
+                return null;
+            };
+
+            const option = await waitFor(() => [...document.querySelectorAll('[data-inline-field="company_id"] .fi-select-input-option')]
+                .find((el) => (el.textContent || '').includes('Northwind')));
+            if (! option) {
+                return false;
+            }
+
+            option.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }));
+
+            return Boolean(await waitFor(() => {
+                const field = document.querySelector('[data-inline-field="company_id"]');
+                const panel = field?.querySelector('.fi-dropdown-panel');
+                const listOpen = Boolean(panel && panel.style.display !== 'none' && panel.getClientRects().length > 0);
+
+                return ! listOpen && field?.innerText.includes('Northwind');
+            }));
         })();
     JS);
 
