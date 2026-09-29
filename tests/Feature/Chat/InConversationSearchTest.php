@@ -162,7 +162,10 @@ it('returns 404 for a teammates conversation inside the very same workspace', fu
 
 it('returns 404 for the participants own conversation in a workspace they are not currently in', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
-    $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey()]);
+    $otherWorkspace = Workspace::factory()->create([
+        'user_id' => $user->getKey(),
+        'personal_workspace' => false,
+    ]);
     $user->workspaces()->attach($otherWorkspace, ['role' => 'admin']);
 
     seedSearchableConversation($user, 'conv-other-workspace', (string) $otherWorkspace->getKey());
