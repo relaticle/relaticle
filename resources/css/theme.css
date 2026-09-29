@@ -522,6 +522,7 @@
     position: static;
     inset: auto;
     transform: none;
+    translate: none;
     flex-shrink: 0;
     background-image: none;
     background-color: transparent;
