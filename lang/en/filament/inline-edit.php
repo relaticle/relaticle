@@ -17,6 +17,7 @@ return [
     'add_tag' => 'Add tag',
     'add_email' => 'Add email',
     'add_domain' => 'Add domain',
+    'add_link' => 'Add link',
     'add_value' => 'Add',
     'search_records' => 'Search records...',
     'fields' => [

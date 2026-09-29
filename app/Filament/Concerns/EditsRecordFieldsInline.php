@@ -479,6 +479,8 @@ trait EditsRecordFieldsInline
 
         if ($component instanceof MultiValueInputComponent && $field->code === CompanyField::DOMAINS->value) {
             $component->addLabel(__('filament/inline-edit.add_domain'));
+        } elseif ($component instanceof MultiValueInputComponent && $field->type === CustomFieldType::LINK) {
+            $component->addLabel(__('filament/inline-edit.add_link'));
         }
 
         $this->applyInlineEditorPlaceholder($component, $field);

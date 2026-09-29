@@ -730,6 +730,7 @@ it('shows editor placeholders on empty native and custom fields', function (): v
     livewire(ViewPeople::class, ['record' => $person->getKey()])
         ->call('startInlineEdit', PeopleField::LINKEDIN->value)
         ->assertSeeHtml('placeholder="Set linkedin"')
+        ->assertSeeHtml('placeholder="'.__('filament/inline-edit.add_link').'..."')
         ->assertDontSeeHtml('placeholder="Add URL..."');
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])
