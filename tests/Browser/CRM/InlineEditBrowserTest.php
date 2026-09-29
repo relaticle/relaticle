@@ -1575,7 +1575,7 @@ it('opens the tags overlay tall enough to show every tag before scrolling', func
     $page->assertNoJavaScriptErrors();
 });
 
-it('keeps compact right padding on an inline select trigger', function (): void {
+it('keeps compact right padding on an inline select trigger whose field and dropdown fill the value column', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -1589,7 +1589,8 @@ it('keeps compact right padding on an inline select trigger', function (): void 
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}")
         ->click('[data-inline-field="stage"] .fi-in-entry-label')
-        ->assertVisible('[data-inline-field="stage"] .fi-select-input-btn');
+        ->assertVisible('[data-inline-field="stage"] .fi-select-input-btn')
+        ->assertVisible('[data-inline-field="stage"] .fi-dropdown-panel');
 
     $chrome = $page->script(<<<'JS'
         (() => {
@@ -1602,18 +1603,21 @@ it('keeps compact right padding on an inline select trigger', function (): void 
 
             const wrpBox = wrp.getBoundingClientRect();
             const colBox = field.querySelector('.fi-in-entry-content-col')?.getBoundingClientRect();
+            const dropdownBox = field.querySelector('.fi-dropdown-panel')?.getBoundingClientRect();
 
             return {
                 ok: true,
                 paddingEnd: Number.parseFloat(getComputedStyle(btn).paddingInlineEnd),
-                hugsContent: ! colBox || wrpBox.width <= colBox.width - 8,
+                fillsColumn: Boolean(colBox) && Math.abs(wrpBox.width - colBox.width) <= 1,
+                dropdownMatchesField: Boolean(dropdownBox) && Math.abs(dropdownBox.left - wrpBox.left) <= 1 && Math.abs(dropdownBox.width - wrpBox.width) <= 1,
             };
         })();
     JS);
 
     expect($chrome['ok'])->toBeTrue()
         ->and($chrome['paddingEnd'])->toBeLessThanOrEqual(10)
-        ->and($chrome['hugsContent'])->toBeTrue();
+        ->and($chrome['fillsColumn'])->toBeTrue()
+        ->and($chrome['dropdownMatchesField'])->toBeTrue();
 
     $page->assertNoJavaScriptErrors();
 });

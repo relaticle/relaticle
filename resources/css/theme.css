@@ -1641,9 +1641,10 @@
     padding: 0;
 }
 
-.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-inline-overlay-select)) .fi-input-wrp:has(.fi-select-input-btn) {
-    width: max-content;
-    max-width: 100%;
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-inline-overlay-select)) .fi-input-wrp:has(.fi-select-input-btn),
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-inline-overlay-select)) .fi-select-input div[x-ref='select'],
+.fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)):not(:has(.fi-inline-overlay-select)) .fi-select-input-btn {
+    width: 100%;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(textarea)) .fi-select-input-btn {
@@ -1702,13 +1703,6 @@
     overflow: visible;
     text-overflow: unset;
     white-space: nowrap;
-}
-
-.fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-dropdown-panel {
-    box-sizing: border-box;
-    width: max-content !important;
-    min-width: 12rem !important;
-    max-width: min(20rem, calc(100vw - 2rem)) !important;
 }
 
 .fi-record-details-rail .fi-inline-field-editor:not(:has(.fi-inline-overlay-select)) .fi-select-input-btn {
