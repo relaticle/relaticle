@@ -51,17 +51,17 @@ final readonly class CustomFieldFilter implements Filter
         }
 
         if (! is_array($value)) {
-            $this->invalid('Custom field filters must be an object keyed by field code.');
+            $this->invalid(__('validation.custom_field.filter_not_object'));
         }
 
         $fieldCodes = array_keys($value);
 
         if (! array_all($fieldCodes, static fn (mixed $fieldCode): bool => is_string($fieldCode))) {
-            $this->invalid('Custom field filter codes must be strings.');
+            $this->invalid(__('validation.custom_field.filter_code_not_string'));
         }
 
         if (count($fieldCodes) > self::MAX_CONDITIONS) {
-            $this->invalid('Maximum 10 filter conditions allowed.');
+            $this->invalid(__('validation.custom_field.too_many_conditions', ['max' => self::MAX_CONDITIONS]));
         }
 
         $fields = $this->filterableFields();
@@ -83,7 +83,7 @@ final readonly class CustomFieldFilter implements Filter
 
         foreach ($value as $fieldCode => $operators) {
             if (! is_array($operators) || $operators === []) {
-                $this->invalid("Custom field filter [{$fieldCode}] must contain an operator object.");
+                $this->invalid(__('validation.custom_field.operator_object', ['field' => $fieldCode]));
             }
 
             $field = $fields[$fieldCode];
@@ -146,7 +146,11 @@ final readonly class CustomFieldFilter implements Filter
         }
 
         $expected = $type === 'array' ? 'an array of strings' : "a {$type}";
-        $this->invalid("Custom field filter [{$fieldCode}.{$operator}] must be {$expected}.");
+        $this->invalid(__('validation.custom_field.operand_type', [
+            'field' => $fieldCode,
+            'operator' => $operator,
+            'expected' => $expected,
+        ]));
     }
 
     /**

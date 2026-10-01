@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
 
 /**
@@ -27,6 +28,7 @@ final readonly class CustomFieldsFilterDescriber
     public function __construct(
         private CustomFieldFilterSchema $filterSchema,
         private WorkspaceCustomFields $customFields,
+        private CustomFieldOptionMap $optionMap,
     ) {}
 
     public function describe(User $user, string $entityType): string
@@ -81,6 +83,7 @@ final readonly class CustomFieldsFilterDescriber
         return $this->customFields->forEntity($workspace, $entityType)
             ->where('active', true)
             ->whereIn('code', $codes)
+            ->filter($this->optionMap->translates(...))
             ->mapWithKeys(fn (CustomField $field): array => [
                 (string) $field->code => array_values(array_map(strval(...), $field->options->pluck('name')->all())),
             ])

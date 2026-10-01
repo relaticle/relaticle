@@ -15,6 +15,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Tools\BaseReadListTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\ListNotesTool;
@@ -537,4 +538,65 @@ it('excludes options and keeps tasks without a status', function (): void {
     TenantContextService::setTenantId(null);
 
     expect(collect($rows)->pluck('attributes.title')->sort()->values()->all())->toBe(['No status', 'Open one']);
+});
+
+it('rejects custom_fields sent as a string instead of returning every row', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
+
+    $result = json_decode((new ListTasksTool)->handle(new Request([
+        'custom_fields' => '{"status": {"eq": "Done"}}',
+    ])), true);
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('object keyed by field code');
+});
+
+it('shows the operator example when a bare value is given', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
+
+    $result = json_decode((new ListTasksTool)->handle(new Request([
+        'custom_fields' => ['status' => 'Done'],
+    ])), true);
+
+    expect($result['error'])->toContain('must be an operator object, e.g. {"eq": "..."}');
+});
+
+it('lists option labels for a select but not for a tags-input field with suggestions', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Segment',
+        'code' => 'segment',
+        'type' => 'select',
+        'options' => ['Enterprise', 'SMB'],
+    ]);
+    TenantContextService::setTenantId($user->currentWorkspace->getKey());
+
+    $labels = app(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Labels',
+        'code' => 'labels',
+        'type' => 'tags-input',
+    ]);
+    $labels->options()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'name' => 'Priority',
+        'sort_order' => 0,
+    ]);
+
+    $description = resolve(CustomFieldsFilterDescriber::class)->describe($user, 'company');
+    $lines = collect(explode("\n", $description));
+
+    TenantContextService::setTenantId(null);
+
+    expect($lines->first(fn (string $line): bool => str_starts_with($line, '- segment')))->toContain('one of: "Enterprise", "SMB"')
+        ->and($lines->first(fn (string $line): bool => str_starts_with($line, '- labels')))->not->toContain('one of:');
 });
