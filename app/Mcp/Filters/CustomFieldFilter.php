@@ -39,14 +39,9 @@ final readonly class CustomFieldFilter implements Filter
         private string $entityType,
     ) {}
 
-    /**
-     * Spatie splits comma-separated filter values into arrays before the filter runs,
-     * which would turn a `contains` term containing a comma into an array. Splitting is
-     * disabled here because this filter splits list operands itself, per operator type.
-     */
     public static function allowedFilter(string $entityType): CustomFieldAllowedFilter
     {
-        return CustomFieldAllowedFilter::custom('custom_fields', new self($entityType))->delimiter('');
+        return CustomFieldAllowedFilter::custom('custom_fields', new self($entityType));
     }
 
     public function __invoke(Builder $query, mixed $value, string $property): void

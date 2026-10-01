@@ -457,6 +457,20 @@ describe('filtering and sorting', function (): void {
         'empty value' => ['filter[custom_fields][stage][not_in]='],
     ]);
 
+    it('ignores an empty custom field filter parameter', function (string $query): void {
+        Sanctum::actingAs($this->user);
+
+        $deal = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Some Deal']);
+
+        $ids = collect($this->getJson("/api/v1/opportunities?{$query}")->assertOk()->json('data'))->pluck('id');
+
+        expect($ids)->toContain($deal->id);
+    })->with([
+        'empty value' => ['filter[custom_fields]='],
+        'bare key' => ['filter[custom_fields]'],
+        'blank value' => ['filter[custom_fields]=%20'],
+    ]);
+
     it('can filter opportunities by a numeric custom field sent as a query string', function (): void {
         Sanctum::actingAs($this->user);
 

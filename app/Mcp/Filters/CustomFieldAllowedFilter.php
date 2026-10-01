@@ -15,6 +15,10 @@ final class CustomFieldAllowedFilter extends AllowedFilter
      */
     public function applyTo(Builder $builder, mixed $value): void
     {
+        if ($value === null) {
+            return;
+        }
+
         // Spatie prunes empty arrays first, so `not_in: []` would become no filter at all.
         ($this->filterClass)($builder, $value, $this->internalName);
     }
