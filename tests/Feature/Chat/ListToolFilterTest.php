@@ -554,6 +554,17 @@ it('rejects custom_fields sent as a string instead of returning every row', func
         ->and($result['error'])->toContain('object keyed by field code');
 });
 
+it('treats an empty custom_fields string as no filter', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request(['custom_fields' => ''])));
+
+    expect($rows)->toHaveCount(1);
+});
+
 it('shows the operator example when a bare value is given', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
