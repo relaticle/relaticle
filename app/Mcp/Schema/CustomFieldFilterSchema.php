@@ -34,9 +34,6 @@ final readonly class CustomFieldFilterSchema
     /** @var array<int, string> */
     private const array BOOLEAN_OPERATORS = ['eq'];
 
-    /** @var array<int, string> */
-    private const array MULTI_OPERATORS = ['has_any'];
-
     /**
      * @return array<string, array<string, mixed>>
      */
@@ -92,20 +89,28 @@ final readonly class CustomFieldFilterSchema
         }
 
         return match ($fieldType) {
-            CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::listOperators(self::MULTI_OPERATORS),
-            CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
-            CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
-            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
-            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
+            CustomFieldType::TEXT => self::withEmptiness(self::buildOperators(self::STRING_OPERATORS, 'string')),
+            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK,
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::withEmptiness(self::listOperators(['has_any', 'has_none'])),
+            CustomFieldType::CURRENCY => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'number')),
+            CustomFieldType::NUMBER => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'integer')),
+            CustomFieldType::DATE, CustomFieldType::DATE_TIME => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'string')),
+            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::withEmptiness(self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean')),
+            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => self::withEmptiness(array_merge(
                 self::buildOperators(['eq'], 'string'),
-                self::listOperators(['in']),
-            ),
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(self::MULTI_OPERATORS),
+                self::listOperators(['in', 'not_in']),
+            )),
             default => [],
         };
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $operators
+     * @return array<string, array<string, mixed>>
+     */
+    private static function withEmptiness(array $operators): array
+    {
+        return [...$operators, 'is_empty' => ['type' => 'boolean']];
     }
 
     /**

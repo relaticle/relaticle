@@ -420,6 +420,43 @@ describe('filtering and sorting', function (): void {
         expect($ids)->not->toContain($unmatched->id);
     });
 
+    it('reads is_empty from a query string boolean', function (string $raw, bool $expectsEmpty): void {
+        Sanctum::actingAs($this->user);
+
+        $stage = CustomField::query()->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace->id)
+            ->where('entity_type', 'opportunity')
+            ->where('code', 'stage')
+            ->firstOrFail();
+        $staged = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Staged Deal']);
+        $unstaged = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Unstaged Deal']);
+        $staged->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Qualification')->getKey());
+
+        $ids = collect($this->getJson("/api/v1/opportunities?filter[custom_fields][stage][is_empty]={$raw}")->assertOk()->json('data'))->pluck('id');
+
+        $expectsEmpty
+            ? expect($ids)->toContain($unstaged->id)->not->toContain($staged->id)
+            : expect($ids)->toContain($staged->id)->not->toContain($unstaged->id);
+    })->with([
+        'one' => ['1', true],
+        'true' => ['true', true],
+        'zero' => ['0', false],
+        'false' => ['false', false],
+    ]);
+
+    it('rejects an empty exclusion list sent as a query string', function (string $query): void {
+        Sanctum::actingAs($this->user);
+
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Some Deal']);
+
+        $this->getJson("/api/v1/opportunities?{$query}")
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('filter');
+    })->with([
+        'empty array item' => ['filter[custom_fields][stage][not_in][]='],
+        'empty value' => ['filter[custom_fields][stage][not_in]='],
+    ]);
+
     it('can filter opportunities by a numeric custom field sent as a query string', function (): void {
         Sanctum::actingAs($this->user);
 

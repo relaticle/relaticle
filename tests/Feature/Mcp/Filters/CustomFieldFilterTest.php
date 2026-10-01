@@ -448,15 +448,130 @@ it('rejects a list operand longer than one hundred values', function (): void {
         ->assertHasErrors(['stage: pass at most 100 values.']);
 });
 
-it('publishes only array-compatible operators for email, phone, and link fields', function (): void {
+it('publishes list and emptiness operators for email, phone, and link fields', function (): void {
+    $operators = [
+        'has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
+        'has_none' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
+        'is_empty' => ['type' => 'boolean'],
+    ];
+
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('filterable_fields.emails.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
-            ->where('filterable_fields.phone_number.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
-            ->where('filterable_fields.linkedin.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
+            ->where('filterable_fields.emails.properties', $operators)
+            ->where('filterable_fields.phone_number.properties', $operators)
+            ->where('filterable_fields.linkedin.properties', $operators)
             ->etc());
+});
+
+it('includes records with no value when excluding single-choice options', function (): void {
+    $stage = filterTestStageField($this->workspace);
+    $qualified = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Qualified Deal']);
+    $prospect = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Prospect Deal']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Unstaged Deal']);
+    $qualified->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Qualification'));
+    $prospect->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Prospecting'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['not_in' => ['Prospecting']]]])
+        ->assertOk()
+        ->assertSee('Qualified Deal')
+        ->assertSee('Unstaged Deal')
+        ->assertDontSee('Prospect Deal');
+});
+
+it('includes records with no value when excluding multi-choice options', function (): void {
+    $temperature = resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Temperature',
+        'code' => 'temperature',
+        'type' => 'multi-select',
+        'options' => ['Hot', 'Warm'],
+    ]);
+    $hot = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Hot Deal']);
+    $warm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Warm Deal']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Untagged Deal']);
+    $hot->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Hot')]);
+    $warm->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Warm')]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['temperature' => ['has_none' => ['Hot']]]])
+        ->assertOk()
+        ->assertSee('Warm Deal')
+        ->assertSee('Untagged Deal')
+        ->assertDontSee('Hot Deal');
+});
+
+it('keeps a free-text tag containing a comma whole when excluding it', function (): void {
+    $labels = resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Labels',
+        'code' => 'labels',
+        'type' => 'tags-input',
+    ]);
+    $excluded = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Excluded Deal']);
+    $kept = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Kept Deal']);
+    $excluded->saveCustomFieldValue($labels, ['Hot, urgent']);
+    $kept->saveCustomFieldValue($labels, ['urgent']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['has_none' => 'Hot, urgent']]])
+        ->assertOk()
+        ->assertSee('Kept Deal')
+        ->assertDontSee('Excluded Deal');
+});
+
+it('treats a missing row, a null, a blank string and an empty array as empty', function (string $type, array $options, mixed $emptyValue, mixed $filledValue): void {
+    $field = resolve(CreateCustomField::class)->execute($this->user, array_filter([
+        'entity_type' => 'opportunity',
+        'name' => 'Probe',
+        'code' => 'probe',
+        'type' => $type,
+        'options' => $options,
+    ]));
+    $stored = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Stored Empty']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Never Set']);
+    $filled = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Has Value']);
+    $stored->saveCustomFieldValue($field, $emptyValue);
+    $filled->saveCustomFieldValue($field, $options === [] ? $filledValue : array_map(fn (string $label): string => filterTestOptionId($field, $label), $filledValue));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['probe' => ['is_empty' => true]]])
+        ->assertOk()
+        ->assertSee('Stored Empty')
+        ->assertSee('Never Set')
+        ->assertDontSee('Has Value');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['probe' => ['is_empty' => false]]])
+        ->assertOk()
+        ->assertSee('Has Value')
+        ->assertDontSee('Stored Empty')
+        ->assertDontSee('Never Set');
+})->with([
+    'text blank string' => ['text', [], '', 'Acme'],
+    'number null' => ['number', [], null, 5],
+    'multi-select empty array' => ['multi-select', ['Hot'], [], ['Hot']],
+]);
+
+it('does not resolve option labels for the emptiness operand', function (): void {
+    $stage = filterTestStageField($this->workspace);
+    $staged = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Staged Deal']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Unstaged Deal']);
+    $staged->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Qualification'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['is_empty' => true]]])
+        ->assertOk()
+        ->assertSee('Unstaged Deal')
+        ->assertDontSee('Staged Deal');
+});
+
+it('rejects an empty exclusion list instead of matching everything', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['not_in' => []]]])
+        ->assertHasErrors(['must be an array of strings']);
 });
 
 it('filters json array custom fields through the people list tool', function (string $fieldCode, mixed $matchingValue, mixed $otherValue, string $operand): void {

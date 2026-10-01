@@ -15,7 +15,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -45,9 +44,9 @@ final readonly class CustomFieldFilter implements Filter
      * which would turn a `contains` term containing a comma into an array. Splitting is
      * disabled here because this filter splits list operands itself, per operator type.
      */
-    public static function allowedFilter(string $entityType): AllowedFilter
+    public static function allowedFilter(string $entityType): CustomFieldAllowedFilter
     {
-        return AllowedFilter::custom('custom_fields', new self($entityType))->delimiter('');
+        return CustomFieldAllowedFilter::custom('custom_fields', new self($entityType))->delimiter('');
     }
 
     public function __invoke(Builder $query, mixed $value, string $property): void
@@ -269,17 +268,44 @@ final readonly class CustomFieldFilter implements Filter
         string $operator,
         mixed $operand,
     ): void {
-        $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
-            $q->where('custom_field_id', $field->getKey());
+        match ($operator) {
+            'not_in' => $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $q
+                ->where('custom_field_id', $field->getKey())
+                ->whereIn($valueColumn, $operand)),
+            'has_none' => $query->whereDoesntHave('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operand): void {
+                $q->where('custom_field_id', $field->getKey());
+                $this->containsAny($q, $valueColumn, $operand);
+            }),
+            'is_empty' => $operand === true
+                ? $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $this->hasValue($q, $field, $valueColumn))
+                : $query->whereHas('customFieldValues', fn (Builder $q): Builder => $this->hasValue($q, $field, $valueColumn)),
+            default => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
+                $q->where('custom_field_id', $field->getKey());
 
-            match ($operator) {
-                'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
-                'contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
-                'in' => $q->whereIn($valueColumn, $operand),
-                'has_any' => $this->containsAny($q, $valueColumn, $operand),
-                default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
-            };
-        });
+                match ($operator) {
+                    'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
+                    'contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
+                    'in' => $q->whereIn($valueColumn, $operand),
+                    'has_any' => $this->containsAny($q, $valueColumn, $operand),
+                    default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
+                };
+            }),
+        };
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @return Builder<Model>
+     */
+    private function hasValue(Builder $query, CustomField $field, string $valueColumn): Builder
+    {
+        $query->where('custom_field_id', $field->getKey())->whereNotNull($valueColumn);
+
+        return match ($valueColumn) {
+            'json_value' => $query->whereRaw("json_value::jsonb not in ('[]'::jsonb, 'null'::jsonb)"),
+            'string_value', 'text_value' => $query->where($valueColumn, '<>', ''),
+            default => $query,
+        };
     }
 
     /**
