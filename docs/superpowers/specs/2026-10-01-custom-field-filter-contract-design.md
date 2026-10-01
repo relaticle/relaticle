@@ -21,14 +21,17 @@ Filtering stays separate from full-text search. Search finds a record by its tex
 | Surface | Engine | Choice operand | Gaps |
 |---|---|---|---|
 | UI tables | package `SelectFilter`, `TagsFilter`, `TernaryFilter`, `RecordFilter`, pushed by `InteractsWithCustomFields` on the five list pages | picked from the option list | multi-select and tags pickers match all of the picked values, not any |
-| REST API | `App\Mcp\Filters\CustomFieldFilter` via `List*` actions | raw option ID | label returns nothing; `has_any` matches all; no empty or negation |
+| REST API | `App\Mcp\Filters\CustomFieldFilter` via `List*` actions | raw option ID | label returns nothing; `has_any` takes one value only; no empty or negation |
 | MCP | same engine via `BaseListTool` | raw option ID | same as API; nothing tells the agent to pass IDs |
-| Chat | same engine, after `CustomFieldsFilterTranslator` maps labels to IDs | label or ID | `has_any` matches all; no empty or negation |
+| Chat | same engine, after `CustomFieldsFilterTranslator` maps labels to IDs | label or ID | `has_any` takes one value only; no empty or negation |
 
 Facts this design rests on:
 
 - Choice values are stored as option ULIDs: `string_value` for single choice, a `json` array in `json_value` for multi choice.
-- `whereJsonContains(col, [a, b])` compiles to `@>`, which requires every element. In Postgres, `'["a"]'::jsonb @> '["a","b"]'::jsonb` is false. Both the app engine and the package's two multi-value filters (`SelectFilter` on json, and `TagsFilter`, which loops `whereJsonContains` inside one `whereHas`) have this bug.
+- `whereJsonContains(col, [a, b])` compiles to `@>`, which requires every element. In Postgres, `'["a"]'::jsonb @> '["a","b"]'::jsonb` is false. The package's two multi-value filters (`SelectFilter` on json, and `TagsFilter`, which loops `whereJsonContains` inside one `whereHas`) have this bug.
+- The app engine publishes `has_any` with operand type `string`, so `normalizeOperand()` rejects a list. On the API, MCP, and chat, `has_any` accepts exactly one value today.
+- Tags-input values are free text written as-is (`acceptsArbitraryValues`), not option IDs. `CustomFieldInput::skipsOptionTranslation()` already encodes which fields translate labels on write.
+- `get-crm-schema` already lists every choice option with its ID and label in `custom_fields`.
 - `CustomFieldFilter::resolveFields()` filters on `active()` only. `CustomFieldFilterSchema::resolveFilterableFields()` also drops encrypted fields. The engine accepts encrypted fields the schema hides and runs `contains` over ciphertext.
 - `CustomFieldOptionMap::idFor()` already accepts an option ID or a case-insensitive, trimmed label, and `isAmbiguous()` detects duplicate labels.
 - Option saves and deletes clear the tenant's MCP schema cache (`AppServiceProvider::configureCustomFieldSchemaInvalidation`), so cached schemas may list option labels.
@@ -61,15 +64,15 @@ Conditions combine with AND, as today.
 
 ### 3. Choice operands accept a label or an ID
 
-- The engine resolves each choice operand through `CustomFieldOptionMap` before it builds the query. An exact option ID wins. Otherwise it matches a label case-insensitively after trimming.
-- An unknown label or ID fails with a 422 on `filter` that names the field and lists its valid labels. The message keeps the phrase "not one of the options".
+- The engine resolves each choice operand through `CustomFieldOptionMap` before it builds the query. It applies the write path's rule for which fields translate (moved from `CustomFieldInput` to `CustomFieldOptionMap::translates()`), so tags-input and lookup-backed fields match their raw stored strings. An exact option ID wins. Otherwise it matches a label case-insensitively after trimming.
+- An unknown label or ID fails with a 422 on `filter` that names the field and lists its valid labels. It reuses the write path's `validation.custom_field.unknown_option` message.
 - A label shared by two options fails with the existing `validation.custom_field.ambiguous_option` message.
 - **Behavior change for API integrators:** a stale or mistyped option ID used to return an empty list with a 200. It now returns a 422. That is the intent: an empty list reads as a confident wrong answer.
 - The canonical form is the option ID. Labels are an input convenience. Anything that persists a filter later (saved views) stores IDs, so renaming an option never breaks a saved filter.
 
 ### 4. `has_any` means any of
 
-A record holding only `[Hot]` matches `has_any [Hot, Warm]`. Implementation: one `whereHas` per condition, and inside it a grouped `where` of `orWhereJsonContains(column, [value])` per element. The `?|` jsonb operator is not used because `?` collides with PDO placeholders.
+`has_any` and `has_none` take a list (a single value still works). A record holding only `[Hot]` matches `has_any [Hot, Warm]`. Implementation: one `whereHas` per condition, and inside it a grouped `where` of `orWhereJsonContains(column, [value])` per element. The `?|` jsonb operator is not used because `?` collides with PDO placeholders.
 
 **Behavior change in the UI:** the multi-select picker (package `SelectFilter` on json values) and the tags picker (`TagsFilter`) switch from all-of to any-of. That matches Filament's own multiple `SelectFilter` and what "is any of" reads as in the filter chip.
 
@@ -120,8 +123,9 @@ OR groups, when they come, use a `$`-prefixed key in the filter object (for exam
 | File | Change |
 |---|---|
 | `app/Mcp/Filters/CustomFieldFilter.php` | label or ID resolution; `not_in`, `has_none`, `is_empty`; any-of `has_any`; list cap; shared field predicate; options eager-loaded in `resolveFields()` |
-| `app/Mcp/Schema/CustomFieldFilterSchema.php` | new operators in `operatorsForType()`; public filterable-field predicate; choice entries in `filterable_fields` list option labels |
-| `app/Mcp/Tools/BaseListTool.php` | `filter` description names the operators and says choice values take a label or an ID |
+| `app/Mcp/Schema/CustomFieldFilterSchema.php` | new operators in `operatorsForType()`, list operands typed as arrays with `maxItems`; public filterable-field predicate |
+| `app/Support/CustomFields/CustomFieldOptionMap.php`, `CustomFieldInput.php` | `translates(CustomField)` moves from `CustomFieldInput::skipsOptionTranslation()` so writes and filters share one rule |
+| `app/Mcp/Tools/BaseListTool.php` | `filter` description names the operators, says choice values take a label or an ID, and points to the options in `get-crm-schema` |
 | `app/Mcp/Resources/*SchemaResource.php` | `usage` string updated the same way |
 | `packages/Chat/src/Services/Tools/CustomFieldsFilterTranslator.php` | deleted; the engine now does its job, and the project forbids dual paths |
 | `packages/Chat/src/Tools/BaseReadListTool.php` | passes `custom_fields` straight to the engine and surfaces its validation message |
@@ -144,7 +148,7 @@ The package changelog states the all-of to any-of change.
 
 - All filter errors are `ValidationException` on `filter`. REST returns 422. MCP returns an error result. Chat returns the message to the model, which can correct its call.
 - Messages name the field code, and for choice fields they list valid labels. They use `__()` keys.
-- Chat's current wording carries over: the tests assert "ambiguous" and "not one of the options".
+- One wording on every surface. Unknown code and unsupported operator adopt chat's wording, which lists the valid choices; the MCP tests that pin the old engine wording update. Unknown option reuses the write path's message.
 
 ## Testing
 
@@ -161,7 +165,7 @@ Fixtures write option IDs through `saveCustomFieldValue($field, $option->id)`, n
    - encrypted field code is rejected as unknown
    - a 101-value list is rejected
    - REST array form carries a label containing a comma
-3. **Chat:** `tests/Feature/Chat/ListToolFilterTest.php` passes unchanged after the translator is removed.
+3. **Chat:** `tests/Feature/Chat/ListToolFilterTest.php` passes after the translator is removed, with one assertion updated from "not one of the options" to the shared write-path wording.
 4. **Contract test**, new file `tests/Feature/Mcp/Filters/CustomFieldFilterContractTest.php` beside the engine's tests: one fixture of opportunities and companies on fields visible in the list. It applies the Filament table filter through Livewire on the list page and the same filter through the REST list, then asserts identical ID sets for single-choice `in`, multi-select `has_any`, and tags `has_any`.
 5. **Package:** tests for any-of in `SelectFilter` and `TagsFilter`.
 6. **Query plan:** `EXPLAIN ANALYZE` for `not_in` and `is_empty` on a seeded tenant with 50k records. `NOT EXISTS` should use the `(entity_id, custom_field_id)` index.
