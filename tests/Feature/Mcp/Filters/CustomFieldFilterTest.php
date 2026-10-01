@@ -148,6 +148,17 @@ it('rejects unknown field codes', function (): void {
         ->get();
 })->throws(ValidationException::class, '"nonexistent_field" is not a filterable custom field on opportunity.');
 
+it('names one unknown field code at a time', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => [
+                'first_typo' => ['eq' => 'x'],
+                'second_typo' => ['eq' => 'y'],
+            ],
+        ])
+        ->assertHasErrors(['"first_typo" is not a filterable custom field on opportunity.']);
+});
+
 it('rejects unknown operators', function (): void {
     $amountField = CustomField::query()
         ->withoutGlobalScopes()

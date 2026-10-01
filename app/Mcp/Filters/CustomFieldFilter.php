@@ -71,11 +71,11 @@ final readonly class CustomFieldFilter implements Filter
 
         $fields = $this->filterableFields();
 
-        $unknownFieldCodes = array_diff($fieldCodes, $fields->keys()->all());
+        $unknownFieldCode = array_first(array_diff($fieldCodes, $fields->keys()->all()));
 
-        if ($unknownFieldCodes !== []) {
+        if ($unknownFieldCode !== null) {
             $this->invalid(__('validation.custom_field.unknown_filter_field', [
-                'field' => implode(', ', $unknownFieldCodes),
+                'field' => $unknownFieldCode,
                 'entity' => $this->entityType,
                 'available' => $fields->isEmpty() ? 'none' : $fields->keys()->implode(', '),
             ]));
