@@ -7,6 +7,7 @@ use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\SearchTool;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
@@ -14,7 +15,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Testing\Fluent\AssertableJson;
 
-mutates(SearchTool::class, FetchTool::class);
+mutates(SearchTool::class, FetchTool::class, CustomFieldValue::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -116,6 +117,54 @@ it('searches custom fields and treats wildcard characters literally', function (
             ->etc());
 });
 
+it('finds notes and tasks by the visible text of their rich text fields', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Customer call']);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Renewal follow-up']);
+
+    $note->saveCustomFieldValue(
+        richTextField($this->workspace, 'note', 'body'),
+        '<p>Len imported <strong>40</strong> companies &amp; chatted with the assistant.</p>',
+    );
+    $task->saveCustomFieldValue(
+        richTextField($this->workspace, 'task', 'description'),
+        '<p>Check the <em>CDA</em> renewal date</p><ul><li>Send&nbsp;the draft</li></ul>',
+    );
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'imported 40 companies & chatted'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 1)
+            ->where('results.0.title', 'Customer call')
+            ->etc());
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => 'CDA renewal date Send the draft'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 1)
+            ->where('results.0.title', 'Renewal follow-up')
+            ->etc());
+});
+
+it('never matches rich text markup that a reader cannot see', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Linked note']);
+
+    $note->saveCustomFieldValue(
+        richTextField($this->workspace, 'note', 'body'),
+        '<p><strong>Bold</strong> claim with <a href="https://example.com/hidden-path">a link</a></p>',
+    );
+
+    foreach (['strong', 'hidden-path', 'href'] as $markup) {
+        RelaticleServer::actingAs($this->user)
+            ->tool(SearchTool::class, ['query' => $markup])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->has('results', 0)
+                ->etc());
+    }
+});
+
 it('reports per-entity truncation and orders results deterministically', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Match Beta']);
     People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Match Alpha']);
@@ -203,3 +252,13 @@ it('returns sanitized fetch payload without internal columns', function (): void
                 ->etc();
         });
 });
+
+function richTextField(Workspace $workspace, string $entityType, string $code): CustomField
+{
+    return CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', $entityType)
+        ->where('code', $code)
+        ->firstOrFail();
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
@@ -13,7 +14,7 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\SearchCrmTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(SearchCrmTool::class);
+mutates(SearchCrmTool::class, CustomFieldValue::class);
 
 it('finds a person by their email custom field value, not just their name', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -68,6 +69,43 @@ it('never matches an option id or rich text markup that merely contains the quer
 
     expect($results['tasks'])->toBeEmpty()
         ->and($results['notes'])->toBeEmpty();
+});
+
+it('finds a note by a phrase in its body, read the way a person sees it', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $note = Note::factory()->for($workspace)->create(['title' => 'Customer call']);
+    $note->update(['custom_fields' => ['body' => '<p>Len imported <strong>40</strong> companies &amp; chatted.</p>']]);
+    TenantContextService::setTenantId(null);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'imported 40 companies & chatted'])), true);
+
+    expect(collect($results['notes'])->pluck('title')->all())->toBe(['Customer call']);
+});
+
+it('ignores values held by a deactivated custom field', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $person = People::factory()->for($workspace)->create(['name' => 'Dana Field']);
+    $person->update(['custom_fields' => ['job_title' => 'Chief Pipeline Officer']]);
+    TenantContextService::setTenantId(null);
+
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'job_title')
+        ->update(['active' => false]);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'Pipeline Officer'])), true);
+
+    expect($results['people'])->toBeEmpty();
 });
 
 it('never surfaces another tenant\'s matching custom field value', function (): void {

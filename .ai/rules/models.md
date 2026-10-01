@@ -16,3 +16,13 @@ paths:
   `where('email', $userInput)`. Same ladder for future scalar normalization:
   one inbound cast per concept in `app/Casts`, value objects only for
   compound values.
+
+## `custom_field_values.visible_text` is generated, never written
+
+The column is `GENERATED ALWAYS AS (...) STORED`: Postgres derives it from `text_value` on every
+write, so search sees the visible text of rich-text fields whatever path wrote them. Never set it,
+and never copy whole rows with `replicate()` or `INSERT ... SELECT *`; both fail on a generated
+column. Its SQL mirrors `App\Support\PlainText::fromHtml()`, so change the two together. Adding or
+changing a stored generated column rewrites the table under an exclusive lock (about 8 s at the
+2026-10 production size), so ship such migrations at a quiet moment.
+
