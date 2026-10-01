@@ -105,7 +105,13 @@ final readonly class CustomFieldFilter implements Filter
                     ]));
                 }
 
-                $operand = $this->normalizeOperand((string) $fieldCode, $operator, $operand, $supportedOperators[$operator]);
+                $operand = $this->normalizeOperand(
+                    (string) $fieldCode,
+                    $operator,
+                    $operand,
+                    $supportedOperators[$operator],
+                    isset($options[$fieldCode]),
+                );
                 $operand = $this->resolveOptions($optionMap, (string) $fieldCode, $options[$fieldCode] ?? null, $operand);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
@@ -121,12 +127,12 @@ final readonly class CustomFieldFilter implements Filter
      *
      * @param  array<string, mixed>  $operatorSchema
      */
-    private function normalizeOperand(string $fieldCode, string $operator, mixed $operand, array $operatorSchema): mixed
+    private function normalizeOperand(string $fieldCode, string $operator, mixed $operand, array $operatorSchema, bool $splitsStrings): mixed
     {
         $type = $operatorSchema['type'] ?? null;
 
         $normalized = match ($type) {
-            'array' => $this->toStringList($operand),
+            'array' => $this->toStringList($operand, $splitsStrings),
             'boolean' => $this->toBoolean($operand),
             'integer' => $this->toInteger($operand),
             'number' => $this->toNumber($operand),
@@ -188,10 +194,10 @@ final readonly class CustomFieldFilter implements Filter
     }
 
     /** @return list<string>|null */
-    private function toStringList(mixed $operand): ?array
+    private function toStringList(mixed $operand, bool $splitsStrings): ?array
     {
         if (is_string($operand)) {
-            $operand = explode(self::LIST_DELIMITER, $operand);
+            $operand = $splitsStrings ? explode(self::LIST_DELIMITER, $operand) : [$operand];
         }
 
         if (! is_array($operand) || $operand === [] || ! array_is_list($operand)) {

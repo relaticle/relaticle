@@ -11,6 +11,7 @@ use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\People\ListPeopleTool;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -384,6 +385,59 @@ it('matches free-text tags by their raw value without an option lookup', functio
         ->assertOk()
         ->assertSee('Urgent Deal')
         ->assertDontSee('Calm Deal');
+});
+
+it('keeps a free-text tag containing a comma whole', function (): void {
+    $labels = resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Labels',
+        'code' => 'labels',
+        'type' => 'tags-input',
+    ]);
+    $urgent = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Urgent Deal']);
+    $calm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Calm Deal']);
+    $urgent->saveCustomFieldValue($labels, ['Hot, urgent']);
+    $calm->saveCustomFieldValue($labels, ['urgent']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['has_any' => 'Hot, urgent']]])
+        ->assertOk()
+        ->assertSee('Urgent Deal')
+        ->assertDontSee('Calm Deal');
+});
+
+it('keeps a link containing a comma whole', function (): void {
+    $linkedin = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'linkedin')
+        ->firstOrFail();
+    $matching = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Matching Person']);
+    $other = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Other Person']);
+    $matching->saveCustomFieldValue($linkedin, ['https://example.com/?a=1,2']);
+    $other->saveCustomFieldValue($linkedin, ['https://example.com/?a=1']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListPeopleTool::class, ['filter' => ['linkedin' => ['has_any' => 'https://example.com/?a=1,2']]])
+        ->assertOk()
+        ->assertSee('Matching Person')
+        ->assertDontSee('Other Person');
+});
+
+it('rejects a label shared by two options and asks for the id', function (): void {
+    $stage = filterTestStageField($this->workspace);
+
+    CustomFieldOption::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_id' => $stage->getKey(),
+        'name' => 'CLOSED WON',
+        'sort_order' => 99,
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => 'Closed Won']]])
+        ->assertHasErrors(['is ambiguous']);
 });
 
 it('rejects a list operand longer than one hundred values', function (): void {

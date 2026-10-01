@@ -523,6 +523,27 @@ describe('filtering and sorting', function (): void {
         expect($ids)->toContain($hot->id)->not->toContain($warm->id);
     });
 
+    it('keeps a free-text tag containing a comma whole when sent as a query string', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $labels = resolve(CreateCustomField::class)->execute($this->user, [
+            'entity_type' => 'opportunity',
+            'name' => 'Labels',
+            'code' => 'labels',
+            'type' => 'tags-input',
+        ]);
+        $urgent = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Urgent Deal']);
+        $calm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Calm Deal']);
+        $urgent->saveCustomFieldValue($labels, ['Hot, urgent']);
+        $calm->saveCustomFieldValue($labels, ['urgent']);
+
+        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][labels][has_any]='.urlencode('Hot, urgent'))
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id');
+        expect($ids)->toContain($urgent->id)->not->toContain($calm->id);
+    });
+
     it('keeps a comma inside a contains operand sent as a query string', function (): void {
         Sanctum::actingAs($this->user);
 
