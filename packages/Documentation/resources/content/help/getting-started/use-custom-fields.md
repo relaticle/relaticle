@@ -34,8 +34,8 @@ The field shows up immediately wherever that entity is created or edited.
 Each field has toggles for **Visible in List**, **Visible in View**,
 **Toggleable Hidden**, **Searchable**, and **Encrypted**, plus, for
 single-choice fields, **Enable Color Options** or **Unique Per Entity Type**.
-Fields marked **Searchable** also become available in that entity's filter
-panel. See
+A field that holds a choice, tags, or a linked record also appears in that
+entity's filter panel while **Visible in List** is on. See
 [Find anything with search and filters](/help/getting-started/find-anything-with-search-and-filters).
 
 ## If a field is marked System, then you can edit it but not delete it

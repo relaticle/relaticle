@@ -75,7 +75,7 @@ final class PeopleSchemaResource extends Resource implements ProvidesEntitySchem
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators.',
+            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Filter list tools with the "filter" param: an object keyed by field code, each value an operator object such as {"eq": "Closed Won"}, {"not_in": ["Done"]} or {"is_empty": true}. Operators per field are listed in filterable_fields. Choice values take an option label or ID.',
         ];
     }
 }

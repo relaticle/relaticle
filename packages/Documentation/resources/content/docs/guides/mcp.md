@@ -246,6 +246,24 @@ Entity list tools support `search`, `per_page` (default 15, maximum 25), and `pa
 
 List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs.
 
+### Filter by custom fields
+
+Pass `filter` as an object keyed by field code. Each value is an operator object. `get-crm-schema-tool` lists the operators for every field under `filterable_fields`, and every choice option under `custom_fields`.
+
+| Field type | Operators |
+|---|---|
+| Single choice (select, radio, toggle buttons) | `eq`, `in`, `not_in`, `is_empty` |
+| Multi choice (multi select, checkbox list), tags, email, phone, link | `has_any`, `has_none`, `is_empty` |
+| Text | `eq`, `contains`, `is_empty` |
+| Number, currency, date, date and time | `eq`, `gt`, `gte`, `lt`, `lte`, `is_empty` |
+| Checkbox, toggle | `eq`, `is_empty` |
+
+Choice values take the option label or its ID. An unknown or ambiguous label returns an error that lists the valid ones. Tags, email, phone and link values match their exact stored value. `not_in` and `has_none` also match records where the field is empty. `is_empty` takes `true` or `false`. Conditions combine with AND, up to 10 per call and 100 values per list.
+
+```json
+{"stage": {"not_in": ["Closed Won", "Closed Lost"]}, "amount": {"gte": 10000}}
+```
+
 ---
 
 ## Schema Resources
