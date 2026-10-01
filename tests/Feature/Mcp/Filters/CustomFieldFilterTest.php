@@ -10,13 +10,16 @@ use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\People\ListPeopleTool;
 use App\Models\CustomField;
+use App\Models\CustomFieldSection;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Http\Request;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Spatie\QueryBuilder\QueryBuilder;
 
 mutates(
@@ -34,6 +37,32 @@ beforeEach(function (): void {
     $this->actingAs($this->user);
     resolve(CurrentWorkspace::class)->set($this->workspace);
 });
+
+function filterTestField(Workspace $workspace, string $entityType, string $code, string $type, ?CustomFieldSettingsData $settings = null): CustomField
+{
+    $section = CustomFieldSection::query()->create([
+        'tenant_id' => $workspace->getKey(),
+        'entity_type' => $entityType,
+        'name' => "{$code} section",
+        'code' => "{$code}_section",
+        'type' => 'section',
+        'sort_order' => 99,
+        'active' => true,
+    ]);
+
+    return CustomField::query()->create([
+        'tenant_id' => $workspace->getKey(),
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => $entityType,
+        'code' => $code,
+        'name' => ucfirst(str_replace('_', ' ', $code)),
+        'type' => $type,
+        'sort_order' => 99,
+        'active' => true,
+        'validation_rules' => [],
+        'settings' => $settings ?? new CustomFieldSettingsData,
+    ]);
+}
 
 it('filters by custom field equality', function (): void {
     $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal A']);
@@ -117,7 +146,7 @@ it('rejects unknown field codes', function (): void {
             CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
-})->throws(ValidationException::class, 'Unknown custom field filter codes: nonexistent_field.');
+})->throws(ValidationException::class, '"nonexistent_field" is not a filterable custom field on opportunity.');
 
 it('rejects unknown operators', function (): void {
     $amountField = CustomField::query()
@@ -140,7 +169,7 @@ it('rejects unknown operators', function (): void {
             CustomFieldFilter::allowedFilter('opportunity'),
         )
         ->get();
-})->throws(ValidationException::class, 'Custom field [amount] does not support operator [approximately].');
+})->throws(ValidationException::class, 'Operator "approximately" is not supported for "amount".');
 
 it('rejects more than 10 filter conditions', function (): void {
     $filters = [];
@@ -167,7 +196,17 @@ it('returns an actionable MCP error for an operator incompatible with the field 
                 'amount' => ['contains' => '500'],
             ],
         ])
-        ->assertHasErrors(['does not support operator [contains]']);
+        ->assertHasErrors(['Operator "contains" is not supported for "amount".']);
+});
+
+it('rejects an encrypted custom field as an unknown filter code', function (): void {
+    filterTestField($this->workspace, 'opportunity', 'secret_code', 'text', new CustomFieldSettingsData(encrypted: true));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, [
+            'filter' => ['secret_code' => ['eq' => 'x']],
+        ])
+        ->assertHasErrors(['"secret_code" is not a filterable custom field on opportunity']);
 });
 
 it('returns an actionable MCP error for an invalid operand shape', function (): void {

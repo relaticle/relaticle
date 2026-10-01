@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -68,12 +69,16 @@ final readonly class CustomFieldFilter implements Filter
             $this->invalid('Maximum 10 filter conditions allowed.');
         }
 
-        $fields = $this->resolveFields($fieldCodes);
+        $fields = $this->filterableFields();
 
         $unknownFieldCodes = array_diff($fieldCodes, $fields->keys()->all());
 
         if ($unknownFieldCodes !== []) {
-            $this->invalid('Unknown custom field filter codes: '.implode(', ', $unknownFieldCodes).'.');
+            $this->invalid(__('validation.custom_field.unknown_filter_field', [
+                'field' => implode(', ', $unknownFieldCodes),
+                'entity' => $this->entityType,
+                'available' => $fields->isEmpty() ? 'none' : $fields->keys()->implode(', '),
+            ]));
         }
 
         foreach ($value as $fieldCode => $operators) {
@@ -87,8 +92,11 @@ final readonly class CustomFieldFilter implements Filter
 
             foreach ($operators as $operator => $operand) {
                 if (! isset($supportedOperators[$operator])) {
-                    $allowed = implode(', ', array_keys($supportedOperators));
-                    $this->invalid("Custom field [{$fieldCode}] does not support operator [{$operator}]. Allowed operators: {$allowed}.");
+                    $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
+                        'operator' => $operator,
+                        'field' => $fieldCode,
+                        'supported' => implode(', ', array_keys($supportedOperators)),
+                    ]));
                 }
 
                 $operand = $this->normalizeOperand((string) $fieldCode, $operator, $operand, $supportedOperators[$operator]);
@@ -217,22 +225,16 @@ final readonly class CustomFieldFilter implements Filter
     }
 
     /**
-     * @param  array<int, string>  $fieldCodes
      * @return Collection<string, CustomField>
      */
-    private function resolveFields(array $fieldCodes): Collection
+    private function filterableFields(): Collection
     {
         /** @var User $user */
         $user = auth()->user();
 
-        /** @var Collection<string, CustomField> */
-        return CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $user->currentWorkspace->getKey())
-            ->where('entity_type', $this->entityType)
-            ->whereIn('code', $fieldCodes)
-            ->active()
-            ->get()
+        return resolve(WorkspaceCustomFields::class)
+            ->forEntity($user->currentWorkspace, $this->entityType)
+            ->filter(CustomFieldFilterSchema::isFilterable(...))
             ->keyBy('code');
     }
 }

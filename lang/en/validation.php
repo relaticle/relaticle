@@ -30,6 +30,9 @@ return [
     'custom_field' => [
         'unknown_option' => ':field: option ":value" is not one of: :labels.',
         'ambiguous_option' => ':field: option ":value" is ambiguous, pass the option ID.',
+        'unknown_filter_field' => '":field" is not a filterable custom field on :entity. Available: :available.',
+        'unsupported_filter_operator' => 'Operator ":operator" is not supported for ":field". Supported: :supported.',
+        'too_many_values' => ':field: pass at most :max values.',
         'single_option' => ':field: pass a single option label or ID.',
         'option_list' => ':field: pass an array of option labels or IDs.',
         'foreign_records' => ':field: records :ids do not belong to this workspace.',

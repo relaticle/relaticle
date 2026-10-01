@@ -8,7 +8,6 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Support\Media\RichContentAttachments;
 use Illuminate\Validation\ValidationException;
-use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 final readonly class CustomFieldInput
@@ -88,7 +87,7 @@ final readonly class CustomFieldInput
      */
     private function singleOption(CustomField $field, mixed $value, array $entry): mixed
     {
-        if ($this->skipsOptionTranslation($field)) {
+        if (! $this->optionMap->translates($field)) {
             return $value;
         }
 
@@ -108,7 +107,7 @@ final readonly class CustomFieldInput
      */
     private function optionList(CustomField $field, mixed $value, array $entry): mixed
     {
-        if ($this->skipsOptionTranslation($field)) {
+        if (! $this->optionMap->translates($field)) {
             return $value;
         }
 
@@ -168,13 +167,6 @@ final readonly class CustomFieldInput
     private function isBlankString(mixed $value): bool
     {
         return is_string($value) && blank($value);
-    }
-
-    private function skipsOptionTranslation(CustomField $field): bool
-    {
-        $typeData = CustomFieldsType::getFieldType($field->type);
-
-        return $typeData === null || $typeData->acceptsArbitraryValues || $field->lookup_type !== null;
     }
 
     private function fail(CustomField $field, string $message): never

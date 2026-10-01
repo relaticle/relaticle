@@ -70,6 +70,14 @@ final readonly class CustomFieldFilterSchema
             ->all();
     }
 
+    public static function isFilterable(CustomField $field): bool
+    {
+        return $field->active
+            && ! in_array($field->type, self::EXCLUDED_TYPES, true)
+            && ! $field->settings->encrypted
+            && self::operatorsForType($field->type) !== [];
+    }
+
     /**
      * @return array<string, array<string, string|array<string, mixed>>>
      */
@@ -124,9 +132,7 @@ final readonly class CustomFieldFilterSchema
         /** @var Collection<int, CustomField> */
         return Cache::remember($cacheKey, McpSchemaCache::TTL, fn (): Collection => resolve(WorkspaceCustomFields::class)
             ->forEntity($workspace, $entityType)
-            ->filter(fn (CustomField $field): bool => $field->active
-                && ! in_array($field->type, self::EXCLUDED_TYPES, true)
-                && ! $field->settings->encrypted)
+            ->filter(self::isFilterable(...))
             ->map(fn (CustomField $field): CustomField => $field->withoutRelations())
             ->values());
     }
