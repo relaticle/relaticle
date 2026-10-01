@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's 39 MCP tools, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-09-15"
+updated: "2026-10-01"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update contacts, and more -- all from a natural conversation.
@@ -258,7 +258,7 @@ Pass `filter` as an object keyed by field code. Each value is an operator object
 | Number, currency, date, date and time | `eq`, `gt`, `gte`, `lt`, `lte`, `is_empty` |
 | Checkbox, toggle | `eq`, `is_empty` |
 
-Choice values take the option label or its ID. An unknown or ambiguous label returns an error that lists the valid ones. Tags, email, phone and link values match their exact stored value. `not_in` and `has_none` also match records where the field is empty. `is_empty` takes `true` or `false`. Conditions combine with AND, up to 10 per call and 100 values per list.
+Select, radio, toggle buttons, multi select and checkbox list values take the option label or its ID. An unknown label returns an error listing the valid labels. An ambiguous label asks for the option ID. Tags, email, phone and link values match their exact stored value. `not_in` and `has_none` also match records where the field is empty. `is_empty` takes `true` or `false`. Conditions combine with AND, up to 10 per call and 100 values per list.
 
 ```json
 {"stage": {"not_in": ["Closed Won", "Closed Lost"]}, "amount": {"gte": 10000}}

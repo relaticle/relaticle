@@ -26,9 +26,8 @@ shows what you searched for as a removable chip under **Active filters**.
 ## Filter a list
 
 1. Click the **Filter** icon above the table.
-2. Set any of the filters shown: built-in ones like **Creation Source** and
-   **Deleted records**, plus custom fields that offer a list of choices, tags,
-   or linked records.
+2. Set any of the filters shown, such as **Creation Source** and **Deleted records**.
+   Custom fields that hold choices, tags, or linked records appear here too.
 3. Click **Reset** to clear them all.
 
 ![The Filters panel for Companies, showing Creation Source, Deleted records, Industry Tags, and Region Tags](/help-assets/getting-started/find-anything-with-search-and-filters-2.png)

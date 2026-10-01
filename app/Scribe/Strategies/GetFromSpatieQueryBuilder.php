@@ -145,8 +145,8 @@ final class GetFromSpatieQueryBuilder extends Strategy
         $params['filter[custom_fields][{code}][{operator}]'] = [
             'type' => 'string',
             'required' => false,
-            'description' => 'Filter by a custom field value. Single choice: eq, in, not_in. Multi choice, email, phone, link: has_any, has_none. Text: eq, contains. Numbers and dates: eq, gt, gte, lt, lte. Every type: is_empty (1, 0, true or false). Choice values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma. Tags, email, phone and link values are matched whole, so repeat [] to send several. not_in and has_none also match records where the field is empty. Up to 10 conditions, 100 values per list.',
-            'example' => 'Qualification,Prospecting',
+            'description' => 'Filter by a custom field value. Single choice: eq, in, not_in. Multi choice, tags, email, phone, link: has_any, has_none. Text: eq, contains. Numbers and dates: eq, gt, gte, lt, lte. Checkbox, toggle: eq. Every type: is_empty (1, 0, true or false). Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma. Tags, email, phone and link values match the exact stored value, so repeat [] to send several. not_in and has_none also match records where the field is empty. Up to 10 conditions, 100 values per list. Example for an opportunity stage field: filter[custom_fields][stage][in]=Qualification,Prospecting.',
+            'example' => null,
         ];
     }
 
