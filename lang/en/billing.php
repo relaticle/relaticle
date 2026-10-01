@@ -112,13 +112,16 @@ return [
     'upgrade' => [
         'button' => 'Upgrade to Pro',
         'now' => 'Upgrade now instead',
+        'rate_limited' => 'Too many attempts. Please wait :seconds seconds before trying again.',
         'activating' => 'Payment received. Activating Pro…',
         'activation_delayed_title' => 'Activation is taking longer than usual',
         'activation_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if Pro still is not active.',
-        'confirm_title' => 'Confirm your workspace',
-        'confirm_body' => 'You are subscribing :workspace. Switch workspaces first if that is not the one you meant.',
-        'confirm_button' => 'Yes, subscribe :workspace',
-        'confirm_cancel' => 'Cancel',
+        'modal_heading' => 'Upgrade plan',
+        'modal_plan_title' => 'Continue with Pro',
+        'billing_period' => 'Billing period',
+        'trial_notice' => 'Your card will not be charged until your trial ends on :date',
+        'paid_title' => 'Payment received',
+        'close' => 'Close',
     ],
     'subscribe' => [
         'button' => 'Subscribe now',
@@ -134,6 +137,7 @@ return [
         'cancel_scheduled_legacy_body' => 'Cloud Pro stays active until :date. Then this workspace returns to its grandfathered Free plan.',
         'past_due_title' => 'Payment issue',
         'past_due_body' => 'Your last payment failed. Update your payment method to keep Pro.',
+        'first_charge' => 'First charge on :date',
     ],
     'payment_failed' => [
         'notification_title' => 'Payment failed for :workspace',
@@ -184,6 +188,8 @@ return [
     ],
     'errors' => [
         'checkout_failed' => "We couldn't start checkout just now. Please try again in a moment.",
+        'frame_failed' => 'The payment form could not load. Check your connection or any ad blocker, then try again.',
+        'retry' => 'Try again',
     ],
     'access' => [
         'paused_api' => 'This workspace is paused. Subscribe to Cloud Pro to restore access.',

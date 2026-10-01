@@ -31,7 +31,7 @@
             $isEnterprise => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
             $pastDue => [__('billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
             $onGrace => [__('billing.status.canceling'), 'bg-warning-50 text-warning-700 dark:bg-warning-400/10 dark:text-warning-400'],
-            $onTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
+            $onTrial, $onStripeTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
             $isSubscribed => [__('billing.status.active'), 'bg-success-50 text-success-700 dark:bg-success-400/10 dark:text-success-400'],
             $onLegacyFree => [__('billing.status.grandfathered'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
             default => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
@@ -46,25 +46,9 @@
         $card = 'rounded-2xl border border-[var(--surface-card-border)] bg-white shadow-sm dark:bg-[var(--surface-card-bg)] dark:shadow-none';
     @endphp
 
-    <div
-        class="w-full max-w-2xl space-y-5"
-        @if($activating) x-data="{ waited: false }" x-init="setTimeout(() => waited = true, 60000)" @endif
-    >
+    <div class="w-full max-w-2xl space-y-5">
         @if($activating)
-            <div class="{{ $card }} flex items-center gap-3 p-5" wire:poll.3s x-show="! waited">
-                <x-filament::loading-indicator class="h-5 w-5 text-primary" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-200">{{ __('billing.upgrade.activating') }}</span>
-            </div>
-
-            <div class="rounded-2xl border border-warning-200 bg-warning-50 p-5 dark:border-warning-400/20 dark:bg-warning-400/[0.06]" x-show="waited" x-cloak>
-                <div class="flex gap-3">
-                    <x-ri-time-line class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
-                    <div>
-                        <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('billing.upgrade.activation_delayed_title') }}</h3>
-                        <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">{{ __('billing.upgrade.activation_delayed_body') }}</p>
-                    </div>
-                </div>
-            </div>
+            <x-billing.activating :card="$card" />
         @endif
 
         @if($creditsFulfilling)
@@ -105,6 +89,8 @@
                                         : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
                                 @elseif($pastDue)
                                     {{ __('billing.manage.past_due_tagline') }}
+                                @elseif($onStripeTrial)
+                                    {{ __('billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
                                 @elseif($isSubscribed)
                                     {{ __('billing.manage.auto_renews') }}
                                 @elseif($onLegacyFree)
@@ -243,7 +229,7 @@
             @endif
 
             <div
-                x-data="{ yearly: true, confirming: false }"
+                x-data="{ yearly: true }"
                 class="relative flex w-full flex-col rounded-2xl border border-primary-200 bg-white p-6 shadow-sm sm:p-8 dark:border-primary-400/25 dark:bg-[var(--surface-card-bg)] dark:shadow-none"
             >
                 <div class="flex flex-1 flex-col">
@@ -274,45 +260,25 @@
                     </ul>
 
                     <div class="mt-7">
-                        <div x-show="! confirming">
-                            @if($trialAvailable)
-                                <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
-                                    {{ __('billing.trial.start_button') }}
-                                </x-filament::button>
-                                <button type="button" x-on:click="confirming = true"
-                                    class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
-                                    {{ __('billing.upgrade.now') }}
-                                </button>
-                            @else
-                                <x-filament::button type="button" size="lg" class="w-full justify-center"
-                                    x-on:click="confirming = true">
-                                    {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button') }}
-                                </x-filament::button>
-                            @endif
-                            <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"
-                                x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
-                                {{ __('billing.pro_plan.billed_yearly') }}
-                            </p>
-                        </div>
-
-                        <div x-show="confirming" x-cloak class="rounded-xl border border-primary/25 bg-primary/[0.03] p-4 dark:border-primary/20">
-                            <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.confirm_title') }}</p>
-                            <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">{{ __('billing.upgrade.confirm_body', ['workspace' => $workspace->name]) }}</p>
-                            <p class="mt-2 text-sm font-medium text-gray-900 dark:text-white"
-                                x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
-                                {{ __('billing.pro_plan.billed_yearly') }}
-                            </p>
-                            <div class="mt-4 flex flex-col gap-2 sm:flex-row-reverse">
-                                <x-filament::button type="button" class="justify-center"
-                                    wire:loading.attr="disabled" wire:target="upgrade" x-on:click="$wire.upgrade(yearly ? 'yearly' : 'monthly')">
-                                    {{ __('billing.upgrade.confirm_button', ['workspace' => $workspace->name]) }}
-                                </x-filament::button>
-                                <x-filament::button type="button" color="gray" class="justify-center"
-                                    x-on:click="confirming = false">
-                                    {{ __('billing.upgrade.confirm_cancel') }}
-                                </x-filament::button>
-                            </div>
-                        </div>
+                        @if($trialAvailable)
+                            <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
+                                {{ __('billing.trial.start_button') }}
+                            </x-filament::button>
+                            <button type="button"
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })"
+                                class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
+                                {{ __('billing.upgrade.now') }}
+                            </button>
+                        @else
+                            <x-filament::button type="button" size="lg" class="w-full justify-center"
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
+                                {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button') }}
+                            </x-filament::button>
+                        @endif
+                        <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"
+                            x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
+                            {{ __('billing.pro_plan.billed_yearly') }}
+                        </p>
                     </div>
                 </div>
             </div>

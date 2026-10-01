@@ -36,7 +36,7 @@ function sidebarFooterHtml(string $html): string
     return $end === false ? substr($html, $start) : substr($html, $start, $end - $start);
 }
 
-test('the owner sees both the members link and the billing link', function (): void {
+test('the owner sees the members link and the upgrade modal button', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
@@ -44,10 +44,11 @@ test('the owner sees both the members link and the billing link', function (): v
 
     expect($footer)
         ->toContain(Members::getUrl())
-        ->toContain(Billing::getUrl());
+        ->toContain(__('billing.sidebar.keep_pro'))
+        ->toContain('open-modal');
 });
 
-test('an admin sees the members link but not the billing link', function (): void {
+test('an admin sees the members link but no billing controls', function (): void {
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
@@ -58,10 +59,11 @@ test('an admin sees the members link but not the billing link', function (): voi
 
     expect($footer)
         ->toContain(Members::getUrl())
-        ->not->toContain(Billing::getUrl());
+        ->not->toContain(Billing::getUrl())
+        ->not->toContain('open-modal');
 });
 
-test('a member sees neither the members link nor the billing link', function (): void {
+test('a member sees neither the members link nor billing controls', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
@@ -72,5 +74,6 @@ test('a member sees neither the members link nor the billing link', function ():
 
     expect($footer)
         ->not->toContain(Members::getUrl())
-        ->not->toContain(Billing::getUrl());
+        ->not->toContain(Billing::getUrl())
+        ->not->toContain('open-modal');
 });
