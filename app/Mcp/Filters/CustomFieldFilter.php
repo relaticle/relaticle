@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
@@ -81,6 +82,11 @@ final readonly class CustomFieldFilter implements Filter
             ]));
         }
 
+        $optionMap = resolve(CustomFieldOptionMap::class);
+        $options = $optionMap->fromFields(
+            $fields->filter(fn (CustomField $field): bool => in_array($field->code, $fieldCodes, true) && $optionMap->translates($field))->values(),
+        );
+
         foreach ($value as $fieldCode => $operators) {
             if (! is_array($operators) || $operators === []) {
                 $this->invalid("Custom field filter [{$fieldCode}] must contain an operator object.");
@@ -100,6 +106,7 @@ final readonly class CustomFieldFilter implements Filter
                 }
 
                 $operand = $this->normalizeOperand((string) $fieldCode, $operator, $operand, $supportedOperators[$operator]);
+                $operand = $this->resolveOptions($optionMap, (string) $fieldCode, $options[$fieldCode] ?? null, $operand);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
             }
@@ -127,12 +134,57 @@ final readonly class CustomFieldFilter implements Filter
             default => null,
         };
 
+        if (is_array($normalized) && count($normalized) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
+            $this->invalid(__('validation.custom_field.too_many_values', [
+                'field' => $fieldCode,
+                'max' => CustomFieldFilterSchema::MAX_LIST_VALUES,
+            ]));
+        }
+
         if ($normalized !== null) {
             return $normalized;
         }
 
         $expected = $type === 'array' ? 'an array of strings' : "a {$type}";
         $this->invalid("Custom field filter [{$fieldCode}.{$operator}] must be {$expected}.");
+    }
+
+    /**
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}|null  $entry
+     */
+    private function resolveOptions(CustomFieldOptionMap $optionMap, string $fieldCode, ?array $entry, mixed $operand): mixed
+    {
+        if ($entry === null || is_bool($operand)) {
+            return $operand;
+        }
+
+        if (is_array($operand)) {
+            return array_map(fn (string $value): string => $this->optionId($optionMap, $fieldCode, $entry, $value), $operand);
+        }
+
+        return $this->optionId($optionMap, $fieldCode, $entry, (string) $operand);
+    }
+
+    /**
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
+     */
+    private function optionId(CustomFieldOptionMap $optionMap, string $fieldCode, array $entry, string $value): string
+    {
+        $id = $optionMap->idFor($entry, $value);
+
+        if ($id !== null) {
+            return $id;
+        }
+
+        if ($optionMap->isAmbiguous($entry, $value)) {
+            $this->invalid(__('validation.custom_field.ambiguous_option', ['field' => $fieldCode, 'value' => $value]));
+        }
+
+        $this->invalid(__('validation.custom_field.unknown_option', [
+            'field' => $fieldCode,
+            'value' => $value,
+            'labels' => $entry['labels'] === [] ? 'none' : implode(', ', $entry['labels']),
+        ]));
     }
 
     /** @return list<string>|null */
@@ -218,9 +270,22 @@ final readonly class CustomFieldFilter implements Filter
                 'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
                 'contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
                 'in' => $q->whereIn($valueColumn, $operand),
-                'has_any' => $q->whereJsonContains($valueColumn, $operand),
+                'has_any' => $this->containsAny($q, $valueColumn, $operand),
                 default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
             };
+        });
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array<int, string>  $values
+     */
+    private function containsAny(Builder $query, string $valueColumn, array $values): void
+    {
+        $query->where(function (Builder $anyValue) use ($valueColumn, $values): void {
+            foreach ($values as $value) {
+                $anyValue->orWhereJsonContains($valueColumn, [$value]);
+            }
         });
     }
 

@@ -15,6 +15,8 @@ use Spatie\QueryBuilder\AllowedSort;
 
 final readonly class CustomFieldFilterSchema
 {
+    public const int MAX_LIST_VALUES = 100;
+
     /** @var array<int, string> */
     private const array EXCLUDED_TYPES = [
         CustomFieldType::FILE_UPLOAD->value,
@@ -79,7 +81,7 @@ final readonly class CustomFieldFilterSchema
     }
 
     /**
-     * @return array<string, array<string, string|array<string, mixed>>>
+     * @return array<string, array<string, mixed>>
      */
     public static function operatorsForType(string $type): array
     {
@@ -91,7 +93,7 @@ final readonly class CustomFieldFilterSchema
 
         return match ($fieldType) {
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::listOperators(self::MULTI_OPERATORS),
             CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
             CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
             CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
@@ -99,9 +101,9 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
             CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
                 self::buildOperators(['eq'], 'string'),
-                ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
+                self::listOperators(['in']),
             ),
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(self::MULTI_OPERATORS),
             default => [],
         };
     }
@@ -116,6 +118,21 @@ final readonly class CustomFieldFilterSchema
 
         foreach ($operators as $op) {
             $result[$op] = ['type' => $jsonType];
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param  array<int, string>  $operators
+     * @return array<string, array<string, mixed>>
+     */
+    private static function listOperators(array $operators): array
+    {
+        $result = [];
+
+        foreach ($operators as $op) {
+            $result[$op] = ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => self::MAX_LIST_VALUES];
         }
 
         return $result;

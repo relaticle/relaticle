@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
 use App\Actions\Opportunity\ListOpportunities;
@@ -459,10 +460,10 @@ describe('filtering and sorting', function (): void {
 
         $matched = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Proposed Deal']);
         $unmatched = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Prospected Deal']);
-        $matched->saveCustomFieldValue($stage, 'Proposal');
-        $unmatched->saveCustomFieldValue($stage, 'Prospecting');
+        $matched->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Qualification')->getKey());
+        $unmatched->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Prospecting')->getKey());
 
-        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][in]=Proposal')
+        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][in]=Qualification')
             ->assertOk();
 
         $ids = collect($response->json('data'))->pluck('id');
@@ -481,15 +482,45 @@ describe('filtering and sorting', function (): void {
         $proposal = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Proposed Deal']);
         $prospecting = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Prospected Deal']);
         $won = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Won Deal']);
-        $proposal->saveCustomFieldValue($stage, 'Proposal');
-        $prospecting->saveCustomFieldValue($stage, 'Prospecting');
-        $won->saveCustomFieldValue($stage, 'Closed Won');
+        $proposal->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Qualification')->getKey());
+        $prospecting->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Prospecting')->getKey());
+        $won->saveCustomFieldValue($stage, (string) $stage->options->firstWhere('name', 'Closed Won')->getKey());
 
-        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][in]=Proposal,Prospecting')
+        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][in]=Qualification,Prospecting')
             ->assertOk();
 
         $ids = collect($response->json('data'))->pluck('id');
         expect($ids)->toContain($proposal->id)->toContain($prospecting->id)->not->toContain($won->id);
+    });
+
+    it('rejects an unknown option label with a 422', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][eq]=Nope')
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('filter');
+    });
+
+    it('carries a label containing a comma through the array form', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $priority = resolve(CreateCustomField::class)->execute($this->user, [
+            'entity_type' => 'opportunity',
+            'name' => 'Priority',
+            'code' => 'deal_priority',
+            'type' => 'select',
+            'options' => ['Hot, urgent', 'Warm'],
+        ]);
+        $hot = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Hot Deal']);
+        $warm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Warm Deal']);
+        $hot->saveCustomFieldValue($priority, (string) $priority->options()->where('name', 'Hot, urgent')->value('id'));
+        $warm->saveCustomFieldValue($priority, (string) $priority->options()->where('name', 'Warm')->value('id'));
+
+        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][deal_priority][in][]='.urlencode('Hot, urgent'))
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id');
+        expect($ids)->toContain($hot->id)->not->toContain($warm->id);
     });
 
     it('keeps a comma inside a contains operand sent as a query string', function (): void {

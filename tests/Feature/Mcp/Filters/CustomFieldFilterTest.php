@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Mcp\Filters\CustomFieldFilter;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
@@ -17,6 +18,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
@@ -64,39 +66,55 @@ function filterTestField(Workspace $workspace, string $entityType, string $code,
     ]);
 }
 
-it('filters by custom field equality', function (): void {
-    $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal A']);
-    $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal B']);
+function filterTestOptionId(CustomField $field, string $label): string
+{
+    return (string) $field->options()->where('name', $label)->value('id');
+}
 
-    $stageField = CustomField::query()
+function filterTestStageField(Workspace $workspace): CustomField
+{
+    return CustomField::query()
         ->withoutGlobalScopes()
-        ->where('tenant_id', $this->workspace->getKey())
+        ->where('tenant_id', $workspace->getKey())
         ->where('entity_type', 'opportunity')
         ->where('code', 'stage')
-        ->first();
+        ->firstOrFail();
+}
 
-    expect($stageField)->not->toBeNull('Stage custom field must exist for this test');
+it('filters by custom field equality',
+    function (): void {
+        $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal A']);
+        $opportunity2 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Deal B']);
 
-    $opportunity1->saveCustomFieldValue($stageField, 'Proposal');
-    $opportunity2->saveCustomFieldValue($stageField, 'Prospecting');
+        $stageField = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace->getKey())
+            ->where('entity_type', 'opportunity')
+            ->where('code', 'stage')
+            ->first();
 
-    $request = new Request([
-        'filter' => [
-            'custom_fields' => [
-                'stage' => ['eq' => 'Proposal'],
+        expect($stageField)->not->toBeNull('Stage custom field must exist for this test');
+
+        $opportunity1->saveCustomFieldValue($stageField, filterTestOptionId($stageField, 'Proposal/Price Quote'));
+        $opportunity2->saveCustomFieldValue($stageField, filterTestOptionId($stageField, 'Prospecting'));
+
+        $request = new Request([
+            'filter' => [
+                'custom_fields' => [
+                    'stage' => ['eq' => 'Proposal/Price Quote'],
+                ],
             ],
-        ],
-    ]);
+        ]);
 
-    $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
-        ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
-        )
-        ->get();
+        $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+            ->allowedFilters(
+                CustomFieldFilter::allowedFilter('opportunity'),
+            )
+            ->get();
 
-    expect($results)->toHaveCount(1)
-        ->and($results->first()->name)->toBe('Deal A');
-});
+        expect($results)->toHaveCount(1)
+            ->and($results->first()->name)->toBe('Deal A');
+    });
 
 it('filters by currency field with gte operator', function (): void {
     $opportunity1 = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Big Deal']);
@@ -251,7 +269,7 @@ it('accepts a single value for an array operand', function (): void {
         ->where('code', 'stage')
         ->firstOrFail();
 
-    $opportunity->saveCustomFieldValue($stageField, 'Qualification');
+    $opportunity->saveCustomFieldValue($stageField, filterTestOptionId($stageField, 'Qualification'));
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
@@ -264,14 +282,126 @@ it('accepts a single value for an array operand', function (): void {
         ->assertDontSee('Proposed Deal');
 });
 
+it('matches a choice option by its label or a differently cased label', function (string $operand): void {
+    $stage = filterTestStageField($this->workspace);
+    $won = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Won Deal']);
+    $lost = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Lost Deal']);
+    $won->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Won'));
+    $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => $operand]]])
+        ->assertOk()
+        ->assertSee('Won Deal')
+        ->assertDontSee('Lost Deal');
+})->with([
+    'label' => 'Closed Won',
+    'cased and padded label' => '  closed won ',
+]);
+
+it('matches a choice option by its id', function (): void {
+    $stage = filterTestStageField($this->workspace);
+    $won = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Won Deal']);
+    $lost = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Lost Deal']);
+    $won->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Won'));
+    $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => filterTestOptionId($stage, 'Closed Won')]]])
+        ->assertOk()
+        ->assertSee('Won Deal')
+        ->assertDontSee('Lost Deal');
+});
+
+it('resolves a list mixing a label and an option id', function (): void {
+    $stage = filterTestStageField($this->workspace);
+    $won = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Won Deal']);
+    $qualified = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Qualified Deal']);
+    $lost = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Lost Deal']);
+    $won->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Won'));
+    $qualified->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Qualification'));
+    $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['in' => ['Closed Won', filterTestOptionId($stage, 'Qualification')]]]])
+        ->assertOk()
+        ->assertSee('Won Deal')
+        ->assertSee('Qualified Deal')
+        ->assertDontSee('Lost Deal');
+});
+
+it('rejects an unknown option label and lists the valid labels', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => 'Nope']]])
+        ->assertHasErrors(['option "Nope" is not one of: Prospecting, Qualification']);
+});
+
+it('rejects an option id that no longer exists', function (): void {
+    $staleId = (string) Str::ulid();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => $staleId]]])
+        ->assertHasErrors(["option \"{$staleId}\" is not one of"]);
+});
+
+it('matches a record holding any one of the requested multi-select options', function (): void {
+    $temperature = resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Temperature',
+        'code' => 'temperature',
+        'type' => 'multi-select',
+        'options' => ['Hot', 'Warm', 'Cold'],
+    ]);
+    $hot = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Hot Deal']);
+    $warm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Warm Deal']);
+    $cold = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Cold Deal']);
+    $hot->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Hot')]);
+    $warm->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Warm')]);
+    $cold->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Cold')]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['temperature' => ['has_any' => ['Hot', 'Warm']]]])
+        ->assertOk()
+        ->assertSee('Hot Deal')
+        ->assertSee('Warm Deal')
+        ->assertDontSee('Cold Deal');
+});
+
+it('matches free-text tags by their raw value without an option lookup', function (): void {
+    $labels = resolve(CreateCustomField::class)->execute($this->user, [
+        'entity_type' => 'opportunity',
+        'name' => 'Labels',
+        'code' => 'labels',
+        'type' => 'tags-input',
+    ]);
+    $urgent = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Urgent Deal']);
+    $calm = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Calm Deal']);
+    $urgent->saveCustomFieldValue($labels, ['urgent']);
+    $calm->saveCustomFieldValue($labels, ['someday']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['has_any' => ['urgent']]]])
+        ->assertOk()
+        ->assertSee('Urgent Deal')
+        ->assertDontSee('Calm Deal');
+});
+
+it('rejects a list operand longer than one hundred values', function (): void {
+    $values = array_map(fn (int $i): string => "Value {$i}", range(1, 101));
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['in' => $values]]])
+        ->assertHasErrors(['stage: pass at most 100 values.']);
+});
+
 it('publishes only array-compatible operators for email, phone, and link fields', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('filterable_fields.emails.properties', ['has_any' => ['type' => 'string']])
-            ->where('filterable_fields.phone_number.properties', ['has_any' => ['type' => 'string']])
-            ->where('filterable_fields.linkedin.properties', ['has_any' => ['type' => 'string']])
+            ->where('filterable_fields.emails.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
+            ->where('filterable_fields.phone_number.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
+            ->where('filterable_fields.linkedin.properties', ['has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100]])
             ->etc());
 });
 
