@@ -22,7 +22,6 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
-use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
@@ -181,7 +180,7 @@ abstract class BaseReadListTool implements Tool
         }
 
         try {
-            $httpRequest = $this->buildHttpRequest($user, $request);
+            $httpRequest = $this->buildHttpRequest($request);
         } catch (ValidationException $exception) {
             return $this->validationError($exception);
         }
@@ -194,6 +193,8 @@ abstract class BaseReadListTool implements Tool
                 page: isset($request['page']) ? (int) $request['page'] : null,
                 request: $httpRequest,
             );
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         } catch (InvalidQuery $e) {
             return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
@@ -674,7 +675,7 @@ abstract class BaseReadListTool implements Tool
     /**
      * @throws ValidationException
      */
-    private function buildHttpRequest(User $user, Request $request): HttpRequest
+    private function buildHttpRequest(Request $request): HttpRequest
     {
         $input = [];
 
@@ -688,10 +689,9 @@ abstract class BaseReadListTool implements Tool
             $this->additionalFilters($request),
         ));
 
-        $customFields = resolve(CustomFieldsFilterTranslator::class)
-            ->translate($user, $this->citationType(), $request['custom_fields'] ?? null);
+        $customFields = $request['custom_fields'] ?? null;
 
-        if ($customFields !== []) {
+        if (is_array($customFields) && $customFields !== []) {
             $nativeFilters['custom_fields'] = $customFields;
         }
 

@@ -219,7 +219,7 @@ it('rejects an unknown option label instead of silently returning everything', f
     TenantContextService::setTenantId(null);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('not one of the options');
+        ->and($result['error'])->toContain('is not one of:');
 });
 
 it('rejects an operator the field does not support', function (): void {
@@ -508,4 +508,33 @@ it('rejects an unknown creation source instead of returning an empty list', func
 
     expect($result)->toHaveKey('error')
         ->and($result['error'])->toContain('creation_source must be one of');
+});
+
+it('excludes options and keeps tasks without a status', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $statusField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail();
+
+    $open = Task::factory()->for($workspace)->create(['title' => 'Open one']);
+    $done = Task::factory()->for($workspace)->create(['title' => 'Finished']);
+    Task::factory()->for($workspace)->create(['title' => 'No status']);
+    $open->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'To do'));
+    $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
+
+    $rows = listToolRows((new ListTasksTool)->handle(new Request([
+        'custom_fields' => ['status' => ['not_in' => ['Done']]],
+    ])));
+
+    TenantContextService::setTenantId(null);
+
+    expect(collect($rows)->pluck('attributes.title')->sort()->values()->all())->toBe(['No status', 'Open one']);
 });

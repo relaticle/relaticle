@@ -19,17 +19,17 @@ use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\PendingAction;
-use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
+use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(CustomFieldInput::class);
 
@@ -299,13 +299,15 @@ it('accepts an option label in any casing when writing a choice field', function
 it('resolves an option label identically whether filtering or writing', function (string $label, bool $valid): void {
     Task::factory()->for($this->workspace)->create(['title' => 'T']);
 
-    $readAccepted = true;
-    try {
-        resolve(CustomFieldsFilterTranslator::class)
-            ->translate($this->user, 'task', ['status' => ['eq' => $label]]);
-    } catch (ValidationException) {
-        $readAccepted = false;
-    }
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    $readResult = json_decode((new ListTasksTool)->handle(new Request([
+        'custom_fields' => ['status' => ['eq' => $label]],
+    ])), true);
+
+    TenantContextService::setTenantId(null);
+
+    $readAccepted = ! array_key_exists('error', $readResult);
 
     $writeAccepted = resolve(CustomFieldsRequestValidator::class)
         ->validate($this->user, 'task', ['status' => $label])->error === null;
