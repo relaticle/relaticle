@@ -511,8 +511,8 @@ it('derives the company name from the registrable domain, not a mail subdomain',
 
     expect($domainsField)->not->toBeNull();
     expect($company->getCustomFieldValue($domainsField))
-        ->toContain('www.email.anthropic.com')
-        ->not->toContain('www.anthropic.com');
+        ->toContain('email.anthropic.com')
+        ->not->toContain('anthropic.com');
 });
 
 it('derives the company name from the registrable label across TLD shapes', function (string $address, string $expected): void {
@@ -613,7 +613,7 @@ it('seeds an auto-created company with a protocol-less domain and ICP set to fal
 
     if ($domainsField) {
         expect($company->getCustomFieldValue($domainsField))
-            ->toContain('www.brandnewcorp.com')
+            ->toContain('brandnewcorp.com')
             ->not->toContain('https://');
     }
 
@@ -656,8 +656,8 @@ it('creates distinct companies for different subdomains of the same apex', funct
         ->map(fn (Company $company): string => json_encode($company->getCustomFieldValue($domainsField)) ?: '')
         ->implode(' ');
 
-    expect($stored)->toContain('www.accounts.printtest.com');
-    expect($stored)->toContain('www.ideas.printtest.com');
+    expect($stored)->toContain('accounts.printtest.com');
+    expect($stored)->toContain('ideas.printtest.com');
 });
 
 it('reuses one company when the host only differs by a www prefix', function (): void {
@@ -797,8 +797,8 @@ it('creates distinct companies for same-named domains with different TLDs and pr
     // acme.com's domain is intact, not clobbered by acme.org.
     $firstFresh = Company::with('customFieldValues.customField')->findOrFail($first->getKey());
     $secondFresh = Company::with('customFieldValues.customField')->findOrFail($second->getKey());
-    expect($firstFresh->getCustomFieldValue($domainsField))->toContain('www.acme.com');
-    expect($secondFresh->getCustomFieldValue($domainsField))->toContain('www.acme.org');
+    expect($firstFresh->getCustomFieldValue($domainsField))->toContain('acme.com');
+    expect($secondFresh->getCustomFieldValue($domainsField))->toContain('acme.org');
 });
 
 it('does not auto-create a person when contact_creation_mode is None', function (): void {

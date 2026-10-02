@@ -179,6 +179,49 @@ it('updates the live record when a deleted record shares its import identity', f
     'company domain' => [ImportEntityType::Company, 'domains', 'northline.example'],
 ])->with(['deleted first' => true, 'deleted last' => false]);
 
+it('re-imports a value written in another format as an update of the stored record', function (ImportEntityType $entityType, string $fieldCode, string $stored, string $csvValue): void {
+    $modelClass = $entityType->importer((string) $this->workspace->id)->modelClass();
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', $entityType->value)
+        ->where('code', $fieldCode)
+        ->firstOrFail();
+
+    $record = $modelClass::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->withJsonValue([$stored])->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => $entityType->value,
+        'entity_id' => $record->id,
+        'tenant_id' => $this->workspace->id,
+    ]);
+
+    ImportExecutionFixture::readyStore($this, ['Name', 'Identity'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Updated import record', 'Identity' => $csvValue]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Identity', target: "custom_fields_{$fieldCode}"),
+    ], $entityType);
+
+    new ResolveMatchesJob($this->import->id)->handle();
+
+    $row = $this->store->query()->firstOrFail();
+    expect($row->match_action)->toBe(RowMatchAction::Update)
+        ->and($row->matched_id)->toBe((string) $record->id);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->created_rows->toBe(0)
+        ->updated_rows->toBe(1)
+        ->failed_rows->toBe(0)
+        ->and($record->fresh()->name)->toBe('Updated import record')
+        ->and($modelClass::query()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
+})->with([
+    'contact phone' => [ImportEntityType::People, 'phone_number', '+14155550100', '+1 415-555-0100'],
+    'company domain' => [ImportEntityType::Company, 'domains', 'northline.example', 'https://www.Northline.example/pricing'],
+]);
+
 // --- Multi-Choice Merge Tests ---
 
 it('merges multi-choice custom field values during update', function (): void {

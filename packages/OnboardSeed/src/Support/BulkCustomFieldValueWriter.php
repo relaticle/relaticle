@@ -23,7 +23,7 @@ final class BulkCustomFieldValueWriter
         string $tenantId,
     ): void {
         $valueColumn = CustomFieldValue::getValueColumn($customField->type);
-        $safeValue = SafeValueConverter::toDbSafe($value, $customField->type);
+        $safeValue = SafeValueConverter::toDbSafe($value, $customField->type, $customField);
 
         if (is_array($safeValue)) {
             $safeValue = json_encode($safeValue);

@@ -709,6 +709,33 @@ describe('custom fields', function (): void {
             ->assertCreated();
     });
 
+    it('stores company domains as bare hosts', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $id = $this->postJson('/api/v1/companies', [
+            'name' => 'Acme',
+            'custom_fields' => ['domains' => ['https://www.Acme.com/pricing']],
+        ])->assertCreated()->json('data.id');
+
+        $domains = CustomField::query()
+            ->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace->id)
+            ->where('entity_type', 'company')
+            ->where('code', 'domains')
+            ->firstOrFail();
+
+        expect(collect(Company::query()->with('customFieldValues.customField')->findOrFail($id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
+    });
+
+    it('rejects a domain another company already uses in another format', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/companies', ['name' => 'Acme', 'custom_fields' => ['domains' => ['acme.com']]])->assertCreated();
+
+        $this->postJson('/api/v1/companies', ['name' => 'Acme 2', 'custom_fields' => ['domains' => ['https://www.acme.com/']]])
+            ->assertUnprocessable();
+    });
+
     it('rejects invalid email in email custom field', function (): void {
         Sanctum::actingAs($this->user);
 

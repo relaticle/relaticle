@@ -523,7 +523,7 @@ final class ExecuteImportJob implements ShouldQueue
             $value = $this->convertCustomFieldValue($value, $cf, $customFieldFormatMap[$code] ?? null);
 
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
-            $safeValue = SafeValueConverter::toDbSafe($value, $cf->type);
+            $safeValue = SafeValueConverter::toDbSafe($value, $cf->type, $cf);
 
             // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
             // rejects a blank string for a date/timestamp column.

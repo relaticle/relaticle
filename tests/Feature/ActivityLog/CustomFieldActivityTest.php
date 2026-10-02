@@ -92,7 +92,7 @@ it('renders link-field values as plain URLs, not escaped JSON', function (): voi
     $change = $activity->properties['custom_field_changes'][0];
 
     expect($change['code'])->toBe('website')
-        ->and($change['new']['label'])->toBe('https://www.linkedin.com/company/airbnb')
+        ->and($change['new']['label'])->toBe('www.linkedin.com/company/airbnb')
         ->and($change['new']['label'])->not->toContain('\\/')
         ->and($change['new']['label'])->not->toContain('[');
 });

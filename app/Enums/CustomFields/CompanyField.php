@@ -75,6 +75,17 @@ enum CompanyField: string
         };
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function additionalSettings(): array
+    {
+        return match ($this) {
+            self::DOMAINS => ['link_variant' => 'domain'],
+            default => [],
+        };
+    }
+
     public function isUniquePerEntityType(): bool
     {
         return match ($this) {

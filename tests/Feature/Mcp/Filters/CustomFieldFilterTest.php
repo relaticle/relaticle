@@ -453,7 +453,7 @@ it('keeps a link containing a comma whole', function (): void {
     $other->saveCustomFieldValue($linkedin, ['https://example.com/?a=1']);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListPeopleTool::class, ['filter' => ['custom_fields' => ['linkedin' => ['$has_any' => 'https://example.com/?a=1,2']]]])
+        ->tool(ListPeopleTool::class, ['filter' => ['custom_fields' => ['linkedin' => ['$has_any' => 'example.com/?a=1,2']]]])
         ->assertOk()
         ->assertSee('Matching Person')
         ->assertDontSee('Other Person');
@@ -635,7 +635,7 @@ it('filters json array custom fields through the people list tool', function (st
 })->with([
     'email' => ['emails', ['match@example.com'], ['other@example.com'], 'match@example.com'],
     'phone' => ['phone_number', '+15550000001', '+15550000002', '+15550000001'],
-    'link' => ['linkedin', 'https://example.com/match', 'https://example.com/other', 'https://example.com/match'],
+    'link' => ['linkedin', 'https://example.com/match', 'https://example.com/other', 'example.com/match'],
 ]);
 
 it('handles empty filter object as no-op', function (): void {
