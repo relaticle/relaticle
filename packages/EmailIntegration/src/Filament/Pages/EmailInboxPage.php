@@ -186,7 +186,7 @@ final class EmailInboxPage extends Page
         $query = Email::query()
             // participants + shares are needed by PrivacyService::effectiveTier() (which each
             // row's can('viewSubject'/'viewBody') hits), so eager-load them to avoid 2 lazy
-            // queries per row, matching BaseRecordEmailsPage / BaseEmailsRelationManager.
+            // queries per row, matching BaseEmailsRelationManager.
             ->with(['from', 'labels', 'participants', 'shares'])
             ->withReadStateFor($user->getKey())
             ->forWorkspace($user->current_workspace_id)

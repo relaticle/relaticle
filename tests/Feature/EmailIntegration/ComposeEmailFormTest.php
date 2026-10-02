@@ -58,7 +58,7 @@ it('prefills the composer to field with the record primary email when compose is
         ->where('code', PeopleField::EMAILS->value)
         ->firstOrFail();
 
-    $this->person->saveCustomFieldValue($emailsField, ['jane@example.com', 'other@example.com'], $this->workspace);
+    $this->person->saveCustomFieldValue($emailsField, ['jane@acme-customer.com', 'other@acme-customer.com'], $this->workspace);
 
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
@@ -66,7 +66,7 @@ it('prefills the composer to field with the record primary email when compose is
     ])
         ->callAction('composeEmail')
         ->assertDispatched('composer:open', function (string $event, array $params): bool {
-            expect($params['payload']['to'])->toBe(['jane@example.com'])
+            expect($params['payload']['to'])->toBe(['jane@acme-customer.com'])
                 ->and($params['payload']['linkRecordType'])->toBe(People::class)
                 ->and($params['payload']['linkRecordId'])->toBe((string) $this->person->getKey());
 

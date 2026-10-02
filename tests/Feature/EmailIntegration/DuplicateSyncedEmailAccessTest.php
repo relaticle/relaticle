@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
@@ -10,7 +9,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -21,7 +19,6 @@ use Relaticle\EmailIntegration\Services\PrivacyService;
 mutates(
     PreferredEmailCopyService::class,
     PrivacyService::class,
-    BaseRecordEmailsPage::class,
     BaseEmailsRelationManager::class,
     EmailVisibilityService::class,
 );
@@ -111,7 +108,10 @@ it('shows one record mailbox row when two teammates synced the same message', fu
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
-    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()]);
+    $page = livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ]);
 
     expect(substr_count($page->html(), 'Acme renewal thread'))->toBe(1);
 
@@ -126,7 +126,10 @@ it('does not ask a teammate to request access when the message is already in the
     $this->actingAs($this->workspacemate);
     Filament::setTenant($this->workspace);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->owner->name]))
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->workspacemate->name]))
         ->call('selectEmail', $this->workspacemateCopy->getKey())
@@ -140,7 +143,10 @@ it('still asks a teammate without a mailbox copy to request access once', functi
     $this->actingAs($outsider);
     Filament::setTenant($this->workspace);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->owner->name]))
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $this->workspacemate->name]));
 });
@@ -161,7 +167,10 @@ it('keeps distinct messages as separate record mailbox rows', function (): void 
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee('Acme renewal thread')
         ->assertSee('Kickoff notes');
 });
@@ -173,7 +182,7 @@ it('counts a duplicated synced message once on the emails tab badge', function (
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('1');
 });
 
-it('hides the duplicate table row from the emails relation manager', function (): void {
+it('hides the duplicate row from the emails relation manager', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
@@ -181,16 +190,19 @@ it('hides the duplicate table row from the emails relation manager', function ()
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertCanSeeTableRecords([$this->ownerCopy])
-        ->assertCanNotSeeTableRecords([$this->workspacemateCopy])
-        ->assertTableActionHidden('requestAccess', $this->ownerCopy);
+        ->assertSeeHtml("email-list-row-{$this->ownerCopy->getKey()}")
+        ->assertDontSeeHtml("email-list-row-{$this->workspacemateCopy->getKey()}")
+        ->assertActionHidden('requestAccess', ['emailId' => $this->ownerCopy->getKey()]);
 });
 
 it('opens the sent email on the record mailbox after compose', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->dispatch('composer:sent', emailId: $this->ownerCopy->getKey())
         ->assertSet('selectedEmailId', $this->ownerCopy->getKey());
 });

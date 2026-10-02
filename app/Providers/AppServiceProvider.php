@@ -68,6 +68,7 @@ use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
 use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Section;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
@@ -685,6 +686,8 @@ final class AppServiceProvider extends ServiceProvider
     private function configureFilament(): void
     {
         ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
+
+        Section::configureUsing(fn (Section $section): Section => $section->compact());
 
         RestoreAction::configureUsing(fn (RestoreAction $action): RestoreAction => $action->before(function (RestoreAction $action, Model $record): void {
             $conflict = resolve(RestoreConflictMessage::class)->for($record, $action->getRecordTitle(...));

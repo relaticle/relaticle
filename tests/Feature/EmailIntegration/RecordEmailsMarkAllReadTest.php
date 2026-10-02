@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -10,7 +11,6 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailRead;
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -62,20 +62,11 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 });
 
-it('marks all of the record\'s unread emails as read', function (): void {
-    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()]);
-    // Nothing is open on mount, so both attached emails start unread.
-    expect($page->instance()->inboxUnreadCount())->toBe(2);
-
-    $page->call('markAllAsRead');
-
-    expect($page->instance()->inboxUnreadCount())->toBe(0);
-    expect(EmailRead::query()->where('user_id', $this->owner->id)
-        ->whereIn('email_id', [$this->newer->id, $this->older->id])->count())->toBe(2);
-});
-
 it('opens with the list only, and reads an email into the overlay until it is closed', function (): void {
-    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    $page = livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSet('selectedEmailId', null);
 
     expect($page->instance()->selectedEmail())->toBeNull();
@@ -92,13 +83,19 @@ it('opens with the list only, and reads an email into the overlay until it is cl
 });
 
 it('shows sender and recipient metadata in the email list', function (): void {
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee('Alex Sender')
         ->assertSee('Taylor Recipient');
 });
 
 it('fills the reader body while the email iframe is loading', function (): void {
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->call('selectEmail', $this->newer->getKey())
         ->assertSeeHtml('x-bind:class="ready ? \'shrink-0\' : \'flex min-h-0 flex-1 flex-col\'"')
         ->assertSeeHtml('x-bind:class="ready ? \'\' : \'min-h-0 flex-1\'"')
@@ -106,7 +103,10 @@ it('fills the reader body while the email iframe is loading', function (): void 
 });
 
 it('saves an email privacy tier from the sharing cards', function (): void {
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->callAction('manageSharing', data: [
             'privacy_tier' => EmailPrivacyTier::SUBJECT->value,
             'shares' => [],
@@ -115,20 +115,4 @@ it('saves an email privacy tier from the sharing cards', function (): void {
         ->assertNotified('Sharing settings saved.');
 
     expect($this->newer->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
-});
-
-it('does not mark emails belonging to other records', function (): void {
-    // An unread email NOT attached to this person.
-    $unrelated = Email::factory()->inbound()->full()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->owner->id,
-        'connected_account_id' => $this->account->getKey(),
-        'sent_at' => now()->subDay(),
-    ]);
-
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->call('markAllAsRead');
-
-    expect(EmailRead::query()->where('user_id', $this->owner->id)
-        ->where('email_id', $unrelated->id)->exists())->toBeFalse();
 });

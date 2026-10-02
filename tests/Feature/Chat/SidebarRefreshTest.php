@@ -54,6 +54,22 @@ it('deletes a conversation via livewire action', function (): void {
     expect(DB::table('agent_conversations')->where('id', 'c-del')->exists())->toBeFalse();
 });
 
+it('wires each row menu delete to that conversation and renders the full title', function (): void {
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-menu',
+        'participant_type' => 'user',
+        'participant_id' => $this->user->getKey(),
+        'workspace_id' => $this->user->current_workspace_id,
+        'title' => 'Quarterly pipeline review with the Acme buying committee',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    Livewire::test(ChatSidebarNav::class)
+        ->assertSeeHtml('wire:click="deleteConversation(\'c-menu\')"')
+        ->assertSee('Quarterly pipeline review with the Acme buying committee');
+});
+
 it('shows empty state when no conversations exist', function (): void {
     Livewire::test(ChatSidebarNav::class)
         ->assertSee('No chats yet');

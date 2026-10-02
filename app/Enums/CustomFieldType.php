@@ -57,6 +57,34 @@ enum CustomFieldType: string
         };
     }
 
+    /** The outline Heroicon shown before the field's label, matching the native detail rows. */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::TEXT => 'heroicon-o-bars-3-bottom-left',
+            self::NUMBER => 'heroicon-o-hashtag',
+            self::EMAIL => 'heroicon-o-envelope',
+            self::PHONE => 'heroicon-o-phone',
+            self::LINK => 'heroicon-o-globe-alt',
+            self::TEXTAREA => 'heroicon-o-document-text',
+            self::CHECKBOX => 'heroicon-o-check-circle',
+            self::CHECKBOX_LIST => 'heroicon-o-list-bullet',
+            self::RADIO => 'heroicon-o-stop-circle',
+            self::RICH_EDITOR => 'heroicon-o-pencil-square',
+            self::TAGS_INPUT => 'heroicon-o-tag',
+            self::COLOR_PICKER => 'heroicon-o-swatch',
+            self::TOGGLE => 'heroicon-o-adjustments-horizontal',
+            self::TOGGLE_BUTTONS => 'heroicon-o-view-columns',
+            self::CURRENCY => 'heroicon-o-banknotes',
+            self::DATE => 'heroicon-o-calendar',
+            self::DATE_TIME => 'heroicon-o-clock',
+            self::SELECT => 'heroicon-o-chevron-up-down',
+            self::MULTI_SELECT => 'heroicon-o-queue-list',
+            self::FILE_UPLOAD => 'heroicon-o-paper-clip',
+            self::RECORD => 'heroicon-o-link',
+        };
+    }
+
     public function example(): mixed
     {
         return match ($this) {

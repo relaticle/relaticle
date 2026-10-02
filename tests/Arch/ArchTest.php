@@ -23,7 +23,6 @@ use App\Rules\ArrayExistsForWorkspace;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager;
 
@@ -68,7 +67,6 @@ arch('avoid open for extension')
         BaseActivityTimelineRelationManager::class,
         BaseEmailsRelationManager::class,
         BaseMeetingsRelationManager::class,
-        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -94,7 +92,6 @@ arch('ensure no extends')
         BaseActivityTimelineRelationManager::class,
         BaseEmailsRelationManager::class,
         BaseMeetingsRelationManager::class,
-        BaseRecordEmailsPage::class,
         BaseLivewireComponent::class,
         BaseImporter::class,
         BaseExporter::class,
@@ -108,7 +105,6 @@ arch('ensure no extends')
         BaseRelationshipTool::class,
         BaseCrmEntityRequest::class,
         ImportPage::class,
-        BaseRecordEmailsPage::class,
     ]);
 
 arch('avoid mutation')

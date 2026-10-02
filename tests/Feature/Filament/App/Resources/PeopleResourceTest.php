@@ -22,6 +22,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
 });
 
 it('can render the index page', function (): void {
@@ -36,14 +37,14 @@ it('can render the view page', function (): void {
         ->assertOk();
 });
 
-it('registers the meetings relation manager on the person view page', function (): void {
+it('registers the emails and meetings relation managers on the person view page', function (): void {
     $record = People::factory()->recycle([$this->user, $this->workspace])->create();
 
     $managers = livewire(ViewPeople::class, ['record' => $record->getKey()])
         ->instance()
         ->getRelationManagers();
 
-    expect($managers)->not->toContain(EmailsRelationManager::class)
+    expect($managers)->toContain(EmailsRelationManager::class)
         ->and($managers)->toContain(MeetingsRelationManager::class);
 });
 
@@ -105,12 +106,12 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = People::factory(20)->recycle([$this->user, $this->workspace])->create();
+    $records = People::factory(30)->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListPeople::class)
-        ->assertCanSeeTableRecords($records->take(10), inOrder: true)
+        ->assertCanSeeTableRecords($records->take(25), inOrder: true)
         ->call('gotoPage', 2)
-        ->assertCanSeeTableRecords($records->skip(10)->take(10), inOrder: true);
+        ->assertCanSeeTableRecords($records->skip(25), inOrder: true);
 });
 
 it('can bulk delete records', function (): void {

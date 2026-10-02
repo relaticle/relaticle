@@ -50,33 +50,10 @@ return [
             ],
         ],
         'view' => [
-            'actions' => [
-                'edit' => [
-                    'label' => 'Modifier',
-                ],
-                'copy_page_url' => [
-                    'label' => "Copier l'URL de la page",
-                ],
-                'copy_record_id' => [
-                    'label' => "Copier l'identifiant",
-                ],
-            ],
             'infolist' => [
                 'fields' => [
-                    'name' => [
-                        'label' => '',
-                    ],
-                    'creator' => [
-                        'label' => 'Créé par',
-                    ],
                     'account_owner' => [
                         'label' => 'Responsable du compte',
-                    ],
-                    'created_at' => [
-                        'label' => 'Date de création',
-                    ],
-                    'updated_at' => [
-                        'label' => 'Dernière mise à jour',
                     ],
                 ],
             ],
@@ -86,26 +63,6 @@ return [
     'relation_managers' => [
         'people' => [
             'model_label' => 'personne',
-        ],
-        'notes' => [
-            'fields' => [
-                'people' => [
-                    'label' => 'Personnes',
-                ],
-            ],
-        ],
-        'tasks' => [
-            'fields' => [
-                'assignees' => [
-                    'label' => 'Responsable',
-                ],
-                'people' => [
-                    'label' => 'Personnes',
-                ],
-                'created_at' => [
-                    'label' => 'Créé le',
-                ],
-            ],
         ],
     ],
 ];

@@ -24,6 +24,7 @@ beforeEach(function () {
     $this->actingAs($this->user);
     $this->workspace = $this->user->currentWorkspace;
     Filament::setTenant($this->workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
 });
 
 it('can render the index page', function (): void {
@@ -106,7 +107,7 @@ it('cannot display trashed records by default', function (): void {
 });
 
 it('can paginate records', function (): void {
-    $records = Company::factory(20)->recycle([$this->user, $this->workspace])->create();
+    $records = Company::factory(30)->recycle([$this->user, $this->workspace])->create();
 
     // Fetch records with the same sort order as the table (created_at DESC)
     $sortedRecords = Company::query()
@@ -115,9 +116,21 @@ it('can paginate records', function (): void {
         ->get();
 
     livewire(ListCompanies::class)
-        ->assertCanSeeTableRecords($sortedRecords->take(10), inOrder: true)
+        ->assertCanSeeTableRecords($sortedRecords->take(25), inOrder: true)
         ->call('gotoPage', 2)
-        ->assertCanSeeTableRecords($sortedRecords->skip(10)->take(10), inOrder: true);
+        ->assertCanSeeTableRecords($sortedRecords->skip(25), inOrder: true);
+});
+
+it('offers a per page choice only once there is more than one page of records', function (): void {
+    Company::factory(25)->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ListCompanies::class)
+        ->assertDontSeeHtml('fi-pagination-records-per-page-select');
+
+    Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ListCompanies::class)
+        ->assertSeeHtml('fi-pagination-records-per-page-select');
 });
 
 it('can bulk delete records', function (): void {

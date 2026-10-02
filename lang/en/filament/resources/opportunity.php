@@ -48,25 +48,8 @@ return [
             ],
         ],
         'view' => [
-            'actions' => [
-                'edit' => [
-                    'label' => 'Edit',
-                ],
-                'view_emails' => [
-                    'label' => 'Emails',
-                ],
-                'copy_page_url' => [
-                    'label' => 'Copy page URL',
-                ],
-                'copy_record_id' => [
-                    'label' => 'Copy record ID',
-                ],
-            ],
             'infolist' => [
                 'fields' => [
-                    'name' => [
-                        'label' => '',
-                    ],
                     'company' => [
                         'label' => 'Company',
                     ],

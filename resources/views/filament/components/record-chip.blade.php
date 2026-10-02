@@ -14,7 +14,7 @@
 
     $shape = $chip->circular ? 'rounded-full' : 'rounded';
 @endphp
-<span class="inline-flex min-w-0 items-center gap-2 align-middle">@if (filled($chip->imageUrl))<img
+<span class="inline-flex min-w-0 max-w-full items-center gap-2 align-middle">@if (filled($chip->imageUrl))<img
         src="{{ $chip->imageUrl }}"
         alt=""
         @class(['shrink-0 object-cover ring-1 ring-gray-950/5 dark:ring-white/10', $box, $shape])

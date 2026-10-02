@@ -102,7 +102,7 @@ describe('Legal pages', function () {
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
         $response->assertSee('privacy@relaticle.com');
-        $response->assertSee('August 26, 2026');
+        $response->assertSee('October 1, 2026');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
         $response->assertSee('Relaticle does not sell CRM data.');
@@ -141,6 +141,21 @@ describe('Legal pages', function () {
     })->with([
         'HTML' => [[], 'text/html'],
         'Markdown' => [['Accept' => 'text/markdown'], 'text/markdown'],
+    ]);
+
+    it('discloses how connected Google mailbox and calendar data is used as :format', function (array $headers): void {
+        $response = $this->get('/privacy-policy', $headers);
+
+        $response->assertOk();
+        $response->assertSeeText("Relaticle's use and transfer of information received from Google APIs to any other app will adhere to the", false);
+        $response->assertSee('including the Limited Use requirements.', false);
+        $response->assertSee('https://developers.google.com/terms/api-services-user-data-policy');
+        $response->assertSee('The thread content goes to our AI provider to produce that summary.');
+        $response->assertSee('Emails and meetings already synced stay in the workspace.');
+        $response->assertSee('We never change, label, or delete messages in your mailbox.');
+    })->with([
+        'HTML' => [[]],
+        'Markdown' => [['Accept' => 'text/markdown']],
     ]);
 });
 

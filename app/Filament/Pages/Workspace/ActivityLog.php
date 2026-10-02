@@ -182,8 +182,6 @@ final class ActivityLog extends Page implements HasTable
             ->defaultSort('created_at', 'desc')
             ->stackedOnMobile()
             ->recordUrl($this->subjectUrl(...))
-            ->defaultPaginationPageOption(25)
-            ->paginationPageOptions([25, 50, 100])
             ->searchPlaceholder(__('workspaces.activity.search_placeholder'))
             ->emptyStateIcon(fn (): Heroicon => $this->isFiltered() ? Heroicon::OutlinedMagnifyingGlass : Heroicon::OutlinedClock)
             ->emptyStateHeading(fn (): string => $this->isFiltered()

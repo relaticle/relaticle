@@ -10,7 +10,7 @@ return [
         'collapse' => 'Collapse checklist',
         'more_actions' => 'More actions',
         'encouragement' => "Let's go!",
-        'invite_members' => 'Invite workspace members',
+        'invite_members' => 'Invite teammates',
         'sample_data' => 'This workspace is preloaded with sample records so you can look around. Anything you add sits alongside them.',
         'remove_sample_data' => 'Remove sample data',
         'remove_sample_data_confirm' => 'Delete every sample record? Your own records stay.',

@@ -63,7 +63,8 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Schemas\Components\Section;
+use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\EmptyState;
 use Filament\Schemas\Schema;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Platform;
@@ -71,6 +72,7 @@ use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -115,6 +117,9 @@ final class AppPanelProvider extends PanelProvider
      */
     private const string DATE_TIME_FORMAT = 'M j, Y H:i';
 
+    /** @var list<int> */
+    private const array PAGINATION_PAGE_OPTIONS = [25, 50, 100];
+
     /**
      * Perform post-registration booting of components.
      */
@@ -150,7 +155,6 @@ final class AppPanelProvider extends PanelProvider
         });
 
         DeleteAction::configureUsing(fn (DeleteAction $action): DeleteAction => $action->label(__('filament/panel.actions.delete_record')));
-        Section::configureUsing(fn (Section $section): Section => $section->compact());
 
         // Filament defaults searchDebounce to 1000ms, which reads as a hung field.
         // configureUsing is global across panels, so this is guarded like the callbacks below.
@@ -158,12 +162,19 @@ final class AppPanelProvider extends PanelProvider
             ? $select->searchDebounce(250)
             : $select);
 
+        EmptyState::configureUsing(fn (EmptyState $emptyState): EmptyState => $this->isCurrentPanel()
+            ? $emptyState->compact()
+            : $emptyState);
+
         // Table and Schema configuration is global, so both callbacks have to check
         // which panel is actually serving the request before they touch the format.
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
             ? $table
                 ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
                 ->reorderableColumns()
+                ->columnManager(! $table->getLivewire() instanceof RelationManager)
+                ->defaultPaginationPageOption(self::PAGINATION_PAGE_OPTIONS[0])
+                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
             : $table);
 
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
@@ -209,6 +220,22 @@ final class AppPanelProvider extends PanelProvider
                 return day === date && focusedMonth === month - 1 && focusedYear === year;
             }
             JS;
+    }
+
+    /** @return list<int> */
+    private function paginationPageOptions(HasTable $livewire): array
+    {
+        // Mount reads these before any query runs; afterwards the count comes from the
+        // already-fetched paginator, and a single option is what hides the select.
+        if ($livewire->getTableRecordsPerPage() === null) {
+            return self::PAGINATION_PAGE_OPTIONS;
+        }
+
+        if ($livewire->getAllTableRecordsCount() > self::PAGINATION_PAGE_OPTIONS[0]) {
+            return self::PAGINATION_PAGE_OPTIONS;
+        }
+
+        return [self::PAGINATION_PAGE_OPTIONS[0]];
     }
 
     private function isCurrentPanel(): bool
@@ -292,7 +319,7 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
-            ->sidebarWidth('67')
+            ->sidebarWidth('16rem')
             ->maxContentWidth(Width::Full)
             // The socialite entry points answer with a 302 to the provider's own
             // domain, and wire:navigate cannot follow a cross-origin redirect.
@@ -329,9 +356,9 @@ final class AppPanelProvider extends PanelProvider
             ->breadcrumbs(false)
             ->sidebarCollapsibleOnDesktop()
             // Navigation icons stay start-aligned so they hold their column
-            // while the sidebar animates. 4.25rem is the width at which that
-            // column is also the centre of the collapsed rail.
-            ->collapsedSidebarWidth('4.25rem')
+            // while the sidebar animates; the theme pads the rail so that
+            // column is also its centre.
+            ->collapsedSidebarWidth('3rem')
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
@@ -465,6 +492,14 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_START,
                 fn (): View|Factory => view('filament.app.appearance-preference')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_START,
+                fn (): View|Factory => view('filament.app.resizable-width-preferences')
+            )
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_START,
+                fn (): View|Factory => view('filament.app.sidebar-resize-handle')
             )
             /**
              * The activation checklist lives here rather than on the dashboard

@@ -2,18 +2,19 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
-use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
+use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
-mutates(BaseRecordEmailsPage::class, Email::class, EmailCategory::class);
+mutates(BaseEmailsRelationManager::class, Email::class, EmailCategory::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -54,7 +55,10 @@ it('shows the system category tag on a record mailbox row', function (): void {
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee('Q3 campaign recap')
         ->assertSee(EmailCategory::Marketing->value);
 });
@@ -96,7 +100,10 @@ it('hides the Other fallback instead of showing a category tag', function (): vo
 
     expect($email->fresh(['labels'])->categoryLabel())->toBeNull();
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee('Catching up next week')
         ->assertDontSee(EmailCategory::Other->value);
 });

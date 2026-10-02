@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
@@ -182,7 +181,10 @@ it('renders an email body in a sandboxed iframe with sanitized content', functio
 
     $this->person->emails()->attach($this->inboundEmail->getKey());
 
-    $page = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    $page = livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->call('selectEmail', $this->inboundEmail->id)
         // The script tag is stripped by the sanitizer before it ever reaches the frame.
         ->assertDontSee('alert(1)', escape: false);
@@ -902,7 +904,10 @@ it('opens grant permission instead of reply when the mailbox cannot send', funct
         ],
     ]);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->call('openReplyModal', $this->inboundEmail->id, 'reply')
         ->assertActionMounted('grantSendPermission');
 
@@ -911,7 +916,7 @@ it('opens grant permission instead of reply when the mailbox cannot send', funct
         ->assertActionMounted('grantSendPermission');
 });
 
-it('redirects to oauth when grant permission is confirmed from a record emails page', function (): void {
+it('redirects to oauth when grant permission is confirmed from the record emails tab', function (): void {
     $this->account->update([
         'capabilities' => [
             'email' => true,
@@ -920,7 +925,10 @@ it('redirects to oauth when grant permission is confirmed from a record emails p
         ],
     ]);
 
-    $component = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    $component = livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->callAction('grantSendPermission');
 
     assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->workspace);
@@ -948,7 +956,10 @@ it('opens the grant permission empty state when replying from a mailbox that can
 it('opens grant permission instead of reply when the mailbox is not active', function (EmailAccountStatus $status): void {
     $this->account->update(['status' => $status]);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->call('openReplyModal', $this->inboundEmail->id, 'reply')
         ->assertActionMounted('grantSendPermission');
 
@@ -992,7 +1003,10 @@ it('redirects to oauth when grant permission is confirmed for a mailbox that nee
         ConnectedAccount::factory()->error()->make()->only(['status', 'last_error']),
     );
 
-    $component = livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    $component = livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->callAction('grantSendPermission');
 
     assertRedirectedToMailboxOAuth($component, 'gmail', $this->account->workspace);

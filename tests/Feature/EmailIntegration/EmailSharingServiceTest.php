@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Models\Company;
-use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -99,101 +95,6 @@ it('updates the email privacy_tier', function (): void {
 
     expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
         ->and($email->fresh()->privacy_tier_customized)->toBeTrue();
-});
-
-it('shares all owner emails linked to a record', function (): void {
-    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-
-    $person = People::create([
-        'workspace_id' => $this->workspace->id,
-        'name' => 'Jane Doe',
-        'creator_id' => $this->owner->id,
-    ]);
-
-    $emailA = makeSharingEmail(['subject' => 'Email A']);
-    $emailB = makeSharingEmail(['subject' => 'Email B']);
-
-    $morphClass = (new People)->getMorphClass();
-    DB::table('emailables')->insert([
-        ['email_id' => $emailA->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $person->getKey(), 'created_at' => now(), 'updated_at' => now()],
-        ['email_id' => $emailB->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $person->getKey(), 'created_at' => now(), 'updated_at' => now()],
-    ]);
-
-    $count = $this->service->shareAllOnRecord($person, $this->owner, $viewer, EmailPrivacyTier::SUBJECT);
-
-    expect($count)->toBe(2);
-
-    $this->assertDatabaseHas('email_shares', ['email_id' => $emailA->getKey(), 'shared_with' => $viewer->getKey(), 'tier' => EmailPrivacyTier::SUBJECT->value]);
-    $this->assertDatabaseHas('email_shares', ['email_id' => $emailB->getKey(), 'shared_with' => $viewer->getKey(), 'tier' => EmailPrivacyTier::SUBJECT->value]);
-});
-
-it('only shares emails owned by the specified owner', function (): void {
-    $otherUser = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
-
-    $person = People::create([
-        'workspace_id' => $this->workspace->id,
-        'name' => 'Contact',
-        'creator_id' => $this->owner->id,
-    ]);
-
-    $ownerEmail = makeSharingEmail(['subject' => 'Owner Email']);
-    $otherEmail = Email::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $otherUser->id,
-        'connected_account_id' => $this->account->getKey(),
-        'subject' => 'Other User Email',
-        'direction' => EmailDirection::INBOUND,
-    ]);
-
-    $morphClass = (new People)->getMorphClass();
-    DB::table('emailables')->insert([
-        ['email_id' => $ownerEmail->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $person->getKey(), 'created_at' => now(), 'updated_at' => now()],
-        ['email_id' => $otherEmail->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $person->getKey(), 'created_at' => now(), 'updated_at' => now()],
-    ]);
-
-    $count = $this->service->shareAllOnRecord($person, $this->owner, $viewer, EmailPrivacyTier::FULL);
-
-    expect($count)->toBe(1);
-    $this->assertDatabaseHas('email_shares', ['email_id' => $ownerEmail->getKey(), 'shared_with' => $viewer->getKey()]);
-    $this->assertDatabaseMissing('email_shares', ['email_id' => $otherEmail->getKey(), 'shared_with' => $viewer->getKey()]);
-});
-
-it('bulk updates privacy_tier on all owner emails linked to a record', function (): void {
-    $company = Company::create([
-        'workspace_id' => $this->workspace->id,
-        'name' => 'Acme Corp',
-        'creator_id' => $this->owner->id,
-    ]);
-
-    $emailA = makeSharingEmail(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
-    $emailB = makeSharingEmail(['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
-
-    $morphClass = (new Company)->getMorphClass();
-    DB::table('emailables')->insert([
-        ['email_id' => $emailA->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $company->getKey(), 'created_at' => now(), 'updated_at' => now()],
-        ['email_id' => $emailB->getKey(), 'emailable_type' => $morphClass, 'emailable_id' => $company->getKey(), 'created_at' => now(), 'updated_at' => now()],
-    ]);
-
-    $updated = $this->service->setTierForAllOnRecord($company, $this->owner, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(2)
-        ->and($emailA->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($emailB->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($emailA->fresh()->privacy_tier_customized)->toBeTrue()
-        ->and($emailB->fresh()->privacy_tier_customized)->toBeTrue();
-});
-
-it('returns 0 when no emails are linked to the record', function (): void {
-    $person = People::create([
-        'workspace_id' => $this->workspace->id,
-        'name' => 'Nobody',
-        'creator_id' => $this->owner->id,
-    ]);
-
-    $updated = $this->service->setTierForAllOnRecord($person, $this->owner, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(0);
 });
 
 it('shares with a workspace member who is currently working in another workspace', function (): void {

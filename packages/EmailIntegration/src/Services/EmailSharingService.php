@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailShare;
@@ -40,39 +37,6 @@ final readonly class EmailSharingService
     }
 
     /**
-     * Share all emails owned by $owner that are linked to $record with a specific user.
-     */
-    public function shareAllOnRecord(Model $record, User $owner, User $sharedWith, EmailPrivacyTier $tier): int
-    {
-        $emails = $this->ownerEmailsOnRecord($record, $owner);
-
-        foreach ($emails as $email) {
-            $this->shareEmail($email, $owner, $sharedWith, $tier);
-        }
-
-        return $emails->count();
-    }
-
-    /**
-     * Update the privacy_tier on all emails owned by $owner that are linked to $record.
-     */
-    public function setTierForAllOnRecord(Model $record, User $owner, EmailPrivacyTier $tier): int
-    {
-        $emailIds = $this->ownerEmailsOnRecord($record, $owner)->modelKeys();
-
-        if (blank($emailIds)) {
-            return 0;
-        }
-
-        return Email::query()
-            ->whereIn('id', $emailIds)
-            ->update([
-                'privacy_tier' => $tier->value,
-                'privacy_tier_customized' => true,
-            ]);
-    }
-
-    /**
      * Update an email's own privacy_tier.
      */
     public function setEmailTier(Email $email, EmailPrivacyTier $tier): void
@@ -81,22 +45,5 @@ final readonly class EmailSharingService
             'privacy_tier' => $tier,
             'privacy_tier_customized' => true,
         ]);
-    }
-
-    /**
-     * Retrieve all emails owned by $owner that are linked to $record via the emailables pivot.
-     *
-     * @return Collection<int, Email>
-     */
-    private function ownerEmailsOnRecord(Model $record, User $owner): Collection
-    {
-        $linkedIds = DB::table('emailables')
-            ->where('emailable_type', $record->getMorphClass())
-            ->where('emailable_id', $record->getKey())
-            ->pluck('email_id');
-
-        return Email::query()->where('user_id', $owner->getKey())
-            ->whereIn('id', $linkedIds)
-            ->get();
     }
 }

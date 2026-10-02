@@ -45,6 +45,14 @@ it('renders the catalog the app is actually running on', function (): void {
         ->assertFormSet(fn (array $state): bool => $state['anthropic_effort'] === config('chat.anthropic_effort'));
 });
 
+it('keeps the model catalog in the full table layout, not the app panel compact one', function (): void {
+    $html = livewire(ManageAiSettings::class)->html();
+
+    expect($html)
+        ->toContain('fi-fo-table-repeater')
+        ->not->toMatch('/fi-fo-table-repeater[^"]*\bfi-compact\b/');
+});
+
 /**
  * A provider with no API key can serve nothing, because save() rejects every model
  * under one, so offering it in the picker is offering a dead end. The exception is a

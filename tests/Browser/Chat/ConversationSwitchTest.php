@@ -97,7 +97,7 @@ it('places the conversation title in the topbar and the toggle beside the worksp
         'chromeCentersAligned' => true,
         'composerInsideViewport' => true,
         'headingOnlyHeaderRemovedFromFlow' => true,
-        'topbarHeight' => 64,
+        'topbarHeight' => 48,
         'chatSurfaceTopGap' => 0,
     ]);
 

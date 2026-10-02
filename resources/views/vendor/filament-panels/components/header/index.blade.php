@@ -12,6 +12,7 @@
     $afterHeading = \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_HEADING_AFTER, scopes: $this->getRenderHookScopes());
     $beforeActions = \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_ACTIONS_BEFORE, scopes: $this->getRenderHookScopes());
     $afterActions = \Filament\Support\Facades\FilamentView::renderHook(\Filament\View\PanelsRenderHook::PAGE_HEADER_ACTIONS_AFTER, scopes: $this->getRenderHookScopes());
+    $headingStart = $isAppPanel && method_exists($this, 'getHeadingStart') ? $this->getHeadingStart() : null;
     $headingEnd = $isAppPanel && method_exists($this, 'getHeadingEnd') ? $this->getHeadingEnd() : null;
     $hasInlineHeaderContent = $breadcrumbs
         || filled($beforeHeading)
@@ -31,7 +32,7 @@
     }}
 >
     @if ($isAppPanel && filled($heading))
-        @include('filament.app.topbar-page-heading', ['heading' => $heading, 'headingEnd' => $headingEnd])
+        @include('filament.app.topbar-page-heading', ['heading' => $heading, 'headingStart' => $headingStart, 'headingEnd' => $headingEnd])
     @endif
 
     @if ($hasInlineHeaderContent)

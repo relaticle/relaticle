@@ -22,7 +22,7 @@
                 x-transition:enter-start="opacity-0 translate-y-1"
                 x-transition:enter-end="opacity-100 translate-y-0"
                 x-on:keydown.escape.window="close()"
-                class="absolute bottom-full left-2 right-2 z-20 mb-2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
+                class="absolute bottom-full left-2 z-20 mb-2 w-[min(20rem,calc(100vw-1rem))] rounded-xl border border-gray-200 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900"
             >
                 <div class="flex items-start justify-between gap-2">
                     <div class="min-w-0">

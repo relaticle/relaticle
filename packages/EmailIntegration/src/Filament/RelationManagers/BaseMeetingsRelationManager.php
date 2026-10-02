@@ -96,8 +96,8 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             ->emptyStateIcon(fn (): Heroicon => $this->hidesOwnerMailbox()
                 ? Heroicon::OutlinedShieldCheck
                 : Heroicon::Calendar)
-            ->emptyStateHeading(fn (): string => ($this->recordMailboxHiddenCopy() ?? [])['heading'] ?? __('filament-tables::table.empty.heading'))
-            ->emptyStateDescription(fn (): ?string => ($this->recordMailboxHiddenCopy() ?? [])['description'] ?? null)
+            ->emptyStateHeading(fn (): ?string => $this->recordMailboxHiddenCopy()['heading'] ?? null)
+            ->emptyStateDescription(fn (): ?string => $this->recordMailboxHiddenCopy()['description'] ?? null)
             ->filters([
                 Filter::make('upcoming')
                     ->query(fn (Builder $query): Builder => $query->where('starts_at', '>=', now())),
@@ -105,9 +105,8 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->query(fn (Builder $query): Builder => $query->where('starts_at', '<', now())),
             ])
             ->recordActions([
-                MeetingDetailInfolist::viewAction(),
-
                 ActionGroup::make([
+                    MeetingDetailInfolist::viewAction(),
                     Action::make('linkToRecord')
                         ->label(__('filament/relation-managers/meetings.actions.link_to_record.label'))
                         ->icon(Heroicon::Link)

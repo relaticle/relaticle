@@ -65,5 +65,17 @@ it('renders exactly one sidebar collapse toggle, in the sidebar above the naviga
 });
 
 it('sizes the collapsed rail to the width that centres the navigation icons', function (): void {
-    expect(Filament::getPanel('app')->getCollapsedSidebarWidth())->toBe('4.25rem');
+    expect(Filament::getPanel('app')->getCollapsedSidebarWidth())->toBe('3rem');
+});
+
+it('sizes the open sidebar with a css length rather than a bare number', function (): void {
+    expect(Filament::getPanel('app')->getSidebarWidth())->toBe('16rem');
+});
+
+it('renders a keyboard reachable resize handle inside the sidebar', function (): void {
+    $handlePosition = strpos($this->html, 'fi-sidebar-resize-handle');
+
+    expect($handlePosition)->toBeGreaterThan(strpos($this->html, 'fi-sidebar fi-main-sidebar'))
+        ->and($this->html)->toContain('role="separator"')
+        ->and($this->html)->toContain(__('filament/panel.sidebar.resize'));
 });

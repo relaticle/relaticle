@@ -10,10 +10,13 @@ use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\CompanyExporter;
-use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
+use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
 use App\Models\Company;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -141,8 +144,12 @@ final class CompanyResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ActivityLogRelationManager::class,
+            PeopleRelationManager::class,
+            TasksRelationManager::class,
+            NotesRelationManager::class,
+            EmailsRelationManager::class,
             MeetingsRelationManager::class,
+            ActivityLogRelationManager::class,
         ];
     }
 
@@ -151,7 +158,6 @@ final class CompanyResource extends Resource
         return [
             'index' => ListCompanies::route('/'),
             'view' => ViewCompany::route('/{record}'),
-            'emails' => CompanyEmailsPage::route('/{record}/emails'),
         ];
     }
 

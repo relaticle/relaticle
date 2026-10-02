@@ -13,6 +13,5 @@ it('includes calendar scope on the default mailbox connect redirect', function (
 
     $response->assertRedirect();
     expect($response->headers->get('Location'))
-        ->toContain(urlencode('https://www.googleapis.com/auth/calendar.events'))
-        ->toContain(urlencode('https://www.googleapis.com/auth/calendar.readonly'));
+        ->toContain(urlencode('https://www.googleapis.com/auth/calendar.events'));
 });

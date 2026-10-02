@@ -42,7 +42,7 @@ Graph mail folders must be identified by well-known path names
 
 ## Privacy-aware email search
 
-Mailbox search (inbox and record email pages) must go through
+Mailbox search (inbox and the record emails tab) must go through
 `EmailSearchService`. Never `ilike` on `subject` or `snippet` alone.
 Metadata-only teammate rows stay in the list, but those columns are hidden.
 A guessed subject must not match. Participants remain searchable, except

@@ -30,27 +30,18 @@ it('redirects to Google using the Gmail OAuth client and the email-account callb
         ->and($query['client_id'] ?? null)->toBe('gmail-client-id')
         // The connect flow must return to the email-account callback, NOT the social-login one.
         ->and($query['redirect_uri'] ?? null)->toBe('http://localhost/email-accounts/callback/gmail')
-        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/gmail.readonly')
-        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/gmail.send')
-        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.events')
-        ->and(urldecode((string) ($query['scope'] ?? '')))->toContain('https://www.googleapis.com/auth/calendar.readonly')
+        ->and(explode(' ', urldecode((string) ($query['scope'] ?? ''))))->toEqualCanonicalizing([
+            'openid',
+            'profile',
+            'email',
+            'https://www.googleapis.com/auth/gmail.readonly',
+            'https://www.googleapis.com/auth/gmail.send',
+            'https://www.googleapis.com/auth/calendar.events',
+        ])
         ->and($query['access_type'] ?? null)->toBe('offline')
         ->and($query['prompt'] ?? null)->toBe('consent');
 
     expect(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($user->currentWorkspace->getKey());
-});
-
-it('includes calendar.readonly even when the leftover capability query is sent', function (): void {
-    $user = User::factory()->withWorkspace()->create();
-    $this->actingAs($user);
-
-    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $user->currentWorkspace))
-        ->headers->get('Location');
-    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
-
-    expect(urldecode((string) ($query['scope'] ?? '')))
-        ->toContain('https://www.googleapis.com/auth/calendar.events')
-        ->toContain('https://www.googleapis.com/auth/calendar.readonly');
 });
 
 it('does not start Google consent when the user has no workspace', function (): void {

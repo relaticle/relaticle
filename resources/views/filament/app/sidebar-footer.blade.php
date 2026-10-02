@@ -45,7 +45,7 @@
 
         @if($canInviteMembers)
             <a href="{{ \App\Filament\Pages\Workspace\Members::getUrl() }}" class="{{ $rowClasses }}">
-                <x-heroicon-o-user-plus class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                <x-heroicon-o-user-plus class="size-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                 <span class="truncate">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
             </a>
         @endif
@@ -56,7 +56,7 @@
                  no dead text sitting next to a live control. --}}
             <div class="mt-2 border-t border-gray-200 pt-2 dark:border-white/10">
                 <a href="{{ \App\Filament\Pages\Billing::getUrl() }}" class="{{ $rowClasses }} group">
-                    <x-heroicon-o-arrow-up-circle class="h-5 w-5 flex-shrink-0 text-gray-400 dark:text-gray-500" />
+                    <x-heroicon-o-arrow-up-circle class="size-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
 
                     <span class="flex-1 truncate">{{ $billing['label'] }}</span>
 

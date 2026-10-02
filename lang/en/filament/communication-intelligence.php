@@ -4,11 +4,6 @@ declare(strict_types=1);
 
 return [
     'heading' => 'Communication Intelligence',
-    'groups' => [
-        'connection' => 'Connection',
-        'email' => 'Email',
-        'calendar' => 'Calendar',
-    ],
     'fields' => [
         'first_interaction' => [
             'label' => 'First interaction',
@@ -22,27 +17,27 @@ return [
             'label' => 'Strength',
         ],
         'strongest_connection' => [
-            'label' => 'Strongest teammate',
+            'label' => 'Closest teammate',
             'placeholder' => 'Nobody',
         ],
         'first_email' => [
-            'label' => 'First',
+            'label' => 'First email',
             'placeholder' => 'Never',
         ],
         'last_email' => [
-            'label' => 'Last',
+            'label' => 'Last email',
             'placeholder' => 'Never',
         ],
         'first_calendar' => [
-            'label' => 'First',
+            'label' => 'First meeting',
             'placeholder' => 'Never',
         ],
         'last_calendar' => [
-            'label' => 'Last',
+            'label' => 'Last meeting',
             'placeholder' => 'Never',
         ],
         'next_calendar' => [
-            'label' => 'Next',
+            'label' => 'Next meeting',
             'placeholder' => 'None',
         ],
     ],

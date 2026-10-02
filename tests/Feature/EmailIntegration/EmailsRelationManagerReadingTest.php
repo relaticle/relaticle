@@ -42,7 +42,7 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 });
 
-describe('requestAccess table action', function (): void {
+describe('requestAccess action', function (): void {
     it('creates an EmailAccessRequest and notifies the owner', function (): void {
         $this->actingAs($this->viewer);
 
@@ -61,9 +61,9 @@ describe('requestAccess table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('requestAccess', $email, data: [
+            ->callAction('requestAccess', data: [
                 'tier_requested' => EmailPrivacyTier::FULL->value,
-            ])
+            ], arguments: ['emailId' => $email->getKey()])
             ->assertNotified('Access request sent.');
 
         expect(
@@ -99,7 +99,7 @@ describe('requestAccess table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableActionHidden('requestAccess', $email);
+            ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);
 
         expect(
             EmailAccessRequest::where('email_id', $email->getKey())
@@ -122,7 +122,7 @@ describe('requestAccess table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableActionHidden('requestAccess', $email);
+            ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);
     });
 
     it('is hidden when the viewer already has full body access via a share', function (): void {
@@ -147,11 +147,11 @@ describe('requestAccess table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableActionHidden('requestAccess', $email);
+            ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);
     });
 });
 
-describe('manageSharing table action', function (): void {
+describe('manageSharing action', function (): void {
     it('updates the email privacy_tier', function (): void {
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,
@@ -166,10 +166,10 @@ describe('manageSharing table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('manageSharing', $email, data: [
+            ->callAction('manageSharing', data: [
                 'privacy_tier' => EmailPrivacyTier::FULL->value,
                 'shares' => [],
-            ])
+            ], arguments: ['emailId' => $email->getKey()])
             ->assertNotified('Sharing settings saved.');
 
         expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
@@ -189,7 +189,7 @@ describe('manageSharing table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('manageSharing', $email, data: [
+            ->callAction('manageSharing', data: [
                 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
                 'shares' => [
                     [
@@ -197,7 +197,7 @@ describe('manageSharing table action', function (): void {
                         'shared_with' => [$this->viewer->id],
                     ],
                 ],
-            ])
+            ], arguments: ['emailId' => $email->getKey()])
             ->assertNotified('Sharing settings saved.');
 
         $this->assertDatabaseHas('email_shares', [
@@ -224,7 +224,7 @@ describe('manageSharing table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('manageSharing', $email, data: [
+            ->callAction('manageSharing', data: [
                 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
                 'shares' => [
                     [
@@ -235,7 +235,7 @@ describe('manageSharing table action', function (): void {
                         ],
                     ],
                 ],
-            ])
+            ], arguments: ['emailId' => $email->getKey()])
             ->assertNotified('Sharing settings saved.');
 
         foreach ([$this->viewer, $secondViewer] as $viewer) {
@@ -268,10 +268,10 @@ describe('manageSharing table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('manageSharing', $email, data: [
+            ->callAction('manageSharing', data: [
                 'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
                 'shares' => [],
-            ])
+            ], arguments: ['emailId' => $email->getKey()])
             ->assertNotified('Sharing settings saved.');
 
         $this->assertDatabaseMissing('email_shares', [
@@ -280,7 +280,7 @@ describe('manageSharing table action', function (): void {
         ]);
     });
 
-    it('is hidden for non-owners', function (): void {
+    it('rejects sharing changes from non-owners', function (): void {
         $this->actingAs($this->viewer);
 
         $email = Email::factory()->create([
@@ -296,86 +296,18 @@ describe('manageSharing table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableActionHidden('manageSharing', $email);
-    });
-});
-
-describe('shareAllOnRecord header action', function (): void {
-    it('updates privacy tier on all owner emails linked to the record', function (): void {
-        $emailA = Email::factory()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->owner->id,
-            'connected_account_id' => $this->account->getKey(),
-            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        ]);
-
-        $emailB = Email::factory()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->owner->id,
-            'connected_account_id' => $this->account->getKey(),
-            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        ]);
-
-        $this->person->emails()->attach($emailA->getKey());
-        $this->person->emails()->attach($emailB->getKey());
-
-        livewire(EmailsRelationManager::class, [
-            'ownerRecord' => $this->person,
-            'pageClass' => ViewPeople::class,
-        ])
-            ->callTableAction('shareAllOnRecord', data: [
+            ->callAction('manageSharing', data: [
                 'privacy_tier' => EmailPrivacyTier::FULL->value,
                 'shares' => [],
-            ])
-            ->assertNotified('Sharing settings saved for all your emails on this record.');
+            ], arguments: ['emailId' => $email->getKey()])
+            ->assertForbidden();
 
-        expect($emailA->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-            ->and($emailB->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
-    });
-
-    it('creates EmailShare rows for each email on the record per specified teammate', function (): void {
-        $email = Email::factory()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->owner->id,
-            'connected_account_id' => $this->account->getKey(),
-            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        ]);
-
-        $this->person->emails()->attach($email->getKey());
-
-        livewire(EmailsRelationManager::class, [
-            'ownerRecord' => $this->person,
-            'pageClass' => ViewPeople::class,
-        ])
-            ->callTableAction('shareAllOnRecord', data: [
-                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY->value,
-                'shares' => [
-                    [
-                        'tier' => EmailPrivacyTier::SUBJECT->value,
-                        'shared_with' => [$this->viewer->id],
-                    ],
-                ],
-            ])
-            ->assertNotified('Sharing settings saved for all your emails on this record.');
-
-        $this->assertDatabaseHas('email_shares', [
-            'email_id' => $email->getKey(),
-            'shared_with' => $this->viewer->id,
-            'tier' => EmailPrivacyTier::SUBJECT->value,
-        ]);
-    });
-
-    it('is hidden when the authenticated user has no emails linked to the record', function (): void {
-        livewire(EmailsRelationManager::class, [
-            'ownerRecord' => $this->person,
-            'pageClass' => ViewPeople::class,
-        ])
-            ->assertTableActionHidden('shareAllOnRecord');
+        expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
     });
 });
 
-describe('view table action', function (): void {
-    it('stays hidden when the viewer cannot read the body', function (EmailPrivacyTier $tier): void {
+describe('reader overlay', function (): void {
+    it('stays closed when the viewer cannot read the body', function (EmailPrivacyTier $tier): void {
         $this->actingAs($this->viewer);
 
         $email = Email::factory()->create([
@@ -391,8 +323,8 @@ describe('view table action', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableActionHidden('view', $email)
-            ->assertTableActionVisible('requestAccess', $email)
+            ->assertDontSeeHtml("selectEmail('{$email->getKey()}')")
+            ->assertActionVisible('requestAccess', ['emailId' => $email->getKey()])
             ->call('selectEmail', $email->getKey())
             ->assertSet('selectedEmailId', null)
             ->assertDontSee('fi-email-reader-panel');
@@ -425,7 +357,7 @@ describe('access request approve and deny from the reader overlay', function ():
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('view', $email)
+            ->call('selectEmail', $email->getKey())
             ->assertSet('selectedEmailId', $email->getKey())
             ->assertSee('fi-email-reader-panel')
             ->assertSee($this->viewer->name)
@@ -460,7 +392,7 @@ describe('access request approve and deny from the reader overlay', function ():
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->callTableAction('view', $email)
+            ->call('selectEmail', $email->getKey())
             ->assertSee('fi-email-reader-panel')
             ->assertSee(__('filament/pages/email-inbox.pending_access.deny'))
             ->callAction(TestAction::make('denyAccessRequest')->arguments(['requestId' => $request->getKey()]))
@@ -472,7 +404,7 @@ describe('access request approve and deny from the reader overlay', function ():
     });
 });
 
-describe('subject column privacy enforcement', function (): void {
+describe('subject privacy enforcement', function (): void {
     it('shows (subject hidden) when the viewer cannot view the subject', function (): void {
         $this->actingAs($this->viewer);
 
@@ -490,7 +422,8 @@ describe('subject column privacy enforcement', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableColumnStateSet('subject', '(subject hidden)', $email);
+            ->assertSee('(subject hidden)')
+            ->assertDontSee('Secret Subject');
     });
 
     it('shows the real subject when the viewer can view the subject', function (): void {
@@ -508,7 +441,8 @@ describe('subject column privacy enforcement', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertTableColumnStateSet('subject', 'Real Subject', $email);
+            ->assertSee('Real Subject')
+            ->assertDontSee('(subject hidden)');
     });
 
     it('does not match a guessed subject when the viewer cannot view the subject', function (): void {
@@ -528,9 +462,56 @@ describe('subject column privacy enforcement', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->assertCanSeeTableRecords([$email])
-            ->searchTable('Secret Subject')
-            ->assertCanNotSeeTableRecords([$email]);
+            ->assertSeeHtml("email-list-row-{$email->getKey()}")
+            ->set('search', 'Secret Subject')
+            ->assertDontSeeHtml("email-list-row-{$email->getKey()}")
+            ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Secret Subject']));
+    });
+
+    it('leaves a teammate private email out of the list', function (): void {
+        $this->actingAs($this->viewer);
+
+        [$visible, $private] = collect([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::PRIVATE])
+            ->map(fn (EmailPrivacyTier $tier): Email => Email::factory()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'privacy_tier' => $tier,
+            ]))
+            ->each(fn (Email $email) => $this->person->emails()->attach($email->getKey()))
+            ->all();
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSeeHtml("email-list-row-{$visible->getKey()}")
+            ->assertDontSeeHtml("email-list-row-{$private->getKey()}");
+    });
+
+    it('returns no emails when a client calls the table records method directly', function (): void {
+        $this->actingAs($this->viewer);
+
+        foreach ([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::PRIVATE] as $tier) {
+            $email = Email::factory()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'subject' => "Secret {$tier->value} subject",
+                'privacy_tier' => $tier,
+            ]);
+
+            $this->person->emails()->attach($email->getKey());
+        }
+
+        $component = livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])->call('getTableRecords');
+
+        expect(json_encode($component->effects['returns']))
+            ->not->toContain('Secret metadata_only subject')
+            ->not->toContain('Secret private subject');
     });
 
     it('matches the subject when searching as a viewer who can view it', function (): void {
@@ -548,8 +529,9 @@ describe('subject column privacy enforcement', function (): void {
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
         ])
-            ->searchTable('Secret Subject')
-            ->assertCanSeeTableRecords([$email]);
+            ->set('search', 'Secret Subject')
+            ->assertSeeHtml("email-list-row-{$email->getKey()}")
+            ->assertSee('Secret Subject');
     });
 });
 

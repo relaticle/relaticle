@@ -3,24 +3,13 @@
     <div
         x-data="{
             open: @entangle('isOpen').live,
-            {{-- try/catch: storage access throws in Safari private mode, and an
-                 exception here would kill the whole component's init. --}}
-            width: (() => {
-                try {
-                    return Math.max(360, Math.min(720, parseInt(localStorage.getItem('chat-panel-width') || '420', 10) || 420));
-                } catch (_) {
-                    return 420;
-                }
-            })(),
-            minWidth: 360,
-            maxWidth: 720,
-            resizing: false,
             viewportWidth: window.innerWidth,
+            {{-- From xl the panel docks beside the page instead of covering it. --}}
+            dockFrom: 1280,
 
-            {{-- The panel only learns the id of a brand-new conversation from the
-                 client, so the header menu tracks it here rather than round-tripping
-                 to the server (which would remount the chat mid-stream). --}}
-            currentConversationId: @js($conversationId),
+            {{-- Read from $wire, never rendered into x-data: a changed x-data re-inits
+                 the component, and init() closes an open panel. --}}
+            currentConversationId: $wire.conversationId,
             historyOpen: false,
             historyLoading: false,
             historyError: false,
@@ -28,16 +17,13 @@
             historyItems: [],
             menuOpen: false,
             copied: false,
+            contextStale: false,
 
             init() {
-                {{-- Open at init only when Livewire restored this page from its
-                     back/forward cache; forward navigation always lands closed. --}}
-                if (this.open) {
-                    this.open = false;
-                }
-
                 this.$watch('open', (newValue) => {
                     if (newValue === true) {
+                        this.syncContextIfStale();
+
                         this.$nextTick(() => {
                             window.dispatchEvent(new CustomEvent('chat:focus-editor', { detail: { context: 'side-panel' } }));
                         });
@@ -75,12 +61,49 @@
 
                 this.resizeHandler = () => { this.viewportWidth = window.innerWidth; };
                 window.addEventListener('resize', this.resizeHandler);
+
+                {{-- Navigation swaps the page but keeps this panel, and resets the classes on <html>. --}}
+                this.navigatedHandler = () => {
+                    this.dock(this.docked);
+                    this.contextStale = true;
+
+                    if (this.open) {
+                        this.syncContextIfStale();
+                    }
+                };
+                document.addEventListener('livewire:navigated', this.navigatedHandler);
+
+                this.closeHandler = () => { this.open = false; };
+                window.addEventListener('chat:close-side-panel', this.closeHandler);
+
+                this.$watch('docked', (docked) => this.dock(docked));
+                this.dock(this.docked);
             },
 
             destroy() {
                 window.removeEventListener('keydown', this.keydownHandler);
                 window.removeEventListener('chat:conversation-created', this.conversationCreatedHandler);
                 window.removeEventListener('resize', this.resizeHandler);
+                document.removeEventListener('livewire:navigated', this.navigatedHandler);
+                window.removeEventListener('chat:close-side-panel', this.closeHandler);
+                this.dock(false);
+            },
+
+            syncContextIfStale() {
+                if (!this.contextStale) {
+                    return;
+                }
+
+                this.contextStale = false;
+                $wire.refreshContext(window.location.href);
+            },
+
+            get docked() {
+                return this.open && this.viewportWidth >= this.dockFrom;
+            },
+
+            dock(docked) {
+                document.documentElement.classList.toggle('fi-chat-docked', docked);
             },
 
             get filteredHistory() {
@@ -188,31 +211,6 @@
                 this.currentConversationId = null;
                 this.historyItems = this.historyItems.filter((item) => item.id !== id);
                 await $wire.deleteConversation(id);
-            },
-
-            startResize(e) {
-                this.resizing = true;
-                const startX = e.clientX;
-                const startWidth = this.width;
-
-                {{-- Pointer events + capture: works for touch/pen too, and the
-                     drag can never strand over an iframe or outside the window. --}}
-                try { e.target.setPointerCapture(e.pointerId); } catch (_) { /* unsupported */ }
-
-                const onPointerMove = (moveEvent) => {
-                    const delta = startX - moveEvent.clientX;
-                    this.width = Math.max(this.minWidth, Math.min(this.maxWidth, startWidth + delta));
-                };
-
-                const onPointerUp = () => {
-                    this.resizing = false;
-                    try { localStorage.setItem('chat-panel-width', this.width.toString()); } catch (_) { /* ignore */ }
-                    document.removeEventListener('pointermove', onPointerMove);
-                    document.removeEventListener('pointerup', onPointerUp);
-                };
-
-                document.addEventListener('pointermove', onPointerMove);
-                document.addEventListener('pointerup', onPointerUp);
             }
         }"
         x-show="open"
@@ -227,22 +225,22 @@
         aria-modal="false"
         aria-label="{{ __('Chat side panel') }}"
         tabindex="-1"
-        class="fixed inset-y-0 right-0 z-50 flex max-w-full"
-        :style="{ width: (viewportWidth < 640 ? viewportWidth : width) + 'px' }"
+        class="fixed inset-y-0 right-0 z-50 flex w-full max-w-full sm:w-(--chat-panel-width)"
         data-chat-side-panel
     >
-        {{-- Resize Handle: a grabbable strip that stays invisible, so the panel's
-             own 1px border is the only line the eye sees. --}}
-        <div
-            @pointerdown="startResize($event)"
-            x-show="viewportWidth >= 640"
-            class="w-1 cursor-col-resize bg-transparent transition-colors hover:bg-primary-400/60 dark:hover:bg-primary-500/60"
-            :class="{ 'bg-primary-500/80': resizing }"
-            aria-hidden="true"
-        ></div>
+        <x-resize-handle
+            storage-key="chat-panel-width"
+            target="[data-chat-side-panel]"
+            side="start"
+            :label="__('Resize chat panel')"
+            class="fi-chat-panel-resize-handle"
+        />
 
         {{-- Panel Content --}}
-        <div class="flex flex-1 flex-col overflow-hidden border-l border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-900">
+        <div
+            class="flex flex-1 flex-col overflow-hidden border-l border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-900"
+            :class="{ 'shadow-xl': !docked }"
+        >
             {{-- Panel Header --}}
             <div class="flex items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <div class="flex min-w-0 items-center gap-2">

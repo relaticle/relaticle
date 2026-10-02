@@ -30,6 +30,18 @@
     --text-micro--line-height: 0.9375rem;
 }
 
+/* ─── Record page tokens ─── */
+:root {
+    --record-rail-width: 24rem;
+    --record-pane-min-width: 36rem;
+    --record-label-width: clamp(7.5rem, 36%, 10rem);
+}
+
+/* Chat panel token, overridden by the stored width (resizable-width-preferences). */
+:root {
+    --chat-panel-width: 26.25rem;
+}
+
 /* ─── Motion tokens ─── */
 /* If you change --ease-out-expo, also update the `ease` array in hero-agent-preview.blade.php */
 :root {

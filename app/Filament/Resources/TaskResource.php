@@ -114,7 +114,6 @@ final class TaskResource extends Resource
             ])
             ->defaultSort('created_at', 'desc')
             ->searchable()
-            ->paginated([10, 25, 50])
             ->filters([
                 Filter::make('assigned_to_me')
                     ->label(__('filament/resources/task.filters.assigned_to_me.label'))

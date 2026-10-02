@@ -89,7 +89,6 @@
                     $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
                     $isActive = request()->url() === $chatUrl;
                     $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
-                    $displayTitle = \Illuminate\Support\Str::limit($conversation->title ?: __('Untitled chat'), 30);
                     $rawTitle = $conversation->title ?: __('Untitled chat');
                 @endphp
                 <li
@@ -171,7 +170,7 @@
                         <a
                             href="{{ $chatUrl }}"
                             wire:navigate
-                            class="fi-sidebar-item-btn pe-16"
+                            class="fi-sidebar-item-btn pe-8 group-hover/chat-item:bg-gray-50 dark:group-hover/chat-item:bg-white/5"
                         >
                             <x-heroicon-o-chat-bubble-left class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                             <span
@@ -183,7 +182,7 @@
                                 title="{{ $rawTitle }}"
                                 class="fi-sidebar-item-label truncate"
                             >
-                                {{ $displayTitle }}
+                                {{ $rawTitle }}
                             </span>
                         </a>
                     </template>
@@ -207,28 +206,41 @@
                         </form>
                     </template>
 
-                    <button
-                        type="button"
-                        @click.stop.prevent="startEdit()"
+                    <x-filament::dropdown
+                        placement="bottom-end"
                         x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="{{ __('Rename chat') }}"
-                        title="{{ __('Rename chat') }}"
-                        class="absolute inset-y-0 end-7 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
+                        class="absolute inset-y-0 end-1 my-auto flex h-6 items-center"
                     >
-                        <x-heroicon-o-pencil-square class="h-4 w-4" />
-                    </button>
+                        <x-slot name="trigger">
+                            <button
+                                type="button"
+                                aria-label="{{ __('Chat actions') }}"
+                                title="{{ __('Chat actions') }}"
+                                x-bind:class="{ 'opacity-100': isOpen }"
+                                class="flex size-6 items-center justify-center rounded-md text-gray-500 opacity-0 transition hover:bg-gray-200/70 hover:text-gray-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 pointer-coarse:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                            >
+                                <x-heroicon-o-ellipsis-horizontal class="size-4" />
+                            </button>
+                        </x-slot>
 
-                    <button
-                        type="button"
-                        wire:click="deleteConversation(@js($conversation->id))"
-                        wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
-                        x-show="$store.sidebar.isOpen && !editing"
-                        aria-label="{{ __('Delete chat') }}"
-                        title="{{ __('Delete chat') }}"
-                        class="absolute inset-y-0 end-1 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
-                    >
-                        <x-heroicon-o-trash class="h-4 w-4" />
-                    </button>
+                        <x-filament::dropdown.list>
+                            <x-filament::dropdown.list.item
+                                :icon="\Filament\Support\Icons\Heroicon::OutlinedPencilSquare"
+                                x-on:click="close(); startEdit()"
+                            >
+                                {{ __('Rename chat') }}
+                            </x-filament::dropdown.list.item>
+
+                            <x-filament::dropdown.list.item
+                                color="danger"
+                                :icon="\Filament\Support\Icons\Heroicon::OutlinedTrash"
+                                wire:click="deleteConversation({{ \Illuminate\Support\Js::from($conversation->id) }})"
+                                wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
+                            >
+                                {{ __('Delete chat') }}
+                            </x-filament::dropdown.list.item>
+                        </x-filament::dropdown.list>
+                    </x-filament::dropdown>
                 </li>
             @endforeach
 

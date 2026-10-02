@@ -73,6 +73,17 @@ it('can render the meetings relation manager', function (): void {
         ->assertOk();
 });
 
+it('names meetings in the empty state heading', function (): void {
+    $person = People::factory()->for($this->workspace)->create();
+
+    livewire(MeetingsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertSee('No meetings')
+        ->assertDontSee('No :model');
+});
+
 it('shows one copy per occurrence and prefers the viewers calendar', function (string $type): void {
     [$person, $manager, $page] = match ($type) {
         'company' => [Company::factory()->for($this->workspace)->create(), App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager::class, ViewCompany::class],

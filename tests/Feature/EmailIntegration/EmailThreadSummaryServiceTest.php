@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -175,7 +176,10 @@ it('does not expose cached private content to a viewer of one shared message', f
         ? 'Confidential acquisition budget summary'
         : 'Shared message summary');
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->mountAction('summarizeThread', arguments: ['emailId' => $shared->getKey()])
         ->assertMountedActionModalSee('Confidential acquisition budget summary');
 
@@ -183,7 +187,10 @@ it('does not expose cached private content to a viewer of one shared message', f
     $this->actingAs($viewer->refresh());
     expect($viewer->can('viewBody', $shared->fresh()))->toBeTrue();
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->mountAction('summarizeThread', arguments: ['emailId' => $shared->getKey()])
         ->assertMountedActionModalSee('Shared message summary')
         ->assertMountedActionModalDontSee('Confidential acquisition budget summary');
@@ -286,7 +293,10 @@ it('regenerates legacy summaries without a permission fingerprint', function ():
     ]);
     ThreadSummarizer::fake(['Verified summary']);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->mountAction('summarizeThread', arguments: ['emailId' => $email->getKey()])
         ->assertMountedActionModalSee('Verified summary')
         ->assertMountedActionModalDontSee('Legacy unscoped summary');

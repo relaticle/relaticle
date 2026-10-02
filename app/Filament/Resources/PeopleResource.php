@@ -12,8 +12,8 @@ use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
@@ -170,10 +170,11 @@ final class PeopleResource extends Resource
     public static function getRelations(): array
     {
         return [
-            ActivityLogRelationManager::class,
             TasksRelationManager::class,
             NotesRelationManager::class,
+            EmailsRelationManager::class,
             MeetingsRelationManager::class,
+            ActivityLogRelationManager::class,
         ];
     }
 
@@ -182,7 +183,6 @@ final class PeopleResource extends Resource
         return [
             'index' => ListPeople::route('/'),
             'view' => ViewPeople::route('/{record}'),
-            'emails' => PeopleEmailsPage::route('/{record}/emails'),
         ];
     }
 

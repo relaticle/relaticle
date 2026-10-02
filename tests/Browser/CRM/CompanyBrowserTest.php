@@ -104,10 +104,10 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
     JS);
 
     expect($spacing)->toMatchArray([
-        'topbarHeight' => 64,
+        'topbarHeight' => 48,
         'titleCentered' => true,
-        'actionsTopGap' => 32,
-        'tableTopGap' => 32,
+        'actionsTopGap' => 24,
+        'tableTopGap' => 24,
         'hasHorizontalOverflow' => false,
     ]);
 

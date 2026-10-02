@@ -65,8 +65,8 @@
         wire:target="selectEmail('{{ $email->id }}')"
     @endif
     {{ $attributes->class([
-        'ei-email-list-row relative flex w-full items-start gap-3 bg-white px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:bg-gray-950 dark:hover:!bg-gray-900 sm:px-6',
-        'cursor-pointer data-[loading]:cursor-wait data-[loading]:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:data-[loading]:bg-gray-900' => $canViewBody,
+        'ei-email-list-row relative flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 dark:hover:bg-white/5 sm:px-6',
+        'cursor-pointer data-[loading]:cursor-wait data-[loading]:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:data-[loading]:bg-white/5' => $canViewBody,
         'cursor-default' => ! $canViewBody,
     ]) }}
 >
@@ -74,7 +74,7 @@
         <span
             wire:loading.flex
             wire:target="selectEmail('{{ $email->id }}')"
-            class="pointer-events-none absolute inset-0 z-10 items-center justify-center bg-white/70 dark:bg-gray-950/70"
+            class="pointer-events-none absolute inset-0 z-10 items-center justify-center bg-white/70 dark:bg-gray-900/70"
             role="status"
             aria-label="{{ __('filament/pages/email-inbox.list_row.opening') }}"
         >

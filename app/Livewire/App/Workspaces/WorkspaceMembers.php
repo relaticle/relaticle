@@ -75,10 +75,9 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     public function table(Table $table): Table
     {
         return $table
-            ->records(fn (?string $search, int|string $page, int|string $recordsPerPage): Collection|LengthAwarePaginator => $this->roster($search, $page, $recordsPerPage))
+            ->records(fn (?string $search, int|string $page, int|string $recordsPerPage): LengthAwarePaginator => $this->roster($search, $page, $recordsPerPage))
             ->searchable()
             ->searchPlaceholder(__('workspaces.table.search_placeholder'))
-            ->paginated([10, 25, 50, 'all'])
             // The roster always holds the owner, so the only way to empty it is
             // a search that matches nobody.
             ->emptyStateIcon(Heroicon::OutlinedMagnifyingGlass)
@@ -122,9 +121,9 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     }
 
     /**
-     * @return Collection<string, array<string, mixed>>|LengthAwarePaginator<string, array<string, mixed>>
+     * @return LengthAwarePaginator<string, array<string, mixed>>
      */
-    private function roster(?string $search, int|string $page, int|string $recordsPerPage): Collection|LengthAwarePaginator
+    private function roster(?string $search, int|string $page, int|string $recordsPerPage): LengthAwarePaginator
     {
         $query = DB::query()
             ->fromSub($this->invitationRows()->unionAll($this->memberRows()), 'roster')
@@ -133,10 +132,6 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
 
         if (filled($search)) {
             $query->where('search_blob', 'like', '%'.$this->escapeForLike(mb_strtolower($search)).'%');
-        }
-
-        if ($recordsPerPage === 'all') {
-            return $this->present($query->get());
         }
 
         $rows = $query->paginate(perPage: (int) $recordsPerPage, page: (int) $page);

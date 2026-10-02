@@ -46,6 +46,8 @@ trait HasEmailComposeActions
      */
     abstract protected function getCrmRecord(): Model;
 
+    abstract public function hidesRecordMailbox(): bool;
+
     public function openReplyModal(string $emailId, string $mode): void
     {
         if (! $this->sendableMailbox() instanceof ConnectedAccount) {
@@ -66,7 +68,7 @@ trait HasEmailComposeActions
             ->label(__('filament/concerns/email-compose.actions.compose.label'))
             ->icon('heroicon-o-pencil-square')
             ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
-            ->visible(fn (): bool => $this->hasActiveConnectedAccount())
+            ->visible(fn (): bool => $this->hasActiveConnectedAccount() && ! $this->hidesRecordMailbox())
             ->action(function (): void {
                 $record = $this->getCrmRecord();
 

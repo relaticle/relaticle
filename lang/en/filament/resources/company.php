@@ -53,36 +53,10 @@ return [
             ],
         ],
         'view' => [
-            'actions' => [
-                'edit' => [
-                    'label' => 'Edit',
-                ],
-                'view_emails' => [
-                    'label' => 'Emails',
-                ],
-                'copy_page_url' => [
-                    'label' => 'Copy page URL',
-                ],
-                'copy_record_id' => [
-                    'label' => 'Copy record ID',
-                ],
-            ],
             'infolist' => [
                 'fields' => [
-                    'name' => [
-                        'label' => '',
-                    ],
-                    'creator' => [
-                        'label' => 'Created By',
-                    ],
                     'account_owner' => [
                         'label' => 'Account Owner',
-                    ],
-                    'created_at' => [
-                        'label' => 'Created Date',
-                    ],
-                    'updated_at' => [
-                        'label' => 'Last Updated',
                     ],
                 ],
             ],
@@ -95,26 +69,6 @@ return [
     'relation_managers' => [
         'people' => [
             'model_label' => 'person',
-        ],
-        'notes' => [
-            'fields' => [
-                'people' => [
-                    'label' => 'People',
-                ],
-            ],
-        ],
-        'tasks' => [
-            'fields' => [
-                'assignees' => [
-                    'label' => 'Assignee',
-                ],
-                'people' => [
-                    'label' => 'People',
-                ],
-                'created_at' => [
-                    'label' => 'Created At',
-                ],
-            ],
         ],
     ],
 ];

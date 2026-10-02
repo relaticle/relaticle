@@ -23,6 +23,7 @@ beforeEach(function (): void {
     $this->workspace = $this->owner->currentWorkspace;
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
 });
 
 test('the owner appears in the members list even though they have no pivot row', function (): void {
@@ -393,7 +394,7 @@ test('a search that matches nobody explains itself instead of showing a blank ta
 });
 
 test('the members list paginates rather than rendering every member at once', function (): void {
-    $members = User::factory()->count(12)->create();
+    $members = User::factory()->count(30)->create();
 
     foreach ($members as $member) {
         $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
@@ -403,8 +404,8 @@ test('the members list paginates rather than rendering every member at once', fu
         ->instance()
         ->getTableRecords();
 
-    expect($page)->toHaveCount(10)
-        ->and($page->total())->toBe(13);
+    expect($page)->toHaveCount(25)
+        ->and($page->total())->toBe(31);
 });
 
 test('an admin sees no remove action on another admins row', function (): void {

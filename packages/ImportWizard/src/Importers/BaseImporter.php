@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Importers;
 
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -196,7 +197,7 @@ abstract class BaseImporter implements ImporterContract
                 ->rules($importRules)
                 ->asCustomField()
                 ->type($customField->typeData->dataType)
-                ->icon($customField->typeData->icon)
+                ->icon(CustomFieldType::tryFrom($customField->type)?->icon())
                 ->sortOrder($customField->sort_order)
                 ->acceptsArbitraryValues($customField->typeData->acceptsArbitraryValues)
                 ->options($options);

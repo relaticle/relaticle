@@ -11,6 +11,10 @@ use App\Notifications\UserDeletionReminderNotification;
 use App\Notifications\WorkspaceDeletionReminderNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailBody;
+use Relaticle\EmailIntegration\Models\Meeting;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 mutates(DeleteWorkspace::class);
@@ -72,6 +76,30 @@ test('purging a user anonymises their chat participation in workspaces that surv
     expect($conversation)->not->toBeNull()
         ->and($conversation->participant_id)->toBeNull()
         ->and($conversation->participant_type)->toBeNull();
+});
+
+test('purging a user removes mail and meetings synced from a mailbox they already disconnected', function () {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+
+    $member = User::factory()->scheduledForDeletion(-1)->create();
+    $workspace->users()->attach($member, ['role' => 'member']);
+
+    $account = ConnectedAccount::factory()->for($workspace)->for($member)->create();
+    $email = Email::factory()->for($workspace)->for($member)->for($account)->create();
+    EmailBody::factory()->for($email)->create();
+    $meeting = Meeting::factory()->for($workspace)->for($account)->create();
+
+    $account->delete();
+
+    $this->artisan('app:purge-scheduled-deletions')
+        ->assertExitCode(0);
+
+    expect(DB::table('connected_accounts')->where('id', $account->id)->exists())->toBeFalse()
+        ->and(DB::table('emails')->where('id', $email->id)->exists())->toBeFalse()
+        ->and(DB::table('email_bodies')->where('email_id', $email->id)->exists())->toBeFalse()
+        ->and(DB::table('meetings')->where('id', $meeting->id)->exists())->toBeFalse()
+        ->and(Workspace::query()->find($workspace->id))->not->toBeNull();
 });
 
 test('non-expired users are not deleted', function () {

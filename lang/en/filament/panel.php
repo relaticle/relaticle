@@ -25,6 +25,10 @@ return [
         'tasks' => 'Tasks',
     ],
 
+    'sidebar' => [
+        'resize' => 'Resize sidebar',
+    ],
+
     'payload_too_large' => 'That change is too large to save. Shorten the content and try again.',
 
     'selects' => [

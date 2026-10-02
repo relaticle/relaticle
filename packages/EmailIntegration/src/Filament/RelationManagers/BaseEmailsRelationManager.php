@@ -8,34 +8,28 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Arr;
+use Illuminate\Database\Eloquent\Relations\MorphPivot;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Livewire\Attributes\On;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
-use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
-use Relaticle\EmailIntegration\Services\EmailSharingService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 /**
+ * @property-read LengthAwarePaginator<int, Email&object{pivot: MorphPivot}> $emails
  * @property-read Email|null $selectedEmail
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
  */
@@ -48,9 +42,13 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
 
+    protected static ?string $badgeColor = 'gray';
+
     protected string $view = 'email-integration::filament.relation-managers.emails-relation-manager';
 
     public ?string $selectedEmailId = null;
+
+    public string $search = '';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -67,11 +65,6 @@ abstract class BaseEmailsRelationManager extends RelationManager
         return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
     }
 
-    public static function getBadgeColor(Model $ownerRecord, string $pageClass): ?string
-    {
-        return static::getBadge($ownerRecord, $pageClass) === null ? null : 'primary';
-    }
-
     protected function getCrmRecord(): Model
     {
         return $this->getOwnerRecord();
@@ -79,232 +72,114 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        $composeEmail = $this->composeEmailAction()
-            ->visible(fn (): bool => $this->hasActiveConnectedAccount() && ! $this->hidesOwnerMailbox());
-
-        return $table
-            ->modifyQueryUsing(function (Builder $query): Builder {
-                $query
-                    // participants + shares are read per row by the privacy policy; eager-load
-                    // them to avoid an N+1 when rendering the subject column.
-                    ->with(['from', 'labels', 'participants', 'shares'])
-                    ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()));
-
-                if ($this->hidesOwnerMailbox()) {
-                    $query->whereRaw('0 = 1');
-                }
-
-                return resolve(PreferredEmailCopyService::class)
-                    ->restrictToPreferredCopies($query, $this->authUser());
-            })
-            ->recordTitleAttribute('subject')
-            ->recordAction('view')
-            ->defaultSort('sent_at', 'desc')
-            ->headerActions([
-                $composeEmail,
-
-                Action::make('shareAllOnRecord')
-                    ->label(__('filament/relation-managers/emails.actions.share_all.label'))
-                    ->icon('heroicon-o-share')
-                    ->color('gray')
-                    ->modalHeading(__('filament/relation-managers/emails.actions.share_all.modal_heading'))
-                    ->modalDescription('Update visibility and teammate access for all emails you own on this record.')
-                    ->modalSubmitActionLabel('Save')
-                    ->visible(fn (): bool => ! $this->hidesOwnerMailbox() && $this->getRelationship()
-                        ->where('user_id', $this->authUser()->getKey())
-                        ->exists())
-                    ->schema([
-                        Select::make('privacy_tier')
-                            ->label(__('filament/relation-managers/emails.fields.privacy_tier_all.label'))
-                            ->options(EmailPrivacyTier::class)
-                            ->required()
-                            ->default(EmailPrivacyTier::METADATA_ONLY->value),
-
-                        Repeater::make('shares')
-                            ->label(__('filament/relation-managers/emails.fields.shares.label'))
-                            ->defaultItems(0)
-                            ->addActionLabel('Add teammate')
-                            ->columns()
-                            ->compact()
-                            ->schema([
-                                Select::make('tier')
-                                    ->label(__('filament/relation-managers/emails.fields.tier.label'))
-                                    ->options(EmailPrivacyTier::class)
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->required(),
-
-                                Select::make('shared_with')
-                                    ->label(__('filament/relation-managers/emails.fields.shared_with.label'))
-                                    ->options(function (): array {
-                                        $user = $this->authUser();
-
-                                        return User::query()
-                                            ->inWorkspace($user->current_workspace_id)
-                                            ->whereKeyNot($user->getKey())
-                                            ->pluck('name', 'id')
-                                            ->all();
-                                    })
-                                    ->multiple()
-                                    ->searchable()
-                                    ->disableOptionsWhenSelectedInSiblingRepeaterItems()
-                                    ->required(),
-                            ]),
-                    ])
-                    ->action(function (array $data, EmailSharingService $sharingService): void {
-                        $owner = $this->authUser();
-                        $record = $this->getOwnerRecord();
-                        $sharingService->setTierForAllOnRecord($record, $owner, $data['privacy_tier']);
-
-                        foreach ($data['shares'] ?? [] as $share) {
-                            foreach (Arr::wrap($share['shared_with']) as $sharedWith) {
-                                $sharedWithUser = User::query()
-                                    ->inWorkspace($owner->current_workspace_id)
-                                    ->whereKey($sharedWith)
-                                    ->first();
-
-                                abort_if($sharedWithUser === null, 403);
-
-                                $sharingService->shareAllOnRecord(
-                                    $record,
-                                    $owner,
-                                    $sharedWithUser,
-                                    $share['tier'],
-                                );
-                            }
-                        }
-
-                        Notification::make()
-                            ->success()
-                            ->title(__('filament/relation-managers/emails.notifications.sharing_saved_all.title'))
-                            ->send();
-                    }),
-            ])
-            ->columns([
-                TextColumn::make('subject')
-                    ->label(__('filament/relation-managers/emails.columns.subject.label'))
-                    ->searchable(query: $this->searchVisibleEmails(...))
-                    ->limit(60)
-                    ->getStateUsing(function (Email $record): string {
-                        if ($this->authUser()->can('viewSubject', $record)) {
-                            return $record->subject ?? '(no subject)';
-                        }
-
-                        return '(subject hidden)';
-                    }),
-
-                TextColumn::make('from_address')
-                    ->label(__('filament/relation-managers/emails.columns.from_address.label'))
-                    ->getStateUsing(fn (Email $record): string => $record->from->first()->name
-                        ?? $record->from->first()->email_address
-                        ?? '—'),
-
-                TextColumn::make('category')
-                    ->label(__('filament/relation-managers/emails.columns.category.label'))
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'Scheduling' => 'info',
-                        'Marketing' => 'warning',
-                        'Invoice' => 'danger',
-                        'Support' => 'success',
-                        'Sales' => 'primary',
-                        default => 'gray',
-                    })
-                    ->getStateUsing(function (Email $record): string {
-                        $label = $record->categoryLabel();
-
-                        return $label instanceof EmailLabel ? $label->label : '';
-                    }),
-
-                TextColumn::make('direction')
-                    ->label(__('filament/relation-managers/emails.columns.direction.label'))
-                    ->badge()
-                    ->formatStateUsing(fn (EmailDirection $state): string => $state->getLabel()),
-
-                TextColumn::make('sent_at')
-                    ->label(__('filament/relation-managers/emails.columns.sent_at.label'))
-                    ->dateTime()
-                    ->sortable(),
-
-                TextColumn::make('privacy_tier')
-                    ->label(__('filament/relation-managers/emails.columns.privacy_tier.label'))
-                    ->badge()
-                    ->formatStateUsing(fn (EmailPrivacyTier $state): string => $state->getLabel())
-                    ->color(fn (EmailPrivacyTier $state): string => match ($state) {
-                        EmailPrivacyTier::PRIVATE => 'gray',
-                        EmailPrivacyTier::METADATA_ONLY => 'gray',
-                        EmailPrivacyTier::SUBJECT => 'warning',
-                        EmailPrivacyTier::FULL => 'success',
-                    }),
-
-                TextColumn::make('is_internal')
-                    ->label(__('filament/relation-managers/emails.columns.is_internal.label'))
-                    ->badge()
-                    ->getStateUsing(fn (Email $record): string => ($record->is_internal && $record->user_id === $this->authUser()->getKey()) ? 'Internal' : '')
-                    ->color('info'),
-            ])
-            ->recordActions([
-                $this->viewEmailAction(),
-
-                ActionGroup::make([
-                    $this->summarizeThreadAction(),
-                    $this->manageSharingAction(),
-                    $this->requestAccessAction(),
-                ]),
-            ])
-            ->emptyStateIcon(fn (): string => $this->hidesOwnerMailbox()
-                ? 'heroicon-o-shield-check'
-                : 'heroicon-o-envelope')
-            ->emptyStateHeading(fn (): string => ($this->recordMailboxHiddenCopy() ?? [])['heading'] ?? ($this->hasActiveConnectedAccount()
-                ? __('filament/relation-managers/emails.empty_state.heading')
-                : __('filament/pages/email-accounts.not_connected.record.heading')))
-            ->emptyStateDescription(fn (): string => ($this->recordMailboxHiddenCopy() ?? [])['description'] ?? ($this->hasActiveConnectedAccount()
-                ? __('filament/relation-managers/emails.empty_state.description')
-                : __('filament/pages/email-accounts.not_connected.record.description')))
-            ->emptyStateActions($this->hidesOwnerMailbox()
-                ? []
-                : [
-                    $composeEmail
-                        ->label(__('filament/relation-managers/emails.empty_state.compose')),
-                    ConnectMailboxAction::make()
-                        ->hidden(fn (): bool => $this->hasActiveConnectedAccount()),
-                ]);
+        // The tab lists emails() itself. The default relationship table skips the
+        // visibility scopes and Livewire lets a client call getTableRecords().
+        return $table->modifyQueryUsing(fn (Builder $query): Builder => $query->whereRaw('0 = 1'));
     }
 
-    protected function viewEmailAction(): Action
+    #[On('composer:sent')]
+    public function showQueuedSendOnRecord(?string $emailId = null): void
     {
-        return Action::make('view')
-            ->label(__('filament-actions::view.single.label'))
-            ->icon('heroicon-o-eye')
-            ->modal(false)
-            ->slideOver(false)
-            ->visible(fn (Email $record): bool => $this->authUser()->can('viewBody', $record))
-            ->action(function (Email $record): void {
-                $this->selectEmail($record->getKey());
-            });
+        $this->search = '';
+
+        if (filled($emailId)) {
+            $this->selectedEmailId = $emailId;
+        }
+
+        unset($this->emails);
     }
 
-    public function selectEmail(string $id): void
+    /**
+     * @return LengthAwarePaginator<int, Email&object{pivot: MorphPivot}>
+     */
+    #[Computed]
+    public function emails(): LengthAwarePaginator
     {
-        $this->openEmailReader($id);
+        if ($this->hidesRecordMailbox()) {
+            return new LengthAwarePaginator([], 0, 20);
+        }
+
+        $user = $this->authUser();
+
+        $query = $this->ownerRecordWithEmails()
+            ->emails()
+            // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
+            ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
+            ->withReadStateFor($user->getKey())
+            ->withExists([
+                'accessRequests as viewer_has_pending_access_request' => fn (Builder $query) => $query
+                    ->where('requester_id', $user->getKey())
+                    ->where('status', EmailAccessRequestStatus::PENDING),
+            ])
+            ->withGlobalScope('visible', new VisibleEmailScope($user));
+
+        if (filled($this->search)) {
+            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
+        }
+
+        resolve(PreferredEmailCopyService::class)->restrictToPreferredCopies($query->getQuery(), $user);
+
+        $paginator = $query->latest('sent_at')->paginate(20, pageName: $this->getTablePaginationPageName());
+
+        resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $this->ownerRecordWithEmails());
+
+        return $paginator;
     }
 
-    public function deselectEmail(): void
+    public function connectMailboxAction(): ConnectMailboxAction
     {
-        $this->selectedEmailId = null;
-        unset($this->selectedEmail);
+        return ConnectMailboxAction::make();
+    }
 
-        $this->dispatch('composer:dismiss-inline');
+    /**
+     * Take the whole tab over with the connect prompt only when the user has nothing
+     * to read here: teammates without a mailbox of their own still get the thread list
+     * for emails shared with them.
+     */
+    #[Computed]
+    public function showConnectPrompt(): bool
+    {
+        if ($this->hidesRecordMailbox() || $this->hasActiveConnectedAccount()) {
+            return false;
+        }
+
+        return $this->ownerRecordWithEmails()
+            ->emails()
+            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
+            ->doesntExist();
+    }
+
+    #[Computed]
+    public function hidesRecordMailbox(): bool
+    {
+        return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getOwnerRecord());
+    }
+
+    /**
+     * @return array{heading: string, description: string}|null
+     */
+    #[Computed]
+    public function recordMailboxHiddenCopy(): ?array
+    {
+        $record = $this->getOwnerRecord();
+
+        if (! $record instanceof People && ! $record instanceof Company) {
+            return null;
+        }
+
+        return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
     }
 
     #[Computed]
     public function selectedEmail(): ?Email
     {
-        if ($this->selectedEmailId === null || $this->hidesOwnerMailbox()) {
+        if ($this->selectedEmailId === null || $this->hidesRecordMailbox()) {
             return null;
         }
 
         /** @var Email|null $email */
-        $email = $this->getRelationship()
+        $email = $this->ownerRecordWithEmails()
+            ->emails()
             ->with(['body', 'participants', 'labels', 'attachments', 'from'])
             ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
             ->whereKey($this->selectedEmailId)
@@ -332,29 +207,31 @@ abstract class BaseEmailsRelationManager extends RelationManager
         return $this->pendingAccessRequestsFor($email);
     }
 
-    private function hidesOwnerMailbox(): bool
+    public function selectEmail(string $id): void
     {
-        return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getOwnerRecord());
+        $this->openEmailReader($id);
     }
 
-    /**
-     * @return array{heading: string, description: string}|null
-     */
-    private function recordMailboxHiddenCopy(): ?array
+    public function deselectEmail(): void
     {
-        $record = $this->getOwnerRecord();
+        $this->selectedEmailId = null;
+        unset($this->selectedEmail);
 
-        if (! $record instanceof People && ! $record instanceof Company) {
-            return null;
-        }
-
-        return resolve(EmailVisibilityService::class)->recordMailboxHiddenCopy($record);
+        // Dismissing the dock persists whatever was typed as a draft, so closing the
+        // reader can never silently drop a half-written reply.
+        $this->dispatch('composer:dismiss-inline');
     }
 
-    /** @param  Builder<Email>  $query */
-    private function searchVisibleEmails(Builder $query, string $search): void
+    public function updatedSearch(): void
     {
-        resolve(EmailSearchService::class)->applyToQuery($query, $this->authUser(), $search);
+        $this->resetPage();
+        unset($this->emails);
+    }
+
+    private function ownerRecordWithEmails(): Company|Opportunity|People
+    {
+        /** @var Company|Opportunity|People */
+        return $this->getOwnerRecord();
     }
 
     private function authUser(): User

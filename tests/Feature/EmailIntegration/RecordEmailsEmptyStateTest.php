@@ -5,10 +5,10 @@ declare(strict_types=1);
 use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 use App\Enums\WorkspaceRole;
-use App\Filament\Resources\CompanyResource\Pages\CompanyEmailsPage;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
-use App\Filament\Resources\OpportunityResource\Pages\OpportunityEmailsPage;
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager as CompanyEmailsRelationManager;
+use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationManager as OpportunityEmailsRelationManager;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\Company;
@@ -16,13 +16,11 @@ use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
-use Relaticle\EmailIntegration\Filament\Pages\BaseRecordEmailsPage;
 use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManager;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -34,7 +32,7 @@ use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
-mutates(BaseRecordEmailsPage::class, BaseEmailsRelationManager::class, EmailSearchService::class, EmailVisibilityService::class, HasEmailReaderActions::class, PreferredEmailCopyService::class);
+mutates(BaseEmailsRelationManager::class, EmailSearchService::class, EmailVisibilityService::class, HasEmailReaderActions::class, PreferredEmailCopyService::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -55,7 +53,10 @@ it('shows a compose empty state when the record has no emails', function (): voi
         'user_id' => $this->user->id,
     ]));
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/record-emails.empty.description'))
         ->assertSee(__('filament/pages/record-emails.empty.compose'))
         ->assertSeeHtml('composer:open')
@@ -70,7 +71,10 @@ it('hides compose from the empty state when a search has no matches', function (
         'user_id' => $this->user->id,
     ]));
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->set('search', 'no-such-thread')
         ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'no-such-thread']))
         ->assertDontSee(__('filament/pages/record-emails.empty.description'))
@@ -78,7 +82,10 @@ it('hides compose from the empty state when a search has no matches', function (
 });
 
 it('keeps the connect prompt instead of compose when no mailbox is linked', function (): void {
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/email-accounts.not_connected.record.heading'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
         ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->workspace))
@@ -114,28 +121,13 @@ it('shows the compose empty state when the record only has hidden emails', funct
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertDontSee('Blocked thread')
-        ->assertSee(__('filament/pages/record-emails.empty.description'))
-        ->assertSee(__('filament/pages/record-emails.empty.compose'));
-});
-
-it('opens the composer from the emails table empty state', function (): void {
-    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->user->id,
-    ]));
-
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertSee(__('filament/relation-managers/emails.empty_state.heading'))
-        ->assertSee(__('filament/relation-managers/emails.empty_state.description'))
-        ->assertSee(__('filament/relation-managers/emails.empty_state.compose'))
-        ->assertTableEmptyStateActionsExistInOrder(['composeEmail', 'connectMailbox'])
-        ->callAction(TestAction::make('composeEmail')->table())
-        ->assertDispatched('composer:open');
+        ->assertDontSee('Blocked thread')
+        ->assertSee(__('filament/pages/record-emails.empty.description'))
+        ->assertSee(__('filament/pages/record-emails.empty.compose'));
 });
 
 function writePersonEmail(People $person, string $emailAddress): void
@@ -192,7 +184,10 @@ it('hides the emails tab on a protected workspace-member person', function (): v
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertSee(__('filament/pages/record-emails.protected.description'))
         ->assertDontSee('Mixed thread with a customer')
@@ -238,10 +233,16 @@ it('still shows a mixed thread on an unprotected company', function (): void {
     $this->person->emails()->attach($email->getKey());
     $company->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertDontSee('Visible on the customer record');
 
-    livewire(CompanyEmailsPage::class, ['record' => $company->getKey()])
+    livewire(CompanyEmailsRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
         ->assertSee('Visible on the customer record')
         ->assertDontSee(__('filament/pages/record-emails.protected.heading'));
 });
@@ -271,12 +272,15 @@ it('hides the emails tab on a company whose domain is protected', function (): v
     ]);
     $company->emails()->attach($email->getKey());
 
-    livewire(CompanyEmailsPage::class, ['record' => $company->getKey()])
+    livewire(CompanyEmailsRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertDontSee('Should not appear on the protected company');
 });
 
-it('omits the emails header badge on a company whose domain is protected', function (): void {
+it('omits the emails tab badge on a company whose domain is protected', function (): void {
     $company = Company::factory()->create([
         'workspace_id' => $this->workspace->id,
         'creator_id' => $this->user->id,
@@ -296,12 +300,7 @@ it('omits the emails header badge on a company whose domain is protected', funct
     ]);
     $company->emails()->attach($email->getKey());
 
-    expect(
-        livewire(ViewCompany::class, ['record' => $company->getKey()])
-            ->instance()
-            ->getAction('viewEmails', isMounting: false)
-            ?->getBadge()
-    )->toBeNull();
+    expect(CompanyEmailsRelationManager::getBadge($company, ViewCompany::class))->toBeNull();
 });
 
 it('hides the emails tab from a teammate when the company domain is protected', function (): void {
@@ -346,14 +345,17 @@ it('hides the emails tab from a teammate when the company domain is protected', 
     $this->actingAs($teammate);
     Filament::setTenant($this->workspace);
 
-    livewire(CompanyEmailsPage::class, ['record' => $company->getKey()])
+    livewire(CompanyEmailsRelationManager::class, [
+        'ownerRecord' => $company,
+        'pageClass' => ViewCompany::class,
+    ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertDontSee(__('filament/pages/record-emails.empty.compose'))
         ->assertDontSee('Hidden from the team on this record')
         ->assertActionHidden('composeEmail');
 });
 
-it('hides the emails table on a protected person', function (): void {
+it('hides the emails list on a protected person', function (): void {
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
@@ -367,10 +369,10 @@ it('hides the emails table on a protected person', function (): void {
     ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertSee(__('filament/pages/record-emails.protected.description'))
-        ->assertDontSee(__('filament/relation-managers/emails.empty_state.compose'));
+        ->assertDontSee(__('filament/pages/record-emails.empty.compose'));
 });
 
-it('hides the emails table from a teammate on a protected person', function (): void {
+it('hides the emails list from a teammate on a protected person', function (): void {
     $teammate = User::factory()->create();
     $teammate->workspaces()->attach($this->workspace, ['role' => WorkspaceRole::Member->value]);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
@@ -390,7 +392,7 @@ it('hides the emails table from a teammate on a protected person', function (): 
         'pageClass' => ViewPeople::class,
     ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
-        ->assertDontSee(__('filament/relation-managers/emails.empty_state.compose'));
+        ->assertDontSee(__('filament/pages/record-emails.empty.compose'));
 });
 
 it('hides the emails tab on a custom protected person', function (): void {
@@ -428,7 +430,10 @@ it('hides the emails tab on a custom protected person', function (): void {
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/record-emails.protected.heading'))
         ->assertDontSee('Counsel thread with a customer');
 });
@@ -468,35 +473,14 @@ it('hides the emails tab on a blocked person', function (): void {
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
-        ->assertSee(__('filament/pages/record-emails.blocked.heading'))
-        ->assertSee(__('filament/pages/record-emails.blocked.description'))
-        ->assertDontSee(__('filament/pages/record-emails.protected.description'))
-        ->assertDontSee('Blocked thread with a customer');
-});
-
-it('hides share all on a protected person', function (): void {
-    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->user->id,
-    ]));
-
-    writePersonEmail($this->person, $this->user->email);
-
-    $email = Email::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->user->id,
-        'subject' => 'Owner thread on protected person',
-        'is_internal' => false,
-    ]);
-
-    $this->person->emails()->attach($email->getKey());
-
     livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertActionHidden(TestAction::make('shareAllOnRecord')->table());
+        ->assertSee(__('filament/pages/record-emails.blocked.heading'))
+        ->assertSee(__('filament/pages/record-emails.blocked.description'))
+        ->assertDontSee(__('filament/pages/record-emails.protected.description'))
+        ->assertDontSee('Blocked thread with a customer');
 });
 
 it('keeps the emails tab visible on an opportunity', function (): void {
@@ -536,10 +520,16 @@ it('keeps the emails tab visible on an opportunity', function (): void {
     $this->person->emails()->attach($email->getKey());
     $opportunity->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertDontSee('Visible on the deal');
 
-    livewire(OpportunityEmailsPage::class, ['record' => $opportunity->getKey()])
+    livewire(OpportunityEmailsRelationManager::class, [
+        'ownerRecord' => $opportunity,
+        'pageClass' => ViewOpportunity::class,
+    ])
         ->assertSee('Visible on the deal')
         ->assertDontSee(__('filament/pages/record-emails.protected.heading'));
 });
@@ -598,7 +588,10 @@ it('shows via two mailboxes using connected mailbox addresses not workspace logi
 
     $this->person->emails()->attach([$ownerCopy->getKey(), $coworkerCopy->getKey()]);
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(trans_choice('filament/pages/email-inbox.list_row.via_mailboxes', 2, ['count' => 2]))
         ->assertSee('whitesharkdevs@gmail.com')
         ->assertSee('mail2asmitnepali99@gmail.com')
@@ -630,7 +623,10 @@ it('shows the imported mailbox name on record email list rows', function (): voi
 
     $this->person->emails()->attach($email->getKey());
 
-    livewire(PeopleEmailsPage::class, ['record' => $this->person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/email-inbox.list_row.via', ['name' => 'Sales Inbox']))
         ->assertSee(__('filament/pages/email-inbox.list_row.opening'));
 });
@@ -672,7 +668,10 @@ it('does not match hidden subject or snippet text when searching metadata-only e
     $this->actingAs($viewer);
     Filament::setTenant($team);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->set('search', 'Quarterly forecast')
         ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Quarterly forecast']))
         ->set('search', 'Secret preview text')
@@ -725,7 +724,10 @@ it('does not match hidden subject or snippet text when a metadata-only share ove
     $this->actingAs($viewer);
     Filament::setTenant($team);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->set('search', 'Quarterly forecast')
         ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'Quarterly forecast']))
         ->set('search', 'Secret preview text')
@@ -771,7 +773,10 @@ it('does not match snippet text when a subject share overrides a full default', 
     $this->actingAs($viewer);
     Filament::setTenant($team);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->set('search', 'Quarterly forecast')
         ->assertSee('Quarterly forecast')
         ->set('search', 'Secret preview text')
@@ -810,7 +815,10 @@ it('shows a request access pill on record mailbox rows without body access', fun
     $this->actingAs($viewer);
     Filament::setTenant($team);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
         ->assertDontSee('Secret preview text')
         ->assertDontSeeHtml("selectEmail('{$email->getKey()}')")
@@ -858,7 +866,10 @@ it('shows a requested label on the list pill when an access request is pending',
     $this->actingAs($viewer);
     Filament::setTenant($team);
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee(__('filament/pages/email-inbox.list_row.requested'))
         ->assertDontSee(__('filament/pages/email-inbox.list_row.request_access', ['name' => $owner->name]))
         ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);

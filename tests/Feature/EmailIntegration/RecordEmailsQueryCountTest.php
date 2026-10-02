@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Filament\Resources\PeopleResource\Pages\PeopleEmailsPage;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -60,7 +61,10 @@ function queriesToRenderPeopleEmails(People $person): int
         $queries++;
     });
 
-    livewire(PeopleEmailsPage::class, ['record' => $person->getKey()])
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
         ->assertSee('Pipeline update 1');
 
     return $queries;
