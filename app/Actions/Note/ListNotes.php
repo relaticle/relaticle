@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Note;
 
-use App\Mcp\Filters\CustomFieldFilter;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Note;
 use App\Models\User;
+use App\Support\Filters\CustomFieldFilter;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;

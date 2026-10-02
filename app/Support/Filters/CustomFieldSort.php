@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Mcp\Filters;
+namespace App\Support\Filters;
 
 use App\Models\CustomField;
 use App\Models\User;

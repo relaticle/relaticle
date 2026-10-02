@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
-use App\Mcp\Filters\CustomFieldFilter;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseListTool;
@@ -18,6 +17,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use App\Support\Filters\CustomFieldFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;

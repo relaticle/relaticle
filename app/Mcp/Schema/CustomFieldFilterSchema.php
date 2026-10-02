@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Mcp\Schema;
 
 use App\Enums\CustomFieldType;
-use App\Mcp\Filters\CustomFieldSort;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\Filters\CustomFieldSort;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Spatie\QueryBuilder\AllowedSort;
