@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Support\Filters;
+namespace App\Enums;
 
 enum FilterKind: string
 {

@@ -6,6 +6,7 @@ namespace App\Support\Filters;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -28,8 +29,8 @@ final readonly class RelationFilter implements Filter
             $operator = (string) $operator;
 
             match ($operator) {
-                '$in' => $query->whereHas($property, fn (Builder $related): Builder => $related->whereKey($this->ids($operator, $operand))),
-                '$not_in' => $query->whereDoesntHave($property, fn (Builder $related): Builder => $related->whereKey($this->ids($operator, $operand))),
+                '$in' => $query->whereHas($property, fn (Builder $related): Builder => $related->whereKey($this->ids($property, $operator, $operand))),
+                '$not_in' => $query->whereDoesntHave($property, fn (Builder $related): Builder => $related->whereKey($this->ids($property, $operator, $operand))),
                 '$is_empty' => $this->emptiness($query, $property, $operand),
                 default => throw FilterErrors::at($operator, __('validation.filter.members_ids_only', ['name' => $property])),
             };
@@ -39,9 +40,17 @@ final readonly class RelationFilter implements Filter
     /**
      * @return list<string>
      */
-    private function ids(string $operator, mixed $operand): array
+    private function ids(string $property, string $operator, mixed $operand): array
     {
-        return Operand::listOrFail($operand, splitsStrings: true, path: $operator, expected: 'a list of record IDs');
+        $ids = Operand::listOrFail($operand, splitsStrings: true, field: $property, operator: $operator, expected: 'a list of record IDs');
+
+        $invalid = array_find($ids, static fn (string $id): bool => ! Str::isUlid($id));
+
+        if ($invalid !== null) {
+            throw FilterErrors::at($operator, __('validation.filter.record_id', ['name' => "{$property} {$operator}", 'value' => $invalid]));
+        }
+
+        return $ids;
     }
 
     /**
@@ -49,7 +58,7 @@ final readonly class RelationFilter implements Filter
      */
     private function emptiness(Builder $query, string $property, mixed $operand): void
     {
-        $empty = Operand::boolean($operand) ?? throw FilterErrors::at('$is_empty', __('validation.filter.operand_type', ['name' => '$is_empty', 'expected' => 'true or false']));
+        $empty = Operand::boolean($operand) ?? throw FilterErrors::at('$is_empty', __('validation.filter.operand_type', ['name' => "{$property} \$is_empty", 'expected' => 'true or false']));
 
         $empty ? $query->whereDoesntHave($property) : $query->whereHas($property);
     }

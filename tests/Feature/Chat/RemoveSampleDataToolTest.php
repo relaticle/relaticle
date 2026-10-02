@@ -22,6 +22,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Workspace\RemoveSampleDataTool;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -187,4 +188,22 @@ it('offers sample removal in the setup conversation too', function (): void {
     );
 
     expect($toolClasses)->toContain(RemoveSampleDataTool::class);
+});
+
+it('points a partial removal at the filter tree form that lists only sample records', function (): void {
+    seedChatSampleRecords($this->workspace, $this->owner);
+    $own = Company::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+
+    $rows = json_decode(resolve(ListCompaniesTool::class)->handle(new Request([
+        'filter' => ['creation_source' => ['$eq' => 'system']],
+    ])), true)['data'];
+
+    expect(resolve(RemoveSampleDataTool::class)->description())
+        ->toContain('use the list tool with filter {"creation_source": {"$eq": "system"}}')
+        ->and(array_column($rows, 'id'))->not->toContain($own->getKey())
+        ->and($rows)->toHaveCount(2);
 });

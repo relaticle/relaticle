@@ -227,18 +227,20 @@ it('rejects malformed list tool inputs before building the database query', func
         ->tool($toolClass, $input)
         ->assertHasErrors([$error]);
 })->with([
-    'filter date operand' => [ListCompaniesTool::class, ['filter' => ['created_at' => ['$gte' => 'yesterday']]], '$gte must be a date'],
-    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'sample']]], 'sample is not one of'],
+    'filter date operand' => [ListCompaniesTool::class, ['filter' => ['created_at' => ['$gte' => 'yesterday']]], 'created_at $gte must be a date or date-time'],
+    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'sample']]], 'creation_source $eq: sample is not one of'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
     'filter operator object' => [ListCompaniesTool::class, ['filter' => ['name' => 'software']], 'name takes an operator object'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],
     'sort field' => [ListCompaniesTool::class, ['sort' => ['direction' => 'asc']], 'field'],
     'sort direction' => [ListCompaniesTool::class, ['sort' => ['field' => 'name', 'direction' => 'sideways']], 'sort.direction'],
     'include list' => [ListCompaniesTool::class, ['include' => ['primary' => 'creator']], 'include'],
-    'people relation ids' => [ListPeopleTool::class, ['filter' => ['company' => ['$in' => []]]], '$in must be a list of record IDs'],
+    'people relation ids' => [ListPeopleTool::class, ['filter' => ['company' => ['$in' => []]]], 'company $in must be a list of record IDs'],
+    'people relation id' => [ListPeopleTool::class, ['filter' => ['company' => ['$in' => ['abc']]]], 'company $in: abc is not a record ID'],
     'opportunity stale days minimum' => [ListOpportunitiesTool::class, ['filter' => ['stale_days' => ['$gte' => 0]]], 'stale_days takes'],
     'opportunity stale days maximum' => [ListOpportunitiesTool::class, ['filter' => ['stale_days' => ['$gte' => 3651]]], 'stale_days takes'],
     'task assigned to me' => [ListTasksTool::class, ['filter' => ['assigned_to_me' => ['$eq' => 'maybe']]], 'assigned_to_me takes'],
+    'task not assigned to me' => [ListTasksTool::class, ['filter' => ['assigned_to_me' => ['$eq' => false]]], 'assigned_to_me takes'],
     'task assignees' => [ListTasksTool::class, ['filter' => ['assignees' => ['$gte' => 'user-id']]], 'assignees takes $in, $not_in or $is_empty'],
     'note relation' => [ListNotesTool::class, ['filter' => ['companies' => ['$eq' => 'x']]], 'companies takes $in, $not_in or $is_empty'],
 ]);

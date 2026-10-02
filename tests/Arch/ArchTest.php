@@ -46,8 +46,6 @@ arch()->preset()
         'Relaticle\Admin\AdminPanelProvider',
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
-        // Names a kind of filter inside the filter engine, next to the classes that switch on it.
-        'App\Support\Filters\FilterKind',
         'App\Mcp',
         'App\Http\Controllers\Mcp',
         'App\ActivityLog',

@@ -34,13 +34,15 @@ final readonly class Operand
     /**
      * @return list<string>
      */
-    public static function listOrFail(mixed $operand, bool $splitsStrings, string $path, string $expected): array
+    public static function listOrFail(mixed $operand, bool $splitsStrings, string $field, string $operator, string $expected): array
     {
+        $name = "{$field} {$operator}";
+
         $list = self::stringList($operand, $splitsStrings)
-            ?? throw FilterErrors::at($path, __('validation.filter.operand_type', ['name' => $path, 'expected' => $expected]));
+            ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => $name, 'expected' => $expected]));
 
         if (count($list) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
-            throw FilterErrors::at($path, __('validation.filter.too_many_values', ['name' => $path, 'max' => CustomFieldFilterSchema::MAX_LIST_VALUES]));
+            throw FilterErrors::at($operator, __('validation.filter.too_many_values', ['name' => $name, 'max' => CustomFieldFilterSchema::MAX_LIST_VALUES]));
         }
 
         return $list;

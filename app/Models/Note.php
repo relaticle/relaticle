@@ -14,9 +14,7 @@ use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\NoteFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -90,34 +88,6 @@ final class Note extends Model implements HasCustomFields, HasMedia, HasTimeline
     public function opportunities(): MorphToMany
     {
         return $this->morphedByMany(Opportunity::class, 'noteable');
-    }
-
-    /** @param Builder<self> $query */
-    #[Scope]
-    protected function forNotableType(Builder $query, string $type): void
-    {
-        $relationMap = [
-            'company' => 'companies',
-            'people' => 'people',
-            'opportunity' => 'opportunities',
-        ];
-
-        $relation = $relationMap[$type] ?? null;
-
-        if ($relation) {
-            $query->whereHas($relation);
-        }
-    }
-
-    /** @param Builder<self> $query */
-    #[Scope]
-    protected function forNotableId(Builder $query, string $id): void
-    {
-        $query->where(function (Builder $q) use ($id): void {
-            $q->whereHas('companies', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id))
-                ->orWhereHas('people', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id))
-                ->orWhereHas('opportunities', fn (Builder $sub) => $sub->where('noteables.noteable_id', $id));
-        });
     }
 
     public function registerMediaCollections(): void

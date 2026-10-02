@@ -370,17 +370,14 @@ describe('includes', function (): void {
 });
 
 describe('filtering and sorting', function (): void {
-    it('excludes tasks assigned to me when assigned_to_me is false', function (): void {
+    it('rejects assigned_to_me when the value is false', function (): void {
         Sanctum::actingAs($this->user);
 
         Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned']);
-        $assignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Assigned']);
-        $assignedTask->assignees()->attach($this->user);
 
         $this->getJson('/api/v1/tasks?filter[assigned_to_me][$eq]=false')
-            ->assertOk()
-            ->assertJsonFragment(['title' => 'Unassigned'])
-            ->assertJsonMissing(['title' => 'Assigned']);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['filter.assigned_to_me']);
     });
 
     it('can filter tasks by title', function (): void {

@@ -25,7 +25,7 @@ final class RemoveSampleDataTool implements Tool
     public function description(): string
     {
         return 'Propose removing every sample record seeded when the workspace was created: its sample companies, people, opportunities, tasks and notes, in one approval. '
-            .'Use this whenever the user wants all the sample, demo, example or placeholder data gone. To remove only some of it, use the list tool with creation_source "system" and that entity\'s delete tool instead. '
+            .'Use this whenever the user wants all the sample, demo, example or placeholder data gone. To remove only some of it, use the list tool with filter {"creation_source": {"$eq": "system"}} and that entity\'s delete tool instead. '
             ."The user's own records are never touched. Only the workspace owner can remove sample data.";
     }
 

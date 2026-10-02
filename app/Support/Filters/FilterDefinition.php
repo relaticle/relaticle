@@ -6,6 +6,7 @@ namespace App\Support\Filters;
 
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Enums\FilterKind;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use BackedEnum;
 use Spatie\QueryBuilder\Filters\Filter;

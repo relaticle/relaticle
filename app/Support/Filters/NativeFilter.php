@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Filters;
 
+use App\Enums\FilterKind;
 use App\Support\LikePattern;
 use BackedEnum;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,9 +45,9 @@ final readonly class NativeFilter implements Filter
             }
 
             match ($this->definition->kind) {
-                FilterKind::Text => $this->text($query, $column, $operator, $operand),
-                FilterKind::DateTime => $this->dateTime($query, $column, $operator, $operand),
-                default => $this->enum($query, $column, $operator, $operand),
+                FilterKind::Text => $this->text($query, $property, $column, $operator, $operand),
+                FilterKind::DateTime => $this->dateTime($query, $property, $column, $operator, $operand),
+                default => $this->enum($query, $property, $column, $operator, $operand),
             };
         }
     }
@@ -54,15 +55,15 @@ final readonly class NativeFilter implements Filter
     /**
      * @param  Builder<Model>  $query
      */
-    private function text(Builder $query, string $column, string $operator, mixed $operand): void
+    private function text(Builder $query, string $property, string $column, string $operator, mixed $operand): void
     {
         if ($operator === '$is_empty') {
-            $this->emptiness($query, $column, $operator, $operand, blankIsEmpty: true);
+            $this->emptiness($query, $property, $column, $operator, $operand, blankIsEmpty: true);
 
             return;
         }
 
-        $text = Operand::string($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => $operator, 'expected' => 'a string']));
+        $text = Operand::string($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => "{$property} {$operator}", 'expected' => 'a string']));
 
         $operator === '$contains'
             ? $query->where($column, 'ILIKE', '%'.LikePattern::escape($text).'%')
@@ -72,15 +73,15 @@ final readonly class NativeFilter implements Filter
     /**
      * @param  Builder<Model>  $query
      */
-    private function dateTime(Builder $query, string $column, string $operator, mixed $operand): void
+    private function dateTime(Builder $query, string $property, string $column, string $operator, mixed $operand): void
     {
         if ($operator === '$is_empty') {
-            $this->emptiness($query, $column, $operator, $operand, blankIsEmpty: false);
+            $this->emptiness($query, $property, $column, $operator, $operand, blankIsEmpty: false);
 
             return;
         }
 
-        $date = Operand::date($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => $operator, 'expected' => 'a date or date-time']));
+        $date = Operand::date($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => "{$property} {$operator}", 'expected' => 'a date or date-time']));
 
         is_string($operand) && Operand::isBareDate($operand)
             ? $query->whereDate($column, self::COMPARISONS[$operator], $date->toDateString())
@@ -90,10 +91,10 @@ final readonly class NativeFilter implements Filter
     /**
      * @param  Builder<Model>  $query
      */
-    private function enum(Builder $query, string $column, string $operator, mixed $operand): void
+    private function enum(Builder $query, string $property, string $column, string $operator, mixed $operand): void
     {
         if ($operator === '$is_empty') {
-            $this->emptiness($query, $column, $operator, $operand, blankIsEmpty: false);
+            $this->emptiness($query, $property, $column, $operator, $operand, blankIsEmpty: false);
 
             return;
         }
@@ -101,11 +102,14 @@ final readonly class NativeFilter implements Filter
         /** @var class-string<BackedEnum> $enumClass */
         $enumClass = $this->definition->enumClass;
         $allowed = array_map(static fn (BackedEnum $case): string => (string) $case->value, $enumClass::cases());
-        $values = Operand::listOrFail($operand, splitsStrings: true, path: $operator, expected: 'one of: '.implode(', ', $allowed));
+        $expected = 'one of: '.implode(', ', $allowed);
+        $values = $operator === '$eq'
+            ? [$this->single($operand, $property, $operator, $expected)]
+            : Operand::listOrFail($operand, splitsStrings: true, field: $property, operator: $operator, expected: $expected);
         $unknown = array_first(array_diff($values, $allowed));
 
         if ($unknown !== null) {
-            throw FilterErrors::at($operator, __('validation.filter.enum_value', ['value' => $unknown, 'values' => implode(', ', $allowed)]));
+            throw FilterErrors::at($operator, __('validation.filter.enum_value', ['name' => "{$property} {$operator}", 'value' => $unknown, 'values' => implode(', ', $allowed)]));
         }
 
         match ($operator) {
@@ -114,12 +118,23 @@ final readonly class NativeFilter implements Filter
         };
     }
 
+    private function single(mixed $operand, string $property, string $operator, string $expected): string
+    {
+        $value = Operand::string($operand);
+
+        if ($value === null || str_contains($value, ',')) {
+            throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => "{$property} {$operator}", 'expected' => $expected]));
+        }
+
+        return $value;
+    }
+
     /**
      * @param  Builder<Model>  $query
      */
-    private function emptiness(Builder $query, string $column, string $operator, mixed $operand, bool $blankIsEmpty): void
+    private function emptiness(Builder $query, string $property, string $column, string $operator, mixed $operand, bool $blankIsEmpty): void
     {
-        $empty = Operand::boolean($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => $operator, 'expected' => 'true or false']));
+        $empty = Operand::boolean($operand) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => "{$property} {$operator}", 'expected' => 'true or false']));
 
         if ($empty) {
             $query->where(fn (Builder $q): Builder => $blankIsEmpty ? $q->whereNull($column)->orWhere($column, '') : $q->whereNull($column));

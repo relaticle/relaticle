@@ -39,11 +39,12 @@ it('filters a native text field by an operator object', function (): void {
 
 it('filters created_at by a calendar date', function (): void {
     $this->travelTo('2026-09-01 10:00:00');
-    Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $early = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $this->travelTo('2026-10-01 23:30:00');
     $late = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    expect(listIds($this, 'companies', ['created_at' => ['$gte' => '2026-10-01']]))->toBe([$late->id]);
+    expect(listIds($this, 'companies', ['created_at' => ['$gte' => '2026-10-01']]))->toBe([$late->id])
+        ->and(listIds($this, 'companies', ['created_at' => ['$lte' => '2026-10-01']]))->toBe(collect([$early->id, $late->id])->sort()->values()->all());
 });
 
 it('filters creation_source with $in and $not_in', function (): void {
@@ -75,6 +76,7 @@ it('filters tasks by assignee and by assigned_to_me', function (): void {
 
 it('returns nothing for a member id from another workspace', function (): void {
     $stranger = User::factory()->withPersonalWorkspace()->create();
+    Task::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create()->assignees()->attach($stranger);
     Task::factory()->recycle([$this->user, $this->workspace])->create()->assignees()->attach($this->user);
 
     expect(listIds($this, 'tasks', ['assignees' => ['$in' => [$stranger->id]]]))->toBe([]);
@@ -95,7 +97,7 @@ it('caps a relation id list at one hundred values', function (): void {
 
     $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['$in' => $ids]]]))
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['filter.assignees.$in']);
+        ->assertJsonValidationErrors(['filter.assignees.$in' => 'assignees $in takes at most 100 values.']);
 });
 
 it('keys an error by the path of the node to fix', function (): void {
@@ -109,3 +111,29 @@ it('rejects a stale_days value outside the supported range', function (int $days
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.stale_days']);
 })->with([0, 3651]);
+
+it('names the field in an operand error', function (): void {
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => ['created_at' => ['$gte' => 'notadate']]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.created_at.$gte' => 'created_at $gte must be a date or date-time.']);
+});
+
+it('takes one creation_source value for $eq and a list for $in', function (): void {
+    $api = Company::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::API]);
+    $web = Company::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::WEB]);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['creation_source' => CreationSource::MCP]);
+
+    expect(listIds($this, 'companies', ['creation_source' => ['$in' => 'api,web']]))->toBe(collect([$api->id, $web->id])->sort()->values()->all());
+
+    foreach (['api,web', ['api', 'web']] as $operand) {
+        $this->getJson('/api/v1/companies?'.http_build_query(['filter' => ['creation_source' => ['$eq' => $operand]]]))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['filter.creation_source.$eq' => 'creation_source $eq must be one of:']);
+    }
+});
+
+it('rejects a relation id that is not a ULID', function (): void {
+    $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['$in' => ['abc']]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.assignees.$in' => 'assignees $in: abc is not a record ID.']);
+});

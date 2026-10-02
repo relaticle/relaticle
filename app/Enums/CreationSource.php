@@ -56,11 +56,6 @@ enum CreationSource: string implements HasColor, HasLabel
         return array_column(self::cases(), 'value');
     }
 
-    public static function filterDescription(): string
-    {
-        return 'Only return records with this creation source: '.implode(', ', self::values()).'. "'.self::SYSTEM->value.'" marks the sample records seeded when the workspace was created.';
-    }
-
     public function getColor(): string
     {
         return match ($this) {

@@ -21,14 +21,12 @@ final readonly class AssignedToMeFilter implements Filter
      */
     public function __invoke(Builder $query, mixed $value, string $property): void
     {
-        $assigned = is_array($value) && array_keys($value) === ['$eq'] ? Operand::boolean($value['$eq']) : null;
+        $assigned = is_array($value) && array_keys($value) === ['$eq'] && Operand::boolean($value['$eq']) === true;
 
-        if ($assigned === null) {
+        if (! $assigned) {
             throw FilterErrors::at('', __('validation.filter.assigned_to_me'));
         }
 
-        $assigned
-            ? $query->whereHas('assignees', fn (Builder $q): Builder => $q->whereKey($this->user->getKey()))
-            : $query->whereDoesntHave('assignees', fn (Builder $q): Builder => $q->whereKey($this->user->getKey()));
+        $query->whereHas('assignees', fn (Builder $q): Builder => $q->whereKey($this->user->getKey()));
     }
 }

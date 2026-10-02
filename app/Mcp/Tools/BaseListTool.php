@@ -43,7 +43,7 @@ abstract class BaseListTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'filter' => $schema->object()->description(EntityFilters::GRAMMAR.' Field names, operators and options for this workspace are listed under filterable_fields in get-crm-schema.'),
+            'filter' => $schema->object()->description(EntityFilters::GRAMMAR.' Native fields and relations sit at the top level of filter. Custom field codes go under filter.custom_fields, and filterable_fields in get-crm-schema lists those codes with their operators and options. Example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}.'),
             'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
             'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
             'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
