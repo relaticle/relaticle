@@ -115,14 +115,14 @@ Normalize on write where a lossless canonical form exists; compute at query time
 |---|---|---|
 | Phone | E.164, with an extension kept as `;ext=12` (`+14155550100;ext=12`) | operand normalized the same way, exact match |
 | Email | stored as typed | `$has_any` case-insensitive; `domain` is the lowercased part after `@` |
-| Link, URL variant (default) | stored as typed | `$has_any` case-insensitive; `domain` extracts the host: lowercase, no scheme, no `www.`, no path |
+| Link, URL variant (default) | scheme stripped, as the panel already does through `LinkFieldType::setValue()` | operand normalized the same way, `$has_any` case-insensitive; `domain` extracts the host: lowercase, no `www.`, no path |
 | Link, domain variant | trimmed, lowercased; scheme, userinfo, port, path, query, fragment, leading `www.` and trailing dot removed | exact match |
 
 Reasons, from the sources checked:
 
 - Phones: the phone field type already promises E.164. The panel's `PhoneInputComponent` stores it, and every path validates `phone:AUTO`, which requires a country code. `CustomFieldInput::normalizeValue()` passes phones through as typed, so API, MCP, chat and import store `+1 415-555-0100` style values: 55 of 60 MCP writes, 11 of 18 chat writes, 29 import writes. E.164 alone drops extensions; libphonenumber's RFC 3966 form keeps them and parses back.
 - Emails: RFC 5321 section 2.4 requires the local part to keep its case, and the app sends mail. 62 stored emails have an uppercase local part.
-- Links: RFC 3986 section 6.2.2.1 makes scheme and host case-insensitive. Dropping `www.` is a product convention, not a standard. The `link` type also holds LinkedIn URLs, whose paths matter, so only a field set to the domain variant is rewritten.
+- Links: RFC 3986 section 6.2.2.1 makes scheme and host case-insensitive. Dropping `www.` is a product convention, not a standard. The `link` type also holds LinkedIn URLs, whose paths matter, so only a field set to the domain variant loses its path. The package already strips the scheme of every link in `LinkFieldType::setValue()`, documented as "Normalize a value before storage and comparison", but only the panel's `LinkComponent` and `UniqueCustomFieldValue` call it, so API, MCP, chat and import store schemes.
 - Company `domains` declares `unique_per_entity_type`, but `UniqueCustomFieldValue` compares exact strings, so `https://acme.com` and `acme.com` both pass. 70% of stored values carry a scheme, and 144 hosts are shared by 426 companies through format differences alone.
 
 Uniqueness changes with it: `UniqueCustomFieldValue` normalizes each candidate with the field's normalizer. On save, it skips values the record already held before this change: a new or changed value must be unique; a record's existing values are grandfathered. Restoring a trashed record stays strict, because `takenUniqueCustomFieldValues()` exists to re-check exactly the values the record already holds. This unblocks the 291 companies whose identical duplicate domains already fail the panel form's uniqueness check, and keeps the 426 newly colliding ones saveable until #885 lets someone merge them.
@@ -234,9 +234,9 @@ Each filter class describes itself (name, kind, operators, options, related enti
 
 Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint here, as v3.11 was for this PR.
 
-1. A field type may declare an item normalizer. `SafeValueConverter::toDbSafe()` applies it to every item, and receives the `CustomField` so a setting can choose the normalizer. Every write path already calls it: `CustomFieldValue::setValue()` (panel, API, MCP, chat, actions), `ExecuteImportJob` and `BulkCustomFieldValueWriter`.
-2. Phone normalizer: E.164 plus RFC 3966 extension. Input it cannot parse comes back unchanged; validation stays the gate. `PhoneInputComponent` keeps extensions through the same normalizer.
-3. Link setting `link_variant`: `url` (default) or `domain`, with the domain normalizer from decision 7.
+1. The normalizer is the package's existing hook, `BaseFieldType::setValue(string): string`. A new `BaseFieldType::normalize(string $value, CustomField $field): string` defaults to `setValue($value)` so a setting can choose the form; existing third-party field types keep working. `SafeValueConverter::toDbSafe()` gains an optional `?CustomField` and runs `normalize()` on every string item. Every write path already calls `toDbSafe()`: `CustomFieldValue::setValue()` (panel, API, MCP, chat, actions), `ExecuteImportJob` and `BulkCustomFieldValueWriter`. `LinkComponent` and `UniqueCustomFieldValue` switch from `setValue()` to `normalize()`.
+2. `PhoneFieldType::setValue()`: E.164 plus RFC 3966 extension, through `CountryPhoneService`. Input it cannot parse comes back unchanged; validation stays the gate. `CountryPhoneService::formatToE164()` (the panel's input) and `parseE164()` (the panel's display) keep the extension too.
+3. Link setting `link_variant`: `url` (default) or `domain`. `LinkFieldType::normalize()` applies the domain form from decision 7 when the field is set to `domain`, and `setValue()` otherwise.
 4. `UniqueCustomFieldValue` normalizes candidates and, in the save validation path only, grandfathers values the record already held. The restore check stays strict.
 
 ## Surfaces
@@ -251,8 +251,9 @@ Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint he
 1. Release custom-fields `v3.12.0`; bump the constraint.
 2. Migration: set `link_variant` to `domain` on every company `domains` field (query builder, chunked with `eachById`). `CompanyField::DOMAINS` declares it for new workspaces.
 3. Command `custom-fields:normalize-values {--force}`: reports by default, writes on `--force`, idempotent, chunked, query builder only.
-   - Phones: convert the 111 international values stored with formatting. Report the 8,505 national numbers by workspace and leave them as they are: 7,839 from the old onboarding seed (6 distinct values), 665 typed before the E.164 picker, 1 imported. No country is guessed.
-   - Domain-variant links: normalize, collapse duplicates within a record, report cross-record collisions by workspace.
+   - Every phone and link value is re-run through its field type's `normalize()`; a value already in canonical form is left alone, so a second run changes nothing.
+   - Phones: converts the 111 international values stored with formatting. Report the 8,505 national numbers by workspace and leave them as they are: 7,839 from the old onboarding seed (6 distinct values), 665 typed before the E.164 picker, 1 imported. No country is guessed.
+   - Links: strips schemes stored by API, MCP, chat and import. Domain-variant links also lose `www.` and paths, collapse duplicates within a record, and cross-record collisions are reported by workspace.
 4. Migration queues it: `Artisan::queue('custom-fields:normalize-values', ['--force' => true])->onQueue('imports')->afterCommit()`, after the settings migration. Self-hosted installs run it the same way.
 5. Release note: the v1 filter shape is replaced; old shapes return 422s naming the replacement. Tell the paying API customer before the release.
 
