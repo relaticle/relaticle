@@ -2681,6 +2681,17 @@ it('matches a url-variant link by its host', function (): void {
     expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$in' => ['acme.com']]]]]))->toBe(['Ana']);
 });
 
+it('publishes only $ operators and the domain sub-field', function (): void {
+    $keys = collect(App\Enums\CustomFieldType::cases())
+        ->flatMap(fn (App\Enums\CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->unique()
+        ->reject(fn (string $key): bool => str_starts_with($key, '$'))
+        ->values()
+        ->all();
+
+    expect($keys)->toBe(['domain']);
+});
+
 it('asks for a country code on a national phone operand', function (): void {
     $phone = filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
 
