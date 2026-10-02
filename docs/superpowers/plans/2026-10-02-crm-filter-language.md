@@ -685,9 +685,30 @@ return new class extends Migration
 };
 ```
 
+- [ ] **Step 3b: Import matching uses the canonical form**
+
+Stored phones and domains are now canonical, but CSV matching compares raw lowercased values (`packages/ImportWizard/src/Support/EntityLinkResolver.php`, `resolveViaJsonColumn()`), so a re-import of `+1 415-555-0100` would miss the person stored as `+14155550100` and create a duplicate. Normalize each CSV value through the field type before the lookup and key the results back by the lowercased original:
+
+```php
+        $field = CustomField::query()->withoutGlobalScopes()->find($customFieldId);
+        $definition = $field instanceof CustomField ? CustomFieldsType::getFieldTypeInstance($field->type) : null;
+        $canonicalByOriginal = [];
+
+        foreach ($uniqueValues as $value) {
+            $canonical = $definition instanceof BaseFieldType && $field instanceof CustomField ? $definition->normalize($value, $field) : $value;
+            $canonicalByOriginal[mb_strtolower($value)] = mb_strtolower($canonical);
+        }
+
+        $uniqueValues = array_values(array_unique($canonicalByOriginal));
+```
+
+Keep the existing query over `$uniqueValues`, then return `array_filter(array_map(fn (string $canonical): int|string|null => $results[$canonical] ?? null, $canonicalByOriginal), fn (int|string|null $id): bool => $id !== null)`. Before editing, read every caller of `resolveViaJsonColumn()` and confirm they look results up by the lowercased CSV value; if one uses another key, map to that key instead.
+
+Test in `tests/Feature/ImportWizard/Jobs/ExecuteImportJobDeduplicationTest.php`, following that file's fixtures: a person stored with phone `+14155550100`, a CSV row with phone `+1 415-555-0100` matched on phone, and the import updates that person instead of creating a second one.
+
 - [ ] **Step 4: Run tests, then the custom field and import suites**
 
-Run: `php artisan test --compact --filter="stores company domains|another format|e.164|imports phone|imports link"` then `php artisan test --compact tests/Feature/ImportWizard tests/Feature/CustomFields tests/Feature/Api`
+Run: `php artisan test --compact --filter="stores company domains|another format|e.164|imports phone|imports link|re-import"` then `php artisan test --compact tests/Feature/ImportWizard tests/Feature/CustomFields tests/Feature/Api`
 Expected: PASS. If another existing test pinned a raw scheme or formatted phone, update its expectation to the canonical form and note it in the commit body.
 
 - [ ] **Step 5: Commit**
@@ -2813,15 +2834,19 @@ Update both `containsAny()` call sites to pass `$field`.
 
 In `GetFromSpatieQueryBuilder::CUSTOM_FIELD_FILTER_DESCRIPTION`, replace `Tags, email, phone and link values match the exact stored value, so repeat [] to send several.` with `Tags match the exact stored value. Email and link values match in any case and phones in any format; email and link take a domain sub-field, for example filter[custom_fields][emails][domain][$in]=acme.com. Repeat [] to send several values.`
 
+- [ ] **Step 3b: Search finds a phone typed in any format**
+
+After the backfill, stored phones are `+14155550100`, so a search for `415-555-0100` in chat's `SearchCrmTool` and MCP's `SearchTool` stops matching. In both, when the query holds 7 or more digits, also match phone-type values on their digits: add `or regexp_replace(<element>, '\D', '', 'g') like ?` with the binding `'%'.preg_replace('/\D/', '', $query).'%'` next to the existing ILIKE on json array elements, scoped to fields of type `phone`. Read both tools' search SQL first and add the clause where they already expand `json_value` elements. Test in `tests/Feature/Chat/SearchCrmToolTest.php`: a person stored with `+14155550100` is found by `415-555-0100` and by `(415) 555 0100`.
+
 - [ ] **Step 4: Run tests**
 
-Run: `php artisan test --compact tests/Feature/Mcp/Filters/CustomFieldFilterTest.php tests/Feature/Api/V1/ListFilterTest.php`
+Run: `php artisan test --compact tests/Feature/Mcp/Filters/CustomFieldFilterTest.php tests/Feature/Api/V1/ListFilterTest.php tests/Feature/Chat/SearchCrmToolTest.php tests/Feature/Mcp`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add app lang tests
+git add app packages lang tests
 git commit -m "feat: match emails, links and phones in any format"
 ```
 
