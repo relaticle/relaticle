@@ -345,6 +345,16 @@ it('rejects an option id that no longer exists', function (): void {
         ->assertHasErrors(["option \"{$staleId}\" is not one of"]);
 });
 
+it('rejects an option id that belongs to another workspace', function (): void {
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreignStage = filterTestStageField($stranger->personalWorkspace());
+    $foreignWonId = filterTestOptionId($foreignStage, 'Closed Won');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['eq' => $foreignWonId]]])
+        ->assertHasErrors(["option \"{$foreignWonId}\" is not one of"]);
+});
+
 it('matches a record holding any one of the requested multi-select options', function (): void {
     $temperature = resolve(CreateCustomField::class)->execute($this->user, [
         'entity_type' => 'opportunity',
