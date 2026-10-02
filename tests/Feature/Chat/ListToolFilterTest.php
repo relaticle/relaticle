@@ -562,7 +562,7 @@ it('treats an empty custom_fields string as no filter', function (): void {
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request(['custom_fields' => ''])));
 
-    expect($rows)->toHaveCount(1);
+    expect(collect($rows)->pluck('attributes.title')->all())->toBe(['Anything']);
 });
 
 it('shows the operator example when a bare value is given', function (): void {
