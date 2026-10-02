@@ -18,14 +18,6 @@ final readonly class CustomFieldFilterSchema
     public const int MAX_LIST_VALUES = 100;
 
     /** @var array<int, string> */
-    private const array EXCLUDED_TYPES = [
-        CustomFieldType::FILE_UPLOAD->value,
-        CustomFieldType::RECORD->value,
-        CustomFieldType::TEXTAREA->value,
-        CustomFieldType::RICH_EDITOR->value,
-    ];
-
-    /** @var array<int, string> */
     private const array NUMERIC_OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte'];
 
     /** @var array<int, string> */
@@ -43,16 +35,10 @@ final readonly class CustomFieldFilterSchema
         $schema = [];
 
         foreach ($fields as $field) {
-            $operators = self::operatorsForType($field->type);
-
-            if ($operators === []) {
-                continue;
-            }
-
             $schema[$field->code] = [
                 'type' => 'object',
                 'description' => $field->name,
-                'properties' => $operators,
+                'properties' => self::operatorsForType($field->type),
             ];
         }
 
@@ -72,7 +58,6 @@ final readonly class CustomFieldFilterSchema
     public static function isFilterable(CustomField $field): bool
     {
         return $field->active
-            && ! in_array($field->type, self::EXCLUDED_TYPES, true)
             && ! $field->settings->encrypted
             && self::operatorsForType($field->type) !== [];
     }
@@ -88,29 +73,22 @@ final readonly class CustomFieldFilterSchema
             return [];
         }
 
-        return match ($fieldType) {
-            CustomFieldType::TEXT => self::withEmptiness(self::buildOperators(self::STRING_OPERATORS, 'string')),
+        $operators = match ($fieldType) {
+            CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
             CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK,
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::withEmptiness(self::listOperators(['has_any', 'has_none'])),
-            CustomFieldType::CURRENCY => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'number')),
-            CustomFieldType::NUMBER => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'integer')),
-            CustomFieldType::DATE, CustomFieldType::DATE_TIME => self::withEmptiness(self::buildOperators(self::NUMERIC_OPERATORS, 'string')),
-            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::withEmptiness(self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean')),
-            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => self::withEmptiness(array_merge(
-                self::buildOperators(['eq'], 'string'),
-                self::listOperators(['in', 'not_in']),
-            )),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['has_any', 'has_none']),
+            CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
+            CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
+            CustomFieldType::DATE, CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
+            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
+                ...self::buildOperators(['eq'], 'string'),
+                ...self::listOperators(['in', 'not_in']),
+            ],
             default => [],
         };
-    }
 
-    /**
-     * @param  array<string, array<string, mixed>>  $operators
-     * @return array<string, array<string, mixed>>
-     */
-    private static function withEmptiness(array $operators): array
-    {
-        return [...$operators, 'is_empty' => ['type' => 'boolean']];
+        return $operators === [] ? [] : [...$operators, 'is_empty' => ['type' => 'boolean']];
     }
 
     /**
@@ -119,13 +97,7 @@ final readonly class CustomFieldFilterSchema
      */
     private static function buildOperators(array $operators, string $jsonType): array
     {
-        $result = [];
-
-        foreach ($operators as $op) {
-            $result[$op] = ['type' => $jsonType];
-        }
-
-        return $result;
+        return array_fill_keys($operators, ['type' => $jsonType]);
     }
 
     /**
@@ -134,13 +106,7 @@ final readonly class CustomFieldFilterSchema
      */
     private static function listOperators(array $operators): array
     {
-        $result = [];
-
-        foreach ($operators as $op) {
-            $result[$op] = ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => self::MAX_LIST_VALUES];
-        }
-
-        return $result;
+        return array_fill_keys($operators, ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => self::MAX_LIST_VALUES]);
     }
 
     /**

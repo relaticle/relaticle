@@ -77,7 +77,7 @@ final class CompanySchemaResource extends Resource implements ProvidesEntitySche
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Filter list tools with the "filter" param: an object keyed by field code, each value an operator object such as {"eq": "Closed Won"}, {"not_in": ["Done"]} or {"is_empty": true}. Operators per field are listed in filterable_fields. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags, email, phone and link values match the exact stored value. Example: {"name": "Acme", "custom_fields": {"icp": true}}.',
+            'usage' => CustomFieldSchema::USAGE.' Example: {"name": "Acme", "custom_fields": {"icp": true}}.',
         ];
     }
 }

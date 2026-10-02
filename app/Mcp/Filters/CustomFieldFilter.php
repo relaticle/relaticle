@@ -90,6 +90,8 @@ final readonly class CustomFieldFilter implements Filter
             $valueColumn = CustomFieldValue::getValueColumn($field->type);
             $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
 
+            $entry = $options[$fieldCode] ?? null;
+
             foreach ($operators as $operator => $operand) {
                 if (! isset($supportedOperators[$operator])) {
                     $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
@@ -99,14 +101,8 @@ final readonly class CustomFieldFilter implements Filter
                     ]));
                 }
 
-                $operand = $this->normalizeOperand(
-                    (string) $fieldCode,
-                    $operator,
-                    $operand,
-                    $supportedOperators[$operator],
-                    isset($options[$fieldCode]),
-                );
-                $operand = $this->resolveOptions($optionMap, (string) $fieldCode, $options[$fieldCode] ?? null, $operand);
+                $operand = $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null);
+                $operand = $this->resolveOptions($optionMap, $fieldCode, $entry, $operand);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
             }

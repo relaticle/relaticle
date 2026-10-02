@@ -691,7 +691,7 @@ abstract class BaseReadListTool implements Tool
 
         $customFields = $request['custom_fields'] ?? null;
 
-        if (! in_array($customFields, [null, [], ''], true)) {
+        if (filled($customFields)) {
             $nativeFilters['custom_fields'] = $customFields;
         }
 
