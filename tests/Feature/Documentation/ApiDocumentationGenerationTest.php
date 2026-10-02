@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFieldType;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Providers\AppServiceProvider;
+use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Yaml\Yaml;
 
-mutates(AppServiceProvider::class, BaseCrmEntityRequest::class);
+mutates(AppServiceProvider::class, BaseCrmEntityRequest::class, GetFromSpatieQueryBuilder::class);
 
 it('generates the complete API documentation with company ownership fields', function (): void {
     expect(Schema::hasTable('custom_fields'))->toBeTrue();
@@ -33,6 +36,16 @@ it('generates the complete API documentation with company ownership fields', fun
         ->toHaveKey('account_owner_id');
     expect($spec['paths']['/api/v1/companies/{id}']['put']['requestBody']['content']['application/json']['schema']['properties'])
         ->toHaveKey('account_owner_id');
+
+    $customFieldFilter = collect($spec['paths']['/api/v1/opportunities']['get']['parameters'])
+        ->firstWhere('name', 'filter[custom_fields][{code}][{operator}]');
+    $publishedOperators = collect(CustomFieldType::cases())
+        ->flatMap(fn (CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->unique()
+        ->all();
+
+    expect($customFieldFilter)->not->toBeNull()
+        ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/[a-z_]+/')->all()))->toBe([]);
 });
 
 it('generates the API documentation before the database is migrated', function (): void {

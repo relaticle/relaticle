@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
+use App\Enums\CustomFieldType;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Http\Requests\Api\V1\StoreCompanyRequest;
 use App\Http\Requests\Api\V1\StoreNoteRequest;
@@ -16,12 +17,14 @@ use App\Mcp\Resources\NoteSchemaResource;
 use App\Mcp\Resources\OpportunitySchemaResource;
 use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Tools\Company\CreateCompanyTool as McpCreateCompany;
 use App\Mcp\Tools\Company\GetCompanyTool as McpGetCompany;
 use App\Mcp\Tools\Note\CreateNoteTool as McpCreateNote;
 use App\Mcp\Tools\Note\GetNoteTool as McpGetNote;
 use App\Mcp\Tools\Opportunity\CreateOpportunityTool as McpCreateOpportunity;
 use App\Mcp\Tools\Opportunity\GetOpportunityTool as McpGetOpportunity;
+use App\Mcp\Tools\Opportunity\ListOpportunitiesTool as McpListOpportunities;
 use App\Mcp\Tools\People\CreatePeopleTool as McpCreatePeople;
 use App\Mcp\Tools\People\GetPeopleTool as McpGetPeople;
 use App\Mcp\Tools\Task\CreateTaskTool as McpCreateTask;
@@ -198,3 +201,15 @@ it('narrows a list to the same records through the table filter and the api', fu
     'multi choice' => ['multi-select', 'has_any', true],
     'free-text tags' => ['tags-input', 'has_any', false],
 ]);
+
+it('names every custom field filter operator in the mcp list tool description', function (): void {
+    $description = resolve(McpListOpportunities::class)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+
+    $publishedOperators = collect(CustomFieldType::cases())
+        ->flatMap(fn (CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->unique()
+        ->all();
+
+    expect($publishedOperators)->not->toBeEmpty()
+        ->and(array_diff($publishedOperators, str($description)->matchAll('/[a-z_]+/')->all()))->toBe([]);
+});
