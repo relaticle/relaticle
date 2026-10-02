@@ -79,7 +79,8 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['has_any', 'has_none']),
             CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
             CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
-            CustomFieldType::DATE, CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date'),
+            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date-time'),
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
             CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
                 ...self::buildOperators(['eq'], 'string'),
@@ -95,9 +96,9 @@ final readonly class CustomFieldFilterSchema
      * @param  array<int, string>  $operators
      * @return array<string, array<string, string>>
      */
-    private static function buildOperators(array $operators, string $jsonType): array
+    private static function buildOperators(array $operators, string $jsonType, ?string $format = null): array
     {
-        return array_fill_keys($operators, ['type' => $jsonType]);
+        return array_fill_keys($operators, array_filter(['type' => $jsonType, 'format' => $format]));
     }
 
     /**

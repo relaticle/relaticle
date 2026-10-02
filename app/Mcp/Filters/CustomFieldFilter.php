@@ -11,9 +11,12 @@ use App\Models\User;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\Filters\Filter;
 
@@ -126,7 +129,7 @@ final readonly class CustomFieldFilter implements Filter
             'boolean' => $this->toBoolean($operand),
             'integer' => $this->toInteger($operand),
             'number' => $this->toNumber($operand),
-            'string' => is_string($operand) ? $operand : null,
+            'string' => $this->toString($operand, $operatorSchema['format'] ?? null),
             default => null,
         };
 
@@ -141,7 +144,11 @@ final readonly class CustomFieldFilter implements Filter
             return $normalized;
         }
 
-        $expected = $type === 'array' ? 'an array of strings' : "a {$type}";
+        $expected = match (true) {
+            $type === 'array' => 'an array of strings',
+            isset($operatorSchema['format']) => "a {$operatorSchema['format']}",
+            default => "a {$type}",
+        };
         $this->invalid(__('validation.custom_field.operand_type', [
             'field' => $fieldCode,
             'operator' => $operator,
@@ -203,6 +210,29 @@ final readonly class CustomFieldFilter implements Filter
         }
 
         return $operand;
+    }
+
+    private function toString(mixed $operand, ?string $format): ?string
+    {
+        if (! is_string($operand)) {
+            return null;
+        }
+
+        return match ($format) {
+            'date' => $this->toDate($operand)?->toDateString(),
+            'date-time' => $this->toDate($operand)?->toDateTimeString(),
+            default => $operand,
+        };
+    }
+
+    private function toDate(string $operand): ?CarbonImmutable
+    {
+        if (Validator::make(['date' => $operand], ['date' => ['date']])->fails()) {
+            return null;
+        }
+
+        // Postgres rejects some strings PHP parses ("Jan 1st 2026"), so only Carbon's canonical form reaches the query.
+        return Date::parse($operand);
     }
 
     private function toBoolean(mixed $operand): ?bool

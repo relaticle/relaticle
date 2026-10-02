@@ -500,6 +500,32 @@ describe('filtering and sorting', function (): void {
             ->assertJsonValidationErrors('filter');
     });
 
+    it('rejects a date operand that is not a calendar date', function (string $operand): void {
+        Sanctum::actingAs($this->user);
+
+        $this->getJson('/api/v1/opportunities?filter[custom_fields][close_date][gt]='.urlencode($operand))
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['filter' => 'close_date.gt']);
+    })->with(['notadate', '2026-13-45', '2026-02-30', 'tomorrow']);
+
+    it('matches a date operand written in any absolute date format', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $closeDate = CustomField::query()->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace->id)
+            ->where('entity_type', 'opportunity')
+            ->where('code', 'close_date')
+            ->firstOrFail();
+        $newYear = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'New Year Deal']);
+        $spring = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Spring Deal']);
+        $newYear->saveCustomFieldValue($closeDate, '2026-01-01');
+        $spring->saveCustomFieldValue($closeDate, '2026-04-01');
+
+        $ids = collect($this->getJson('/api/v1/opportunities?filter[custom_fields][close_date][eq]='.urlencode('Jan 1st 2026'))->assertOk()->json('data'))->pluck('id');
+
+        expect($ids)->toContain($newYear->id)->not->toContain($spring->id);
+    });
+
     it('can filter opportunities by a single-value in operand sent as a query string', function (): void {
         Sanctum::actingAs($this->user);
 
