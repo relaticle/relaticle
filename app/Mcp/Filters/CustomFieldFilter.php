@@ -146,6 +146,7 @@ final readonly class CustomFieldFilter implements Filter
 
         $expected = match (true) {
             $type === 'array' => 'an array of strings',
+            $type === 'integer' => 'an integer',
             isset($operatorSchema['format']) => "a {$operatorSchema['format']}",
             default => "a {$type}",
         };
