@@ -1443,6 +1443,8 @@ final readonly class Operand
             return null;
         }
 
+        $operand = array_map(static fn (mixed $item): mixed => is_bool($item) ? ($item ? 'true' : 'false') : $item, $operand);
+
         if (! array_all($operand, static fn (mixed $item): bool => is_string($item) && $item !== '')) {
             return null;
         }
@@ -1524,6 +1526,8 @@ final readonly class Operand
     }
 }
 ```
+
+Spatie turns every query-string `true`/`false` into a boolean, list items included, so `stringList()` maps them back to text: a tag literally named `true` stays reachable (`filter[custom_fields][labels][$has_any][]=true`). Add that case to `tests/Feature/Api/V1/OpportunitiesApiTest.php` next to Task 9's text-`true` test.
 
 In `CustomFieldFilter`, delete `toStringList`, `toString`, `toDate`, `toBoolean`, `toInteger`, `toNumber` and call `Operand::stringList()`, `Operand::string()`/`Operand::date()`, `Operand::boolean()`, `Operand::integer()`, `Operand::number()`. Its existing `too_many_values` check after `normalizeOperand()` stays as it is.
 
