@@ -147,7 +147,7 @@ Each condition is one indexed EXISTS (`entity_id, custom_field_id` plus a per-ty
 
 ### 10. Errors
 
-Every filter error is a Laravel 422, keyed by the path of the node to fix:
+Every filter error is a Laravel 422, keyed by the path of the node to fix. The messages below show the intent; the exact wording lives in `lang/en/validation.php`:
 
 | Path | Message |
 |---|---|
