@@ -15,6 +15,7 @@
 - PostgreSQL only. No driver checks or compatibility layers.
 - Every PHP file starts with `declare(strict_types=1);`. Classes are `final` (`final readonly` where possible). All parameters and returns typed; type coverage stays 100%.
 - Actions expose only `execute()` (`tests/Arch/ConventionsTest.php`).
+- `tests/Arch/ArchTest.php`: every `App` class is `final`, no abstract classes, and `App\Support` classes are `readonly` and extend nothing. A class that must extend a vendor class (`TreeAllowedFilter extends AllowedFilter`) gets an entry with a one-line reason in both the "avoid mutation" and "avoid inheritance" ignore lists. Share code between filter classes with a trait, never a base class.
 - No public method outside a model, enum or `Scope` takes a query builder unless it implements an interface or overrides a parent (`ConventionsTest`, `hasPrototype()`). Builder code lives in Spatie `Filter::__invoke()`, `AllowedFilter::applyTo()`/`filter()` overrides, and private or protected helpers.
 - No comments narrating the diff; no comments in tests; docblocks carry types only.
 - Never an em-dash (U+2014) in code, copy, commits or docs. No competitor names in any committed file.
@@ -1391,7 +1392,7 @@ namespace App\Support\Filters;
 
 use Illuminate\Validation\ValidationException;
 
-final class FilterErrors
+final readonly class FilterErrors
 {
     public static function at(string $path, string $message): ValidationException
     {
@@ -1429,7 +1430,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Validator;
 
-final class Operand
+final readonly class Operand
 {
     /** @return list<string>|null */
     public static function stringList(mixed $operand, bool $splitsStrings): ?array
@@ -1575,7 +1576,7 @@ final class TreeAllowedFilter extends AllowedFilter
 }
 ```
 
-The override skips Spatie's comma splitting and empty pruning for every tree node (`"Smith, John"` stays whole; `$not_in: []` reaches the filter).
+The override skips Spatie's comma splitting and empty pruning for every tree node (`"Smith, John"` stays whole; `$not_in: []` reaches the filter). In `tests/Arch/ArchTest.php`, rename the two `App\Support\Filters\CustomFieldAllowedFilter` ignore entries (added in Task 8) to `App\Support\Filters\TreeAllowedFilter`.
 
 - [ ] **Step 3d: `CustomFieldFilter` takes the user and throws relative keys**
 
@@ -1795,7 +1796,7 @@ final readonly class RelationFilter implements Filter
 }
 ```
 
-Task 11 turns this into a `NodeFilter` subclass with nested nodes; `$definition` is kept now for that.
+Task 11 adds nested nodes through a shared trait; `$definition` is kept now for that.
 
 - [ ] **Step 3g: computed filters**
 
@@ -2107,7 +2108,7 @@ git commit -m "feat: filter native fields and relation ids through one filter tr
 ### Task 11: Logic and nested relation nodes
 
 **Files:**
-- Create: `app/Support/Filters/NodeFilter.php`, `app/Support/Filters/LogicFilter.php`
+- Create: `app/Support/Filters/AppliesFilterNodes.php` (trait), `app/Support/Filters/LogicFilter.php`
 - Modify: `app/Support/Filters/RelationFilter.php`, `app/Support/Filters/EntityFilters.php`
 - Test: `tests/Feature/Api/V1/ListFilterTest.php`
 
@@ -2200,7 +2201,7 @@ Expected: the new tests FAIL (`$and`, `$or`, `$not` unknown; nested relation key
 
 - [ ] **Step 3: Implement**
 
-`NodeFilter.php`:
+`AppliesFilterNodes.php` (a trait: `ArchTest` bans abstract classes and inheritance in `App\Support`):
 
 ```php
 <?php
@@ -2212,12 +2213,8 @@ namespace App\Support\Filters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\QueryBuilder\AllowedFilter;
-use Spatie\QueryBuilder\Filters\Filter;
 
-/**
- * @implements Filter<Model>
- */
-abstract readonly class NodeFilter implements Filter
+trait AppliesFilterNodes
 {
     /**
      * @param  Builder<Model>  $query
@@ -2261,9 +2258,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\Filters\Filter;
 
-final readonly class LogicFilter extends NodeFilter
+/**
+ * @implements Filter<Model>
+ */
+final readonly class LogicFilter implements Filter
 {
+    use AppliesFilterNodes;
+
     public const array KEYWORDS = ['$and', '$or', '$not'];
 
     public function __construct(
@@ -2323,11 +2326,13 @@ final readonly class LogicFilter extends NodeFilter
 }
 ```
 
-`RelationFilter.php` becomes a `NodeFilter`:
+`RelationFilter.php` uses the trait (keep its `@implements Filter<Model>` docblock):
 
 ```php
-final readonly class RelationFilter extends NodeFilter
+final readonly class RelationFilter implements Filter
 {
+    use AppliesFilterNodes;
+
     public function __construct(
         private FilterDefinition $definition,
         private EntityFilters $filters,
@@ -2395,7 +2400,7 @@ and after the `custom_fields` filter:
 - [ ] **Step 4: Run tests**
 
 Run: `php artisan test --compact tests/Feature/Api/V1/ListFilterTest.php tests/Arch`
-Expected: PASS. `ConventionsTest` stays green because `applyNode()` is protected and every public builder method implements `Filter`.
+Expected: PASS. `ConventionsTest` stays green because `applyNode()` is protected and every public builder method implements `Filter`; `ArchTest` stays green because the shared code is a trait.
 
 - [ ] **Step 5: Commit**
 
@@ -2476,7 +2481,7 @@ namespace App\Support\Filters;
 
 use App\Enums\CrmEntity;
 
-final class FilterTree
+final readonly class FilterTree
 {
     public const int MAX_CONDITIONS = 20;
 
