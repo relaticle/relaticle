@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Http\Requests\Api\V1\StoreCompanyRequest;
 use App\Http\Requests\Api\V1\StoreNoteRequest;
 use App\Http\Requests\Api\V1\StoreOpportunityRequest;
@@ -24,10 +26,13 @@ use App\Mcp\Tools\People\CreatePeopleTool as McpCreatePeople;
 use App\Mcp\Tools\People\GetPeopleTool as McpGetPeople;
 use App\Mcp\Tools\Task\CreateTaskTool as McpCreateTask;
 use App\Mcp\Tools\Task\GetTaskTool as McpGetTask;
+use App\Models\Opportunity;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Laravel\Sanctum\Sanctum;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompany;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompany;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompanies;
@@ -141,3 +146,55 @@ it('offers every crm relation of the mcp allowlist as a chat include', function 
         ->and(declaredFields(resolve($chatListTool), 'availableIncludes'))
         ->toEqualCanonicalizing($expected);
 })->with(array_map(fn (array $row): array => [$row[0], $row[4], $row[5], $row[6]], crmSurfaces()));
+
+it('narrows a list to the same records through the table filter and the api', function (string $type, string $operator, bool $usesOptions): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->personalWorkspace();
+    $this->actingAs($user);
+    Filament::setTenant($workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $field = app(CreateCustomField::class)->execute($user, array_filter([
+        'entity_type' => 'opportunity',
+        'name' => 'Segment',
+        'code' => 'segment',
+        'type' => $type,
+        'options' => $usesOptions ? [['name' => 'Enterprise'], ['name' => 'Mid-Market'], ['name' => 'SMB']] : null,
+    ]));
+    $stored = fn (string $label): string => $usesOptions
+        ? (string) $field->options()->where('name', $label)->value('id')
+        : $label;
+    $value = fn (string $label): string|array => $type === 'select' ? $stored($label) : [$stored($label)];
+
+    $enterprise = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Enterprise Deal']);
+    $midMarket = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Mid-Market Deal']);
+    $smb = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'SMB Deal']);
+    $blank = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Unsegmented Deal']);
+    $enterprise->saveCustomFieldValue($field, $value('Enterprise'));
+    $midMarket->saveCustomFieldValue($field, $value('Mid-Market'));
+    $smb->saveCustomFieldValue($field, $value('SMB'));
+
+    livewire(ListOpportunities::class)
+        ->filterTable('custom_fields.segment', [$stored('Enterprise'), $stored('Mid-Market')])
+        ->assertCanSeeTableRecords([$enterprise, $midMarket])
+        ->assertCanNotSeeTableRecords([$smb, $blank]);
+
+    Sanctum::actingAs($user);
+
+    $operand = $usesOptions
+        ? 'Enterprise,Mid-Market'
+        : ['Enterprise', 'Mid-Market'];
+    $query = http_build_query(['filter' => ['custom_fields' => ['segment' => [$operator => $operand]]]]);
+
+    $apiIds = collect($this->getJson("/api/v1/opportunities?{$query}")->assertOk()->json('data'))
+        ->pluck('id')
+        ->sort()
+        ->values()
+        ->all();
+
+    expect($apiIds)->toBe(collect([$enterprise->id, $midMarket->id])->sort()->values()->all());
+})->with([
+    'single choice' => ['select', 'in', true],
+    'multi choice' => ['multi-select', 'has_any', true],
+    'free-text tags' => ['tags-input', 'has_any', false],
+]);
