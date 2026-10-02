@@ -525,9 +525,11 @@ git add src tests
 git commit -m "feat: grandfather a record's own unique values on save"
 ```
 
-### Task 5: Release custom-fields v3.12.0
+### Task 5: Merge the package PR (tag later)
 
-**Checkpoint: needs the user's explicit go-ahead before merging and tagging.**
+**Status:** PR #244 merged into `3.x` on 2026-10-02. The v3.12.0 tag was pushed and then withdrawn at the user's request (release, tag and the bot's CHANGELOG commit removed via #245): nothing is tagged until both PRs are finalized end to end. The tag moves to Task 17. Steps 4 and 5 below now run there.
+
+**Checkpoint: needs the user's explicit go-ahead before tagging.**
 
 - [ ] **Step 1:** Run the full package gate: `composer test`. Expected: green.
 - [ ] **Step 2:** Add a `## v3.12.0` entry to `CHANGELOG.md`: values are normalized on every write path through `BaseFieldType::normalize()`; phones store E.164 with `;ext=`; links gain a `link_variant: domain` setting; uniqueness grandfathers a record's own values on save while restore stays strict.
@@ -544,7 +546,7 @@ All paths below are in `relaticle` on `feat/custom-field-filter-contract-v1`.
 ### Task 6: Adopt v3.12 and declare the domain variant
 
 **Files:**
-- Modify: `composer.json` (`"relaticle/custom-fields": "^3.12"`), `composer.lock`
+- Modify: `composer.json` (`"relaticle/custom-fields": "dev-3.x as 3.12.0"` until the tag in Task 17), `composer.lock`
 - Modify: `packages/ImportWizard/src/Jobs/ExecuteImportJob.php:526`
 - Modify: `packages/OnboardSeed/src/Support/BulkCustomFieldValueWriter.php:26`
 - Modify: `app/Enums/CustomFields/CustomFieldTrait.php`, `app/Enums/CustomFields/CompanyField.php`
@@ -623,8 +625,10 @@ Expected: FAIL (values stored as typed).
 - [ ] **Step 3: Implement**
 
 ```bash
-composer require "relaticle/custom-fields:^3.12" -W
+composer require "relaticle/custom-fields:dev-3.x as 3.12.0" -W
 ```
+
+The package changes are merged on `3.x` but not tagged; Task 17 tags v3.12.0 and switches this constraint to `^3.12` after the end-to-end walk.
 
 `ExecuteImportJob.php:526`: `$safeValue = SafeValueConverter::toDbSafe($value, $cf->type, $cf);`
 `BulkCustomFieldValueWriter.php:26`: `$safeValue = SafeValueConverter::toDbSafe($value, $customField->type, $customField);`
@@ -3190,4 +3194,5 @@ git commit -m "feat: publish one filter vocabulary to mcp and chat"
 - [ ] **Step 2: Chat on the production-shaped stack.** Horizon running, `QUEUE_CONNECTION=redis`, Reverb up. In a real browser (agent-browser), ask: "open deals in Proposal or Negotiation at ICP companies", then "who do we know at acme.com", then "find +1 415 555 0100". Each answer renders a list block from one list call with a `filter` tree; capture screenshots under `.context/`.
 - [ ] **Step 3: MCP.** Through a real MCP client against the local server, run `get-crm-schema` for opportunities and one `list-opportunities-tool` call with an `$or` and a relation node.
 - [ ] **Step 4: Gates.** `vendor/bin/pint --test --parallel`, `vendor/bin/rector --dry-run`, `vendor/bin/phpstan analyse`, `composer test:type-coverage`, `composer test:pest:full`, `php artisan test tests/Browser`.
-- [ ] **Step 5: Release note draft.** For the PR body: the v1 filter shape is replaced; old shapes return 422s naming the replacement; examples for GET and POST. Show the draft to the user before posting anything, and tell the paying API customer before release.
+- [ ] **Step 5: Tag the package and pin the release (user checkpoint).** With the user's go-ahead: tag v3.12.0 on `3.x` (`git tag v3.12.0 <3.x sha> && git push origin v3.12.0`; release.yml creates the release and CHANGELOG), append the upgrade notes from PR #244 to the release body, confirm `repo.packagist.org/p2/relaticle/custom-fields.json` lists it, then `composer require "relaticle/custom-fields:^3.12" -W` here and re-run the targeted suites.
+- [ ] **Step 6: Release note draft.** For the PR body: the v1 filter shape is replaced; old shapes return 422s naming the replacement; examples for GET and POST. Show the draft to the user before posting anything, and tell the paying API customer before release.
