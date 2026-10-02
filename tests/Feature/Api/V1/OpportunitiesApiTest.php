@@ -544,6 +544,29 @@ describe('filtering and sorting', function (): void {
         expect($ids)->toContain($proposal->id)->toContain($prospecting->id)->not->toContain($won->id);
     });
 
+    it('accepts option ids separated by a comma and a space', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $stage = CustomField::query()->withoutGlobalScopes()
+            ->where('tenant_id', $this->workspace->id)
+            ->where('entity_type', 'opportunity')
+            ->where('code', 'stage')
+            ->firstOrFail();
+        $qualificationId = (string) $stage->options->firstWhere('name', 'Qualification')->getKey();
+        $prospectingId = (string) $stage->options->firstWhere('name', 'Prospecting')->getKey();
+
+        $qualified = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Qualified Deal']);
+        $prospect = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Prospect Deal']);
+        $qualified->saveCustomFieldValue($stage, $qualificationId);
+        $prospect->saveCustomFieldValue($stage, $prospectingId);
+
+        $response = $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][in]='.urlencode("{$qualificationId}, {$prospectingId}"))
+            ->assertOk();
+
+        $ids = collect($response->json('data'))->pluck('id');
+        expect($ids)->toContain($qualified->id)->toContain($prospect->id);
+    });
+
     it('rejects an unknown option label with a 422', function (): void {
         Sanctum::actingAs($this->user);
 

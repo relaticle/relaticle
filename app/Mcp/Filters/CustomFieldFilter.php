@@ -195,7 +195,7 @@ final readonly class CustomFieldFilter implements Filter
     private function toStringList(mixed $operand, bool $splitsStrings): ?array
     {
         if (is_string($operand)) {
-            $operand = $splitsStrings ? explode(self::LIST_DELIMITER, $operand) : [$operand];
+            $operand = $splitsStrings ? array_map(trim(...), explode(self::LIST_DELIMITER, $operand)) : [$operand];
         }
 
         if (! is_array($operand) || $operand === [] || ! array_is_list($operand)) {
