@@ -2744,7 +2744,7 @@ Add:
 ```php
     private const array DOMAIN_OF = [
         'email' => "lower(split_part(element, '@', 2))",
-        'link' => "substring(lower(element) from '^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/]*@)?(?:www\\.)*([^/?#:]+)')",
+        'link' => "regexp_replace(rtrim(split_part(regexp_replace(split_part(split_part(split_part(regexp_replace(regexp_replace(lower(element), '\\s+', '', 'g'), '^[a-z][a-z0-9+.-]*://', ''), '/', 1), '?', 1), '#', 1), '^.*@', ''), ':', 1), '.'), '^(www\\.)+', '')",
     ];
 
     private function canonical(CustomField $field, mixed $operand): mixed
@@ -2802,7 +2802,7 @@ Add:
     }
 ```
 
-The host check above keeps `,`, `{`, `}` and `"` out of the Postgres array literal. Imports for `CustomFieldFilter`: `Relaticle\CustomFields\Facades\CustomFieldsType`, `Relaticle\CustomFields\FieldTypeSystem\BaseFieldType`.
+The host check above keeps `,`, `{`, `}` and `"` out of the Postgres array literal. The `link` expression mirrors `LinkFieldType::normalize()` from custom-fields 3.12 step for step (lowercase, drop whitespace, strip scheme, cut at `/`, `?`, `#`, strip userinfo, cut at `:`, trim trailing dots, strip leading `www.`), so a stored URL and a domain-variant value yield the same host; add a test row `https://acme.com?ref=a@b.com` that must match `acme.com`. Imports for `CustomFieldFilter`: `Relaticle\CustomFields\Facades\CustomFieldsType`, `Relaticle\CustomFields\FieldTypeSystem\BaseFieldType`.
 
 `containsAny()` becomes case-insensitive for email and link:
 
