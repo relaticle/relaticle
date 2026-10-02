@@ -54,7 +54,7 @@ A flat namespace is not possible: production holds 9 custom fields coded `name`,
 
 - Keys in one object are ANDed. `$and` takes an array and exists for the case JSON cannot hold: two `$or` keys in one object.
 - `$or` takes an array of nodes.
-- `$not` takes one node and returns every record the node does not return, empty values included. It compiles as a set complement (`whereNotExists` against the same table), never as SQL `NOT (...)`, which drops rows where a nullable column is null. `$not_in`, `$has_none` and relation `$not_in` follow the same rule.
+- `$not` takes one node and returns every record the node does not return, empty values included. It compiles as a set complement, `whereNotIn(<qualified key>, <inner query selecting the key>)`, with the inner query built through the same registry and no table alias (the architecture rules: `whereKey()` and `whereRelation()` qualify with the table name, which Postgres rejects under an alias). It never compiles as SQL `NOT (...)`, which drops rows where a nullable column is null. `$not_in`, `$has_none` and relation `$not_in` follow the same rule.
 - An empty `$and` or `$or` array, an empty `$not` object, and an empty relation node are 422s. An empty top-level filter is no filter.
 
 ### 4. Relations
@@ -125,7 +125,7 @@ Reasons, from the sources checked:
 - Links: RFC 3986 section 6.2.2.1 makes scheme and host case-insensitive. Dropping `www.` is a product convention, not a standard. The `link` type also holds LinkedIn URLs, whose paths matter, so only a field set to the domain variant is rewritten.
 - Company `domains` declares `unique_per_entity_type`, but `UniqueCustomFieldValue` compares exact strings, so `https://acme.com` and `acme.com` both pass. 70% of stored values carry a scheme, and 144 hosts are shared by 426 companies through format differences alone.
 
-Uniqueness changes with it: `UniqueCustomFieldValue` normalizes each candidate with the field's normalizer, and skips values already stored on the same record. A new or changed value must be unique; a record's existing values are grandfathered. This unblocks the 291 companies whose identical duplicate domains already fail the panel form's uniqueness check, and keeps the 426 newly colliding ones saveable until #885 lets someone merge them.
+Uniqueness changes with it: `UniqueCustomFieldValue` normalizes each candidate with the field's normalizer. On save, it skips values the record already held before this change: a new or changed value must be unique; a record's existing values are grandfathered. Restoring a trashed record stays strict, because `takenUniqueCustomFieldValues()` exists to re-check exactly the values the record already holds. This unblocks the 291 companies whose identical duplicate domains already fail the panel form's uniqueness check, and keeps the 426 newly colliding ones saveable until #885 lets someone merge them.
 
 ### 8. Limits
 
@@ -161,7 +161,7 @@ Every filter error is a Laravel 422, keyed by the path of the node to fix:
 | `filter` | A filter holds at most 20 conditions. This one has 23. |
 | `filter.custom_fields.phone_number.$has_any.0` | phone_number needs a country code, for example +1 415 555 0100. |
 
-A pre-pass validates every name, operator, limit and empty node before the query builder is built. Spatie checks names inside `allowedFilters()` and applies them in the same call, so the pre-pass runs first in each list action; every top-level name is then known and Spatie's 400 `InvalidFilterQuery` never fires for a filter. Sort and include errors keep Spatie's `InvalidQuery`. Messages live under `validation.filter.*` in `lang/en/validation.php`.
+A `filter` that is not an object (for example `?filter=stage`, which Spatie silently drops today) is a 422 too. A pre-pass validates every name, operator, limit and empty node before the query builder is built. Spatie checks names inside `allowedFilters()` and applies them in the same call, so the pre-pass runs first in each list action; every top-level name is then known and Spatie's 400 `InvalidFilterQuery` never fires for a filter. Sort and include errors keep Spatie's `InvalidQuery`. Messages live under `validation.filter.*` in `lang/en/validation.php`.
 
 ## Architecture
 
@@ -169,28 +169,44 @@ The engine composes spatie/laravel-query-builder 7 and Laravel's builder. Spatie
 
 ### Registry
 
-Each list action exposes its filters as a static method, the list it passes to `allowedFilters()` today:
+Actions may expose only `execute()` (`ConventionsTest`), so the registry is its own class, keyed by the existing `CrmEntity` enum. It has two paths over one list of definitions:
 
 ```php
-/** @return array<int, AllowedFilter> */
-public static function filters(): array
+final readonly class EntityFilters
 {
-    return [
-        NativeFilter::text('name'),
-        NativeFilter::dateTime('created_at'),
-        NativeFilter::dateTime('updated_at'),
-        NativeFilter::enum('creation_source', CreationSource::class),
-        RelationFilter::members('creator'),
-        RelationFilter::members('accountOwner'),
-        RelationFilter::to('people', ListPeople::class),
-        RelationFilter::to('opportunities', ListOpportunities::class),
-        CustomFieldFilter::allowedFilter('company'),
-        ...LogicFilter::for(self::class),
-    ];
+    public function __construct(private User $user) {}
+
+    /** @return array<string, FilterDefinition> */
+    public static function definitions(CrmEntity $entity): array
+    {
+        return match ($entity) {
+            CrmEntity::Company => [
+                'name' => FilterDefinition::text(),
+                'created_at' => FilterDefinition::dateTime(),
+                'updated_at' => FilterDefinition::dateTime(),
+                'creation_source' => FilterDefinition::enum(CreationSource::class),
+                'creator' => FilterDefinition::members(),
+                'accountOwner' => FilterDefinition::members(),
+                'people' => FilterDefinition::relation(CrmEntity::People),
+                'opportunities' => FilterDefinition::relation(CrmEntity::Opportunity),
+            ],
+            // the other four entities follow the tables in decisions 4 and 5
+        };
+    }
+
+    /** @return array<int, AllowedFilter> */
+    public function for(CrmEntity $entity): array
+    {
+        // definitions -> NativeFilter / RelationFilter / computed filters,
+        // plus CustomFieldFilter and LogicFilter, all bound to $this->user
+    }
 }
 ```
 
-`execute()` passes `...self::filters()`. A relation resolves the related action's `filters()` only when applied, so company, people, company cannot recurse while the registry is built.
+- `definitions()` needs no user and no database. Scribe documents from it, because docs generation runs with no workspace. Custom fields appear there as the `filter[custom_fields][{code}][{operator}]` template Scribe uses today.
+- `for()` is the apply path. Each list action builds it with the acting `$user`, runs `FilterTree` over the request's `filter`, then passes `...$filters->for(CrmEntity::Company)` to `allowedFilters()`. The user is passed, never read from `auth()`: chat list tools run in queued jobs. `CustomFieldFilter` takes the same user instead of calling `auth()->user()` as it does today.
+- `stale_days` and `assigned_to_me` are definitions with a computed kind; their closures receive the user from `for()`.
+- A relation resolves the related entity's filters only when applied, so company, people, company cannot recurse while the registry is built.
 
 ### Components
 
@@ -201,12 +217,14 @@ All in `app/Support/Filters/`, moved from `app/Mcp/Filters/` because REST, MCP a
 | `TreeAllowedFilter` | today's `CustomFieldAllowedFilter`, generalized: an AllowedFilter that skips Spatie's comma splitting and empty pruning |
 | `FilterTree` | the pre-pass: walks the tree, checks names against the registry, operators against types, limits and empty nodes, and throws one `ValidationException` with path keys |
 | `NativeFilter` | column conditions; operators from the mapped custom field type |
-| `RelationFilter` | `whereHas` over the related action's registry; relation `$in`/`$not_in`/`$is_empty`; `whereBelongsTo` for to-one ids |
+| `RelationFilter` | `whereHas` over the related entity's registry; relation `$in`/`$not_in`/`$is_empty`; `whereBelongsTo` for to-one ids |
 | `LogicFilter` | `$and`, `$or`, `$not`; applies child nodes through `AllowedFilter::applyTo()`, the call Spatie's own `FiltersGroup` uses |
 | `CustomFieldFilter` | today's engine, with `$` operators, the `domain` sub-field, case-insensitive email and link matching, and phone operand normalization |
 | `CustomFieldSort` | moved, unchanged |
 
 `App\Mcp\Schema\CustomFieldFilterSchema` stays the owner of operators per type, as the architecture rules name it.
+
+`ConventionsTest` fails a public method outside a model, enum or `Scope` that takes a query builder, unless the method implements an interface or overrides a parent (`hasPrototype()`). So builder-taking code lives only in Spatie `Filter::__invoke()` implementations, `applyTo()` overrides and private helpers. `FilterTree` takes arrays, never a builder.
 
 ### Published vocabulary
 
@@ -219,11 +237,11 @@ Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint he
 1. A field type may declare an item normalizer. `SafeValueConverter::toDbSafe()` applies it to every item, and receives the `CustomField` so a setting can choose the normalizer. Every write path already calls it: `CustomFieldValue::setValue()` (panel, API, MCP, chat, actions), `ExecuteImportJob` and `BulkCustomFieldValueWriter`.
 2. Phone normalizer: E.164 plus RFC 3966 extension. Input it cannot parse comes back unchanged; validation stays the gate. `PhoneInputComponent` keeps extensions through the same normalizer.
 3. Link setting `link_variant`: `url` (default) or `domain`, with the domain normalizer from decision 7.
-4. `UniqueCustomFieldValue` normalizes candidates and grandfathers values already stored on the same record.
+4. `UniqueCustomFieldValue` normalizes candidates and, in the save validation path only, grandfathers values the record already held. The restore check stays strict.
 
 ## Surfaces
 
-- **REST.** GET and POST as in decision 9. Scribe's `GetFromSpatieQueryBuilder` reads `ListX::filters()` at runtime instead of parsing source, and documents the POST endpoints with body examples.
+- **REST.** GET and POST as in decision 9. Scribe's `GetFromSpatieQueryBuilder` reads `EntityFilters::definitions()` instead of parsing action source, works with no custom fields present, and documents the POST endpoints with body examples.
 - **MCP.** `BaseListTool` takes `filter`, `sort`, `include`, `per_page`, `page`. `search`, `created_after`, `created_before`, `creation_source` and every `additionalFilters()` param go: each is a filter node, and `SearchTool` keeps full-text search. The `filter` description states the grammar; the vocabulary comes from `get-crm-schema`.
 - **Chat.** `BaseReadListTool` takes `filter` in place of `custom_fields` and the flat params; `lookup` and `sort` stay. The inlined description comes from the vocabulary builder. Prompt text that names a removed param moves to the new syntax. No tool is added, so `toolLabels` is unchanged.
 - **Docs.** The MCP guide and the "find anything with search and filters" help page move to the new syntax. A bare `: ` inside unquoted YAML front matter there 500s every docs page.
@@ -243,14 +261,15 @@ Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint he
 Feature tests through real entry points (REST GET and POST, MCP list tools, chat list tools), extending the existing files: `tests/Feature/Mcp/Filters/CustomFieldFilterTest.php`, `tests/Feature/Api/V1/OpportunitiesApiTest.php`, `tests/Feature/Chat/ListToolFilterTest.php`, `tests/Feature/CRM/SurfaceParityTest.php`, `ApiDocumentationGenerationTest`.
 
 - Grammar: `$` operators; bare operators, shorthand and v1 params return the 422s in decision 10.
-- Logic: `$and` of two `$or`; `$not` includes empty native, custom and relation values; empty arrays and nodes 422.
+- Logic: `$and` of two `$or`; `$not` includes empty native, custom and relation values (an opportunity with no contact is returned by `$not` of `contact.$in`); empty arrays and nodes 422; a string `filter` 422.
 - Relations: one and two hops; a third hop 422; to-many matches one record satisfying every condition (a CTO in Berlin, not a CTO and a Berliner); relation `$in`, `$not_in`, `$is_empty`; member relations by id.
 - Limits: 21 conditions, depth 4 and 101 values each 422 with the path.
 - GET coercion: numbers, booleans, comma lists for choices and ids; free text with commas and a text value `true` stay whole.
 - POST `/query`: a read-only token succeeds; the response equals GET for the same filter.
-- Value formats: phone E.164 from panel, API, MCP, chat and import, extension kept, operand normalized; email `$has_any` across case; email and link `domain`; domain variant normalization; uniqueness grandfathers stored values and rejects a new duplicate in any format.
+- Value formats: phone E.164 from panel, API, MCP, chat and import, extension kept, operand normalized; email `$has_any` across case; email and link `domain`; domain variant normalization; uniqueness grandfathers stored values on save, rejects a new duplicate in any format, and still blocks restoring a trashed record whose value is taken.
 - Backfill: report mode writes nothing; `--force` converts, reports national phones and collisions, and a second run changes nothing; the migration names an existing command (`ConventionsTest`).
-- Parity: MCP vocabulary, chat description and Scribe parameters equal the registry for every entity.
+- Parity: MCP vocabulary, chat description and Scribe parameters equal the registry for every entity; `definitions()` names equal the AllowedFilter names `for()` builds; Scribe generation passes with no custom fields.
+- Architecture: `ConventionsTest` stays green (one public method per action, no public builder parameter without a prototype).
 
 Chat changes are verified on the production-shaped stack (Horizon, `QUEUE_CONNECTION=redis`, Reverb) in a real browser: a list question with an OR and a relation, then a phone lookup.
 
