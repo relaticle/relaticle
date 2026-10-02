@@ -42,8 +42,8 @@ such as Text, Number, or Date, have no filter in the panel.
 A field of one of those types also needs **Visible in List** turned on.
 Follow these steps to check it.
 
-1. Click your workspace name at the top of the sidebar, then click
-   **Custom Fields**.
+1. Click your workspace name at the top of the sidebar, click
+   **Workspace Settings**, then open the **Custom Fields** tab.
 2. Select the entity tab, then open the field from its **Actions** menu.
 3. Under **Settings**, turn on **Visible in List**.
 4. Save the field.
