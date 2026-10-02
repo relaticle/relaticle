@@ -688,7 +688,7 @@ it('promotes a filtered hidden field to the first column', function (): void {
     $unfiltered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([])));
 
     $filtered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([
-        'custom_fields' => ['deal_source' => ['eq' => 'Referral']],
+        'custom_fields' => ['deal_source' => ['$eq' => 'Referral']],
     ])));
 
     expect(blockColumnKeys($unfiltered))->not->toContain('deal_source')

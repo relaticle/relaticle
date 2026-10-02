@@ -121,7 +121,7 @@ it('filters tasks by a choice custom field using the option label', function ():
     $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['eq' => 'Done']],
+        'custom_fields' => ['status' => ['$eq' => 'Done']],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -152,7 +152,7 @@ it('filters tasks by a choice custom field using the option id', function (): vo
     $done->saveCustomFieldValue($statusField, $doneId);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['eq' => $doneId]],
+        'custom_fields' => ['status' => ['$eq' => $doneId]],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -183,7 +183,7 @@ it('rejects a label shared by two options and asks for the id', function (): voi
     ]);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['eq' => 'Done']],
+        'custom_fields' => ['status' => ['$eq' => 'Done']],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -199,7 +199,7 @@ it('rejects an unknown custom field code instead of silently returning everythin
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['not_a_field' => ['eq' => 'x']],
+        'custom_fields' => ['not_a_field' => ['$eq' => 'x']],
     ])), true);
 
     expect($result)->toHaveKey('error')
@@ -214,7 +214,7 @@ it('rejects an unknown option label instead of silently returning everything', f
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['eq' => 'Nope']],
+        'custom_fields' => ['status' => ['$eq' => 'Nope']],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -230,7 +230,7 @@ it('rejects an operator the field does not support', function (): void {
     TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['contains' => 'Done']],
+        'custom_fields' => ['status' => ['$contains' => 'Done']],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -282,7 +282,7 @@ it('can filter by a custom field immediately after creating it', function (): vo
     ]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['eq' => 'Enterprise']],
+        'custom_fields' => ['segment' => ['$eq' => 'Enterprise']],
     ])), true);
 
     expect($result)->not->toHaveKey('error');
@@ -300,12 +300,12 @@ it('stops offering a custom field for filtering once it is deactivated', functio
         'options' => ['Enterprise'],
     ]);
 
-    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['eq' => 'Enterprise']]]));
+    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]));
 
     app(UpdateCustomField::class)->execute($user, $field, ['active' => false]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['eq' => 'Enterprise']],
+        'custom_fields' => ['segment' => ['$eq' => 'Enterprise']],
     ])), true);
 
     expect($result)->toHaveKey('error')
@@ -324,7 +324,7 @@ it('can filter by an option added to an existing custom field', function (): voi
         'options' => ['Enterprise'],
     ]);
 
-    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['eq' => 'Enterprise']]]));
+    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]));
 
     app(AddCustomFieldOptions::class)->execute($user, [
         '_record_id' => $field->getKey(),
@@ -332,7 +332,7 @@ it('can filter by an option added to an existing custom field', function (): voi
     ]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['eq' => 'Mid-Market']],
+        'custom_fields' => ['segment' => ['$eq' => 'Mid-Market']],
     ])), true);
 
     expect($result)->not->toHaveKey('error');
@@ -532,7 +532,7 @@ it('excludes options and keeps tasks without a status', function (): void {
     $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['not_in' => ['Done']]],
+        'custom_fields' => ['status' => ['$not_in' => ['Done']]],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -547,7 +547,7 @@ it('rejects custom_fields sent as a string instead of returning every row', func
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => '{"status": {"eq": "Done"}}',
+        'custom_fields' => '{"status": {"$eq": "Done"}}',
     ])), true);
 
     expect($result)->toHaveKey('error')
@@ -575,7 +575,7 @@ it('shows the operator example when a bare value is given', function (): void {
         'custom_fields' => ['status' => 'Done'],
     ])), true);
 
-    expect($result['error'])->toContain('must be an operator object, e.g. {"eq": "..."}');
+    expect($result['error'])->toContain('must be an operator object, e.g. {"$eq": "..."}');
 });
 
 it('lists option labels for a select but not for a tags-input field with suggestions', function (): void {

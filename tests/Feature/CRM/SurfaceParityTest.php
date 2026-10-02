@@ -197,9 +197,9 @@ it('narrows a list to the same records through the table filter and the api', fu
 
     expect($apiIds)->toBe(collect([$enterprise->id, $midMarket->id])->sort()->values()->all());
 })->with([
-    'single choice' => ['select', 'in', true],
-    'multi choice' => ['multi-select', 'has_any', true],
-    'free-text tags' => ['tags-input', 'has_any', false],
+    'single choice' => ['select', '$in', true],
+    'multi choice' => ['multi-select', '$has_any', true],
+    'free-text tags' => ['tags-input', '$has_any', false],
 ]);
 
 it('names every custom field filter operator in the mcp list tool description', function (): void {
@@ -207,9 +207,10 @@ it('names every custom field filter operator in the mcp list tool description', 
 
     $publishedOperators = collect(CustomFieldType::cases())
         ->flatMap(fn (CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->filter(fn (string $operator): bool => str_starts_with($operator, '$'))
         ->unique()
         ->all();
 
     expect($publishedOperators)->not->toBeEmpty()
-        ->and(array_diff($publishedOperators, str($description)->matchAll('/[a-z_]+/')->all()))->toBe([]);
+        ->and(array_diff($publishedOperators, str($description)->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
 });

@@ -41,11 +41,12 @@ it('generates the complete API documentation with company ownership fields', fun
         ->firstWhere('name', 'filter[custom_fields][{code}][{operator}]');
     $publishedOperators = collect(CustomFieldType::cases())
         ->flatMap(fn (CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->filter(fn (string $operator): bool => str_starts_with($operator, '$'))
         ->unique()
         ->all();
 
     expect($customFieldFilter)->not->toBeNull()
-        ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/[a-z_]+/')->all()))->toBe([]);
+        ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
 });
 
 it('generates the API documentation before the database is migrated', function (): void {

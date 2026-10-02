@@ -31,11 +31,11 @@ final readonly class CustomFieldFilter implements Filter
     private const int MAX_CONDITIONS = 10;
 
     private const array OPERATOR_MAP = [
-        'eq' => '=',
-        'gt' => '>',
-        'gte' => '>=',
-        'lt' => '<',
-        'lte' => '<=',
+        '$eq' => '=',
+        '$gt' => '>',
+        '$gte' => '>=',
+        '$lt' => '<',
+        '$lte' => '<=',
     ];
 
     public function __construct(
@@ -96,6 +96,10 @@ final readonly class CustomFieldFilter implements Filter
             $entry = $options[$fieldCode] ?? null;
 
             foreach ($operators as $operator => $operand) {
+                if (! str_starts_with((string) $operator, '$') && isset($supportedOperators['$'.$operator])) {
+                    $this->invalid(__('validation.filter.operator_sigil', ['operator' => '$'.$operator]));
+                }
+
                 if (! isset($supportedOperators[$operator])) {
                     $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
                         'operator' => $operator,
@@ -215,6 +219,11 @@ final readonly class CustomFieldFilter implements Filter
 
     private function toString(mixed $operand, ?string $format): ?string
     {
+        // Spatie turns the query-string values true and false into booleans before any filter runs.
+        if (is_bool($operand)) {
+            $operand = $operand ? 'true' : 'false';
+        }
+
         if (! is_string($operand)) {
             return null;
         }
@@ -295,24 +304,24 @@ final readonly class CustomFieldFilter implements Filter
         mixed $operand,
     ): void {
         match ($operator) {
-            'not_in' => $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $q
+            '$not_in' => $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $q
                 ->where('custom_field_id', $field->getKey())
                 ->whereIn($valueColumn, $operand)),
-            'has_none' => $query->whereDoesntHave('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operand): void {
+            '$has_none' => $query->whereDoesntHave('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
                 $this->containsAny($q, $valueColumn, $operand);
             }),
-            'is_empty' => $operand === true
+            '$is_empty' => $operand === true
                 ? $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $this->hasValue($q, $field, $valueColumn))
                 : $query->whereHas('customFieldValues', fn (Builder $q): Builder => $this->hasValue($q, $field, $valueColumn)),
             default => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
 
                 match ($operator) {
-                    'eq', 'gt', 'gte', 'lt', 'lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
-                    'contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
-                    'in' => $q->whereIn($valueColumn, $operand),
-                    'has_any' => $this->containsAny($q, $valueColumn, $operand),
+                    '$eq', '$gt', '$gte', '$lt', '$lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
+                    '$contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
+                    '$in' => $q->whereIn($valueColumn, $operand),
+                    '$has_any' => $this->containsAny($q, $valueColumn, $operand),
                     default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
                 };
             }),

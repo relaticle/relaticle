@@ -18,13 +18,13 @@ final readonly class CustomFieldFilterSchema
     public const int MAX_LIST_VALUES = 100;
 
     /** @var array<int, string> */
-    private const array NUMERIC_OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte'];
+    private const array NUMERIC_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte'];
 
     /** @var array<int, string> */
-    private const array STRING_OPERATORS = ['eq', 'contains'];
+    private const array STRING_OPERATORS = ['$eq', '$contains'];
 
     /** @var array<int, string> */
-    private const array BOOLEAN_OPERATORS = ['eq'];
+    private const array BOOLEAN_OPERATORS = ['$eq'];
 
     /**
      * @return array<string, array<string, mixed>>
@@ -76,20 +76,20 @@ final readonly class CustomFieldFilterSchema
         $operators = match ($fieldType) {
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
             CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK,
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['has_any', 'has_none']),
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['$has_any', '$has_none']),
             CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
             CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
             CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date'),
             CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date-time'),
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
             CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
-                ...self::buildOperators(['eq'], 'string'),
-                ...self::listOperators(['in', 'not_in']),
+                ...self::buildOperators(['$eq'], 'string'),
+                ...self::listOperators(['$in', '$not_in']),
             ],
             default => [],
         };
 
-        return $operators === [] ? [] : [...$operators, 'is_empty' => ['type' => 'boolean']];
+        return $operators === [] ? [] : [...$operators, '$is_empty' => ['type' => 'boolean']];
     }
 
     /**

@@ -35,7 +35,7 @@ return [
         'filter_not_object' => 'Custom field filters must be an object keyed by field code.',
         'filter_code_not_string' => 'Custom field filter codes must be strings.',
         'too_many_conditions' => 'Maximum :max filter conditions allowed.',
-        'operator_object' => 'Custom field filter [:field] must be an operator object, e.g. {"eq": "..."}.',
+        'operator_object' => 'Custom field filter [:field] must be an operator object, e.g. {"$eq": "..."}.',
         'operand_type' => 'Custom field filter [:field.:operator] must be :expected.',
         'too_many_values' => ':field: pass at most :max values.',
         'single_option' => ':field: pass a single option label or ID.',
@@ -44,6 +44,9 @@ return [
         'unsupported_lookup' => ':field: lookup type ":type" cannot be written by API, MCP, or chat.',
         'record_ids' => ':field: pass an array of record IDs.',
         'upload' => 'This file is unavailable for :field. Upload a new file or keep the file already attached to this field.',
+    ],
+    'filter' => [
+        'operator_sigil' => 'Operators start with $. Use :operator.',
     ],
     'date' => 'The :attribute field must be a valid date.',
     'date_equals' => 'The :attribute field must be a date equal to :date.',

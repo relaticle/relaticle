@@ -43,7 +43,7 @@ final readonly class CustomFieldsFilterDescriber
 
         $lines = [
             'Filter by custom field values. Keys MUST be one of the codes below; each value is an object of operator => operand.',
-            'For choice fields pass the option label as listed; an option ID also works. not_in and has_none also match records where the field is empty. is_empty takes true or false.',
+            'For choice fields pass the option label as listed; an option ID also works. $not_in and $has_none also match records where the field is empty. $is_empty takes true or false.',
             '',
         ];
 
@@ -59,7 +59,7 @@ final readonly class CustomFieldsFilterDescriber
         }
 
         $lines[] = '';
-        $lines[] = 'Example: {"'.array_key_first($schema).'": {"eq": "..."}}';
+        $lines[] = 'Example: {"'.array_key_first($schema).'": {"$eq": "..."}}';
 
         return implode("\n", $lines);
     }
