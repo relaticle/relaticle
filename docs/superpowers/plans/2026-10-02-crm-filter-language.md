@@ -1240,6 +1240,14 @@ it('keeps a native name and a custom field coded name apart', function (): void 
         ->and(listIds($this, 'companies', ['custom_fields' => ['name' => ['$contains' => 'Acme']]]))->toBe([$byCustom->id]);
 });
 
+it('caps a relation id list at one hundred values', function (): void {
+    $ids = array_map(fn (): string => (string) str()->ulid(), range(1, 101));
+
+    $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['$in' => $ids]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.assignees.$in']);
+});
+
 it('keys an error by the path of the node to fix', function (): void {
     $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => ['custom_fields' => ['amount' => ['$contains' => 'x']]]]))
         ->assertUnprocessable()
@@ -1417,7 +1425,22 @@ final class Operand
             return null;
         }
 
-        return count($operand) > CustomFieldFilterSchema::MAX_LIST_VALUES ? null : $operand;
+        return $operand;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function listOrFail(mixed $operand, bool $splitsStrings, string $path, string $expected): array
+    {
+        $list = self::stringList($operand, $splitsStrings)
+            ?? throw FilterErrors::at($path, __('validation.filter.operand_type', ['name' => $path, 'expected' => $expected]));
+
+        if (count($list) > CustomFieldFilterSchema::MAX_LIST_VALUES) {
+            throw FilterErrors::at($path, __('validation.filter.too_many_values', ['name' => $path, 'max' => CustomFieldFilterSchema::MAX_LIST_VALUES]));
+        }
+
+        return $list;
     }
 
     public static function string(mixed $operand): ?string
@@ -1480,7 +1503,7 @@ final class Operand
 }
 ```
 
-In `CustomFieldFilter`, delete `toStringList`, `toString`, `toDate`, `toBoolean`, `toInteger`, `toNumber` and call `Operand::stringList()`, `Operand::string()`/`Operand::date()`, `Operand::boolean()`, `Operand::integer()`, `Operand::number()`. The list-size check keeps its own message: test `count($list) > MAX_LIST_VALUES` before calling `Operand::stringList()`, which returns `null` for an oversized list.
+In `CustomFieldFilter`, delete `toStringList`, `toString`, `toDate`, `toBoolean`, `toInteger`, `toNumber` and call `Operand::stringList()`, `Operand::string()`/`Operand::date()`, `Operand::boolean()`, `Operand::integer()`, `Operand::number()`. Its existing `too_many_values` check after `normalizeOperand()` stays as it is.
 
 - [ ] **Step 3c: `TreeAllowedFilter`**
 
@@ -1659,7 +1682,7 @@ final readonly class NativeFilter implements Filter
         /** @var class-string<BackedEnum> $enumClass */
         $enumClass = $this->definition->enumClass;
         $allowed = array_map(static fn (BackedEnum $case): string => (string) $case->value, $enumClass::cases());
-        $values = Operand::stringList($operand, splitsStrings: true) ?? throw FilterErrors::at($operator, __('validation.filter.operand_type', ['name' => $operator, 'expected' => 'one of: '.implode(', ', $allowed)]));
+        $values = Operand::listOrFail($operand, splitsStrings: true, path: $operator, expected: 'one of: '.implode(', ', $allowed));
         $unknown = array_first(array_diff($values, $allowed));
 
         if ($unknown !== null) {
@@ -1736,8 +1759,7 @@ final readonly class RelationFilter implements Filter
      */
     private function ids(string $operator, mixed $operand): array
     {
-        return Operand::stringList($operand, splitsStrings: true)
-            ?? throw FilterErrors::at($operator, __('validation.filter.record_ids', ['name' => $operator]));
+        return Operand::listOrFail($operand, splitsStrings: true, path: $operator, expected: 'a list of record IDs');
     }
 
     /**
@@ -1966,7 +1988,8 @@ MCP `app/Mcp/Tools/BaseListTool.php`:
 - Each MCP list tool's `#[Description]` says `with optional filters and pagination`.
 
 Chat `packages/Chat/src/Tools/BaseReadListTool.php`:
-- Delete `searchFilterName()`, `additionalSchema()`, `additionalFilters()`, `creationSourceFilter()` and the overrides in the five chat list tools. Every remaining `$this->searchFilterName()` becomes `$this->entity()->titleColumn()`.
+- Delete `searchFilterName()`, `additionalSchema()`, `additionalFilters()`, `creationSourceFilter()` and the overrides in the five chat list tools. Declare `abstract protected function entity(): CrmEntity;` on `BaseReadListTool` (the concrete tools already implement it), then every remaining `$this->searchFilterName()` becomes `$this->entity()->titleColumn()`.
+- In `CustomFieldsFilterDescriber::describe()`, the first line becomes `Custom field conditions go under custom_fields. Their keys MUST be one of the codes below; each value is an object of operator => operand.` and the example becomes `{"custom_fields": {"<first code>": {"$eq": "..."}}}`, so the interim description matches the tree until Task 15 replaces it.
 - In `schema()`, replace `search`, `created_after`, `created_before`, `creation_source` and `custom_fields` with one `'filter' => $schema->object()->description($filterDescription)`, where `$filterDescription` is `EntityFilters::GRAMMAR."\n\n".$describer->describe($user, $entityType)` when a user is present, else `EntityFilters::GRAMMAR`.
 - `buildHttpRequest()`:
 
@@ -2015,7 +2038,7 @@ Scribe `GetFromSpatieQueryBuilder::extractQueryParams()`: replace `extractFilter
         'unsupported_operator' => ':name does not support :operator. Use :supported.',
         'operand_type' => ':name must be :expected.',
         'enum_value' => ':value is not one of: :values.',
-        'record_ids' => ':name takes a list of record IDs.',
+        'too_many_values' => ':name takes at most :max values.',
         'members_ids_only' => ':name takes $in, $not_in or $is_empty.',
         'stale_days' => 'stale_days takes {"$gte": <whole days>}.',
         'assigned_to_me' => 'assigned_to_me takes {"$eq": true}.',
@@ -2212,6 +2235,7 @@ declare(strict_types=1);
 namespace App\Support\Filters;
 
 use App\Enums\CrmEntity;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -2225,6 +2249,7 @@ final readonly class LogicFilter extends NodeFilter
         private string $keyword,
         private CrmEntity $entity,
         private EntityFilters $filters,
+        private User $user,
     ) {}
 
     /**
@@ -2266,7 +2291,9 @@ final readonly class LogicFilter extends NodeFilter
     private function complement(Builder $query, array $registry, mixed $node): void
     {
         $model = $query->getModel();
-        $matching = $model->newQuery()->select($model->getQualifiedKeyName());
+        $matching = $model->newQuery()
+            ->select($model->getQualifiedKeyName())
+            ->whereBelongsTo($this->user->currentWorkspace);
 
         $this->applyNode($matching, $registry, is_array($node) ? $node : []);
 
@@ -2320,7 +2347,7 @@ final readonly class RelationFilter extends NodeFilter
     }
 ```
 
-Keep `ids()` and `emptiness()` from Task 10. Import `App\Enums\CrmEntity`.
+Keep `ids()` and `emptiness()` from Task 10. Import `App\Enums\CrmEntity`. The complement's inner query is bounded to the workspace (`whereBelongsTo`, the same relation every list action already filters on), so `$not` never scans other workspaces' rows.
 
 `EntityFilters::for()`:
 
@@ -2332,7 +2359,7 @@ and after the `custom_fields` filter:
 
 ```php
         foreach (LogicFilter::KEYWORDS as $keyword) {
-            $filters[] = TreeAllowedFilter::custom($keyword, new LogicFilter($keyword, $entity, $this));
+            $filters[] = TreeAllowedFilter::custom($keyword, new LogicFilter($keyword, $entity, $this, $this->user));
         }
 ```
 
@@ -2729,7 +2756,7 @@ Add:
         }
 
         foreach ($operators as $operator => $operand) {
-            $domains = Operand::stringList($operand, splitsStrings: true) ?? throw FilterErrors::at("{$field->code}.domain.{$operator}", __('validation.filter.record_ids', ['name' => (string) $operator]));
+            $domains = Operand::listOrFail($operand, splitsStrings: true, path: "{$field->code}.domain.{$operator}", expected: 'a list of domains such as acme.com');
             $domains = array_map(static fn (string $domain): string => mb_strtolower(trim($domain)), $domains);
 
             if (array_any($domains, static fn (string $domain): bool => preg_match('/^[a-z0-9.-]+$/', $domain) !== 1)) {
