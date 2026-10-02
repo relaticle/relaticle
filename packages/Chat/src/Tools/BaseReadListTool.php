@@ -181,11 +181,6 @@ abstract class BaseReadListTool implements Tool
 
         try {
             $httpRequest = $this->buildHttpRequest($request);
-        } catch (ValidationException $exception) {
-            return $this->validationError($exception);
-        }
-
-        try {
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
