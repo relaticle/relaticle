@@ -2636,6 +2636,8 @@ Each list action calls it right after `abort_unless(...)` and the `$request ??=`
 
 MCP `BaseListTool::handle()` already turns a `ValidationException` into a tool error through laravel/mcp; chat's `BaseReadListTool::handle()` already catches it. Confirm both by running their filter tests.
 
+Chat's `BaseReadListTool::buildHttpRequest()` passes `filter` only when it is an array, so a JSON-string filter silently returns every row. Pass any `filled()` value through (`if (filled($filter)) { $input['filter'] = $filter; }`) so `FilterTree::validate()` answers it with the `not_object` 422, and add a test in `tests/Feature/Chat/ListToolFilterTest.php`: `filter: '{"name":"x"}'` returns the error, not a table.
+
 - [ ] **Step 4: Run tests**
 
 Run: `php artisan test --compact tests/Feature/Api/V1/ListFilterTest.php tests/Feature/Mcp tests/Feature/Chat/ListToolFilterTest.php`
