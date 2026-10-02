@@ -546,7 +546,7 @@ All paths below are in `relaticle` on `feat/custom-field-filter-contract-v1`.
 ### Task 6: Adopt v3.12 and declare the domain variant
 
 **Files:**
-- Modify: `composer.json` (`"relaticle/custom-fields": "dev-3.x as 3.12.0"` until the tag in Task 17), `composer.lock`
+- Modify: `composer.json` (`"relaticle/custom-fields": "3.x-dev as 3.12.0"` until the tag in Task 17), `composer.lock`
 - Modify: `packages/ImportWizard/src/Jobs/ExecuteImportJob.php:526`
 - Modify: `packages/OnboardSeed/src/Support/BulkCustomFieldValueWriter.php:26`
 - Modify: `app/Enums/CustomFields/CustomFieldTrait.php`, `app/Enums/CustomFields/CompanyField.php`
@@ -625,7 +625,7 @@ Expected: FAIL (values stored as typed).
 - [ ] **Step 3: Implement**
 
 ```bash
-composer require "relaticle/custom-fields:dev-3.x as 3.12.0" -W
+composer require "relaticle/custom-fields:3.x-dev as 3.12.0" -W
 ```
 
 The package changes are merged on `3.x` but not tagged; Task 17 tags v3.12.0 and switches this constraint to `^3.12` after the end-to-end walk.
@@ -2685,6 +2685,13 @@ it('matches a url-variant link by its host', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($site, ['https://www.Acme.com/team']);
 
     expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$in' => ['acme.com']]]]]))->toBe(['Ana']);
+});
+
+it('finds a stored link by a raw url operand', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'homepage', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($site, ['https://acme.com/team, hiring']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['homepage' => ['$has_any' => ['HTTPS://acme.com/team, hiring']]]]))->toBe(['Ana']);
 });
 
 it('publishes only $ operators and the domain sub-field', function (): void {
