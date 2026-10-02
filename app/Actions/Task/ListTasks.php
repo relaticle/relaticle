@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Task;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Task;
 use App\Models\User;
-use App\Support\Filters\CustomFieldFilter;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -40,36 +38,7 @@ final readonly class ListTasks
             Task::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
-            ->allowedFilters(
-                AllowedFilter::partial('title'),
-                AllowedFilter::callback('assigned_to_me', function (Builder $query, mixed $value) use ($user): void {
-                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
-                        $query->whereHas('assignees', fn (Builder $q) => $q->where('users.id', $user->getKey()));
-                    }
-                }),
-                // Mirrors the panel's multi-select assignee filter: match a task if ANY
-                // of the given members is on it. assigned_to_me stays as the shorthand
-                // for the caller themselves, which needs no id round-trip.
-                AllowedFilter::callback('assignee_ids', function (Builder $query, mixed $value): void {
-                    $ids = array_values(array_filter(array_map(
-                        static fn (mixed $id): string => is_scalar($id) ? trim((string) $id) : '',
-                        Arr::wrap($value),
-                    ), static fn (string $id): bool => $id !== ''));
-
-                    if ($ids === []) {
-                        return;
-                    }
-
-                    $query->whereHas('assignees', fn (Builder $q) => $q->whereIn('users.id', $ids));
-                }),
-                AllowedFilter::scope('company_id', 'forCompany'),
-                AllowedFilter::scope('people_id', 'forPerson'),
-                AllowedFilter::scope('opportunity_id', 'forOpportunity'),
-                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '>=', $value)),
-                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('tasks.created_at', '<=', $value)),
-                AllowedFilter::exact('creation_source', 'tasks.creation_source'),
-                CustomFieldFilter::allowedFilter('task'),
-            )
+            ->allowedFilters(...new EntityFilters($user)->for(CrmEntity::Task))
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(
                 'creator', 'assignees', 'companies', 'people', 'opportunities',

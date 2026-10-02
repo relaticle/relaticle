@@ -47,7 +47,7 @@ describe('ListTasksTool assigned_to_me', function () {
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListTasksTool::class, [
-                'assigned_to_me' => true,
+                'filter' => ['assigned_to_me' => ['$eq' => true]],
             ])
             ->assertOk()
             ->assertSee('Assigned Task')
@@ -72,7 +72,7 @@ describe('ListTasksTool assigned_to_me', function () {
 // ListNotesTool: notable_type / notable_id filtering
 // ---------------------------------------------------------------------------
 describe('ListNotesTool notable filtering', function () {
-    it('filters notes by notable_type company', function (): void {
+    it('filters notes attached to any company', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -84,14 +84,14 @@ describe('ListNotesTool notable filtering', function () {
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class, [
-                'notable_type' => 'company',
+                'filter' => ['companies' => ['$is_empty' => false]],
             ])
             ->assertOk()
             ->assertSee('Company Note')
             ->assertDontSee('Person Note');
     });
 
-    it('filters notes by notable_type people', function (): void {
+    it('filters notes attached to any person', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $person = People::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -103,14 +103,14 @@ describe('ListNotesTool notable filtering', function () {
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class, [
-                'notable_type' => 'people',
+                'filter' => ['people' => ['$is_empty' => false]],
             ])
             ->assertOk()
             ->assertSee('Person Note')
             ->assertDontSee('Company Note');
     });
 
-    it('filters notes by notable_id', function (): void {
+    it('filters notes attached to one company id', function (): void {
         $company1 = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $company2 = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -122,14 +122,14 @@ describe('ListNotesTool notable filtering', function () {
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class, [
-                'notable_id' => $company1->id,
+                'filter' => ['companies' => ['$in' => [$company1->id]]],
             ])
             ->assertOk()
             ->assertSee('Note For Company 1')
             ->assertDontSee('Note For Company 2');
     });
 
-    it('filters notes by notable_type and notable_id combined', function (): void {
+    it('filters notes attached to a company without matching other record types', function (): void {
         $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -141,8 +141,7 @@ describe('ListNotesTool notable filtering', function () {
 
         RelaticleServer::actingAs($this->user)
             ->tool(ListNotesTool::class, [
-                'notable_type' => 'company',
-                'notable_id' => $company->id,
+                'filter' => ['companies' => ['$in' => [$company->id]]],
             ])
             ->assertOk()
             ->assertSee('Specific Company Note')

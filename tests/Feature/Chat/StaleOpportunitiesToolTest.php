@@ -30,7 +30,7 @@ it('returns only opportunities with no activity in the last 30 days when stale_d
     $activeOpp = Opportunity::factory()->for($this->workspace)->create(['name' => 'Active Deal']);
 
     $tool = new ListOpportunitiesTool;
-    $response = $tool->handle(new Request(['stale_days' => 30]));
+    $response = $tool->handle(new Request(['filter' => ['stale_days' => ['$gte' => 30]]]));
 
     $data = json_decode($response, true);
     $items = is_array($data) && isset($data['data']) ? $data['data'] : $data;
@@ -62,7 +62,7 @@ it('includes opportunities created long ago with no recent activity when stale_d
     ]);
 
     $tool = new ListOpportunitiesTool;
-    $response = $tool->handle(new Request(['stale_days' => 30]));
+    $response = $tool->handle(new Request(['filter' => ['stale_days' => ['$gte' => 30]]]));
 
     $data = json_decode($response, true);
     $items = is_array($data) && isset($data['data']) ? $data['data'] : $data;
@@ -94,7 +94,7 @@ it('still treats an opportunity as stale when a different workspace has a recent
     ]);
 
     $tool = new ListOpportunitiesTool;
-    $response = $tool->handle(new Request(['stale_days' => 30]));
+    $response = $tool->handle(new Request(['filter' => ['stale_days' => ['$gte' => 30]]]));
 
     $data = json_decode($response, true);
     $items = is_array($data) && isset($data['data']) ? $data['data'] : $data;

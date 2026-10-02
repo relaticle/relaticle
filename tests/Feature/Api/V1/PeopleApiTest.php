@@ -358,7 +358,7 @@ describe('filtering and sorting', function (): void {
         People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Alice Johnson']);
         People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob Smith']);
 
-        $response = $this->getJson('/api/v1/people?filter[name]=Alice');
+        $response = $this->getJson('/api/v1/people?filter[name][$contains]=Alice');
 
         $response->assertOk();
 
@@ -367,14 +367,14 @@ describe('filtering and sorting', function (): void {
         expect($names)->not->toContain('Bob Smith');
     });
 
-    it('can filter people by company_id', function (): void {
+    it('can filter people by company', function (): void {
         Sanctum::actingAs($this->user);
 
         $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $matched = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
         $unmatched = People::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $response = $this->getJson("/api/v1/people?filter[company_id]={$company->id}");
+        $response = $this->getJson('/api/v1/people?filter[company][$in]='.$company->id);
 
         $response->assertOk();
 

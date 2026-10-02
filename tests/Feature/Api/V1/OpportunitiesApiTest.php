@@ -395,7 +395,7 @@ describe('filtering and sorting', function (): void {
         Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Enterprise Deal']);
         Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Small Contract']);
 
-        $response = $this->getJson('/api/v1/opportunities?filter[name]=Enterprise');
+        $response = $this->getJson('/api/v1/opportunities?filter[name][$contains]=Enterprise');
 
         $response->assertOk();
 
@@ -404,14 +404,14 @@ describe('filtering and sorting', function (): void {
         expect($names)->not->toContain('Small Contract');
     });
 
-    it('can filter opportunities by company_id', function (): void {
+    it('can filter opportunities by company', function (): void {
         Sanctum::actingAs($this->user);
 
         $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
         $matched = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
         $unmatched = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-        $response = $this->getJson("/api/v1/opportunities?filter[company_id]={$company->id}");
+        $response = $this->getJson('/api/v1/opportunities?filter[company][$in]='.$company->id);
 
         $response->assertOk();
 
@@ -459,6 +459,25 @@ describe('filtering and sorting', function (): void {
         expect($ids->all())->toBe([$match->id]);
     });
 
+    it('matches a tag literally named true sent as a query string list item', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $labels = resolve(CreateCustomField::class)->execute($this->user, [
+            'entity_type' => 'opportunity',
+            'name' => 'Labels',
+            'code' => 'labels',
+            'type' => 'tags-input',
+        ]);
+        $tagged = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Tagged Deal']);
+        $plain = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Plain Deal']);
+        $tagged->saveCustomFieldValue($labels, ['true']);
+        $plain->saveCustomFieldValue($labels, ['other']);
+
+        $ids = collect($this->getJson('/api/v1/opportunities?filter[custom_fields][labels][$has_any][]=true')->assertOk()->json('data'))->pluck('id');
+
+        expect($ids->all())->toBe([$tagged->id]);
+    });
+
     it('reads is_empty from a query string boolean', function (string $raw, bool $expectsEmpty): void {
         Sanctum::actingAs($this->user);
 
@@ -490,7 +509,7 @@ describe('filtering and sorting', function (): void {
 
         $this->getJson("/api/v1/opportunities?{$query}")
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('filter');
+            ->assertJsonValidationErrors(['filter.custom_fields.stage.$not_in']);
     })->with([
         'empty array item' => ['filter[custom_fields][stage][$not_in][]='],
         'empty value' => ['filter[custom_fields][stage][$not_in]='],
@@ -536,7 +555,7 @@ describe('filtering and sorting', function (): void {
 
         $this->getJson('/api/v1/opportunities?filter[custom_fields][amount][$gt]=lots')
             ->assertStatus(422)
-            ->assertJsonValidationErrors('filter');
+            ->assertJsonValidationErrors(['filter.custom_fields.amount.$gt']);
     });
 
     it('rejects a date operand that is not a calendar date', function (string $operand): void {
@@ -544,7 +563,7 @@ describe('filtering and sorting', function (): void {
 
         $this->getJson('/api/v1/opportunities?filter[custom_fields][close_date][$gt]='.urlencode($operand))
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['filter' => 'close_date.$gt']);
+            ->assertJsonValidationErrors(['filter.custom_fields.close_date.$gt' => 'close_date.$gt']);
     })->with(['notadate', '2026-13-45', '2026-02-30', 'tomorrow']);
 
     it('matches a date operand written in any absolute date format', function (): void {
@@ -637,7 +656,7 @@ describe('filtering and sorting', function (): void {
 
         $this->getJson('/api/v1/opportunities?filter[custom_fields][stage][$eq]=Nope')
             ->assertStatus(422)
-            ->assertJsonValidationErrors('filter');
+            ->assertJsonValidationErrors(['filter.custom_fields.stage.$eq']);
     });
 
     it('carries a label containing a comma through the array form', function (): void {

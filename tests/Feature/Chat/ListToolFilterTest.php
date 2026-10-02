@@ -60,14 +60,14 @@ it('applies a filter when searching for the literal term "0" instead of returnin
     Company::factory()->for($workspace)->create(['name' => 'Globex']);
 
     $tool = new ListCompaniesTool;
-    $json = $tool->handle(new Request(['search' => '0']));
+    $json = $tool->handle(new Request(['filter' => ['name' => ['$contains' => '0']]]));
     $data = json_decode($json, true);
 
     $rows = $data['data'] ?? $data;
     expect($rows)->toHaveCount(1);
 });
 
-it('restricts tasks to the current user when assigned_to_me is set', function (): void {
+it('restricts tasks to the current user when assigned_to_me is true', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     $workspace = $user->currentWorkspace;
@@ -81,13 +81,13 @@ it('restricts tasks to the current user when assigned_to_me is set', function ()
     $theirs = Task::factory()->for($workspace)->create(['title' => 'Theirs']);
     $theirs->assignees()->attach($colleague);
 
-    $rows = listToolRows((new ListTasksTool)->handle(new Request(['assigned_to_me' => true])));
+    $rows = listToolRows((new ListTasksTool)->handle(new Request(['filter' => ['assigned_to_me' => ['$eq' => true]]])));
 
     expect($rows)->toHaveCount(1)
         ->and($rows[0]['attributes']['title'])->toBe('Mine');
 });
 
-it('returns every workspace task when assigned_to_me is not set', function (): void {
+it('returns every workspace task when no filter is set', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     $workspace = $user->currentWorkspace;
@@ -121,7 +121,7 @@ it('filters tasks by a choice custom field using the option label', function ():
     $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$eq' => 'Done']],
+        'filter' => ['custom_fields' => ['status' => ['$eq' => 'Done']]],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -152,7 +152,7 @@ it('filters tasks by a choice custom field using the option id', function (): vo
     $done->saveCustomFieldValue($statusField, $doneId);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$eq' => $doneId]],
+        'filter' => ['custom_fields' => ['status' => ['$eq' => $doneId]]],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -183,7 +183,7 @@ it('rejects a label shared by two options and asks for the id', function (): voi
     ]);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$eq' => 'Done']],
+        'filter' => ['custom_fields' => ['status' => ['$eq' => 'Done']]],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -199,7 +199,7 @@ it('rejects an unknown custom field code instead of silently returning everythin
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['not_a_field' => ['$eq' => 'x']],
+        'filter' => ['custom_fields' => ['not_a_field' => ['$eq' => 'x']]],
     ])), true);
 
     expect($result)->toHaveKey('error')
@@ -214,7 +214,7 @@ it('rejects an unknown option label instead of silently returning everything', f
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$eq' => 'Nope']],
+        'filter' => ['custom_fields' => ['status' => ['$eq' => 'Nope']]],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -230,7 +230,7 @@ it('rejects an operator the field does not support', function (): void {
     TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$contains' => 'Done']],
+        'filter' => ['custom_fields' => ['status' => ['$contains' => 'Done']]],
     ])), true);
 
     TenantContextService::setTenantId(null);
@@ -282,7 +282,7 @@ it('can filter by a custom field immediately after creating it', function (): vo
     ]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['$eq' => 'Enterprise']],
+        'filter' => ['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]],
     ])), true);
 
     expect($result)->not->toHaveKey('error');
@@ -300,12 +300,12 @@ it('stops offering a custom field for filtering once it is deactivated', functio
         'options' => ['Enterprise'],
     ]);
 
-    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]));
+    (new ListCompaniesTool)->handle(new Request(['filter' => ['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]]));
 
     app(UpdateCustomField::class)->execute($user, $field, ['active' => false]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['$eq' => 'Enterprise']],
+        'filter' => ['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]],
     ])), true);
 
     expect($result)->toHaveKey('error')
@@ -324,7 +324,7 @@ it('can filter by an option added to an existing custom field', function (): voi
         'options' => ['Enterprise'],
     ]);
 
-    (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]));
+    (new ListCompaniesTool)->handle(new Request(['filter' => ['custom_fields' => ['segment' => ['$eq' => 'Enterprise']]]]));
 
     app(AddCustomFieldOptions::class)->execute($user, [
         '_record_id' => $field->getKey(),
@@ -332,13 +332,13 @@ it('can filter by an option added to an existing custom field', function (): voi
     ]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([
-        'custom_fields' => ['segment' => ['$eq' => 'Mid-Market']],
+        'filter' => ['custom_fields' => ['segment' => ['$eq' => 'Mid-Market']]],
     ])), true);
 
     expect($result)->not->toHaveKey('error');
 });
 
-it('restricts tasks to a named colleague when assignee_ids is set', function (): void {
+it('restricts tasks to a named colleague when assignees is set', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     $workspace = $user->currentWorkspace;
@@ -355,7 +355,7 @@ it('restricts tasks to a named colleague when assignee_ids is set', function ():
     Task::factory()->for($workspace)->create(['title' => 'Unassigned task']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'assignee_ids' => [(string) $colleague->getKey()],
+        'filter' => ['assignees' => ['$in' => [(string) $colleague->getKey()]]],
     ])));
 
     expect($rows)->toHaveCount(1)
@@ -377,13 +377,13 @@ it('matches tasks assigned to any of several people', function (): void {
     Task::factory()->for($workspace)->create(['title' => 'Third']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'assignee_ids' => [(string) $one->getKey(), (string) $two->getKey()],
+        'filter' => ['assignees' => ['$in' => [(string) $one->getKey(), (string) $two->getKey()]]],
     ])));
 
     expect($rows)->toHaveCount(2);
 });
 
-it('never leaks another workspace\'s tasks through assignee_ids', function (): void {
+it('never leaks another workspace\'s tasks through assignees', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
@@ -394,21 +394,22 @@ it('never leaks another workspace\'s tasks through assignee_ids', function (): v
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Mine']);
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'assignee_ids' => [(string) $outsider->getKey()],
+        'filter' => ['assignees' => ['$in' => [(string) $outsider->getKey()]]],
     ])));
 
     expect($rows)->toBeEmpty();
 });
 
-it('ignores an empty assignee_ids list rather than returning nothing', function (): void {
+it('rejects an empty assignees list instead of returning nothing', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Alpha']);
 
-    $rows = listToolRows((new ListTasksTool)->handle(new Request(['assignee_ids' => []])));
+    $result = json_decode((new ListTasksTool)->handle(new Request(['filter' => ['assignees' => ['$in' => []]]])), true);
 
-    expect($rows)->toHaveCount(1);
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('$in must be a list of record IDs');
 });
 
 it('filters every list tool by creation date, including tasks and notes', function (string $toolClass, string $factory): void {
@@ -419,9 +420,9 @@ it('filters every list tool by creation date, including tasks and notes', functi
 
     $tool = new $toolClass;
 
-    expect(listToolRows($tool->handle(new Request(['created_after' => now()->addDay()->toDateString()]))))->toBeEmpty()
-        ->and(listToolRows($tool->handle(new Request(['created_before' => now()->subYears(5)->toDateString()]))))->toBeEmpty()
-        ->and(listToolRows($tool->handle(new Request(['created_after' => now()->subYears(5)->toDateString()]))))->toHaveCount(1);
+    expect(listToolRows($tool->handle(new Request(['filter' => ['created_at' => ['$gte' => now()->addDay()->toDateString()]]]))))->toBeEmpty()
+        ->and(listToolRows($tool->handle(new Request(['filter' => ['created_at' => ['$lte' => now()->subYears(5)->toDateString()]]]))))->toBeEmpty()
+        ->and(listToolRows($tool->handle(new Request(['filter' => ['created_at' => ['$gte' => now()->subYears(5)->toDateString()]]]))))->toHaveCount(1);
 })->with([
     'companies' => [ListCompaniesTool::class, Company::class],
     'tasks' => [ListTasksTool::class, Task::class],
@@ -488,7 +489,7 @@ it('lists only the records of the requested creation source', function (string $
     $sample = $modelClass::factory()->for($workspace)->create(['creation_source' => CreationSource::SYSTEM]);
     $modelClass::factory()->for($workspace)->create(['creation_source' => CreationSource::WEB]);
 
-    $rows = listToolRows(resolve($toolClass)->handle(new Request(['creation_source' => 'system'])));
+    $rows = listToolRows(resolve($toolClass)->handle(new Request(['filter' => ['creation_source' => ['$eq' => 'system']]])));
 
     expect(array_column($rows, 'id'))->toBe([$sample->getKey()]);
 })->with([
@@ -505,10 +506,10 @@ it('rejects an unknown creation source instead of returning an empty list', func
 
     Company::factory()->for($user->currentWorkspace)->create();
 
-    $result = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['creation_source' => 'sample'])), true);
+    $result = json_decode(resolve(ListCompaniesTool::class)->handle(new Request(['filter' => ['creation_source' => ['$eq' => 'sample']]])), true);
 
     expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('creation_source must be one of');
+        ->and($result['error'])->toContain('sample is not one of');
 });
 
 it('excludes options and keeps tasks without a status', function (): void {
@@ -532,7 +533,7 @@ it('excludes options and keeps tasks without a status', function (): void {
     $done->saveCustomFieldValue($statusField, taskCustomFieldOptionId($workspace->getKey(), 'status', 'Done'));
 
     $rows = listToolRows((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$not_in' => ['Done']]],
+        'filter' => ['custom_fields' => ['status' => ['$not_in' => ['Done']]]],
     ])));
 
     TenantContextService::setTenantId(null);
@@ -547,20 +548,20 @@ it('rejects custom_fields sent as a string instead of returning every row', func
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => '{"status": {"$eq": "Done"}}',
+        'filter' => ['custom_fields' => '{"status": {"$eq": "Done"}}'],
     ])), true);
 
     expect($result)->toHaveKey('error')
         ->and($result['error'])->toContain('object keyed by field code');
 });
 
-it('treats an empty custom_fields string as no filter', function (): void {
+it('treats an empty filter string as no filter', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
-    $rows = listToolRows((new ListTasksTool)->handle(new Request(['custom_fields' => ''])));
+    $rows = listToolRows((new ListTasksTool)->handle(new Request(['filter' => ''])));
 
     expect(collect($rows)->pluck('attributes.title')->all())->toBe(['Anything']);
 });
@@ -572,7 +573,7 @@ it('shows the operator example when a bare value is given', function (): void {
     Task::factory()->for($user->currentWorkspace)->create(['title' => 'Anything']);
 
     $result = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => 'Done'],
+        'filter' => ['custom_fields' => ['status' => 'Done']],
     ])), true);
 
     expect($result['error'])->toContain('must be an operator object, e.g. {"$eq": "..."}');

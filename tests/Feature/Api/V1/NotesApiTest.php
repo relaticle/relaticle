@@ -295,7 +295,7 @@ describe('filtering and sorting', function (): void {
         Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Meeting summary']);
         Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Code review']);
 
-        $response = $this->getJson('/api/v1/notes?filter[title]=Meeting');
+        $response = $this->getJson('/api/v1/notes?filter[title][$contains]=Meeting');
 
         $response->assertOk();
 

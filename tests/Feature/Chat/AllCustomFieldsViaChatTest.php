@@ -302,7 +302,7 @@ it('resolves an option label identically whether filtering or writing', function
     TenantContextService::setTenantId($this->workspace->getKey());
 
     $readResult = json_decode((new ListTasksTool)->handle(new Request([
-        'custom_fields' => ['status' => ['$eq' => $label]],
+        'filter' => ['custom_fields' => ['status' => ['$eq' => $label]]],
     ])), true);
 
     TenantContextService::setTenantId(null);

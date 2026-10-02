@@ -17,7 +17,7 @@ use App\Support\CustomFields\WorkspaceCustomFields;
  * Most of what a CRM user filters on (stage, status, due date, priority, amount)
  * lives in custom fields, so a list tool without them can only ever answer "all of
  * them". This inlines the tenant's filterable codes, their operators and their
- * option labels into the tool's `custom_fields` slot, so the assistant can build a
+ * option labels into the tool's `filter` slot, so the assistant can build a
  * correct filter without a discovery round-trip.
  *
  * Filterability and operators come from {@see CustomFieldFilterSchema}, the same
@@ -42,7 +42,7 @@ final readonly class CustomFieldsFilterDescriber
         $optionLabels = $this->optionLabels($user->currentWorkspace, $entityType, array_keys($schema));
 
         $lines = [
-            'Filter by custom field values. Keys MUST be one of the codes below; each value is an object of operator => operand.',
+            'Custom field conditions go under custom_fields. Their keys MUST be one of the codes below; each value is an object of operator => operand.',
             'For choice fields pass the option label as listed; an option ID also works. $not_in and $has_none also match records where the field is empty. $is_empty takes true or false.',
             '',
         ];
@@ -59,7 +59,7 @@ final readonly class CustomFieldsFilterDescriber
         }
 
         $lines[] = '';
-        $lines[] = 'Example: {"'.array_key_first($schema).'": {"$eq": "..."}}';
+        $lines[] = 'Example: {"custom_fields": {"'.array_key_first($schema).'": {"$eq": "..."}}}';
 
         return implode("\n", $lines);
     }

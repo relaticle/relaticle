@@ -4,6 +4,13 @@ declare(strict_types=1);
 
 namespace App\Scribe\Strategies;
 
+use App\Actions\Company\ListCompanies;
+use App\Actions\Note\ListNotes;
+use App\Actions\Opportunity\ListOpportunities;
+use App\Actions\People\ListPeople;
+use App\Actions\Task\ListTasks;
+use App\Enums\CrmEntity;
+use App\Support\Filters\EntityFilters;
 use Knuckles\Camel\Extraction\ExtractedEndpointData;
 use Knuckles\Scribe\Extracting\Strategies\Strategy;
 use ReflectionClass;
@@ -13,13 +20,21 @@ use ReflectionNamedType;
 /**
  * Extracts query parameters from Spatie QueryBuilder usage in List action classes.
  *
- * Reads allowedFilters(), allowedSorts(), and allowedIncludes() from the action
- * class injected into the controller's index() method, then documents them as
- * query parameters automatically.
+ * Reads filters from the entity registry, and allowedSorts() and allowedIncludes()
+ * from the action class injected into the controller's index() method, then
+ * documents them as query parameters automatically.
  */
 final class GetFromSpatieQueryBuilder extends Strategy
 {
     public const string CUSTOM_FIELD_FILTER_DESCRIPTION = 'Filter by a custom field value. Single choice: $eq, $in, $not_in. Multi choice, tags, email, phone, link: $has_any, $has_none. Text: $eq, $contains. Numbers and dates: $eq, $gt, $gte, $lt, $lte. Checkbox, toggle: $eq. Every type: $is_empty (1, 0, true or false). Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma. Tags, email, phone and link values match the exact stored value, so repeat [] to send several. $not_in and $has_none also match records where the field is empty. Up to 10 conditions, 100 values per list. Example for an opportunity stage field: filter[custom_fields][stage][$in]=Qualification,Prospecting.';
+
+    private const array ENTITIES = [
+        ListCompanies::class => CrmEntity::Company,
+        ListPeople::class => CrmEntity::People,
+        ListOpportunities::class => CrmEntity::Opportunity,
+        ListTasks::class => CrmEntity::Task,
+        ListNotes::class => CrmEntity::Note,
+    ];
 
     /**
      * @param  array<string, array<string, string|bool>>  $routeRules
@@ -89,8 +104,7 @@ final class GetFromSpatieQueryBuilder extends Strategy
             return [];
         }
 
-        $this->extractFilters($source, $params);
-        $this->extractCustomFieldFilter($source, $params);
+        $this->addFilters(self::ENTITIES[$actionClass], $params);
         $this->extractSorts($source, $params);
         $this->extractIncludes($source, $params);
         $this->addPaginationParams($params);
@@ -121,27 +135,15 @@ final class GetFromSpatieQueryBuilder extends Strategy
     /**
      * @param  array<string, array<string, mixed>>  $params
      */
-    private function extractFilters(string $source, array &$params): void
+    private function addFilters(CrmEntity $entity, array &$params): void
     {
-        if (preg_match_all("/AllowedFilter::\w+\('([^']+)'/", $source, $matches)) {
-            foreach ($matches[1] as $filter) {
-                $params["filter[{$filter}]"] = [
-                    'type' => 'string',
-                    'required' => false,
-                    'description' => "Filter results by {$filter}.",
-                    'example' => null,
-                ];
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, array<string, mixed>>  $params
-     */
-    private function extractCustomFieldFilter(string $source, array &$params): void
-    {
-        if (! str_contains($source, 'CustomFieldFilter::allowedFilter(')) {
-            return;
+        foreach (EntityFilters::definitions($entity) as $name => $definition) {
+            $params["filter[{$name}][{operator}]"] = [
+                'type' => 'string',
+                'required' => false,
+                'description' => "Filter by {$name}. Operators: ".implode(', ', $definition->operators()).'.',
+                'example' => null,
+            ];
         }
 
         $params['filter[custom_fields][{code}][{operator}]'] = [

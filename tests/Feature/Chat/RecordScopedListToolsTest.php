@@ -31,8 +31,7 @@ it('scopes notes to the record they are attached to', function (): void {
     $globex->notes()->attach($globexNote);
 
     $payload = json_decode(resolve(ListNotesTool::class)->handle(new Request([
-        'notable_type' => 'company',
-        'notable_id' => (string) $acme->getKey(),
+        'filter' => ['companies' => ['$in' => [(string) $acme->getKey()]]],
     ])), true);
 
     $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
@@ -52,7 +51,7 @@ it('scopes tasks to the company they are attached to', function (): void {
     $globex->tasks()->attach($globexTask);
 
     $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request([
-        'company_id' => (string) $acme->getKey(),
+        'filter' => ['companies' => ['$in' => [(string) $acme->getKey()]]],
     ])), true);
 
     $titles = array_column(array_column($payload['data'], 'attributes'), 'title');
@@ -61,7 +60,7 @@ it('scopes tasks to the company they are attached to', function (): void {
         ->not->toContain('Chase Globex invoice');
 });
 
-it('does not leak another workspace notes through the notable filter', function (): void {
+it('does not leak another workspace notes through the companies filter', function (): void {
     $mine = Company::factory()->for($this->workspace)->create(['name' => 'Mine']);
     $mineNote = Note::factory()->for($this->workspace)->create(['title' => 'My note']);
     $mine->notes()->attach($mineNote);
@@ -73,8 +72,7 @@ it('does not leak another workspace notes through the notable filter', function 
     $theirs->notes()->attach($theirNote);
 
     $payload = json_decode(resolve(ListNotesTool::class)->handle(new Request([
-        'notable_type' => 'company',
-        'notable_id' => (string) $theirs->getKey(),
+        'filter' => ['companies' => ['$in' => [(string) $theirs->getKey()]]],
     ])), true);
 
     $titles = array_column(array_column($payload['data'], 'attributes'), 'title');

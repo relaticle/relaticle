@@ -11,13 +11,9 @@ use App\Models\User;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
-use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -25,9 +21,6 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class CustomFieldFilter implements Filter
 {
-    /** Separator for list operands sent as a single query-string value. */
-    private const string LIST_DELIMITER = ',';
-
     private const int MAX_CONDITIONS = 10;
 
     private const array OPERATOR_MAP = [
@@ -40,12 +33,8 @@ final readonly class CustomFieldFilter implements Filter
 
     public function __construct(
         private string $entityType,
+        private User $user,
     ) {}
-
-    public static function allowedFilter(string $entityType): CustomFieldAllowedFilter
-    {
-        return CustomFieldAllowedFilter::custom('custom_fields', new self($entityType));
-    }
 
     public function __invoke(Builder $query, mixed $value, string $property): void
     {
@@ -76,7 +65,7 @@ final readonly class CustomFieldFilter implements Filter
                 'field' => $unknownFieldCode,
                 'entity' => $this->entityType,
                 'available' => $fields->isEmpty() ? 'none' : $fields->keys()->implode(', '),
-            ]));
+            ]), (string) $unknownFieldCode);
         }
 
         $optionMap = resolve(CustomFieldOptionMap::class);
@@ -86,7 +75,7 @@ final readonly class CustomFieldFilter implements Filter
 
         foreach ($value as $fieldCode => $operators) {
             if (! is_array($operators) || $operators === []) {
-                $this->invalid(__('validation.custom_field.operator_object', ['field' => $fieldCode]));
+                $this->invalid(__('validation.custom_field.operator_object', ['field' => $fieldCode]), (string) $fieldCode);
             }
 
             $field = $fields[$fieldCode];
@@ -97,7 +86,7 @@ final readonly class CustomFieldFilter implements Filter
 
             foreach ($operators as $operator => $operand) {
                 if (! str_starts_with((string) $operator, '$') && isset($supportedOperators['$'.$operator])) {
-                    $this->invalid(__('validation.filter.operator_sigil', ['operator' => '$'.$operator]));
+                    $this->invalid(__('validation.filter.operator_sigil', ['operator' => '$'.$operator]), "{$fieldCode}.{$operator}");
                 }
 
                 if (! isset($supportedOperators[$operator])) {
@@ -105,11 +94,11 @@ final readonly class CustomFieldFilter implements Filter
                         'operator' => $operator,
                         'field' => $fieldCode,
                         'supported' => implode(', ', array_keys($supportedOperators)),
-                    ]));
+                    ]), "{$fieldCode}.{$operator}");
                 }
 
                 $operand = $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null);
-                $operand = $this->resolveOptions($optionMap, $fieldCode, $entry, $operand);
+                $operand = $this->resolveOptions($optionMap, $fieldCode, $operator, $entry, $operand);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
             }
@@ -129,11 +118,11 @@ final readonly class CustomFieldFilter implements Filter
         $type = $operatorSchema['type'] ?? null;
 
         $normalized = match ($type) {
-            'array' => $this->toStringList($operand, $splitsStrings),
-            'boolean' => $this->toBoolean($operand),
-            'integer' => $this->toInteger($operand),
-            'number' => $this->toNumber($operand),
-            'string' => $this->toString($operand, $operatorSchema['format'] ?? null),
+            'array' => Operand::stringList($operand, $splitsStrings),
+            'boolean' => Operand::boolean($operand),
+            'integer' => Operand::integer($operand),
+            'number' => Operand::number($operand),
+            'string' => $this->formattedString($operand, $operatorSchema['format'] ?? null),
             default => null,
         };
 
@@ -141,7 +130,7 @@ final readonly class CustomFieldFilter implements Filter
             $this->invalid(__('validation.custom_field.too_many_values', [
                 'field' => $fieldCode,
                 'max' => CustomFieldFilterSchema::MAX_LIST_VALUES,
-            ]));
+            ]), "{$fieldCode}.{$operator}");
         }
 
         if ($normalized !== null) {
@@ -158,29 +147,29 @@ final readonly class CustomFieldFilter implements Filter
             'field' => $fieldCode,
             'operator' => $operator,
             'expected' => $expected,
-        ]));
+        ]), "{$fieldCode}.{$operator}");
     }
 
     /**
      * @param  array{ids: array<string, list<string>>, labels: list<string>}|null  $entry
      */
-    private function resolveOptions(CustomFieldOptionMap $optionMap, string $fieldCode, ?array $entry, mixed $operand): mixed
+    private function resolveOptions(CustomFieldOptionMap $optionMap, string $fieldCode, string $operator, ?array $entry, mixed $operand): mixed
     {
         if ($entry === null || is_bool($operand)) {
             return $operand;
         }
 
         if (is_array($operand)) {
-            return array_map(fn (string $value): string => $this->optionId($optionMap, $fieldCode, $entry, $value), $operand);
+            return array_map(fn (string $value): string => $this->optionId($optionMap, $fieldCode, $operator, $entry, $value), $operand);
         }
 
-        return $this->optionId($optionMap, $fieldCode, $entry, (string) $operand);
+        return $this->optionId($optionMap, $fieldCode, $operator, $entry, (string) $operand);
     }
 
     /**
      * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
-    private function optionId(CustomFieldOptionMap $optionMap, string $fieldCode, array $entry, string $value): string
+    private function optionId(CustomFieldOptionMap $optionMap, string $fieldCode, string $operator, array $entry, string $value): string
     {
         $id = $optionMap->idFor($entry, $value);
 
@@ -189,108 +178,28 @@ final readonly class CustomFieldFilter implements Filter
         }
 
         if ($optionMap->isAmbiguous($entry, $value)) {
-            $this->invalid(__('validation.custom_field.ambiguous_option', ['field' => $fieldCode, 'value' => $value]));
+            $this->invalid(__('validation.custom_field.ambiguous_option', ['field' => $fieldCode, 'value' => $value]), "{$fieldCode}.{$operator}");
         }
 
         $this->invalid(__('validation.custom_field.unknown_option', [
             'field' => $fieldCode,
             'value' => $value,
             'labels' => $entry['labels'] === [] ? 'none' : implode(', ', $entry['labels']),
-        ]));
+        ]), "{$fieldCode}.{$operator}");
     }
 
-    /** @return list<string>|null */
-    private function toStringList(mixed $operand, bool $splitsStrings): ?array
+    private function formattedString(mixed $operand, ?string $format): ?string
     {
-        if (is_string($operand)) {
-            $operand = $splitsStrings ? array_map(trim(...), explode(self::LIST_DELIMITER, $operand)) : [$operand];
-        }
-
-        if (! is_array($operand) || $operand === [] || ! array_is_list($operand)) {
-            return null;
-        }
-
-        if (! array_all($operand, static fn (mixed $item): bool => is_string($item))) {
-            return null;
-        }
-
-        return $operand;
-    }
-
-    private function toString(mixed $operand, ?string $format): ?string
-    {
-        // Spatie turns the query-string values true and false into booleans before any filter runs.
-        if (is_bool($operand)) {
-            $operand = $operand ? 'true' : 'false';
-        }
-
-        if (! is_string($operand)) {
-            return null;
-        }
-
         return match ($format) {
-            'date' => $this->toDate($operand)?->toDateString(),
-            'date-time' => $this->toDate($operand)?->toDateTimeString(),
-            default => $operand,
+            'date' => Operand::date($operand)?->toDateString(),
+            'date-time' => Operand::date($operand)?->toDateTimeString(),
+            default => Operand::string($operand),
         };
     }
 
-    private function toDate(string $operand): ?CarbonImmutable
+    private function invalid(string $message, string $path = ''): never
     {
-        if (Validator::make(['date' => $operand], ['date' => ['date']])->fails()) {
-            return null;
-        }
-
-        // Postgres rejects some strings PHP parses ("Jan 1st 2026"), so only Carbon's canonical form reaches the query.
-        return Date::parse($operand);
-    }
-
-    private function toBoolean(mixed $operand): ?bool
-    {
-        if (is_bool($operand)) {
-            return $operand;
-        }
-
-        if (! is_string($operand) && ! is_int($operand)) {
-            return null;
-        }
-
-        return filter_var($operand, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-    }
-
-    private function toInteger(mixed $operand): ?int
-    {
-        if (is_int($operand)) {
-            return $operand;
-        }
-
-        if (! is_string($operand)) {
-            return null;
-        }
-
-        $integer = filter_var($operand, FILTER_VALIDATE_INT);
-
-        return $integer === false ? null : $integer;
-    }
-
-    private function toNumber(mixed $operand): int|float|null
-    {
-        if (is_int($operand) || is_float($operand)) {
-            return $operand;
-        }
-
-        if (! is_string($operand)) {
-            return null;
-        }
-
-        $number = filter_var($operand, FILTER_VALIDATE_FLOAT);
-
-        return $number === false ? null : $number;
-    }
-
-    private function invalid(string $message): never
-    {
-        throw ValidationException::withMessages(['filter' => [$message]]);
+        throw FilterErrors::at($path, $message);
     }
 
     /**
@@ -361,11 +270,8 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function filterableFields(): Collection
     {
-        /** @var User $user */
-        $user = auth()->user();
-
         return resolve(WorkspaceCustomFields::class)
-            ->forEntity($user->currentWorkspace, $this->entityType)
+            ->forEntity($this->user->currentWorkspace, $this->entityType)
             ->filter(CustomFieldFilterSchema::isFilterable(...))
             ->keyBy('code');
     }

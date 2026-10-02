@@ -210,41 +210,37 @@ it('rejects page numbers that could overflow database offsets', function (string
     ListCustomFieldsTool::class,
 ]);
 
-it('publishes the opportunity stale day bounds', function (): void {
-    expect(resolve(ListOpportunitiesTool::class)->toArray())
-        ->toHaveKey('inputSchema.properties.stale_days.minimum', 1)
-        ->toHaveKey('inputSchema.properties.stale_days.maximum', 3650);
-});
+it('publishes one filter object and no flat filter params on every list tool', function (string $toolClass): void {
+    $properties = resolve($toolClass)->toArray()['inputSchema']['properties'];
+
+    expect(array_keys($properties))->toBe(['filter', 'sort', 'include', 'per_page', 'page']);
+})->with([
+    ListCompaniesTool::class,
+    ListPeopleTool::class,
+    ListOpportunitiesTool::class,
+    ListTasksTool::class,
+    ListNotesTool::class,
+]);
 
 it('rejects malformed list tool inputs before building the database query', function (string $toolClass, array $input, string $error): void {
     RelaticleServer::actingAs($this->user)
         ->tool($toolClass, $input)
         ->assertHasErrors([$error]);
 })->with([
-    'search' => [ListCompaniesTool::class, ['search' => ['Acme']], 'search'],
-    'created after' => [ListCompaniesTool::class, ['created_after' => 'yesterday'], 'created after'],
-    'created before' => [ListCompaniesTool::class, ['created_before' => '26-08-2026'], 'created before'],
-    'date range' => [ListCompaniesTool::class, ['created_after' => '2026-08-27', 'created_before' => '2026-08-26'], 'created before'],
-    'creation source' => [ListCompaniesTool::class, ['creation_source' => 'sample'], 'creation source'],
+    'filter date operand' => [ListCompaniesTool::class, ['filter' => ['created_at' => ['$gte' => 'yesterday']]], '$gte must be a date'],
+    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'sample']]], 'sample is not one of'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
-    'filter operator object' => [ListCompaniesTool::class, ['filter' => ['industry' => 'software']], 'filter.industry'],
+    'filter operator object' => [ListCompaniesTool::class, ['filter' => ['name' => 'software']], 'name takes an operator object'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],
     'sort field' => [ListCompaniesTool::class, ['sort' => ['direction' => 'asc']], 'field'],
     'sort direction' => [ListCompaniesTool::class, ['sort' => ['field' => 'name', 'direction' => 'sideways']], 'sort.direction'],
     'include list' => [ListCompaniesTool::class, ['include' => ['primary' => 'creator']], 'include'],
-    'people company id' => [ListPeopleTool::class, ['company_id' => []], 'company id'],
-    'opportunity company id' => [ListOpportunitiesTool::class, ['company_id' => []], 'company id'],
-    'opportunity contact id' => [ListOpportunitiesTool::class, ['contact_id' => []], 'contact id'],
-    'opportunity stale days minimum' => [ListOpportunitiesTool::class, ['stale_days' => 0], 'stale days'],
-    'opportunity stale days maximum' => [ListOpportunitiesTool::class, ['stale_days' => 3651], 'stale days'],
-    'task assigned to me' => [ListTasksTool::class, ['assigned_to_me' => 'yes'], 'assigned to me'],
-    'task assignee ids' => [ListTasksTool::class, ['assignee_ids' => 'user-id'], 'assignee ids'],
-    'task assignee id' => [ListTasksTool::class, ['assignee_ids' => ['not-a-ulid']], 'assignee_ids.0'],
-    'task company id' => [ListTasksTool::class, ['company_id' => []], 'company id'],
-    'task people id' => [ListTasksTool::class, ['people_id' => []], 'people id'],
-    'task opportunity id' => [ListTasksTool::class, ['opportunity_id' => []], 'opportunity id'],
-    'note notable type' => [ListNotesTool::class, ['notable_type' => 'deal'], 'notable type'],
-    'note notable id' => [ListNotesTool::class, ['notable_id' => []], 'notable id'],
+    'people relation ids' => [ListPeopleTool::class, ['filter' => ['company' => ['$in' => []]]], '$in must be a list of record IDs'],
+    'opportunity stale days minimum' => [ListOpportunitiesTool::class, ['filter' => ['stale_days' => ['$gte' => 0]]], 'stale_days takes'],
+    'opportunity stale days maximum' => [ListOpportunitiesTool::class, ['filter' => ['stale_days' => ['$gte' => 3651]]], 'stale_days takes'],
+    'task assigned to me' => [ListTasksTool::class, ['filter' => ['assigned_to_me' => ['$eq' => 'maybe']]], 'assigned_to_me takes'],
+    'task assignees' => [ListTasksTool::class, ['filter' => ['assignees' => ['$gte' => 'user-id']]], 'assignees takes $in, $not_in or $is_empty'],
+    'note relation' => [ListNotesTool::class, ['filter' => ['companies' => ['$eq' => 'x']]], 'companies takes $in, $not_in or $is_empty'],
 ]);
 
 it('computes task due status in the caller timezone', function (): void {

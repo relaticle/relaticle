@@ -46,6 +46,8 @@ arch()->preset()
         'Relaticle\Admin\AdminPanelProvider',
         'App\Enums\EnumValues',
         'App\Enums\CustomFields\CustomFieldTrait',
+        // Names a kind of filter inside the filter engine, next to the classes that switch on it.
+        'App\Support\Filters\FilterKind',
         'App\Mcp',
         'App\Http\Controllers\Mcp',
         'App\ActivityLog',
@@ -141,7 +143,7 @@ arch('avoid mutation')
         'App\Support\ActivityLog\CleanActivityLogAction',
         // Extends spatie's AllowedFilter; PHP forbids a readonly class extending a
         // non-readonly one.
-        'App\Support\Filters\CustomFieldAllowedFilter',
+        'App\Support\Filters\TreeAllowedFilter',
         // Request-scoped batch_uuid holder, mutable by design (lazily caches the
         // per-request id), like a value cache rather than a service.
         'App\Support\ActivityLog\RequestActivityBatch',
@@ -213,7 +215,7 @@ arch('avoid inheritance')
         'App\View',
         'App\Support\ActivityLog\CleanActivityLogAction',
         // Subclasses spatie's AllowedFilter, the query builder's extension point.
-        'App\Support\Filters\CustomFieldAllowedFilter',
+        'App\Support\Filters\TreeAllowedFilter',
         // Hooks slug uniqueness by extending sluggable's GenerateSlugAction,
         // which is the package's documented extension point.
         'App\Support\ReservedSlugAwareGenerateSlugAction',

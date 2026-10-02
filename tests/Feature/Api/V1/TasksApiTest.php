@@ -370,17 +370,17 @@ describe('includes', function (): void {
 });
 
 describe('filtering and sorting', function (): void {
-    it('ignores assigned_to_me filter when value is false', function (): void {
+    it('excludes tasks assigned to me when assigned_to_me is false', function (): void {
         Sanctum::actingAs($this->user);
 
-        $unassignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned']);
+        Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Unassigned']);
         $assignedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Assigned']);
         $assignedTask->assignees()->attach($this->user);
 
-        $this->getJson('/api/v1/tasks?filter[assigned_to_me]=false')
+        $this->getJson('/api/v1/tasks?filter[assigned_to_me][$eq]=false')
             ->assertOk()
             ->assertJsonFragment(['title' => 'Unassigned'])
-            ->assertJsonFragment(['title' => 'Assigned']);
+            ->assertJsonMissing(['title' => 'Assigned']);
     });
 
     it('can filter tasks by title', function (): void {
@@ -389,7 +389,7 @@ describe('filtering and sorting', function (): void {
         Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Fix login bug']);
         Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Deploy to staging']);
 
-        $response = $this->getJson('/api/v1/tasks?filter[title]=login');
+        $response = $this->getJson('/api/v1/tasks?filter[title][$contains]=login');
 
         $response->assertOk();
 

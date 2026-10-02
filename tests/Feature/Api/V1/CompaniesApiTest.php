@@ -815,7 +815,7 @@ describe('filtering and sorting', function (): void {
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta Inc']);
 
-        $response = $this->getJson('/api/v1/companies?filter[name]=Acme');
+        $response = $this->getJson('/api/v1/companies?filter[name][$contains]=Acme');
 
         $response->assertOk();
 
@@ -830,7 +830,7 @@ describe('filtering and sorting', function (): void {
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Sample Corp', 'creation_source' => CreationSource::SYSTEM]);
         Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Real Corp', 'creation_source' => CreationSource::WEB]);
 
-        $names = collect($this->getJson('/api/v1/companies?filter[creation_source]=system')->assertOk()->json('data'))->pluck('attributes.name');
+        $names = collect($this->getJson('/api/v1/companies?filter[creation_source][$eq]=system')->assertOk()->json('data'))->pluck('attributes.name');
 
         expect($names->all())->toBe(['Sample Corp']);
     });

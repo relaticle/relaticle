@@ -688,7 +688,7 @@ it('promotes a filtered hidden field to the first column', function (): void {
     $unfiltered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([])));
 
     $filtered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([
-        'custom_fields' => ['deal_source' => ['$eq' => 'Referral']],
+        'filter' => ['custom_fields' => ['deal_source' => ['$eq' => 'Referral']]],
     ])));
 
     expect(blockColumnKeys($unfiltered))->not->toContain('deal_source')
@@ -777,7 +777,7 @@ it('strips display_block from the replayed agent history while the row keeps it'
 it('emits no block when the list is called in lookup mode, keeping the data for chaining', function (): void {
     app(CreateCompany::class)->execute($this->user, ['name' => 'Lookup Co']);
 
-    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request(['search' => 'Lookup', 'lookup' => true])), true);
+    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request(['filter' => ['name' => ['$contains' => 'Lookup']], 'lookup' => true])), true);
 
     expect($decoded)->not->toHaveKey('display_block')
         ->and($decoded['data'][0]['attributes']['name'])->toBe('Lookup Co');

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseListTool;
@@ -18,6 +19,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use App\Support\Filters\CustomFieldFilter;
+use App\Support\Filters\EntityFilters;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -109,7 +112,7 @@ it('filters by custom field equality',
 
         $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
             ->allowedFilters(
-                CustomFieldFilter::allowedFilter('opportunity'),
+                ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
             )
             ->get();
 
@@ -143,7 +146,7 @@ it('filters by currency field with gte operator', function (): void {
 
     $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
+            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
         )
         ->get();
 
@@ -160,19 +163,25 @@ it('rejects unknown field codes', function (): void {
         ],
     ]);
 
-    QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+    expect(fn (): Collection => QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
+            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
         )
-        ->get();
-})->throws(ValidationException::class, '"nonexistent_field" is not a filterable custom field on opportunity.');
+        ->get())
+        ->toThrow(function (ValidationException $exception): void {
+            expect(array_keys($exception->errors()))->toBe(['filter.custom_fields.nonexistent_field'])
+                ->and($exception->getMessage())->toContain('"nonexistent_field" is not a filterable custom field on opportunity.');
+        });
+});
 
 it('names one unknown field code at a time', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'first_typo' => ['$eq' => 'x'],
-                'second_typo' => ['$eq' => 'y'],
+                'custom_fields' => [
+                    'first_typo' => ['$eq' => 'x'],
+                    'second_typo' => ['$eq' => 'y'],
+                ],
             ],
         ])
         ->assertHasErrors(['"first_typo" is not a filterable custom field on opportunity.']);
@@ -194,12 +203,16 @@ it('rejects unknown operators', function (): void {
         ],
     ]);
 
-    QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+    expect(fn (): Collection => QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
+            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
         )
-        ->get();
-})->throws(ValidationException::class, 'Operator "approximately" is not supported for "amount".');
+        ->get())
+        ->toThrow(function (ValidationException $exception): void {
+            expect(array_keys($exception->errors()))->toBe(['filter.custom_fields.amount.approximately'])
+                ->and($exception->getMessage())->toContain('Operator "approximately" is not supported for "amount".');
+        });
+});
 
 it('rejects more than 10 filter conditions', function (): void {
     $filters = [];
@@ -212,18 +225,23 @@ it('rejects more than 10 filter conditions', function (): void {
         'filter' => ['custom_fields' => $filters],
     ]);
 
-    QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
+    expect(fn (): Collection => QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
+            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
         )
-        ->get();
-})->throws(ValidationException::class);
+        ->get())
+        ->toThrow(function (ValidationException $exception): void {
+            expect(array_keys($exception->errors()))->toBe(['filter.custom_fields']);
+        });
+});
 
 it('returns an actionable MCP error for an operator incompatible with the field type', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'amount' => ['$contains' => '500'],
+                'custom_fields' => [
+                    'amount' => ['$contains' => '500'],
+                ],
             ],
         ])
         ->assertHasErrors(['Operator "$contains" is not supported for "amount".']);
@@ -234,7 +252,7 @@ it('rejects an encrypted custom field as an unknown filter code', function (): v
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
-            'filter' => ['secret_code' => ['$eq' => 'x']],
+            'filter' => ['custom_fields' => ['secret_code' => ['$eq' => 'x']]],
         ])
         ->assertHasErrors(['"secret_code" is not a filterable custom field on opportunity']);
 });
@@ -243,7 +261,9 @@ it('returns an actionable MCP error for an invalid operand shape', function (): 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'stage' => ['$in' => ['nested' => 'Qualification']],
+                'custom_fields' => [
+                    'stage' => ['$in' => ['nested' => 'Qualification']],
+                ],
             ],
         ])
         ->assertHasErrors(['must be an array']);
@@ -253,7 +273,9 @@ it('returns an actionable MCP error for an operand that is not the declared type
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'amount' => ['$gt' => 'lots'],
+                'custom_fields' => [
+                    'amount' => ['$gt' => 'lots'],
+                ],
             ],
         ])
         ->assertHasErrors(['must be a number']);
@@ -275,7 +297,9 @@ it('accepts a single value for an array operand', function (): void {
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
             'filter' => [
-                'stage' => ['$in' => 'Qualification'],
+                'custom_fields' => [
+                    'stage' => ['$in' => 'Qualification'],
+                ],
             ],
         ])
         ->assertOk()
@@ -291,7 +315,7 @@ it('matches a choice option by its label or a differently cased label', function
     $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => $operand]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => $operand]]]])
         ->assertOk()
         ->assertSee('Won Deal')
         ->assertDontSee('Lost Deal');
@@ -308,7 +332,7 @@ it('matches a choice option by its id', function (): void {
     $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => filterTestOptionId($stage, 'Closed Won')]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => filterTestOptionId($stage, 'Closed Won')]]]])
         ->assertOk()
         ->assertSee('Won Deal')
         ->assertDontSee('Lost Deal');
@@ -324,7 +348,7 @@ it('resolves a list mixing a label and an option id', function (): void {
     $lost->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Closed Lost'));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$in' => ['Closed Won', filterTestOptionId($stage, 'Qualification')]]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$in' => ['Closed Won', filterTestOptionId($stage, 'Qualification')]]]]])
         ->assertOk()
         ->assertSee('Won Deal')
         ->assertSee('Qualified Deal')
@@ -333,7 +357,7 @@ it('resolves a list mixing a label and an option id', function (): void {
 
 it('rejects an unknown option label and lists the valid labels', function (): void {
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => 'Nope']]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => 'Nope']]]])
         ->assertHasErrors(['option "Nope" is not one of: Prospecting, Qualification']);
 });
 
@@ -341,7 +365,7 @@ it('rejects an option id that no longer exists', function (): void {
     $staleId = (string) Str::ulid();
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => $staleId]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => $staleId]]]])
         ->assertHasErrors(["option \"{$staleId}\" is not one of"]);
 });
 
@@ -351,7 +375,7 @@ it('rejects an option id that belongs to another workspace', function (): void {
     $foreignWonId = filterTestOptionId($foreignStage, 'Closed Won');
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => $foreignWonId]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => $foreignWonId]]]])
         ->assertHasErrors(["option \"{$foreignWonId}\" is not one of"]);
 });
 
@@ -371,7 +395,7 @@ it('matches a record holding any one of the requested multi-select options', fun
     $cold->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Cold')]);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['temperature' => ['$has_any' => ['Hot', 'Warm']]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['temperature' => ['$has_any' => ['Hot', 'Warm']]]]])
         ->assertOk()
         ->assertSee('Hot Deal')
         ->assertSee('Warm Deal')
@@ -391,7 +415,7 @@ it('matches free-text tags by their raw value without an option lookup', functio
     $calm->saveCustomFieldValue($labels, ['someday']);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['$has_any' => ['urgent']]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['labels' => ['$has_any' => ['urgent']]]]])
         ->assertOk()
         ->assertSee('Urgent Deal')
         ->assertDontSee('Calm Deal');
@@ -410,7 +434,7 @@ it('keeps a free-text tag containing a comma whole', function (): void {
     $calm->saveCustomFieldValue($labels, ['urgent']);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['$has_any' => 'Hot, urgent']]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['labels' => ['$has_any' => 'Hot, urgent']]]])
         ->assertOk()
         ->assertSee('Urgent Deal')
         ->assertDontSee('Calm Deal');
@@ -429,7 +453,7 @@ it('keeps a link containing a comma whole', function (): void {
     $other->saveCustomFieldValue($linkedin, ['https://example.com/?a=1']);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListPeopleTool::class, ['filter' => ['linkedin' => ['$has_any' => 'https://example.com/?a=1,2']]])
+        ->tool(ListPeopleTool::class, ['filter' => ['custom_fields' => ['linkedin' => ['$has_any' => 'https://example.com/?a=1,2']]]])
         ->assertOk()
         ->assertSee('Matching Person')
         ->assertDontSee('Other Person');
@@ -446,7 +470,7 @@ it('rejects a label shared by two options and asks for the id', function (): voi
     ]);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$eq' => 'Closed Won']]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$eq' => 'Closed Won']]]])
         ->assertHasErrors(['is ambiguous']);
 });
 
@@ -454,7 +478,7 @@ it('rejects a list operand longer than one hundred values', function (): void {
     $values = array_map(fn (int $i): string => "Value {$i}", range(1, 101));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$in' => $values]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$in' => $values]]]])
         ->assertHasErrors(['stage: pass at most 100 values.']);
 });
 
@@ -484,7 +508,7 @@ it('includes records with no value when excluding single-choice options', functi
     $prospect->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Prospecting'));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$not_in' => ['Prospecting']]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$not_in' => ['Prospecting']]]]])
         ->assertOk()
         ->assertSee('Qualified Deal')
         ->assertSee('Unstaged Deal')
@@ -506,7 +530,7 @@ it('includes records with no value when excluding multi-choice options', functio
     $warm->saveCustomFieldValue($temperature, [filterTestOptionId($temperature, 'Warm')]);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['temperature' => ['$has_none' => ['Hot']]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['temperature' => ['$has_none' => ['Hot']]]]])
         ->assertOk()
         ->assertSee('Warm Deal')
         ->assertSee('Untagged Deal')
@@ -526,7 +550,7 @@ it('keeps a free-text tag containing a comma whole when excluding it', function 
     $kept->saveCustomFieldValue($labels, ['urgent']);
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['labels' => ['$has_none' => 'Hot, urgent']]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['labels' => ['$has_none' => 'Hot, urgent']]]])
         ->assertOk()
         ->assertSee('Kept Deal')
         ->assertDontSee('Excluded Deal');
@@ -547,14 +571,14 @@ it('treats a missing row, a null, a blank string and an empty array as empty', f
     $filled->saveCustomFieldValue($field, $options === [] ? $filledValue : array_map(fn (string $label): string => filterTestOptionId($field, $label), $filledValue));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['probe' => ['$is_empty' => true]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['probe' => ['$is_empty' => true]]]])
         ->assertOk()
         ->assertSee('Stored Empty')
         ->assertSee('Never Set')
         ->assertDontSee('Has Value');
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['probe' => ['$is_empty' => false]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['probe' => ['$is_empty' => false]]]])
         ->assertOk()
         ->assertSee('Has Value')
         ->assertDontSee('Stored Empty')
@@ -572,7 +596,7 @@ it('does not resolve option labels for the emptiness operand', function (): void
     $staged->saveCustomFieldValue($stage, filterTestOptionId($stage, 'Qualification'));
 
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$is_empty' => true]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$is_empty' => true]]]])
         ->assertOk()
         ->assertSee('Unstaged Deal')
         ->assertDontSee('Staged Deal');
@@ -580,7 +604,7 @@ it('does not resolve option labels for the emptiness operand', function (): void
 
 it('rejects an empty exclusion list instead of matching everything', function (): void {
     RelaticleServer::actingAs($this->user)
-        ->tool(ListOpportunitiesTool::class, ['filter' => ['stage' => ['$not_in' => []]]])
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['custom_fields' => ['stage' => ['$not_in' => []]]]])
         ->assertHasErrors(['must be an array of strings']);
 });
 
@@ -600,7 +624,9 @@ it('filters json array custom fields through the people list tool', function (st
     RelaticleServer::actingAs($this->user)
         ->tool(ListPeopleTool::class, [
             'filter' => [
-                $fieldCode => ['$has_any' => $operand],
+                'custom_fields' => [
+                    $fieldCode => ['$has_any' => $operand],
+                ],
             ],
         ])
         ->assertOk()
@@ -625,7 +651,7 @@ it('handles empty filter object as no-op', function (): void {
 
     $results = QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
         ->allowedFilters(
-            CustomFieldFilter::allowedFilter('opportunity'),
+            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
         )
         ->get();
 

@@ -514,7 +514,7 @@ it('cannot detach relationships from a task outside the current workspace', func
     expect($otherTask->companies()->whereKey($company->id)->exists())->toBeTrue();
 });
 
-it('can filter tasks by company_id', function (): void {
+it('can filter tasks by company', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $linkedTask = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Linked Task']);
     $linkedTask->companies()->attach($company);
@@ -522,7 +522,7 @@ it('can filter tasks by company_id', function (): void {
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListTasksTool::class, [
-            'company_id' => $company->id,
+            'filter' => ['companies' => ['$in' => [$company->id]]],
         ])
         ->assertOk()
         ->assertSee('Linked Task')
