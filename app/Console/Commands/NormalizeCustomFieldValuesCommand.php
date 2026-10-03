@@ -11,16 +11,22 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use stdClass;
+use Throwable;
 
 #[Description('Re-run every phone and link custom field value through its field type normalizer')]
 #[Signature('custom-fields:normalize-values {--force : Write changes instead of reporting them}')]
 final class NormalizeCustomFieldValuesCommand extends Command
 {
+    private const string NATIONAL_PHONE = '/^(?=.*\d)[\d\s().\-]+(?:;ext=\d+)?$/';
+
     private int $changed = 0;
 
     private int $national = 0;
 
-    /** @var array<string, array<string, list<string>>> */
+    private int $malformed = 0;
+
+    /** @var array<string, list<string>> */
     private array $domainOwners = [];
 
     public function handle(): int
@@ -28,6 +34,7 @@ final class NormalizeCustomFieldValuesCommand extends Command
         $write = (bool) $this->option('force');
         $this->changed = 0;
         $this->national = 0;
+        $this->malformed = 0;
         $this->domainOwners = [];
 
         CustomField::query()
@@ -38,8 +45,6 @@ final class NormalizeCustomFieldValuesCommand extends Command
                 $this->normalizeField($field, $write);
             });
 
-        $this->reportCollisions();
-
         $this->comment($write
             ? "{$this->changed} value(s) changed."
             : "{$this->changed} value(s) would change. Re-run with --force to write.");
@@ -48,40 +53,68 @@ final class NormalizeCustomFieldValuesCommand extends Command
             $this->comment("{$this->national} national phone number(s) have no country code and were left as they are.");
         }
 
+        if ($this->malformed > 0) {
+            $this->comment("{$this->malformed} value(s) have an unexpected shape and were left as they are.");
+        }
+
         return self::SUCCESS;
     }
 
     private function normalizeField(CustomField $field, bool $write): void
     {
         $isDomain = $field->type === 'link' && $field->setting('link_variant') === 'domain';
+        $nationalBefore = $this->national;
+        $this->domainOwners = [];
 
         DB::table('custom_field_values')
             ->where('custom_field_id', $field->getKey())
             ->whereNotNull('json_value')
             ->chunkById(500, function (Collection $rows) use ($field, $isDomain, $write): void {
                 foreach ($rows as $row) {
-                    $stored = json_decode((string) $row->json_value, true);
-
-                    if (! is_array($stored)) {
-                        continue;
-                    }
-
-                    $normalized = CanonicalValue::each($field, $stored);
-
-                    $this->countNational($field, $normalized);
-                    $this->collectDomains($field, $isDomain, (string) $row->entity_id, $normalized);
-
-                    if ($normalized === $stored) {
-                        continue;
-                    }
-
-                    $this->changed++;
-
-                    if ($write) {
-                        DB::table('custom_field_values')->where('id', $row->id)->update(['json_value' => json_encode($normalized)]);
+                    try {
+                        $this->normalizeRow($field, $row, $isDomain, $write);
+                    } catch (Throwable $exception) {
+                        $this->warn("Value {$row->id}: {$exception->getMessage()}, skipped.");
                     }
                 }
             });
+
+        $this->reportCollisions($field);
+        $this->domainOwners = [];
+
+        if ($this->national > $nationalBefore) {
+            $this->comment('Workspace '.$field->tenant_id.': '.($this->national - $nationalBefore)." national phone number(s) in {$field->entity_type}.{$field->code}.");
+        }
+    }
+
+    private function normalizeRow(CustomField $field, stdClass $row, bool $isDomain, bool $write): void
+    {
+        $stored = json_decode((string) $row->json_value, true);
+
+        if ($stored === null) {
+            return;
+        }
+
+        if (! is_array($stored) || ! array_is_list($stored) || ! array_all($stored, fn (mixed $item): bool => is_string($item))) {
+            $this->malformed++;
+
+            return;
+        }
+
+        $normalized = CanonicalValue::each($field, $stored);
+
+        $this->countNational($field, $normalized);
+        $this->collectDomains($isDomain, (string) $row->entity_id, $normalized);
+
+        if ($normalized === $stored) {
+            return;
+        }
+
+        $this->changed++;
+
+        if ($write) {
+            DB::table('custom_field_values')->where('id', $row->id)->update(['json_value' => json_encode($normalized)]);
+        }
     }
 
     /**
@@ -93,32 +126,30 @@ final class NormalizeCustomFieldValuesCommand extends Command
             return;
         }
 
-        $this->national += count(array_filter($values, fn (string $value): bool => ! str_starts_with($value, '+')));
+        $this->national += count(array_filter($values, fn (string $value): bool => preg_match(self::NATIONAL_PHONE, $value) === 1));
     }
 
     /**
      * @param  array<int, string>  $values
      */
-    private function collectDomains(CustomField $field, bool $isDomain, string $entityId, array $values): void
+    private function collectDomains(bool $isDomain, string $entityId, array $values): void
     {
         if (! $isDomain) {
             return;
         }
 
         foreach ($values as $value) {
-            $this->domainOwners[$field->tenant_id][$value][] = $entityId;
+            $this->domainOwners[$value][] = $entityId;
         }
     }
 
-    private function reportCollisions(): void
+    private function reportCollisions(CustomField $field): void
     {
-        foreach ($this->domainOwners as $workspaceId => $domains) {
-            foreach ($domains as $domain => $entityIds) {
-                $owners = array_values(array_unique($entityIds));
+        foreach ($this->domainOwners as $domain => $entityIds) {
+            $owners = array_values(array_unique($entityIds));
 
-                if (count($owners) > 1) {
-                    $this->warn("Workspace {$workspaceId}: {$domain} is shared by ".count($owners).' companies ('.implode(', ', $owners).').');
-                }
+            if (count($owners) > 1) {
+                $this->warn("Workspace {$field->tenant_id}: {$domain} is shared by ".count($owners).' companies ('.implode(', ', $owners).').');
             }
         }
     }
