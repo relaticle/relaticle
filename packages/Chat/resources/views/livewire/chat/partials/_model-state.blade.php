@@ -14,7 +14,8 @@ upgradeUrl: @js(
         ? \App\Filament\Pages\Billing::getUrl(panel: 'app', tenant: auth()->user()->currentWorkspace)
         : null
 ),
-allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(auth()->user()?->currentWorkspace?->plan ?? \App\Enums\Plan::default())),
+allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(app(\Relaticle\Chat\Services\ModelAccess::class)->planFor(auth()->user()?->currentWorkspace))),
+trialLocked: @js(app(\Relaticle\Chat\Services\ModelAccess::class)->isTrialLocked(auth()->user()?->currentWorkspace)),
 modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 ...window.ChatModules.modelPickerModule({
     persistSelection: @js($persistSelection ?? false),

@@ -51,7 +51,10 @@ function decodeRaw(Message $message): string
     return base64_decode(strtr($message->getRaw(), '-_', '+/'));
 }
 
-function fetchGmailMessageFromHeader(string $from): FetchedEmailData
+/**
+ * @param  list<string>  $labelIds
+ */
+function fetchGmailMessageFromHeader(string $from, array $labelIds = ['INBOX']): FetchedEmailData
 {
     $account = ConnectedAccount::factory()->make();
 
@@ -72,7 +75,7 @@ function fetchGmailMessageFromHeader(string $from): FetchedEmailData
         'id' => 'gmail-msg-from',
         'threadId' => 'gmail-thread-from',
         'internalDate' => (string) (now()->timestamp * 1000),
-        'labelIds' => ['INBOX'],
+        'labelIds' => $labelIds,
         'snippet' => 'Hello',
     ]);
     $message->setPayload($payload);
@@ -873,7 +876,7 @@ it('excludes drafts from the initial backfill listing', function (): void {
     new GmailService($account, $gmail)->initialBackfill();
 
     expect($captured['userId'])->toBe('me')
-        ->and($captured['params']['q'])->toBe('-in:drafts');
+        ->and($captured['params']['q'])->toBe('-in:drafts -category:promotions -category:social -category:forums -category:updates');
 });
 
 it('keeps the draft exclusion when the initial backfill is date-capped', function (): void {
@@ -903,5 +906,17 @@ it('keeps the draft exclusion when the initial backfill is date-capped', functio
 
     new GmailService($account, $gmail)->initialBackfill(90);
 
-    expect($captured['q'])->toBe('-in:drafts after:1781179200');
+    expect($captured['q'])->toBe('-in:drafts -category:promotions -category:social -category:forums -category:updates after:1781179200');
+});
+
+it('flags mail Gmail filed under a bulk category', function (string $label): void {
+    $data = fetchGmailMessageFromHeader('News <news@brand.example>', ['INBOX', $label, 'UNREAD']);
+
+    expect($data->isBulkMail)->toBeTrue();
+})->with(['CATEGORY_PROMOTIONS', 'CATEGORY_SOCIAL', 'CATEGORY_FORUMS', 'CATEGORY_UPDATES']);
+
+it('does not flag mail in the primary tab as bulk', function (): void {
+    $data = fetchGmailMessageFromHeader('Prospect <prospect@acme.example>', ['INBOX', 'CATEGORY_PERSONAL']);
+
+    expect($data->isBulkMail)->toBeFalse();
 });

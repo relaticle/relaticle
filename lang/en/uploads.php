@@ -3,6 +3,13 @@
 declare(strict_types=1);
 
 return [
+    'logo' => [
+        'description' => 'PNG, JPEG or WebP, up to :max.',
+        'upload' => 'Upload',
+        'replace' => 'Replace',
+        'remove' => 'Remove',
+        'failed' => 'The upload failed. Try again.',
+    ],
     'errors' => [
         'busy' => 'The upload is being processed. Try again shortly.',
         'too_large' => 'The file is larger than :max MB.',

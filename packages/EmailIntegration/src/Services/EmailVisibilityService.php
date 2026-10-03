@@ -143,11 +143,9 @@ final class EmailVisibilityService
             return 0;
         }
 
-        $query = $record
-            ->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+        $query = $record->emails();
 
-        $this->preferredCopies->restrictToPreferredCopies($query->getQuery(), $viewer);
+        $this->preferredCopies->restrictToVisiblePreferredCopies($query->getQuery(), $viewer);
 
         return $query->count();
     }
@@ -180,11 +178,9 @@ final class EmailVisibilityService
             return new VisibleCommunicationIntelligence;
         }
 
-        $emailsQuery = $record
-            ->emails()
-            ->withGlobalScope('visible', new VisibleEmailScope($viewer));
+        $emailsQuery = $record->emails();
 
-        $this->preferredCopies->restrictToPreferredCopies($emailsQuery->getQuery(), $viewer);
+        $this->preferredCopies->restrictToVisiblePreferredCopies($emailsQuery->getQuery(), $viewer);
 
         $emailAggregates = $emailsQuery
             ->reorder()

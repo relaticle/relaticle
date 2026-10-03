@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Models\User;
 use Relaticle\Chat\Services\AiModelResolver;
+use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
+use Tests\Helpers\ChatCatalog;
 
 mutates(AiModelResolver::class, ModelRegistry::class);
 
@@ -168,15 +170,43 @@ it('returns null once the auto chain is exhausted', function (): void {
     expect($next)->toBeNull();
 });
 
+it('does not fail over to a premium model for a locked trial', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    config()->set('chat.models', [
+        ChatCatalog::entry(),
+        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'auto' => true]),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
+
+    expect(resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5'))->toBeNull();
+});
+
+it('fails over to a premium model for a paid Pro workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    config()->set('chat.models', [
+        ChatCatalog::entry(),
+        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'auto' => true]),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
+
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5');
+
+    expect($next)->not->toBeNull()
+        ->and($next['id'])->toBe('claude-opus-5');
+});
+
 it('throws a clear error when no chat model is configured', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
     config([
         'chat.models' => [],
         'chat.auto_chain' => [],
         'chat.self_hosted' => ['url' => null, 'key' => '', 'models' => null],
     ]);
 
-    $resolver = new AiModelResolver(new ModelRegistry);
-    $user = User::factory()->withPersonalWorkspace()->create();
+    $resolver = new AiModelResolver(new ModelRegistry, new ModelAccess);
 
     expect(fn (): array => $resolver->resolve($user))
         ->toThrow(RuntimeException::class, 'No chat model is configured');

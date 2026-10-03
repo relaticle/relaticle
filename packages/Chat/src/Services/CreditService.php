@@ -10,7 +10,10 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Ai;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 
@@ -315,14 +318,35 @@ final readonly class CreditService
         string $resolutionKey,
         string $reason,
         int $reservedCredits = 1,
+        ?string $model = null,
+        ?TextUsage $usage = null,
     ): void {
+        if ($model === null || ! $usage instanceof TextUsage) {
+            $this->recordResolution(
+                workspace: $workspace,
+                resolutionKey: $resolutionKey,
+                type: AiCreditType::Chat,
+                model: 'incomplete',
+                inputTokens: 0,
+                outputTokens: 0,
+                creditsCharged: $reservedCredits,
+                remainingDelta: 0,
+                usedDelta: 0,
+                userId: (string) $user->getKey(),
+                conversationId: $conversationId,
+                metadata: ['reason' => $reason],
+            );
+
+            return;
+        }
+
         $this->recordResolution(
             workspace: $workspace,
             resolutionKey: $resolutionKey,
             type: AiCreditType::Chat,
-            model: 'incomplete',
-            inputTokens: 0,
-            outputTokens: 0,
+            model: $model,
+            inputTokens: $usage->uncachedInputTokens(),
+            outputTokens: $usage->outputTokens,
             creditsCharged: $reservedCredits,
             remainingDelta: 0,
             usedDelta: 0,
@@ -330,6 +354,31 @@ final readonly class CreditService
             conversationId: $conversationId,
             metadata: ['reason' => $reason],
         );
+    }
+
+    public function recordInternalUsage(string $conversationId, ?string $provider, TextUsage $usage, ?string $reportedModel): void
+    {
+        $conversation = AgentConversation::query()->find($conversationId);
+
+        if (! $conversation instanceof AgentConversation || $conversation->workspace_id === null) {
+            return;
+        }
+
+        $model = rescue(fn (): string => Ai::textProvider($provider)->cheapestTextModel(), $reportedModel) ?: 'unknown';
+
+        AiCreditTransaction::query()->create([
+            'workspace_id' => $conversation->workspace_id,
+            'user_id' => $conversation->participant_id,
+            'conversation_id' => $conversationId,
+            'idempotency_key' => 'internal-'.Str::ulid(),
+            'type' => AiCreditType::Internal,
+            'model' => $model,
+            'input_tokens' => $usage->uncachedInputTokens(),
+            'output_tokens' => $usage->outputTokens,
+            'credits_charged' => 0,
+            'metadata' => [],
+            'created_at' => now(),
+        ]);
     }
 
     public function calculateCredits(string $model, int $toolCallsCount): int

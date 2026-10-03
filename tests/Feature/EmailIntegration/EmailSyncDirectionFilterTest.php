@@ -19,7 +19,7 @@ mutates(StoreEmailJob::class);
  * Build a StoreEmailJob whose mailbox returns a message of the given direction,
  * then run it against the account's inbox/sent toggles.
  */
-function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction, ?EmailFolder $folder = null): void
+function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction, ?EmailFolder $folder = null, bool $isBulkMail = false): void
 {
     $fetched = new FetchedEmailData(
         providerMessageId: 'msg-'.$direction->value,
@@ -39,6 +39,7 @@ function runStoreEmailJob(ConnectedAccount $account, EmailDirection $direction, 
             ['email_address' => 'someone@example.com', 'name' => 'Someone', 'role' => 'from'],
         ],
         attachments: [],
+        isBulkMail: $isBulkMail,
     );
 
     $service = Mockery::mock(MailServiceInterface::class);
@@ -78,6 +79,14 @@ it('skips storing a provider draft even when inbox sync is on', function (): voi
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['sync_inbox' => true, 'sync_sent' => true]));
 
     runStoreEmailJob($account, EmailDirection::INBOUND, EmailFolder::Drafts);
+
+    expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(0);
+});
+
+it('skips storing mail the provider filed as bulk', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['sync_inbox' => true, 'sync_sent' => true]));
+
+    runStoreEmailJob($account, EmailDirection::INBOUND, isBulkMail: true);
 
     expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(0);
 });

@@ -11,11 +11,13 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Prompts\AgentPrompt;
 use Relaticle\Chat\Agents\ConversationTitler;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Events\ConversationTitleGenerated;
 use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TitleSanitizer;
@@ -473,4 +475,68 @@ it('titles at turn end from an attachment message using its typed text, not the 
         fn (GenerateConversationTitle $job): bool => $job->provisionalTitle === 'Here are my contacts'
             && $job->message === 'Here are my contacts',
     );
+});
+
+it('books the title call on the ledger without charging credits', function (): void {
+    Event::fake([ConversationTitleGenerated::class]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        message: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        provider: 'anthropic',
+    ))->handle();
+
+    $row = AiCreditTransaction::query()->where('conversation_id', $conversationId)->sole();
+
+    expect($row->type)->toBe(AiCreditType::Internal)
+        ->and($row->credits_charged)->toBe(0)
+        ->and($row->model)->toBe(config('ai.providers.anthropic.models.text.cheapest'))
+        ->and($row->user_id)->toBe((string) $this->user->getKey())
+        ->and(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(100);
+});
+
+it('books an OpenAI title call on the requested model, not the dated id the provider reports', function (): void {
+    OpenAiResponses::fakeStructured(['has_topic' => true, 'title' => 'Follow Up With Acme'], 'gpt-5.6-luna-2026-09-01');
+
+    $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        message: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        provider: 'openai',
+    ))->handle();
+
+    $row = AiCreditTransaction::query()->where('conversation_id', $conversationId)->sole();
+
+    expect($row->model)->toBe(config('ai.providers.openai.models.text.cheapest'));
+});
+
+it('still applies the title when the ledger write fails', function (): void {
+    Event::fake([ConversationTitleGenerated::class]);
+    ConversationTitler::fake([['has_topic' => true, 'title' => 'Follow Up With Acme']]);
+    AiCreditTransaction::creating(fn (): never => throw new RuntimeException('ledger down'));
+
+    $conversationId = seedTitlingConversation('Create a follow-up task for Sarah at Acme next Tuesday');
+
+    (new GenerateConversationTitle(
+        conversationId: $conversationId,
+        provisionalTitle: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        message: 'Create a follow-up task for Sarah at Acme next Tuesday',
+        provider: 'anthropic',
+    ))->handle();
+
+    expect(AgentConversation::query()->find($conversationId)->title)->toBe('Follow Up With Acme');
+
+    Event::assertDispatched(ConversationTitleGenerated::class);
 });

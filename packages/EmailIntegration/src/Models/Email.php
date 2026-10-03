@@ -165,19 +165,6 @@ final class Email extends Model
         return $query->withExists(['reads as is_read' => fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId)]);
     }
 
-    /**
-     * Inbound emails the given user has not yet read.
-     *
-     * @param  Builder<Email>  $query
-     * @return Builder<Email>
-     */
-    #[Scope]
-    protected function unreadFor(Builder $query, string $userId): Builder
-    {
-        return $query->where('direction', EmailDirection::INBOUND)
-            ->whereDoesntHave('reads', fn (Builder $readQuery): Builder => $readQuery->where('user_id', $userId));
-    }
-
     // Relations
 
     /**

@@ -77,7 +77,7 @@ it('batches a StoreMeetingJob per event and does not advance the cursor until th
 
     (new InitialCalendarSyncJob($account))->handle($factory);
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-sync'
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-import'
         && $batch->jobs->count() === 1
         && $batch->jobs->first() instanceof StoreMeetingJob
     );

@@ -79,3 +79,12 @@ it('renders a keyboard reachable resize handle inside the sidebar', function ():
         ->and($this->html)->toContain('role="separator"')
         ->and($this->html)->toContain(__('filament/panel.sidebar.resize'));
 });
+
+it('renders the chat assistant entry points in the customer panel', function (): void {
+    expect($this->html)
+        ->toContain('RECORD_CHIP_ICONS')
+        ->toContain('app.chat.chat-sidebar-nav')
+        ->toContain('app.chat.chat-side-panel')
+        ->toContain('chat:toggle-panel')
+        ->toContain(__('Ask :name', ['name' => config('chat.assistant_name')]));
+});

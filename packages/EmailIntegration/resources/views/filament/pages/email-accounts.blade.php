@@ -17,7 +17,7 @@
         <div
             class="space-y-3"
             @if ($this->isImportingAnyAccount())
-                wire:poll.5s="refreshAccounts"
+                wire:poll.10s.visible="refreshAccounts"
             @endif
         >
             @foreach ($this->connectedAccounts as $account)
@@ -62,11 +62,12 @@
                                 </x-filament::badge>
                             @endif
                             @if (! $account->hasSend())
+                                @php($sendMissingLabel = __('filament/emails/composer.grant_send.heading', ['email' => $account->email_address]).' '.__('filament/emails/composer.grant_send.description'))
                                 <x-filament::badge
                                     color="warning"
                                     icon="heroicon-m-exclamation-triangle"
-                                    :tooltip="__('filament/pages/email-accounts.send_missing_tooltip')"
-                                    :aria-label="__('filament/pages/email-accounts.send_missing_tooltip')"
+                                    :tooltip="$sendMissingLabel"
+                                    :aria-label="$sendMissingLabel"
                                 />
                             @endif
 

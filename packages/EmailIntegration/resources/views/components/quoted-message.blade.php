@@ -33,10 +33,10 @@
         <div class="min-w-0 flex-1">
             @if ($authUser->can('viewSubject', $record))
                 <p class="text-sm font-medium text-gray-900 dark:text-white break-words">
-                    {{ $record->subject ?: '(no subject)' }}
+                    {{ $record->subject ?: __('filament/pages/email-inbox.subject.none') }}
                 </p>
             @else
-                <p class="text-sm italic text-gray-400 dark:text-gray-500">(subject hidden)</p>
+                <p class="text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.subject.hidden') }}</p>
             @endif
 
             <p class="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">

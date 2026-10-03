@@ -22,12 +22,14 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Laravel\Jetstream\Contracts\DeletesTeams;
 use Override;
+use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\EditWorkspace;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\ListWorkspaces;
@@ -36,14 +38,22 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\CompaniesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\ConversationsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\ImportsRelationManager;
+use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\MailboxesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\NotesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\OpportunitiesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\PeopleRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
+use Relaticle\SystemAdmin\Filament\Support\EndTrial;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
+use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
+use Relaticle\SystemAdmin\Metrics\Scopes\ExternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
+use Relaticle\SystemAdmin\Metrics\Scopes\InternalWorkspace;
+use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
+use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
 
 final class WorkspaceResource extends Resource
 {
@@ -165,6 +175,18 @@ final class WorkspaceResource extends Resource
                     TextEntry::make('updated_at')
                         ->dateTime(),
                 ])->columnSpanFull()->columns(),
+                Section::make('Journey')
+                    ->columnSpanFull()
+                    ->columns(2)
+                    ->schema(array_map(
+                        fn (string $label): TextEntry => TextEntry::make('journey_'.str($label)->slug('_'))
+                            ->label($label)
+                            ->state(fn (Workspace $record): string => WorkspaceJourney::facts($record)[$label]),
+                        [
+                            'Signed up', 'Signup method', 'First own record', 'Active days (30d)', 'Typed chat messages', 'Credits used this period', 'Internal',
+                            ...(EmailIntegrationServiceProvider::enabled() ? ['Connected mailboxes'] : []),
+                        ],
+                    )),
             ]);
     }
 
@@ -251,13 +273,62 @@ final class WorkspaceResource extends Resource
                 SelectFilter::make('onboarding_referral_source')
                     ->label('Referral Source')
                     ->options(OnboardingReferralSource::class),
+                TernaryFilter::make('internal')
+                    ->label('Internal')
+                    ->placeholder('All workspaces')
+                    ->trueLabel('Owned by a system administrator')
+                    ->falseLabel('Customers only')
+                    ->queries(
+                        true: function (Builder $query): Builder {
+                            (new InternalWorkspace)->apply($query, $query->getModel());
+
+                            return $query;
+                        },
+                        false: function (Builder $query): Builder {
+                            (new ExternalWorkspace)->apply($query, $query->getModel());
+
+                            return $query;
+                        },
+                        blank: fn (Builder $query): Builder => $query,
+                    ),
+                Filter::make('formed_habit')
+                    ->label('Formed a habit')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new FormedHabit)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
+                Filter::make('abuse_suspect')
+                    ->label('Abuse suspect')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new AbuseSuspect)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
+                Filter::make('connected_mailbox')
+                    ->label('Connected a mailbox')
+                    ->toggle()
+                    ->visible(fn (): bool => EmailIntegrationServiceProvider::enabled())
+                    ->query(fn (Builder $query): Builder => $query->withConnectedMailbox()),
+                Filter::make('stuck_after_setup')
+                    ->label('Stuck after setup')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new StuckAfterSetup)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
             ])
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
+                EndTrial::action(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    EndTrial::bulkAction(),
                     SafeDelete::bulkAction(function (Workspace $record): void {
                         resolve(DeletesTeams::class)->delete($record);
                     }),
@@ -303,6 +374,7 @@ final class WorkspaceResource extends Resource
             NotesRelationManager::class,
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
+            MailboxesRelationManager::class,
             SubscriptionsRelationManager::class,
             ActivityRelationManager::class,
         ];

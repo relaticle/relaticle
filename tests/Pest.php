@@ -130,7 +130,7 @@ function mailboxOwnerInWorkspace(ConnectedAccount $account, string $role = 'admi
     return $owner->fresh();
 }
 
-function insertHistoryImportFailedJob(ConnectedAccount $account, string $batchId, string $uuid, string $messageId = 'failed-message'): void
+function insertHistoryImportFailedJob(ConnectedAccount $account, string $batchId, string $uuid, string $messageId = 'failed-message', string $queue = 'emails-import'): void
 {
     $job = new StoreEmailJob($account, $messageId);
     $job->withBatchId($batchId);
@@ -138,7 +138,7 @@ function insertHistoryImportFailedJob(ConnectedAccount $account, string $batchId
     DB::table('failed_jobs')->insert([
         'uuid' => $uuid,
         'connection' => config('queue.default'),
-        'queue' => 'emails-sync',
+        'queue' => $queue,
         'payload' => json_encode([
             'uuid' => $uuid,
             'displayName' => StoreEmailJob::class,

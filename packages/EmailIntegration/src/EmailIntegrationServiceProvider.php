@@ -31,7 +31,6 @@ use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
-use Relaticle\EmailIntegration\Livewire\MailboxImportStatus;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
@@ -99,7 +98,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 ->forceDelete();
         });
 
-        if (! Feature::for(null)->active(EmailIntegration::class)) {
+        if (! self::enabled()) {
             return;
         }
 
@@ -145,7 +144,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component(EmailAccessNotificationHandler::LIVEWIRE_ALIAS, EmailAccessNotificationHandler::class);
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
-        Livewire::component('email-integration.mailbox-import-status', MailboxImportStatus::class);
         Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
         Livewire::component('email-integration.user-email-privacy-settings', UserEmailPrivacySettings::class);
 
@@ -160,10 +158,13 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 }
 
                 $pageTo = ComposerPageTo::email();
+                $pageRecordId = ComposerPageTo::recordId();
 
-                return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo], key($composerKey))', [
+                return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo, \'pageRecordType\' => $pageRecordType, \'pageRecordId\' => $pageRecordId], key($composerKey))', [
                     'pageTo' => $pageTo,
-                    'composerKey' => 'email-composer-'.($pageTo ?? ''),
+                    'pageRecordType' => ComposerPageTo::recordType(),
+                    'pageRecordId' => $pageRecordId,
+                    'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
                 ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
             },
         );
@@ -177,5 +178,10 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
                 RenewCalendarPushChannelsCommand::class,
             ]);
         }
+    }
+
+    public static function enabled(): bool
+    {
+        return Feature::for(null)->active(EmailIntegration::class);
     }
 }

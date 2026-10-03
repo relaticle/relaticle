@@ -407,6 +407,8 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null) {
         const isFirstMessage = !this.conversationId;
 
+        this.anchorTo(userMsg);
+
         if (isFirstMessage) {
             this.mintAssistantStub();
             this.currentToolStatus = null;
@@ -464,7 +466,6 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                 // It reserves a credit, dispatches ProcessChatMessage, and the
                 // job's broadcasts arrive on our already-subscribed channel.
                 this.startStreamTimeout();
-                this.scrollToBottom(true);
 
                 this.streamAbortController = new AbortController();
 
@@ -596,8 +597,6 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             this.clearStreamTimeout();
             this.restoreInputFocus();
         }
-
-        this.scrollToBottom(true);
     },
 
     // The server answered without a model turn (a large attachment): fill the
@@ -616,7 +615,6 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         }
         this.isStreaming = false;
         this.clearStreamTimeout();
-        this.scrollToBottom(true);
         this.restoreInputFocus();
         this.flushQueuedSend();
         // No model turn ran, so no title broadcast fires; the server hands the

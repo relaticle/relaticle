@@ -14,8 +14,6 @@ use Relaticle\Chat\Services\CreditService;
 
 final readonly class StartProTrial
 {
-    public const int TRIAL_DAYS = 14;
-
     public function __construct(private CreditService $credits) {}
 
     /** @throws AuthorizationException */
@@ -39,7 +37,7 @@ final readonly class StartProTrial
 
             $lockedWorkspace->forceFill([
                 'plan' => Plan::Pro,
-                'trial_ends_at' => now()->addDays(self::TRIAL_DAYS),
+                'trial_ends_at' => now()->addDays(Workspace::PRO_TRIAL_DAYS),
                 'pro_trial_used_at' => now(),
             ])->save();
 

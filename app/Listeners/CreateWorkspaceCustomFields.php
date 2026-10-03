@@ -53,7 +53,7 @@ final readonly class CreateWorkspaceCustomFields
         $this->migrator->setTenantId($workspace->id);
 
         $stagePreset = $workspace->onboarding_use_case instanceof OnboardingUseCase
-            ? $workspace->onboarding_use_case->stagePreset()
+            ? $workspace->onboarding_use_case->pipelineStages()
             : null;
 
         // The defaults every workspace starts with are not an edit anyone made, so

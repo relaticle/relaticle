@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Helpers;
 
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
@@ -31,6 +32,36 @@ final class ChatBrowser
         ]);
 
         return $id;
+    }
+
+    /**
+     * Ids are sortable strings, not uuid7, so ORDER BY id in ListConversationMessages
+     * does not rest on uuid7 staying monotonic under a tight insert loop.
+     */
+    public static function seedSequencedMessages(string $conversationId, User $user, int $count, CarbonImmutable $baseline, string $prefix = 'seq'): void
+    {
+        $rows = [];
+
+        foreach (range(1, $count) as $i) {
+            $rows[] = [
+                'id' => sprintf('%s-%04d', $prefix, $i),
+                'conversation_id' => $conversationId,
+                'participant_type' => 'user',
+                'participant_id' => (string) $user->getKey(),
+                'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+                'role' => 'user',
+                'content' => sprintf('Seeded message %04d', $i),
+                'document' => ChatDocument::emptyJson(),
+                'attachments' => '[]',
+                'steps' => '[]',
+                'usage' => '{}',
+                'meta' => '{}',
+                'created_at' => $baseline->copy()->addMinutes($i),
+                'updated_at' => $baseline->copy()->addMinutes($i),
+            ];
+        }
+
+        DB::table('agent_conversation_messages')->insert($rows);
     }
 
     /**

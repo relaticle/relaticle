@@ -14,7 +14,7 @@ trait ProvidesComposerToAddress
 
     public function renderingProvidesComposerToAddress(): void
     {
-        ComposerPageTo::remember($this->getEmail());
+        ComposerPageTo::remember($this->getEmail(), $this->getRecord());
     }
 
     public function getEmail(): ?string

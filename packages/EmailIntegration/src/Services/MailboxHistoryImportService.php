@@ -19,8 +19,6 @@ final readonly class MailboxHistoryImportService
 {
     private const string AWAITING_RETRY_SUCCESS_NOTICE_PREFIX = 'email-integration:history-import-awaiting-retry-success-notice:';
 
-    private const string FAILURE_GENERATION_PREFIX = 'email-integration:history-import-failure-generation:';
-
     private const string CALENDAR_FAILURES_PREFIX = 'email-integration:history-import-calendar-failures:';
 
     private const string EMAIL_LISTING_PENDING_PREFIX = 'email-integration:history-import-email-listing:';
@@ -49,24 +47,6 @@ final readonly class MailboxHistoryImportService
     public function clearAwaitingRetrySuccessNotice(string $batchId): void
     {
         Cache::forget(self::AWAITING_RETRY_SUCCESS_NOTICE_PREFIX.$batchId);
-    }
-
-    public function failureGeneration(string $batchId): int
-    {
-        return (int) Cache::get(self::FAILURE_GENERATION_PREFIX.$batchId, 0);
-    }
-
-    public function recordFailureGeneration(string $batchId): int
-    {
-        $key = self::FAILURE_GENERATION_PREFIX.$batchId;
-
-        if (! Cache::has($key)) {
-            Cache::put($key, 1, now()->addMonth());
-
-            return 1;
-        }
-
-        return (int) Cache::increment($key);
     }
 
     public function recordCalendarFailures(string $batchId, int $count): void
@@ -509,7 +489,7 @@ final readonly class MailboxHistoryImportService
 
         return Bus::batch([])
             ->name("Mailbox history import: {$account->email_address}")
-            ->onQueue('emails-sync')
+            ->onQueue('emails-import')
             ->allowFailures()
             ->progress($complete)
             ->finally($complete)

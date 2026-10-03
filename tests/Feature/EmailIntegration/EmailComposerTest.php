@@ -12,8 +12,12 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Factories\Sequence;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
@@ -24,7 +28,6 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -35,16 +38,14 @@ use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
-use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
-use Tests\Helpers\AllowedComposerRecipient;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -56,18 +57,6 @@ beforeEach(function (): void {
     actingAs($this->user);
     Filament::setCurrentPanel(Filament::getPanel('app'));
     Filament::setTenant($this->user->currentWorkspace);
-
-    AllowedComposerRecipient::seedMany($this->user, [
-        'lead@example.com',
-        'a@example.com',
-        'x@example.com',
-        'd@example.com',
-        'draft@example.com',
-        'victim@example.com',
-        'recipient@example.com',
-        'existing@example.com',
-        'forward-to@example.com',
-    ]);
 });
 
 it('opens via the composer:open event with the default account preselected', function (): void {
@@ -88,6 +77,20 @@ it('uses the payload to instead of the page email', function (): void {
     Livewire::test(EmailComposer::class, ['pageTo' => 'jane@example.com'])
         ->dispatch('composer:open', payload: ['to' => ['other@example.com']])
         ->assertSet('to', ['other@example.com']);
+});
+
+it('keeps a mass send opened on a record page unlinked from that record', function (): void {
+    $person = People::factory()->for($this->user->currentWorkspace)->create(['creator_id' => $this->user->getKey()]);
+
+    Livewire::test(EmailComposer::class, [
+        'pageTo' => 'jane@example.com',
+        'pageRecordType' => People::class,
+        'pageRecordId' => (string) $person->getKey(),
+    ])
+        ->dispatch('composer:open', payload: ['massSend' => true, 'recipients' => [], 'linkRecordType' => null, 'linkRecordId' => null])
+        ->assertSet('isMassSend', true)
+        ->assertSet('linkRecordType', null)
+        ->assertSet('linkRecordId', null);
 });
 
 it('leaves to blank when the current page has no email', function (): void {
@@ -305,8 +308,6 @@ it('resolves merge tags from the primary To recipient when compose was not opene
 
     $person->saveCustomFieldValue($emailsField, ['crm@example.com'], $person->workspace);
 
-    AllowedComposerRecipient::seed($this->user, 'crm@example.com');
-
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->set('to', ['crm@example.com'])
@@ -505,20 +506,19 @@ it('surfaces a validation error for a malformed recipient and sends nothing', fu
     expect(Email::query()->where('subject', 'Malformed recipient')->exists())->toBeFalse();
 });
 
-it('rejects a recipient that is not on a record or in suggestions and sends nothing', function (): void {
+it('sends to a typed address that is not on a record or in suggestions', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->set('to', ['random@example.com'])
         ->set('subject', 'Random recipient')
         ->set('bodyHtml', '<p>Body</p>')
         ->call('send')
-        ->assertHasErrors(['to.0'])
-        ->assertSet('isOpen', true);
+        ->assertHasNoErrors();
 
-    expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeFalse();
+    expect(Email::query()->where('subject', 'Random recipient')->exists())->toBeTrue();
 });
 
-it('includes CRM addresses outside the autocomplete cap in the allowed recipient list', function (): void {
+it('sends to a CRM address outside the autocomplete cap', function (): void {
     $seedEmail = function (People $person, string $email): void {
         $emailsField = CustomField::query()
             ->withoutGlobalScopes()
@@ -546,9 +546,6 @@ it('includes CRM addresses outside the autocomplete cap in the allowed recipient
     $seedEmail($overflow, 'overflow@example.com');
 
     $component = Livewire::test(EmailComposer::class)->dispatch('composer:open');
-
-    expect($component->instance()->allowedRecipientAddresses())
-        ->toContain('overflow@example.com');
 
     $optionEmails = collect($component->instance()->recipientOptions())
         ->pluck('email')
@@ -712,6 +709,32 @@ it('notifies when an inline reply draft is saved on dismiss', function (): void 
         ->assertSet('isOpen', false);
 });
 
+it('subscribes each dock only to the events it answers', function (): void {
+    expect(Livewire::test(EmailComposer::class)->effects['listeners'])
+        ->toBe(['composer:open'])
+        ->and(Livewire::test(EmailComposer::class, ['dock' => 'inline'])->effects['listeners'])
+        ->toBe(['composer:reply', 'composer:dismiss-inline', 'composer:resume-draft']);
+});
+
+it('opens a saved draft that has no body', function (): void {
+    $draft = Email::query()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Subject only',
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::DRAFT,
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: (string) $draft->getKey())
+        ->assertSet('isOpen', true)
+        ->assertSet('draftId', (string) $draft->getKey())
+        ->assertSet('subject', 'Subject only');
+});
+
 it('deletes the draft after a successful send', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
@@ -738,19 +761,6 @@ it('does not save empty drafts on close', function (): void {
         ->call('close');
 
     expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
-});
-
-it('never lists drafts in the mail panes', function (): void {
-    Livewire::test(EmailComposer::class)
-        ->dispatch('composer:open')
-        ->set('to', ['d@example.com'])
-        ->set('subject', 'Hidden draft')
-        ->set('bodyHtml', '<p>b</p>')
-        ->call('close');
-
-    Livewire::test(EmailInboxPage::class)
-        ->call('setFolder', 'all')
-        ->assertDontSee('Hidden draft');
 });
 
 it('does not load another user\'s draft into the composer', function (): void {
@@ -863,6 +873,93 @@ it('excludes a teammate\'s unsent draft recipients from recipient suggestions', 
         ->recipientSuggestions();
 
     expect($suggestions)->not->toContain('hidden-recipient@example.com');
+});
+
+it('suggests the most recent correspondents first', function (): void {
+    foreach (['aaron@older.example' => now()->subDays(3), 'zoe@newer.example' => now()->subHour()] as $address => $sentAt) {
+        $email = Email::factory()->create([
+            'workspace_id' => $this->user->current_workspace_id,
+            'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->id,
+            'status' => EmailStatus::SYNCED,
+            'sent_at' => $sentAt,
+        ]);
+
+        EmailParticipant::factory()->create([
+            'email_id' => $email->id,
+            'email_address' => $address,
+            'role' => EmailParticipantRole::FROM,
+        ]);
+    }
+
+    $suggestions = composerRecipientSuggestions();
+
+    expect(array_search('zoe@newer.example', $suggestions, true))
+        ->toBeLessThan(array_search('aaron@older.example', $suggestions, true));
+});
+
+it('reads recipient suggestions and options once across composer round-trips', function (): void {
+    $suggestionQueries = 0;
+    $optionQueries = 0;
+
+    DB::listen(function (QueryExecuted $query) use (&$suggestionQueries, &$optionQueries): void {
+        if (str_contains($query->sql, 'recent_emails')) {
+            $suggestionQueries++;
+        }
+
+        if (str_contains($query->sql, 'from "people"') && str_contains($query->sql, 'limit 300')) {
+            $optionQueries++;
+        }
+    });
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->call('toggleCc')
+        ->call('toggleBcc');
+
+    expect($suggestionQueries)->toBe(1)
+        ->and($optionQueries)->toBe(1);
+});
+
+it('keeps suggesting the viewer\'s correspondents when a teammate\'s private mail is newer', function (): void {
+    $email = Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'sent_at' => now()->subDays(2),
+    ]);
+
+    EmailParticipant::factory()->create([
+        'email_id' => $email->id,
+        'email_address' => 'old-friend@client.example',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    $privateEmail = teammateSentEmailReturningEmail($this->user, EmailPrivacyTier::PRIVATE, 'secret@teammate.example', EmailParticipantRole::TO);
+
+    collect(range(1, 1000))
+        ->map(fn (int $index): array => [
+            'id' => (string) Str::ulid(),
+            'workspace_id' => $privateEmail->workspace_id,
+            'user_id' => $privateEmail->user_id,
+            'connected_account_id' => $privateEmail->connected_account_id,
+            'rfc_message_id' => "<private-{$index}@teammate.example>",
+            'provider_message_id' => "private-{$index}",
+            'thread_id' => "private-thread-{$index}",
+            'subject' => 'Private',
+            'sent_at' => now()->subMinutes($index),
+            'direction' => EmailDirection::INBOUND->value,
+            'folder' => EmailFolder::Inbox->value,
+            'privacy_tier' => EmailPrivacyTier::PRIVATE->value,
+            'status' => EmailStatus::SYNCED->value,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ])
+        ->chunk(250)
+        ->each(fn (Collection $rows) => DB::table('emails')->insert($rows->values()->all()));
+
+    expect(composerRecipientSuggestions())->toContain('old-friend@client.example');
 });
 
 it('excludes a teammate\'s private mail recipients from recipient suggestions', function (): void {

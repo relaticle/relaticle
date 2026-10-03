@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -644,7 +645,7 @@ it('creates distinct companies for different subdomains of the same apex', funct
         ->first();
 
     $companies = Company::where('workspace_id', $this->workspace->id)
-        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('creation_source', CreationSource::MAILBOX)
         ->where('name', 'Printtest')
         ->with('customFieldValues.customField')
         ->get();
@@ -681,7 +682,7 @@ it('reuses one company when the host only differs by a www prefix', function ():
     app(LinkEmailAction::class)->execute($second);
 
     expect(Company::where('workspace_id', $this->workspace->id)
-        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('creation_source', CreationSource::MAILBOX)
         ->where('name', 'Cap')
         ->count())->toBe(1);
 });
@@ -791,7 +792,7 @@ it('creates distinct companies for same-named domains with different TLDs and pr
     // Two distinct companies — same first label, different TLD must not dedup.
     expect($second->getKey())->not->toBe($first->getKey());
     expect(Company::where('workspace_id', $this->workspace->id)
-        ->where('creation_source', CreationSource::SYSTEM)
+        ->where('creation_source', CreationSource::MAILBOX)
         ->count())->toBe(2);
 
     // acme.com's domain is intact, not clobbered by acme.org.
@@ -832,6 +833,38 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
     app(LinkEmailAction::class)->execute($email);
 
     expect(People::where('workspace_id', $this->workspace->id)->where('name', 'New Contact')->exists())->toBeTrue();
+});
+
+it('records auto-created people and companies and their activity as mailbox sync', function (): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'dana@northwind.io',
+        'name' => 'Dana Reyes',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    $person = People::query()->where('workspace_id', $this->workspace->id)->where('name', 'Dana Reyes')->firstOrFail();
+    $company = Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'Northwind')->firstOrFail();
+
+    $sources = Activity::withoutGlobalScopes()
+        ->whereIn('subject_id', [$person->getKey(), $company->getKey()])
+        ->get()
+        ->map(fn (Activity $activity): ?CreationSource => $activity->source)
+        ->unique()
+        ->values()
+        ->all();
+
+    expect($person->creation_source)->toBe(CreationSource::MAILBOX)
+        ->and($company->creation_source)->toBe(CreationSource::MAILBOX)
+        ->and($sources)->toBe([CreationSource::MAILBOX]);
 });
 
 it('does not auto-create a person for a workspace-blocked address', function (): void {

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'navigation_label' => 'Access Requests',
+    'navigation_label' => 'Access requests',
     'tabs' => [
         'aria' => 'Access request tabs',
         'incoming' => 'Incoming',
@@ -30,8 +30,6 @@ return [
         'requested_incoming' => 'requested access',
         'requested_outgoing' => 'you requested access',
         'unknown_user' => 'Unknown user',
-        'no_subject' => '(No subject)',
-        'subject_hidden' => '(Subject hidden)',
         'email_unavailable' => 'The associated email is no longer available.',
     ],
     'empty' => [
@@ -44,7 +42,7 @@ return [
         'outgoing_description' => "You haven't asked for access to any emails yet.",
     ],
     'actions' => [
-        'open_email' => 'Open in inbox',
+        'open_email' => 'Open email',
         'approve' => [
             'label' => 'Approve',
             'modal_heading' => 'Approve access request',

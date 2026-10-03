@@ -173,7 +173,7 @@ function workMailboxImportQueueOnce(?int $tries = null): void
 {
     $parameters = [
         'connection' => 'database',
-        '--queue' => 'emails-sync',
+        '--queue' => 'emails-import,emails-sync',
         '--once' => true,
         '--sleep' => 0,
         '--stop-when-empty' => true,
@@ -192,7 +192,7 @@ function workMailboxImportQueueUntilEmpty(int $maxJobs = 50, ?int $tries = null)
 {
     $processed = 0;
 
-    while ($processed < $maxJobs && DB::table('jobs')->where('queue', 'emails-sync')->exists()) {
+    while ($processed < $maxJobs && DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->exists()) {
         workMailboxImportQueueOnce($tries);
         $processed++;
     }
@@ -200,7 +200,7 @@ function workMailboxImportQueueUntilEmpty(int $maxJobs = 50, ?int $tries = null)
 
 function mailboxImportQueueContains(string $jobClass): bool
 {
-    return DB::table('jobs')->where('queue', 'emails-sync')->get()->contains(function (object $job) use ($jobClass): bool {
+    return DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->get()->contains(function (object $job) use ($jobClass): bool {
         $payload = json_decode((string) $job->payload, true);
 
         return is_array($payload) && str_contains((string) ($payload['displayName'] ?? ''), class_basename($jobClass));
@@ -326,7 +326,6 @@ it('notifies with issues when some store jobs permanently fail', function (): vo
     assertMailboxImportRetryAction($notification->data, $account, $batchId);
 
     livewire(EmailAccountsPage::class)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))
         ->assertDontSee(__('filament/pages/email-accounts.actions.retry_failed_import.label'))
         ->assertSee(__('filament/pages/email-accounts.in_sync'));
 
@@ -362,7 +361,7 @@ it('waits for calendar store work before sending the import summary', function (
 
     $sawEmailDoneWhileCalendarPending = false;
 
-    while (DB::table('jobs')->where('queue', 'emails-sync')->exists()) {
+    while (DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->exists()) {
         workMailboxImportQueueOnce();
         $account->refresh();
 
@@ -713,7 +712,7 @@ it('sends a recovery notice when a worker finishes during the retry request', fu
 
         Artisan::call('queue:work', [
             'connection' => 'database',
-            '--queue' => 'emails-sync',
+            '--queue' => 'emails-import,emails-sync',
             '--once' => true,
             '--sleep' => 0,
             '--stop-when-empty' => true,
@@ -793,9 +792,9 @@ it('does not send the import summary while an expired calendar cursor rebuilds',
 
     $sawExpiredCursorHandoff = false;
 
-    while (DB::table('jobs')->where('queue', 'emails-sync')->exists()) {
+    while (DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->exists()) {
         $account->refresh();
-        $initialQueued = DB::table('jobs')->where('queue', 'emails-sync')->get()->contains(function (object $job): bool {
+        $initialQueued = DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->get()->contains(function (object $job): bool {
             $payload = json_decode((string) $job->payload, true);
 
             return is_array($payload) && str_contains((string) ($payload['displayName'] ?? ''), class_basename(InitialCalendarSyncJob::class));
@@ -950,7 +949,7 @@ it('queues calendar retry when the dispatched job is not in the database jobs ta
     retryMailboxImportFromNotification($account->fresh());
 
     Queue::assertPushed(InitialCalendarSyncJob::class);
-    expect(DB::table('jobs')->where('queue', 'emails-sync')->count())->toBe(0)
+    expect(DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->count())->toBe(0)
         ->and($account->fresh()->calendar_sync_cursor)->toBeNull()
         ->and($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1)
         ->and($user->notifications()->sole()->data['viewData']['kind'])->toBe('partial');
@@ -1068,11 +1067,11 @@ it('keeps retry queued when Retry is clicked again while calendar recovery is in
     bindMailboxImportCalendarService();
     retryMailboxImportFromNotification($account->fresh());
 
-    expect(DB::table('jobs')->where('queue', 'emails-sync')->count())->toBe(1);
+    expect(DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->count())->toBe(1);
 
     retryMailboxImportFromNotification($account->fresh());
 
-    expect(DB::table('jobs')->where('queue', 'emails-sync')->count())->toBe(1)
+    expect(DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->count())->toBe(1)
         ->and($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1);
 
     workMailboxImportQueueUntilEmpty(tries: 1);
@@ -1103,7 +1102,7 @@ it('does not retry calendar work when the mailbox needs reconnection', function 
 
     expect(resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($user, $account->fresh(), (string) $account->fresh()->history_import_batch_id))->toBeFalse();
 
-    expect(DB::table('jobs')->where('queue', 'emails-sync')->count())->toBe(0)
+    expect(DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->count())->toBe(0)
         ->and($account->fresh()->status)->toBe(EmailAccountStatus::REAUTH_REQUIRED)
         ->and($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1);
 });
@@ -1132,7 +1131,7 @@ it('does not retry another users mailbox from the notification action', function
     Livewire::test(EmailAccessNotificationHandler::class)
         ->dispatch('retry-mailbox-history-import', accountId: (string) $account->getKey(), batchId: $batchId);
 
-    expect(DB::table('jobs')->where('queue', 'emails-sync')->count())->toBe(0)
+    expect(DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->count())->toBe(0)
         ->and(DB::table('failed_jobs')->count())->toBe(1);
 });
 

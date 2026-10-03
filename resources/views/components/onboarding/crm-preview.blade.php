@@ -1,109 +1,150 @@
 @props([
-    'useCaseLabels' => [],
+    'preview',
 ])
 
+@php
+    $hasStages = $preview['stages'] !== [];
+    $barWidths = ['dashboard' => 'w-10', 'people' => 'w-12', 'companies' => 'w-16', 'opportunities' => 'w-20', 'tasks' => 'w-9', 'notes' => 'w-11', 'emails' => 'w-12'];
+@endphp
+
 <div
-    class="relative flex h-full flex-col overflow-hidden"
-    x-data
+    class="relative h-full overflow-hidden"
+    x-data="{
+        get showBoard() {
+            return wizardStep === 2 && @js($hasStages)
+        },
+        get spotlight() {
+            return wizardStep === 0 ? (focused ?? hovered) : null
+        },
+        lens(region) {
+            if (this.spotlight === region) {
+                return 'relative z-10 scale-110 bg-white shadow-xl shadow-primary-950/10 ring-1 ring-primary-500/40 dark:bg-gray-800 dark:ring-primary-400/40'
+            }
+
+            return this.spotlight ? 'opacity-40' : ''
+        },
+        dim() {
+            return this.spotlight ? 'opacity-40' : ''
+        },
+    }"
+    aria-hidden="true"
 >
-    {{-- Tab bar (Attio-style) --}}
-    <div class="flex items-end gap-4 border-b border-gray-200 px-5 pt-5 dark:border-white/10">
-        {{-- Workspace tab (active) --}}
-        <div class="flex items-center gap-2 border-b-2 border-gray-900 pb-3 dark:border-white">
-            <div
-                class="flex size-5 items-center justify-center rounded bg-gray-900 text-[9px] font-bold text-white dark:bg-white dark:text-gray-900"
-                x-text="($wire.data?.name || 'W').charAt(0).toUpperCase()"
-            ></div>
-            <span
-                class="max-w-[140px] truncate text-xs font-semibold text-gray-900 dark:text-white"
-                x-text="$wire.data?.name || 'Workspace'"
-                x-cloak
-            ></span>
-            <x-filament::icon icon="ri-arrow-down-s-line" class="size-3 text-gray-400" />
-        </div>
-
-        {{-- People tab (inactive) --}}
-        <div class="flex items-center gap-1.5 border-b-2 border-transparent pb-3">
-            <x-filament::icon icon="ri-user-line" class="size-3.5 text-gray-400" />
-            <span class="text-xs text-gray-400">People</span>
-        </div>
-    </div>
-
-    {{-- Toolbar --}}
-    <div class="pointer-events-none select-none border-b border-gray-100 px-5 py-3 opacity-50 dark:border-white/5">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="size-5 rounded bg-gray-200 dark:bg-gray-700"></div>
-                <div class="h-4 w-6 rounded bg-gray-100 dark:bg-gray-800"></div>
-                <div class="h-4 w-4 rounded bg-gray-100 dark:bg-gray-800"></div>
-            </div>
-            <div class="flex items-center gap-2">
-                <div class="h-5 w-14 rounded bg-primary-100 dark:bg-primary-900/30"></div>
-                <div class="size-5 rounded bg-gray-100 dark:bg-gray-800"></div>
-                <div class="size-5 rounded bg-gray-100 dark:bg-gray-800"></div>
-            </div>
-        </div>
-    </div>
-
-    {{-- Table skeleton --}}
-    <div class="pointer-events-none flex-1 select-none px-5 pt-2 opacity-40">
-        {{-- Filter chips --}}
-        <div class="flex items-center gap-2 pb-3">
-            <div class="h-5 w-12 rounded bg-gray-100 dark:bg-gray-800"></div>
-            <div class="h-5 w-10 rounded bg-gray-100 dark:bg-gray-800"></div>
-        </div>
-
-        {{-- Rows --}}
-        <div class="space-y-0">
-            @for ($i = 0; $i < 10; $i++)
-                <div class="flex items-center gap-3 border-b border-gray-100 py-2.5 dark:border-gray-800/50">
-                    <div class="size-3 rounded bg-gray-100 dark:bg-gray-800"></div>
-                    <div class="size-5 rounded-full bg-gray-200/70 dark:bg-gray-700"></div>
-                    <div
-                        @class([
-                            'h-2.5 rounded',
-                            'bg-gray-200 dark:bg-gray-700' => $i % 3 === 0,
-                            'bg-gray-100 dark:bg-gray-800' => $i % 3 !== 0,
-                        ])
-                        style="width: {{ [55, 40, 70, 35, 60, 45, 50, 65, 38, 58][$i] }}%"
-                    ></div>
-                    <div class="ms-auto h-2.5 w-16 rounded bg-gray-100 dark:bg-gray-800"></div>
-                </div>
-            @endfor
-        </div>
-    </div>
-
-    {{-- Contextual module preview (floating card, visible on use-case step) --}}
     <div
-        x-show="wizardStep === 2 && $wire.data?.onboarding_use_case"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 translate-y-2"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 translate-y-2"
-        class="absolute bottom-1/3 left-1/2 -translate-x-1/2 rounded-xl bg-white p-5 shadow-lg ring-1 ring-primary-200 dark:bg-gray-800 dark:ring-primary-500/30"
-        x-cloak
+        class="pointer-events-none absolute end-0 top-16 bottom-0 flex select-none rounded-tl-2xl bg-white shadow-2xl shadow-gray-950/10 ring-1 ring-gray-950/5 transition-[inset] duration-500 ease-out dark:bg-gray-900 dark:shadow-black/40 dark:ring-white/10"
+        x-bind:class="showBoard ? 'start-6' : 'start-14'"
     >
-        <div class="space-y-3">
-            <div class="flex items-center gap-2 text-sm">
-                <x-filament::icon icon="ri-user-line" class="size-4 text-primary-500" />
-                <span class="font-medium text-gray-900 dark:text-white">People</span>
-            </div>
-            <div class="flex items-center gap-2 text-sm">
-                <x-filament::icon icon="ri-building-line" class="size-4 text-primary-500" />
-                <span class="font-medium text-gray-900 dark:text-white">Companies</span>
-            </div>
-            <div class="flex items-center gap-2 text-sm">
-                <x-filament::icon icon="ri-briefcase-line" class="size-4 text-primary-500" />
+        <div class="flex w-40 shrink-0 flex-col gap-y-3 border-e border-gray-950/5 p-3 dark:border-white/10">
+            <div
+                class="flex origin-left items-center gap-2 rounded-lg p-1.5 transition duration-300 ease-out"
+                x-bind:class="[lens('workspace'), spotlight === 'workspace' ? 'w-max min-w-full pe-3' : 'min-w-0']"
+            >
+                <img
+                    src="{{ $preview['workspaceAvatarUrl'] }}"
+                    alt=""
+                    class="size-6 shrink-0 rounded-md object-cover"
+                />
                 <span
-                    class="font-medium text-gray-900 dark:text-white"
-                    x-text="(() => {
-                        const labels = {{ Js::from($useCaseLabels) }};
-                        return labels[$wire.data?.onboarding_use_case] || 'Opportunities';
-                    })()"
-                ></span>
+                    class="text-sm font-semibold text-gray-950 dark:text-white"
+                    x-bind:class="spotlight === 'workspace' ? 'whitespace-nowrap' : 'truncate'"
+                    x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
+                >{{ $preview['companyPlaceholder'] }}</span>
+                <x-filament::icon icon="ri-arrow-down-s-line" class="ms-auto size-4 shrink-0 text-gray-400" />
+            </div>
+
+            <div class="flex flex-col gap-y-3 transition duration-300" x-bind:class="dim()">
+                <div class="flex items-center gap-2 rounded-md px-2 py-1.5 ring-1 ring-gray-950/5 dark:ring-white/10">
+                    <x-filament::icon icon="heroicon-o-magnifying-glass" class="size-3.5 shrink-0 text-gray-400" />
+                    <span class="h-1.5 w-14 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                    <span class="ms-auto h-3.5 w-6 rounded bg-gray-100 dark:bg-white/10"></span>
+                </div>
+
+                <div class="space-y-0.5">
+                    @foreach ($preview['navigationIcons'] as $key => $icon)
+                        <div
+                            class="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-300"
+                            x-bind:class="(showBoard ? 'opportunities' : 'dashboard') === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
+                        >
+                            <x-filament::icon :icon="$icon" class="size-4 shrink-0" />
+                            <span @class(['h-1.5 rounded-full bg-current opacity-25', $barWidths[$key] ?? 'w-12'])></span>
+                        </div>
+                    @endforeach
+                </div>
             </div>
         </div>
+
+        <div class="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/60 dark:bg-gray-950/40">
+            <div class="flex h-12 shrink-0 items-center justify-end border-b border-gray-950/5 px-4 dark:border-white/10">
+                <img
+                    src="{{ $preview['userAvatarUrl'] }}"
+                    alt=""
+                    class="size-6 rounded-full object-cover transition duration-300 ease-out"
+                    x-bind:class="lens('user')"
+                />
+            </div>
+
+            <div
+                class="flex flex-1 flex-col px-5 pt-10"
+                x-show="! showBoard"
+                x-transition.opacity.duration.300ms
+            >
+                <p
+                    class="self-center rounded-lg px-2 py-1 text-center text-base font-semibold tracking-tight text-gray-950 transition duration-300 ease-out dark:text-white"
+                    x-bind:class="lens('user')"
+                >{{ $preview['greeting'] }}</p>
+
+                <div class="mt-4 transition duration-300" x-bind:class="dim()">
+                    <div class="rounded-xl bg-white p-3 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                        <span class="block h-1.5 w-20 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                        <div class="mt-6 flex justify-end">
+                            <span class="size-5 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                        </div>
+                    </div>
+
+                    <span class="mt-6 block h-1.5 w-10 rounded-full bg-gray-200 dark:bg-white/15"></span>
+
+                    <div class="mt-3 space-y-3">
+                        @foreach (['w-3/4', 'w-1/2', 'w-2/3'] as $width)
+                            <div class="flex items-center gap-2">
+                                <span class="size-3 shrink-0 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"></span>
+                                <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $width])></span>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            @if ($hasStages)
+                <div
+                    class="flex flex-1 gap-2 p-3"
+                    x-show="showBoard"
+                    x-cloak
+                >
+                    @foreach ($preview['stages'] as $position => $stage)
+                        <div
+                            class="w-[7.25rem] shrink-0 self-start rounded-xl bg-gray-100/80 p-1.5 dark:bg-white/5"
+                            x-show="showBoard"
+                            x-transition:enter="transition duration-500 ease-out"
+                            x-transition:enter-start="translate-y-3 opacity-0"
+                            x-transition:enter-end="translate-y-0 opacity-100"
+                            style="transition-delay: {{ min($position, 6) * 70 }}ms"
+                        >
+                            <div class="flex items-center gap-1.5 px-1.5 py-1">
+                                <span class="size-2 shrink-0 rounded-full" style="background-color: {{ $stage['color'] }}"></span>
+                                <span class="truncate text-xs font-medium text-gray-700 dark:text-gray-200">{{ $stage['name'] }}</span>
+                            </div>
+
+                            @for ($card = 0; $card < max(1, 3 - $position); $card++)
+                                <div class="mt-1.5 rounded-lg bg-white p-2.5 shadow-xs ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                                    <span class="block h-1.5 w-3/4 rounded-full bg-gray-200 dark:bg-white/15"></span>
+                                    <span class="mt-2 block h-1.5 w-1/2 rounded-full bg-gray-100 dark:bg-white/5"></span>
+                                </div>
+                            @endfor
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
     </div>
+
+    <div class="pointer-events-none absolute inset-x-0 bottom-0 z-30 h-28 bg-gradient-to-t from-gray-50 to-transparent dark:from-gray-950"></div>
 </div>

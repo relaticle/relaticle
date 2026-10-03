@@ -6,6 +6,9 @@ namespace Relaticle\Chat\Models;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -50,6 +53,13 @@ final class ChatMessageFeedback extends Model
         'comment',
         'model',
     ];
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function createdThisWeek(Builder $query): void
+    {
+        $query->where($this->qualifyColumn('created_at'), '>=', now()->startOfWeek(CarbonInterface::MONDAY));
+    }
 
     /** @return BelongsTo<Workspace, $this> */
     public function workspace(): BelongsTo

@@ -34,6 +34,7 @@ use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamFailed;
@@ -44,6 +45,7 @@ use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
@@ -218,6 +220,8 @@ final class ProcessChatMessage implements ShouldQueue
                 'role' => $this->user->workspaceRoleLabel($this->workspace->getKey()) ?? '',
                 'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
+            $agent->withModel($this->modelLabel(), $this->resolved['source'] === 'auto');
+            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace));
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -312,6 +316,8 @@ final class ProcessChatMessage implements ShouldQueue
                     conversationId: $this->conversationId,
                     resolutionKey: $this->resolutionKey(),
                     reason: 'cancelled',
+                    model: $this->resolved['model'] ?? null,
+                    usage: $response->usage,
                 );
                 ChatTelemetry::breadcrumb('stream.cancelled', []);
                 $this->broadcastSafely(new ChatStreamFailed(
@@ -1020,6 +1026,11 @@ final class ProcessChatMessage implements ShouldQueue
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function modelLabel(): ?string
+    {
+        return resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''))?->displayLabel();
     }
 
     private function isSetupConversation(): bool

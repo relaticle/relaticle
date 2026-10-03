@@ -23,11 +23,11 @@ it('renders a breadcrumb trail back to email settings on signature, privacy, and
     livewire($page)
         ->assertSeeHtml('fi-breadcrumbs')
         ->assertSeeHtml('href="'.e(EmailAccountsPage::getUrl()).'"')
-        ->assertSee($crumb);
+        ->assertSee(__($crumb));
 })->with([
-    [EmailSignaturesPage::class, 'Signatures'],
-    [UserEmailPrivacyPage::class, 'My Email Privacy'],
-    [EmailAccessRequestsPage::class, 'Access Requests'],
+    [EmailSignaturesPage::class, 'filament/pages/email-signatures.title'],
+    [UserEmailPrivacyPage::class, 'filament/pages/user-email-privacy.navigation_label'],
+    [EmailAccessRequestsPage::class, 'filament/pages/email-access-requests.navigation_label'],
 ]);
 
 it('does not render breadcrumbs on the accounts and templates pages', function (string $page): void {

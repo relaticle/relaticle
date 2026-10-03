@@ -7,7 +7,7 @@
 
     <div
         @if ($this->shouldPollAccountStatus())
-            wire:poll.5s="refreshAccount"
+            wire:poll.10s.visible="refreshAccount"
         @endif
     >
         <x-filament::section class="-mt-2">

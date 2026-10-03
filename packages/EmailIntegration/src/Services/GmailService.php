@@ -23,6 +23,9 @@ use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
 
 final readonly class GmailService implements MailServiceInterface
 {
+    /** @var list<string> */
+    private const array BULK_CATEGORIES = ['promotions', 'social', 'forums', 'updates'];
+
     public function __construct(private ConnectedAccount $account, private Gmail $gmail) {}
 
     /**
@@ -151,7 +154,8 @@ final readonly class GmailService implements MailServiceInterface
             bodyHtml: $bodyHtml,
             participants: $this->extractParticipants($headers),
             attachments: $attachments,
-            providerCategory: $this->resolveProviderCategory($labelIds),
+            providerCategory: in_array('CATEGORY_PERSONAL', $labelIds, true) ? EmailCategory::Personal : null,
+            isBulkMail: $this->isBulkCategory($labelIds),
         );
     }
 
@@ -173,7 +177,10 @@ final readonly class GmailService implements MailServiceInterface
             // Gmail's messages.list includes drafts unless we exclude them.
             // Drafts have no SENT label, so the store job would treat them as
             // inbound and share unsent mail with the workspace.
-            'q' => '-in:drafts',
+            'q' => implode(' ', [
+                '-in:drafts',
+                ...array_map(fn (string $category): string => "-category:{$category}", self::BULK_CATEGORIES),
+            ]),
         ];
 
         if ($daysBack !== null && $daysBack > 0) {
@@ -455,25 +462,11 @@ final readonly class GmailService implements MailServiceInterface
     }
 
     /**
-     * Map Gmail's free, native inbox-category labels to our classification
-     * vocabulary so we skip a paid LLM call for the high-volume noise buckets.
-     *
-     * Only high-confidence consumer categories are mapped. CATEGORY_UPDATES
-     * (receipts, statements, confirmations) is deliberately left unmapped,
-     * because it frequently hides Invoice/Scheduling/Support mail that only AI
-     * resolves, as is an inbox-only message with no category at all.
-     *
      * @param  array<int, string>  $labelIds
      */
-    private function resolveProviderCategory(array $labelIds): ?EmailCategory
+    private function isBulkCategory(array $labelIds): bool
     {
-        return match (true) {
-            in_array('CATEGORY_PROMOTIONS', $labelIds, true) => EmailCategory::Marketing,
-            in_array('CATEGORY_PERSONAL', $labelIds, true) => EmailCategory::Personal,
-            in_array('CATEGORY_SOCIAL', $labelIds, true) => EmailCategory::Other,
-            in_array('CATEGORY_FORUMS', $labelIds, true) => EmailCategory::Other,
-            default => null,
-        };
+        return array_any(self::BULK_CATEGORIES, fn (string $category): bool => in_array('CATEGORY_'.strtoupper($category), $labelIds, true));
     }
 
     /**

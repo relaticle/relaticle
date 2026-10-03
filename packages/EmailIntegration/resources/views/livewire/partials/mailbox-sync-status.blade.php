@@ -9,7 +9,7 @@
 @endphp
 
 <div
-    @if ($this->shouldPollMailboxSync()) wire:poll.5s="refreshMailboxSync" @endif
+    @if ($this->shouldPollMailboxSync()) wire:poll.15s.visible="refreshMailboxSync" @endif
     data-testid="meetings-mailbox-sync"
     class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center"
     aria-busy="true"

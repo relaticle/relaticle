@@ -6,6 +6,7 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
@@ -15,6 +16,7 @@ use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManag
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
@@ -332,6 +334,67 @@ describe('reader overlay', function (): void {
         EmailPrivacyTier::METADATA_ONLY,
         EmailPrivacyTier::SUBJECT,
     ]);
+
+    it('lets a teammate clear their own unread state on a shared email', function (): void {
+        [$newer, $older] = collect([now(), now()->subHour()])
+            ->map(fn (CarbonImmutable $sentAt): Email => Email::factory()->inbound()->full()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'sent_at' => $sentAt,
+            ]))
+            ->each(fn (Email $email) => $this->person->emails()->attach($email->getKey()))
+            ->all();
+
+        $this->actingAs($this->viewer);
+
+        $tab = livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ]);
+
+        expect(EmailRead::query()->where('user_id', $this->viewer->id)->exists())->toBeFalse();
+
+        $tab->call('selectEmail', $older->getKey());
+
+        expect(EmailRead::query()->where('user_id', $this->viewer->id)->pluck('email_id')->all())->toBe([$older->getKey()]);
+
+        $tab->call('selectEmail', $newer->getKey());
+
+        expect(EmailRead::query()->where('user_id', $this->viewer->id)->pluck('email_id')->all())
+            ->toEqualCanonicalizing([$older->getKey(), $newer->getKey()]);
+    });
+
+    it('keeps each viewer read state independent of the owner', function (): void {
+        [$newer, $older] = collect([now(), now()->subHour()])
+            ->map(fn (CarbonImmutable $sentAt): Email => Email::factory()->inbound()->full()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'sent_at' => $sentAt,
+            ]))
+            ->each(fn (Email $email) => $this->person->emails()->attach($email->getKey()))
+            ->all();
+
+        $this->actingAs($this->viewer);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $older->getKey())
+            ->call('selectEmail', $newer->getKey());
+
+        $this->actingAs($this->owner);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ]);
+
+        expect(EmailRead::query()->where('user_id', $this->viewer->id)->count())->toBe(2)
+            ->and(EmailRead::query()->where('user_id', $this->owner->id)->exists())->toBeFalse();
+    });
 });
 
 describe('access request approve and deny from the reader overlay', function (): void {
@@ -547,6 +610,10 @@ it('badges the emails tab with the visible count for the record', function (): v
     $this->person->emails()->attach($visible->modelKeys());
 
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBe('2');
+});
+
+it('loads the emails tab badge after the record page renders', function (): void {
+    expect(EmailsRelationManager::getTabComponent($this->person, ViewPeople::class)->isBadgeDeferred())->toBeTrue();
 });
 
 it('caps the emails tab badge at 99+', function (): void {

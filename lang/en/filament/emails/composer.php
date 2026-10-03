@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 return [
     'title' => 'New email',
+    'title_mass_send' => 'New mass email',
+    'opening' => 'Opening the composer…',
     'draft' => 'Draft',
     'quoted' => [
         'hidden' => 'The original message is not shared with you.',
@@ -21,11 +23,11 @@ return [
         'signature_default' => 'Use as my default signature',
         'template_none' => 'No templates yet',
         'template_name' => 'Template name',
-        'template_shared' => 'Share with my team',
+        'template_shared' => 'Share with my workspace',
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
         'company_team' => 'Company team',
-        'company_team_count' => 'Team',
+        'company_team_people' => '{1}1 person|[2,*]:count people',
     ],
     'toolbar' => [
         'paragraph' => 'Paragraph',
@@ -34,7 +36,7 @@ return [
     ],
 
     'mass_send' => [
-        'summary' => 'Sending individual emails to :count recipients',
+        'summary' => '{0}No recipients yet|{1}Sending to 1 recipient|[2,*]Sending a separate email to each of :count recipients',
         'toggle' => 'Mass sending',
         'send_button' => 'Send emails (:count)',
         'add_recipients' => 'Add recipients',
@@ -54,7 +56,7 @@ return [
         'download_attachment' => 'Download attachment',
         'remove_attachment' => 'Remove attachment',
         'uploading' => 'Uploading…',
-        'expand' => 'Fit to screen',
+        'expand' => 'Full screen',
         'shrink' => 'Exit full screen',
         'minimize' => 'Minimize',
         'restore' => 'Restore',
@@ -65,14 +67,14 @@ return [
         ],
     ],
     'grant_send' => [
-        'heading' => '":email" does not have permission to send emails.',
-        'heading_generic' => 'This mailbox does not have permission to send emails.',
-        'description' => 'Please grant permission to enable email sending.',
+        'heading' => "Relaticle can't send from :email yet.",
+        'heading_generic' => "Relaticle can't send from this account yet.",
+        'description' => 'Grant send permission to fix this.',
     ],
     'notifications' => [
         'mass_queued' => [
             'title' => 'Mass email queued',
-            'body' => 'Sending to :count recipient(s).',
+            'body' => '{1}Sending to 1 recipient.|[2,*]Sending to :count recipients.',
         ],
         'queued' => ['title' => 'Email queued for sending'],
         'signature_created' => ['title' => 'Signature created'],
@@ -100,6 +102,5 @@ return [
     ],
     'validation' => [
         'body_required' => 'Write a message before sending.',
-        'recipient_not_allowed' => 'Choose a recipient from your workspace records or suggested addresses.',
     ],
 ];

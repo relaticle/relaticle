@@ -16,7 +16,6 @@ use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Config;
-use Relaticle\EmailIntegration\Actions\RecordMailboxHistoryImportStoreFailureAction;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
@@ -141,6 +140,12 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        // Newsletters, notifications and social mail stay out of the CRM. The Gmail
+        // listing query filters them on the first import, incremental history does not.
+        if ($fetched->isBulkMail) {
+            return;
+        }
+
         // Honour the account's inbox/sent toggles. Gated here rather than in a
         // provider service so it covers Gmail and Microsoft, and both the initial
         // backfill and incremental syncs, in one place. Re-read from the DB on
@@ -156,17 +161,6 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
     public function failed(Throwable $exception): void
     {
         SyncItemFailures::record($this->connectedAccount, self::class, $this->messageId);
-
-        $batch = $this->batch();
-        $batchId = $batch?->id;
-        $historyBatchId = $this->connectedAccount->history_import_batch_id;
-
-        if (is_string($batchId) && is_string($historyBatchId) && $batchId === $historyBatchId) {
-            resolve(RecordMailboxHistoryImportStoreFailureAction::class)->execute(
-                $this->connectedAccount,
-                $historyBatchId,
-            );
-        }
     }
 
     private function doesItAlreadyExists(): bool

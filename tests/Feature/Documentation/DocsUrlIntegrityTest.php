@@ -17,6 +17,7 @@ it('serves every current developer docs url', function (string $path): void {
     '/developers',
     '/developers/self-hosting',
     '/developers/mcp',
+    '/developers/rest-api',
     '/developers/contributing',
     '/developers/api',
 ]);

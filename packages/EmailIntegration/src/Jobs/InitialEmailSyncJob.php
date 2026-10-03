@@ -29,7 +29,7 @@ use Throwable;
 #[DeleteWhenMissingModels]
 #[Backoff(60, 300, 900)]
 #[MaxExceptions(3)]
-#[Queue('emails-sync')]
+#[Queue('emails-import')]
 #[Timeout(300)]
 #[UniqueFor(3600)]
 final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue

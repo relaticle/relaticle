@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-08-13"
+updated: "2026-10-02"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -11,15 +11,21 @@ your whole team without the price moving. The **Billing** page lives under your
 workspace name in the sidebar; subscription actions there belong to the
 workspace owner, and other members see who to ask.
 
-## Cloud Pro
+## What Cloud Pro costs
 
-One paid plan: unlimited users and records, 2,000 AI credits a month,
-premium AI models, the REST API and MCP server, and email support. Pay
-monthly, or yearly for a discount. Current prices are on the
-[pricing page](/pricing).
+Cloud Pro is the self-serve plan: unlimited users and records, 2,000 AI
+credits a month, premium AI models, the REST API and MCP server, and email
+support. It costs **$19/mo per workspace billed yearly** ($228 a year), or
+**$24/mo billed monthly**. For larger rollouts, Enterprise implementation
+starts at $20,000 a year. The [pricing page](/pricing) has the details.
 
-Every new workspace can start a **14-day Pro trial with no card**. When the
-trial ends, subscribe from the Billing page to keep Cloud access.
+## The trial
+
+Every new Cloud workspace starts a **14-day Pro trial automatically, with no
+card**. The trial includes everything in Cloud Pro, with 2,000 AI credits.
+Premium AI models unlock once the workspace holds a record of its own.
+When it ends, subscribe from the Billing page to keep Cloud access; without
+a subscription the workspace pauses. Relaticle Cloud has no free plan.
 
 ## Managing the subscription
 
@@ -46,5 +52,7 @@ period. What credits are and what messages cost is covered in
 ## Self-hosting instead
 
 Relaticle is open source (AGPL-3.0). Self-hosted installs are free forever,
-with no workspace pausing and no credit billing; AI usage runs on your own
-provider keys. See the [Self-Hosting Guide](/developers/self-hosting).
+with no subscription and no workspace pausing, and AI runs on your own
+provider keys. The assistant still meters credits there: a workspace gets
+300 a month by default, which the operator can raise. See the
+[Self-Hosting Guide](/developers/self-hosting).

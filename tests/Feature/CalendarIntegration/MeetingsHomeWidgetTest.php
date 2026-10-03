@@ -78,12 +78,13 @@ it('shows mailbox sync progress inside the meetings section', function (): void 
 
     livewire(MeetingsHomeWidget::class)
         ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
-        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 30]))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 30]))
         ->assertSee(__('filament/pages/dashboard.meetings.syncing.description_initial'))
         ->assertSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_processed', 12, ['count' => 12]))
         ->assertDontSee(trans_choice('filament/pages/dashboard.meetings.syncing.meetings_processed', 0, ['count' => 0]))
         ->assertSee('role="progressbar"', false)
-        ->assertSee('aria-valuenow="30"', false)
+        ->assertDontSee('aria-valuenow', false)
         ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
@@ -116,8 +117,7 @@ it('does not show an import issue callout on home when store jobs failed', funct
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertDontSee('data-testid="meetings-import-issue"', escape: false)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'));
+        ->assertDontSee('data-testid="meetings-import-issue"', escape: false);
 });
 
 it('does not name failing mailboxes on home when more than one import failed', function (): void {
@@ -144,8 +144,7 @@ it('does not name failing mailboxes on home when more than one import failed', f
     }
 
     livewire(MeetingsHomeWidget::class)
-        ->assertDontSee('data-testid="meetings-import-issue"', escape: false)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'));
+        ->assertDontSee('data-testid="meetings-import-issue"', escape: false);
 });
 
 it('does not show an import issue callout on home when no store job failed', function (): void {
@@ -160,8 +159,7 @@ it('does not show an import issue callout on home when no store job failed', fun
     ]);
 
     livewire(MeetingsHomeWidget::class)
-        ->assertDontSee('data-testid="meetings-import-issue"', escape: false)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'));
+        ->assertDontSee('data-testid="meetings-import-issue"', escape: false);
 });
 
 it('does not offer a retry control on home after import store failures', function (): void {
@@ -285,7 +283,8 @@ it('shows mailbox sync progress during email-only history import', function (): 
 
     livewire(MeetingsHomeWidget::class)
         ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
-        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 0]))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 0]))
         ->assertDontSee(__('filament/pages/dashboard.meetings.empty.title'));
 });
 
@@ -373,7 +372,8 @@ it('shows mailbox sync progress on the dashboard inside meetings', function (): 
     ]);
 
     livewire(Dashboard::class)
-        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 4]))
+        ->assertSee(__('filament/pages/dashboard.meetings.syncing.title'))
+        ->assertDontSee(__('filament/pages/dashboard.meetings.syncing.title_with_percent', ['percent' => 4]))
         ->assertSee('data-testid="meetings-mailbox-sync"', escape: false)
         ->assertDontSee('data-mailbox-import="home"', false);
 });

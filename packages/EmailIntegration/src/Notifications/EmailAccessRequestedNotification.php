@@ -33,7 +33,7 @@ final class EmailAccessRequestedNotification extends Notification
     {
         $email = $this->request->email;
         $requesterName = $this->request->requester->name;
-        $subject = $email !== null ? ($email->subject ?? __('filament/notifications/email-access-requested.no_subject')) : __('filament/notifications/email-access-requested.no_subject');
+        $subject = $email !== null ? ($email->subject ?? __('filament/pages/email-inbox.subject.none')) : __('filament/pages/email-inbox.subject.none');
 
         $notification = FilamentNotification::make()
             ->title(__('filament/notifications/email-access-requested.title', ['name' => $requesterName]))

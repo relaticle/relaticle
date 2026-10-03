@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Workspaces;
 
+use App\Filament\Components\Forms\WorkspaceLogoUpload;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -42,20 +42,13 @@ final class UpdateWorkspaceLogo extends BaseLivewireComponent
                     ->aside()
                     ->description(__('workspaces.sections.update_workspace_logo.description'))
                     ->schema([
-                        SpatieMediaLibraryFileUpload::make('logo')
-                            ->label(__('workspaces.form.workspace_logo.label'))
-                            ->collection(Workspace::LOGO_MEDIA_COLLECTION)
-                            ->imageEditor()
-                            ->avatar()
-                            // Last in the chain on purpose: avatar() calls image(),
-                            // which resets the allowlist back to `image/*`.
-                            ->acceptedFileTypes(Workspace::LOGO_MIME_TYPES)
-                            ->maxSize(Workspace::LOGO_MAX_KILOBYTES),
+                        WorkspaceLogoUpload::make('logo')
+                            ->label(__('workspaces.form.workspace_logo.label')),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
                                 ->submit('updateLogo'),
-                        ]),
+                        ])->alignEnd(),
                     ]),
             ])
             ->statePath('data');

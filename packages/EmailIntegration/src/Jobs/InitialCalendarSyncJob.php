@@ -29,7 +29,7 @@ use Throwable;
 
 #[DeleteWhenMissingModels]
 #[Backoff(60, 300, 900)]
-#[Queue('emails-sync')]
+#[Queue('emails-import')]
 #[Tries(3)]
 #[UniqueFor(3600)]
 final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue

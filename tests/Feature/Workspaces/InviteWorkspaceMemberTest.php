@@ -7,6 +7,7 @@ use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
+use App\Livewire\App\Workspaces\InviteWorkspaceMembersModal;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Mail\WorkspaceInvitationMail;
 use App\Models\User;
@@ -14,6 +15,7 @@ use App\Models\WorkspaceInvitation;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Mail\Events\MessageSending;
@@ -393,16 +395,35 @@ test('an administrator can invite someone as a member', function (): void {
     expect(WorkspaceInvitation::query()->where('email', 'fine@example.com')->exists())->toBeTrue();
 });
 
-test('shows a hint for every role option in the invite modal', function (): void {
+test('explains the chosen role under the invite modal role select', function (WorkspaceRole $role): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction('invitePeople')
-        ->assertSchemaComponentExists('role', checkComponentUsing: function (Radio $component): bool {
-            $descriptions = $component->getDescriptions();
+        ->setActionData(['role' => $role->value])
+        ->assertSchemaComponentExists('role', checkComponentUsing: fn (Select $component): bool => $component->getChildSchema($component::BELOW_CONTENT_SCHEMA_KEY)?->toHtml() !== null
+            && str_contains((string) $component->getChildSchema($component::BELOW_CONTENT_SCHEMA_KEY)->toHtml(), e($role->description())));
+})->with(WorkspaceRole::cases());
 
-            return $descriptions[WorkspaceRole::Admin->value] === __('workspaces.roles.admin.description')
-                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
-                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
-        });
+test('the sidebar invite row opens the invite modal in place and sends the invitation', function (): void {
+    livewire(InviteWorkspaceMembersModal::class, ['workspace' => $this->workspace])
+        ->dispatch('open-invite-workspace-members')
+        ->assertActionMounted('invitePeople')
+        ->setActionData(['emails' => 'from-sidebar@example.com'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertDispatched('workspaceInvitationSent');
+
+    expect($this->workspace->fresh()->workspaceInvitations->sole()->email)->toBe('from-sidebar@example.com');
+});
+
+test('a member cannot open the invite modal', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member->fresh());
+
+    livewire(InviteWorkspaceMembersModal::class, ['workspace' => $this->workspace])
+        ->dispatch('open-invite-workspace-members')
+        ->assertActionNotMounted();
 });
 
 test('offers an admin every role but admin in the invite modal', function (): void {
@@ -413,7 +434,7 @@ test('offers an admin every role but admin in the invite modal', function (): vo
 
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction('invitePeople')
-        ->assertSchemaComponentExists('role', checkComponentUsing: fn (Radio $component): bool => array_keys($component->getOptions()) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
+        ->assertSchemaComponentExists('role', checkComponentUsing: fn (Select $component): bool => array_keys($component->getOptions()) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
 });
 
 test('shows a hint for every role option in the invite-link default role picker', function (): void {

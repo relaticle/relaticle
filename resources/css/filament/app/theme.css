@@ -998,7 +998,7 @@ body:has(.fi-record-page) {
     @apply rounded-xl;
 }
 
-/* Onboarding Wizard - Attio-style split-screen layout overrides */
+/* Onboarding Wizard - split-screen layout overrides */
 .fi-body.fi-onboarding-wizard {
     @apply bg-white dark:bg-gray-950;
 }

@@ -376,7 +376,7 @@ it('warns when a connected mailbox cannot send', function (): void {
     ]);
 
     livewire(EmailAccountsPage::class)
-        ->assertSee(__('filament/pages/email-accounts.send_missing_tooltip'))
+        ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]).' '.__('filament/emails/composer.grant_send.description'))
         ->assertSee(__('filament/pages/email-accounts.in_sync'));
 });
 
@@ -463,7 +463,6 @@ it('stays in sync after history import store failures', function (): void {
     ]);
 
     livewire(EmailAccountsPage::class)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))
         ->assertDontSee(__('filament/pages/email-accounts.actions.retry_failed_import.label'))
         ->assertDontSee(__('filament/pages/email-accounts.sync_error.heading'))
         ->assertSee(__('filament/pages/email-accounts.in_sync'));
@@ -487,7 +486,6 @@ it('does not show a retry control after history import store failures', function
     ]);
 
     livewire(EmailAccountsPage::class)
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))
         ->assertDontSee(__('filament/pages/email-accounts.actions.retry_failed_import.label'))
         ->assertSee(__('filament/pages/email-accounts.in_sync'));
 });

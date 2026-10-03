@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Responses\StructuredAgentResponse;
 use Relaticle\Chat\Agents\NextStepSuggester;
 use Relaticle\Chat\Events\NextStepsSuggested;
+use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ChatTelemetry;
 use Throwable;
 
@@ -102,6 +103,10 @@ final class SuggestNextSteps implements ShouldQueue
                 $this->buildPrompt(),
                 provider: $this->provider,
             );
+
+            rescue(function () use ($response): void {
+                resolve(CreditService::class)->recordInternalUsage($this->conversationId, $this->provider, $response->usage, $response->meta->model);
+            });
 
             if (! $response instanceof StructuredAgentResponse) {
                 return [];

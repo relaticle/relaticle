@@ -28,6 +28,13 @@ const CONVERSATION_ID_PLACEHOLDER = '__CONVERSATION_ID__';
 // visual group (no repeated timestamp/avatar chrome, tighter spacing).
 const GROUPING_GAP_MINUTES = 3;
 
+// Send anchor: an anchored row stops this far below the transcript's top edge. The
+// previous turn's action row and spacing take 56px, leaving three 24px lines of its text.
+const ANCHOR_GAP_PX = 128;
+// A row taller than this anchors on its tail instead (assistant-ui's 10em/6em).
+const ANCHOR_TALL_ROW_PX = 160;
+const ANCHOR_TALL_ROW_TAIL_PX = 96;
+
 // A records_table block carries the WHOLE page the model read (see
 // BaseReadListTool: it stopped slicing server-side so the model and the
 // table never disagree about what was shown). But a chat bubble that scrolls
@@ -201,9 +208,16 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // this alone, so it is there the whole time the user is reading back, not
     // only in the moment new content happens to land.
     pinnedToBottom: true,
-    // Held while jumpToLatest()'s animation is in flight; see the comment there.
+    // Held while animateScrollTo()'s animation is in flight; see the comment there.
     scrollAnimating: false,
     _scrollAnimationTimer: null,
+    anchorKey: null,
+    _anchorScrollPending: false,
+    // An in-flight anchor scroll's target, then where the reader came to rest on
+    // it. Layout changes above the anchor move both, until the reader scrolls away.
+    _anchorScrollTarget: null,
+    _anchorRestTop: null,
+    _anchorObserver: null,
 
     // Stable identity for the x-for key: server id when persisted, otherwise a
     // minted client uuid that survives reconciliation (never reassigned).
@@ -713,6 +727,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         this.highlightedMessageId = null;
         clearTimeout(this._highlightTimer);
 
+        this.clearAnchor();
         this.scrollToBottom(true);
 
         this.$nextTick(() => {
@@ -1462,12 +1477,10 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return !!group && Array.isArray(group.actions) && group.actions.length > 1;
     },
 
-    // The user owns the scroll position. Streaming autoscrolls ONLY while they
-    // are already pinned near the bottom; once they scroll up to read, new
-    // content lands below them and the jump-to-latest button (already on screen
-    // the moment they left the bottom) takes them back. force=true is for
-    // actions the user just took themselves (sending, that button, initial load).
+    // Follows streaming only while the reader is pinned near the bottom, and never
+    // in an anchored turn, whose reply grows into the reserve. force lands a conversation.
     scrollToBottom(force = false) {
+        if (this.anchorKey) return;
         if (!force && !this.pinnedToBottom) return;
 
         this.$nextTick(() => {
@@ -1480,21 +1493,31 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // Travelling back to the newest message on the user's own click, animated:
     // this is the one scroll they asked for as a movement, so it reads as one
     // instead of teleporting them past everything they had scrolled through.
-    // Every other caller stays instant (scrollToBottom): animating an autoscroll
-    // would chase its own tail against arriving tokens.
     jumpToLatest() {
         const el = this.$refs.messages;
         if (!el) return;
 
+        // Jumping past an anchored reply that outgrew the viewport asks to follow
+        // it; with the reserve already spent, dropping the anchor shrinks nothing.
+        if (this.anchorKey && this.$refs.anchorReserve?.offsetHeight === 0) this.clearAnchor();
+
+        this.animateScrollTo(el.scrollHeight);
+    },
+
+    animateScrollTo(top, { anchored = false } = {}) {
+        const el = this.$refs.messages;
+        if (!el) return;
+
+        this._anchorScrollTarget = anchored ? top : null;
+
         // Pin up front and hold it for the length of the animation. A smooth
-        // scroll fires scroll events the whole way down, and re-deriving the
-        // pin from those would drop it mid-flight and flash the button back on
-        // under the user's cursor.
+        // scroll fires scroll events the whole way, and re-deriving the pin
+        // from those would drop it mid-flight and flash the jump button on.
         this.pinnedToBottom = true;
         this.scrollAnimating = true;
 
         el.scrollTo({
-            top: el.scrollHeight,
+            top,
             behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
         });
 
@@ -1502,10 +1525,135 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         this._scrollAnimationTimer = setTimeout(() => {
             if (this.destroyed) return;
             this.scrollAnimating = false;
+            if (this._anchorScrollTarget !== null) {
+                const landed = Math.abs(el.scrollTop - this._anchorScrollTarget) <= 1;
+                this._anchorRestTop = landed ? this._anchorScrollTarget : null;
+                this._anchorScrollTarget = null;
+            }
             // A wheel/trackpad gesture cancels a smooth scroll mid-flight, so
-            // re-derive rather than assume we landed at the bottom.
+            // re-derive rather than assume we landed where we aimed.
             this.trackScrollPosition();
         }, 700);
+    },
+
+    // A turn's first row sits at the top and a spacer reserves the viewport below it,
+    // so the reply and its late blocks grow into the reserve without moving anything.
+    anchorTo(msg) {
+        if (!msg?.clientKey) return;
+
+        this.anchorKey = msg.clientKey;
+        this._anchorScrollPending = true;
+
+        // Edit, regenerate and next-step sends render the row a tick later, so the
+        // first sync that finds it scrolls: this frame's, or the observer's.
+        requestAnimationFrame(() => {
+            if (!this.destroyed) this.syncAnchorReserve();
+        });
+    },
+
+    clearAnchor() {
+        this.anchorKey = null;
+        this._anchorScrollPending = false;
+        this._anchorScrollTarget = null;
+        this._anchorRestTop = null;
+        this.setAnchorReserve(0);
+    },
+
+    anchorElement() {
+        if (!this.anchorKey) return null;
+
+        return this.$refs.messages?.querySelector(`[data-client-key="${CSS.escape(this.anchorKey)}"]`) ?? null;
+    },
+
+    anchorScrollTop(el) {
+        const scroller = this.$refs.messages;
+        const rect = el.getBoundingClientRect();
+        const edge = rect.height > ANCHOR_TALL_ROW_PX ? rect.bottom - ANCHOR_TALL_ROW_TAIL_PX : rect.top;
+
+        const offset = edge - scroller.getBoundingClientRect().top + scroller.scrollTop;
+
+        return Math.max(0, Math.round(offset - ANCHOR_GAP_PX));
+    },
+
+    // Sizes the reserve so the transcript scrolls no further than the anchor. Measured
+    // against scrollHeight, not summed from padding, so the side panel holds too.
+    syncAnchorReserve() {
+        const scroller = this.$refs.messages;
+        const reserve = this.$refs.anchorReserve;
+        if (!scroller || !reserve || scroller.clientHeight === 0) return;
+
+        const el = this.anchorElement();
+        if (!el) {
+            this.releaseVanishedAnchor(scroller, reserve);
+
+            return;
+        }
+
+        const target = this.anchorScrollTop(el);
+        const maxScrollTop = scroller.scrollHeight - scroller.clientHeight;
+        const atRest = this._anchorRestTop !== null && Math.abs(scroller.scrollTop - this._anchorRestTop) <= 1;
+        // Content that shrank under a reader sitting at the anchor already had
+        // its scrollTop clamped by layout; growing the reserve back cannot undo that.
+        const clamped = scroller.scrollTop < target - 1 && scroller.scrollTop >= maxScrollTop - 1;
+
+        this.setAnchorReserve(Math.max(0, reserve.offsetHeight + target - maxScrollTop));
+
+        if (this._anchorScrollPending || (this._anchorScrollTarget !== null && this._anchorScrollTarget !== target)) {
+            this._anchorScrollPending = false;
+            this.animateScrollTo(target, { anchored: true });
+
+            return;
+        }
+
+        if (atRest || clamped) {
+            scroller.scrollTop = target;
+            this._anchorRestTop = target;
+        }
+
+        // A reply outgrowing the viewport fires no scroll event, yet the jump
+        // button has to appear for the content now below the fold.
+        this.trackScrollPosition();
+    },
+
+    // Regenerate, retry and edit splice the anchored row out and send it again a tick
+    // later, so a reader resting on it is held there instead of losing the reserve.
+    releaseVanishedAnchor(scroller, reserve) {
+        if (this._anchorScrollPending) return;
+
+        if (this._anchorRestTop === null) {
+            this.clearAnchor();
+
+            return;
+        }
+
+        const maxScrollTop = scroller.scrollHeight - scroller.clientHeight;
+        this.setAnchorReserve(Math.max(0, reserve.offsetHeight + this._anchorRestTop - maxScrollTop));
+        scroller.scrollTop = this._anchorRestTop;
+    },
+
+    setAnchorReserve(px) {
+        const reserve = this.$refs.anchorReserve;
+        if (reserve) reserve.style.height = `${Math.round(px)}px`;
+    },
+
+    // Runs before paint, so no frame shows a stale reserve. The reserve sits outside
+    // both observed boxes, so writing it cannot re-trigger the observer.
+    initAnchorObserver() {
+        this.teardownAnchorObserver();
+        if (typeof ResizeObserver === 'undefined') return;
+
+        this._anchorObserver = new ResizeObserver(() => {
+            if (this.anchorKey) this.syncAnchorReserve();
+        });
+
+        [this.$refs.messages, this.$refs.messageColumn]
+            .filter(Boolean)
+            .forEach((el) => this._anchorObserver.observe(el));
+    },
+
+    teardownAnchorObserver() {
+        this._anchorObserver?.disconnect();
+        this._anchorObserver = null;
     },
 
     trackScrollPosition() {
@@ -1513,7 +1661,17 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
         const el = this.$refs.messages;
         if (!el) return;
-        this.pinnedToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+        // An anchored turn never follows, so any content below the fold needs the jump button.
+        const slack = this.anchorKey ? 2 : 80;
+        this.pinnedToBottom = el.scrollHeight - el.scrollTop - el.clientHeight < slack;
+
+        // Content shrinking under the reader clamps scrollTop to the new bottom; that is
+        // layout moving, not the reader scrolling away from the anchor.
+        const bottom = el.scrollHeight - el.clientHeight;
+        const clampedByLayout = el.scrollTop < this._anchorRestTop && el.scrollTop >= bottom - 1;
+        if (this._anchorRestTop !== null && Math.abs(el.scrollTop - this._anchorRestTop) > 1 && !clampedByLayout) {
+            this._anchorRestTop = null;
+        }
     },
 
     // Keyboard layer. Bound via `x-on:keydown` directly on the chat root

@@ -10,6 +10,8 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use Closure;
+use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
@@ -208,28 +210,37 @@ final class ChatServiceProvider extends ServiceProvider
     {
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
-            fn (): string => $this->recordChipIconScript()
-                .Blade::render("@vite(['resources/js/echo.js', 'packages/Chat/resources/js/chat.js'])"),
+            $this->inAppPanel(fn (): string => $this->recordChipIconScript()
+                .Blade::render("@vite(['resources/js/echo.js', 'packages/Chat/resources/js/chat.js'])")),
         );
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::SIDEBAR_NAV_END,
-            fn (): View|Factory => view('chat::filament.app.chat-sidebar-nav-hook'),
+            $this->inAppPanel(fn (): View|Factory => view('chat::filament.app.chat-sidebar-nav-hook')),
         );
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
-            fn (): View|Factory => view('chat::filament.app.chat-topbar-toggle-hook'),
+            $this->inAppPanel(fn (): View|Factory => view('chat::filament.app.chat-topbar-toggle-hook')),
         );
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
-            fn (): View|Factory => view('chat::filament.app.chat-side-panel-hook'),
+            $this->inAppPanel(fn (): View|Factory => view('chat::filament.app.chat-side-panel-hook')),
         );
 
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
-            fn (): View|Factory => view('chat::filament.app.chat-all-chats-panel-hook'),
+            $this->inAppPanel(fn (): View|Factory => view('chat::filament.app.chat-all-chats-panel-hook')),
         );
+    }
+
+    /**
+     * @param  Closure(): (View|Factory|string)  $render
+     * @return Closure(): (View|Factory|string)
+     */
+    private function inAppPanel(Closure $render): Closure
+    {
+        return fn (): View|Factory|string => Filament::getCurrentPanel()?->getId() === 'app' ? $render() : '';
     }
 }

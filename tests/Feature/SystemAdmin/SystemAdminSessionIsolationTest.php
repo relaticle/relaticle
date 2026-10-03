@@ -302,8 +302,8 @@ it('rejects a saved staff page snapshot on the customer host after staff logout'
     ])->assertStatus(419);
 })->with([
     'model catalog' => ['/ai-models', 'ManageAiSettings'],
-    'dashboard' => ['/', '\\Pages\\Dashboard'],
-    'lazy widget' => ['/', 'PlatformGrowthStatsWidget'],
+    'dashboard' => ['/', '\\Pages\\Overview'],
+    'lazy widget' => ['/', 'ValueStats'],
     'shared global search' => ['/', 'GlobalSearch'],
     'shared notifications' => ['/', 'DatabaseNotifications'],
     'shared topbar' => ['/', 'Topbar'],
@@ -607,7 +607,7 @@ it('requires second factor enrollment on an existing staff Livewire page', funct
     preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
     $snapshot = collect($matches[1])
         ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
-        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], 'Dashboard'));
+        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], 'Overview'));
     expect($snapshot)->not->toBeNull();
     $administrator->update(['app_authentication_secret' => null]);
 

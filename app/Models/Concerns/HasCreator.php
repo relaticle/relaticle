@@ -7,6 +7,8 @@ namespace App\Models\Concerns;
 use App\Enums\CreationSource;
 use App\Models\User;
 use App\Support\CurrentSource;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -37,7 +39,16 @@ trait HasCreator
      */
     public function isSystemCreated(): bool
     {
-        return $this->creation_source === CreationSource::SYSTEM;
+        return in_array($this->creation_source, CreationSource::automated(), true);
+    }
+
+    /**
+     * @param  Builder<static>  $query
+     */
+    #[Scope]
+    protected function ownData(Builder $query): void
+    {
+        $query->whereNotIn($query->qualifyColumn('creation_source'), CreationSource::automated());
     }
 
     /**
@@ -46,7 +57,7 @@ trait HasCreator
     protected function createdBy(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => $this->creation_source === CreationSource::SYSTEM ?
+            get: fn (): string => $this->isSystemCreated() ?
                 '⊙ System' :
                 $this->creator?->name ?? 'Former Member', // @phpstan-ignore nullsafe.neverNull (creator_id can reference a deleted user)
         );

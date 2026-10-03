@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
@@ -109,6 +110,17 @@ it('leaves the first-record step incomplete while only seeded demo records exist
         ->assertSee('0/5 steps completed');
 });
 
+it('leaves the first-record step incomplete while only mailbox-synced records exist', function (): void {
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creation_source' => CreationSource::MAILBOX,
+    ]);
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml(stepState('first_record', false))
+        ->assertSee('0/5 steps completed');
+});
+
 it('completes the import step for an imported record', function (): void {
     People::factory()->create([
         'workspace_id' => $this->workspace->getKey(),
@@ -136,7 +148,7 @@ it('links the sync email step to the email accounts settings page', function ():
         ->assertSee(__('filament/pages/dashboard.activation.steps.sync_email.label'));
 });
 
-it('shows an inline syncing row while the mailbox import is in flight', function (): void {
+it('shows an inline syncing row without a percent while the mailbox is still being listed', function (): void {
     ConnectedAccount::factory()->create([
         'workspace_id' => $this->workspace->getKey(),
         'user_id' => $this->owner->getKey(),
@@ -149,7 +161,24 @@ it('shows an inline syncing row while the mailbox import is in flight', function
         ->assertSeeHtml(stepState('sync_email', true))
         ->assertSeeHtml('data-testid="activation-email-sync-progress"')
         ->assertSee(__('filament/pages/dashboard.activation.steps.sync_email.syncing'))
-        ->assertSee('12%');
+        ->assertDontSee('12%')
+        ->assertDontSee(__('filament/pages/dashboard.activation.steps.sync_email.syncing_percent', ['percent' => 0]));
+});
+
+it('shows the highest import percent when another mailbox is still at zero', function (): void {
+    foreach (['starting@acme.example' => 10, 'halfway@acme.example' => 11] as $address => $pendingJobs) {
+        $account = ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->getKey(),
+            'user_id' => $this->owner->getKey(),
+            'email_address' => $address,
+            'sync_cursor' => 'history-done',
+        ]);
+        setHistoryImportBatchProgress(attachHistoryImportBatch($account), $address === 'starting@acme.example' ? 10 : 20, $pendingJobs);
+    }
+
+    livewire(ActivationChecklist::class)
+        ->assertSeeHtml('data-testid="activation-email-sync-progress"')
+        ->assertSee('45%');
 });
 
 it('does not show import issue on the checklist when store jobs failed', function (): void {
@@ -533,6 +562,23 @@ it('removes every system record and keeps the workspace\'s own', function (): vo
 
     expect(People::query()->whereKey($own->getKey())->exists())->toBeTrue()
         ->and(resolve(WorkspaceActivationFacts::class)->hasSampleData($this->workspace->fresh()))->toBeFalse();
+});
+
+it('keeps the contacts a mailbox sync created when removing sample data', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+    $synced = resolve(AutoCreatePersonAction::class)->execute('Dana Reyes', 'dana@northwind.io', $this->workspace->getKey(), $this->workspace);
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
+
+    expect(resolve(WorkspaceActivationFacts::class)->sampleRecordCount($this->workspace))->toBe(5);
+
+    livewire(ActivationChecklist::class)->call('removeSampleData');
+
+    expect(People::query()->whereKey($synced->getKey())->exists())->toBeTrue();
 });
 
 it('refuses removal while the workspace has no own record', function (): void {

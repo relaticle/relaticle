@@ -7,14 +7,14 @@ return [
     'navigation_label' => 'Accounts',
     'subheading' => 'Manage and sync your email and calendar accounts to stay organized.',
     'actions' => [
-        'connect_gmail' => 'Connect Google Account',
-        'connect_azure' => 'Connect Microsoft Account',
+        'connect_gmail' => 'Connect Google account',
+        'connect_azure' => 'Connect Microsoft account',
         'manage' => 'Manage',
         'edit_settings' => 'Edit settings',
         'reconnect' => 'Reconnect',
         'set_default' => 'Set as default',
         'retry_sync' => 'Retry sync',
-        'disconnect' => 'Disconnect Mailbox',
+        'disconnect' => 'Disconnect account',
         'sync_calendar' => [
             'enable_label' => 'Sync calendar',
             'disable_label' => 'Disable calendar sync',
@@ -27,7 +27,7 @@ return [
         'sync_calendar_now' => 'Sync now',
         'reimport_history' => [
             'label' => 'Re-import history',
-            'heading' => 'Re-import mailbox history?',
+            'heading' => 'Re-import account history?',
             'description' => 'Already synced mail and events stay in Relaticle. We will create missing people and companies using the current workspace record-creation setting, and import any messages not stored yet. This can take a while on a large mailbox.',
         ],
         'retry_failed_import' => [
@@ -37,11 +37,11 @@ return [
     'settings' => [
         'sync_inbox' => [
             'label' => 'Sync inbox',
-            'helper_text' => 'Sync incoming emails to this account.',
+            'helper_text' => 'Bring emails you receive into Relaticle.',
         ],
         'sync_sent' => [
             'label' => 'Sync sent',
-            'helper_text' => 'Sync emails you send from this account.',
+            'helper_text' => 'Bring emails you send from this account into Relaticle.',
         ],
         'hourly_send_limit' => [
             'label' => 'Hourly send limit',
@@ -53,7 +53,7 @@ return [
             'placeholder' => 'Default: :default',
             'helper_text' => 'Leave blank to use the workspace default.',
         ],
-        'modal_heading' => 'Account Settings',
+        'modal_heading' => 'Account settings',
         'submit_label' => 'Save',
     ],
     'notifications' => [
@@ -94,38 +94,30 @@ return [
     'sections' => [
         'connected' => [
             'heading' => 'Connected accounts',
-            'description' => 'We take your privacy very seriously. Read our <a href=":url" target="_blank" class="underline">Privacy Policy</a>.',
+            'description' => 'Read how we handle your data in our <a href=":url" target="_blank" class="underline">Privacy Policy</a>.',
         ],
     ],
     'synced_at' => 'Synced :time',
-    'in_sync' => 'In Sync',
+    'in_sync' => 'In sync',
     'sync_error' => [
         'badge' => 'Sync issue',
         'heading' => 'Some items could not be synced',
     ],
-    'send_missing_tooltip' => 'Send access was not granted. Grant it to send mail from Relaticle.',
     'importing' => 'Syncing',
-    'importing_calendar' => 'Syncing calendar',
-    'importing_email' => 'Syncing email',
-    'importing_email_and_calendar' => 'Syncing email and calendar',
     'importing_percent' => ':percent%',
+    'importing_count' => '{1}:count email|[2,*]:count emails',
+    'statuses' => [
+        'active' => 'Active',
+        'error' => 'Sync issue',
+        'disconnected' => 'Disconnected',
+        'reauth_required' => 'Reconnect needed',
+    ],
     'history_import' => [
         'processed' => ':processed of :total processed',
-        'failed_jobs' => ':count messages could not be imported',
         'successful_jobs' => ':count imported successfully',
     ],
     'history_import_failure' => [
-        'badge' => 'Import issue',
-        'dismiss' => 'Dismiss',
         'max_attempts' => 'This message could not be stored after several tries. Use Retry above. If it keeps failing, wait a few minutes and try again.',
-    ],
-    'sync_status' => [
-        'title_syncing' => 'Syncing',
-        'title_complete' => 'Import complete',
-        'meetings_processed' => '{1}:count meeting processed|[2,*]:count meetings processed',
-        'emails_processed' => '{1}:count email processed|[2,*]:count emails processed',
-        'close' => 'Dismiss',
-        'open_settings' => 'Open account settings',
     ],
     'capabilities' => [
         'email' => 'Email',
@@ -134,15 +126,15 @@ return [
     'not_connected' => [
         'inbox' => [
             'heading' => 'Send emails in Relaticle',
-            'description' => 'Connect your mailbox to read and reply without leaving Relaticle. Mass sending, templates, attachments, and more.',
+            'description' => 'Connect your email account to read and reply without leaving Relaticle. You also get mass sending, templates, and attachments.',
         ],
         'record' => [
             'heading' => 'Keep emails on the record',
-            'description' => 'Connect your mailbox to see every conversation with this record and reply in one click.',
+            'description' => 'Connect your email account to see every conversation with this record and reply in one click.',
         ],
         'meetings' => [
             'heading' => 'See your meetings in Relaticle',
-            'description' => 'Connect your mailbox to track meetings alongside your CRM records.',
+            'description' => 'Connect your account to track meetings alongside your CRM records.',
         ],
     ],
 ];

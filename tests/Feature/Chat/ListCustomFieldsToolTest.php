@@ -143,3 +143,25 @@ it('offers uniqueness on a regular text field but not on a system one', function
     expect($fields->firstWhere('name', 'Region')['settings'])->toHaveKey('unique_per_entity_type')
         ->and($fields->firstWhere('name', 'Legal name')['settings'])->not->toHaveKey('unique_per_entity_type');
 });
+
+it('reports whether each field rejects duplicates, including system fields that cannot change it', function (): void {
+    $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+
+    foreach ([['Emails', true, true], ['Region', false, false]] as [$name, $systemDefined, $unique]) {
+        CustomField::factory()->create([
+            $tenantKey => $this->workspace->getKey(),
+            'entity_type' => 'people',
+            'name' => $name,
+            'type' => 'text',
+            'system_defined' => $systemDefined,
+            'active' => true,
+            'settings' => new CustomFieldSettingsData(unique_per_entity_type: $unique),
+        ]);
+    }
+
+    $fields = collect(json_decode(resolve(ListCustomFieldsTool::class)->handle(new Request(['entity_type' => 'people'])), true)['custom_fields']);
+
+    expect($fields->firstWhere('name', 'Emails')['unique'])->toBeTrue()
+        ->and($fields->firstWhere('name', 'Emails')['settings'])->not->toHaveKey('unique_per_entity_type')
+        ->and($fields->firstWhere('name', 'Region')['unique'])->toBeFalse();
+});

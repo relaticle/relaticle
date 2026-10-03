@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
+use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
+
 /**
  * Sentry Laravel SDK configuration file.
  *
@@ -44,6 +47,9 @@ return [
     'ignore_transactions' => [
         // Ignore Laravel's default health URL
         '/up',
+        // One transaction per stored message: a mailbox import used up the daily span quota.
+        StoreEmailJob::class,
+        StoreMeetingJob::class,
     ],
 
     // Breadcrumb specific configuration

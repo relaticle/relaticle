@@ -44,10 +44,15 @@
         @livewire(\App\Livewire\App\Onboarding\ActivationChecklist::class)
 
         @if($canInviteMembers)
-            <a href="{{ \App\Filament\Pages\Workspace\Members::getUrl() }}" class="{{ $rowClasses }}">
+            <button
+                type="button"
+                x-data
+                x-on:click="$dispatch('open-invite-workspace-members')"
+                class="{{ $rowClasses }} w-[calc(100%-2rem)] text-start"
+            >
                 <x-heroicon-o-user-plus class="size-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
                 <span class="truncate">{{ __('filament/pages/dashboard.activation.invite_members') }}</span>
-            </a>
+            </button>
         @endif
 
         @if($billing !== null)

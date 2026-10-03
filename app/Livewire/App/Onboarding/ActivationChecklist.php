@@ -283,9 +283,12 @@ final class ActivationChecklist extends Component
      */
     private function buildEmailSyncProgress(Collection $syncingAccounts): array
     {
-        $percent = (int) $syncingAccounts
-            ->map(fn (ConnectedAccount $account): int => $account->syncDisplayPercent())
-            ->max();
+        $percents = $syncingAccounts->map(fn (ConnectedAccount $account): ?int => $account->syncDisplayPercent());
+        $percent = (int) $percents->max();
+
+        if ($percents->containsStrict(null)) {
+            return ['percent' => $percent, 'showsPercent' => false];
+        }
 
         return [
             'percent' => $percent,

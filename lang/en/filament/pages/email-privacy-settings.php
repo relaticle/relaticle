@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 return [
-    'title' => 'Workspace Privacy',
-    'navigation_label' => 'Workspace Privacy',
+    'title' => 'Workspace privacy',
+    'navigation_label' => 'Workspace privacy',
     'tabs' => [
         'aria' => 'Workspace email settings',
         'visibility' => 'Email visibility',
@@ -15,9 +15,9 @@ return [
         'save' => 'Save',
     ],
     'workspace_default' => [
-        'heading' => 'Workspace Default Sharing Tier',
+        'heading' => 'Workspace default sharing tier',
         'description' => 'Applied to synced emails for members who follow the workspace default. Existing emails update when you save, except emails a member changed individually.',
-        'tier_label' => 'Default Sharing Tier for Connected Email Accounts',
+        'tier_label' => 'Default sharing tier for connected email accounts',
     ],
     'visibility' => [
         'heading' => 'Email visibility',
@@ -29,21 +29,21 @@ return [
         'empty_hint' => 'System defaults above always apply. Add custom addresses or domains when you need more coverage.',
         'emails_label' => 'Email addresses',
         'emails_placeholder' => 'e.g. legal@acme.com',
-        'emails_after_label' => 'Press Enter(⏎) to add each address.',
+        'emails_after_label' => 'Press Enter to add each address.',
         'domains_label' => 'Domains',
         'domains_placeholder' => 'e.g. acme.com',
-        'domains_after_label' => 'Press Enter(⏎) to add each domain.',
+        'domains_after_label' => 'Press Enter to add each domain.',
         'include_subdomains_label' => 'Include subdomains',
         'include_subdomains_hint' => 'Also hide mail from addresses like user@mail.example.com when you add example.com.',
         'include_subdomains_short' => 'Include subdomains',
         'enforcement' => [
             'protected' => [
                 'label' => 'Protected',
-                'description' => 'Emails and calendar events are hidden, unless one or more included contacts are not protected and not blocked.',
+                'description' => 'Hidden only when every contact on the email or event is protected or blocked.',
             ],
             'blocked' => [
                 'label' => 'Blocked',
-                'description' => 'Emails and calendar events are hidden even when non-protected or non-blocked contacts are included.',
+                'description' => 'Always hidden when this contact is on the email or event.',
             ],
         ],
         'notifications' => [
@@ -67,14 +67,14 @@ return [
         'heading' => 'Workspace blocklist',
         'description' => 'Emails from these addresses and domains are hidden from every connected mailbox in this workspace.',
         'add' => 'Add to blocklist',
-        'empty_heading' => 'No emails or domains yet',
+        'empty_heading' => 'No addresses or domains yet',
         'empty_description' => 'Emails from blocklisted domains and addresses will not appear in Relaticle for any mailbox in this workspace.',
         'emails_label' => 'Blocked addresses',
         'emails_placeholder' => 'noisy@example.com',
-        'emails_after_label' => 'Press Enter(⏎) to add each address.',
+        'emails_after_label' => 'Press Enter to add each address.',
         'domains_label' => 'Blocked domains',
         'domains_placeholder' => 'example.com',
-        'domains_after_label' => 'Press Enter(⏎) to add each domain.',
+        'domains_after_label' => 'Press Enter to add each domain.',
         'notifications' => [
             'added' => 'Blocklist updated.',
             'deleted' => 'Blocklist entry removed.',
@@ -86,37 +86,6 @@ return [
             'actions' => 'Actions',
             'unknown_user' => 'Unknown',
         ],
-    ],
-    'privacy_protections' => [
-        'heading' => 'Privacy protections',
-        'description' => 'System defaults keep internal team conversations and your workspace domain private inside Relaticle. Add custom addresses or domains below when you need more coverage.',
-        'add' => 'Add protection',
-        'empty_heading' => 'No custom protections yet',
-        'empty_description' => 'Add addresses or domains that should stay hidden from teammates. System defaults above always apply.',
-        'notifications' => [
-            'added' => 'Privacy protections updated.',
-            'deleted' => 'Protection removed.',
-        ],
-        'table' => [
-            'address' => 'Email / Domain',
-            'protection' => 'Protection',
-            'source' => 'Source',
-            'actions' => 'Actions',
-            'protected' => 'Protected',
-            'system_default' => 'System default',
-            'members_row' => "Workspace members' email addresses",
-            'unknown_user' => 'Unknown',
-        ],
-    ],
-    'protected_recipients' => [
-        'heading' => 'Protected Recipients',
-        'description' => 'Emails involving these addresses or domains are hidden from all teammates workspace-wide. Only the syncing user can see them.',
-        'emails_label' => 'Email addresses',
-        'emails_placeholder' => 'e.g. legal@acme.com',
-        'emails_after_label' => 'Press Enter(⏎) to add each address.',
-        'domains_label' => 'Domains',
-        'domains_placeholder' => 'e.g. acme.com',
-        'domains_after_label' => 'All emails from these domains will be protected.',
     ],
     'record_creation' => [
         'heading' => 'Automatic record creation',
@@ -139,6 +108,24 @@ return [
         'companies' => [
             'label' => 'Automatically create company records',
             'description' => 'When enabled, a company is created from a person\'s email domain. This follows the contact setting above. It is unavailable when record creation is None.',
+        ],
+    ],
+    'tiers' => [
+        'private' => [
+            'label' => 'Private',
+            'description' => 'Nothing is shared. Only you can see these emails.',
+        ],
+        'metadata_only' => [
+            'label' => 'Metadata only',
+            'description' => 'Your workspace sees the participants and timestamp.',
+        ],
+        'subject' => [
+            'label' => 'Subject line and metadata',
+            'description' => 'Your workspace sees the subject line, participants, and timestamp.',
+        ],
+        'full' => [
+            'label' => 'Full access',
+            'description' => 'Your workspace sees the body, subject line, and attachments.',
         ],
     ],
     'notifications' => [

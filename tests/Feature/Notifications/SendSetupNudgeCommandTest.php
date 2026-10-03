@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\ActivationStep;
 use App\Enums\CreationSource;
+use App\Features\SetupConversation;
 use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Pennant\Feature;
 
 it('renders the nudge naming the unfinished step', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed']);
@@ -147,8 +149,28 @@ it('skips a workspace already scheduled for deletion', function (): void {
     Mail::assertNothingQueued();
 });
 
-it('points the nudge at the dashboard, never at an id-less chat URL', function (): void {
+it('points the nudge at the setup conversation the owner landed in', function (): void {
     Mail::fake();
+    Feature::define(SetupConversation::class, true);
+
+    $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
+    $workspace = $owner->currentWorkspace;
+    $conversationId = $workspace->setupConversation->id;
+
+    $this->travelTo(now()->setTime(9, 0));
+    $workspace->forceFill(['created_at' => now()->subDays(2)])->save();
+
+    $this->artisan('notifications:send-setup-nudge')->assertSuccessful();
+
+    Mail::assertQueued(SetupNudgeMail::class, fn (SetupNudgeMail $mail): bool => $mail->conversationUrl === ChatConversation::getUrl(
+        ['conversationId' => $conversationId, 'tenant' => $workspace],
+        panel: 'app',
+    ));
+});
+
+it('points the nudge at the dashboard when the workspace has no setup conversation', function (): void {
+    Mail::fake();
+    Feature::define(SetupConversation::class, false);
 
     $owner = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC']);
     $workspace = $owner->currentWorkspace;

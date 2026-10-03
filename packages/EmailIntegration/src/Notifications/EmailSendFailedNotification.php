@@ -48,7 +48,7 @@ final class EmailSendFailedNotification extends Notification
 
         $body = $this->count === 1
             ? __("filament/notifications/email-send-failed.{$copy}.body_one", [
-                'subject' => filled($this->subject) ? $this->subject : __('filament/notifications/email-send-failed.no_subject'),
+                'subject' => filled($this->subject) ? $this->subject : __('filament/pages/email-inbox.subject.none'),
             ])
             : __("filament/notifications/email-send-failed.{$copy}.body_many");
 

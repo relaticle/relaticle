@@ -12,6 +12,7 @@ use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\EditA
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\ViewAiCreditBalance;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\OverviewData;
 
 mutates(AiCreditBalanceResource::class);
 
@@ -121,4 +122,21 @@ it('explains an allowance with the workspace billing badge, not a vocabulary of 
         ->assertCanRenderTableColumn('billing_status')
         ->assertSee(BillingStatus::Trialing->getLabel())
         ->assertSeeHtml(BillingStatus::Trialing->getDescription());
+});
+
+it('filters balances of trialing workspaces', function (): void {
+    $trial = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    $free = OverviewData::workspaceOf(OverviewData::owner());
+
+    $trialBalance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $trial->getKey()], [
+        'credits_remaining' => 1500, 'credits_used' => 500, 'period_starts_at' => now()->startOfMonth(), 'period_ends_at' => now()->endOfMonth(),
+    ]);
+    $freeBalance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $free->getKey()], [
+        'credits_remaining' => 300, 'credits_used' => 0, 'period_starts_at' => now()->startOfMonth(), 'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    livewire(ListAiCreditBalances::class)
+        ->filterTable('trialing')
+        ->assertCanSeeTableRecords([$trialBalance])
+        ->assertCanNotSeeTableRecords([$freeBalance]);
 });

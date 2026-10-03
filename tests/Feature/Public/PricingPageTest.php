@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\StartProTrial;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
+use App\Models\Workspace;
 use App\Support\CompetitorFacts;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\ModelRegistry;
@@ -240,7 +240,7 @@ it('discloses that self-hosted installs are not exempt from the free-tier credit
     expect($windows)->not->toBeEmpty()
         ->and($windows->contains(fn (string $answer): bool => str_contains($answer, (string) Plan::Free->credits())
             && str_contains($answer, number_format(Plan::Pro->credits()))
-            && str_contains($answer, StartProTrial::TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must state the Free credits, the Pro credits and the trial length')
+            && str_contains($answer, Workspace::PRO_TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must state the Free credits, the Pro credits and the trial length')
         ->and($html)->not->toContain('brand-new Cloud signup gets exactly the same one')
         ->and($html)->not->toContain("\u{2014}");
 });
@@ -470,4 +470,38 @@ it('keeps the shipped seed catalog free of copy holes on both public pages', fun
 
     assertNoCopyHoles((string) $this->get('/pricing')->assertOk()->getContent());
     assertNoCopyHoles((string) $this->get('/ai')->assertOk()->getContent());
+});
+
+it('keeps the plans help article in step with the pricing page', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $pricing = $this->get('/pricing')->assertOk()->getContent();
+    $article = $this->get(route('help.show', ['category' => 'workspace', 'slug' => 'billing-and-plans']))->assertOk()->getContent();
+
+    $facts = [
+        '$19/mo',
+        '$24/mo',
+        '$228',
+        Workspace::PRO_TRIAL_DAYS.'-day',
+        number_format(Plan::Pro->credits()),
+        '$'.number_format(config('relaticle.enterprise.starting_price_yearly')),
+    ];
+
+    foreach ($facts as $fact) {
+        expect($pricing)->toContain($fact)
+            ->and($article)->toContain($fact);
+    }
+});
+
+it('keeps the credits help article in step with each plan allowance', function (): void {
+    $article = new Crawler((string) $this->get(route('help.show', ['category' => 'ai-assistant', 'slug' => 'ai-credits-and-limits']))->assertOk()->getContent());
+
+    $rows = collect($article->filter('table tbody tr')->each(fn (Crawler $row): array => $row->filter('td')->each(fn (Crawler $cell): string => $cell->text())))
+        ->keyBy(fn (array $cells): string => $cells[0]);
+
+    expect($rows->all())->toBe([
+        'Cloud Pro and its trial' => ['Cloud Pro and its trial', number_format(Plan::Pro->credits()), (string) Plan::Pro->rateLimit()],
+        'Enterprise' => ['Enterprise', number_format(Plan::Enterprise->credits()), (string) Plan::Enterprise->rateLimit()],
+        'Self-hosted (default)' => ['Self-hosted (default)', number_format(Plan::default()->credits()), (string) Plan::default()->rateLimit()],
+    ]);
 });

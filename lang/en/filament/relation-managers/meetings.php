@@ -15,18 +15,6 @@ return [
         ],
     ],
 
-    'fields' => [
-        'organizer' => [
-            'label' => 'Organizer',
-        ],
-        'email_address' => [
-            'label' => 'Email',
-        ],
-        'html_link' => [
-            'label' => 'Open in Google Calendar',
-        ],
-    ],
-
     'actions' => [
         'link_to_record' => [
             'label' => 'Link to record',

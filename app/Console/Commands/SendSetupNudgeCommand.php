@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\ActivationStep;
+use App\Filament\Pages\ChatConversation;
 use App\Filament\Pages\Dashboard;
 use App\Mail\SetupNudgeMail;
 use App\Models\User;
@@ -118,13 +119,12 @@ final class SendSetupNudgeCommand extends Command
         return null;
     }
 
-    /**
-     * Where "Continue in Rela" lands. An id-less chat URL is not a destination:
-     * that page bounces straight back to the dashboard, so the nudge points at
-     * the dashboard composer directly.
-     */
     private function continueUrl(Workspace $workspace): string
     {
-        return Dashboard::getUrl(['tenant' => $workspace], panel: 'app');
+        $setupConversationId = $workspace->setupConversation()->value('id');
+
+        return is_string($setupConversationId)
+            ? ChatConversation::getUrl(['conversationId' => $setupConversationId, 'tenant' => $workspace], panel: 'app')
+            : Dashboard::getUrl(['tenant' => $workspace], panel: 'app');
     }
 }

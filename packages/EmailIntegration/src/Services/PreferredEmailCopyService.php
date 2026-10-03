@@ -17,7 +17,7 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 final readonly class PreferredEmailCopyService
 {
     /**
-     * Keep one visible copy of each RFC Message-ID.
+     * Keep one copy the viewer may see of each RFC Message-ID.
      *
      * Two connected mailboxes can store the same message. The record mailbox
      * should show it once. Prefer the viewer's own copy when they have one.
@@ -25,9 +25,9 @@ final readonly class PreferredEmailCopyService
      * @param  Builder<Email>  $query
      * @return Builder<Email>
      */
-    public function restrictToPreferredCopies(Builder $query, User $viewer): Builder
+    public function restrictToVisiblePreferredCopies(Builder $query, User $viewer): Builder
     {
-        $preferred = $query->clone();
+        $preferred = $query->clone()->withGlobalScope('visible', new VisibleEmailScope($viewer));
         $base = $preferred->getQuery();
         $base->orders = null;
         $base->columns = null;

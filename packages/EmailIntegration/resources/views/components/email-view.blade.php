@@ -88,9 +88,7 @@
     @if ($record->is_internal && $isOwner)
         <div class="flex shrink-0 items-center gap-2.5 border-b border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/30 px-6 py-2.5 text-sm text-blue-700 dark:text-blue-300">
             <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0" />
-            <span class="font-medium">Internal email</span>
-            <span class="text-blue-400">&middot;</span>
-            <span class="text-blue-600 dark:text-blue-400">visible only to workspace members and hidden from external views.</span>
+            <span class="font-medium">{{ __('filament/pages/email-inbox.reader.internal') }}</span>
         </div>
     @endif
 
@@ -119,10 +117,10 @@
                 <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
                     @if ($canViewSubject)
                         <h2 class="min-w-0 text-base font-semibold leading-snug text-gray-900 break-words dark:text-white">
-                            {{ $subject ?: '(no subject)' }}
+                            {{ $subject ?: __('filament/pages/email-inbox.subject.none') }}
                         </h2>
                     @else
-                        <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">(subject hidden)</p>
+                        <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.subject.hidden') }}</p>
                     @endif
 
                     @if ($categoryLabel)
@@ -214,7 +212,7 @@
                     >
                         <span class="flex flex-wrap items-baseline gap-x-1">
                             <span class="text-sm font-medium text-gray-900 dark:text-white">
-                                {{ $from?->name ?: $from?->email_address ?: '(unknown sender)' }}
+                                {{ $from?->name ?: $from?->email_address ?: __('filament/pages/email-inbox.reader.unknown_sender') }}
                             </span>
                             @if ($toList->isEmpty() && $ccList->isEmpty())
                                 <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500" x-bind:class="detailsOpen && 'rotate-180'" />
@@ -237,7 +235,7 @@
                     </button>
                 @else
                     <span class="text-sm font-medium text-gray-900 dark:text-white">
-                        {{ $from?->name ?: $from?->email_address ?: '(unknown sender)' }}
+                        {{ $from?->name ?: $from?->email_address ?: __('filament/pages/email-inbox.reader.unknown_sender') }}
                     </span>
                 @endif
 
@@ -428,7 +426,7 @@
                 @if ($record->body?->body_text)
                     <pre class="max-w-prose whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
                 @else
-                    <p class="text-sm italic text-gray-400 dark:text-gray-500">(no message body)</p>
+                    <p class="text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.reader.no_body') }}</p>
                 @endif
             </div>
         @endif

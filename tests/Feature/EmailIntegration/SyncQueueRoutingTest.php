@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterfac
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 
 mutates(
     IncrementalEmailSyncJob::class,
@@ -57,22 +58,39 @@ function queueRoutingCalendarEvent(): CalendarEventData
     );
 }
 
-it('routes inbound email and calendar sync jobs to emails-sync queue', function (string $job): void {
+it('routes ongoing email and calendar sync jobs to the emails-sync queue', function (string $job): void {
     $queue = (new ReflectionClass($job))->getAttributes(Queue::class)[0]->newInstance();
 
     expect($queue->queue)->toBe('emails-sync');
 })->with([
     IncrementalEmailSyncJob::class,
-    InitialEmailSyncJob::class,
     StoreEmailJob::class,
     IncrementalCalendarSyncJob::class,
-    InitialCalendarSyncJob::class,
     StoreMeetingJob::class,
-    RelinkMailboxHistoryJob::class,
     EnsureCalendarPushChannelJob::class,
 ]);
 
-it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue', function (): void {
+it('routes mailbox history import jobs to the emails-import queue', function (string $job): void {
+    $queue = (new ReflectionClass($job))->getAttributes(Queue::class)[0]->newInstance();
+
+    expect($queue->queue)->toBe('emails-import');
+})->with([
+    InitialEmailSyncJob::class,
+    InitialCalendarSyncJob::class,
+    RelinkMailboxHistoryJob::class,
+]);
+
+it('starts the mailbox history import batch on the emails-import queue', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    resolve(MailboxHistoryImportService::class)->startBatch($account);
+
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-import');
+});
+
+it('dispatches the initial-sync StoreEmailJob batch onto the emails-import queue', function (): void {
     Bus::fake();
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
@@ -91,7 +109,7 @@ it('dispatches the initial-sync StoreEmailJob batch onto the emails-sync queue',
 
     // Bus::batch() ignores each job's constructor onQueue() — without an explicit
     // ->onQueue() on the batch the StoreEmailJobs leak onto the default queue.
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-sync'
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-import'
         && $batch->jobs->count() === 2
     );
 });

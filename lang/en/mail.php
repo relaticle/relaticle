@@ -65,7 +65,7 @@ return [
     'setup_nudge' => [
         'subject' => 'Your workspace is waiting',
         'preheader' => 'One step gets :workspace working: :step',
-        'heading' => ':name, :workspace is still empty',
+        'heading' => ':name, :workspace is ready for your own contacts',
         'step' => 'Next step: :step.',
         'cta' => 'Continue in :assistant',
     ],

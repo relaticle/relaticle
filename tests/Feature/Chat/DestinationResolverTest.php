@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Support\DestinationResolver;
 
 mutates(DestinationResolver::class);
@@ -69,4 +70,22 @@ it('resolves connect_assistant to the public help page on the primary host', fun
     $url = app(DestinationResolver::class)->resolve('connect_assistant', $this->user->currentWorkspace);
 
     expect($url)->toBe('https://marketing.test/help/ai-assistant/connect-claude-or-chatgpt');
+});
+
+it('resolves email_accounts to the mailbox page while the email integration is on', function (): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $url = app(DestinationResolver::class)->resolve('email_accounts', $this->user->currentWorkspace);
+
+    expect($url)->toBeString()
+        ->and($url)->toContain((string) $this->user->currentWorkspace->slug)
+        ->and($url)->toContain('workspace/email');
+});
+
+it('resolves no email_accounts page while the email integration is off', function (): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
+    expect(app(DestinationResolver::class)->resolve('email_accounts', $this->user->currentWorkspace))->toBeNull();
 });

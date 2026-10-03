@@ -70,7 +70,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         ->where('role', 'to')->pluck('email_address')->implode(', ')),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('scheduled_for')->dateTime()->label(__('filament/pages/email-outbox.columns.scheduled_for')),
-                TextColumn::make('priority')->badge(),
+                TextColumn::make('priority')->label(__('filament/pages/email-outbox.columns.type'))->badge(),
                 TextColumn::make('last_error')
                     ->toggleable(isToggledHiddenByDefault: $this->lockedStatus !== EmailStatus::FAILED)
                     ->wrap(),
@@ -141,7 +141,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
                         $title = $skipped > 0
                             ? __('filament/pages/email-outbox.notifications.bulk_cancelled_with_skipped', ['cancelled' => $cancelled, 'skipped' => $skipped])
-                            : __('filament/pages/email-outbox.notifications.bulk_cancelled', ['count' => $cancelled]);
+                            : trans_choice('filament/pages/email-outbox.notifications.bulk_cancelled', $cancelled);
 
                         $this->dispatch('outbox:changed');
                         Notification::make()->title($title)->success()->send();

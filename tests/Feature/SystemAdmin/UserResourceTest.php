@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\Plan;
 use App\Enums\SocialiteProvider;
 use App\Enums\SubscriberTagEnum;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +30,7 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\Socia
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\WorkspacesRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\OverviewData;
 
 mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, UserResource::class, Impersonate::class);
 
@@ -490,4 +494,93 @@ it('mints a single-use impersonation link addressed to the app', function (): vo
     expect($link)->toStartWith(url()->getPublicUrl("impersonate/{$user->getKey()}?"))
         ->and($query)->toHaveKeys(['administrator', 'nonce', 'expires', 'signature'])
         ->and($query['administrator'])->toBe(Auth::guard('sysadmin')->id());
+});
+
+it('filters genuine signups and leaves out invited teammates, unverified users and administrators', function (): void {
+    $genuine = OverviewData::owner();
+    $unverified = OverviewData::owner(attributes: ['email_verified_at' => null]);
+    $administrator = OverviewData::internalOwner();
+
+    $invited = User::factory()->create(['created_at' => now()->subHour()]);
+    OverviewData::workspaceOf($genuine)->users()->attach($invited, ['role' => WorkspaceRole::Member->value, 'created_at' => now()]);
+
+    livewire(ListUsers::class)
+        ->filterTable('genuine_signup')
+        ->assertCanSeeTableRecords([$genuine])
+        ->assertCanNotSeeTableRecords([$unverified, $administrator, $invited]);
+});
+
+it('filters genuine signups who added their own data within seven days', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 12:00:00'));
+
+    $fast = OverviewData::owner(CarbonImmutable::parse('2026-09-15 10:00:00'));
+    OverviewData::ownRecord(OverviewData::workspaceOf($fast), $fast, CarbonImmutable::parse('2026-09-20 10:00:00'));
+
+    $slow = OverviewData::owner(CarbonImmutable::parse('2026-09-15 10:00:00'));
+    OverviewData::ownRecord(OverviewData::workspaceOf($slow), $slow, CarbonImmutable::parse('2026-09-25 10:00:00'));
+
+    $chatOnly = OverviewData::owner(CarbonImmutable::parse('2026-09-15 10:00:00'));
+    OverviewData::typedMessage(OverviewData::workspaceOf($chatOnly), $chatOnly, CarbonImmutable::parse('2026-09-16 10:00:00'));
+
+    livewire(ListUsers::class)
+        ->filterTable('reached_first_value')
+        ->assertCanSeeTableRecords([$fast])
+        ->assertCanNotSeeTableRecords([$slow, $chatOnly]);
+});
+
+it('filters users by signup date', function (): void {
+    $inside = OverviewData::owner(CarbonImmutable::parse('2026-09-16 10:00:00'));
+    $outside = OverviewData::owner(CarbonImmutable::parse('2026-09-23 10:00:00'));
+
+    livewire(ListUsers::class)
+        ->filterTable('signed_up', ['from' => '2026-09-15', 'until' => '2026-09-21'])
+        ->assertCanSeeTableRecords([$inside])
+        ->assertCanNotSeeTableRecords([$outside])
+        ->assertSee('Signed up from: 2026-09-15')
+        ->assertSee('Signed up until: 2026-09-21');
+});
+
+it('shows how each user signed up', function (): void {
+    $password = OverviewData::owner();
+    $google = OverviewData::owner();
+    UserSocialAccount::factory()->create(['user_id' => $google->getKey(), 'provider_name' => 'google']);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('signup_method', 'Password', $password)
+        ->assertTableColumnStateSet('signup_method', 'Google', $google);
+});
+
+it('keeps trial farmers out of genuine signups once their trial has ended', function (): void {
+    config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
+
+    $farmer = OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran']);
+    $builder = OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran']);
+    OverviewData::ownRecord(OverviewData::workspaceOf($builder), $builder, now());
+
+    foreach ([$farmer, $builder] as $owner) {
+        OverviewData::trial(OverviewData::workspaceOf($owner))
+            ->forceFill(['plan' => Plan::Free, 'trial_ends_at' => now()->subDay()])
+            ->save();
+    }
+
+    livewire(ListUsers::class)
+        ->filterTable('genuine_signup')
+        ->assertCanSeeTableRecords([$builder])
+        ->assertCanNotSeeTableRecords([$farmer]);
+});
+
+it('shows a password signup who linked a social account later as Password', function (): void {
+    $user = OverviewData::owner(CarbonImmutable::parse('2026-09-01 10:00:00'));
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'provider_name' => 'google',
+        'created_at' => CarbonImmutable::parse('2026-09-20 10:00:00'),
+    ]);
+
+    livewire(ListUsers::class)
+        ->assertTableColumnStateSet('signup_method', 'Password', $user);
+});
+
+it('shows the signup method column without toggling it on', function (): void {
+    expect(livewire(ListUsers::class)->instance()->isTableColumnToggledHidden('signup_method'))->toBeFalse();
 });

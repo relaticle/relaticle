@@ -22,7 +22,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 #[DeleteWhenMissingModels]
-#[Queue('emails-sync')]
+#[Queue('emails-import')]
 #[Timeout(300)]
 #[UniqueFor(3600)]
 final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue

@@ -95,6 +95,31 @@ it('keeps migrations off the database clock (no useCurrent, CURRENT_TIMESTAMP, o
     );
 });
 
+it('keeps migrations out of the test suite', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/tests', FilesystemIterator::SKIP_DOTS));
+
+    $offenders = [];
+
+    foreach ($files as $file) {
+        $path = $file->getPathname();
+
+        if ($file->getExtension() !== 'php' || str_starts_with($path, $root.'/tests/Arch/')) {
+            continue;
+        }
+
+        if (preg_match('#database/migrations/|database_path\(\s*[\'"]migrations#', (string) file_get_contents($path)) === 1) {
+            $offenders[] = str_replace($root.'/', '', $path);
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Migrations are not tested (.ai/guidelines/relaticle/testing.md). Remove the migration test from: '.implode(', ', $offenders),
+    );
+});
+
 it('keeps compiled agent guidelines in sync with their .ai sources', function (): void {
     $root = dirname(__DIR__, 2);
 
@@ -179,7 +204,7 @@ it('keeps reusable query predicates on their model as scopes', function (): void
 
     $allowed = [
         'Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery::apply',
-        'Relaticle\EmailIntegration\Services\PreferredEmailCopyService::restrictToPreferredCopies',
+        'Relaticle\EmailIntegration\Services\PreferredEmailCopyService::restrictToVisiblePreferredCopies',
         'Relaticle\EmailIntegration\Services\EmailSearchService::applyToQuery',
         'Relaticle\EmailIntegration\Services\EmailSearchService::whereSubjectVisibleTo',
         'Relaticle\EmailIntegration\Support\BlocklistDomainMatcher::constrainWhereExistsDomainMatch',

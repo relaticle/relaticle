@@ -132,33 +132,6 @@ final readonly class ForwardAttachmentCopyService
     }
 
     /**
-     * Copy every forwardable file from the source for modal reply/forward (no attachment UI).
-     *
-     * @return array{
-     *     paths: list<string>,
-     *     names: array<string, string>,
-     *     attributes: array<string, array{is_inline: bool, content_id: ?string}>,
-     *     unavailable: list<EmailAttachment>,
-     *     rejected_filenames: list<string>,
-     * }
-     */
-    public function copyAllForForward(User $user, Email $source): array
-    {
-        [$nonInline, $rejected] = $this->forwardableNonInlineAttachments($source);
-
-        [$paths, $names, $attributes, $unavailable] = $this->copyRecords($user, $nonInline);
-        [$inlinePaths, $inlineNames, $inlineAttributes, $inlineUnavailable] = $this->copyInlineFromSource($user, $source);
-
-        return [
-            'paths' => [...$paths, ...$inlinePaths],
-            'names' => [...$names, ...$inlineNames],
-            'attributes' => [...$attributes, ...$inlineAttributes],
-            'unavailable' => [...$unavailable, ...$inlineUnavailable],
-            'rejected_filenames' => $rejected,
-        ];
-    }
-
-    /**
      * @param  list<string>  $attachmentIds
      * @return array{0: list<string>, 1: array<string, string>, 2: array<string, array{is_inline: bool, content_id: ?string}>, 3: list<EmailAttachment>}
      */

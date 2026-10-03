@@ -40,9 +40,7 @@ final readonly class OpenMassSendComposer
         if ($result->skipped > 0) {
             Notification::make()
                 ->title(__('filament/actions/mass-send.notifications.skipped.title'))
-                ->body(__('filament/actions/mass-send.notifications.skipped.body', [
-                    'skipped' => $result->skipped,
-                ]))
+                ->body(trans_choice('filament/actions/mass-send.notifications.skipped.body', $result->skipped))
                 ->warning()
                 ->send();
         }

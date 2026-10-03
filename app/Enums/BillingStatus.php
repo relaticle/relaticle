@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Features\Billing;
 use App\Models\Workspace;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasDescription;
@@ -11,6 +12,7 @@ use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Cashier\Subscription;
+use Laravel\Pennant\Feature;
 
 /**
  * Why a workspace has the plan it has.
@@ -44,6 +46,11 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     case Granted = 'granted';
 
     case Free = 'free';
+
+    public static function billingEnabled(): bool
+    {
+        return Feature::active(Billing::class);
+    }
 
     /**
      * Ordered by precedence, most specific first. Past due comes before

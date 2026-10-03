@@ -7,7 +7,6 @@ namespace App\Support\Auth;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
-use Filament\Facades\Filament;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Routing\Router;
@@ -38,7 +37,7 @@ final readonly class LoginDestination
     {
         return $user->currentWorkspace
             ? Dashboard::getUrl(['tenant' => $user->currentWorkspace])
-            : Filament::getPanel('app')->getUrl();
+            : url()->getAppUrl();
     }
 
     private function isAccessible(string $intended, User $user): bool

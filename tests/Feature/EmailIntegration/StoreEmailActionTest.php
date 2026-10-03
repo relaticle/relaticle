@@ -688,6 +688,41 @@ it('bumps mailbox import progress while the history cursor is still empty', func
     expect($this->account->fresh()?->initial_sync_imported)->toBe(1);
 });
 
+it('keeps the first copy when the mailbox holds a second message with the same Message-ID', function (): void {
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'gmail-first-copy',
+        'rfcMessageId' => '<newsletter-42@mail.example.com>',
+    ]));
+
+    $second = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'gmail-second-copy',
+        'rfcMessageId' => '<newsletter-42@mail.example.com>',
+    ]));
+
+    expect($second->is($first))->toBeTrue()
+        ->and(Email::query()->where('connected_account_id', $this->account->getKey())->count())->toBe(1)
+        ->and($this->account->fresh()?->initial_sync_imported)->toBe(1);
+});
+
+it('stores the same Message-ID separately for a different mailbox', function (): void {
+    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'gmail-mine',
+        'rfcMessageId' => '<shared-thread@example.com>',
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($otherAccount, makeFetchedEmailData([
+        'providerMessageId' => 'gmail-theirs',
+        'rfcMessageId' => '<shared-thread@example.com>',
+    ]));
+
+    expect(Email::query()->where('rfc_message_id', '<shared-thread@example.com>')->count())->toBe(2);
+});
+
 it('does not bump mailbox import progress after the history cursor is written', function (): void {
     $this->account->update(['sync_cursor' => 'history-1']);
 

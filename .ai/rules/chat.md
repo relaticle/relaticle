@@ -327,8 +327,8 @@ and a 24h `Cache::remember` over a vendor's bad minute blanks the model picker f
 
 ## composer test scripts need disableProcessTimeout
 Composer kills a script at 300s by default. `test:pest` had the guard and its siblings
-did not, so `composer test:pest:full`, the merge gate CLAUDE.md tells you to run,
-started aborting on the clock rather than on a test once the suite crossed five minutes.
+did not, so `composer test:pest:full` started aborting on the clock rather than on a
+test once the suite crossed five minutes.
 Every script that can run the whole suite or a slow subset now carries it. Add it to any
 new one.
 

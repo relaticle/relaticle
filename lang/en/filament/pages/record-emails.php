@@ -10,11 +10,15 @@ return [
             'submit' => 'Save',
         ],
         'summarize_thread' => [
-            'label' => 'Summarize Thread',
-            'modal_heading' => 'AI Thread Summary',
+            'label' => 'Summarize thread',
+            'modal_heading' => 'AI thread summary',
+            'empty' => 'No summary is available for this thread.',
+            'generated' => 'Generated :time',
+            'copy' => 'Copy',
+            'copied' => 'Copied',
         ],
         'request_access' => [
-            'label' => 'Request Access',
+            'label' => 'Request access',
             'modal_heading' => 'Request access',
         ],
         'approve_access_request' => [
@@ -44,15 +48,15 @@ return [
     'empty' => [
         'heading' => 'No emails',
         'description' => 'This record doesn\'t have any emails, or they may be hidden due to permissions.',
-        'compose' => 'Compose email',
+        'compose' => 'Compose',
     ],
     'protected' => [
         'heading' => 'Nothing to show here',
-        'description' => 'This record is Protected. Communications stay hidden on this page to protect their privacy.',
+        'description' => 'This record is protected. Its emails and meetings stay hidden here.',
     ],
     'blocked' => [
         'heading' => 'Nothing to show here',
-        'description' => 'This record is Blocked. Communications stay hidden on this page.',
+        'description' => 'This record is blocked. Its emails and meetings stay hidden here.',
     ],
 
     'notifications' => [

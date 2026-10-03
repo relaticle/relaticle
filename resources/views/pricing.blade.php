@@ -43,7 +43,7 @@
                 $enterpriseCredits = number_format(\App\Enums\Plan::Enterprise->credits());
                 $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
                 $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
-                $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
+                $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
                 $toolCapableCloudModels = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
                     ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): array => [
                         'label' => $model->displayLabel(),

@@ -11,6 +11,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\ProvidesComposerToAddress;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\ComposeRecordRecipientResolver;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
@@ -20,6 +21,7 @@ mutates(ComposeRecordRecipientResolver::class);
 mutates(ProvidesComposerToAddress::class);
 mutates(ComposerPageTo::class);
 mutates(ViewPeople::class);
+mutates(EmailComposer::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -41,37 +43,14 @@ beforeEach(function (): void {
     ]);
 });
 
-it('opens the floating composer instead of a compose modal', function (): void {
-    livewire(EmailsRelationManager::class, [
+it('opens the floating composer from the browser without a server round-trip', function (): void {
+    $component = livewire(EmailsRelationManager::class, [
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
-    ])
-        ->callAction('composeEmail')
-        ->assertDispatched('composer:open');
-});
+    ]);
 
-it('prefills the composer to field with the record primary email when compose is opened from a person', function (): void {
-    $emailsField = CustomField::query()
-        ->withoutGlobalScopes()
-        ->where('tenant_id', $this->workspace->id)
-        ->where('entity_type', 'people')
-        ->where('code', PeopleField::EMAILS->value)
-        ->firstOrFail();
-
-    $this->person->saveCustomFieldValue($emailsField, ['jane@acme-customer.com', 'other@acme-customer.com'], $this->workspace);
-
-    livewire(EmailsRelationManager::class, [
-        'ownerRecord' => $this->person,
-        'pageClass' => ViewPeople::class,
-    ])
-        ->callAction('composeEmail')
-        ->assertDispatched('composer:open', function (string $event, array $params): bool {
-            expect($params['payload']['to'])->toBe(['jane@acme-customer.com'])
-                ->and($params['payload']['linkRecordType'])->toBe(People::class)
-                ->and($params['payload']['linkRecordId'])->toBe((string) $this->person->getKey());
-
-            return true;
-        });
+    expect($component->instance()->getAction('composeEmail')->getLivewireClickHandler())
+        ->toBe("\$dispatch('composer:open')");
 });
 
 it('exposes the person primary email on the view page for the composer', function (): void {
@@ -103,25 +82,42 @@ it('passes the person email into the floating composer on the view page', functi
     expect(ComposerPageTo::email())->toBe('jane@example.com');
 });
 
+it('opens the composer on a record page with the record primary email and link', function (): void {
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+
+    $this->person->saveCustomFieldValue($emailsField, ['jane@acme-customer.com', 'other@acme-customer.com'], $this->workspace);
+
+    livewire(ViewPeople::class, ['record' => $this->person->getKey()]);
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('to', ['jane@acme-customer.com'])
+        ->assertSet('linkRecordType', People::class)
+        ->assertSet('linkRecordId', (string) $this->person->getKey());
+});
+
 it('exposes no composer email on the view page when the person has none', function (): void {
     expect(livewire(ViewPeople::class, ['record' => $this->person->getKey()])->instance()->getEmail())
         ->toBeNull();
 });
 
-it('leaves the composer to field empty when the person has no email address', function (): void {
-    livewire(EmailsRelationManager::class, [
-        'ownerRecord' => $this->person,
-        'pageClass' => ViewPeople::class,
-    ])
-        ->callAction('composeEmail')
-        ->assertDispatched('composer:open', function (string $event, array $params): bool {
-            expect($params['payload']['to'])->toBe([]);
+it('opens the composer with an empty to field on a record page whose person has no email', function (): void {
+    livewire(ViewPeople::class, ['record' => $this->person->getKey()]);
 
-            return true;
-        });
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->assertSet('isOpen', true)
+        ->assertSet('to', [])
+        ->assertSet('linkRecordId', (string) $this->person->getKey());
 });
 
-it('opens the composer when the mailbox cannot send', function (): void {
+it('keeps compose available when the mailbox cannot send', function (): void {
     $this->account->update([
         'capabilities' => [
             'email' => true,
@@ -134,9 +130,7 @@ it('opens the composer when the mailbox cannot send', function (): void {
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertActionVisible('composeEmail')
-        ->callAction('composeEmail')
-        ->assertDispatched('composer:open');
+        ->assertActionVisible('composeEmail');
 });
 
 it('is hidden when user has no active connected account', function (): void {

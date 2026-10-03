@@ -10,11 +10,22 @@
         ->filter(static fn (\Filament\Schemas\Components\Wizard\Step $step): bool => $step->isVisible())
         ->count();
 
+    if (count($steps) > 1 && $nextAction->getLivewireTarget() === 'callSchemaComponentMethod') {
+        $nextActionTargetKey = \Illuminate\Support\Js::from($key)->toHtml();
+
+        $nextAction->livewireTarget(
+            collect(range(0, count($steps) - 2))
+                ->map(static fn (int $stepIndex): string => "callSchemaComponentMethod({$nextActionTargetKey}, 'nextStep', ".\Illuminate\Support\Js::from(['currentStepIndex' => $stepIndex])->toHtml().')')
+                ->implode(', '),
+        );
+    }
+
 @endphp
 {{-- Custom wizard view for onboarding. Removes the previous/cancel action
      divs from the footer that Filament's default view hardcodes.
      Source: vendor/filament/schemas/resources/views/components/wizard.blade.php
-     Diff: only the footer section (fi-sc-wizard-footer) is simplified. --}}
+     Diff: the footer is simplified, and the next action's loading target is narrowed
+     the way Filament's own renderer does it. --}}
 
 <div
     x-load
@@ -27,6 +38,15 @@
                 stepQueryStringKey: @js($getStepQueryStringKey()),
             })"
     x-on:next-wizard-step.window="if ($event.detail.key === @js($key)) goToNextStep()"
+    x-on:form-validation-error.window="
+        if ($event.detail.livewireId === $wire.$id) {
+            requestAnimationFrame(() => $el
+                .querySelector('[data-validation-error]')
+                ?.closest('[data-field-wrapper]')
+                ?.querySelector('input:not([type=hidden]):not([type=file]), textarea, select')
+                ?.focus())
+        }
+    "
     x-on:go-to-wizard-step.window="$event.detail.key === @js($key) && goToStep($event.detail.step)"
     {{-- Enter advances the step; on the last one it submits via requestSubmit
          so native validation still runs. Without this the wizard was mouse-only. --}}
@@ -168,47 +188,20 @@
         </ol>
     @endif
 
-    {{-- Stands in for the step header this wizard hides, so the user can still tell
-         how much of onboarding is left. --}}
     @if ($isHeaderHidden && $stepCount > 1)
-        <div x-cloak class="mb-6">
-            {{-- Back lives up here rather than under the primary button, so the footer
-                 keeps one clear call to action per step. --}}
-            <div class="flex items-center justify-between gap-x-4">
-                <button
-                    x-show="! isFirstStep()"
-                    type="button"
-                    x-on:click="goToPreviousStep()"
-                    class="flex items-center gap-x-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-                >
-                    {{ \Filament\Support\generate_icon_html(
-                        \Filament\Support\Icons\Heroicon::OutlinedArrowLeft,
-                        attributes: new \Illuminate\View\ComponentAttributeBag(['class' => 'h-3.5 w-3.5']),
-                    ) }}
-
-                    {{ __('filament/pages/workspaces.create_workspace.actions.back') }}
-                </button>
-
-                <p
-                    class="ms-auto text-xs font-medium text-gray-500 dark:text-gray-400"
-                    x-text="@js(__('filament/pages/workspaces.create_workspace.step_indicator'))
-                        .replace(':current', getStepIndex(step) + 1)
-                        .replace(':total', @js($stepCount))"
-                ></p>
-            </div>
-
-            <div
-                class="mt-2 h-1 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10"
-                role="progressbar"
-                x-bind:aria-valuenow="getStepIndex(step) + 1"
-                aria-valuemin="1"
-                aria-valuemax="{{ $stepCount }}"
+        <div x-show="! isFirstStep()" x-cloak class="mb-6">
+            <button
+                type="button"
+                x-on:click="goToPreviousStep()"
+                class="flex items-center gap-x-1 text-xs font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
             >
-                <div
-                    class="h-full rounded-full bg-primary-600 transition-all duration-300 dark:bg-primary-500"
-                    x-bind:style="`width: ${((getStepIndex(step) + 1) / @js($stepCount)) * 100}%`"
-                ></div>
-            </div>
+                {{ \Filament\Support\generate_icon_html(
+                    \Filament\Support\Icons\Heroicon::OutlinedArrowLeft,
+                    attributes: new \Illuminate\View\ComponentAttributeBag(['class' => 'h-3.5 w-3.5']),
+                ) }}
+
+                {{ __('filament/pages/workspaces.create_workspace.actions.back') }}
+            </button>
         </div>
     @endif
 

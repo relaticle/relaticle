@@ -160,6 +160,10 @@ final class AiCreditBalanceResource extends Resource
                 Filter::make('period_expired')
                     ->label('Period expired')
                     ->query(fn (Builder $query): Builder => $query->where('period_ends_at', '<', now())),
+                Filter::make('trialing')
+                    ->label('Trialing')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->whereHas('workspace', fn (Builder $workspace): Builder => BillingStatus::Trialing->applyToQuery($workspace))),
                 SelectFilter::make('workspace')
                     ->relationship('workspace', 'name')
                     ->searchable(),

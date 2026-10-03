@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -37,6 +38,20 @@ beforeEach(function (): void {
 });
 
 describe('Tab switching', function (): void {
+    it('opens the requested email in the reader instead of linking to the inbox', function (): void {
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->callTableAction('openEmail', $request)
+            ->assertDispatched('open-email-from-access-request', emailId: $this->email->getKey());
+    });
+
     it('shows incoming requests in a table with the available review actions', function (): void {
         $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
 
@@ -116,6 +131,34 @@ describe('Tab switching', function (): void {
             ->assertCanNotSeeTableRecords([$incomingRequest]);
     });
 
+});
+
+describe('Empty state', function (): void {
+    it('explains each tab when it has no requests', function (): void {
+        livewire(AccessRequestsTable::class)
+            ->assertSee(__('filament/pages/email-access-requests.empty.incoming_heading'))
+            ->assertSee(__('filament/pages/email-access-requests.empty.incoming_description'))
+            ->call('setTab', 'outgoing')
+            ->assertSee(__('filament/pages/email-access-requests.empty.outgoing_heading'))
+            ->assertSee(__('filament/pages/email-access-requests.empty.outgoing_description'));
+    });
+
+    it('names the status filter and clears it when the filter hides every request', function (): void {
+        $requester = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+
+        $request = EmailAccessRequest::factory()->pending()->create([
+            'owner_id' => $this->user->id,
+            'requester_id' => $requester->id,
+            'email_id' => $this->email->getKey(),
+        ]);
+
+        livewire(AccessRequestsTable::class)
+            ->filterTable('status', EmailAccessRequestStatus::APPROVED->value)
+            ->assertCanNotSeeTableRecords([$request])
+            ->assertSee(__('filament/pages/email-access-requests.empty.filtered_heading', ['status' => 'approved']))
+            ->callAction(TestAction::make('showAllRequests')->table())
+            ->assertCanSeeTableRecords([$request]);
+    });
 });
 
 describe('approveAccessRequest action', function (): void {
@@ -398,7 +441,7 @@ describe('subject privacy', function (): void {
         livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
             ->assertCanSeeTableRecords([$request])
-            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-access-requests.request.subject_hidden'), $request)
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
             ->assertDontSee('Confidential Thread XYZ');
     });
 
@@ -427,7 +470,7 @@ describe('subject privacy', function (): void {
         livewire(AccessRequestsTable::class)
             ->call('setTab', 'outgoing')
             ->assertCanSeeTableRecords([$request])
-            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-access-requests.request.subject_hidden'), $request)
+            ->assertTableColumnStateSet('email.subject', __('filament/pages/email-inbox.subject.hidden'), $request)
             ->assertDontSee('Denied Thread Secret');
     });
 

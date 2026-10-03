@@ -6,7 +6,6 @@ return [
     'navigation_label' => 'Emails',
     'account_filter' => [
         'label' => 'Account',
-        'all' => 'All accounts',
     ],
     'tabs' => [
         'drafts' => 'Drafts',
@@ -17,9 +16,6 @@ return [
     'drafts' => [
         'columns' => [
             'subject' => 'Draft',
-            'no_subject' => 'No subject',
-            'recipients' => 'To',
-            'no_recipients' => 'No recipients',
             'last_edited' => 'Last edited',
         ],
         'actions' => [
@@ -48,17 +44,16 @@ return [
             'description' => 'Emails that could not be delivered will appear here.',
         ],
     ],
-    'folders' => [
-        'all' => 'All',
-        'inbox' => 'Inbox',
-        'sent' => 'Sent',
-    ],
     'search' => [
         'placeholder' => 'Search emails…',
+        'clear' => 'Clear search',
     ],
-    'unread_label' => ':count unread',
+    'subject' => [
+        'none' => '(no subject)',
+        'hidden' => '(subject hidden)',
+    ],
     'pagination' => [
-        'previous' => 'Prev',
+        'previous' => 'Previous',
         'next' => 'Next',
         'range' => ':first–:last of :total',
     ],
@@ -76,10 +71,6 @@ return [
         'request_access' => 'Request access from :name',
         'requested' => 'Requested',
         'opening' => 'Opening…',
-    ],
-    'detail_empty' => [
-        'heading' => 'Select an email to read',
-        'description' => 'Choose a message from the list on the left',
     ],
     'pending_access' => [
         'heading' => '{1}1 pending access request|[2,*]:count pending access requests',
@@ -109,11 +100,14 @@ return [
             'heading' => 'This email is private',
             'description' => 'Only the email owner can view this content.',
         ],
-        'request_hint' => 'Select :action on the email list to ask for expanded access.',
+        'request_hint' => 'Select :action above to ask for more access.',
         'request_pending' => 'Your access request is pending.',
     ],
     'reader' => [
         'heading' => 'View email',
+        'internal' => 'Internal email. Only workspace members can see it.',
+        'unknown_sender' => '(unknown sender)',
+        'no_body' => '(no message body)',
         'attachments' => [
             'unnamed' => 'Unnamed file',
             'processing' => 'processing…',
@@ -134,11 +128,10 @@ return [
     ],
     'mark_all_read' => [
         'label' => 'Mark all read',
-        'notification' => '{0}No unread emails to mark|{1}1 email marked as read|[2,*]:count emails marked as read',
     ],
     'reply_forward' => [
         'modal_headings' => [
-            'reply_all' => 'Reply All',
+            'reply_all' => 'Reply all',
             'forward' => 'Forward',
             'reply' => 'Reply',
         ],
@@ -175,12 +168,8 @@ return [
             ],
         ],
     ],
-    'summarize_thread' => [
-        'label' => 'Summarize Thread',
-        'modal_heading' => 'AI Thread Summary',
-    ],
     'request_access' => [
-        'label' => 'Request Access',
+        'label' => 'Request access',
         'fields' => [
             'tier_requested' => [
                 'label' => 'Access level requested',
@@ -195,79 +184,9 @@ return [
             ],
         ],
     ],
-    'approve_access_request' => [
-        'modal_heading' => 'Approve access request',
-        'notifications' => [
-            'approved' => [
-                'title' => 'Access request approved.',
-            ],
-        ],
-    ],
-    'deny_access_request' => [
-        'modal_heading' => 'Deny access request',
-        'notifications' => [
-            'denied' => [
-                'title' => 'Access request denied.',
-            ],
-        ],
-    ],
     'compose_form' => [
-        'from' => [
-            'label' => 'From',
-        ],
-        'template' => [
-            'label' => 'Template',
-            'placeholder' => 'Apply a template…',
-        ],
-        'to' => [
-            'label' => 'To',
-            'placeholder' => 'email@example.com',
-        ],
-        'cc' => [
-            'label' => 'CC',
-            'placeholder' => 'email@example.com',
-        ],
-        'bcc' => [
-            'label' => 'BCC',
-            'placeholder' => 'email@example.com',
-        ],
-        'body' => [
-            'label' => 'Body',
-        ],
-        'privacy' => [
-            'label' => 'Who can see this email?',
-            'helper_text' => 'Defaults to your team or personal sharing setting.',
-        ],
         'signature' => [
             'label' => 'Signature',
-            'placeholder' => 'No signature',
-        ],
-        'settings' => [
-            'description' => 'Privacy and signature options for this email.',
-        ],
-    ],
-    'reply_form' => [
-        'from' => [
-            'label' => 'From',
-        ],
-        'to' => [
-            'label' => 'To',
-            'placeholder' => 'email@example.com',
-        ],
-        'cc' => [
-            'label' => 'CC',
-            'placeholder' => 'email@example.com',
-        ],
-        'bcc' => [
-            'label' => 'BCC',
-            'placeholder' => 'email@example.com',
-        ],
-        'message' => [
-            'label' => 'Message',
-        ],
-        'privacy' => [
-            'label' => 'Who can see this email?',
-            'helper_text' => 'Defaults to your team or personal sharing setting.',
         ],
     ],
 ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\CustomFields\OpportunityField;
 use Filament\Support\Contracts\HasLabel;
 
 enum OnboardingUseCase: string implements HasLabel
@@ -78,6 +79,14 @@ enum OnboardingUseCase: string implements HasLabel
             ],
             self::Sales, self::Marketing, self::Other => null,
         };
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function pipelineStages(): array
+    {
+        return $this->stagePreset() ?? OpportunityField::STAGE->getOptionColors() ?? [];
     }
 
     public function getDescription(): string

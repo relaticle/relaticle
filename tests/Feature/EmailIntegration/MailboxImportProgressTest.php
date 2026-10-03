@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\PeopleResource;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +14,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
 mutates(EmailAccountsPage::class, ConnectedAccount::class, MailboxHistoryImportService::class, MailboxSyncTracker::class);
 
-it('shows import progress while the mailbox cursor has not been written', function (): void {
+it('shows the imported count instead of a percent while the mailbox is still being listed', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentWorkspace);
@@ -26,10 +28,10 @@ it('shows import progress while the mailbox cursor has not been written', functi
 
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.importing'))
-        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 30]))
+        ->assertSee(trans_choice('filament/pages/email-accounts.importing_count', 12, ['count' => 12]))
+        ->assertDontSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 30]))
         ->assertSee('role="progressbar"', false)
-        ->assertSee('aria-valuenow="30"', false)
-        ->assertSee('aria-valuemax="100"', false)
+        ->assertDontSee('aria-valuenow', false)
         ->assertSee('motion-safe:animate-spin', false);
 });
 
@@ -58,7 +60,7 @@ it('picks up a new batch percent when the accounts list refreshes', function ():
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
-        'sync_cursor' => null,
+        'sync_cursor' => 'history-done',
     ]));
     $batchId = attachHistoryImportBatch($account);
     setHistoryImportBatchProgress($batchId, 387, 387);
@@ -75,7 +77,7 @@ it('picks up a new batch percent when the accounts list refreshes', function ():
         ->assertSee('aria-valuenow="6"', false);
 });
 
-it('shows 0% until store jobs exist on the history import batch', function (): void {
+it('shows no percent before store jobs exist on the history import batch', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentWorkspace);
@@ -91,10 +93,10 @@ it('shows 0% until store jobs exist on the history import batch', function (): v
 
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.importing'))
-        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 0]))
+        ->assertDontSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 0]))
         ->assertDontSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 8]))
         ->assertSee('role="progressbar"', false)
-        ->assertSee('aria-valuenow="0"', false)
+        ->assertDontSee('aria-valuenow', false)
         ->assertSee('motion-safe:animate-spin', false);
 });
 
@@ -207,7 +209,7 @@ it('counts a failed store job once when reporting import progress', function ():
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'workspace_id' => $user->currentWorkspace->getKey(),
         'user_id' => $user->getKey(),
-        'sync_cursor' => null,
+        'sync_cursor' => 'history-done',
     ]));
     $batchId = attachHistoryImportBatch($account);
     setHistoryImportBatchProgress($batchId, 10, 4);
@@ -236,4 +238,47 @@ it('treats a batch whose only pending jobs failed again after a retry as complet
     ]);
 
     expect(resolve(MailboxHistoryImportService::class)->isRunning($account->fresh()))->toBeFalse();
+});
+
+it('shows the syncing badge and initial import count on the accounts page', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'sync_cursor' => null,
+        'initial_sync_imported' => 57,
+        'initial_sync_estimated' => 100,
+    ]));
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee($account->email_address)
+        ->assertSee(__('filament/pages/email-accounts.importing'))
+        ->assertSee(trans_choice('filament/pages/email-accounts.importing_count', 57, ['count' => 57]));
+});
+
+it('does not show an importing mailbox on the people or companies list', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::setTenant($user->currentWorkspace);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'email_address' => 'sync-status@example.com',
+        'sync_cursor' => null,
+        'initial_sync_imported' => 643,
+        'initial_sync_estimated' => 1128,
+    ]));
+
+    $this->get(PeopleResource::getUrl('index'))
+        ->assertOk()
+        ->assertDontSee($account->email_address);
+
+    $this->get(CompanyResource::getUrl('index'))
+        ->assertOk()
+        ->assertDontSee($account->email_address);
 });

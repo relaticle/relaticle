@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use App\Enums\WorkspaceCapability;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
@@ -14,6 +15,8 @@ use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Workspace;
+use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
@@ -39,6 +42,7 @@ final readonly class DestinationResolver
         'workspace_members',
         'access_tokens',
         'connect_assistant',
+        'email_accounts',
     ];
 
     /**
@@ -88,6 +92,7 @@ final readonly class DestinationResolver
                 'workspace_members' => Members::getUrl(panel: 'app', tenant: $workspace),
                 'access_tokens' => AccessTokens::getUrl(panel: 'app', tenant: $workspace),
                 'connect_assistant' => url()->getPublicUrl(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt'], absolute: false)),
+                'email_accounts' => Feature::active(EmailIntegration::class) ? EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace) : null,
                 default => null,
             };
         } catch (Throwable) {

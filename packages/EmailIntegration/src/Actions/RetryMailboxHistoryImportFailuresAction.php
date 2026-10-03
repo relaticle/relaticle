@@ -170,7 +170,8 @@ final readonly class RetryMailboxHistoryImportFailuresAction
         $storeJobName = class_basename(StoreEmailJob::class);
         $uuids = [];
 
-        foreach (DB::table('failed_jobs')->where('queue', 'emails-sync')->get(['uuid', 'payload']) as $row) {
+        // Imports that failed before history moved to emails-import still sit on emails-sync.
+        foreach (DB::table('failed_jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->get(['uuid', 'payload']) as $row) {
             $payload = json_decode((string) $row->payload, true);
 
             if (! is_array($payload)) {

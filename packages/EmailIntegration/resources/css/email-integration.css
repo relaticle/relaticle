@@ -110,6 +110,24 @@
     }
 }
 
+/* The window already frames the draft, so the editor drops Filament's input box:
+   its toolbar sits on the same gutter and divider as the To and Subject rows. */
+.email-composer-body.fi-input-wrp {
+    @apply rounded-none bg-transparent shadow-none ring-0 dark:bg-transparent;
+
+    &:not(.fi-disabled):not(:has(.fi-ac-action:focus)) {
+        @apply focus-within:ring-0;
+    }
+
+    & .fi-fo-rich-editor-toolbar {
+        @apply border-gray-100 px-0 dark:border-white/5;
+    }
+
+    & .fi-fo-rich-editor-content {
+        @apply px-0;
+    }
+}
+
 .email-composer-body {
     @apply flex h-full flex-col;
 
@@ -162,9 +180,21 @@
     animation: fi-email-reader-panel-in 200ms ease-out;
 }
 
+/* The composer window opens over this frame, so the frame carries the entrance
+   and the window takes its place without animating a second time. */
+.ei-composer-opening-backdrop {
+    animation: fi-email-reader-backdrop-in 200ms ease-out;
+}
+
+.ei-composer-opening-panel {
+    animation: fi-email-reader-panel-in 200ms ease-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
     .fi-email-reader-backdrop,
-    .fi-email-reader-panel {
+    .fi-email-reader-panel,
+    .ei-composer-opening-backdrop,
+    .ei-composer-opening-panel {
         animation: none;
     }
 }
@@ -184,6 +214,11 @@
 .fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-close-overlay,
 .fi-modal.fi-modal-open ~ .fi-modal.fi-modal-open > .fi-modal-window-ctn {
     z-index: 70;
+}
+
+/* Toasts keep Filament's place above every modal, so they clear the lifted ones too. */
+.fi-no {
+    z-index: 80;
 }
 
 /* ── Docked draft: the writing area runs to the footer ─────────────────────

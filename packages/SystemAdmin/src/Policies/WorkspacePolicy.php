@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\SystemAdmin\Policies;
 
+use App\Enums\BillingStatus;
 use App\Models\Workspace;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -32,6 +33,12 @@ final class WorkspacePolicy
     public function impersonateOwner(SystemAdministrator $admin, Workspace $workspace): bool
     {
         return $admin->role->canImpersonate() && $workspace->owner !== null;
+    }
+
+    public function endTrial(SystemAdministrator $admin, Workspace $workspace): bool
+    {
+        return $admin->role->canManageCustomerAccess()
+            && $workspace->billingStatus() === BillingStatus::Trialing;
     }
 
     public function delete(SystemAdministrator $admin): bool

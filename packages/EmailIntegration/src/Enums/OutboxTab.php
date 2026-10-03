@@ -17,11 +17,11 @@ enum OutboxTab: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::QUEUED => 'Queued',
-            self::SCHEDULED => 'Scheduled',
-            self::SENDING => 'Sending',
-            self::FAILED => 'Failed',
-            self::SENT => 'Sent (24h)',
+            self::QUEUED => __('filament/pages/email-outbox.tabs.queued'),
+            self::SCHEDULED => __('filament/pages/email-outbox.tabs.scheduled'),
+            self::SENDING => __('filament/pages/email-outbox.tabs.sending'),
+            self::FAILED => __('filament/pages/email-outbox.tabs.failed'),
+            self::SENT => __('filament/pages/email-outbox.tabs.sent'),
         };
     }
 }

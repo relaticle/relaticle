@@ -19,7 +19,6 @@ use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
@@ -40,6 +39,21 @@ trait InteractsWithEmailAccessRequests
             ->query($this->requestsQuery())
             ->defaultSort('created_at', 'desc')
             ->emptyStateIcon(Heroicon::OutlinedKey)
+            ->emptyStateHeading($this->accessRequestsEmptyHeading(...))
+            ->emptyStateDescription(fn (): string => match (true) {
+                $this->filteredStatus() instanceof EmailAccessRequestStatus => __('filament/pages/email-access-requests.empty.filtered_description'),
+                $this->tab === 'incoming' => __('filament/pages/email-access-requests.empty.incoming_description'),
+                default => __('filament/pages/email-access-requests.empty.outgoing_description'),
+            })
+            ->emptyStateActions([
+                Action::make('showAllRequests')
+                    ->label(__('filament/pages/email-access-requests.empty.show_all'))
+                    ->color('gray')
+                    ->visible(fn (): bool => $this->filteredStatus() instanceof EmailAccessRequestStatus)
+                    ->action(function (): void {
+                        $this->removeTableFilters();
+                    }),
+            ])
             ->columns([
                 TextColumn::make('requester.name')
                     ->label(__('filament/pages/email-access-requests.columns.requested_by'))
@@ -51,7 +65,7 @@ trait InteractsWithEmailAccessRequests
                     ->visible(fn (): bool => $this->tab === 'outgoing'),
                 TextColumn::make('email.subject')
                     ->label(__('filament/pages/email-access-requests.columns.email'))
-                    ->placeholder(__('filament/pages/email-access-requests.request.no_subject'))
+                    ->placeholder(__('filament/pages/email-inbox.subject.none'))
                     ->searchable(query: $this->searchVisibleEmailSubject(...))
                     ->getStateUsing($this->visibleEmailSubject(...))
                     ->limit(60),
@@ -84,6 +98,26 @@ trait InteractsWithEmailAccessRequests
         return EmailAccessRequest::query()->pendingIncomingFor($this->authUser())->count();
     }
 
+    private function accessRequestsEmptyHeading(): string
+    {
+        $status = $this->filteredStatus();
+
+        if ($status instanceof EmailAccessRequestStatus) {
+            return __('filament/pages/email-access-requests.empty.filtered_heading', [
+                'status' => mb_strtolower($status->getLabel()),
+            ]);
+        }
+
+        return $this->tab === 'incoming'
+            ? __('filament/pages/email-access-requests.empty.incoming_heading')
+            : __('filament/pages/email-access-requests.empty.outgoing_heading');
+    }
+
+    private function filteredStatus(): ?EmailAccessRequestStatus
+    {
+        return EmailAccessRequestStatus::tryFrom((string) ($this->getTableFilterState('status')['value'] ?? ''));
+    }
+
     /** @return Builder<EmailAccessRequest> */
     private function requestsQuery(): Builder
     {
@@ -108,7 +142,7 @@ trait InteractsWithEmailAccessRequests
         }
 
         if (! $this->authUser()->can('viewSubject', $email)) {
-            return __('filament/pages/email-access-requests.request.subject_hidden');
+            return __('filament/pages/email-inbox.subject.hidden');
         }
 
         return $email->subject;
@@ -139,9 +173,10 @@ trait InteractsWithEmailAccessRequests
             ->icon('heroicon-m-arrow-top-right-on-square')
             ->iconButton()
             ->color('gray')
-            ->url(fn (EmailAccessRequest $request): ?string => $request->email_id === null
-                ? null
-                : EmailInboxPage::getUrl(parameters: ['email' => $request->email_id], tenant: filament()->getTenant()));
+            ->visible(fn (EmailAccessRequest $request): bool => $request->email_id !== null)
+            ->action(function (EmailAccessRequest $request): void {
+                $this->dispatch('open-email-from-access-request', emailId: $request->email_id);
+            });
     }
 
     private function approveAccessRequestAction(): Action

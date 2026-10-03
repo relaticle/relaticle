@@ -117,7 +117,7 @@ it('batches one page of messages and leaves the cursor unset until the page stor
 
     handleInitialEmailSync(new InitialEmailSyncJob($account), $factory);
 
-    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-sync'
+    Bus::assertBatched(fn (PendingBatch $batch): bool => $batch->queue() === 'emails-import'
         && $batch->jobs->count() === 2
         && $batch->jobs->every(fn ($job): bool => $job instanceof StoreEmailJob)
     );

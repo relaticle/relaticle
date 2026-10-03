@@ -11,7 +11,7 @@ use RuntimeException;
 
 final readonly class AiModelResolver
 {
-    public function __construct(private ModelRegistry $registry) {}
+    public function __construct(private ModelRegistry $registry, private ModelAccess $access) {}
 
     /**
      * Resolve the provider and model for a chat request. An available,
@@ -32,8 +32,7 @@ final readonly class AiModelResolver
      */
     public function resolve(User $user, ?string $override = null): array
     {
-        $workspace = $user->currentWorkspace;
-        $plan = $workspace !== null ? $workspace->plan : Plan::default();
+        $plan = $this->access->planFor($user->currentWorkspace);
         $requested = $override ?? ($user->ai_preferences['default_model'] ?? 'auto');
 
         if (is_string($requested) && $requested !== 'auto') {
@@ -56,8 +55,7 @@ final readonly class AiModelResolver
      */
     public function failoverNext(User $user, string $failedId): ?array
     {
-        $workspace = $user->currentWorkspace;
-        $plan = $workspace !== null ? $workspace->plan : Plan::default();
+        $plan = $this->access->planFor($user->currentWorkspace);
         $passed = false;
 
         foreach ($this->registry->autoChain() as $descriptor) {

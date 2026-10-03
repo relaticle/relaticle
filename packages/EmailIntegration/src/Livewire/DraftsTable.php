@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Livewire;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -22,10 +23,10 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
-use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -40,6 +41,8 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
     use InteractsWithActions;
     use InteractsWithSchemas;
     use InteractsWithTable;
+
+    private ?bool $hasMailbox = null;
 
     public function table(Table $table): Table
     {
@@ -67,50 +70,45 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
             ->columns([
                 TextColumn::make('subject')
                     ->label(__('filament/pages/email-inbox.drafts.columns.subject'))
-                    ->placeholder(__('filament/pages/email-inbox.drafts.columns.no_subject'))
+                    ->placeholder(__('filament/pages/email-inbox.subject.none'))
                     ->limit(60)
+                    ->description(fn (Email $record): ?string => $this->bodyPreview($record))
                     ->searchable(),
-                TextColumn::make('participants_to')
-                    ->badge()
-                    ->listWithLineBreaks()
-                    ->separator(', ')
-                    ->limitList(5)
-                    ->expandableLimitedList()
-                    ->label(__('filament/pages/email-inbox.drafts.columns.recipients'))
-                    ->placeholder(__('filament/pages/email-inbox.drafts.columns.no_recipients'))
-                    ->state(fn (Email $record): string => $record->participants
-                        ->where('role', EmailParticipantRole::TO)
-                        ->pluck('email_address')
-                        ->implode(', ')),
                 TextColumn::make('updated_at')
                     ->label(__('filament/pages/email-inbox.drafts.columns.last_edited'))
                     ->since()
+                    ->dateTimeTooltip()
+                    ->color('gray')
+                    ->alignEnd()
+                    ->width('1%')
                     ->sortable(),
             ])
             ->recordActions([
-                Action::make('openDraft')
-                    ->label(__('filament/pages/email-inbox.drafts.actions.open'))
-                    ->hiddenLabel()
-                    ->tooltip(__('filament/pages/email-inbox.drafts.actions.open'))
-                    ->icon(Heroicon::OutlinedPencilSquare)
-                    ->action(fn (Email $record) => $this->dispatch('composer:open', draftId: (string) $record->getKey())),
-                Action::make('deleteDraft')
-                    ->label(__('filament/pages/email-inbox.drafts.actions.delete'))
-                    ->hiddenLabel()
-                    ->tooltip(__('filament/pages/email-inbox.drafts.actions.delete'))
-                    ->icon(Heroicon::OutlinedTrash)
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Email $record): void {
-                        resolve(DeleteEmailDraftAction::class)->execute($this->authUser(), (string) $record->getKey());
+                ActionGroup::make([
+                    Action::make('openDraft')
+                        ->label(__('filament/pages/email-inbox.drafts.actions.open'))
+                        ->icon(Heroicon::OutlinedPencilSquare)
+                        ->dispatch('composer:open', fn (Email $record): array => ['draftId' => (string) $record->getKey()])
+                        // A row click mounts the action on the server, where the browser dispatch above never runs.
+                        ->action(function (Email $record): void {
+                            $this->dispatch('composer:open', draftId: (string) $record->getKey());
+                        }),
+                    Action::make('deleteDraft')
+                        ->label(__('filament/pages/email-inbox.drafts.actions.delete'))
+                        ->icon(Heroicon::OutlinedTrash)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(function (Email $record): void {
+                            resolve(DeleteEmailDraftAction::class)->execute($this->authUser(), (string) $record->getKey());
 
-                        $this->dispatch('drafts:changed');
+                            $this->dispatch('drafts:changed');
 
-                        Notification::make()
-                            ->success()
-                            ->title(__('filament/pages/email-inbox.drafts.notifications.deleted'))
-                            ->send();
-                    }),
+                            Notification::make()
+                                ->success()
+                                ->title(__('filament/pages/email-inbox.drafts.notifications.deleted'))
+                                ->send();
+                        }),
+                ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -163,9 +161,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
             ->icon(Heroicon::OutlinedPencilSquare)
             ->tooltip(__('filament/concerns/email-compose.actions.compose.tooltip'))
             ->visible(fn (): bool => $this->hasMailbox())
-            ->action(function (): void {
-                $this->dispatch('composer:open');
-            });
+            ->dispatch('composer:open');
     }
 
     /**
@@ -177,10 +173,16 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
     private function buildQuery(): Builder
     {
         return Email::query()
-            ->with(['participants'])
             ->where('workspace_id', $this->currentWorkspace()?->getKey())
             ->where('user_id', auth()->id())
             ->where('status', EmailStatus::DRAFT);
+    }
+
+    private function bodyPreview(Email $record): ?string
+    {
+        $text = Str::squish(html_entity_decode((string) $record->snippet, ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+        return $text === '' ? null : Str::limit($text, 90);
     }
 
     private function authUser(): User
@@ -191,7 +193,7 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
 
     private function hasMailbox(): bool
     {
-        return ConnectedAccount::hasConnectedFor($this->authUser(), $this->currentWorkspace());
+        return $this->hasMailbox ??= ConnectedAccount::hasConnectedFor($this->authUser(), $this->currentWorkspace());
     }
 
     private function currentWorkspace(): ?Workspace

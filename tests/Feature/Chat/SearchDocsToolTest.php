@@ -105,3 +105,34 @@ it('is registered on the assistant', function (): void {
 
     expect($tools)->toContain(SearchDocsTool::class);
 });
+
+it('answers a buyer api question from the REST API guide', function (string $question): void {
+    expect(searchDocs($question)['results'][0]['title'])->toBe('REST API');
+})->with([
+    'is there a REST API or only MCP',
+    'does Relaticle have an API',
+    'what is the API base url',
+    'which permissions can an access token have',
+    'what is the API rate limit',
+    'upsert a person by email through the API',
+]);
+
+it('quotes the production api base url', function (): void {
+    $content = implode("\n", array_column(searchDocs('what is the API base url')['results'], 'content'));
+
+    expect($content)->toContain('https://api.relaticle.com/v1');
+});
+
+it('answers a trial or price question from the plans article', function (string $question): void {
+    expect(array_column(searchDocs($question)['results'], 'title'))->toContain('Billing and plans');
+})->with([
+    'is there a free trial',
+    'how many credits does the trial include',
+    'how much does Relaticle cost',
+]);
+
+it('sends a ChatGPT user to the published Relaticle plugin', function (): void {
+    $content = implode("\n", array_column(searchDocs('how do I connect ChatGPT to Relaticle')['results'], 'content'));
+
+    expect($content)->toContain('https://chatgpt.com/plugins/plugin_asdk_app_6a92c3af04a0819180ed6652ebe09961');
+});

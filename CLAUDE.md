@@ -172,9 +172,8 @@ production: message ordering, approval races, duplicate proposals.
 - Every tool registered on `CrmAssistant` needs a label in the `toolLabels` map
   (`packages/Chat/resources/views/livewire/chat/chat-interface.blade.php`), or the
   streaming shimmer falls back to "Running <tool name>…" and leaks the identifier.
-  `tests/Browser/Chat/LoadingShimmerTest.php` is the gate, and it lives in the
-  Browser suite, which `composer test:pest` EXCLUDES: run `php artisan test tests/Browser`
-  after registering a tool, or CI is the first thing that tells you.
+  `tests/Browser/Chat/LoadingShimmerTest.php` is the gate. Run that one file after
+  registering a tool: `php artisan test tests/Browser/Chat/LoadingShimmerTest.php`.
 - A tool whose action works on the workspace rather than on records (`RemoveSampleDataTool`
   is the precedent) does not fit the per-record proposal pipeline: `executeDelete()` resolves
   models from `_record_ids`/`_model_class`. Such a tool carries neither marker, is branched
@@ -217,6 +216,17 @@ months two copies of the same field vocabulary drifted apart.
 
 - This project uses **PostgreSQL exclusively**. Do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
 - Migrations must only have `up()` methods. Never write a `down()` method
+- Prove a migration by rehearsing it on anonymized production data, never with a test. A test
+  seeds the rows its author imagined. Production holds the rest: `creation_source = 'system'`
+  meant both seeded samples and mailbox-synced contacts, which no fixture mixed. The rehearsal:
+  1. Export read-only from production: `pg_dump -s` for the schema, `pg_dump -a -t migrations`
+     so only the new migration is pending, and `\copy` of every table the migration reads.
+     Replace personal columns in the export query (names, emails, bodies, free-text JSON values)
+  2. Load the export into a scratch database. Tables loaded without their parents need
+     `set session_replication_role = replica`. Save a before-state query of the rows in scope
+  3. Run `DB_DATABASE=<scratch> php artisan migrate --force` and confirm only the new migration
+     ran. Diff the after-state against the before-state, row counts and the rows it must leave alone
+  4. Run `migrate` again to prove it is a no-op, then drop the scratch database and delete the export
 - A data backfill the query builder can express belongs in the migration, chunked with
   `eachById`: no models, no file access, no app code. This is the only shape that reaches a
   self-hosted install unaided. `2026_09_10_000000_convert_markdown_editor_custom_fields_to_rich_editor`
@@ -264,20 +274,36 @@ months two copies of the same field vocabulary drifted apart.
 - Steer the clock in tests with `$this->travelTo()`. `Carbon::setTestNow()` names the
   mutable class, so `CarbonSetTestNowToTravelToRector` rewrites it
 
-## Pre-Commit Quality Checks
+## Quality Checks
 
-Before committing any changes, always run these checks in order:
+The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
+only full run: it executes lint, rector, type coverage, PHPStan, all five test shards
+and the Browser suite on every push to a pull request, in about 7 minutes.
+
+After each change, while iterating:
 
 1. `vendor/bin/pint --dirty --format agent`: fix code style
-2. `vendor/bin/rector --dry-run`: if rector suggests changes, apply them with `vendor/bin/rector`
-3. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
-4. `composer test:type-coverage`: type coverage must stay at 100%
-5. `php artisan test --compact`: run relevant tests (use `--filter` for targeted runs)
+2. `php artisan test --compact <paths>`: the test files you touched, plus the tests
+   that exercise the classes you changed (`grep -rl 'ClassName' tests`)
 
-`--dirty` only covers files with uncommitted changes, so a file you committed
-earlier in the branch stops being checked and its style break surfaces only in
-CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
---parallel`, whole repo).
+Once, before pushing:
+
+3. `vendor/bin/rector --dry-run`: if rector suggests changes, apply them with `vendor/bin/rector`
+4. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
+5. `composer test:lint`: `--dirty` only covers uncommitted files, so a file committed
+   earlier in the branch is checked here (`pint --test --parallel`, whole repo)
+
+After a push, open the pull request if the branch has none, and watch the `Tests`
+workflow as a background task:
+`gh run watch --exit-status $(gh run list --branch <branch> --workflow Tests --limit 1
+--json databaseId --jq '.[0].databaseId')`. Never a `sleep` loop. Fix what it reports
+and push again.
+
+Never run `composer test:pest`, `composer test:pest:full`, `composer test:type-coverage`
+or `composer test:browser` locally to confirm a commit or a push. CI runs all four on the
+pushed commit, and a local run slows every other workspace on the machine: the full suite
+takes 116s alone and 514s beside three other heavy jobs. Run one locally only to reproduce
+a CI failure, scoped to the failing file.
 
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed. Untyped closures and parameters fail type coverage in CI.
 
@@ -379,6 +405,9 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - Never write tests that assert on source code as text (reading a Blade/PHP file
   and checking it contains a string). They break on refactors and pass on broken
   behavior. Test the rendered/runtime behavior instead.
+- Do not write tests for migrations, schema changes and backfills included. Rehearse them on
+  anonymized production data instead, as the Database section of `core.md` describes.
+  `tests/Arch/ConventionsTest.php` fails when a test outside `tests/Arch/` loads a migration file.
 - `tests/Pest.php` binds `TestCase` + `LazilyRefreshDatabase` for the Feature,
   Smoke, and Browser suites. Don't repeat `uses(...)` per file there.
 - Use `mutates(ClassName::class)` in test files to declare which source classes
@@ -392,14 +421,17 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 
 ## Running the suite
 
-- `composer test:pest` is the normal local run (parallel, TIA enabled, excludes
-  Browser). Pest records a coverage-backed dependency graph once, then replays
-  unaffected tests instead of executing them.
-- `composer test:pest:full` is the complete non-TIA merge gate.
-- TIA is a local accelerator only. It replays a cached pass whenever a test's
-  edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
-  expiring tokens), `.env` edits, or dynamic dispatch it did not trace while
-  recording. Always confirm with `composer test:pest:full` before pushing.
+- The normal local run is scoped: `php artisan test --compact <paths>` over the test
+  files you touched and the tests that exercise the classes you changed. The Quality
+  Checks section of `core.md` lists the whole loop.
+- The merge gate is the `Tests` workflow on GitHub, which runs the complete suite on
+  every push to a pull request. After a push, watch it as a background task. Do not run
+  the complete suite locally to confirm a push.
+- `composer test:pest` (parallel, TIA enabled, excludes Browser) and
+  `composer test:pest:full` (non-TIA) stay available for reproducing a CI failure that
+  a scoped run cannot, and for recording a TIA graph. TIA replays a cached pass whenever
+  a test's edges are unchanged, so it cannot see time-dependent failures (`travelTo`,
+  expiring tokens), `.env` edits, or dynamic dispatch it did not trace while recording.
 - After changing test timings materially, refresh the CI shard balance with
   `composer test:update-shards` and commit `tests/.pest/shards.json`; a stale
   file silently drops new test classes out of time-balancing.
@@ -534,11 +566,9 @@ every help and docs page, not just that file. Use a period or a comma there.
 
 # Laravel Boost Guidelines
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
-
 ## Foundational Context
 
-This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
+This application is a Laravel application running on PHP 8.5. Always use the APIs that match the installed major version of each package — do not assume a version.
 
 Before relying on a package's API, confirm its installed version:
 - PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
@@ -565,15 +595,11 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `pnpm run build`, `pnpm run dev`, or `composer run dev`. Ask them.
+- If a frontend change doesn't show in the UI or you get a "Unable to locate file in Vite manifest" error, run `pnpm run build` or ask the user to run `pnpm run dev` or `composer run dev`.
 
 ## Documentation Files
 
 - You must only create documentation files if explicitly requested by the user.
-
-## Replies
-
-- Be concise in your explanations - focus on what's important rather than explaining obvious details.
 
 === boost rules ===
 
@@ -603,8 +629,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 ## Project Rules
 
-- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists (settled decisions, non-obvious traps, standing constraints). Framework and package guidelines that only apply to specific paths (testing, frontend, components) also live there, under `.ai/rules/boost` — this is not just recorded decisions, it is load-bearing guidance you have not seen inline. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
-- Record a rule with `record-rule` only when the user explicitly asks for one. Instructions for the work at hand are not rules, no matter how emphatic: "remove this typo", "use X here" are work to do, not rules to record. Never record a rule on your own initiative, as a byproduct of a change, or to summarize what you just did. When the user does ask, pass a `glob` (e.g. `app/Http/Controllers/**`), a short `title`, and a few-line `note`. Use `record-rule` rather than your native memory or notes tool, because native memory is personal and session-scoped, while only `.ai/rules` is shared with the team and persists in the repo.
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists, including path-scoped framework guidelines under `.ai/rules/boost`. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
 
 ## Artisan
 
@@ -634,7 +659,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 # Deployment
 
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
-- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
 
 === herd rules ===
 
@@ -664,10 +688,6 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 ## URL Generation
 
 - When generating links to other pages, prefer named routes and the `route()` function.
-
-## Vite Error
-
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `pnpm run build` or ask the user to run `pnpm run dev` or `composer run dev`.
 
 === pint/core rules ===
 

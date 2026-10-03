@@ -88,41 +88,6 @@ it('groups messages under a 3-minute gap and renders exactly one day separator a
     expect($byText->get('Third today message')['grouped'] ?? null)->toBeFalse();
 });
 
-/**
- * Auto-load-earlier-on-scroll-up: a top sentinel drives loadEarlierMessages()
- * via IntersectionObserver, guarded (see loadEarlier() in transcript.js). IDs
- * are deterministic, lexicographically sortable strings (not uuid7) so
- * ORDER BY m.id in ListConversationMessages does not rest on uuid7's
- * monotonicity under a tight insert loop, the same pattern already used by
- * tests/Feature/Chat/MessagePaginationTest.php for this exact ordering
- * concern.
- */
-function transcriptShapeInsertSequencedMessages(string $conversationId, User $user, int $count, CarbonImmutable $baseline, string $prefix = 'seq'): void
-{
-    $rows = [];
-
-    foreach (range(1, $count) as $i) {
-        $rows[] = [
-            'id' => sprintf('%s-%04d', $prefix, $i),
-            'conversation_id' => $conversationId,
-            'participant_type' => 'user',
-            'participant_id' => (string) $user->getKey(),
-            'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
-            'role' => 'user',
-            'content' => sprintf('Seeded message %04d', $i),
-            'document' => ChatDocument::emptyJson(),
-            'attachments' => '[]',
-            'steps' => '[]',
-            'usage' => '{}',
-            'meta' => '{}',
-            'created_at' => $baseline->copy()->addMinutes($i),
-            'updated_at' => $baseline->copy()->addMinutes($i),
-        ];
-    }
-
-    DB::table('agent_conversation_messages')->insert($rows);
-}
-
 function transcriptShapeTopBubbleText(AwaitableWebpage $page): ?string
 {
     return $page->script(<<<'JS'
@@ -172,7 +137,7 @@ it('auto-loads earlier messages on scroll-to-top, without a click, preserving sc
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
@@ -245,7 +210,7 @@ it('guards against a duplicate load when triggered again while one is already in
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
@@ -296,7 +261,7 @@ it('clears the in-flight guard on a failed request, so history loading is not pe
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 120, $baseline);
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 120, $baseline);
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');
@@ -362,7 +327,7 @@ it('auto-loads on mount when a short first page leaves the sentinel visible with
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
     // One more than PAGE_SIZE (50): the initial fetch returns the newest 50
     // and reports hasMoreMessages = true, leaving exactly one message behind.
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 51, $baseline);
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 51, $baseline);
 
     $page = ChatBrowser::logIn($user, $workspace->slug)
         ->resize(1400, 9000)
@@ -665,8 +630,8 @@ it('renders the sticky transcript pills at their natural height inside the zero-
     // sticky date pill to mirror; ids stay lexicographically ordered across
     // both batches ('dayA-…' sorts before 'dayB-…').
     $baseline = Date::parse('2026-08-19 08:00:00', 'UTC');
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline->copy()->subDay(), 'dayA');
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 20, $baseline, 'dayB');
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 20, $baseline->copy()->subDay(), 'dayA');
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 20, $baseline, 'dayB');
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0020');
@@ -727,7 +692,7 @@ it('shows the scroll-to-bottom button whenever the transcript is scrolled up, wi
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'scroll affordance', $conversationId);
 
-    transcriptShapeInsertSequencedMessages(
+    ChatBrowser::seedSequencedMessages(
         $conversationId,
         $user,
         40,
@@ -793,6 +758,54 @@ it('shows the scroll-to-bottom button whenever the transcript is scrolled up, wi
 
     expect($backAtBottom['visible'])->toBeFalse()
         ->and($backAtBottom['distanceFromBottom'])->toBeLessThan(2);
+});
+
+it('keeps every message the same height while a reply streams and after it ends', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'layout stability');
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = json_decode((string) $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            const measure = () => ({
+                users: [...document.querySelectorAll('[data-user-bubble]')].map((el) => el.getBoundingClientRect().height),
+                assistants: [...document.querySelectorAll('[data-assistant-bubble]')].map((el) => el.getBoundingClientRect().height),
+                actionsVisible: [...document.querySelectorAll('[data-copy-button]')].map((el) => getComputedStyle(el).visibility === 'visible'),
+            });
+
+            const assistant = (content, rendered) => ({ role: 'assistant', content, rendered, prerendered: false, pending_actions: [], display_blocks: [] });
+
+            data.messages = [
+                { role: 'user', content: 'How many companies do I have?', editing: false, editText: '' },
+                assistant('You have four companies.', true),
+                { role: 'user', content: 'Name them.', editing: false, editText: '' },
+                assistant('Airbnb, Apple, Figma and Notion.', false),
+            ];
+            data.isStreaming = true;
+            await Alpine.nextTick();
+            const streaming = measure();
+
+            data.messages[3].rendered = true;
+            data.isStreaming = false;
+            await Alpine.nextTick();
+            const settled = measure();
+
+            return JSON.stringify({ streaming, settled });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($result['streaming']['users'])->toBe($result['settled']['users'])
+        ->and($result['streaming']['assistants'])->toBe($result['settled']['assistants'])
+        ->and($result['streaming']['actionsVisible'])->toBe([false, true, false, false])
+        ->and($result['settled']['actionsVisible'])->toBe([true, true, true, true]);
 });
 
 /**
@@ -865,7 +878,7 @@ it('keeps a turn sent after paging back when the stream-end reconcile and title 
     $conversationId = (string) Str::uuid7();
     ChatBrowser::seedConversation($user, $workspace->getKey(), 'transcript shape', $conversationId);
 
-    transcriptShapeInsertSequencedMessages($conversationId, $user, 120, Date::parse('2026-08-19 08:00:00', 'UTC'));
+    ChatBrowser::seedSequencedMessages($conversationId, $user, 120, Date::parse('2026-08-19 08:00:00', 'UTC'));
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSourceHas('Seeded message 0120');

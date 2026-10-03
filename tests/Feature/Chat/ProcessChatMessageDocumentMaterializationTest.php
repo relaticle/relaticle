@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class);
 
@@ -117,4 +119,41 @@ it('TipTapDocumentParser::buildFromText produces the expected stored shape', fun
             'content' => [['type' => 'text', 'text' => 'I found 2 deals.']],
         ]],
     ]);
+});
+
+it('stores only the reply text when the model thinks before answering', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-thinking',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    AnthropicSse::fake(AnthropicSse::thinkingThenReply('The user wrote in Persian, so answer in Persian.', 'سلام! چطور می‌توانم کمک کنم؟', 'claude-sonnet-5'));
+    Queue::fake();
+
+    new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'سلام',
+        conversationId: 'c-thinking',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+    )->handle(resolve(CreditService::class));
+
+    $reply = DB::table('agent_conversation_messages')
+        ->where('conversation_id', 'c-thinking')
+        ->where('role', 'assistant')
+        ->sole();
+
+    expect($reply->content)->toBe('سلام! چطور می‌توانم کمک کنم؟')
+        ->and($reply->content)->not->toContain('answer in Persian')
+        ->and(json_decode($reply->steps, true)[0]['reasoning'])->toBe('The user wrote in Persian, so answer in Persian.');
 });

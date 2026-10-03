@@ -11,6 +11,7 @@ use App\Models\User;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -23,6 +24,8 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\Indicator;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -39,6 +42,10 @@ use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\Works
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\SafeDelete;
+use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
+use Relaticle\SystemAdmin\Metrics\Scopes\GenuineSignup;
+use Relaticle\SystemAdmin\Metrics\Scopes\ReachedFirstValue;
+use Relaticle\SystemAdmin\Metrics\SignupMethod;
 
 final class UserResource extends Resource
 {
@@ -155,6 +162,7 @@ final class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('socialAccounts'))
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('name')
@@ -169,6 +177,11 @@ final class UserResource extends Resource
                     ->boolean()
                     ->trueIcon('heroicon-o-check-badge')
                     ->falseIcon('heroicon-o-x-mark'),
+                TextColumn::make('signup_method')
+                    ->label('Signup method')
+                    ->state(fn (User $record): string => SignupMethod::for($record))
+                    ->badge()
+                    ->toggleable(),
                 TextColumn::make('currentWorkspace.name')
                     ->label('Current Workspace')
                     ->sortable()
@@ -236,6 +249,39 @@ final class UserResource extends Resource
                         $query,
                         $data['value'] ?? null,
                     )),
+                Filter::make('genuine_signup')
+                    ->label('Genuine signup')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new GenuineSignup)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
+                Filter::make('reached_first_value')
+                    ->label('Reached first value')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new ReachedFirstValue)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
+                Filter::make('no_workspace')
+                    ->label('No workspace')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->whereDoesntHave('ownedWorkspaces')->whereDoesntHave('workspaces')),
+                Filter::make('signed_up')
+                    ->schema([
+                        DatePicker::make('from')->label('Signed up from'),
+                        DatePicker::make('until')->label('Signed up until'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when($data['from'] ?? null, fn (Builder $q, mixed $date): Builder => $q->where('users.created_at', '>=', ViewerTime::startOfDayUtc((string) $date)))
+                        ->when($data['until'] ?? null, fn (Builder $q, mixed $date): Builder => $q->where('users.created_at', '<=', ViewerTime::endOfDayUtc((string) $date))))
+                    ->indicateUsing(fn (array $data): array => collect(['from' => 'Signed up from', 'until' => 'Signed up until'])
+                        ->filter(fn (string $label, string $field): bool => is_string($data[$field] ?? null) && $data[$field] !== '')
+                        ->map(fn (string $label, string $field): Indicator => Indicator::make("{$label}: {$data[$field]}")->removeField($field))
+                        ->values()
+                        ->all()),
             ])
             ->recordActions([
                 ViewAction::make(),

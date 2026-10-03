@@ -2,26 +2,30 @@
 title: Connect Claude or ChatGPT to Relaticle
 description: Set up an AI connector to Relaticle with OAuth. This guide explains access and why MCP clients write directly to records.
 order: 5
-updated: "2026-08-13"
+updated: "2026-10-02"
 related: [docs/guides/mcp, help/ai-assistant/ask-questions-about-your-data, help/ai-assistant/ai-credits-and-limits]
 ---
 
 The assistants you already use, Claude and ChatGPT, can work with your
-Relaticle data directly. You add Relaticle as a **connector**, approve access
-once, and from then on you can ask your assistant about your pipeline, or
-have it create and update records, from its own chat.
+Relaticle data directly. You install the Relaticle plugin in ChatGPT, or add
+Relaticle as a **connector** in Claude, approve access once, and from then on
+you can ask your assistant about your pipeline, or have it create and update
+records, from its own chat.
 
 No code, no API keys: the whole setup is a consent screen.
 
 ## Connect it
 
-1. In your assistant's connector or integration settings, add a custom
-   connector with the URL `https://mcp.relaticle.com`. (In Claude that's
-   **Settings → Connectors**; in ChatGPT it's part of custom connectors.)
+1. Add Relaticle to your assistant:
+   - **ChatGPT:** open the
+     [Relaticle plugin](https://chatgpt.com/plugins/plugin_asdk_app_6a92c3af04a0819180ed6652ebe09961)
+     in ChatGPT's plugin directory and click **Install plugin**.
+   - **Claude:** in **Settings → Connectors**, add a custom connector with
+     the URL `https://mcp.relaticle.com`.
 2. The assistant sends you to Relaticle to sign in, if you aren't already.
 3. Approve access and **pick the workspace** the connector may use.
 4. That's it. Ask your assistant something: "what's in my pipeline this
-   month?"
+   month?" In ChatGPT, start the message with **@Relaticle**.
 
 The connector acts as **you**, inside **that one workspace**: it can do what
 you can do there, and nothing else. To point an assistant at a different

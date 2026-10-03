@@ -533,6 +533,22 @@ final class AppPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
             )
+            // Mounted on the body: a modal inside the sidebar is clipped to its width.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                function (): string {
+                    $workspace = Filament::getTenant();
+
+                    if (! $workspace instanceof Workspace || $this->signedInUser()?->can('manageMembers', $workspace) !== true) {
+                        return '';
+                    }
+
+                    return Blade::render(
+                        '@livewire(\App\Livewire\App\Workspaces\InviteWorkspaceMembersModal::class, [\'workspace\' => $workspace])',
+                        ['workspace' => $workspace],
+                    );
+                },
+            )
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),

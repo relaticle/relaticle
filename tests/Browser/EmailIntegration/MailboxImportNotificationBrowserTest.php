@@ -37,7 +37,6 @@ it('stays in sync on the accounts page after history import store failures', fun
         ->navigate("/app/{$workspace->slug}/workspace/email")
         ->waitForText($account->email_address)
         ->assertSee(__('filament/pages/email-accounts.in_sync'))
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))
         ->assertDontSee(__('filament/pages/email-accounts.actions.retry_failed_import.label'))
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);

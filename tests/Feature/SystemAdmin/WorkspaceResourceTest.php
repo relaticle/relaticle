@@ -3,17 +3,27 @@
 declare(strict_types=1);
 
 use App\Enums\BillingStatus;
+use App\Enums\CreationSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Billing\HostedWorkspaceAccess;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Str;
 use Laravel\Cashier\Subscription;
+use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\SystemAdmin\Actions\UpdateCustomerRecord;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\CreateWorkspace;
@@ -25,9 +35,11 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\MembersRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery;
+use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Tests\Helpers\OverviewData;
 
-mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, BillingStatus::class, WorkspaceResource::class, MembersRelationManager::class, CompaniesRelationManager::class, ActivityRelationManager::class, PivotSafeTableQuery::class, Impersonate::class);
+mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, BillingStatus::class, WorkspaceResource::class, MembersRelationManager::class, CompaniesRelationManager::class, ActivityRelationManager::class, PivotSafeTableQuery::class, Impersonate::class, WorkspaceJourney::class);
 
 beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
@@ -569,4 +581,266 @@ it('lands the owner impersonation link in the viewed workspace', function (): vo
 
     expect($link)->toStartWith(url()->getPublicUrl("impersonate/{$workspace->user_id}?"))
         ->and($query['workspace'])->toBe($workspace->getKey());
+});
+
+it('filters workspaces owned by a system administrator as internal', function (): void {
+    $internal = OverviewData::workspaceOf(OverviewData::internalOwner());
+    $external = OverviewData::workspaceOf(OverviewData::owner());
+    $ownerless = Workspace::factory()->create(['user_id' => (string) Str::ulid()]);
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('internal', true)
+        ->assertCanSeeTableRecords([$internal])
+        ->assertCanNotSeeTableRecords([$external, $ownerless]);
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('internal', false)
+        ->assertCanSeeTableRecords([$external, $ownerless])
+        ->assertCanNotSeeTableRecords([$internal]);
+});
+
+it('creates overview fixture records under a sysadmin session without a creator or a stray user', function (): void {
+    $owner = OverviewData::owner();
+    $workspace = OverviewData::workspaceOf($owner);
+    $usersBefore = User::query()->count();
+
+    $sample = OverviewData::sampleRecord($workspace, now())->refresh();
+    $own = OverviewData::ownRecord($workspace, $owner, now())->refresh();
+
+    expect($sample->creator_id)->toBeNull()
+        ->and($sample->account_owner_id)->toBeNull()
+        ->and($sample->creation_source)->toBe(CreationSource::SYSTEM)
+        ->and($own->creator_id)->toBe($owner->getKey())
+        ->and($own->account_owner_id)->toBe($owner->getKey())
+        ->and($own->creation_source)->toBe(CreationSource::WEB)
+        ->and(User::query()->count())->toBe($usersBefore);
+});
+
+it('filters workspaces active in at least three of the last four complete weeks', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 12:00:00'));
+    $weekStart = CarbonImmutable::parse('2026-09-28');
+
+    $habitOwner = OverviewData::owner(CarbonImmutable::parse('2026-08-20'));
+    $habit = OverviewData::workspaceOf($habitOwner);
+    OverviewData::ownRecord($habit, $habitOwner, $weekStart->subWeeks(1)->addDay());
+    OverviewData::ownRecord($habit, $habitOwner, $weekStart->subWeeks(2)->addDay());
+    OverviewData::typedMessage($habit, $habitOwner, $weekStart->subWeeks(4)->addDay());
+
+    $twoWeeksOwner = OverviewData::owner(CarbonImmutable::parse('2026-08-20'));
+    $twoWeeks = OverviewData::workspaceOf($twoWeeksOwner);
+    OverviewData::ownRecord($twoWeeks, $twoWeeksOwner, $weekStart->subWeeks(1)->addDay());
+    OverviewData::ownRecord($twoWeeks, $twoWeeksOwner, $weekStart->subWeeks(2)->addDay());
+
+    $sampleOnly = OverviewData::workspaceOf(OverviewData::owner(CarbonImmutable::parse('2026-08-20')));
+    foreach ([1, 2, 3] as $weeksAgo) {
+        OverviewData::sampleRecord($sampleOnly, $weekStart->subWeeks($weeksAgo)->addDay());
+    }
+
+    $internalOwner = OverviewData::internalOwner();
+    $internal = OverviewData::workspaceOf($internalOwner);
+    foreach ([1, 2, 3] as $weeksAgo) {
+        OverviewData::ownRecord($internal, $internalOwner, $weekStart->subWeeks($weeksAgo)->addDay());
+    }
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('formed_habit')
+        ->assertCanSeeTableRecords([$habit])
+        ->assertCanNotSeeTableRecords([$twoWeeks, $sampleOnly, $internal]);
+});
+
+it('counts own records whose creator was deleted toward a habit', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-01 12:00:00'));
+    $weekStart = CarbonImmutable::parse('2026-09-28');
+
+    $workspace = OverviewData::workspaceOf(OverviewData::owner(CarbonImmutable::parse('2026-08-20')));
+    foreach ([1, 2, 3] as $weeksAgo) {
+        $at = $weekStart->subWeeks($weeksAgo)->addDay();
+
+        Company::withoutEvents(fn (): Company => Company::factory()->create([
+            'workspace_id' => $workspace->getKey(),
+            'creator_id' => null,
+            'account_owner_id' => null,
+            'creation_source' => CreationSource::WEB,
+            'created_at' => $at,
+            'updated_at' => $at,
+        ]));
+    }
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('formed_habit')
+        ->assertCanSeeTableRecords([$workspace]);
+});
+
+function chargeChat(Workspace $workspace, string $model, int $credits): void
+{
+    AiCreditTransaction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $workspace->user_id,
+        'idempotency_key' => 'test-'.Str::ulid(),
+        'type' => AiCreditType::Chat,
+        'model' => $model,
+        'input_tokens' => 0,
+        'output_tokens' => 0,
+        'credits_charged' => $credits,
+        'metadata' => [],
+        'created_at' => now(),
+    ]);
+}
+
+it('filters trialing workspaces without own data that farm premium models or sit in an abuse timezone', function (): void {
+    config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
+
+    $byTimezone = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran'])));
+    $byPremium = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    chargeChat($byPremium, 'claude-opus-5', 6);
+    chargeChat($byPremium, 'claude-sonnet-5', 2);
+
+    $genuineOwner = OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran']);
+    $genuine = OverviewData::trial(OverviewData::workspaceOf($genuineOwner));
+    OverviewData::ownRecord($genuine, $genuineOwner, now());
+
+    $freeTehran = OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran']));
+    $mostlyFree = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    chargeChat($mostlyFree, 'claude-sonnet-5', 9);
+    chargeChat($mostlyFree, 'claude-opus-5', 3);
+
+    livewire(ListWorkspaces::class)
+        ->filterTable('abuse_suspect')
+        ->assertCanSeeTableRecords([$byTimezone, $byPremium])
+        ->assertCanNotSeeTableRecords([$genuine, $freeTehran, $mostlyFree]);
+});
+
+it('ends a trial now so the workspace pauses on the pay screen', function (): void {
+    Feature::define(Billing::class, true);
+    $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    livewire(ListWorkspaces::class)
+        ->callAction(TestAction::make('endTrial')->table($workspace));
+
+    $workspace->refresh();
+
+    expect($workspace->billingStatus())->toBe(BillingStatus::TrialEnded)
+        ->and(resolve(HostedWorkspaceAccess::class)->isPaused($workspace))->toBeTrue();
+});
+
+it('ends several trials at once and skips workspaces that are not trialing', function (): void {
+    $trialA = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    $trialB = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    $free = OverviewData::workspaceOf(OverviewData::owner());
+
+    livewire(ListWorkspaces::class)
+        ->selectTableRecords([$trialA, $trialB, $free])
+        ->callAction(TestAction::make('endTrials')->table()->bulk())
+        ->assertNotified('Ended 2 of 3 trials');
+
+    expect($trialA->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded)
+        ->and($trialB->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded)
+        ->and($free->refresh()->trial_ends_at)->toBeNull();
+});
+
+it('reports success when every selected workspace is trialing', function (): void {
+    $trialA = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+    $trialB = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    livewire(ListWorkspaces::class)
+        ->selectTableRecords([$trialA, $trialB])
+        ->callAction(TestAction::make('endTrials')->table()->bulk())
+        ->assertNotified('Trials ended');
+
+    expect($trialA->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded)
+        ->and($trialB->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded);
+});
+
+it('hides end trial on a workspace that is not trialing', function (): void {
+    $free = OverviewData::workspaceOf(OverviewData::owner());
+
+    livewire(ListWorkspaces::class)
+        ->assertActionHidden(TestAction::make('endTrial')->table($free));
+});
+
+it('hides end trial from an administrator without customer access', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]), 'sysadmin');
+    $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    livewire(ListWorkspaces::class)
+        ->assertActionHidden(TestAction::make('endTrial')->table($workspace));
+});
+
+it('hides the end trials bulk action from an administrator without customer access', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]), 'sysadmin');
+    OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    livewire(ListWorkspaces::class)
+        ->assertActionHidden(TestAction::make('endTrials')->table()->bulk());
+});
+
+it('warns instead of reporting success when no selected workspace is trialing', function (): void {
+    $free = OverviewData::workspaceOf(OverviewData::owner());
+
+    livewire(ListWorkspaces::class)
+        ->selectTableRecords([$free])
+        ->callAction(TestAction::make('endTrials')->table()->bulk())
+        ->assertNotified('No trialing workspaces selected');
+});
+
+it('offers end trial on the workspace page', function (): void {
+    $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->callAction('endTrial');
+
+    expect($workspace->refresh()->billingStatus())->toBe(BillingStatus::TrialEnded);
+});
+
+it('shows the journey of a workspace on its page', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
+    $owner = OverviewData::owner(CarbonImmutable::parse('2026-10-01 09:00:00'));
+    $workspace = OverviewData::workspaceOf($owner);
+    OverviewData::ownRecord($workspace, $owner, CarbonImmutable::parse('2026-10-02 09:00:00'));
+    OverviewData::typedMessage($workspace, $owner, CarbonImmutable::parse('2026-10-03 09:00:00'));
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertSee('Journey')
+        ->assertSee('Password')
+        ->assertSee('Oct 2, 2026')
+        ->assertSee('2 active days')
+        ->assertDontSee('Last wizard step');
+});
+
+it('shows how many mailboxes a workspace connected and how many need attention on its journey', function (): void {
+    $workspace = OverviewData::workspaceOf(OverviewData::owner());
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertSeeInOrder(['Connected mailboxes', 'None']);
+
+    ConnectedAccount::factory()->create(['workspace_id' => $workspace]);
+    ConnectedAccount::factory()->error()->create(['workspace_id' => $workspace]);
+    ConnectedAccount::factory()->disconnected()->create(['workspace_id' => $workspace]);
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertSee('2 connected, 1 needs attention');
+});
+
+it('counts the last 30 calendar days, today included, as the journey active days', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
+    $owner = OverviewData::owner(CarbonImmutable::parse('2026-08-01'));
+    $workspace = OverviewData::workspaceOf($owner);
+    OverviewData::ownRecord($workspace, $owner, CarbonImmutable::parse('2026-09-15 12:00:00'));
+    OverviewData::ownRecord($workspace, $owner, CarbonImmutable::parse('2026-09-16 12:00:00'));
+    OverviewData::ownRecord($workspace, $owner, now());
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertSee('2 active days');
+});
+
+it('shows the journey of a workspace whose owner no longer exists', function (): void {
+    $departed = OverviewData::owner();
+    $workspace = OverviewData::workspaceOf($departed);
+    OverviewData::ownRecord($workspace, $departed, now());
+    $workspace->forceFill(['user_id' => (string) Str::ulid()])->save();
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertSee('Journey')
+        ->assertSee('1 active day')
+        ->assertSeeInOrder(['Signed up', "\u{2014}", 'Signup method', "\u{2014}", 'First own record']);
 });

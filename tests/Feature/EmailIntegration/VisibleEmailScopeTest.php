@@ -185,6 +185,46 @@ it('hides a mailbox-blocklisted email from teammates', function (): void {
     expect(visibleTo($this->viewer)->modelKeys())->not->toContain($blocked->id);
 });
 
+it('hides mail from an address the workspace blocks after an earlier read', function (): void {
+    $email = ($this->makeCoworkerEmail)(['late-block@contact.com']);
+
+    expect(visibleTo($this->coworker)->modelKeys())->toContain($email->id);
+
+    TeamEmailBlocklist::factory()->blocked()->email('late-block@contact.com')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->viewer->id,
+    ]);
+
+    expect(visibleTo($this->coworker)->modelKeys())->not->toContain($email->id);
+});
+
+it('hides mail from an address the mailbox blocks after an earlier read', function (): void {
+    $email = ($this->makeCoworkerEmail)(['late-spam@badactor.com']);
+
+    expect(visibleTo($this->coworker)->modelKeys())->toContain($email->id);
+
+    EmailBlocklist::factory()->email('late-spam@badactor.com')->create([
+        'user_id' => $this->coworker->id,
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->getKey(),
+    ]);
+
+    expect(visibleTo($this->coworker)->modelKeys())->not->toContain($email->id);
+});
+
+it('ignores another workspace blocking the same address', function (): void {
+    $otherOwner = User::factory()->withWorkspace()->create();
+
+    TeamEmailBlocklist::factory()->blocked()->email('shared@contact.com')->create([
+        'workspace_id' => $otherOwner->current_workspace_id,
+        'created_by' => $otherOwner->id,
+    ]);
+
+    $email = ($this->makeCoworkerEmail)(['shared@contact.com']);
+
+    expect(visibleTo($this->coworker)->modelKeys())->toContain($email->id);
+});
+
 it('hides a coworker email when the viewer has a private per-teammate share', function (): void {
     $shared = ($this->makeCoworkerEmail)(['hidden-by-share@contact.com']);
 

@@ -49,7 +49,7 @@ final class InitialSyncPageStoreBatch
 
         Bus::batch($jobs)
             ->name("Initial sync: {$account->email_address}")
-            ->onQueue('emails-sync')
+            ->onQueue('emails-import')
             ->allowFailures()
             ->finally(static function (Batch $batch) use (
                 $accountId,
@@ -126,7 +126,7 @@ final class InitialSyncPageStoreBatch
 
         Bus::batch($jobs)
             ->name("Initial calendar sync: {$account->email_address}")
-            ->onQueue('emails-sync')
+            ->onQueue('emails-import')
             ->allowFailures()
             ->finally(static function (Batch $batch) use (
                 $accountId,

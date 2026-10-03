@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Workspace;
+use App\Support\CurrentSource;
 use App\Support\Database\AdvisoryLock;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
@@ -35,7 +36,7 @@ final readonly class AutoCreateCompanyAction
     {
         $host = $this->domainMatcher->host($domain);
 
-        return $this->advisoryLock->transactional("auto-create-company:{$teamId}:{$host}", function () use ($host, $teamId, $team): Company {
+        return CurrentSource::during(CreationSource::MAILBOX, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$teamId}:{$host}", function () use ($host, $teamId, $team): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.
@@ -46,7 +47,7 @@ final readonly class AutoCreateCompanyAction
             }
 
             return $this->createCompany($host, $teamId, $team);
-        });
+        }));
     }
 
     /**
@@ -64,7 +65,6 @@ final readonly class AutoCreateCompanyAction
         $company = Company::query()->create([
             'name' => $this->domainToCompanyName($domain),
             'workspace_id' => $teamId,
-            'creation_source' => CreationSource::SYSTEM,
         ]);
 
         $domainsField = $this->customFieldByCode('domains', $teamId);

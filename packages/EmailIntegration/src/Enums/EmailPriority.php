@@ -15,8 +15,8 @@ enum EmailPriority: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::PRIORITY => 'Priority',
-            self::BULK => 'Bulk',
+            self::PRIORITY => __('filament/pages/email-outbox.priorities.priority'),
+            self::BULK => __('filament/pages/email-outbox.priorities.bulk'),
         };
     }
 

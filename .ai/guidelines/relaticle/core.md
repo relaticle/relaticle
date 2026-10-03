@@ -18,6 +18,17 @@ months two copies of the same field vocabulary drifted apart.
 
 - This project uses **PostgreSQL exclusively**. Do not add SQLite/MySQL compatibility layers, driver checks, or conditional SQL
 - Migrations must only have `up()` methods. Never write a `down()` method
+- Prove a migration by rehearsing it on anonymized production data, never with a test. A test
+  seeds the rows its author imagined. Production holds the rest: `creation_source = 'system'`
+  meant both seeded samples and mailbox-synced contacts, which no fixture mixed. The rehearsal:
+  1. Export read-only from production: `pg_dump -s` for the schema, `pg_dump -a -t migrations`
+     so only the new migration is pending, and `\copy` of every table the migration reads.
+     Replace personal columns in the export query (names, emails, bodies, free-text JSON values)
+  2. Load the export into a scratch database. Tables loaded without their parents need
+     `set session_replication_role = replica`. Save a before-state query of the rows in scope
+  3. Run `DB_DATABASE=<scratch> php artisan migrate --force` and confirm only the new migration
+     ran. Diff the after-state against the before-state, row counts and the rows it must leave alone
+  4. Run `migrate` again to prove it is a no-op, then drop the scratch database and delete the export
 - A data backfill the query builder can express belongs in the migration, chunked with
   `eachById`: no models, no file access, no app code. This is the only shape that reaches a
   self-hosted install unaided. `2026_09_10_000000_convert_markdown_editor_custom_fields_to_rich_editor`
@@ -65,20 +76,36 @@ months two copies of the same field vocabulary drifted apart.
 - Steer the clock in tests with `$this->travelTo()`. `Carbon::setTestNow()` names the
   mutable class, so `CarbonSetTestNowToTravelToRector` rewrites it
 
-## Pre-Commit Quality Checks
+## Quality Checks
 
-Before committing any changes, always run these checks in order:
+The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
+only full run: it executes lint, rector, type coverage, PHPStan, all five test shards
+and the Browser suite on every push to a pull request, in about 7 minutes.
+
+After each change, while iterating:
 
 1. `vendor/bin/pint --dirty --format agent`: fix code style
-2. `vendor/bin/rector --dry-run`: if rector suggests changes, apply them with `vendor/bin/rector`
-3. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
-4. `composer test:type-coverage`: type coverage must stay at 100%
-5. `php artisan test --compact`: run relevant tests (use `--filter` for targeted runs)
+2. `php artisan test --compact <paths>`: the test files you touched, plus the tests
+   that exercise the classes you changed (`grep -rl 'ClassName' tests`)
 
-`--dirty` only covers files with uncommitted changes, so a file you committed
-earlier in the branch stops being checked and its style break surfaces only in
-CI. Before pushing, run what CI runs: `composer test:lint` (`pint --test
---parallel`, whole repo).
+Once, before pushing:
+
+3. `vendor/bin/rector --dry-run`: if rector suggests changes, apply them with `vendor/bin/rector`
+4. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
+5. `composer test:lint`: `--dirty` only covers uncommitted files, so a file committed
+   earlier in the branch is checked here (`pint --test --parallel`, whole repo)
+
+After a push, open the pull request if the branch has none, and watch the `Tests`
+workflow as a background task:
+`gh run watch --exit-status $(gh run list --branch <branch> --workflow Tests --limit 1
+--json databaseId --jq '.[0].databaseId')`. Never a `sleep` loop. Fix what it reports
+and push again.
+
+Never run `composer test:pest`, `composer test:pest:full`, `composer test:type-coverage`
+or `composer test:browser` locally to confirm a commit or a push. CI runs all four on the
+pushed commit, and a local run slows every other workspace on the machine: the full suite
+takes 116s alone and 514s beside three other heavy jobs. Run one locally only to reproduce
+a CI failure, scoped to the failing file.
 
 Do not add new PHPStan ignores without approval. All parameters and return types must be explicitly typed. Untyped closures and parameters fail type coverage in CI.
 

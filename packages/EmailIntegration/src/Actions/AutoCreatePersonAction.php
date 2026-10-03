@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Enums\CreationSource;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentSource;
 use App\Support\Database\AdvisoryLock;
 use App\Support\EmailAddress;
 use Illuminate\Support\Str;
@@ -29,7 +30,7 @@ final readonly class AutoCreatePersonAction
      * who happen to share a name must stay distinct, and the same address reuses
      * the existing record rather than spawning a duplicate. The lock serialises
      * concurrent queue workers racing the same address so the check-then-create
-     * stays atomic. New records use CreationSource::SYSTEM so they are
+     * stays atomic. New records use CreationSource::MAILBOX so they are
      * distinguishable from manually created ones.
      */
     public function execute(
@@ -43,7 +44,7 @@ final readonly class AutoCreatePersonAction
         $displayName = Str::substr($this->headerParser->humanName($name, $canonical) ?? $canonical, 0, 255);
         $emailField = $this->personEmailMatcher->emailField($teamId);
 
-        return $this->advisoryLock->transactional("auto-create-person:{$teamId}:{$canonical}", function () use ($displayName, $canonical, $teamId, $team, $companyId, $emailField): People {
+        return CurrentSource::during(CreationSource::MAILBOX, fn (): People => $this->advisoryLock->transactional("auto-create-person:{$teamId}:{$canonical}", function () use ($displayName, $canonical, $teamId, $team, $companyId, $emailField): People {
             $existing = $this->personEmailMatcher->firstMatching($canonical, $teamId);
 
             if ($existing instanceof People) {
@@ -54,7 +55,6 @@ final readonly class AutoCreatePersonAction
                 'name' => $displayName,
                 'workspace_id' => $teamId,
                 'company_id' => $companyId,
-                'creation_source' => CreationSource::SYSTEM,
             ]);
 
             if ($emailField instanceof BaseCustomField) {
@@ -62,6 +62,6 @@ final readonly class AutoCreatePersonAction
             }
 
             return $person;
-        });
+        }));
     }
 }

@@ -95,7 +95,7 @@
     <span class="min-w-0 flex-1">
         <span class="flex items-center justify-between gap-3">
             <span class="min-w-0 flex-1 truncate text-sm font-medium leading-5 text-gray-800 dark:text-gray-200">
-                {{ $canViewSubject ? ($subject ?: '(no subject)') : '(subject hidden)' }}
+                {{ $canViewSubject ? ($subject ?: __('filament/pages/email-inbox.subject.none')) : __('filament/pages/email-inbox.subject.hidden') }}
             </span>
 
             <span class="flex shrink-0 items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
@@ -133,7 +133,7 @@
                 @elseif (filled($mailboxViaName))
                     <span class="flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400">
                         <x-heroicon-m-envelope class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-                        <span class="max-w-[7rem] truncate">{{ __('filament/pages/email-inbox.list_row.via', ['name' => $mailboxViaName]) }}</span>
+                        <span class="max-w-[7rem] truncate" title="{{ $mailboxViaName }}">{{ __('filament/pages/email-inbox.list_row.via', ['name' => $mailboxViaName]) }}</span>
                     </span>
                 @endif
 

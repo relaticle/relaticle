@@ -15,14 +15,14 @@ use Illuminate\Support\Facades\Http;
 final class OpenAiResponses
 {
     /** @param array<string, mixed> $structured */
-    public static function fakeStructured(array $structured): void
+    public static function fakeStructured(array $structured, string $model = 'gpt-5.6-luna'): void
     {
         Http::fake([
             'api.openai.com/*' => static fn (Request $request): PromiseInterface => array_key_exists('temperature', $request->data())
                 ? Http::response(['error' => ['message' => "Unsupported parameter: 'temperature' is not supported with this model.", 'type' => 'invalid_request_error', 'param' => 'temperature', 'code' => 'unsupported_parameter']], 400)
                 : Http::response([
                     'id' => 'resp_fake',
-                    'model' => 'gpt-5.6-luna',
+                    'model' => $model,
                     'status' => 'completed',
                     'output' => [[
                         'type' => 'message',

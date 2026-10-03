@@ -75,10 +75,12 @@
          its floor: on a short conversation the offer belongs just above the
          composer, not orphaned under the last bubble with dead space beneath it.
          Dropped while the empty state is up, since that sibling is already
-         h-full and the two together would scroll an empty conversation. --}}
+         h-full and the two together would scroll an empty conversation, and
+         while a turn is anchored, since the anchor reserve below fills instead. --}}
     <div
+        x-ref="messageColumn"
         class="mx-auto flex max-w-3xl flex-col space-y-5"
-        :class="(messages.length === 0 && !isStreaming) ? '' : 'min-h-full'"
+        :class="(anchorKey || (messages.length === 0 && !isStreaming)) ? '' : 'min-h-full'"
     >
         <template x-if="hasMoreMessages">
             <div class="flex justify-center py-2">
@@ -107,6 +109,7 @@
                      revealMessage() in transcript.js). Absent on an optimistic
                      bubble, which has no server id to search by yet. --}}
                 :data-message-id="msg.id || null"
+                :data-client-key="msg.clientKey"
                 {{-- Tightens the gap AFTER this message when the NEXT one groups
                      with it (space-y-6 on the parent sets each item's own
                      trailing margin, so the message being pulled closer to its
@@ -279,8 +282,13 @@
                                 </div>
                             </template>
 
-                            <template x-if="!msg.editing && !isStreaming">
-                                <div class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
+                            {{-- Hidden rather than unmounted while a reply streams, so no
+                                 bubble changes height mid-turn. --}}
+                            <template x-if="!msg.editing">
+                                <div
+                                    class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100"
+                                    :class="{ 'invisible': isStreaming }"
+                                >
                                     <button
                                         type="button"
                                         data-copy-button
@@ -393,8 +401,11 @@
                             </div>
                         </template>
 
-                        <template x-if="msg.rendered && msg.content">
-                            <div class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100">
+                        <template x-if="msg.content">
+                            <div
+                                class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100"
+                                :class="{ 'invisible': !msg.rendered }"
+                            >
                                 <button
                                     type="button"
                                     data-copy-button
@@ -574,11 +585,10 @@
         </template>
 
         {{-- Next steps for the turn that just ended, drafted by NextStepSuggester
-             and cleared the moment the user sends anything. They sit at the
-             floor of the transcript rather than directly under the bubble they
-             came from: on a short conversation that puts the offer where the
-             eye already is, just above the composer, and on a long one it
-             scrolls away with its turn instead of hovering over older messages.
+             and cleared the moment the user sends anything. On a reopened
+             conversation they sit at the floor of the transcript, where the eye
+             already is; in an anchored turn they land directly under the reply,
+             inside the reserve, so their late arrival moves nothing on screen.
              `margin-top: auto` is inline because the column's own `space-y-5`
              out-specifies a margin utility on one of its children; x-show only
              ever writes `display`, so it leaves this alone. --}}
@@ -609,6 +619,10 @@
             </template>
         </div>
     </div>
+
+    {{-- Anchor reserve, sized by syncAnchorReserve() in transcript.js. Outside the
+         message column so writing its height never re-triggers the observer. --}}
+    <div x-ref="anchorReserve" aria-hidden="true" class="[overflow-anchor:none]"></div>
 
     {{-- Scroll-to-bottom button: sticky to the bottom of THIS scrollable transcript
          viewport, mirroring the sticky date pill above it (same zero-height-wrapper

@@ -17,10 +17,10 @@ enum EmailAccountStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::ACTIVE => 'Active',
-            self::ERROR => 'Sync Error',
-            self::DISCONNECTED => 'Disconnected',
-            self::REAUTH_REQUIRED => 'Re-authentication Required',
+            self::ACTIVE => __('filament/pages/email-accounts.statuses.active'),
+            self::ERROR => __('filament/pages/email-accounts.statuses.error'),
+            self::DISCONNECTED => __('filament/pages/email-accounts.statuses.disconnected'),
+            self::REAUTH_REQUIRED => __('filament/pages/email-accounts.statuses.reauth_required'),
         };
     }
 

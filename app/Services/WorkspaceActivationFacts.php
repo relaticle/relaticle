@@ -38,7 +38,7 @@ final class WorkspaceActivationFacts
 
     /**
      * A record the workspace made itself, in any workspace surface. False in a
-     * workspace holding only the records seeded at sign-up.
+     * workspace holding only the records seeded at sign-up or created by a mailbox sync.
      */
     public function hasOwnRecord(Workspace $workspace): bool
     {
@@ -136,22 +136,20 @@ final class WorkspaceActivationFacts
         $bindings = [];
         $columns = [];
 
+        $automated = array_column(CreationSource::automated(), 'value');
+
         foreach ([
-            'own' => ['creation_source <> ?', CreationSource::SYSTEM->value],
-            'any' => [null, null],
-            'import' => ['creation_source = ?', CreationSource::IMPORT->value],
-            'sample' => ['creation_source = ?', CreationSource::SYSTEM->value],
-        ] as $name => [$predicate, $value]) {
+            'own' => ['creation_source not in ('.implode(', ', array_fill(0, count($automated), '?')).')', $automated],
+            'any' => [null, []],
+            'import' => ['creation_source = ?', [CreationSource::IMPORT->value]],
+            'sample' => ['creation_source = ?', [CreationSource::SYSTEM->value]],
+        ] as $name => [$predicate, $values]) {
             $parts = [];
 
             foreach (self::ENTITY_TABLES as $table) {
                 $parts[] = "exists(select 1 from {$table} where workspace_id = ? and deleted_at is null"
                     .($predicate === null ? '' : " and {$predicate}").')';
-                $bindings[] = $workspace->getKey();
-
-                if ($value !== null) {
-                    $bindings[] = $value;
-                }
+                array_push($bindings, $workspace->getKey(), ...$values);
             }
 
             $columns[] = '('.implode(' or ', $parts).") as {$name}";

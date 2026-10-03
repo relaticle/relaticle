@@ -160,11 +160,16 @@ jobs:
 
   browser-tests:
     runs-on: ubuntu-latest
-    name: Browser Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+
+    name: Browser Tests (Shard ${{ matrix.shard }}/6)
 
     # A browser test that waits on an element which never appears hangs rather
     # than fails, and without a ceiling the job runs until GitHub cancels it at
-    # six hours. The suite finishes in about two minutes.
+    # six hours. A shard finishes in about two minutes.
     timeout-minutes: 20
 
     services:
@@ -245,14 +250,16 @@ jobs:
         run: pnpm exec playwright install-deps chromium
         if: steps.playwright-cache.outputs.cache-hit == 'true'
 
+      # tests/.pest/shards.json times the Default suite only, so Pest splits these
+      # classes round-robin and warns that the file is out of date.
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml --shard=${{ matrix.shard }}/6
 
       - name: Upload browser failure artifacts
         if: failure()
         uses: actions/upload-artifact@v7
         with:
-          name: browser-failure
+          name: browser-failure-${{ matrix.shard }}
           path: |
             tests/Browser/Screenshots
             storage/logs

@@ -18,8 +18,6 @@ return [
             'back' => 'Back',
         ],
 
-        'step_indicator' => 'Step :current of :total',
-
         'headings' => [
             'workspace' => 'Create your workspace',
             'attribution' => 'How did you hear about us?',
@@ -35,7 +33,6 @@ return [
             ],
             'company_logo' => [
                 'label' => 'Company logo',
-                'description' => 'We support PNGs, JPEGs and WebPs under :max. Recommended size is 400x400px.',
             ],
             'workspace_name' => [
                 'label' => 'Company name',
@@ -63,6 +60,9 @@ return [
                 'title' => 'Workspace limit reached',
                 'body' => 'You already own the maximum number of workspaces. Delete one, or ask to be invited to an existing workspace.',
             ],
+        ],
+        'preview' => [
+            'company_placeholder' => 'Your company',
         ],
         'validation' => [
             'context_required' => 'Pick at least one option for the selected use case.',

@@ -3,20 +3,7 @@
 declare(strict_types=1);
 
 return [
-    'label' => 'Send Email',
-
-    'fields' => [
-        'from' => [
-            'label' => 'From',
-        ],
-        'template' => [
-            'label' => 'Template',
-            'placeholder' => 'None. Write below',
-        ],
-        'body' => [
-            'label' => 'Body',
-        ],
-    ],
+    'label' => 'Send email',
 
     'notifications' => [
         'no_recipients' => [
@@ -25,12 +12,7 @@ return [
         ],
         'skipped' => [
             'title' => 'Some recipients skipped',
-            'body' => ':skipped selected record(s) have no email address and were not added.',
-        ],
-        'queued' => [
-            'title' => 'Mass email queued',
-            'body' => 'Sending to :count recipient(s).',
-            'body_with_skipped' => 'Queued :count recipient(s), skipped :skipped without an email address.',
+            'body' => '{1}1 selected record has no email address and was not added.|[2,*]:count selected records have no email address and were not added.',
         ],
     ],
 ];

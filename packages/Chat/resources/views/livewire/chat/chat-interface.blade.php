@@ -275,7 +275,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         // Deferred behind its own $nextTick, queued after scrollToBottom's
         // above, so the observer's first intersection check runs against the
         // settled post-scroll layout rather than a mid-render one.
-        this.$nextTick(() => this.initLoadEarlierObserver());
+        this.$nextTick(() => {
+            this.initLoadEarlierObserver();
+            this.initAnchorObserver();
+        });
 
         // Bootstrap payload from the dashboard: when the user submits their
         // first message there, we stash the editor document in sessionStorage
@@ -467,6 +470,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.uninstallProposalExpiryWatch();
         this.teardownDaySeparatorObserver();
         this.teardownLoadEarlierObserver();
+        this.teardownAnchorObserver();
         this.teardownMessageSearch();
         this.clearStreamTimeout();
         clearTimeout(this._copiedTimer);

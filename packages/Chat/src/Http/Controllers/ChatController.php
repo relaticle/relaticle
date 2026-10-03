@@ -38,6 +38,7 @@ use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\AttachedRows;
@@ -63,6 +64,7 @@ final readonly class ChatController
         private StoreImportHandoff $importHandoffs,
         private MarkAttachmentSent $markAttachmentSent,
         private CreateConversation $createConversation,
+        private ModelAccess $modelAccess,
     ) {}
 
     /** @return list<string> */
@@ -134,7 +136,18 @@ final readonly class ChatController
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($workspace->plan)) {
+            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($this->modelAccess->planFor($workspace))) {
+                if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
+                    return response()->json([
+                        'error' => 'model_not_allowed',
+                        'message' => __('Add your own records to unlock premium models during your trial.'),
+                        'plan' => $workspace->plan->value,
+                        'requested_model' => $descriptor->id,
+                        'upgrade_available' => false,
+                        'upgrade_url' => null,
+                    ], 403);
+                }
+
                 $isFree = $workspace->plan === Plan::Free;
 
                 return response()->json([

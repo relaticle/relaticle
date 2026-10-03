@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services;
 
-use App\Actions\Billing\StartProTrial;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
 use RuntimeException;
@@ -44,7 +43,7 @@ final readonly class CreditPeriodResolver
 
         if ($workspace->onGenericTrial() && $workspace->trial_ends_at !== null) {
             return [
-                'start' => $workspace->trial_ends_at->copy()->subDays(StartProTrial::TRIAL_DAYS),
+                'start' => $workspace->trial_ends_at->copy()->subDays(Workspace::PRO_TRIAL_DAYS),
                 'end' => $workspace->trial_ends_at->copy(),
             ];
         }

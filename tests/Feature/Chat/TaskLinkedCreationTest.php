@@ -141,3 +141,19 @@ it('shows the assignee row on the card when assignee_ids arrives as a scalar', f
     $fields = collect($pending->display_data['fields'] ?? []);
     expect($fields->firstWhere('label', 'Assignees')['value'] ?? '')->toContain('Dana Scully');
 });
+
+it('shows a task linked to a contact as having no assignee', function (): void {
+    $angel = People::factory()->for($this->workspace)->create(['name' => 'Angel']);
+
+    $tool = resolve(CreateTaskTool::class);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000001');
+
+    $tool->handle(new Request([
+        'records' => [['title' => 'Call Angel', 'people_ids' => [(string) $angel->id]]],
+    ]));
+
+    $fields = collect(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->latest()->firstOrFail()->display_data['fields']);
+
+    expect($fields->firstWhere('label', 'Linked people')['value'])->toBe('Angel')
+        ->and($fields->firstWhere('label', 'Assignees')['value'])->toBe(__('(none)'));
+});

@@ -16,13 +16,14 @@ enum AiCreditType: string implements HasColor, HasLabel
     case Refund = 'refund';
     case Reservation = 'reservation';
     case Purchase = 'purchase';
+    case Internal = 'internal';
 
     public function getColor(): string
     {
         return match ($this) {
             self::Chat => 'primary',
             self::Summary => 'info',
-            self::Embedding, self::Reservation => 'gray',
+            self::Embedding, self::Reservation, self::Internal => 'gray',
             self::Adjustment => 'warning',
             self::Refund => 'success',
             self::Purchase => 'success',

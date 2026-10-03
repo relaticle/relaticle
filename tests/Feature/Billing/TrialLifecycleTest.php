@@ -124,6 +124,34 @@ it('does not downgrade an expired trial that converted to a subscription', funct
         ->and($workspace->trial_ends_at)->toBeNull();
 });
 
+it('downgrades an expired trial whose only subscription never started', function (string $status): void {
+    Mail::fake();
+
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->subHour(),
+        'pro_trial_used_at' => now()->subDays(14),
+    ])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_unstarted',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => null,
+    ]);
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email)
+        && $mail->status === BillingStatus::TrialEnded);
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->billingStatus())->toBe(BillingStatus::TrialEnded);
+})->with(['incomplete', 'incomplete_expired']);
+
 it('emails the owner once when their expired trial is paused', function (): void {
     Mail::fake();
 
@@ -183,6 +211,26 @@ it('emails the owner when the trial ends in three days', function (): void {
 
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
+});
+
+it('reminds the owner when the only subscription never started', function (): void {
+    $this->travelTo(today()->addHours(12));
+    Mail::fake();
+
+    [, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(3)->addHour()])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_unstarted',
+        'stripe_status' => 'incomplete',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => null,
+    ]);
 
     $this->artisan('billing:process-trials')->assertSuccessful();
 

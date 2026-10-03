@@ -11,12 +11,14 @@ use Laravel\Ai\Prompts\AgentPrompt;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Agents\NextStepSuggester;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\NextStepsSuggested;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Jobs\SuggestNextSteps;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\NextSteps;
@@ -396,4 +398,68 @@ it('reads no steps off a message that predates the feature', function (): void {
     $messageId = seedSuggestibleMessage('assistant', 'An older reply.');
 
     expect(persistedNextSteps($messageId))->toBe([]);
+});
+
+it('books the suggestion call on the ledger without charging credits', function (): void {
+    Event::fake([NextStepsSuggested::class]);
+    NextStepSuggester::fake([['suggestions' => [['label' => 'Add a note', 'prompt' => 'Add a note to Acme Corp']]]]);
+
+    $messageId = seedSuggestibleMessage('assistant', 'Your workspace is empty.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'What can you help me with?',
+        reply: 'Your workspace is empty.',
+        provider: 'anthropic',
+    ))->handle();
+
+    $row = AiCreditTransaction::query()
+        ->where('conversation_id', $this->conversationId)
+        ->where('type', AiCreditType::Internal)
+        ->sole();
+
+    expect($row->credits_charged)->toBe(0)
+        ->and(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(100);
+});
+
+it('books an OpenAI suggestion call on the requested model, not the dated id the provider reports', function (): void {
+    OpenAiResponses::fakeStructured(['suggestions' => [['label' => 'Add a note', 'prompt' => 'Add a note to Acme Corp']]], 'gpt-5.6-luna-2026-09-01');
+
+    $messageId = seedSuggestibleMessage('assistant', 'Your workspace is empty.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'What can you help me with?',
+        reply: 'Your workspace is empty.',
+        provider: 'openai',
+    ))->handle();
+
+    $row = AiCreditTransaction::query()
+        ->where('conversation_id', $this->conversationId)
+        ->where('type', AiCreditType::Internal)
+        ->sole();
+
+    expect($row->model)->toBe(config('ai.providers.openai.models.text.cheapest'));
+});
+
+it('still persists the suggestions when the ledger write fails', function (): void {
+    Event::fake([NextStepsSuggested::class]);
+    NextStepSuggester::fake([['suggestions' => [['label' => 'Add a note', 'prompt' => 'Add a note to Acme Corp']]]]);
+    AiCreditTransaction::creating(fn (): never => throw new RuntimeException('ledger down'));
+
+    $messageId = seedSuggestibleMessage('assistant', 'Your workspace is empty.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'What can you help me with?',
+        reply: 'Your workspace is empty.',
+        provider: 'anthropic',
+    ))->handle();
+
+    expect(persistedNextSteps($messageId))->toBe([
+        ['label' => 'Add a note', 'prompt' => 'Add a note to Acme Corp'],
+    ]);
 });

@@ -30,7 +30,7 @@ use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 /**
  * Sharing, summarize, and request-access actions for `x-email-integration::email-view`,
- * used by the inbox and the emails relation manager.
+ * used by the emails relation manager and the access notification handler.
  *
  * @property ?string $selectedEmailId
  *

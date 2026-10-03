@@ -3,10 +3,6 @@
     'selectedPersonIds' => [],
 ])
 
-@php
-    $companyTeamLabel = __('filament/emails/composer.fields.company_team_count');
-@endphp
-
 <div
     wire:key="mass-recipient-search-{{ implode('-', $selectedPersonIds) }}"
     x-data="{
@@ -14,7 +10,6 @@
         activeIndex: 0,
         options: @js(array_values($options)),
         selectedIds: @js($selectedPersonIds),
-        companyTeamLabel: @js($companyTeamLabel),
 
         get matches() {
             const q = this.query.trim().toLowerCase();
@@ -63,7 +58,7 @@
 
         optionTooltip(option) {
             if (option.type === 'company_team') {
-                return option.label + ' (' + this.companyTeamLabel + ' ' + option.count + ')';
+                return option.label + ' (' + option.countLabel + ')';
             }
 
             if (option.email && option.label !== option.email) {
@@ -87,6 +82,7 @@
             x-on:keydown.arrow-down.prevent="activeIndex = Math.min(activeIndex + 1, matches.length - 1)"
             x-on:keydown.arrow-up.prevent="activeIndex = Math.max(activeIndex - 1, 0)"
             x-on:keydown.enter.prevent="matches[activeIndex] && choose(matches[activeIndex])"
+            x-on:keydown.escape="if (query !== '') { $event.preventDefault(); query = '' }"
         />
     </div>
 
@@ -106,7 +102,7 @@
                     <x-email-integration::recipient-avatar box="size-7" glyph="size-4" initials-size="text-[11px]" />
                     <span
                         class="min-w-0 flex-1"
-                        x-bind:x-tooltip="optionTooltip(chip) ? { content: optionTooltip(chip), theme: $store.theme } : false"
+                        x-tooltip="{ content: optionTooltip(chip), theme: $store.theme }"
                     >
                         <span class="block truncate font-medium text-gray-900 dark:text-gray-100" x-text="chip.label"></span>
                         <span class="block truncate text-xs text-gray-500 dark:text-gray-400" x-text="chip.description"></span>
@@ -114,7 +110,7 @@
                     <span
                         x-show="chip.type === 'company_team'"
                         class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300"
-                        x-text="companyTeamLabel + ' (' + chip.count + ')'"
+                        x-text="chip.countLabel"
                     ></span>
                 </button>
             </li>

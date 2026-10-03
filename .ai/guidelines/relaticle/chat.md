@@ -51,9 +51,8 @@ production: message ordering, approval races, duplicate proposals.
 - Every tool registered on `CrmAssistant` needs a label in the `toolLabels` map
   (`packages/Chat/resources/views/livewire/chat/chat-interface.blade.php`), or the
   streaming shimmer falls back to "Running <tool name>…" and leaks the identifier.
-  `tests/Browser/Chat/LoadingShimmerTest.php` is the gate, and it lives in the
-  Browser suite, which `composer test:pest` EXCLUDES: run `php artisan test tests/Browser`
-  after registering a tool, or CI is the first thing that tells you.
+  `tests/Browser/Chat/LoadingShimmerTest.php` is the gate. Run that one file after
+  registering a tool: `php artisan test tests/Browser/Chat/LoadingShimmerTest.php`.
 - A tool whose action works on the workspace rather than on records (`RemoveSampleDataTool`
   is the precedent) does not fit the per-record proposal pipeline: `executeDelete()` resolves
   models from `_record_ids`/`_model_class`. Such a tool carries neither marker, is branched

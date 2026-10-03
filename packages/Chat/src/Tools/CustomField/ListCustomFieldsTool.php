@@ -64,6 +64,7 @@ final class ListCustomFieldsTool implements Tool
                     'type' => $field->type,
                     'active' => (bool) $field->active,
                     'system_defined' => $field->isSystemDefined(),
+                    'unique' => $field->settings->unique_per_entity_type,
                     'options' => $field->options->pluck('name')->values()->all(),
                     'settings' => CustomFieldSettingsSchema::current($field),
                 ];
@@ -74,7 +75,7 @@ final class ListCustomFieldsTool implements Tool
 
         return (string) json_encode([
             'custom_fields' => $data,
-            'note' => 'System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. `settings` holds each field\'s current values for exactly the settings it accepts. To update a field, its options or its settings, use its entity_type + code.',
+            'note' => 'System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. `unique` says whether the field rejects duplicate values, which is what an upsert matches on. `settings` holds each field\'s current values for exactly the settings it accepts. To update a field, its options or its settings, use its entity_type + code.',
         ], JSON_UNESCAPED_SLASHES);
     }
 }

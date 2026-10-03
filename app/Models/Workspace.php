@@ -40,6 +40,7 @@ use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\ImportWizard\Models\Import;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -177,6 +178,8 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      * How many days an invite-link token stays valid after creation/rotation.
      */
     public const int INVITE_LINK_TTL_DAYS = 7;
+
+    public const int PRO_TRIAL_DAYS = 14;
 
     /**
      * The event map for the model.
@@ -381,6 +384,16 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      * @return Builder<Workspace>
      */
     #[Scope]
+    protected function withConnectedMailbox(Builder $query): Builder
+    {
+        return $query->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected());
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');
@@ -554,6 +567,14 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     public function imports(): HasMany
     {
         return $this->hasMany(Import::class);
+    }
+
+    /**
+     * @return HasMany<ConnectedAccount, $this>
+     */
+    public function connectedAccounts(): HasMany
+    {
+        return $this->hasMany(ConnectedAccount::class);
     }
 
     /**

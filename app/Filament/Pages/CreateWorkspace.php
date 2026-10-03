@@ -8,36 +8,44 @@ use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Features\EmailIntegration;
+use App\Filament\Components\Forms\WorkspaceLogoUpload;
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\NoteResource;
+use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\PeopleResource;
+use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
 use App\Support\WorkspaceUrlPrefix;
+use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Pages\Tenancy\RegisterTenant;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Components\Wizard;
 use Filament\Schemas\Components\Wizard\Step;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
-use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Enums\Width;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Number;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
+use Laravel\Pennant\Feature;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Override;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 
 final class CreateWorkspace extends RegisterTenant
 {
@@ -271,19 +279,6 @@ final class CreateWorkspace extends RegisterTenant
         return new HtmlString($html);
     }
 
-    private function logoHint(): HtmlString
-    {
-        $title = __('filament/pages/workspaces.create_workspace.form.company_logo.label');
-        $description = __('filament/pages/workspaces.create_workspace.form.company_logo.description', [
-            'max' => Number::fileSize(Workspace::LOGO_MAX_KILOBYTES * 1024),
-        ]);
-
-        return new HtmlString(
-            '<p class="text-base font-semibold text-gray-950 dark:text-white">'.e($title).'</p>'
-            .'<p class="mt-1 text-sm text-gray-500 dark:text-gray-400">'.e($description).'</p>'
-        );
-    }
-
     private function handleIsDerived(Get $get): bool
     {
         $slug = $get('slug');
@@ -305,32 +300,15 @@ final class CreateWorkspace extends RegisterTenant
     private function getWorkspaceFormComponents(): array
     {
         return [
-            Flex::make([
-                SpatieMediaLibraryFileUpload::make('logo')
-                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
-                    ->hiddenLabel()
-                    ->collection(Workspace::LOGO_MEDIA_COLLECTION)
-                    ->imageEditor()
-                    ->avatar()
-                    // Last in the chain on purpose: avatar() calls image(),
-                    // which resets the allowlist back to `image/*`.
-                    ->acceptedFileTypes(Workspace::LOGO_MIME_TYPES)
-                    ->maxSize(Workspace::LOGO_MAX_KILOBYTES)
-                    ->grow(false),
-
-                Placeholder::make('company_logo_hint')
-                    ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label'))
-                    ->hiddenLabel()
-                    ->content($this->logoHint())
-                    ->dehydrated(false),
-            ])->verticalAlignment(VerticalAlignment::Center),
+            WorkspaceLogoUpload::make('logo')
+                ->label(__('filament/pages/workspaces.create_workspace.form.company_logo.label')),
 
             TextInput::make('user_name')
                 ->label(__('filament/pages/workspaces.create_workspace.form.your_name.label'))
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/workspaces.create_workspace.form.your_name.placeholder'))
-                ->autofocus()
+                ->live(onBlur: true)
                 ->visible(fn (): bool => $this->isFirstWorkspace())
                 ->default(function (): string {
                     /** @var User $user */
@@ -341,6 +319,7 @@ final class CreateWorkspace extends RegisterTenant
 
             TextInput::make('name')
                 ->label(__('filament/pages/workspaces.create_workspace.form.workspace_name.label'))
+                ->autofocus()
                 ->required()
                 ->maxLength(255)
                 ->placeholder(__('filament/pages/workspaces.create_workspace.form.workspace_name.placeholder'))
@@ -477,14 +456,77 @@ final class CreateWorkspace extends RegisterTenant
     }
 
     /**
-     * @return array<string, string>
+     * @return array{
+     *     companyPlaceholder: string,
+     *     workspaceAvatarUrl: string,
+     *     userAvatarUrl: string,
+     *     greeting: string,
+     *     navigationIcons: array<string, string|BackedEnum|Htmlable|null>,
+     *     stages: list<array{name: string, color: string}>
+     * }
      */
-    public function getUseCaseLabelsForPreview(): array
+    public function getPreview(): array
     {
-        return collect(OnboardingUseCase::cases())
-            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
-                $case->value => $case->getLabel(),
-            ])
-            ->all();
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        $companyPlaceholder = (string) __('filament/pages/workspaces.create_workspace.preview.company_placeholder');
+        $workspaceName = trim((string) ($this->data['name'] ?? '')) ?: $companyPlaceholder;
+        $userName = trim((string) ($this->data['user_name'] ?? '')) ?: $user->name;
+        $stages = OnboardingUseCase::tryFrom((string) ($this->data['onboarding_use_case'] ?? ''))?->pipelineStages() ?? [];
+
+        $previewUser = clone $user;
+        $previewUser->name = $userName;
+
+        return [
+            'companyPlaceholder' => $companyPlaceholder,
+            'workspaceAvatarUrl' => $this->previewLogoUrl() ?? new Workspace(['name' => $workspaceName])->getFilamentAvatarUrl(),
+            'userAvatarUrl' => $previewUser->getFilamentAvatarUrl(),
+            'greeting' => Dashboard::greetingFor($user, explode(' ', $userName)[0]),
+            'navigationIcons' => $this->previewNavigationIcons(),
+            'stages' => array_map(
+                fn (string $name, string $color): array => ['name' => $name, 'color' => $color],
+                array_keys($stages),
+                $stages,
+            ),
+        ];
+    }
+
+    private function previewLogoUrl(): ?string
+    {
+        $files = $this->data['logo'] ?? [];
+
+        if (! is_array($files)) {
+            return null;
+        }
+
+        foreach ($files as $file) {
+            if ($file instanceof TemporaryUploadedFile && $file->isPreviewable()) {
+                return $file->temporaryUrl();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, string|BackedEnum|Htmlable|null>
+     */
+    private function previewNavigationIcons(): array
+    {
+        $icons = [
+            'dashboard' => Dashboard::getNavigationIcon(),
+            'people' => PeopleResource::getNavigationIcon(),
+            'companies' => CompanyResource::getNavigationIcon(),
+            'opportunities' => OpportunityResource::getNavigationIcon(),
+            'tasks' => TaskResource::getNavigationIcon(),
+            'notes' => NoteResource::getNavigationIcon(),
+        ];
+
+        if (Feature::active(EmailIntegration::class)) {
+            $icons['emails'] = EmailInboxPage::getNavigationIcon();
+        }
+
+        return $icons;
     }
 }

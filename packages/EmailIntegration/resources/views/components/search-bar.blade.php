@@ -17,7 +17,10 @@
         />
         @if (filled($search))
             <button
+                type="button"
                 wire:click="$set('search', '')"
+                aria-label="{{ __('filament/pages/email-inbox.search.clear') }}"
+                x-tooltip="{ content: @js(__('filament/pages/email-inbox.search.clear')), theme: $store.theme }"
                 class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
             >
                 <x-heroicon-o-x-mark class="h-4 w-4" />

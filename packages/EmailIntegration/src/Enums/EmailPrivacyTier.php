@@ -19,20 +19,20 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::PRIVATE => 'Private',
-            self::METADATA_ONLY => 'Metadata only',
-            self::SUBJECT => 'Subject line and metadata',
-            self::FULL => 'Full access',
+            self::PRIVATE => __('filament/pages/email-privacy-settings.tiers.private.label'),
+            self::METADATA_ONLY => __('filament/pages/email-privacy-settings.tiers.metadata_only.label'),
+            self::SUBJECT => __('filament/pages/email-privacy-settings.tiers.subject.label'),
+            self::FULL => __('filament/pages/email-privacy-settings.tiers.full.label'),
         };
     }
 
     public function getDescription(): string
     {
         return match ($this) {
-            self::PRIVATE => 'Nothing is shared. These emails stay visible to you alone',
-            self::METADATA_ONLY => 'The email participants and timestamp will be visible to anyone in your workspace',
-            self::SUBJECT => "We'll share the subject, participants and timestamp with anyone in your workspace",
-            self::FULL => 'Everything is shared with your workspace (including the body, subject line, attachments)',
+            self::PRIVATE => __('filament/pages/email-privacy-settings.tiers.private.description'),
+            self::METADATA_ONLY => __('filament/pages/email-privacy-settings.tiers.metadata_only.description'),
+            self::SUBJECT => __('filament/pages/email-privacy-settings.tiers.subject.description'),
+            self::FULL => __('filament/pages/email-privacy-settings.tiers.full.description'),
         };
     }
 

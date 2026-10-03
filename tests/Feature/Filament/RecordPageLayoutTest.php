@@ -115,6 +115,17 @@ it('credits a system created record to the system in the record info', function 
         ->assertSee('⊙ System');
 });
 
+it('credits a record a mailbox sync created to the system in the record info', function (): void {
+    $company = Company::factory()->recycle([$this->workspace])->create([
+        'creator_id' => null,
+        'creation_source' => CreationSource::MAILBOX,
+    ]);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSee('⊙ System')
+        ->assertDontSee('Former Member');
+});
+
 it('credits a record whose creator deleted their account to a former member in the record info', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $company->forceFill(['creator_id' => null])->saveQuietly();

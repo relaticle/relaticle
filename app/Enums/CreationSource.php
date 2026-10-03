@@ -17,9 +17,7 @@ enum CreationSource: string implements HasColor, HasLabel
     case WEB = 'web';
 
     /**
-     * Created by automated system processes without direct user action.
-     * Examples include scheduled jobs, event-triggered workflows,
-     * and background processes that generate records automatically.
+     * Sample records seeded when the workspace was created.
      */
     case SYSTEM = 'system';
 
@@ -50,6 +48,14 @@ enum CreationSource: string implements HasColor, HasLabel
      */
     case CHAT = 'chat';
 
+    case MAILBOX = 'mailbox';
+
+    /** @return list<self> */
+    public static function automated(): array
+    {
+        return [self::SYSTEM, self::MAILBOX];
+    }
+
     /** @return list<string> */
     public static function values(): array
     {
@@ -65,6 +71,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::API => 'purple',
             self::MCP => 'gray',
             self::CHAT => 'indigo',
+            self::MAILBOX => 'gray',
         };
     }
 
@@ -77,6 +84,7 @@ enum CreationSource: string implements HasColor, HasLabel
             self::API => 'API',
             self::MCP => 'MCP Agent',
             self::CHAT => 'AI Chat',
+            self::MAILBOX => 'Mailbox Sync',
         };
     }
 }

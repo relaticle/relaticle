@@ -7,7 +7,29 @@
 
     {{-- Main card --}}
     <div class="mx-auto w-full max-w-[960px] flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-        <div class="flex h-full">
+        <div
+            class="flex h-full"
+            x-data="{
+                wizardStep: 0,
+                focused: null,
+                hovered: null,
+                blurTimer: null,
+                regionFor(element) {
+                    if (element.closest('[data-logo-upload]')) {
+                        return 'workspace'
+                    }
+
+                    const model = [...element.attributes].find((attribute) => attribute.name.startsWith('wire:model'))?.value
+
+                    return { 'data.name': 'workspace', 'data.slug': 'workspace', 'data.user_name': 'user' }[model] ?? null
+                },
+            }"
+            x-on:onboarding-step-changed.window="wizardStep = $event.detail.index"
+            x-on:focusin="clearTimeout(blurTimer); focused = regionFor($event.target)"
+            x-on:focusout="blurTimer = setTimeout(() => focused = null, 80)"
+            x-on:mouseover="hovered = $event.target.closest('[data-logo-upload]') ? 'workspace' : null"
+            x-on:mouseleave="hovered = null"
+        >
             {{-- Left: form, with a way back out for anyone who already has a workspace --}}
             <div class="flex flex-1 flex-col px-10 py-10 sm:px-12 sm:py-12">
                 {{ $this->content }}
@@ -41,14 +63,8 @@
             </div>
 
             {{-- Right: CRM preview (step-aware) --}}
-            <div
-                class="hidden w-[48%] shrink-0 bg-gray-50 lg:block dark:bg-gray-900/50"
-                x-data="{ wizardStep: 0 }"
-                x-on:onboarding-step-changed.window="wizardStep = $event.detail.index"
-            >
-                <x-onboarding.crm-preview
-                    :use-case-labels="$this->getUseCaseLabelsForPreview()"
-                />
+            <div class="hidden w-[48%] shrink-0 border-s border-gray-950/5 bg-gray-50 lg:block dark:border-white/10 dark:bg-gray-950">
+                <x-onboarding.crm-preview :preview="$this->getPreview()" />
             </div>
         </div>
     </div>

@@ -64,6 +64,9 @@ final class ConnectedAccount extends Model
      */
     use HasFactory, HasUlids, HasWorkspace, SoftDeletes;
 
+    // The scheduler dispatches an incremental sync every 5 minutes.
+    private const int STALE_AFTER_MINUTES = 60;
+
     protected static function newFactory(): ConnectedAccountFactory
     {
         return ConnectedAccountFactory::new();
@@ -152,6 +155,43 @@ final class ConnectedAccount extends Model
     protected function connected(Builder $query): Builder
     {
         return $query->whereNot('status', EmailAccountStatus::DISCONNECTED);
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function failing(Builder $query): Builder
+    {
+        return $query->whereIn('status', [EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function stale(Builder $query): Builder
+    {
+        return $query
+            ->active()
+            ->whereNotNull('sync_cursor')
+            ->where(fn (Builder $overdue): Builder => $overdue
+                ->whereNull('last_synced_at')
+                ->orWhere('last_synced_at', '<', now()->subMinutes(self::STALE_AFTER_MINUTES)));
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function needingAttention(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $unhealthy): Builder => $unhealthy
+            ->where(fn (Builder $failing): Builder => $failing->failing())
+            ->orWhere(fn (Builder $stale): Builder => $stale->stale()));
     }
 
     /**
@@ -280,6 +320,16 @@ final class ConnectedAccount extends Model
         return $this->status === EmailAccountStatus::ACTIVE;
     }
 
+    public function isStale(): bool
+    {
+        if (! $this->isActive() || $this->sync_cursor === null) {
+            return false;
+        }
+
+        return $this->last_synced_at === null
+            || $this->last_synced_at->lt(now()->subMinutes(self::STALE_AFTER_MINUTES));
+    }
+
     /**
      * Mailbox-level sync problems (auth, API, incremental sync). History import store
      * failures are import issue on the batch, not a sync error on the account.
@@ -304,6 +354,13 @@ final class ConnectedAccount extends Model
         }
 
         return $this->isImportingCalendarHistory();
+    }
+
+    private function isListingEmailHistory(): bool
+    {
+        return $this->isImportingHistory()
+            && $this->hasEmail()
+            && $this->sync_cursor === null;
     }
 
     public function mailboxHistoryImportSummary(): ?MailboxHistoryImportSummary
@@ -426,48 +483,6 @@ final class ConnectedAccount extends Model
         return $this->showsMailboxHistoryImportProgressOnAccountsPage();
     }
 
-    public function mailboxHistoryImportFailureDismissToken(): ?string
-    {
-        $batchId = $this->history_import_batch_id;
-
-        if (blank($batchId) || ! $this->showsMailboxHistoryImportFailureSummary()) {
-            return null;
-        }
-
-        $generation = resolve(MailboxHistoryImportService::class)->failureGeneration((string) $batchId);
-
-        return $batchId.':'.$generation;
-    }
-
-    public function isIncrementalSyncing(): bool
-    {
-        return ! $this->isImportingHistory() && ($this->isCalendarSyncing() || $this->isEmailSyncing());
-    }
-
-    public function incrementalSyncStatusLabel(): ?string
-    {
-        if ($this->isImportingHistory()) {
-            return null;
-        }
-
-        $emailSyncing = $this->isEmailSyncing();
-        $calendarSyncing = $this->isCalendarSyncing();
-
-        if ($emailSyncing && $calendarSyncing) {
-            return __('filament/pages/email-accounts.importing_email_and_calendar');
-        }
-
-        if ($calendarSyncing) {
-            return __('filament/pages/email-accounts.importing_calendar');
-        }
-
-        if ($emailSyncing) {
-            return __('filament/pages/email-accounts.importing_email');
-        }
-
-        return null;
-    }
-
     /**
      * Percent of the first mailbox import. Starts at 0 until the provider
      * gives a size estimate and imported rows start landing.
@@ -530,8 +545,12 @@ final class ConnectedAccount extends Model
         return $this->initial_calendar_sync_imported;
     }
 
-    public function syncDisplayPercent(): int
+    public function syncDisplayPercent(): ?int
     {
+        if ($this->isListingEmailHistory()) {
+            return null;
+        }
+
         if ($this->isImportingHistory()) {
             if ($this->hasEmail() && filled($this->history_import_batch_id)) {
                 return resolve(MailboxHistoryImportService::class)->progressPercent($this);

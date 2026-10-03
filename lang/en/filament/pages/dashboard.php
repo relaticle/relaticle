@@ -21,8 +21,8 @@ return [
             ],
             'sync_email' => [
                 'label' => 'Sync your email account',
-                'description' => 'Connect your mailbox to pull conversations and meetings into the CRM',
-                'syncing' => 'Syncing email...',
+                'description' => 'Connect your email account to pull conversations and meetings into the CRM',
+                'syncing' => 'Syncing email…',
                 'syncing_percent' => 'Syncing email (:percent%)',
             ],
             'import' => [
@@ -77,10 +77,10 @@ return [
         'syncing' => [
             'title' => 'Syncing',
             'title_with_percent' => 'Syncing (:percent%)',
-            'description_initial' => 'We are processing your email and calendar events...',
-            'description_update' => 'Checking for new emails and calendar updates...',
-            'emails_processed' => '{1}:count email processed|[2,*]:count emails processed',
-            'meetings_processed' => '{1}:count meeting found|[2,*]:count meetings found',
+            'description_initial' => 'We are processing your email and calendar events…',
+            'description_update' => 'Checking for new emails and calendar updates…',
+            'emails_processed' => '{1}:count email synced|[2,*]:count emails synced',
+            'meetings_processed' => '{1}:count meeting synced|[2,*]:count meetings synced',
             'emails_updated' => '{1}:count new email|[2,*]:count new emails',
             'meetings_updated' => '{1}:count meeting updated|[2,*]:count meetings updated',
         ],

@@ -8,7 +8,6 @@
     'fromAccount' => null,
     'recipientSuggestions' => [],
     'recipientOptions' => [],
-    'allowedRecipientAddresses' => [],
 ])
 
 @php
@@ -45,7 +44,9 @@
     <div class="{{ $rowClass }}">
         <span class="{{ $labelClass }}">{{ __('filament/emails/composer.fields.to') }}</span>
         @if ($isMassSend)
-            <x-email-integration::composer-mass-send-to-summary :count="count($massRecipients)" />
+            <span class="flex h-10 min-w-0 flex-1 items-center">
+                <x-email-integration::composer-mass-send-to-summary :count="count($massRecipients)" />
+            </span>
         @else
             <div class="min-w-0 flex-1">
                 <x-email-integration::recipient-chips
@@ -53,7 +54,6 @@
                     :autofocus="true"
                     :suggestions="$recipientSuggestions"
                     :options="$recipientOptions"
-                    :allowed-addresses="$allowedRecipientAddresses"
                     class="w-full"
                 />
             </div>
@@ -85,7 +85,6 @@
                     wire:model="cc"
                     :suggestions="$recipientSuggestions"
                     :options="$recipientOptions"
-                    :allowed-addresses="$allowedRecipientAddresses"
                     class="w-full"
                 />
             </div>
@@ -103,7 +102,6 @@
                     wire:model="bcc"
                     :suggestions="$recipientSuggestions"
                     :options="$recipientOptions"
-                    :allowed-addresses="$allowedRecipientAddresses"
                     class="w-full"
                 />
             </div>

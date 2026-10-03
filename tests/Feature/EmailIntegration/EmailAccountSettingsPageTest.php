@@ -290,11 +290,10 @@ it('does not show history import failure recovery on account settings', function
     ]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->assertDontSee(__('filament/pages/email-accounts.history_import_failure.badge'))
         ->assertDontSee(__('filament/pages/email-accounts.actions.retry_failed_import.label'));
 });
 
-it('shows syncing percent while mailbox history is importing', function (): void {
+it('shows the synced count while mailbox history is still being listed', function (): void {
     $this->account->update([
         'sync_cursor' => null,
         'initial_sync_imported' => 57,
@@ -303,7 +302,8 @@ it('shows syncing percent while mailbox history is importing', function (): void
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->assertSee(__('filament/pages/email-accounts.importing'))
-        ->assertSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 57]));
+        ->assertSee(trans_choice('filament/pages/email-accounts.importing_count', 57, ['count' => 57]))
+        ->assertDontSee(__('filament/pages/email-accounts.importing_percent', ['percent' => 57]));
 });
 
 it('does not open the settings page for another user\'s account', function (): void {

@@ -126,7 +126,8 @@
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan event:clear --ansi",
             "@php artisan package:discover --ansi",
-            "@php artisan filament:upgrade"
+            "@php artisan filament:upgrade",
+            "@php artisan icons:cache --ansi"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"

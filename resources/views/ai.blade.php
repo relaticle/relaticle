@@ -38,7 +38,7 @@
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $freeCredits = number_format(\App\Enums\Plan::Free->credits());
     $proCredits = number_format(\App\Enums\Plan::Pro->credits());
-    $trialDays = \App\Actions\Billing\StartProTrial::TRIAL_DAYS;
+    $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
     // Rendered as a human duration so raising the config never leaks "1440 minutes" into the page.
     $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))

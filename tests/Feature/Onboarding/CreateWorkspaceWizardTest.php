@@ -17,6 +17,7 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Schemas\Components\Wizard;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -41,7 +42,7 @@ it('renders the create workspace page with wizard for workspaceless users', func
         ->assertSee('Create your workspace');
 });
 
-it('shows a step indicator and a back affordance in the wizard', function (): void {
+it('shows a back affordance but no step counter in the wizard', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -49,7 +50,7 @@ it('shows a step indicator and a back affordance in the wizard', function (): vo
     livewire(CreateWorkspace::class)
         ->assertSuccessful()
         ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
-        ->assertSee('Step :current of :total');
+        ->assertDontSeeHtml('role="progressbar"');
 });
 
 it('flags the workspace created event when the wizard finishes', function (): void {
@@ -499,16 +500,33 @@ it('stores referral source', function (): void {
     expect($workspace->onboarding_referral_source)->toBe(OnboardingReferralSource::Google);
 });
 
-it('has exactly three steps', function (): void {
+it('previews the pipeline stages the chosen use case creates', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Recruiting->value])
+        ->assertSee(array_keys(OnboardingUseCase::Recruiting->pipelineStages()))
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Fundraising->value])
+        ->assertSee(array_keys(OnboardingUseCase::Fundraising->pipelineStages()))
+        ->assertDontSee('Sourced');
+});
+
+it('has exactly three steps', function (): void {
+    $user = User::factory()->create();
+
+    $this->actingAs($user);
+
+    $component = livewire(CreateWorkspace::class)
         ->assertSuccessful()
-        ->assertSeeHtml('aria-valuemax="3"')
+        ->assertWizardStepExists(3)
         ->assertDontSee('Collaborate with your team')
         ->assertDontSee('Copy invite link');
+
+    $wizard = $component->instance()->form->getComponent(fn (mixed $component): bool => $component instanceof Wizard);
+
+    expect($wizard->getDefaultChildComponents())->toHaveCount(3);
 });
 
 it('hides the account menu links while no workspace is bound, instead of sending them to the dashboard', function (): void {

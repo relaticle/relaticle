@@ -299,7 +299,7 @@ final readonly class AvatarService
         $hash2 = crc32(strrev(Str::ascii($name)));
 
         // Blend the two hashes for better distribution across the color wheel
-        $blendedHash = ($hash1 + $hash2) / 2;
+        $blendedHash = intdiv($hash1 + $hash2, 2);
 
         // Map to hue values, avoiding too much clustering around certain hues
         $hue = $blendedHash % 360;

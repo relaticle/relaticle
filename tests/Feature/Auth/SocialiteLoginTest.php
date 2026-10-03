@@ -14,6 +14,9 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Illuminate\Foundation\Bootstrap\LoadConfiguration;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
+use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
@@ -572,4 +575,59 @@ test('linking a provider the user already has one linked for reports already lin
         ->assertRedirect();
 
     expect($user->socialAccounts()->where('provider_name', SocialiteProvider::GOOGLE->value)->count())->toBe(1);
+});
+
+describe('callback destinations - domain-routed panel', function (): void {
+    beforeEach(function (): void {
+        $connection = config('database.default');
+        $database = config("database.connections.{$connection}.database");
+
+        putenv('APP_PANEL_DOMAIN=app.example.com');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+        RouteServiceProvider::loadCachedRoutesUsing(null);
+        LoadConfiguration::alwaysUse(null);
+        $this->refreshApplication();
+
+        config(["database.connections.{$connection}.database" => $database]);
+        DB::purge($connection);
+        $this->beginDatabaseTransaction();
+    });
+
+    afterEach(function (): void {
+        putenv('APP_PANEL_DOMAIN');
+        CachedState::$cachedRoutes = null;
+        CachedState::$cachedConfig = null;
+    });
+
+    it('sends a new social user to workspace creation on the panel domain', function (): void {
+        Socialite::fake(
+            SocialiteProvider::GOOGLE->value,
+            makeSocialiteUser('123456789', 'Test User', 'test@example.com'),
+        );
+
+        $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']))
+            ->assertRedirect(url()->getAppUrl());
+
+        $this->assertAuthenticated();
+        $this->get(url()->getAppUrl())->assertRedirect(url()->getAppUrl('new'));
+    });
+
+    it('sends a returning social user to their dashboard on the panel domain', function (): void {
+        $user = User::factory()->withWorkspace()->create(['email' => 'returning@example.com']);
+
+        UserSocialAccount::factory()->create([
+            'user_id' => $user->id,
+            'provider_name' => SocialiteProvider::GOOGLE->value,
+            'provider_id' => '987654321',
+        ]);
+
+        Socialite::fake(
+            SocialiteProvider::GOOGLE->value,
+            makeSocialiteUser('987654321', 'Returning User', 'returning@example.com'),
+        );
+
+        $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']))
+            ->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
+    });
 });

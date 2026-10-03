@@ -97,9 +97,7 @@ final class CreateTaskTool extends BaseWriteCreateTool
         }
 
         $assigneeNames = $this->recordNames()->names($this->idListFromArray($record, 'assignee_ids'), User::class, null);
-        if ($assigneeNames !== '') {
-            $fields[] = ['label' => 'Assignees', 'value' => $assigneeNames];
-        }
+        $fields[] = ['label' => 'Assignees', 'value' => $assigneeNames !== '' ? $assigneeNames : __('(none)')];
 
         return [
             'title' => 'Create Task',

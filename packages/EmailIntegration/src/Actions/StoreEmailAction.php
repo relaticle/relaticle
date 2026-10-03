@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -157,8 +159,28 @@ final readonly class StoreEmailAction
         } catch (Throwable $exception) {
             Storage::disk(EmailAttachment::DISK)->delete($storedInlinePaths);
 
+            // Gmail keeps a separate message for each delivery of one Message-ID, such as a
+            // newsletter that arrived twice. The mailbox keeps the first copy.
+            if ($exception instanceof UniqueConstraintViolationException) {
+                return $this->storedCopy($connectedAccount, $data) ?? throw $exception;
+            }
+
             throw $exception;
         }
+    }
+
+    private function storedCopy(ConnectedAccount $connectedAccount, FetchedEmailData $data): ?Email
+    {
+        return Email::query()
+            ->where('connected_account_id', $connectedAccount->getKey())
+            ->where(function (Builder $query) use ($data): void {
+                $query->where('provider_message_id', $data->providerMessageId);
+
+                if ($data->rfcMessageId !== null) {
+                    $query->orWhere('rfc_message_id', $data->rfcMessageId);
+                }
+            })
+            ->first();
     }
 
     /**

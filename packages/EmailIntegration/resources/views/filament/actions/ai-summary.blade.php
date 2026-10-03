@@ -2,7 +2,7 @@
     @if ($summary === null)
         <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4">
             <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                {{ __('No summary is available for this thread.') }}
+                {{ __('filament/pages/record-emails.actions.summarize_thread.empty') }}
             </p>
         </div>
     @else
@@ -27,7 +27,7 @@
             <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                 <div class="flex items-center gap-2">
                     <x-heroicon-o-clock class="h-4 w-4" />
-                    <span>{{ __('Generated') }} {{ $summary->created_at->diffForHumans() }}</span>
+                    <span>{{ __('filament/pages/record-emails.actions.summarize_thread.generated', ['time' => $summary->created_at->diffForHumans()]) }}</span>
                 </div>
 
                 <button
@@ -38,13 +38,13 @@
                     <template x-if="! copied">
                         <span class="flex items-center gap-1.5">
                             <x-heroicon-o-clipboard-document class="h-4 w-4" />
-                            <span>{{ __('Copy') }}</span>
+                            <span>{{ __('filament/pages/record-emails.actions.summarize_thread.copy') }}</span>
                         </span>
                     </template>
                     <template x-if="copied">
                         <span class="flex items-center gap-1.5 text-success-600 dark:text-success-400">
                             <x-heroicon-o-check class="h-4 w-4" />
-                            <span>{{ __('Copied') }}</span>
+                            <span>{{ __('filament/pages/record-emails.actions.summarize_thread.copied') }}</span>
                         </span>
                     </template>
                 </button>

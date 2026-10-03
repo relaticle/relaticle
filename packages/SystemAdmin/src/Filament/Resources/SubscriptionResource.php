@@ -17,6 +17,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -27,6 +28,7 @@ use Relaticle\SystemAdmin\Exceptions\TransferRefused;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions;
 use Relaticle\SystemAdmin\Filament\Resources\SubscriptionResource\Pages\ViewSubscription;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
+use Relaticle\SystemAdmin\Metrics\Scopes\CountsTowardMrr;
 use UnitEnum;
 
 final class SubscriptionResource extends Resource
@@ -152,6 +154,14 @@ final class SubscriptionResource extends Resource
                     ->label('Status')
                     ->options(StripeSubscriptionStatus::class)
                     ->multiple(),
+                Filter::make('counts_toward_mrr')
+                    ->label('Counts toward MRR')
+                    ->toggle()
+                    ->query(function (Builder $query): Builder {
+                        (new CountsTowardMrr)->apply($query, $query->getModel());
+
+                        return $query;
+                    }),
             ])
             ->recordActions([
                 ViewAction::make(),

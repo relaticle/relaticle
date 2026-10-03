@@ -32,7 +32,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
-use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -57,7 +56,6 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
-use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
@@ -111,13 +109,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     public ?string $replyMode = null;
 
-    /**
-     * The message being replied to, quoted into the body at send time. It is
-     * never rendered in the composer: on the inline dock the original is on
-     * screen directly above it.
-     */
-    public ?string $quotedBodyHtml = null;
-
     public ?string $draftId = null;
 
     public ?string $accountId = null;
@@ -168,9 +159,31 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     #[Locked]
     public ?string $pageTo = null;
 
+    #[Locked]
+    public ?string $pageRecordType = null;
+
+    #[Locked]
+    public ?string $pageRecordId = null;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function getListeners(): array
+    {
+        return $this->dock === 'inline'
+            ? [
+                'composer:reply' => 'openReply',
+                'composer:dismiss-inline' => 'dismissInline',
+                'composer:resume-draft' => 'resumeDraftFor',
+            ]
+            : ['composer:open' => 'open'];
+    }
+
     public function mount(): void
     {
         $this->pageTo ??= ComposerPageTo::email();
+        $this->pageRecordType ??= ComposerPageTo::recordType();
+        $this->pageRecordId ??= ComposerPageTo::recordId();
     }
 
     /**
@@ -192,7 +205,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     /**
      * `$draftId` is its own parameter, not a `$payload` key. Livewire resolves
-     * `#[On]` listener arguments by matching each incoming event parameter to
+     * event listener arguments by matching each incoming event parameter to
      * a method parameter BY NAME (`Livewire\ImplicitlyBoundMethod`, layered on
      * Laravel's container method-call binding), and this applies uniformly
      * whether the event came from a PHP-side `$this->dispatch('composer:open',
@@ -210,7 +223,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     linkRecordId?: string,
      * }  $payload
      */
-    #[On('composer:open')]
     public function open(array $payload = [], ?string $draftId = null): void
     {
         // Compose belongs to the floating window. Both instances hear the event.
@@ -248,8 +260,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->to = $this->isMassSend
             ? []
             : ($payload['to'] ?? ($this->pageTo !== null && $this->pageTo !== '' ? [$this->pageTo] : []));
-        $this->linkRecordType = $payload['linkRecordType'] ?? null;
-        $this->linkRecordId = $payload['linkRecordId'] ?? null;
+        $this->linkRecordType = $payload['linkRecordType'] ?? ($this->isMassSend ? null : $this->pageRecordType);
+        $this->linkRecordId = $payload['linkRecordId'] ?? ($this->isMassSend ? null : $this->pageRecordId);
         $this->privacyTier = resolve(PrivacyService::class)
             ->defaultTierForUser($this->authUser())->value;
 
@@ -276,7 +288,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * Only the inline instance answers, so the floating window stays free for a
      * separate compose draft.
      */
-    #[On('composer:reply')]
     public function openReply(string $emailId, string $mode = 'reply'): void
     {
         if ($this->dock !== 'inline') {
@@ -322,8 +333,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
         $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').$originalSubject;
 
-        // Only quote the original body when the viewer is entitled to read it.
-        $this->quotedBodyHtml = $user->can('viewBody', $email) ? $email->quotedBodyHtml() : null;
         $this->sourceEmailId = (string) $email->getKey();
         // A forward carries its source for display, but must not thread against it.
         $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
@@ -346,7 +355,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * The draft answers the email that was on screen, so it must not stay attached
      * under a different one. Anything typed is saved as a draft on the way out.
      */
-    #[On('composer:dismiss-inline')]
     public function dismissInline(): void
     {
         if ($this->dock !== 'inline' || ! $this->isOpen) {
@@ -361,7 +369,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * A draft written here and left behind should be waiting under that message, not
      * only findable by hunting through the Drafts tab.
      */
-    #[On('composer:resume-draft')]
     public function resumeDraftFor(string $emailId): void
     {
         if ($this->dock !== 'inline' || $this->isOpen) {
@@ -457,24 +464,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'subject' => ['required', 'string', 'max:255'],
         ]);
 
-        $recipientErrors = resolve(AllowedRecipientService::class)->validationErrors(
-            $this->authUser(),
-            $this->to,
-            $this->cc,
-            $this->bcc,
-            $this->threadRecipientAllowlist(),
-        );
-
-        foreach ($recipientErrors as $key => $messages) {
-            foreach ($messages as $message) {
-                $this->addError($key, $message);
-            }
-        }
-
-        if ($recipientErrors !== []) {
-            return;
-        }
-
         $bodyHtml = $this->bodyHtmlForPersistence();
 
         // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
@@ -527,8 +516,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'creation_source' => $this->creationSource(),
                 'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
                 'batch_id' => null,
-                // Interactive sends from the composer keep the undo-send window (matches
-                // the surface being replaced, HasEmailComposeActions::buildSendData()).
+                // Interactive sends from the composer keep the undo-send window.
                 'priority' => EmailPriority::PRIORITY,
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
@@ -639,9 +627,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         Notification::make()
             ->success()
             ->title(__('filament/emails/composer.notifications.mass_queued.title'))
-            ->body(__('filament/emails/composer.notifications.mass_queued.body', [
-                'count' => count($recipients),
-            ]))
+            ->body(trans_choice('filament/emails/composer.notifications.mass_queued.body', count($recipients)))
             ->send();
 
         $this->closeComposer();
@@ -697,50 +683,38 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Reply and reply-all pre-fill thread participants that may not yet appear in
-     * CRM records or autocomplete. Forwards and net-new compose do not get extras.
-     *
-     * @return list<string>
-     */
-    private function threadRecipientAllowlist(): array
-    {
-        if (! in_array($this->replyMode, ['reply', 'reply_all'], true)) {
-            return [];
-        }
-
-        $emailId = $this->sourceEmailId ?? $this->inReplyToEmailId;
-
-        if ($emailId === null) {
-            return [];
-        }
-
-        $email = $this->replyableEmail($emailId);
-
-        if (! $email instanceof Email) {
-            return [];
-        }
-
-        return array_values($email->participants
-            ->pluck('email_address')
-            ->filter(fn (?string $address): bool => filled($address))
-            ->map(fn (string $address): string => $address)
-            ->all());
-    }
-
-    /**
      * Append the original message to a reply or forward. The composer never shows
      * this, because the message is on screen above the dock. The recipient's
      * client needs it for the conversation to read as a thread.
      */
     private function withQuotedBody(string $bodyHtml): string
     {
-        if (blank($this->quotedBodyHtml)) {
+        $quotedBodyHtml = $this->quotedBodyHtml();
+
+        if (blank($quotedBodyHtml)) {
             return $bodyHtml;
         }
 
         return $bodyHtml.($this->replyMode === 'forward'
-            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$this->quotedBodyHtml
-            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$this->quotedBodyHtml.'</blockquote>');
+            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$quotedBodyHtml
+            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
+    }
+
+    // Read at send time: the original can be hundreds of KB, and a public property
+    // would ship it to the browser and back on every composer request.
+    private function quotedBodyHtml(): ?string
+    {
+        if ($this->sourceEmailId === null || $this->replyMode === null) {
+            return null;
+        }
+
+        $source = $this->replyableEmail($this->sourceEmailId);
+
+        if (! $source instanceof Email || ! $this->authUser()->can('viewBody', $source)) {
+            return null;
+        }
+
+        return $source->quotedBodyHtml();
     }
 
     public function minimize(): void
@@ -1102,6 +1076,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         return $schema->components([
             RichEditor::make('bodyHtml')
+                ->label(__('filament/emails/composer.fields.message'))
                 ->hiddenLabel()
                 ->resizableImages()
                 ->fileAttachmentsDisk(EmailAttachment::DISK)
@@ -1130,25 +1105,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     /**
      * @return list<string>
      */
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function recipientSuggestions(): array
     {
         return resolve(RecipientSuggestionService::class)->addressesFor($this->authUser());
-    }
-
-    /**
-     * Every address the composer may commit or send to. Wider than {@see recipientOptions},
-     * which caps autocomplete rows for performance.
-     *
-     * @return list<string>
-     */
-    #[Computed]
-    public function allowedRecipientAddresses(): array
-    {
-        return resolve(AllowedRecipientService::class)->addressesFor(
-            $this->authUser(),
-            $this->threadRecipientAllowlist(),
-        );
     }
 
     /**
@@ -1159,6 +1119,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     description: string|null,
      *     email?: string,
      *     count?: int,
+     *     countLabel?: string,
      *     emails?: list<string>,
      *     avatarUrl: string|null,
      *     iconPath: string|null,
@@ -1166,7 +1127,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarColor: string,
      * }>
      */
-    #[Computed]
+    #[Computed(persist: true, seconds: 300)]
     public function recipientOptions(): array
     {
         $teamId = (string) $this->authUser()->current_workspace_id;
@@ -1267,6 +1228,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     label: string,
      *     description: string,
      *     count: int,
+     *     countLabel: string,
      *     emails: list<string>,
      *     avatarUrl: string|null,
      *     iconPath: string|null,
@@ -1312,7 +1274,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return [];
         }
 
-        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}> */
+        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}> */
         return Company::query()
             ->where('workspace_id', $teamId)
             ->whereKey(array_keys($companyCounts))
@@ -1328,6 +1290,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     'label' => $company->name,
                     'description' => __('filament/emails/composer.fields.company_team'),
                     'count' => $companyCounts[$companyId],
+                    'countLabel' => trans_choice('filament/emails/composer.fields.company_team_people', $companyCounts[$companyId]),
                     'emails' => $companyEmails[$companyId],
                     ...$this->recipientChipAppearance($company),
                 ];
@@ -2128,7 +2091,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->subject = $draft->subject;
-        $this->setBodyHtml((string) $draft->body?->body_html);
+        $this->setBodyHtml($draft->body?->body_html ?: '<p></p>');
 
         $this->to = $this->participantAddresses($draft, EmailParticipantRole::TO);
         $this->cc = $this->participantAddresses($draft, EmailParticipantRole::CC);
@@ -2183,7 +2146,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             default => 'reply',
         };
         $this->inReplyToEmailId = $this->replyMode === 'forward' ? null : $this->sourceEmailId;
-        $this->quotedBodyHtml = $user->can('viewBody', $original) ? $original->quotedBodyHtml() : null;
     }
 
     /**
@@ -2225,7 +2187,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'replyMode',
             'sourceEmailId',
             'inReplyToEmailId',
-            'quotedBodyHtml',
             'linkRecordType',
             'linkRecordId',
         ]);

@@ -9,8 +9,8 @@ return [
             'label' => 'Body',
         ],
         'is_shared' => [
-            'label' => 'Share with team',
-            'helper_text' => 'When enabled, all team members can use this template.',
+            'label' => 'Share with workspace',
+            'helper_text' => 'Everyone in your workspace can use this template.',
         ],
     ],
 
@@ -22,7 +22,7 @@ return [
             'label' => 'Shared',
         ],
         'creator' => [
-            'label' => 'Created By',
+            'label' => 'Created by',
             'placeholder' => '—',
         ],
         'created_at' => [

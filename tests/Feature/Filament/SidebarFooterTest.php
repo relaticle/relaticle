@@ -36,18 +36,18 @@ function sidebarFooterHtml(string $html): string
     return $end === false ? substr($html, $start) : substr($html, $start, $end - $start);
 }
 
-test('the owner sees both the members link and the billing link', function (): void {
+test('the owner sees both the invite row and the billing link', function (): void {
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
     $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
-        ->toContain(Members::getUrl())
+        ->toContain('open-invite-workspace-members')
         ->toContain(Billing::getUrl());
 });
 
-test('an admin sees the members link but not the billing link', function (): void {
+test('an admin sees the invite row but not the billing link', function (): void {
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
@@ -57,11 +57,11 @@ test('an admin sees the members link but not the billing link', function (): voi
     $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
-        ->toContain(Members::getUrl())
+        ->toContain('open-invite-workspace-members')
         ->not->toContain(Billing::getUrl());
 });
 
-test('a member sees neither the members link nor the billing link', function (): void {
+test('a member sees neither the invite row nor the billing link', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
@@ -71,6 +71,7 @@ test('a member sees neither the members link nor the billing link', function ():
     $footer = sidebarFooterHtml($this->get(Dashboard::getUrl(tenant: $this->workspace))->assertOk()->getContent());
 
     expect($footer)
+        ->not->toContain('open-invite-workspace-members')
         ->not->toContain(Members::getUrl())
         ->not->toContain(Billing::getUrl());
 });

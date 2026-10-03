@@ -116,6 +116,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public const array PROFILE_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
+    public const int SOCIAL_SIGNUP_WINDOW_SECONDS = 60;
+
     /** @var array<string, bool> */
     private array $ownershipByWorkspaceId = [];
 
@@ -253,6 +255,18 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             $members->whereKey($workspace->user_id)
                 ->orWhereHas('workspaces', fn (Builder $workspaces): Builder => $workspaces->whereKey($workspace->getKey()));
         });
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
+    protected function signedUpWith(Builder $query, ?string $provider = null): Builder
+    {
+        return $query->whereHas('socialAccounts', fn (Builder $accounts): Builder => $accounts
+            ->when($provider !== null, fn (Builder $matching): Builder => $matching->where('provider_name', $provider))
+            ->whereRaw('user_social_accounts.created_at <= users.created_at + make_interval(secs => ?)', [self::SOCIAL_SIGNUP_WINDOW_SECONDS]));
     }
 
     /**

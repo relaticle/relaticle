@@ -17,10 +17,10 @@ enum EmailBatchStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Queued => 'Queued',
-            self::Sending => 'Sending',
-            self::Completed => 'Completed',
-            self::PartialFailure => 'Partial Failure',
+            self::Queued => __('filament/pages/email-outbox.batch_statuses.queued'),
+            self::Sending => __('filament/pages/email-outbox.batch_statuses.sending'),
+            self::Completed => __('filament/pages/email-outbox.batch_statuses.completed'),
+            self::PartialFailure => __('filament/pages/email-outbox.batch_statuses.partial_failure'),
         };
     }
 

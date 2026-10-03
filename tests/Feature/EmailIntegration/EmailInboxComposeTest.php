@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
@@ -51,10 +51,21 @@ it('does not expose compose as a page header action', function (): void {
 });
 
 it('opens the floating composer from the drafts table header', function (): void {
-    livewire(DraftsTable::class)
-        ->assertTableHeaderActionsExistInOrder(['composeEmail'])
-        ->callAction(TestAction::make('composeEmail')->table())
-        ->assertDispatched('composer:open');
+    $drafts = livewire(DraftsTable::class)->assertTableHeaderActionsExistInOrder(['composeEmail']);
+
+    expect($drafts->instance()->getTable()->getAction('composeEmail')->getLivewireClickHandler())
+        ->toBe("\$dispatch('composer:open')");
+});
+
+it('checks for a connected mailbox once per drafts table render', function (): void {
+    DB::enableQueryLog();
+
+    livewire(DraftsTable::class);
+
+    $mailboxLookups = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_starts_with($query['query'], 'select exists(select * from "connected_accounts"'));
+
+    expect($mailboxLookups)->toHaveCount(1);
 });
 
 it('does not put compose on the outbox table header', function (): void {
@@ -80,8 +91,7 @@ it('keeps the compose action when the mailbox cannot send', function (): void {
 
     livewire(DraftsTable::class)
         ->assertSee(__('filament/concerns/email-compose.actions.compose.label'))
-        ->callAction(TestAction::make('composeEmail')->table())
-        ->assertDispatched('composer:open')
+        ->assertTableActionVisible('composeEmail')
         ->assertDontSee(__('filament/pages/email-accounts.not_connected.inbox.heading'));
 });
 

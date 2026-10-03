@@ -143,3 +143,13 @@ it('renders initials with a polished system type treatment', function () {
         ->toContain('fill-opacity="0.12"')
         ->toContain('fill-opacity="0.04"');
 });
+
+it('generates an avatar without a deprecation when the name hashes average to a fraction', function (): void {
+    set_error_handler(fn (int $level, string $message): never => throw new ErrorException($message, 0, $level), E_DEPRECATED);
+
+    try {
+        expect($this->avatarService->generateAuto('Acme Corporation'))->toStartWith('data:image/svg+xml;base64,');
+    } finally {
+        restore_error_handler();
+    }
+});

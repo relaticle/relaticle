@@ -10,8 +10,10 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\Chat\Models\ChatMessageFeedback;
 use Relaticle\SystemAdmin\Filament\Resources\ChatMessageFeedbackResource\Pages\ListChatMessageFeedback;
@@ -99,6 +101,10 @@ final class ChatMessageFeedbackResource extends Resource
                         ChatMessageFeedback::RATING_UP => 'Up',
                         ChatMessageFeedback::RATING_DOWN => 'Down',
                     ]),
+                Filter::make('this_week')
+                    ->label('This week')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->createdThisWeek()),
                 SelectFilter::make('category')
                     ->options(array_combine(ChatMessageFeedback::CATEGORIES, ChatMessageFeedback::CATEGORIES)),
                 SelectFilter::make('workspace')

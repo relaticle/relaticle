@@ -2,7 +2,7 @@
 title: Choose an AI model
 description: Pick the model behind the assistant per conversation, or leave it on Auto and let Relaticle decide.
 order: 3
-updated: "2026-08-13"
+updated: "2026-10-02"
 related: [help/ai-assistant/ai-credits-and-limits, help/ai-assistant/ask-questions-about-your-data]
 ---
 
@@ -25,8 +25,10 @@ what the operator has configured. On Relaticle Cloud:
 | Claude Opus | Pro | 3x |
 | GPT-5 class models | Pro | 1.5x |
 
-Models marked with an amber **Pro** badge need a Pro workspace. The
-multiplier scales what a message costs in credits. See
+Models marked with an amber **Pro** badge need a Pro workspace. During the
+14-day trial they unlock once the workspace holds a record of its own; until
+then the picker offers the models everyone can use. The multiplier scales what
+a message costs in credits. See
 [AI credits and rate limits](/help/ai-assistant/ai-credits-and-limits).
 
 Self-hosted workspaces can also point the assistant at their own models

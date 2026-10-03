@@ -1,7 +1,6 @@
 @props([
     'options' => [],
     'suggestions' => [],
-    'allowedAddresses' => [],
     'autofocus' => false,
 ])
 
@@ -11,9 +10,13 @@
     $wireModel = $attributes->wire('model')->value();
     $listboxId = Str::slug($wireModel ?: 'recipients').'-suggestions';
     $removeLabel = __('filament/emails/composer.actions.remove_recipient');
-    $companyTeamLabel = __('filament/emails/composer.fields.company_team_count');
     $avatarColor = static fn (string $name): string => ['primary', 'success', 'warning', 'danger', 'info'][abs(crc32(mb_strtolower($name))) % 5];
+    $optionEmails = collect($options)
+        ->pluck('email')
+        ->filter()
+        ->map(fn (string $email): string => mb_strtolower($email));
     $manualOptions = collect($suggestions)
+        ->reject(fn (string $suggestion): bool => $optionEmails->contains(mb_strtolower($suggestion)))
         ->map(fn (string $suggestion): array => [
             'type' => 'email',
             'id' => $suggestion,
@@ -25,6 +28,7 @@
             'circular' => true,
             'avatarColor' => $avatarColor($suggestion),
         ])
+        ->values()
         ->all();
 @endphp
 
@@ -35,9 +39,7 @@
         activeIndex: 0,
         popoverStyle: {},
         options: @js([...$options, ...$manualOptions]),
-        allowedAddresses: @js($allowedAddresses),
         removeLabel: @js($removeLabel),
-        companyTeamLabel: @js($companyTeamLabel),
 
         get matches() {
             const query = this.newValue.trim().toLowerCase();
@@ -112,20 +114,14 @@
             };
         },
 
-        allowedEmail(raw = null) {
+        typedEmail(raw = null) {
             const value = (raw ?? this.newValue).trim().replace(/,$/, '');
 
-            if (! value) {
-                return null;
-            }
-
-            const normalized = value.toLowerCase();
-
-            return this.allowedAddresses.find((email) => email.toLowerCase() === normalized) ?? null;
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) ? value : null;
         },
 
         resolveEmail(raw = null) {
-            return this.resolveEmailFromOptions(raw) ?? this.allowedEmail(raw);
+            return this.resolveEmailFromOptions(raw) ?? this.typedEmail(raw);
         },
 
         resolveEmailFromOptions(raw = null) {
@@ -160,8 +156,6 @@
             const value = this.resolveEmail(raw);
 
             if (! value) {
-                this.newValue = '';
-
                 return;
             }
 
@@ -233,6 +227,10 @@
             }
 
             if (event.key === 'Escape') {
+                if (this.newValue !== '') {
+                    event.preventDefault();
+                }
+
                 this.activeIndex = 0;
                 this.newValue = '';
 
@@ -330,7 +328,7 @@
                     <span
                         x-show="chip.type === 'company_team'"
                         class="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300"
-                        x-text="companyTeamLabel + ' (' + chip.count + ')'"
+                        x-text="chip.countLabel"
                     ></span>
                 </button>
             </template>

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\Plan;
+use App\Enums\StripeSubscriptionStatus;
 use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
@@ -14,6 +15,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Relaticle\Chat\Services\CreditService;
@@ -38,9 +40,7 @@ final class ProcessTrialsCommand extends Command
 
         Workspace::query()
             ->whereBetween('trial_ends_at', [$windowStart, $windowEnd])
-            ->whereDoesntHave('subscriptions', function (Builder $query): void {
-                $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
-            })
+            ->whereDoesntHave('subscriptions', $this->live(...))
             ->with('owner')
             ->chunkById(100, function (Collection $workspaces) use (&$count): void {
                 $workspaces->each(function (Workspace $workspace) use (&$count): void {
@@ -69,9 +69,7 @@ final class ProcessTrialsCommand extends Command
             ->chunkById(100, function (Collection $workspaces) use ($credits, &$count): void {
                 $workspaces->each(function (Workspace $workspace) use ($credits, &$count): void {
                     $hasLiveSubscription = $workspace->subscriptions()
-                        ->where(function (Builder $query): void {
-                            $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
-                        })
+                        ->where($this->live(...))
                         ->exists();
 
                     // Only revert what the trial granted. A converted
@@ -99,5 +97,15 @@ final class ProcessTrialsCommand extends Command
             });
 
         $this->comment("Paused {$count} expired trial(s).");
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function live(Builder $query): void
+    {
+        $query
+            ->whereNotIn('stripe_status', StripeSubscriptionStatus::neverGranted())
+            ->where(fn (Builder $running): Builder => $running->whereNull('ends_at')->orWhere('ends_at', '>', now()));
     }
 }

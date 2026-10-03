@@ -39,5 +39,6 @@ final readonly class FetchedEmailData
          */
         public ?EmailCategory $providerCategory = null,
         public ?string $reconciliationMessageId = null,
+        public bool $isBulkMail = false,
     ) {}
 }

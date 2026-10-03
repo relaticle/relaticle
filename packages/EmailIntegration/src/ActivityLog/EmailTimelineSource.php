@@ -40,7 +40,7 @@ final readonly class EmailTimelineSource
                 // VisibleEmailScope admits metadata-only mail. Subjects are masked
                 // here the same way the inbox does: viewSubject, not a raw column read.
                 if (! $this->viewer instanceof User || ! $this->viewer->can('viewSubject', $email)) {
-                    return '(subject hidden)';
+                    return __('filament/pages/email-inbox.subject.hidden');
                 }
 
                 return $email->subject ?? 'Email';

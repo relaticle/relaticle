@@ -58,6 +58,15 @@ it('advertises every resolvable destination in its schema description', function
     }
 });
 
+it('declares every destination its schema description advertises', function (): void {
+    $schema = app(GuideToPageTool::class)->schema(new JsonSchemaTypeFactory);
+    $destination = (new Serializer)->serialize($schema['destination']);
+
+    preg_match_all('/"([a-z_]+)"/', $destination['description'], $advertised);
+
+    expect($advertised[1])->toEqualCanonicalizing(DestinationResolver::DESTINATIONS);
+});
+
 it('names the access tokens and connect assistant destinations in its schema description', function (): void {
     $schema = app(GuideToPageTool::class)->schema(new JsonSchemaTypeFactory);
     $destination = (new Serializer)->serialize($schema['destination']);

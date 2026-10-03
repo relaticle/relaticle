@@ -34,7 +34,7 @@ use Relaticle\EmailIntegration\Services\MeetingTemporalState;
 
 /**
  * @property-read Collection<int, Meeting> $meetings
- * @property-read list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: int, hasCalendar: bool, isInitialImport: bool}> $mailboxSyncRows
+ * @property-read list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: ?int, hasCalendar: bool, isInitialImport: bool}> $mailboxSyncRows
  * @property-read list<array{id: string, title: string, all_day: bool, response_status: AttendeeResponseStatus, time: array{start: string, end: string|null, range: string, datetime: string}, happening_now: bool, is_past: bool}> $meetingCards
  * @property-read Action $connectGmailAction
  */
@@ -144,10 +144,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
 
     public function syncDisplayPercent(): int
     {
-        $percents = array_map(
-            fn (array $row): int => $row['percent'],
-            $this->mailboxSyncRows,
-        );
+        $percents = array_filter(array_column($this->mailboxSyncRows, 'percent'), is_int(...));
 
         return $percents === [] ? 0 : max($percents);
     }
@@ -186,6 +183,10 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
 
     public function syncShowsPercent(): bool
     {
+        if (in_array(null, array_column($this->mailboxSyncRows, 'percent'), true)) {
+            return false;
+        }
+
         if ($this->syncIsInitialImport()) {
             return true;
         }
@@ -208,7 +209,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     }
 
     /**
-     * @return list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: int, hasCalendar: bool, isInitialImport: bool}>
+     * @return list<array{id: string, email: string, emailsImported: int, meetingsImported: int, percent: ?int, hasCalendar: bool, isInitialImport: bool}>
      */
     #[Computed]
     public function mailboxSyncRows(): array

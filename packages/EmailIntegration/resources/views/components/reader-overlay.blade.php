@@ -11,6 +11,8 @@
          A mount animation has no state to fall out of sync. --}}
     <div
         x-data="{
+            closing: false,
+
             /**
              * Save any reply in progress before the reader goes away. Closing
              * removes the docked composer along with the reader, so an event asking
@@ -18,6 +20,12 @@
              * draft has to be persisted first, and awaited.
              */
             async closeReader() {
+                if (this.closing) {
+                    return
+                }
+
+                this.closing = true
+
                 const dock = $el.querySelector('[data-inline-composer][wire\\:id]')
 
                 if (dock) {
@@ -27,8 +35,9 @@
                 $wire.deselectEmail()
             },
         }"
-        wire:key="email-reader"
-        x-on:keydown.escape.window="closeReader()"
+        wire:key="email-reader-{{ $email->getKey() }}"
+        x-bind:style="closing ? { display: 'none' } : {}"
+        x-on:keydown.escape.window="$event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']') || closeReader()"
         {{ $attributes->class(['fixed inset-0 flex items-center justify-center p-4 sm:p-6', $layer]) }}
     >
         <div
