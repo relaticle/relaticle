@@ -295,7 +295,7 @@ final readonly class CustomFieldFilter implements Filter
             $this->assertSupported($path, $operator, $domainOperators);
 
             $domains = array_map(
-                static fn (string $domain): string => trim($domain),
+                trim(...),
                 $this->normalizeOperand($path, $operator, $operand, $domainOperators[$operator], true),
             );
 
