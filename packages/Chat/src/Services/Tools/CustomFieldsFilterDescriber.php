@@ -46,10 +46,16 @@ final readonly class CustomFieldsFilterDescriber
             if (isset($entry['operand']) && $entry['type'] === FilterKind::Computed->value) {
                 $line .= "; takes {$entry['operand']}";
             } elseif (isset($entry['operand'])) {
-                $rules[$entry['type']] = "- {$entry['type']}: takes {$entry['operand']}";
+                $rules[$entry['type']] ??= "- {$entry['type']}: takes {$entry['operand']}";
             }
 
-            $lines[] = $line.'; example: '.CustomFieldFilterSchema::json($entry['example']).')';
+            $line .= '; example: '.CustomFieldFilterSchema::json($entry['example']);
+            $line .= isset($entry['nested_example']) ? '; nested example: '.CustomFieldFilterSchema::json($entry['nested_example']) : '';
+            $lines[] = $line.')';
+
+            if (isset($entry['nested_custom_field_example']) && isset($rules['relation']) && ! str_contains($rules['relation'], 'nested custom field example')) {
+                $rules['relation'] .= '; nested custom field example '.CustomFieldFilterSchema::json([$name => $entry['nested_custom_field_example']]);
+            }
         }
 
         if ($rules !== []) {

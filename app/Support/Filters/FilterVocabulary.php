@@ -6,6 +6,7 @@ namespace App\Support\Filters;
 
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Enums\FilterKind;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\User;
@@ -35,6 +36,16 @@ final readonly class FilterVocabulary
                 $entry['entity'] = $definition->related->value;
             }
 
+            if ($definition->kind === FilterKind::Relation && $definition->related instanceof CrmEntity) {
+                $title = $definition->related->titleColumn();
+                $entry['nested_example'] = [$title => EntityFilters::definitions($definition->related)[$title]->example()];
+                $customFieldExample = $this->firstCustomFieldExample($user, $definition->related);
+
+                if ($customFieldExample !== null) {
+                    $entry['nested_custom_field_example'] = $customFieldExample;
+                }
+            }
+
             if ($definition->enumClass !== null) {
                 $entry['values'] = array_map(static fn (BackedEnum $case): string => (string) $case->value, $definition->enumClass::cases());
             }
@@ -50,6 +61,19 @@ final readonly class FilterVocabulary
         ['types' => $vocabulary['types'], 'fields' => $vocabulary['custom_fields']] = $this->customFieldEntries($user, $entity);
 
         return $vocabulary;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>|null
+     */
+    private function firstCustomFieldExample(User $user, CrmEntity $entity): ?array
+    {
+        ['types' => $types, 'fields' => $fields] = $this->customFieldEntries($user, $entity);
+        $code = array_key_first($fields);
+
+        return $code === null
+            ? null
+            : ['custom_fields' => [$code => $fields[$code]['example'] ?? $types[$fields[$code]['type']]['example']]];
     }
 
     /**

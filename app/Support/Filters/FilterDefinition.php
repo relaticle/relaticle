@@ -15,7 +15,7 @@ final readonly class FilterDefinition
 {
     public const array LINK_OPERATORS = ['$in', '$not_in', '$is_empty'];
 
-    public const string RELATION_OPERAND = '$in, $not_in or $is_empty on record ids, or conditions on the related record';
+    public const string RELATION_OPERAND = '$in, $not_in or $is_empty on record ids, or conditions on the related record that use that record type\'s own filter names, including custom_fields. Prefer conditions over listing the related records first and passing their ids';
 
     public const string MEMBER_OPERAND = '$in, $not_in or $is_empty on workspace member ids only, with no nested conditions';
 

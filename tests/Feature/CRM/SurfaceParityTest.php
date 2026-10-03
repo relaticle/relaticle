@@ -337,11 +337,27 @@ it('renders on chat what the registry and mcp publish for each name', function (
             expect($lines['names'][$name])->toContain('one of: '.implode(', ', $entry['values']));
         }
 
+        if (isset($entry['nested_example'])) {
+            expect($lines['names'][$name])->toContain('; nested example: '.CustomFieldFilterSchema::json($entry['nested_example']));
+        } else {
+            expect($lines['names'][$name])->not->toContain('nested example');
+        }
+
         if (isset($entry['operand'])) {
             $carrier = $entry['type'] === 'computed' ? $lines['names'][$name] : $lines['rules'][$entry['type']];
 
             expect($carrier)->toContain("takes {$entry['operand']}");
         }
+    }
+
+    $nestedCustom = array_filter($published, fn (array $entry): bool => isset($entry['nested_custom_field_example']));
+
+    if ($nestedCustom !== []) {
+        $name = array_key_first($nestedCustom);
+
+        expect($lines['rules']['relation'])->toContain('nested custom field example '.CustomFieldFilterSchema::json([$name => $nestedCustom[$name]['nested_custom_field_example']]));
+    } else {
+        expect($chatDescription)->not->toContain('nested custom field example');
     }
 
     foreach ($types as $type => $entry) {
@@ -480,6 +496,15 @@ it('publishes filter examples the list action accepts on every surface', functio
         array_push($known, CustomFieldFilterSchema::json($entry['example']), CustomFieldFilterSchema::json([$name => $entry['example']]));
     }
 
+    foreach ($vocabulary as $name => $entry) {
+        foreach (['nested_example', 'nested_custom_field_example'] as $key) {
+            if (isset($entry[$key])) {
+                $filters[] = [$name => $entry[$key]];
+                array_push($known, CustomFieldFilterSchema::json($entry[$key]), CustomFieldFilterSchema::json([$name => $entry[$key]]));
+            }
+        }
+    }
+
     foreach ($types as $entry) {
         isset($entry['example']) && $known[] = CustomFieldFilterSchema::json($entry['example']);
     }
@@ -501,7 +526,10 @@ it('publishes filter examples the list action accepts on every surface', functio
         str(resolve($schemaResource)->toSchema($user)['usage'])->before(' Write example:')->toString(),
     ];
 
-    expect($types['text']['example'])->toBe(CustomFieldType::TEXT->filterExample())
+    $relations = array_filter($vocabulary, fn (array $entry): bool => $entry['type'] === 'relation');
+
+    expect($relations === [] || array_all($relations, fn (array $entry): bool => isset($entry['nested_example']) && isset($entry['nested_custom_field_example'])))->toBeTrue()
+        ->and($types['text']['example'])->toBe(CustomFieldType::TEXT->filterExample())
         ->and($types['select'])->not->toHaveKey('example')
         ->and($customFields['probe_a']['example'])->toBe(['$in' => ['Alpha']])
         ->and($customFields['probe_b']['example'])->toBe(['$in' => ['Gamma']])
@@ -570,10 +598,15 @@ it('names each filter and each rule once in a chat tool description', function (
     }
 
     $kinds = array_unique(array_map(fn (FilterDefinition $definition): string => $definition->kind->value, $definitions));
+    $hasNestedCustom = array_any(
+        resolve(FilterVocabulary::class)->for($user, $entity),
+        fn (mixed $entry): bool => is_array($entry) && isset($entry['nested_custom_field_example']),
+    );
 
     expect($chat)->not->toContain('Native fields:')
         ->and(substr_count($chat, FilterDefinition::MEMBER_OPERAND))->toBe(in_array('members', $kinds, true) ? 1 : 0)
-        ->and(substr_count($chat, FilterDefinition::RELATION_OPERAND))->toBe(in_array('relation', $kinds, true) ? 1 : 0);
+        ->and(substr_count($chat, FilterDefinition::RELATION_OPERAND))->toBe(in_array('relation', $kinds, true) ? 1 : 0)
+        ->and(substr_count($chat, 'nested custom field example'))->toBe($hasNestedCustom ? 1 : 0);
 })->with(array_map(fn (array $row): array => [$row[0], $row[6]], crmSurfaces()));
 
 it('describes the real shape of filterable_fields in the mcp list tool', function (CrmEntity $entity, string $mcpTool): void {
