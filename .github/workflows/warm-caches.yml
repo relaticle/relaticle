@@ -1,30 +1,46 @@
 name: Warm Caches
 
-# Tag-triggered release runs can only restore caches created on the default branch,
-# and only pull_request workflows saved composer caches, so every release ran cold.
+run-name: Workspace seeding before and after
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - composer.lock
-      - .github/workflows/warm-caches.yml
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  composer:
+  paired:
     runs-on: ubuntu-latest
-    name: Warm Composer Cache
+    name: shard ${{ matrix.shard }}/5
+    timeout-minutes: 40
+
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 3, 5]
+
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_DB: relaticle_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+        ports:
+          - 5432:5432
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Cache Dependencies
-        uses: actions/cache@v6
+        uses: actions/cache/restore@v6
         with:
           path: |
             ~/.composer/cache
@@ -41,5 +57,30 @@ jobs:
           tools: composer:v2
           coverage: none
 
+      - name: Hardware
+        run: lscpu | grep 'Model name'
+
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan passport:keys --force --no-interaction
+
+      - name: Paired runs
+        env:
+          SHARD: ${{ matrix.shard }}/5
+        run: |
+          cp app/Listeners/CreateWorkspaceCustomFields.php /tmp/after.php
+          git fetch --depth=1 origin main
+          git show FETCH_HEAD:app/Listeners/CreateWorkspaceCustomFields.php > /tmp/before.php
+          for variant in before after before after; do
+            cp /tmp/$variant.php app/Listeners/CreateWorkspaceCustomFields.php
+            start=$(date +%s)
+            composer test:pest:ci > /tmp/out.txt 2>&1 || true
+            end=$(date +%s)
+            summary=$(sed -E 's/\x1b\[[0-9;]*m//g' /tmp/out.txt | grep -E 'Tests:|Duration:' | tr -s ' ' | tr '\n' ' ')
+            echo "RESULT variant=$variant wall=$((end-start))s $summary"
+          done
