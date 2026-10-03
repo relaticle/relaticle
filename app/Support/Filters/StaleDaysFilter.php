@@ -15,7 +15,12 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class StaleDaysFilter implements Filter
 {
-    private const int MAX_DAYS = 3650;
+    public const int MAX_DAYS = 3650;
+
+    public const string OPERAND = '$gte with whole days without activity, from 1 to '.self::MAX_DAYS;
+
+    /** @var array<string, int> */
+    public const array EXAMPLE = ['$gte' => 30];
 
     public function __construct(private User $user) {}
 

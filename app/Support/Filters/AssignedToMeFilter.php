@@ -14,6 +14,11 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class AssignedToMeFilter implements Filter
 {
+    public const string OPERAND = '$eq with true, to list the tasks assigned to you';
+
+    /** @var array<string, bool> */
+    public const array EXAMPLE = ['$eq' => true];
+
     public function __construct(private User $user) {}
 
     /**

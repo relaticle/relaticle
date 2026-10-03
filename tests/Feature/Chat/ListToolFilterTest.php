@@ -6,6 +6,7 @@ use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Company;
@@ -644,6 +645,18 @@ it('names the domain sub-field operators and the matching rule on email and phon
     expect($email)->toContain('operators: $has_any, $has_none, $is_empty;', 'sub-field domain: $in, $not_in', CustomFieldType::EMAIL->filterMatching())
         ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
         ->and($phone)->not->toContain('sub-field')
-        ->and($filterDescription)->toContain(EntityFilters::grammar())
+        ->and($filterDescription)->toContain(EntityFilters::grammar(CrmEntity::People))
         ->and(CustomFieldFilterSchema::valueRules())->toContain('domain sub-field with $in or $not_in', CustomFieldType::PHONE->filterMatching());
+});
+
+it('renders the related entity and the field type on chat and states emptiness on an entity without custom fields', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $opportunities = resolve(CustomFieldsFilterDescriber::class)->describe($user, 'opportunity');
+    $notes = (new ListNotesTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+
+    expect($opportunities)->toContain('- contact (relation to people;', '- amount (Amount, currency;', '- close_date (Close Date, date;')
+        ->and($opportunities)->not->toContain('- amount (Amount;')
+        ->and($notes)->toContain('No filterable custom fields are defined', CustomFieldFilterSchema::EMPTINESS_RULE);
 });

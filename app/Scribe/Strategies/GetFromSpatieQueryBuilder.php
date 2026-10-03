@@ -79,9 +79,10 @@ final class GetFromSpatieQueryBuilder extends Strategy
         return implode(' ', [
             'Filter by a custom field value.',
             CustomFieldFilterSchema::operatorSummary(),
-            'Every type: $is_empty (1, 0, true or false). Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma.',
+            'In a query string $is_empty also takes 1 or 0. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma.',
             CustomFieldFilterSchema::valueRules(),
-            'Repeat [] to send several values. $not_in and $has_none also match records where the field is empty. Up to 20 conditions per filter, 100 values per list.',
+            'Repeat [] to send several values.',
+            EntityFilters::limits(),
             'Examples: '.implode(' and ', self::CUSTOM_FIELD_EXAMPLES).'.',
         ]);
     }

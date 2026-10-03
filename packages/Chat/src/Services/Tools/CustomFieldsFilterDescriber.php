@@ -37,11 +37,14 @@ final readonly class CustomFieldsFilterDescriber
         $lines = ['Names for this entity type:'];
 
         foreach ($vocabulary as $name => $entry) {
-            $lines[] = "- {$name} ({$entry['type']}; operators: ".implode(', ', $entry['operators']).(isset($entry['values']) ? '; one of: '.implode(', ', $entry['values']) : '').')';
+            $line = "- {$name} ({$entry['type']}".(isset($entry['entity']) ? " to {$entry['entity']}" : '').'; operators: '.implode(', ', $entry['operators']);
+            $line .= isset($entry['values']) ? '; one of: '.implode(', ', $entry['values']) : '';
+            $line .= isset($entry['operand']) ? "; takes {$entry['operand']}" : '';
+            $lines[] = $line.'; example: '.CustomFieldFilterSchema::json($entry['example']).')';
         }
 
         $lines[] = '';
-        $lines[] = 'Example: '.json_encode(EntityFilters::example($entity));
+        $lines[] = 'Example: '.CustomFieldFilterSchema::json(EntityFilters::example($entity));
 
         if ($customFields === []) {
             $lines[] = '';
@@ -52,20 +55,20 @@ final readonly class CustomFieldsFilterDescriber
 
         $lines[] = '';
         $lines[] = 'Custom field conditions go under custom_fields. Their keys MUST be one of the codes below; each value is an object of operator => operand.';
-        $lines[] = 'For choice fields pass the option label as listed; an option ID also works. $not_in and $has_none also match records where the field is empty. $is_empty takes true or false.';
+        $lines[] = 'For choice fields pass the option label as listed; an option ID also works.';
         $lines[] = '';
 
         foreach ($customFields as $code => $entry) {
-            $line = "- {$code} ({$entry['name']}; operators: ".implode(', ', $entry['operators']);
+            $line = "- {$code} ({$entry['name']}, {$entry['type']}; operators: ".implode(', ', $entry['operators']);
             $line .= isset($entry['sub_fields']) ? '; sub-field domain: '.implode(', ', $entry['sub_fields']['domain']) : '';
             $line .= isset($entry['matching']) ? "; values match {$entry['matching']}" : '';
             $line .= isset($entry['options']) ? '; one of: "'.implode('", "', $entry['options']).'"' : '';
-            $lines[] = $line.')';
+            $lines[] = $line.'; example: '.CustomFieldFilterSchema::json($entry['example']).')';
         }
 
         $firstCode = array_key_first($customFields);
         $lines[] = '';
-        $lines[] = 'Custom field example: '.json_encode(['custom_fields' => [$firstCode => $customFields[$firstCode]['example']]]);
+        $lines[] = 'Custom field example: '.CustomFieldFilterSchema::json(['custom_fields' => [$firstCode => $customFields[$firstCode]['example']]]);
 
         return implode("\n", $lines);
     }

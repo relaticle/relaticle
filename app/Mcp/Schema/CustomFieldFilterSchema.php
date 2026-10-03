@@ -21,6 +21,13 @@ final readonly class CustomFieldFilterSchema
     /** @var list<string> */
     public const array DOMAIN_OPERATORS = ['$in', '$not_in'];
 
+    public const string EMPTINESS_RULE = '$is_empty takes true or false.';
+
+    public const string EMPTY_MATCH_RULE = '$not_in and $has_none also match records where the field is empty.';
+
+    /** @var array<string, array<string, list<string>>> */
+    public const array DOMAIN_EXAMPLE = ['domain' => ['$in' => ['acme.com']]];
+
     /** @var array<int, string> */
     private const array NUMERIC_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte'];
 
@@ -123,9 +130,37 @@ final readonly class CustomFieldFilterSchema
             $sentences[] = ucfirst(Arr::join($types, ', ', ' and '))." values match {$matching}.";
         }
 
-        $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as {"domain": {"$in": ["acme.com"]}}, which matches the host of each value.';
+        $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as '.self::json(self::DOMAIN_EXAMPLE).', which matches the host of each value.';
+        $sentences[] = self::EMPTY_MATCH_RULE;
+        $sentences[] = self::EMPTINESS_RULE;
 
         return implode(' ', $sentences);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     */
+    public static function json(array $value): string
+    {
+        return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function operatorNames(): array
+    {
+        $names = [];
+
+        foreach (CustomFieldType::cases() as $type) {
+            foreach (array_keys(self::operatorsForType($type->value)) as $operator) {
+                if (str_starts_with($operator, '$')) {
+                    $names[] = $operator;
+                }
+            }
+        }
+
+        return array_values(array_unique($names));
     }
 
     public static function operatorSummary(): string

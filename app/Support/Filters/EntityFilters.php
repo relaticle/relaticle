@@ -13,13 +13,48 @@ use Spatie\QueryBuilder\AllowedFilter;
 
 final readonly class EntityFilters
 {
-    private const string GRAMMAR = 'An object of conditions. Keys starting with $ are keywords: operators ($eq, $gt, $gte, $lt, $lte, $contains, $in, $not_in, $has_any, $has_none, $is_empty) and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names: native fields (name, title, created_at, updated_at, creation_source), relations (company, contact, people, opportunities, companies, creator, accountOwner, assignees), computed filters (stale_days on opportunities takes {"$gte": <days without activity>}, assigned_to_me on tasks takes {"$eq": true}) and custom_fields, an object keyed by custom field code. Each field takes an operator object such as {"$gte": "2026-10-01"}. A relation takes $in, $not_in or $is_empty on record ids, or conditions on the related record.';
-
     public function __construct(private User $user) {}
 
-    public static function grammar(): string
+    public static function grammar(CrmEntity $entity): string
     {
-        return self::GRAMMAR.' '.CustomFieldFilterSchema::valueRules();
+        $definitions = self::definitions($entity);
+        $named = static fn (FilterKind ...$kinds): array => array_keys(array_filter(
+            $definitions,
+            static fn (FilterDefinition $definition): bool => in_array($definition->kind, $kinds, true),
+        ));
+        $relations = array_map(
+            static fn (string $name): string => "{$name} (".$definitions[$name]->related?->value.')',
+            $named(FilterKind::Relation),
+        );
+
+        $sentences = [
+            'An object of conditions. Keys starting with $ are keywords: operators ('.implode(', ', CustomFieldFilterSchema::operatorNames()).') and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names.',
+            'Native fields: '.implode(', ', $named(FilterKind::Text, FilterKind::DateTime, FilterKind::Enum)).'.',
+        ];
+
+        if ($relations !== []) {
+            $sentences[] = 'Relations take '.implode(', ', FilterDefinition::LINK_OPERATORS).' on record ids, or conditions on the related record: '.implode(', ', $relations).'.';
+        }
+
+        if ($named(FilterKind::Members) !== []) {
+            $sentences[] = 'Member relations take '.FilterDefinition::MEMBER_OPERAND.': '.implode(', ', $named(FilterKind::Members)).'.';
+        }
+
+        foreach ($named(FilterKind::Computed) as $name) {
+            $sentences[] = "{$name} takes {$definitions[$name]->operand()}, for example ".CustomFieldFilterSchema::json([$name => $definitions[$name]->example()]).'.';
+        }
+
+        return implode(' ', [
+            ...$sentences,
+            'custom_fields takes an object keyed by custom field code, each value an operator object.',
+            self::limits(),
+            CustomFieldFilterSchema::valueRules(),
+        ]);
+    }
+
+    public static function limits(): string
+    {
+        return 'A filter holds at most '.FilterTree::MAX_CONDITIONS.' conditions, '.FilterTree::MAX_LOGIC_DEPTH.' levels of $and, $or and $not, and '.FilterTree::MAX_HOPS.' levels of relations. A list holds at most '.CustomFieldFilterSchema::MAX_LIST_VALUES.' values.';
     }
 
     /**
@@ -61,14 +96,14 @@ final readonly class EntityFilters
             CrmEntity::Opportunity => [
                 'company' => FilterDefinition::relation(CrmEntity::Company),
                 'contact' => FilterDefinition::relation(CrmEntity::People),
-                'stale_days' => FilterDefinition::computed(StaleDaysFilter::class, ['$gte']),
+                'stale_days' => FilterDefinition::computed(StaleDaysFilter::class, ['$gte'], StaleDaysFilter::EXAMPLE, StaleDaysFilter::OPERAND),
             ],
             CrmEntity::Task => [
                 'assignees' => FilterDefinition::members(),
                 'companies' => FilterDefinition::relation(CrmEntity::Company),
                 'people' => FilterDefinition::relation(CrmEntity::People),
                 'opportunities' => FilterDefinition::relation(CrmEntity::Opportunity),
-                'assigned_to_me' => FilterDefinition::computed(AssignedToMeFilter::class, ['$eq']),
+                'assigned_to_me' => FilterDefinition::computed(AssignedToMeFilter::class, ['$eq'], AssignedToMeFilter::EXAMPLE, AssignedToMeFilter::OPERAND),
             ],
             CrmEntity::Note => [
                 'companies' => FilterDefinition::relation(CrmEntity::Company),

@@ -113,7 +113,25 @@ enum CustomFieldType: string
         return match ($this) {
             self::EMAIL, self::LINK => 'in any letter case',
             self::PHONE => 'in any format, and the operand needs a country code such as +1 415 555 0100',
+            self::TAGS_INPUT => 'the exact stored value',
             default => null,
+        };
+    }
+
+    /**
+     * A filter condition on this type, built from the same operand {@see self::example()} writes.
+     *
+     * @return array<string, mixed>
+     */
+    public function filterExample(): array
+    {
+        return match ($this) {
+            self::TEXT => ['$contains' => $this->example()],
+            self::NUMBER, self::CURRENCY, self::DATE, self::DATE_TIME => ['$gte' => $this->example()],
+            self::CHECKBOX, self::TOGGLE => ['$eq' => $this->example()],
+            self::EMAIL, self::PHONE, self::LINK, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => ['$has_any' => $this->example()],
+            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => ['$in' => [$this->example()]],
+            default => [],
         };
     }
 

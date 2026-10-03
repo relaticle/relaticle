@@ -28,12 +28,14 @@ final class GetFilterBodyFromEntityFilters extends Strategy
             return null;
         }
 
+        $entity = self::LIST_ACTION_ENTITIES[$actionClass];
+
         return [
             'filter' => [
                 'type' => 'object',
                 'required' => false,
-                'description' => EntityFilters::grammar(),
-                'example' => EntityFilters::example(self::LIST_ACTION_ENTITIES[$actionClass]),
+                'description' => EntityFilters::grammar($entity),
+                'example' => EntityFilters::example($entity),
             ],
             ...$this->listParameters($actionClass),
         ];

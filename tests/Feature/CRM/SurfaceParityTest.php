@@ -38,6 +38,7 @@ use App\Mcp\Tools\Task\ListTasksTool as McpListTasks;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterTree;
 use App\Support\Filters\FilterVocabulary;
 use App\Support\Filters\LogicFilter;
 use Filament\Facades\Filament;
@@ -227,12 +228,47 @@ it('names every custom field filter operator in the mcp list tool description', 
         ->and(array_diff($publishedOperators, str($description)->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
 });
 
-it('publishes one filter vocabulary on mcp, chat and the registry', function (CrmEntity $entity, string $chatTool): void {
-    $user = User::factory()->withPersonalWorkspace()->create();
-    $this->actingAs($user);
+/**
+ * @return list<string>
+ */
+function jsonFragments(string $text): array
+{
+    $fragments = [];
+    $offset = 0;
 
-    $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
-    $registry = array_map(fn (AllowedFilter $filter): string => $filter->getName(), new EntityFilters($user)->for($entity));
+    while (($start = strpos($text, '{"', $offset)) !== false) {
+        $depth = 0;
+        $end = $start;
+
+        for ($length = strlen($text); $end < $length; $end++) {
+            $depth += match ($text[$end]) {
+                '{' => 1,
+                '}' => -1,
+                default => 0,
+            };
+
+            if ($depth === 0) {
+                break;
+            }
+        }
+
+        $fragments[] = substr($text, $start, $end - $start + 1);
+        $offset = $end + 1;
+    }
+
+    return $fragments;
+}
+
+function normalizedJson(string $json): string
+{
+    return CustomFieldFilterSchema::json(json_decode($json, true, flags: JSON_THROW_ON_ERROR));
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function mcpFilterableFields(User $user, CrmEntity $entity): array
+{
     $published = [];
 
     RelaticleServer::actingAs($user)
@@ -243,32 +279,169 @@ it('publishes one filter vocabulary on mcp, chat and the registry', function (Cr
             $json->etc();
         });
 
-    $chatDescription = resolve($chatTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+    return $published;
+}
 
-    expect(array_keys($vocabulary))->toEqualCanonicalizing(array_values(array_diff($registry, LogicFilter::KEYWORDS)))
-        ->and(array_keys($published))->toEqualCanonicalizing(array_keys($vocabulary))
-        ->and(array_diff(array_keys($vocabulary), str($chatDescription)->matchAll('/[A-Za-z_]+/')->all()))->toBe([]);
+function filterDescription(string $tool): string
+{
+    return resolve($tool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+}
+
+it('renders on chat what the registry and mcp publish for each name', function (CrmEntity $entity, string $chatTool, string $mcpTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $registry = array_map(fn (AllowedFilter $filter): string => $filter->getName(), new EntityFilters($user)->for($entity));
+    $published = mcpFilterableFields($user, $entity);
+    $customFields = (array) $published['custom_fields'];
+    unset($published['custom_fields']);
+
+    $grammar = EntityFilters::grammar($entity);
+    $chatDescription = filterDescription($chatTool);
+    $lines = collect(explode("\n", str($chatDescription)->after($grammar)->toString()))
+        ->filter(fn (string $line): bool => str_starts_with($line, '- '))
+        ->mapWithKeys(fn (string $line): array => [str($line)->after('- ')->before(' (')->toString() => $line]);
+
+    expect(array_values(array_diff($registry, LogicFilter::KEYWORDS)))->toEqualCanonicalizing([...array_keys($published), 'custom_fields'])
+        ->and($lines->keys()->all())->toEqualCanonicalizing([...array_keys($published), ...array_keys($customFields)])
+        ->and(filterDescription($mcpTool))->toContain($grammar)
+        ->and($chatDescription)->toStartWith($grammar);
+
+    foreach ($published as $name => $entry) {
+        expect($lines[$name])->toContain("({$entry['type']}", 'operators: '.implode(', ', $entry['operators']), 'example: '.CustomFieldFilterSchema::json($entry['example']));
+
+        if (isset($entry['entity'])) {
+            expect($lines[$name])->toContain("{$entry['type']} to {$entry['entity']};");
+        }
+
+        if (isset($entry['values'])) {
+            expect($lines[$name])->toContain('one of: '.implode(', ', $entry['values']));
+        }
+
+        if (isset($entry['operand'])) {
+            expect($lines[$name])->toContain("takes {$entry['operand']}");
+        }
+    }
+
+    foreach ($customFields as $code => $entry) {
+        expect($lines[$code])->toContain("({$entry['name']}, {$entry['type']};", 'operators: '.implode(', ', $entry['operators']), 'example: '.CustomFieldFilterSchema::json($entry['example']));
+
+        if (isset($entry['sub_fields'])) {
+            expect($lines[$code])->toContain('sub-field domain: '.implode(', ', $entry['sub_fields']['domain']));
+        }
+
+        if (isset($entry['matching'])) {
+            expect($lines[$code])->toContain("values match {$entry['matching']}");
+        }
+
+        if (isset($entry['options'])) {
+            expect($lines[$code])->toContain('one of: "'.implode('", "', $entry['options']).'"');
+        }
+    }
+})->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[8]], crmSurfaces()));
+
+it('publishes exactly the filter names the list action accepts for each entity', function (CrmEntity $entity, string $chatTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $universe = collect(CrmEntity::cases())
+        ->flatMap(fn (CrmEntity $case): array => array_keys(EntityFilters::definitions($case)))
+        ->push('custom_fields')
+        ->unique()
+        ->values();
+    $publishedText = preg_replace('/\([^)]*\)|\{[^}]*\}/', '', EntityFilters::grammar($entity));
+
+    expect($universe->count())->toBeGreaterThan(count(EntityFilters::definitions($entity)));
+
+    foreach ($universe as $name) {
+        $published = preg_match('/(?<![\w$])'.preg_quote($name, '/').'(?!\w)/', $publishedText) === 1;
+        $error = json_decode(resolve($chatTool)->handle(new ChatRequest(['filter' => [$name => ['$is_empty' => true]]])), true)['error'] ?? '';
+
+        expect($published)->toBe(! str_contains($error, 'Unknown filter'), "{$entity->value}: {$name}");
+    }
 })->with(array_map(fn (array $row): array => [$row[0], $row[6]], crmSurfaces()));
+
+it('states every filter limit from the constants on every surface', function (CrmEntity $entity, string $chatTool, string $mcpTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $limits = [
+        FilterTree::MAX_CONDITIONS.' conditions',
+        FilterTree::MAX_LOGIC_DEPTH.' levels of $and, $or and $not',
+        FilterTree::MAX_HOPS.' levels of relations',
+        CustomFieldFilterSchema::MAX_LIST_VALUES.' values',
+    ];
+
+    expect(EntityFilters::grammar($entity))->toContain(...$limits)
+        ->and(filterDescription($mcpTool))->toContain(...$limits)
+        ->and(filterDescription($chatTool))->toContain(...$limits);
+})->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[8]], crmSurfaces()));
+
+it('states the matching, emptiness and operand rules on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $rules = [
+        CustomFieldFilterSchema::EMPTINESS_RULE,
+        CustomFieldFilterSchema::EMPTY_MATCH_RULE,
+        CustomFieldType::TAGS_INPUT->filterMatching(),
+        CustomFieldType::PHONE->filterMatching(),
+    ];
+
+    expect(filterDescription($mcpTool))->toContain(...$rules)
+        ->and(filterDescription($chatTool))->toContain(...$rules)
+        ->and(resolve($schemaResource)->toSchema($user)['usage'])->toContain(...$rules);
+})->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[7], $row[8]], crmSurfaces()));
 
 it('publishes filter examples the list action accepts on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     Sanctum::actingAs($user);
 
-    $example = json_encode(EntityFilters::example($entity));
+    app(CreateCustomField::class)->execute($user, [
+        'entity_type' => $entity->value,
+        'name' => 'Probe',
+        'code' => 'probe',
+        'type' => 'text',
+    ]);
+
     $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
-    $customFieldExamples = array_map(fn (array $field): array => ['custom_fields' => [$field['code'] => $field['example']]], array_map(fn (string $code, array $field): array => [...$field, 'code' => $code], array_keys($vocabulary['custom_fields']), $vocabulary['custom_fields']));
-    $chatDescription = resolve($chatTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
-    $mcpDescription = resolve($mcpTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
-    $usage = resolve($schemaResource)->toSchema($user)['usage'];
+    $customFields = $vocabulary['custom_fields'];
+    unset($vocabulary['custom_fields']);
 
-    $chatExamples = [$example, ...array_map(json_encode(...), array_slice($customFieldExamples, 0, 1))];
+    $filters = [EntityFilters::example($entity)];
+    $known = [CustomFieldFilterSchema::json(EntityFilters::example($entity)), CustomFieldFilterSchema::json(CustomFieldFilterSchema::DOMAIN_EXAMPLE)];
 
-    expect($mcpDescription)->toContain($example)
-        ->and($usage)->toContain($example)
-        ->and($chatDescription)->toContain(...$chatExamples);
+    foreach ($vocabulary as $name => $entry) {
+        $filters[] = [$name => $entry['example']];
+        array_push($known, CustomFieldFilterSchema::json($entry['example']), CustomFieldFilterSchema::json([$name => $entry['example']]));
+    }
 
-    foreach ([EntityFilters::example($entity), ...$customFieldExamples] as $filter) {
+    foreach ($customFields as $code => $entry) {
+        $filters[] = ['custom_fields' => [$code => $entry['example']]];
+        array_push($known, CustomFieldFilterSchema::json($entry['example']), CustomFieldFilterSchema::json(['custom_fields' => [$code => $entry['example']]]));
+
+        if (isset($entry['sub_fields'])) {
+            $filters[] = ['custom_fields' => [$code => CustomFieldFilterSchema::DOMAIN_EXAMPLE]];
+        }
+    }
+
+    $texts = [
+        filterDescription($mcpTool),
+        filterDescription($chatTool),
+        str(resolve($schemaResource)->toSchema($user)['usage'])->before(' Write example:')->toString(),
+    ];
+
+    expect($customFields)->toHaveKey('probe')
+        ->and($filters)->toContain(['custom_fields' => ['probe' => $customFields['probe']['example']]]);
+
+    foreach ($texts as $text) {
+        foreach (jsonFragments($text) as $fragment) {
+            expect($known)->toContain(normalizedJson($fragment));
+        }
+    }
+
+    foreach ($filters as $filter) {
         RelaticleServer::actingAs($user)->tool($mcpTool, ['filter' => $filter])->assertHasNoErrors();
 
         expect(json_decode(resolve($chatTool)->handle(new ChatRequest(['filter' => $filter])), true))->not->toHaveKey('error');

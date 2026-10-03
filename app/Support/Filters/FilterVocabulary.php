@@ -39,6 +39,11 @@ final readonly class FilterVocabulary
                 $entry['values'] = array_map(static fn (BackedEnum $case): string => (string) $case->value, $definition->enumClass::cases());
             }
 
+            if ($definition->operand() !== null) {
+                $entry['operand'] = $definition->operand();
+            }
+
+            $entry['example'] = $definition->example();
             $vocabulary[$name] = $entry;
         }
 
@@ -84,7 +89,7 @@ final readonly class FilterVocabulary
                 $entry['options'] = $options;
             }
 
-            $entry['example'] = $this->example($operators, $options);
+            $entry['example'] = $this->example($field, $options);
             $entries[$code] = $entry;
         }
 
@@ -92,18 +97,21 @@ final readonly class FilterVocabulary
     }
 
     /**
-     * @param  list<string>  $operators
      * @param  list<string>  $options
      * @return array<string, mixed>
      */
-    private function example(array $operators, array $options): array
+    private function example(?CustomField $field, array $options): array
     {
-        $listOperator = array_find(['$in', '$has_any'], static fn (string $operator): bool => in_array($operator, $operators, true));
-
-        if ($options !== [] && $listOperator !== null) {
-            return [$listOperator => [$options[0]]];
+        if (! $field instanceof CustomField) {
+            return ['$is_empty' => false];
         }
 
-        return ['$is_empty' => false];
+        $example = CustomFieldType::tryFrom($field->type)?->filterExample() ?? [];
+
+        if ($example !== [] && $this->optionMap->translates($field)) {
+            $example = $options === [] ? [] : [array_key_first($example) => [$options[0]]];
+        }
+
+        return $example === [] ? ['$is_empty' => false] : $example;
     }
 }

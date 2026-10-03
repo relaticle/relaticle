@@ -24,9 +24,9 @@ use stdClass;
  */
 final readonly class CustomFieldSchema
 {
-    private const string WRITE_USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags match the exact stored value.';
+    private const string WRITE_USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID.';
 
-    private const string FILTER_USAGE = 'Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object such as {"$not_in": ["Done"]} or {"$is_empty": true}. Names, operators and options are listed in filterable_fields.';
+    private const string FILTER_USAGE = 'Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object. Names, operators, operands and options are listed in filterable_fields.';
 
     public function __construct(private FilterVocabulary $vocabulary) {}
 
@@ -35,8 +35,9 @@ final readonly class CustomFieldSchema
         return implode(' ', [
             self::WRITE_USAGE,
             self::FILTER_USAGE,
+            EntityFilters::limits(),
             CustomFieldFilterSchema::valueRules(),
-            'Filter example: '.json_encode(EntityFilters::example($entity)).'.',
+            'Filter example: '.CustomFieldFilterSchema::json(EntityFilters::example($entity)).'.',
         ]);
     }
 

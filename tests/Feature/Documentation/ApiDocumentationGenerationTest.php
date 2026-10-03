@@ -78,7 +78,7 @@ it('generates the complete API documentation with company ownership fields', fun
         $filter = $spec['paths']["/api/v1/{$path}/query"]['post']['requestBody']['content']['application/json']['schema']['properties']['filter'];
 
         expect($filter['examples'][0])->toBe(EntityFilters::example($entity))
-            ->and($filter['description'])->toBe(EntityFilters::grammar());
+            ->and($filter['description'])->toBe(EntityFilters::grammar($entity));
 
         $this->postJson("/api/v1/{$path}/query", ['filter' => $filter['examples'][0]])->assertOk();
     }
@@ -91,7 +91,7 @@ it('generates the complete API documentation with company ownership fields', fun
 
     expect($customFieldFilter)->not->toBeNull()
         ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([])
-        ->and($customFieldFilter['description'])->toContain(CustomFieldFilterSchema::valueRules(), CustomFieldType::PHONE->filterMatching(), 'domain sub-field with $in or $not_in');
+        ->and($customFieldFilter['description'])->toContain(CustomFieldFilterSchema::valueRules(), EntityFilters::limits(), CustomFieldType::PHONE->filterMatching(), CustomFieldType::TAGS_INPUT->filterMatching(), 'domain sub-field with $in or $not_in');
 });
 
 it('generates the API documentation before the database is migrated', function (): void {
