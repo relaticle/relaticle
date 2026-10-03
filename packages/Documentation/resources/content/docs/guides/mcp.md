@@ -275,7 +275,7 @@ Native fields and relations sit at the top level. Custom fields sit under `custo
 | Tasks | `title`, `created_at`, `updated_at`, `creation_source`, `assigned_to_me` | `companies`, `people`, `opportunities` | `creator`, `assignees` |
 | Notes | `title`, `created_at`, `updated_at`, `creation_source` | `companies`, `people`, `opportunities` | `creator` |
 
-`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators, and a bare date such as `2026-10-01` compares the UTC calendar date. `creation_source` is a single choice with the values `web`, `system`, `import`, `api`, `mcp`, `chat` and `mailbox`. `stale_days` takes `{"$gte": 30}`, whole days without activity. `assigned_to_me` takes `{"$eq": true}`.
+`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators, and a bare date such as `2026-10-01` compares the UTC calendar date. `creation_source` is a single choice with the values `web`, `system`, `import`, `api`, `mcp`, `chat` and `mailbox`. `stale_days` matches opportunities by whole days without activity, as in `{"$gte": 30}`. `assigned_to_me` takes `{"$eq": true}`.
 
 #### Combine conditions
 
@@ -312,7 +312,7 @@ Email and link fields also take a `domain` sub-field with `$in` and `$not_in`. I
 
 - Choice values take the option label or its ID. An unknown label returns an error listing the valid labels. An ambiguous label asks for the option ID.
 - Email and link values match in any letter case.
-- Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0102`. An operand without one is an error that names its position.
+- Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
 - `$not_in` and `$has_none` also match records where the field is empty.
 
@@ -352,8 +352,8 @@ Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool
 
 `get-crm-schema-tool` returns `filterable_fields` for one entity type. It holds three parts:
 
-- Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`.
-- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule, any `sub_fields` and an `example`.
+- Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`. Relations, member relations and `stale_days` add an `operand` that states what they accept.
+- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
 - `custom_fields` lists each filterable custom field by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
 
 #### Filter errors

@@ -57,7 +57,7 @@ Each record resource supports list, create, read, update and delete. Responses f
 
 ## Filter a list
 
-Every list endpoint takes a `filter` object. It can combine native fields, custom fields and linked records with `$and`, `$or` and `$not`. The [MCP guide](/developers/mcp) describes the full grammar, and the MCP server and the in-app assistant read the same filter.
+The list endpoints for companies, people, opportunities, tasks and notes take a `filter` object. It can combine native fields, custom fields and linked records with `$and`, `$or` and `$not`. The [MCP guide](/developers/mcp) describes the full grammar, and the MCP server and the in-app assistant read the same filter.
 
 `GET /v1/companies?filter[name][$contains]=Acme` sends a filter in the query string, as nested brackets. The query string carries every value as text, and Relaticle converts it to the type of the field.
 
@@ -71,7 +71,7 @@ POST /v1/tasks/query
 POST /v1/notes/query
 ```
 
-The body is a JSON object. It takes `filter`, `sort`, `include`, `per_page`, and `page` or `cursor`. Every key is optional, and an empty object returns every record.
+The body is a JSON object. It takes `filter`, `sort`, `include`, `per_page`, and `page` or `cursor`. Every key is optional, and an empty object returns the first page of records, 15 by default.
 
 ```bash
 curl https://api.relaticle.com/v1/opportunities/query \
@@ -89,9 +89,9 @@ curl https://api.relaticle.com/v1/opportunities/query \
   }'
 ```
 
-The response has the same shape as the matching `GET` list. To fetch the next page, send the same body with the next `page`. To page by cursor, send `cursor` with the value from `links.next` in the previous response.
+The response has the same shape as the matching `GET` list. To fetch the next page, send the same body with the next `page`. To page by cursor, send `cursor` with the `meta.next_cursor` value from the previous response, in the same body. The `links` URLs in a response cannot be fetched with `GET`, so page a query by sending the body again.
 
-A body that is not a JSON object returns `422`. That includes truncated JSON, a bare string, a list, and a body sent without the `application/json` content type.
+A body that is not a JSON object returns `422`. That includes truncated JSON, a bare string or number, and a body sent without the `application/json` content type. An empty body counts as no filter.
 
 ## Upsert: find or create a record
 
