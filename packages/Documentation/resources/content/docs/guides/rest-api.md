@@ -108,7 +108,7 @@ The value matches case-insensitively, including inside multi-value fields. The A
 
 ## API rate limits
 
-Each workspace can make 600 requests a minute. Each token can make 300 reads and 60 writes a minute. A filter query counts as a read. Every authenticated response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. Over a limit, the API returns `429` with a `Retry-After` header giving the seconds to wait.
+Each workspace can make 600 requests a minute. Each token can make 300 reads and 60 writes a minute. The API counts a filter query as a read. Every authenticated API response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. Over a limit, the API returns `429` with a `Retry-After` header giving the seconds to wait.
 
 ## Errors
 
