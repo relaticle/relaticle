@@ -95,7 +95,7 @@ final class TaskSchemaResource extends Resource implements ProvidesEntitySchema
                 'peopleCount' => 'Count of related people',
                 'opportunitiesCount' => 'Count of related opportunities',
             ],
-            'usage' => 'Pass custom field values in the "custom_fields" object using field codes as keys. Use "filter" param in list tools to filter by custom field values with operators.',
+            'usage' => CustomFieldSchema::USAGE,
         ];
     }
 }

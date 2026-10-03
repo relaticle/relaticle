@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
-use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CustomFields\RecordNameResolver;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -22,18 +23,15 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
-use Relaticle\Chat\Services\Tools\CustomFieldsFilterTranslator;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
-use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Spatie\QueryBuilder\Exceptions\InvalidQuery;
 
 abstract class BaseReadListTool implements Tool
 {
     use LocalisesDatetimes;
-    use NormalizesToolInput;
     use ReportsValidationFailures;
 
     /**
@@ -73,17 +71,11 @@ abstract class BaseReadListTool implements Tool
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
 
-    abstract protected function searchFilterName(): string;
+    abstract protected function entity(): CrmEntity;
 
     abstract protected function citationType(): string;
 
     abstract public function description(): string;
-
-    /** @return array<string, mixed> */
-    protected function additionalSchema(JsonSchema $schema): array
-    {
-        return [];
-    }
 
     /**
      * Related collections rows may carry under `included`, keyed by relation
@@ -99,12 +91,6 @@ abstract class BaseReadListTool implements Tool
         return [];
     }
 
-    /** @return array<string, mixed> */
-    protected function additionalFilters(Request $request): array
-    {
-        return [];
-    }
-
     /**
      * Native columns every entity can be sorted by; custom-field codes are added
      * per tenant.
@@ -113,7 +99,7 @@ abstract class BaseReadListTool implements Tool
      */
     protected function nativeSorts(): array
     {
-        return [$this->searchFilterName(), 'created_at', 'updated_at'];
+        return [$this->entity()->titleColumn(), 'created_at', 'updated_at'];
     }
 
     public function schema(JsonSchema $schema): array
@@ -121,31 +107,24 @@ abstract class BaseReadListTool implements Tool
         $user = auth()->user();
         $entityType = $this->citationType();
 
-        $customFieldsDescription = 'Filter by custom field values.';
+        $filterDescription = EntityFilters::GRAMMAR;
         $sortable = $this->nativeSorts();
 
         if ($user instanceof User) {
             $describer = resolve(CustomFieldsFilterDescriber::class);
-            $customFieldsDescription = $describer->describe($user, $entityType);
+            $filterDescription .= "\n\n".$describer->describe($user, $entityType);
             $sortable = array_merge($sortable, $describer->sortableCodes($user, $entityType));
         }
 
-        $fields = array_merge(
-            ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
-            $this->additionalSchema($schema),
-            [
-                'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
-                'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
-                'creation_source' => $schema->string()->enum(CreationSource::values())->description(CreationSource::filterDescription()),
-                'custom_fields' => $schema->object()->description($customFieldsDescription),
-                'sort' => $schema->string()->description(
-                    'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
-                ),
-                'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
-                'page' => $schema->integer()->description('Page number.')->default(1),
-                'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
-            ],
-        );
+        $fields = [
+            'filter' => $schema->object()->description($filterDescription),
+            'sort' => $schema->string()->description(
+                'Sort by one of: '.implode(', ', $sortable).'. Prefix with "-" for descending (e.g. "-created_at").',
+            ),
+            'per_page' => $schema->integer()->description('Results per page (default 10, max 25).')->default(10),
+            'page' => $schema->integer()->description('Page number.')->default(1),
+            'lookup' => $schema->boolean()->description('Set true when you call this only to find ids for another tool call (e.g. before an update or delete): the user then sees no table. Leave unset when the user asked to see the records.'),
+        ];
 
         $includes = $this->availableIncludes();
 
@@ -181,12 +160,7 @@ abstract class BaseReadListTool implements Tool
         }
 
         try {
-            $httpRequest = $this->buildHttpRequest($user, $request);
-        } catch (ValidationException $exception) {
-            return $this->validationError($exception);
-        }
-
-        try {
+            $httpRequest = $this->buildHttpRequest($request);
             $action = app()->make($this->actionClass());
             $results = $action->execute(
                 user: $user,
@@ -194,6 +168,8 @@ abstract class BaseReadListTool implements Tool
                 page: isset($request['page']) ? (int) $request['page'] : null,
                 request: $httpRequest,
             );
+        } catch (ValidationException $exception) {
+            return $this->validationError($exception);
         } catch (InvalidQuery $e) {
             return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
@@ -430,7 +406,7 @@ abstract class BaseReadListTool implements Tool
 
         $workspace = $user->currentWorkspace;
         $entityType = $this->citationType();
-        $coreKey = $this->searchFilterName();
+        $coreKey = $this->entity()->titleColumn();
 
         // Nothing stops a workspace from coding a custom field `name` or `title`.
         // Left in, it would emit the core column twice and its cell would
@@ -603,7 +579,8 @@ abstract class BaseReadListTool implements Tool
      */
     private function promotedCodes(Request $request): array
     {
-        $customFields = $request['custom_fields'] ?? null;
+        $filter = $request['filter'] ?? null;
+        $customFields = is_array($filter) ? ($filter['custom_fields'] ?? null) : null;
 
         $codes = is_array($customFields) ? array_map(strval(...), array_keys($customFields)) : [];
 
@@ -651,52 +628,14 @@ abstract class BaseReadListTool implements Tool
         return $ordered;
     }
 
-    /**
-     * @throws ValidationException
-     */
-    private function creationSourceFilter(Request $request): ?string
-    {
-        $value = $request['creation_source'] ?? null;
-
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        if (! is_string($value) || ! CreationSource::tryFrom($value) instanceof CreationSource) {
-            throw ValidationException::withMessages([
-                'creation_source' => 'creation_source must be one of: '.implode(', ', CreationSource::values()).'.',
-            ]);
-        }
-
-        return $value;
-    }
-
-    /**
-     * @throws ValidationException
-     */
-    private function buildHttpRequest(User $user, Request $request): HttpRequest
+    private function buildHttpRequest(Request $request): HttpRequest
     {
         $input = [];
 
-        $nativeFilters = $this->dropNull(array_merge(
-            [
-                $this->searchFilterName() => $request['search'] ?? null,
-                'created_after' => $request['created_after'] ?? null,
-                'created_before' => $request['created_before'] ?? null,
-                'creation_source' => $this->creationSourceFilter($request),
-            ],
-            $this->additionalFilters($request),
-        ));
+        $filter = $request['filter'] ?? null;
 
-        $customFields = resolve(CustomFieldsFilterTranslator::class)
-            ->translate($user, $this->citationType(), $request['custom_fields'] ?? null);
-
-        if ($customFields !== []) {
-            $nativeFilters['custom_fields'] = $customFields;
-        }
-
-        if ($nativeFilters !== []) {
-            $input['filter'] = $nativeFilters;
+        if (is_array($filter) && $filter !== []) {
+            $input['filter'] = $filter;
         }
 
         $sort = $request['sort'] ?? null;

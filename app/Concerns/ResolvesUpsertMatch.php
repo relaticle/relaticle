@@ -8,6 +8,7 @@ use App\Actions\CustomFields\FindEntitiesByFieldValue;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFields\CanonicalValue;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Collection;
@@ -167,15 +168,13 @@ trait ResolvesUpsertMatch
         return is_string($code) ? $this->matchableFields()->get($code) : null;
     }
 
-    // Panel writes store the field type's form (a link loses its scheme) while the API stores
-    // values as sent, so both spellings can be on file. The stored form comes first.
+    // Rows written before values were normalized on every write can still hold the spelling as sent.
     /** @return array<int, string> */
     private function matchValues(CustomField $field, string $value): array
     {
         $value = trim($value);
-        $stored = CustomFieldsType::getFieldTypeInstance($field->type)?->setValue($value) ?? $value;
 
-        return array_values(array_unique([$stored, $value]));
+        return array_values(array_unique([CanonicalValue::of($field, $value), $value]));
     }
 
     /** @return Collection<string, CustomField> */

@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Support;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\CustomFields\CanonicalValue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\ImportWizard\Data\EntityLink;
@@ -187,7 +188,7 @@ final class EntityLinkResolver
         $valueColumn = $customField->getValueColumn();
 
         return $valueColumn === 'json_value'
-            ? $this->resolveViaJsonColumn($link, $customField->getKey(), $uniqueValues)
+            ? $this->resolveViaJsonColumn($link, $customField, $uniqueValues)
             : CustomFieldValue::query()
                 ->withoutGlobalScopes()
                 ->where('tenant_id', $this->workspaceId)
@@ -213,11 +214,14 @@ final class EntityLinkResolver
      * @param  array<string>  $uniqueValues
      * @return array<string, int|string>
      */
-    private function resolveViaJsonColumn(EntityLink $link, int|string $customFieldId, array $uniqueValues): array
+    private function resolveViaJsonColumn(EntityLink $link, CustomField $customField, array $uniqueValues): array
     {
         if ($uniqueValues === []) {
             return [];
         }
+
+        $canonicalByOriginal = $this->canonicalByOriginal($customField, $uniqueValues);
+        $lookupValues = array_values(array_unique([...array_map(strval(...), array_keys($canonicalByOriginal)), ...array_values($canonicalByOriginal)]));
 
         $model = new CustomFieldValue;
         $connection = $model->getConnection();
@@ -227,7 +231,7 @@ final class EntityLinkResolver
         $accessibleEntities = $this->accessibleEntities($link)->toBase();
         $results = [];
 
-        foreach (array_chunk($uniqueValues, 5000) as $chunk) {
+        foreach (array_chunk($lookupValues, 5000) as $chunk) {
             $lowerChunk = array_map(mb_strtolower(...), $chunk);
             $placeholders = implode(',', array_fill(0, count($lowerChunk), '?'));
 
@@ -269,7 +273,7 @@ final class EntityLinkResolver
 
             $sql .= " AND cfv.entity_id IN ({$accessibleEntities->toSql()})";
             $bindings = array_merge(
-                [$this->workspaceId, $customFieldId, $link->targetEntity],
+                [$this->workspaceId, $customField->getKey(), $link->targetEntity],
                 $lowerChunk,
                 $accessibleEntities->getBindings(),
             );
@@ -282,7 +286,32 @@ final class EntityLinkResolver
             }
         }
 
-        return $results;
+        $matched = [];
+
+        foreach ($canonicalByOriginal as $original => $canonical) {
+            $id = $results[$original] ?? $results[$canonical] ?? null;
+
+            if ($id !== null) {
+                $matched[(string) $original] = $id;
+            }
+        }
+
+        return $matched;
+    }
+
+    /**
+     * @param  array<string>  $uniqueValues
+     * @return array<string, string>
+     */
+    private function canonicalByOriginal(CustomField $customField, array $uniqueValues): array
+    {
+        $canonicalByOriginal = [];
+
+        foreach ($uniqueValues as $value) {
+            $canonicalByOriginal[mb_strtolower($value)] = mb_strtolower(CanonicalValue::of($customField, $value));
+        }
+
+        return $canonicalByOriginal;
     }
 
     /** @param  array<mixed>  $values */

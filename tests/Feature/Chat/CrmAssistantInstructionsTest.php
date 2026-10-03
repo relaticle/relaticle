@@ -293,7 +293,7 @@ it('removes all sample data in one approval but lets a partial removal use the c
 
     expect($instructions)
         ->toContain('wants all the sample data gone, call RemoveSampleDataTool')
-        ->toContain('To remove only part of it ("just the sample contacts"), list those records with `creation_source: "system"`');
+        ->toContain('To remove only part of it ("just the sample contacts"), list those records with `filter: {"creation_source": {"$eq": "system"}}`');
 });
 
 it('renders the workspace_state block naming the seeded sample count when the workspace holds only sample records', function (): void {

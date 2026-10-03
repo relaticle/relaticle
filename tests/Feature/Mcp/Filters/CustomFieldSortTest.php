@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Mcp\Filters\CustomFieldSort;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
+use App\Support\Filters\CustomFieldSort;
 use Illuminate\Http\Request;
 use Spatie\QueryBuilder\AllowedSort;
 use Spatie\QueryBuilder\QueryBuilder;

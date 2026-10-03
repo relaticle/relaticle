@@ -7,6 +7,7 @@ use App\Http\Resources\V1\Concerns\FormatsCustomFields;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\Note\CreateNoteTool;
 use App\Mcp\Tools\Note\GetNoteTool;
 use App\Mcp\Tools\Task\CreateTaskTool;
@@ -31,6 +32,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Tests\Helpers\LegacyCompanyDomains;
 
 mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
@@ -526,7 +528,7 @@ it('sets then clears a value for every writable custom field type', function (st
     'currency' => ['currency', 1500.5, 1500.5],
     'email' => ['email', ['ada@example.com'], ['ada@example.com']],
     'phone' => ['phone', ['+14155552671'], ['+14155552671']],
-    'link' => ['link', ['https://example.com'], ['https://example.com']],
+    'link' => ['link', ['https://example.com'], ['example.com']],
     'checkbox' => ['checkbox', true, true],
     'toggle' => ['toggle', true, true],
     'tags-input' => ['tags-input', ['priority', 'customer'], ['priority', 'customer']],
@@ -604,4 +606,20 @@ describe('rich editor images', function (): void {
             ->assertSee(signedUrlSignature($media->refresh()->getUrl()))
             ->assertDontSee('stale');
     });
+});
+
+it('accepts a company resubmitting its own legacy domain while another company holds the canonical form', function (): void {
+    ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateCompanyTool::class, ['id' => $own->getKey(), 'custom_fields' => ['domains' => ['https://acme.com']]])
+        ->assertOk();
+});
+
+it('rejects a domain another company holds in a different spelling', function (): void {
+    ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateCompanyTool::class, ['id' => $own->getKey(), 'custom_fields' => ['domains' => ['https://acme.com', 'www.other.com']]])
+        ->assertHasErrors();
 });

@@ -153,6 +153,27 @@ it('matches a domain the api stored with its scheme', function (): void {
         ->and(Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
 });
 
+it('matches one company however its domain is written', function (string $matchValue): void {
+    Sanctum::actingAs($this->user);
+
+    $created = $this->postJson('/api/v1/companies/upsert', [
+        'match' => ['field' => 'domains', 'value' => 'acme.com'],
+        'name' => 'Acme Corp',
+    ])->assertCreated();
+
+    $this->postJson('/api/v1/companies/upsert', [
+        'match' => ['field' => 'domains', 'value' => $matchValue],
+        'name' => 'Acme Corporation',
+    ])->assertOk()->assertJsonPath('data.id', $created->json('data.id'));
+
+    expect(Company::query()->withoutGlobalScopes()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
+})->with([
+    'url with www' => 'https://www.acme.com',
+    'www host' => 'www.acme.com',
+    'trailing slash' => 'acme.com/',
+    'url with path' => 'https://acme.com/about',
+]);
+
 it('stores the matched domain on the company it creates', function (): void {
     Sanctum::actingAs($this->user);
 
@@ -220,7 +241,7 @@ it('answers 503 without writing when a concurrent upsert of the same domain hold
     $this->assertDatabaseMissing('companies', ['name' => 'Acme Corp', 'workspace_id' => $this->workspace->id]);
 
     $lock->release();
-})->with(['Acme.com', 'https://ACME.com']);
+})->with(['Acme.com', 'https://ACME.com', 'https://www.acme.com/about']);
 
 it('matches an existing company on a second domain', function (): void {
     Sanctum::actingAs($this->user);

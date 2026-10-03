@@ -56,7 +56,7 @@ it('can delete an opportunity via MCP tool', function (): void {
     expect($opportunity->refresh()->trashed())->toBeTrue();
 });
 
-it('can filter opportunities by contact_id', function (): void {
+it('can filter opportunities by contact', function (): void {
     $person = People::factory()->recycle([$this->user, $this->workspace])->create();
     $matchingOpp = Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
         'contact_id' => $person->id,
@@ -65,7 +65,7 @@ it('can filter opportunities by contact_id', function (): void {
 
     RelaticleServer::actingAs($this->user)
         ->tool(ListOpportunitiesTool::class, [
-            'contact_id' => $person->id,
+            'filter' => ['contact' => ['$in' => [$person->id]]],
         ])
         ->assertOk()
         ->assertSee($matchingOpp->name)
@@ -152,7 +152,7 @@ describe('stale filtering', function () {
         Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Active Deal']);
 
         RelaticleServer::actingAs($this->user)
-            ->tool(ListOpportunitiesTool::class, ['stale_days' => 30])
+            ->tool(ListOpportunitiesTool::class, ['filter' => ['stale_days' => ['$gte' => 30]]])
             ->assertOk()
             ->assertSee('Stale Deal')
             ->assertDontSee('Active Deal');

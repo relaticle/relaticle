@@ -13,11 +13,15 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\MatchableField;
+use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -178,6 +182,49 @@ it('updates the live record when a deleted record shares its import identity', f
     'contact phone' => [ImportEntityType::People, 'phone_number', '+14155550127'],
     'company domain' => [ImportEntityType::Company, 'domains', 'northline.example'],
 ])->with(['deleted first' => true, 'deleted last' => false]);
+
+it('re-imports a value written in another format as an update of the stored record', function (ImportEntityType $entityType, string $fieldCode, string $stored, string $csvValue): void {
+    $modelClass = $entityType->importer((string) $this->workspace->id)->modelClass();
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', $entityType->value)
+        ->where('code', $fieldCode)
+        ->firstOrFail();
+
+    $record = $modelClass::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->withJsonValue([$stored])->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => $entityType->value,
+        'entity_id' => $record->id,
+        'tenant_id' => $this->workspace->id,
+    ]);
+
+    ImportExecutionFixture::readyStore($this, ['Name', 'Identity'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Updated import record', 'Identity' => $csvValue]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Identity', target: "custom_fields_{$fieldCode}"),
+    ], $entityType);
+
+    new ResolveMatchesJob($this->import->id)->handle();
+
+    $row = $this->store->query()->firstOrFail();
+    expect($row->match_action)->toBe(RowMatchAction::Update)
+        ->and($row->matched_id)->toBe((string) $record->id);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->created_rows->toBe(0)
+        ->updated_rows->toBe(1)
+        ->failed_rows->toBe(0)
+        ->and($record->fresh()->name)->toBe('Updated import record')
+        ->and($modelClass::query()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
+})->with([
+    'contact phone' => [ImportEntityType::People, 'phone_number', '+14155550100', '+1 415-555-0100'],
+    'company domain' => [ImportEntityType::Company, 'domains', 'northline.example', 'https://www.Northline.example/pricing'],
+]);
 
 // --- Multi-Choice Merge Tests ---
 
@@ -357,6 +404,95 @@ it('populates matching custom field when auto-creating company via domain MatchO
     expect($cfv)->not->toBeNull()
         ->and($cfv->json_value)->toBeInstanceOf(Collection::class)
         ->and($cfv->json_value->all())->toBe(['example.com']);
+});
+
+it('stores an auto-created company domain in its canonical form and matches it on re-import', function (string $csvCell): void {
+    $importCompanyRow = function (string $cell): void {
+        $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+
+        ImportExecutionFixture::readyStore($this, ['Name', 'Company'], [
+            ImportExecutionFixture::row(2, ['Name' => 'John Doe', 'Company' => $cell], ['match_action' => RowMatchAction::Create->value]),
+        ], [
+            ColumnData::toField(source: 'Name', target: 'name'),
+            $column,
+        ]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        ImportExecutionFixture::run($this);
+    };
+
+    $importCompanyRow($csvCell);
+    $firstImport = $this->import;
+
+    $importCompanyRow($csvCell);
+    ImportStore::delete($firstImport->id);
+    $firstImport->delete();
+
+    $companies = Company::query()->where('workspace_id', $this->workspace->id)->get();
+    $domainField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    expect($companies)->toHaveCount(1)
+        ->and(People::query()->where('workspace_id', $this->workspace->id)->where('company_id', $companies->first()->id)->count())->toBe(2)
+        ->and(collect(ImportExecutionFixture::customFieldValue($this, (string) $companies->first()->id, (string) $domainField->id)->json_value)->all())->toBe(['acme.com']);
+})->with([
+    'url with path' => 'https://www.Acme.com/pricing',
+    'bare host' => 'acme.com',
+]);
+
+it('matches a legacy-format value by the identical csv value and a canonical value by a formatted one', function (string $stored, string $csvValue): void {
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'phone_number')
+        ->firstOrFail();
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->withJsonValue([$stored])->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->workspace->id,
+    ]);
+
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'people', targetModelClass: People::class);
+    $resolved = (new EntityLinkResolver((string) $this->workspace->id))
+        ->batchResolve($link, MatchableField::phone(), [$csvValue]);
+
+    expect((string) $resolved[$csvValue])->toBe((string) $person->id);
+})->with([
+    'legacy value, identical csv value' => ['+1 415-555-0100', '+1 415-555-0100'],
+    'canonical value, formatted csv value' => ['+14155550100', '+1 (415) 555-0100'],
+]);
+
+it('prefers the record storing the exact csv value over one storing its canonical form', function (): void {
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'phone_number')
+        ->firstOrFail();
+    $legacy = People::factory()->create(['workspace_id' => $this->workspace->id]);
+    $canonical = People::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    foreach ([[$legacy, '+1 415-555-0100'], [$canonical, '+14155550100']] as [$person, $stored]) {
+        CustomFieldValue::factory()->withJsonValue([$stored])->create([
+            'custom_field_id' => $field->id,
+            'entity_type' => 'people',
+            'entity_id' => $person->id,
+            'tenant_id' => $this->workspace->id,
+        ]);
+    }
+
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'people', targetModelClass: People::class);
+    $resolved = (new EntityLinkResolver((string) $this->workspace->id))
+        ->batchResolve($link, MatchableField::phone(), ['+1 415-555-0100']);
+
+    expect((string) $resolved['+1 415-555-0100'])->toBe((string) $legacy->id);
 });
 
 it('does not populate custom field when auto-creating via name matcher', function (): void {

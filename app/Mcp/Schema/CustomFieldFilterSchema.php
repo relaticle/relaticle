@@ -5,35 +5,26 @@ declare(strict_types=1);
 namespace App\Mcp\Schema;
 
 use App\Enums\CustomFieldType;
-use App\Mcp\Filters\CustomFieldSort;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\Filters\CustomFieldSort;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Spatie\QueryBuilder\AllowedSort;
 
 final readonly class CustomFieldFilterSchema
 {
-    /** @var array<int, string> */
-    private const array EXCLUDED_TYPES = [
-        CustomFieldType::FILE_UPLOAD->value,
-        CustomFieldType::RECORD->value,
-        CustomFieldType::TEXTAREA->value,
-        CustomFieldType::RICH_EDITOR->value,
-    ];
+    public const int MAX_LIST_VALUES = 100;
 
     /** @var array<int, string> */
-    private const array NUMERIC_OPERATORS = ['eq', 'gt', 'gte', 'lt', 'lte'];
+    private const array NUMERIC_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte'];
 
     /** @var array<int, string> */
-    private const array STRING_OPERATORS = ['eq', 'contains'];
+    private const array STRING_OPERATORS = ['$eq', '$contains'];
 
     /** @var array<int, string> */
-    private const array BOOLEAN_OPERATORS = ['eq'];
-
-    /** @var array<int, string> */
-    private const array MULTI_OPERATORS = ['has_any'];
+    private const array BOOLEAN_OPERATORS = ['$eq'];
 
     /**
      * @return array<string, array<string, mixed>>
@@ -44,16 +35,10 @@ final readonly class CustomFieldFilterSchema
         $schema = [];
 
         foreach ($fields as $field) {
-            $operators = self::operatorsForType($field->type);
-
-            if ($operators === []) {
-                continue;
-            }
-
             $schema[$field->code] = [
                 'type' => 'object',
                 'description' => $field->name,
-                'properties' => $operators,
+                'properties' => self::operatorsForType($field->type),
             ];
         }
 
@@ -70,8 +55,15 @@ final readonly class CustomFieldFilterSchema
             ->all();
     }
 
+    public static function isFilterable(CustomField $field): bool
+    {
+        return $field->active
+            && ! $field->settings->encrypted
+            && self::operatorsForType($field->type) !== [];
+    }
+
     /**
-     * @return array<string, array<string, string|array<string, mixed>>>
+     * @return array<string, array<string, mixed>>
      */
     public static function operatorsForType(string $type): array
     {
@@ -81,36 +73,41 @@ final readonly class CustomFieldFilterSchema
             return [];
         }
 
-        return match ($fieldType) {
+        $operators = match ($fieldType) {
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK,
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['$has_any', '$has_none']),
             CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
             CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),
-            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
-            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string'),
+            CustomFieldType::DATE => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date'),
+            CustomFieldType::DATE_TIME => self::buildOperators(self::NUMERIC_OPERATORS, 'string', 'date-time'),
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
-            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => array_merge(
-                self::buildOperators(['eq'], 'string'),
-                ['in' => ['type' => 'array', 'items' => ['type' => 'string']]],
-            ),
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(self::MULTI_OPERATORS, 'string'),
+            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
+                ...self::buildOperators(['$eq'], 'string'),
+                ...self::listOperators(['$in', '$not_in']),
+            ],
             default => [],
         };
+
+        return $operators === [] ? [] : [...$operators, '$is_empty' => ['type' => 'boolean']];
     }
 
     /**
      * @param  array<int, string>  $operators
      * @return array<string, array<string, string>>
      */
-    private static function buildOperators(array $operators, string $jsonType): array
+    private static function buildOperators(array $operators, string $jsonType, ?string $format = null): array
     {
-        $result = [];
+        return array_fill_keys($operators, array_filter(['type' => $jsonType, 'format' => $format]));
+    }
 
-        foreach ($operators as $op) {
-            $result[$op] = ['type' => $jsonType];
-        }
-
-        return $result;
+    /**
+     * @param  array<int, string>  $operators
+     * @return array<string, array<string, mixed>>
+     */
+    private static function listOperators(array $operators): array
+    {
+        return array_fill_keys($operators, ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => self::MAX_LIST_VALUES]);
     }
 
     /**
@@ -124,9 +121,7 @@ final readonly class CustomFieldFilterSchema
         /** @var Collection<int, CustomField> */
         return Cache::remember($cacheKey, McpSchemaCache::TTL, fn (): Collection => resolve(WorkspaceCustomFields::class)
             ->forEntity($workspace, $entityType)
-            ->filter(fn (CustomField $field): bool => $field->active
-                && ! in_array($field->type, self::EXCLUDED_TYPES, true)
-                && ! $field->settings->encrypted)
+            ->filter(self::isFilterable(...))
             ->map(fn (CustomField $field): CustomField => $field->withoutRelations())
             ->values());
     }

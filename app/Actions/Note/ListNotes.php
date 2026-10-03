@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Note;
 
-use App\Mcp\Filters\CustomFieldFilter;
+use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Note;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -39,15 +38,7 @@ final readonly class ListNotes
             Note::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
-            ->allowedFilters(
-                AllowedFilter::partial('title'),
-                AllowedFilter::scope('notable_type', 'forNotableType'),
-                AllowedFilter::scope('notable_id', 'forNotableId'),
-                CustomFieldFilter::allowedFilter('note'),
-                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '>=', $value)),
-                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('notes.created_at', '<=', $value)),
-                AllowedFilter::exact('creation_source', 'notes.creation_source'),
-            )
+            ->allowedFilters(...new EntityFilters($user)->for(CrmEntity::Note))
             ->allowedFields('id', 'title', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(
                 'creator', 'companies', 'people', 'opportunities',

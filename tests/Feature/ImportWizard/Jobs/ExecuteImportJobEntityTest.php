@@ -274,5 +274,5 @@ it('imports company with custom field values for toggle and link', function (): 
 
     $linkedinCfv = ImportExecutionFixture::customFieldValue($this, (string) $company->id, (string) $linkedinCf->id);
     expect($linkedinCfv)->not->toBeNull()
-        ->and(collect($linkedinCfv->json_value)->all())->toContain('https://linkedin.com/company/great');
+        ->and(collect($linkedinCfv->json_value)->all())->toContain('linkedin.com/company/great');
 });

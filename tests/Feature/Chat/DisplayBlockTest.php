@@ -165,6 +165,7 @@ function forceDisplaySettings(User $user, string $entityType, string $code, arra
         'visible_in_list' => true,
         'list_toggleable_hidden' => false,
         'visible_in_view' => true,
+        'additional' => $field->settings->additional,
         ...$settings,
     ]);
     $field->save();
@@ -496,19 +497,19 @@ it('emits no block when the list matches no records', function (): void {
 it('keeps a long link value whole so a card href cannot break', function (): void {
     $user = $this->user;
 
-    forceDisplaySettings($user, 'company', 'domains');
+    forceDisplaySettings($user, 'company', 'linkedin');
 
-    $long = 'https://example.com/?ref='.str_repeat('a', 600);
+    $long = 'example.com/?ref='.str_repeat('a', 600);
 
     $company = app(CreateCompany::class)->execute($user, [
         'name' => 'Acme',
-        'custom_fields' => ['domains' => [$long]],
+        'custom_fields' => ['linkedin' => ["https://{$long}"]],
     ]);
 
     $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
 
-    expect(blockFieldValue($card, 'Domains'))->toBe($long)
-        ->and(blockFieldValues($card, 'Domains'))->toBe([$long]);
+    expect(blockFieldValue($card, 'LinkedIn'))->toBe($long)
+        ->and(blockFieldValues($card, 'LinkedIn'))->toBe([$long]);
 });
 
 it('carries choice option names as a values list so the card renders chips', function (): void {
@@ -688,7 +689,7 @@ it('promotes a filtered hidden field to the first column', function (): void {
     $unfiltered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([])));
 
     $filtered = displayBlockOf(app(ListOpportunitiesTool::class)->handle(new Request([
-        'custom_fields' => ['deal_source' => ['eq' => 'Referral']],
+        'filter' => ['custom_fields' => ['deal_source' => ['$eq' => 'Referral']]],
     ])));
 
     expect(blockColumnKeys($unfiltered))->not->toContain('deal_source')
@@ -777,7 +778,7 @@ it('strips display_block from the replayed agent history while the row keeps it'
 it('emits no block when the list is called in lookup mode, keeping the data for chaining', function (): void {
     app(CreateCompany::class)->execute($this->user, ['name' => 'Lookup Co']);
 
-    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request(['search' => 'Lookup', 'lookup' => true])), true);
+    $decoded = json_decode(app(ListCompaniesTool::class)->handle(new Request(['filter' => ['name' => ['$contains' => 'Lookup']], 'lookup' => true])), true);
 
     expect($decoded)->not->toHaveKey('display_block')
         ->and($decoded['data'][0]['attributes']['name'])->toBe('Lookup Co');

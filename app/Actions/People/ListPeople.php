@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\People;
 
-use App\Mcp\Filters\CustomFieldFilter;
+use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\People;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
-use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\AllowedInclude;
 use Spatie\QueryBuilder\QueryBuilder;
 
@@ -39,14 +38,7 @@ final readonly class ListPeople
             People::query()->withCustomFieldValues()->whereBelongsTo($user->currentWorkspace),
             $request,
         )
-            ->allowedFilters(
-                AllowedFilter::partial('name'),
-                AllowedFilter::exact('company_id'),
-                CustomFieldFilter::allowedFilter('people'),
-                AllowedFilter::callback('created_after', fn (Builder $query, string $value) => $query->whereDate('people.created_at', '>=', $value)),
-                AllowedFilter::callback('created_before', fn (Builder $query, string $value) => $query->whereDate('people.created_at', '<=', $value)),
-                AllowedFilter::exact('creation_source', 'people.creation_source'),
-            )
+            ->allowedFilters(...new EntityFilters($user)->for(CrmEntity::People))
             ->allowedFields('id', 'name', 'company_id', 'creator_id', 'created_at', 'updated_at')
             ->allowedIncludes(
                 'creator', 'company',

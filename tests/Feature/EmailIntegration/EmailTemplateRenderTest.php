@@ -155,7 +155,7 @@ it('renders people custom field merge tags for phone number job title and linked
     $result = app(EmailTemplateRenderService::class)->render($template, $person);
 
     expect($result['subject'])->toBe('Account Executive at ')
-        ->and($result['body_html'])->toBe('<p>Jane Doe | +1 555 0100 | https://linkedin.com/in/jane-doe</p>');
+        ->and($result['body_html'])->toBe('<p>Jane Doe | +15550100 | linkedin.com/in/jane-doe</p>');
 });
 
 it('renders {name} for a Company record', function (): void {

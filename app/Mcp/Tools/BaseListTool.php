@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
-use App\Enums\CreationSource;
 use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -40,48 +40,15 @@ abstract class BaseListTool extends Tool
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
 
-    abstract protected function searchFilterName(): string;
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function additionalSchema(JsonSchema $schema): array
-    {
-        return [];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function additionalFilters(Request $request): array
-    {
-        return [];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    protected function additionalValidationRules(User $user): array
-    {
-        return [];
-    }
-
     public function schema(JsonSchema $schema): array
     {
-        return array_merge(
-            ['search' => $schema->string()->description("Search by {$this->searchFilterName()}.")],
-            $this->additionalSchema($schema),
-            [
-                'created_after' => $schema->string()->description('Only return records created on or after this date (YYYY-MM-DD).'),
-                'created_before' => $schema->string()->description('Only return records created on or before this date (YYYY-MM-DD).'),
-                'creation_source' => $schema->string()->enum(CreationSource::values())->description(CreationSource::filterDescription()),
-                'filter' => $schema->object()->description('Filter by custom field values. Keys are field codes, values are operator objects (eq, gt, gte, lt, lte, contains, in, has_any).'),
-                'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
-                'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
-                'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
-                'page' => $schema->integer()->description('Page number (max 1,000,000).')->default(1),
-            ],
-        );
+        return [
+            'filter' => $schema->object()->description(EntityFilters::GRAMMAR.' Native fields and relations sit at the top level of filter. Custom field codes go under filter.custom_fields, and filterable_fields in get-crm-schema lists those codes with their operators and options. Example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}.'),
+            'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
+            'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
+            'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
+            'page' => $schema->integer()->description('Page number (max 1,000,000).')->default(1),
+        ];
     }
 
     public function outputSchema(JsonSchema $schema): array
@@ -105,13 +72,8 @@ abstract class BaseListTool extends Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $validated = $request->validate(array_merge([
-            'search' => ['sometimes', 'string', 'max:255'],
-            'created_after' => ['sometimes', Rule::date()->format('Y-m-d')],
-            'created_before' => ['sometimes', Rule::date()->format('Y-m-d'), 'after_or_equal:created_after'],
-            'creation_source' => ['sometimes', Rule::enum(CreationSource::class)],
+        $validated = $request->validate([
             'filter' => ['sometimes', $this->objectRule(allowEmpty: true)],
-            'filter.*' => [$this->objectRule(allowEmpty: false)],
             'sort' => ['sometimes', 'array:field,direction', 'required_array_keys:field'],
             'sort.field' => ['string'],
             'sort.direction' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
@@ -119,7 +81,7 @@ abstract class BaseListTool extends Tool
             'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
             'include' => ['sometimes', 'array', 'list', 'max:20'],
             'include.*' => ['string', 'distinct'],
-        ], $this->additionalValidationRules($user)));
+        ]);
 
         $requestedIncludes = $request->get('include');
         $toManyIncludes = is_array($requestedIncludes)
@@ -213,24 +175,10 @@ abstract class BaseListTool extends Tool
     {
         $input = [];
 
-        $nativeFilters = array_filter(array_merge(
-            [
-                $this->searchFilterName() => $mcpRequest->get('search'),
-                'created_after' => $mcpRequest->get('created_after'),
-                'created_before' => $mcpRequest->get('created_before'),
-                'creation_source' => $mcpRequest->get('creation_source'),
-            ],
-            $this->additionalFilters($mcpRequest),
-        ));
+        $filter = $mcpRequest->get('filter');
 
-        if ($nativeFilters !== []) {
-            $input['filter'] = $nativeFilters;
-        }
-
-        $customFieldFilters = $mcpRequest->get('filter');
-
-        if (is_array($customFieldFilters) && $customFieldFilters !== []) {
-            $input['filter']['custom_fields'] = $customFieldFilters;
+        if (is_array($filter) && $filter !== []) {
+            $input['filter'] = $filter;
         }
 
         $sort = $mcpRequest->get('sort');

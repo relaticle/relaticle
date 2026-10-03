@@ -21,7 +21,7 @@ final class ListCompaniesTool extends BaseReadListTool
 
     public function description(): string
     {
-        return 'List companies in the CRM with optional search and pagination.';
+        return 'List companies in the CRM with optional filters and pagination.';
     }
 
     protected function actionClass(): string
@@ -32,11 +32,6 @@ final class ListCompaniesTool extends BaseReadListTool
     protected function resourceClass(): string
     {
         return CompanyResource::class;
-    }
-
-    protected function searchFilterName(): string
-    {
-        return 'name';
     }
 
     protected function entity(): CrmEntity

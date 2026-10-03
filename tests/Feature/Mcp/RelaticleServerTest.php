@@ -192,13 +192,13 @@ it('validates company_id and contact_id exist when creating opportunity via MCP'
     $response->assertHasErrors(['company id', 'contact id']);
 });
 
-it('can filter companies by name via MCP search param', function (): void {
+it('can filter companies by name via the MCP filter param', function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beta Inc']);
 
     $response = RelaticleServer::actingAs($this->user)
         ->tool(ListCompaniesTool::class, [
-            'search' => 'Acme',
+            'filter' => ['name' => ['$contains' => 'Acme']],
         ]);
 
     $response->assertOk()
