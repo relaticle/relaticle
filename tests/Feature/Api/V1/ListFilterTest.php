@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\People\ListPeople;
 use App\Enums\CreationSource;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -10,10 +11,12 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use App\Support\Filters\EntityFilters;
 use App\Support\Filters\LogicFilter;
 use App\Support\Filters\NativeFilter;
 use App\Support\Filters\RelationFilter;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
 mutates(EntityFilters::class, LogicFilter::class, NativeFilter::class, RelationFilter::class);
@@ -27,6 +30,17 @@ beforeEach(function (): void {
 function listIds(mixed $test, string $entity, array $filter): array
 {
     return collect($test->getJson("/api/v1/{$entity}?".http_build_query(['filter' => $filter]))->assertOk()->json('data'))
+        ->pluck('id')
+        ->sort()
+        ->values()
+        ->all();
+}
+
+function listIdsWithoutWorkspaceContext(mixed $test, array $filter): array
+{
+    resolve(CurrentWorkspace::class)->forget();
+
+    return collect(resolve(ListPeople::class)->execute($test->user, filters: $filter)->items())
         ->pluck('id')
         ->sort()
         ->values()
@@ -273,11 +287,84 @@ it('rejects an empty logic node and a logic keyword without a list', function (a
 it('rejects an operator outside the link operators on a record relation', function (): void {
     $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['company' => ['$eq' => 'x']]]))
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['filter.company.$eq' => 'company takes $in, $not_in or $is_empty.']);
+        ->assertJsonValidationErrors(['filter.company.$eq' => 'company does not support $eq. Use $in, $not_in, $is_empty, or conditions on the related record.']);
 });
 
 it('rejects a nested node on a member relation', function (): void {
     $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['name' => ['$eq' => 'x']]]]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.assignees.name']);
+});
+
+it('applies a link $in and nested conditions to the same related record', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $bob = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id, 'name' => 'Bob']);
+    $alice = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id, 'name' => 'Alice']);
+    $orAliceOrZed = ['$or' => [['name' => ['$eq' => 'Alice']], ['name' => ['$eq' => 'Zed']]]];
+
+    expect(listIds($this, 'companies', ['people' => ['$in' => [$bob->id], 'name' => ['$eq' => 'Alice']]]))->toBe([])
+        ->and(listIds($this, 'companies', ['people' => ['$in' => [$alice->id], 'name' => ['$eq' => 'Alice']]]))->toBe([$company->id])
+        ->and(listIds($this, 'companies', ['people' => ['$in' => [$bob->id], ...$orAliceOrZed]]))->toBe([])
+        ->and(listIds($this, 'companies', ['people' => ['$in' => [$alice->id], ...$orAliceOrZed]]))->toBe([$company->id]);
+});
+
+it('keeps $not_in and $is_empty as statements about the whole link', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $bob = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id, 'name' => 'Bob']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id, 'name' => 'Alice']);
+
+    expect(listIds($this, 'companies', ['people' => ['$not_in' => [$bob->id], 'name' => ['$eq' => 'Alice']]]))->toBe([])
+        ->and(listIds($this, 'companies', ['people' => ['$is_empty' => false, 'name' => ['$eq' => 'Alice']]]))->toBe([$company->id]);
+});
+
+it('ignores a related record from another workspace when no workspace is ambient', function (): void {
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Company::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create(['name' => 'Foreign Holdings']);
+    Opportunity::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create(['company_id' => $foreign->id, 'name' => 'Foreign Deal']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    DB::table('people')->where('id', $person->id)->update(['company_id' => $foreign->id]);
+
+    expect(listIdsWithoutWorkspaceContext($this, ['company' => ['name' => ['$contains' => 'Foreign']]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['opportunities' => ['name' => ['$eq' => 'Foreign Deal']]]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['$in' => [$foreign->id]]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['$is_empty' => false]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['$is_empty' => true]]))->toBe([$person->id])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['$not_in' => [$foreign->id]]]))->toBe([$person->id]);
+});
+
+it('ignores a second-hop record from another workspace when no workspace is ambient', function (): void {
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreignDeal = Opportunity::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create(['name' => 'Foreign Deal']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+    DB::table('opportunities')->where('id', $foreignDeal->id)->update(['company_id' => $company->id]);
+
+    expect(listIdsWithoutWorkspaceContext($this, ['company' => ['opportunities' => ['name' => ['$eq' => 'Foreign Deal']]]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['opportunities' => ['$in' => [$foreignDeal->id]]]]))->toBe([])
+        ->and(listIdsWithoutWorkspaceContext($this, ['company' => ['opportunities' => ['$is_empty' => true]]]))->toBe([$person->id]);
+});
+
+it('counts a person whose company is trashed as having no company', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+    $company->delete();
+
+    expect(listIds($this, 'people', ['company' => ['$is_empty' => true]]))->toBe([$person->id])
+        ->and(listIds($this, 'people', ['company' => ['$is_empty' => false]]))->toBe([]);
+});
+
+it('keeps a top-level condition and an $or group in one workspace-bound conjunction', function (): void {
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $match = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'creation_source' => CreationSource::API]);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'creation_source' => CreationSource::MCP]);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex', 'creation_source' => CreationSource::API]);
+    Company::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create(['name' => 'Acme', 'creation_source' => CreationSource::API]);
+
+    expect(listIds($this, 'companies', [
+        'name' => ['$eq' => 'Acme'],
+        '$or' => [
+            ['creation_source' => ['$eq' => 'api']],
+            ['creation_source' => ['$eq' => 'web']],
+        ],
+    ]))->toBe([$match->id]);
 });

@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Validation\ValidationException;
 use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
@@ -73,6 +74,8 @@ final readonly class LogicFilter implements Filter
 
         $this->applyNode($matching, $registry, is_array($node) ? $node : []);
 
-        $query->whereNotIn($model->getQualifiedKeyName(), $matching);
+        $query->whereNotExists(fn (QueryBuilder $anti) => $anti
+            ->fromSub($matching, 'matched')
+            ->whereColumn("matched.{$model->getKeyName()}", $model->getQualifiedKeyName()));
     }
 }

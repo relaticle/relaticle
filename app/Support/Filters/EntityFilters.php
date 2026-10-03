@@ -68,7 +68,7 @@ final readonly class EntityFilters
         foreach (self::definitions($entity) as $name => $definition) {
             $filters[] = TreeAllowedFilter::custom($name, match ($definition->kind) {
                 FilterKind::Text, FilterKind::DateTime, FilterKind::Enum => new NativeFilter($definition),
-                FilterKind::Members, FilterKind::Relation => new RelationFilter($definition, $this),
+                FilterKind::Members, FilterKind::Relation => new RelationFilter($definition, $this, $this->user),
                 FilterKind::Computed => new ($definition->filterClass)($this->user),
             });
         }

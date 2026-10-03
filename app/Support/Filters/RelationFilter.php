@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Support\Filters;
 
 use App\Enums\CrmEntity;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Spatie\QueryBuilder\AllowedFilter;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -20,6 +22,7 @@ final readonly class RelationFilter implements Filter
     public function __construct(
         private FilterDefinition $definition,
         private EntityFilters $filters,
+        private User $user,
     ) {}
 
     /**
@@ -32,38 +35,65 @@ final readonly class RelationFilter implements Filter
         }
 
         $linkOperators = array_flip(FilterDefinition::LINK_OPERATORS);
-
-        foreach (array_intersect_key($value, $linkOperators) as $operator => $operand) {
-            $operator = (string) $operator;
-
-            match ($operator) {
-                '$in' => $query->whereHas($property, fn (Builder $related): Builder => $related->whereKey($this->ids($property, $operator, $operand))),
-                '$not_in' => $query->whereDoesntHave($property, fn (Builder $related): Builder => $related->whereKey($this->ids($property, $operator, $operand))),
-                default => $this->emptiness($query, $property, $operand),
-            };
-        }
-
         $nested = array_diff_key($value, $linkOperators);
+        $registry = $nested === [] ? [] : $this->nestedRegistry($property, $nested);
+        $in = array_key_exists('$in', $value) ? $this->ids($property, '$in', $value['$in']) : null;
 
-        if ($nested === []) {
-            return;
+        if ($in !== null || $nested !== []) {
+            $query->whereHas($property, function (Builder $related) use ($in, $registry, $nested): void {
+                $this->bounded($related);
+
+                if ($in !== null) {
+                    $related->whereKey($in);
+                }
+
+                if ($nested !== []) {
+                    $this->applyNode($related, $registry, $nested);
+                }
+            });
         }
 
-        if (! $this->definition->related instanceof CrmEntity) {
+        if (array_key_exists('$not_in', $value)) {
+            $notIn = $this->ids($property, '$not_in', $value['$not_in']);
+
+            $query->whereDoesntHave($property, fn (Builder $related): Builder => $this->bounded($related)->whereKey($notIn));
+        }
+
+        if (array_key_exists('$is_empty', $value)) {
+            $this->emptiness($query, $property, $value['$is_empty']);
+        }
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $nested
+     * @return list<AllowedFilter>
+     */
+    private function nestedRegistry(string $property, array $nested): array
+    {
+        $related = $this->definition->related;
+
+        if (! $related instanceof CrmEntity) {
             throw FilterErrors::at((string) array_key_first($nested), __('validation.filter.members_ids_only', ['name' => $property]));
         }
 
         $stray = array_find_key($nested, static fn (mixed $condition, int|string $key): bool => str_starts_with((string) $key, '$') && ! in_array($key, LogicFilter::KEYWORDS, true));
 
         if ($stray !== null) {
-            throw FilterErrors::at((string) $stray, __('validation.filter.members_ids_only', ['name' => $property]));
+            throw FilterErrors::at((string) $stray, __('validation.filter.relation_operator', ['name' => $property, 'operator' => $stray]));
         }
 
-        $registry = $this->filters->for($this->definition->related);
+        return $this->filters->for($related);
+    }
 
-        $query->whereHas($property, function (Builder $related) use ($registry, $nested): void {
-            $this->applyNode($related, $registry, $nested);
-        });
+    /**
+     * @param  Builder<Model>  $related
+     * @return Builder<Model>
+     */
+    private function bounded(Builder $related): Builder
+    {
+        return $this->definition->related instanceof CrmEntity
+            ? $related->whereBelongsTo($this->user->currentWorkspace)
+            : $related;
     }
 
     /**
@@ -89,6 +119,10 @@ final readonly class RelationFilter implements Filter
     {
         $empty = Operand::boolean($operand) ?? throw FilterErrors::at('$is_empty', __('validation.filter.operand_type', ['name' => "{$property} \$is_empty", 'expected' => 'true or false']));
 
-        $empty ? $query->whereDoesntHave($property) : $query->whereHas($property);
+        $inWorkspace = fn (Builder $related): Builder => $this->bounded($related);
+
+        $empty
+            ? $query->whereDoesntHave($property, $inWorkspace)
+            : $query->whereHas($property, $inWorkspace);
     }
 }

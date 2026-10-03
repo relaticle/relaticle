@@ -242,7 +242,7 @@ it('rejects malformed list tool inputs before building the database query', func
     'task assigned to me' => [ListTasksTool::class, ['filter' => ['assigned_to_me' => ['$eq' => 'maybe']]], 'assigned_to_me takes'],
     'task not assigned to me' => [ListTasksTool::class, ['filter' => ['assigned_to_me' => ['$eq' => false]]], 'assigned_to_me takes'],
     'task assignees' => [ListTasksTool::class, ['filter' => ['assignees' => ['$gte' => 'user-id']]], 'assignees takes $in, $not_in or $is_empty'],
-    'note relation' => [ListNotesTool::class, ['filter' => ['companies' => ['$eq' => 'x']]], 'companies takes $in, $not_in or $is_empty'],
+    'note relation' => [ListNotesTool::class, ['filter' => ['companies' => ['$eq' => 'x']]], 'companies does not support $eq. Use $in, $not_in, $is_empty, or conditions on the related record'],
 ]);
 
 it('computes task due status in the caller timezone', function (): void {

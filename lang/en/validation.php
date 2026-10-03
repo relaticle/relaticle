@@ -56,6 +56,7 @@ return [
         'members_ids_only' => ':name takes $in, $not_in or $is_empty.',
         'stale_days' => 'stale_days takes {"$gte": <whole days from 1 to :max>}.',
         'assigned_to_me' => 'assigned_to_me takes {"$eq": true}.',
+        'relation_operator' => ':name does not support :operator. Use $in, $not_in, $is_empty, or conditions on the related record.',
         'node_object' => 'Each condition must be an object of field conditions.',
         'logic_list' => ':keyword takes a non-empty list of condition objects.',
         'unknown_name' => 'Unknown filter :name. Use one of: :available.',
