@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's 39 MCP tools, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-10-01"
+updated: "2026-10-04"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update contacts, and more -- all from a natural conversation.
@@ -183,7 +183,7 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `list-companies-tool` | List companies with optional search by name and pagination |
+| `list-companies-tool` | List companies with an optional filter, sort and pagination |
 | `get-company-tool` | Get a single company by ID with full details and relationships |
 | `create-company-tool` | Create a new company (requires `name`) |
 | `update-company-tool` | Update a company by ID |
@@ -193,7 +193,7 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `list-people-tool` | List contacts with optional search, filter by company |
+| `list-people-tool` | List contacts with an optional filter, sort and pagination |
 | `get-people-tool` | Get a single person by ID with full details and relationships |
 | `create-people-tool` | Create a new contact (requires `name`, optional `company_id`) |
 | `update-people-tool` | Update a contact by ID |
@@ -203,7 +203,7 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `list-opportunities-tool` | List deals with optional search, filter by company |
+| `list-opportunities-tool` | List deals with an optional filter, sort and pagination |
 | `get-opportunity-tool` | Get a single opportunity by ID with full details and relationships |
 | `create-opportunity-tool` | Create a new deal (requires `name`, optional `company_id`, `contact_id`) |
 | `update-opportunity-tool` | Update a deal by ID |
@@ -213,7 +213,7 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `list-tasks-tool` | List tasks with optional search by title |
+| `list-tasks-tool` | List tasks with an optional filter, sort and pagination |
 | `get-task-tool` | Get a single task by ID with full details and relationships |
 | `create-task-tool` | Create a new task (requires `title`) |
 | `update-task-tool` | Update a task by ID |
@@ -225,7 +225,7 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `list-notes-tool` | List notes with optional search by title |
+| `list-notes-tool` | List notes with an optional filter, sort and pagination |
 | `get-note-tool` | Get a single note by ID with full details and relationships |
 | `create-note-tool` | Create a new note (requires `title`) |
 | `update-note-tool` | Update a note by ID |
@@ -242,27 +242,125 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 
 Uploads stay pending for 24 hours. Saving a record whose rich-editor body embeds the file claims it; unclaimed files are purged.
 
-Entity list tools support `search`, `per_page` (default 15, maximum 25), and `page`. They also support date filters, custom-field filters, sorting, and selected relationship includes.
+Entity list tools take `filter`, `sort`, `include`, `per_page` (default 15, maximum 25) and `page`. `sort` is an object with `field` and `direction` (`asc` or `desc`). `include` is a list of singular relationships or relationship counts. To find records by words across every entity, use the `search` tool.
 
 List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs.
 
-### Filter by custom fields
+### Filter records
 
-Pass `filter` as an object keyed by field code. Each value is an operator object. `get-crm-schema-tool` lists the operators for every field under `filterable_fields`, and every choice option under `custom_fields`.
+Pass `filter` to a list tool to narrow the records it returns. A filter is a JSON object. The [REST API](/developers/rest-api) and the in-app assistant read the same filter.
+
+Every key in a filter is one of these:
+
+| Key | Meaning |
+|---|---|
+| `$and`, `$or`, `$not` | Logic |
+| `$eq`, `$in`, `$contains` and the other operators | A test on the field or relation around it |
+| A native field such as `name` or `created_at` | A condition on one of the record's own columns |
+| A relation such as `company` or `assignees` | A condition on linked records |
+| `custom_fields` | Conditions on your custom fields, keyed by field code |
+| A sub-field such as `domain` | One part of an email or link value |
+
+A key that starts with `$` is a keyword. Every other key is a name. There is no shorthand: `{"stage": "Won"}` is an error, and so is an operator without its `$`.
+
+Native fields and relations sit at the top level. Custom fields sit under `custom_fields`, so a custom field coded `name` never collides with the native `name`.
+
+#### Native fields and relations
+
+| Entity | Native fields | Record relations | Member relations |
+|---|---|---|---|
+| Companies | `name`, `created_at`, `updated_at`, `creation_source` | `people`, `opportunities` | `creator`, `accountOwner` |
+| People | `name`, `created_at`, `updated_at`, `creation_source` | `company` | `creator` |
+| Opportunities | `name`, `created_at`, `updated_at`, `creation_source`, `stale_days` | `company`, `contact` | `creator` |
+| Tasks | `title`, `created_at`, `updated_at`, `creation_source`, `assigned_to_me` | `companies`, `people`, `opportunities` | `creator`, `assignees` |
+| Notes | `title`, `created_at`, `updated_at`, `creation_source` | `companies`, `people`, `opportunities` | `creator` |
+
+`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators, and a bare date such as `2026-10-01` compares the UTC calendar date. `creation_source` is a single choice with the values `web`, `system`, `import`, `api`, `mcp`, `chat` and `mailbox`. `stale_days` takes `{"$gte": 30}`, whole days without activity. `assigned_to_me` takes `{"$eq": true}`.
+
+#### Combine conditions
+
+- Keys in one object combine with AND.
+- `$or` takes a list of condition objects and returns records that match any of them.
+- `$and` takes a list too. Use it when one object would need two `$or` keys.
+- `$not` takes one condition object. It returns every record that object does not return, including records where the field is empty.
+- An empty `$and` or `$or` list, an empty `$not` object and an empty relation node are errors. An empty filter means no filter.
+
+#### Filter through a relation
+
+A relation node holds the same filter grammar, applied to the related records. The names inside it belong to the related entity.
+
+- Record relations take `$in`, `$not_in` (record IDs) and `$is_empty`, or conditions on the related record.
+- Member relations take `$in`, `$not_in` (member IDs) and `$is_empty`. Member names and emails are not filterable.
+- A to-many relation matches when at least one related record matches. Every condition in one relation node applies to the same related record. To find records with none, wrap the node in `$not`.
+- Relations nest at most 2 levels, such as `company` then `people`.
+
+#### Operators by field type
+
+Native fields take the operators of the field type they match. `$is_empty` takes `true` or `false`.
 
 | Field type | Operators |
 |---|---|
-| Single choice (select, radio, toggle buttons) | `eq`, `in`, `not_in`, `is_empty` |
-| Multi choice (multi select, checkbox list), tags, email, phone, link | `has_any`, `has_none`, `is_empty` |
-| Text | `eq`, `contains`, `is_empty` |
-| Number, currency, date, date and time | `eq`, `gt`, `gte`, `lt`, `lte`, `is_empty` |
-| Checkbox, toggle | `eq`, `is_empty` |
+| Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
+| Multi choice (multi select, checkbox list), tags, email, phone, link | `$has_any`, `$has_none`, `$is_empty` |
+| Text | `$eq`, `$contains`, `$is_empty` |
+| Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
+| Checkbox, toggle | `$eq`, `$is_empty` |
 
-Select, radio, toggle buttons, multi select and checkbox list values take the option label or its ID. An unknown label returns an error listing the valid labels. An ambiguous label asks for the option ID. Tags, email, phone and link values match their exact stored value. `not_in` and `has_none` also match records where the field is empty. `is_empty` takes `true` or `false`. Conditions combine with AND, up to 10 per call and 100 values per list.
+Email and link fields also take a `domain` sub-field with `$in` and `$not_in`. It matches the domain of each value, so `{"domain": {"$in": ["canva.com"]}}` finds every address at `canva.com`. A domain is a bare host. A path, user or port is an error.
+
+#### How values match
+
+- Choice values take the option label or its ID. An unknown label returns an error listing the valid labels. An ambiguous label asks for the option ID.
+- Email and link values match in any letter case.
+- Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0102`. An operand without one is an error that names its position.
+- Tags match the exact stored value.
+- `$not_in` and `$has_none` also match records where the field is empty.
+
+#### Limits
+
+A filter holds at most 20 conditions, counted as every operator at any depth. It nests `$and`, `$or` and `$not` at most 3 levels and relations at most 2 levels. A list holds at most 100 values.
+
+#### Examples
+
+Deals worth at least 10,000 that sit in Proposal/Price Quote or Negotiation/Review. The condition outside `$or` combines with it by AND.
 
 ```json
-{"stage": {"not_in": ["Closed Won", "Closed Lost"]}, "amount": {"gte": 10000}}
+{
+  "custom_fields": {"amount": {"$gte": 10000}},
+  "$or": [
+    {"custom_fields": {"stage": {"$eq": "Proposal/Price Quote"}}},
+    {"custom_fields": {"stage": {"$eq": "Negotiation/Review"}}}
+  ]
+}
 ```
+
+Deals at companies with the `icp` toggle on. `company` is a relation, so its node holds conditions on the company, including its custom fields.
+
+```json
+{"company": {"custom_fields": {"icp": {"$eq": true}}}}
+```
+
+People with an email address at one domain. This works the same for a link field.
+
+```json
+{"custom_fields": {"emails": {"domain": {"$in": ["canva.com"]}}}}
+```
+
+Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool` to read yours.
+
+#### Read the filter vocabulary
+
+`get-crm-schema-tool` returns `filterable_fields` for one entity type. It holds three parts:
+
+- Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`.
+- `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule, any `sub_fields` and an `example`.
+- `custom_fields` lists each filterable custom field by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
+
+#### Filter errors
+
+An invalid filter returns an error that names the part to fix. For example, an unknown custom field code returns `"stagee" is not a filterable custom field on opportunity. Available: amount, close_date, stage.` A bare operator returns `Operators start with $. Use $eq.`
+
+The flat names of the earlier filter no longer exist. Inside `filter`, keys such as `search`, `created_after`, `company_id` and `assignee_ids` return an error that names the replacement, for example `company_id was replaced. Use company (or companies) with $in.`
 
 ---
 

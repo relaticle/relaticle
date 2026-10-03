@@ -2,7 +2,7 @@
 title: Find anything with search and filters
 description: Find instructions for searching Relaticle records and filtering lists of companies, people, opportunities, tasks and notes.
 order: 7
-updated: "2026-10-01"
+updated: "2026-10-04"
 related: [help/getting-started/use-custom-fields, help/getting-started/import-your-existing-data]
 ---
 
@@ -50,3 +50,7 @@ Follow these steps to check it.
 
 The **Searchable** setting has no effect on the filter panel. See
 [Use custom fields](/help/getting-started/use-custom-fields) for every field setting.
+
+## Filter through the API, MCP or the assistant
+
+The filter panel is one way to narrow a list. The REST API, the MCP server and the in-app assistant use a `filter` object instead. It filters by native fields and custom fields, combines conditions with AND, OR and NOT, and follows links between records. Read [the MCP guide](/developers/mcp) for the full grammar.
