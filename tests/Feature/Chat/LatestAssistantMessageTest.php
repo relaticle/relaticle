@@ -3,14 +3,19 @@
 declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
+use App\Enums\Plan;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\CreditService;
+use Tests\Helpers\AnthropicSse;
 use Tests\Helpers\ChatDocument;
 
 function latestAssistantSeedConversation(User $user, string $title = 'T'): string
@@ -64,6 +69,41 @@ it('returns the persisted latest assistant message for reconciliation', function
     $result = $component->instance()->latestAssistantMessage();
 
     expect($result['content'])->toBe('Final answer');
+});
+
+it('returns the acknowledgement that replaced a blank reply', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    $conversationId = latestAssistantSeedConversation($user);
+    $turnId = (string) Str::ulid();
+
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: $conversationId,
+        userId: (string) $user->getKey(),
+    );
+
+    AnthropicSse::fake(AnthropicSse::reply('', 'claude-sonnet-5'));
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'Here is part one of my notes.',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle(resolve(CreditService::class));
+
+    $this->actingAs($user);
+
+    $result = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])
+        ->instance()->latestAssistantMessage();
+
+    expect($result['content'])->toBe(__('Noted. Go on, or ask me a question.'));
 });
 
 it('returns still-pending proposal cards so a dropped tool_result can be reconciled (R7)', function (): void {

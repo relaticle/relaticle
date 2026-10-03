@@ -198,7 +198,7 @@ it('renders a human label for every tool the assistant can call', function (): v
     // have no mapping at all.
     $byName = array_combine($toolNames, $labels);
     expect($byName['ListCompaniesTool'])->toBe('Searching companies…')
-        ->and($byName['AddCustomFieldOptionsTool'])->toBe('Preparing new field options…')
+        ->and($byName['SetCustomFieldOptionsTool'])->toBe('Preparing field option changes…')
         ->and($byName['SearchDocsTool'])->toBe('Searching the documentation…');
 });
 

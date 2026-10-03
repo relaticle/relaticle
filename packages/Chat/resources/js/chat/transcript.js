@@ -1293,7 +1293,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     },
 
     canRetryTurn(index) {
-        return !this.precedingPromptHasAttachment(index);
+        return this.hasUserPrompt(index) && !this.precedingPromptHasAttachment(index);
     },
 
     canEdit(index) {

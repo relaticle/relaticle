@@ -9,9 +9,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 use Relaticle\Chat\Actions\DeleteChatAttachment;
 use Relaticle\Chat\Actions\ImportAttachment;
 use Relaticle\Chat\Actions\StoreChatAttachment;
+use Relaticle\Chat\Support\AttachedText;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
@@ -26,8 +28,11 @@ final readonly class ChatAttachmentController
 
     public function store(Request $request): JsonResponse
     {
+        $upload = $request->file('file');
+        $isText = $upload instanceof UploadedFile && AttachedText::accepts(StoreChatAttachment::originalName($upload));
+
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:'.StoreChatAttachment::MAX_KILOBYTES, 'mimes:csv,txt'],
+            'file' => ['required', 'file', 'max:'.StoreChatAttachment::MAX_KILOBYTES, Rule::unless($isText, 'mimes:csv,txt,md')],
             'conversation_id' => ['nullable', 'string', 'uuid'],
         ]);
 

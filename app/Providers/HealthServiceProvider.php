@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Health\ChatProviderCheck;
+use App\Health\ChatTurnFailureRateCheck;
 use Illuminate\Support\ServiceProvider;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
 use Spatie\Health\Checks\Checks\CacheCheck;
@@ -86,6 +87,8 @@ final class HealthServiceProvider extends ServiceProvider
             CacheCheck::new(),
 
             ...ChatProviderCheck::forConfiguredProviders(),
+
+            ChatTurnFailureRateCheck::new(),
         ]);
     }
 

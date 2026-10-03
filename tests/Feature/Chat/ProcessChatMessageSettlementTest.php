@@ -6,7 +6,10 @@ use App\Enums\Plan;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Ai\Contracts\ConversationStore;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -289,3 +292,163 @@ it('records a turn that died from a provider error as incomplete', function (): 
 
     expect($settlement->model)->toBe('incomplete');
 });
+
+it('refunds a turn that ends with no text and no tool call and stores an acknowledgement', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-8',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = '01TURNBLANKAAAAAAAAAAAAAAA';
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: 'c-8',
+        userId: (string) $user->getKey(),
+    );
+
+    AnthropicSse::fake(AnthropicSse::reply('', 'claude-sonnet-5'));
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user, workspace: $workspace, message: 'Here is part one of my notes.', conversationId: 'c-8',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle(resolve(CreditService::class));
+
+    $acknowledgement = __('Noted. Go on, or ask me a question.');
+
+    $resolution = AiCreditTransaction::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('idempotency_key', "resolve-{$turnId}")
+        ->sole();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
+
+    $assistant = DB::table('agent_conversation_messages')
+        ->where('conversation_id', 'c-8')
+        ->where('role', 'assistant')
+        ->sole();
+
+    expect($resolution->type)->toBe(AiCreditType::Refund)
+        ->and($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0)
+        ->and($assistant->content)->toBe($acknowledgement)
+        ->and(json_decode((string) $assistant->steps, true)[0]['content'])->toBe($acknowledgement)
+        ->and(json_decode((string) $assistant->document, true)['content'][0]['content'][0]['text'])->toBe($acknowledgement)
+        ->and(resolve(ConversationStore::class)->getLatestConversationMessages('c-8', 100)->last()->content)->toBe($acknowledgement);
+});
+
+it('still bills a turn that called a tool and wrote no text', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-9',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = '01TURNTOOLONLYAAAAAAAAAAAA';
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: 'c-9',
+        userId: (string) $user->getKey(),
+    );
+
+    Http::fake([
+        'api.anthropic.com/*' => Http::sequence()
+            ->push(AnthropicSse::toolUseStep('GetCrmSummaryTool'), 200, ['Content-Type' => 'text/event-stream'])
+            ->push(AnthropicSse::reply('', 'claude-sonnet-5'), 200, ['Content-Type' => 'text/event-stream']),
+    ]);
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user, workspace: $workspace, message: 'How is my pipeline?', conversationId: 'c-9',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle(resolve(CreditService::class));
+
+    $resolution = AiCreditTransaction::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('idempotency_key', "resolve-{$turnId}")
+        ->sole();
+
+    expect($resolution->type)->toBe(AiCreditType::Chat)
+        ->and($resolution->credits_charged)->toBe(2)
+        ->and(DB::table('agent_conversation_messages')->where('conversation_id', 'c-9')->where('role', 'assistant')->value('content'))->toBe('');
+});
+
+it('refunds a blank turn and stores copy chosen by how the model stopped', function (string $reply, string $stopReason, string $expected): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    DB::table('agent_conversations')->insert([
+        'id' => 'c-10',
+        'participant_type' => 'user',
+        'participant_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'Test conversation',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = '01TURNBLANKREASONAAAAAAAAA';
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: 'c-10',
+        userId: (string) $user->getKey(),
+    );
+
+    AnthropicSse::fake(AnthropicSse::reply($reply, 'claude-sonnet-5', $stopReason));
+    Queue::fake();
+
+    (new ProcessChatMessage(
+        user: $user, workspace: $workspace, message: 'Summarise everything.', conversationId: 'c-10',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turnId,
+    ))->handle(resolve(CreditService::class));
+
+    $resolution = AiCreditTransaction::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('idempotency_key', "resolve-{$turnId}")
+        ->sole();
+
+    $assistant = DB::table('agent_conversation_messages')
+        ->where('conversation_id', 'c-10')
+        ->where('role', 'assistant')
+        ->sole();
+
+    expect($resolution->type)->toBe(AiCreditType::Refund)
+        ->and($assistant->content)->toBe($expected)
+        ->and(json_decode((string) $assistant->steps, true)[0]['content'])->toBe($expected)
+        ->and(json_decode((string) $assistant->document, true)['content'][0]['content'][0]['text'])->toBe($expected);
+})->with([
+    'whitespace-only reply' => ["\n", 'end_turn', 'Noted. Go on, or ask me a question.'],
+    'ran out of room' => ['', 'max_tokens', 'This reply ran out of room before it said anything. Ask again, or ask for a shorter answer.'],
+    'declined by the model' => ['', 'refusal', 'The model declined to answer this. Try rephrasing your request.'],
+    'unrecognised stop reason' => ['', 'something_new', 'Noted. Go on, or ask me a question.'],
+]);

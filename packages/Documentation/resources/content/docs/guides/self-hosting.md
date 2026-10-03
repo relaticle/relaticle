@@ -147,7 +147,7 @@ There are two ways to run a self-hosted model, and you can use either or both:
 **Known limitations with self-hosted models:**
 
 - Cloud providers enforce one-write-proposal-at-a-time at the API level; self-hosted models have no equivalent switch, so this is enforced by prompt instructions only. Every write still requires your explicit approval before anything is saved.
-- Each response must complete within 120 seconds. If a slow model exceeds it, the turn stops cleanly. Your message stays in the conversation with a "didn't respond within the time limit" note and nothing is silently lost, so you can just retry. To avoid the limit, use a smaller/faster model or a GPU; "thinking" models like `qwen3` reason before answering and reach it sooner, so a non-thinking model or a shorter prompt helps for interactive use.
+- Each response must complete within 120 seconds. If a slow model exceeds it, the turn stops cleanly and nothing is silently lost. Your message stays in the conversation with a note that the reply hit the 120-second limit. Ask for a shorter answer, or for it in parts. To avoid the limit, use a smaller/faster model or a GPU; "thinking" models like `qwen3` reason before answering and reach it sooner, so a non-thinking model or a shorter prompt helps for interactive use.
 
 ### Feature Flags
 

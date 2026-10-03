@@ -65,7 +65,8 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         invite_workspace_member: 'Preparing a workspace invitation…',
         create_custom_field: 'Drafting a custom field…',
         update_custom_field: 'Preparing custom field changes…',
-        add_custom_field_options: 'Preparing new field options…',
+        set_custom_field_options: 'Preparing field option changes…',
+        delete_custom_field: 'Preparing custom field deletion…',
         ...toolLabels,
     },
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
@@ -108,6 +109,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             invocationId: null,
             streamError: null,
             retryable: false,
+            retryOnAuto: false,
             _needsSeparator: false,
             feedback: null,
             feedbackPanelOpen: false,
@@ -346,6 +348,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
                 if (!assistantMsg.content) {
                     assistantMsg.streamError = this.streamTexts.timeout;
                     assistantMsg.retryable = true;
+                    assistantMsg.retryOnAuto = false;
                 }
                 assistantMsg.rendered = true;
                 assistantMsg.prerendered = false;
@@ -584,6 +587,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             b.invocationId = null;
             b.streamError = event?.message || this.streamTexts.streamError;
             b.retryable = true;
+            b.retryOnAuto = event?.retryOnAuto === true;
             b.rendered = true;
             b.prerendered = false;
         }

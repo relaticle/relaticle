@@ -81,14 +81,12 @@ it('attaches a large csv, stores the handoff and lands on the mapping step', fun
     $page->script(<<<'JS'
         (() => {
             const wrapper = document.querySelector('[data-chat-context="conversation"][x-data*="chatEditor"]');
-            Alpine.$data(wrapper).setText('Import these');
             wrapper.closest('form').requestSubmit();
         })();
     JS);
 
     $page->waitForText("That's 40 rows.")
         ->assertVisible('[data-chat-context="conversation"] [data-user-attachment]')
-        ->assertVisible('[data-chat-context="conversation"] [data-user-text]')
         ->assertSee('Import as people');
 
     expect(DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->count())->toBe(2);

@@ -7,8 +7,9 @@ namespace Relaticle\Chat\Services;
 use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
-use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\CustomFields\DeleteCustomField;
+use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
@@ -35,6 +36,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
@@ -44,6 +46,7 @@ use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
@@ -84,7 +87,8 @@ final readonly class PendingActionService
         DeleteNote::class,
         CreateCustomField::class,
         UpdateCustomField::class,
-        AddCustomFieldOptions::class,
+        SetCustomFieldOptions::class,
+        DeleteCustomField::class,
         CreateWorkspaceInvitation::class,
         RemoveSampleData::class,
     ];
@@ -531,10 +535,7 @@ final readonly class PendingActionService
         $modelClass = $this->resolveModelClass($record);
         $recordId = ProposalPayload::recordIdOf($record, 'delete batch item');
 
-        $model = $modelClass::query()
-            ->with(['workspace'])
-            ->where('workspace_id', $pendingAction->workspace_id)
-            ->find($recordId);
+        $model = $this->deletableQuery($modelClass, $pendingAction)->find($recordId);
 
         // A vanished record fails only this item (RuntimeException -> resolve-failed),
         // never the sibling items. Per-item resolution is independent, not atomic.
@@ -675,7 +676,7 @@ final readonly class PendingActionService
                 continue;
             }
 
-            $label = $item === null ? null : $this->recordLabel($item['data'], $item['display']);
+            $label = $item === null ? null : ProposalLabel::of($action->entity_type, $item['data'], $item['display']);
             $entries[] = [
                 'record' => $label ?? __('record :position', ['position' => (int) $index + 1]),
                 'fields' => $fields,
@@ -736,7 +737,7 @@ final readonly class PendingActionService
             }
 
             $item = $items[(int) $index] ?? null;
-            $label = $item === null ? null : $this->recordLabel($item['data'], $item['display']);
+            $label = $item === null ? null : ProposalLabel::of($action->entity_type, $item['data'], $item['display']);
             $labels[] = $label ?? __('record :position', ['position' => (int) $index + 1]);
         }
 
@@ -800,7 +801,7 @@ final readonly class PendingActionService
     public function resolveActionLabel(PendingAction $action): ?string
     {
         $labels = array_values(array_filter(array_map(
-            fn (array $item): ?string => $this->recordLabel($item['data'], $item['display']),
+            static fn (array $item): ?string => ProposalLabel::of($action->entity_type, $item['data'], $item['display']),
             ProposalPayload::from($action)->items(),
         )));
 
@@ -855,41 +856,12 @@ final readonly class PendingActionService
             $item = $items[(int) $index] ?? null;
             $records[] = [
                 'id' => (string) $id,
-                'label' => $item === null ? null : $this->recordLabel($item['data'], $item['display']),
+                'label' => $item === null ? null : ProposalLabel::of($action->entity_type, $item['data'], $item['display']),
                 'url' => $resolver->referenceUrl($action->entity_type, (string) $id),
             ];
         }
 
         return $records;
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @param  array<string, mixed>  $display
-     */
-    private function recordLabel(array $data, array $display): ?string
-    {
-        foreach (['name', 'title', 'email'] as $field) {
-            if (is_string($data[$field] ?? null) && $data[$field] !== '') {
-                return $data[$field];
-            }
-        }
-
-        $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
-
-        foreach ($fields as $row) {
-            if (! is_array($row) || ! in_array($row['label'] ?? null, ['Name', 'Title', 'Email'], true)) {
-                continue;
-            }
-
-            $value = $row['new'] ?? $row['value'] ?? $row['old'] ?? null;
-
-            if (is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        return null;
     }
 
     private function resolveResultRecordId(PendingAction $action): ?string
@@ -1092,23 +1064,39 @@ final readonly class PendingActionService
         return $modelClass;
     }
 
+    /**
+     * @param  class-string<Model>  $modelClass
+     */
     private function resolveModel(string $modelClass, PendingAction $pendingAction, string $recordId): Model
     {
-        // CustomField uses tenant_id (from the custom-fields package) rather than the
-        // workspace_id column used by all other CRM models. Scope the lookup accordingly.
-        $tenantColumn = $modelClass === CustomField::class
-            ? (string) config('custom-fields.database.column_names.tenant_foreign_key', 'tenant_id')
-            : 'workspace_id';
+        return $this->ownedQuery($modelClass, $pendingAction)->findOrFail($recordId);
+    }
 
-        $query = $modelClass::query()->where($tenantColumn, $pendingAction->workspace_id);
-
-        // CustomField has a global active scope that would exclude deactivated fields;
-        // skip it so an update-to-deactivate proposal can find the field regardless.
-        if ($modelClass === CustomField::class) {
-            $query->withoutGlobalScope(CustomFieldsActivableScope::class);
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @return Builder<covariant Model>
+     */
+    private function ownedQuery(string $modelClass, PendingAction $pendingAction): Builder
+    {
+        if ($modelClass !== CustomField::class) {
+            return $modelClass::query()->where('workspace_id', $pendingAction->workspace_id);
         }
 
-        return $query->findOrFail($recordId);
+        // The activable scope hides deactivated fields, which a proposal must still reach.
+        return CustomField::query()
+            ->withoutGlobalScope(CustomFieldsActivableScope::class)
+            ->where((string) config('custom-fields.database.column_names.tenant_foreign_key', 'tenant_id'), $pendingAction->workspace_id);
+    }
+
+    /**
+     * @param  class-string<Model>  $modelClass
+     * @return Builder<covariant Model>
+     */
+    private function deletableQuery(string $modelClass, PendingAction $pendingAction): Builder
+    {
+        $query = $this->ownedQuery($modelClass, $pendingAction);
+
+        return $modelClass === CustomField::class ? $query : $query->with(['workspace']);
     }
 
     /**
@@ -1120,9 +1108,7 @@ final readonly class PendingActionService
         $ids = ProposalPayload::from($pendingAction)->recordIds();
 
         return array_values(
-            $modelClass::query()
-                ->with(['workspace'])
-                ->where('workspace_id', $pendingAction->workspace_id)
+            $this->deletableQuery($modelClass, $pendingAction)
                 ->findOrFail($ids)
                 ->all(),
         );

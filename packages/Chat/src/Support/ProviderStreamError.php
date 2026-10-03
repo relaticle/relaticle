@@ -6,7 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Streaming\Events\Error;
-use RuntimeException;
+use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Throwable;
 
 final readonly class ProviderStreamError
@@ -26,9 +26,7 @@ final readonly class ProviderStreamError
             );
         }
 
-        return new RuntimeException(
-            "Provider stream error [{$event->type}]: {$event->message}",
-        );
+        return new ProviderStreamRejectedException($event);
     }
 
     /**

@@ -151,11 +151,12 @@
                                     :class="showsTextBubble(msg) ? '' : 'rounded-br-md'"
                                 >
                                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-gray-500 ring-1 ring-gray-900/5 dark:bg-white/10 dark:text-gray-300 dark:ring-white/10">
-                                        <x-heroicon-o-table-cells class="h-4 w-4" aria-hidden="true" />
+                                        <x-heroicon-o-table-cells x-show="msg.attachment.kind !== 'text'" class="h-4 w-4" aria-hidden="true" />
+                                        <x-heroicon-o-document-text x-show="msg.attachment.kind === 'text'" class="h-4 w-4" aria-hidden="true" />
                                     </span>
                                     <span class="flex min-w-0 flex-col text-start">
                                         <span class="truncate text-sm font-medium text-gray-900 dark:text-gray-100" x-text="msg.attachment.name"></span>
-                                        <span class="text-xs text-gray-500 dark:text-gray-400" x-text="attachmentRowLabel(msg.attachment.row_count)"></span>
+                                        <span x-show="msg.attachment.kind !== 'text'" class="text-xs text-gray-500 dark:text-gray-400" x-text="attachmentRowLabel(msg.attachment.row_count)"></span>
                                     </span>
                                 </div>
                             </template>
@@ -397,6 +398,15 @@
                                     class="rounded-md bg-amber-600 px-2 py-1 text-xs font-medium text-white transition hover:bg-amber-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
                                 >
                                     {{ __('Retry') }}
+                                </button>
+                                <button
+                                    type="button"
+                                    data-retry-on-auto-button
+                                    x-show="msg.retryOnAuto && msg.retryable && !isStreaming && !rateLimit && canRetryTurn(index)"
+                                    x-on:click="selectModel('auto'); retryTurn(msg)"
+                                    class="shrink-0 whitespace-nowrap rounded-md border border-amber-600 px-2 py-1 text-xs font-medium text-amber-800 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:border-amber-400 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                                >
+                                    {{ __('Retry on Auto') }}
                                 </button>
                             </div>
                         </template>

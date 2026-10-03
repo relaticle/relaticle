@@ -39,7 +39,7 @@ final readonly class CustomFieldDefinitionValidator
      *
      * @throws ValidationException
      */
-    public static function forCreate(User $user, array $data): array
+    public static function forCreate(User $user, array $data, int $proposedAlongside = 0): array
     {
         $entityType = is_string($data['entity_type'] ?? null) ? $data['entity_type'] : '';
         $type = is_string($data['type'] ?? null) ? $data['type'] : '';
@@ -47,7 +47,7 @@ final readonly class CustomFieldDefinitionValidator
         $maxOptions = self::maxOptions();
 
         return Validator::make(self::normalize($data), [
-            'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType)],
+            'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],
             'type' => ['required', Rule::in(CreateCustomField::ALLOWED_TYPES)],
             'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
                 $tenantId,
@@ -141,35 +141,27 @@ final readonly class CustomFieldDefinitionValidator
     }
 
     /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     *
      * @throws ValidationException
      */
-    public static function forNewOptions(User $user, CustomField $field, array $data): array
+    public static function forDelete(CustomField $field): void
     {
-        $maxOptions = self::maxOptions();
-        $existing = DB::table(self::optionsTable())
-            ->where('custom_field_id', $field->getKey())
-            ->count();
-        $remaining = max(0, $maxOptions - $existing);
+        if ($field->isSystemDefined()) {
+            throw ValidationException::withMessages([
+                'code' => "\"{$field->name}\" is a system-defined field and cannot be deleted.",
+            ]);
+        }
 
-        return Validator::make(self::normalize($data), [
-            'options' => ['nullable', 'required', 'array', "max:{$remaining}"],
-            'options.*.name' => [
-                'required', 'string', 'max:255', 'distinct:ignore_case',
-                self::uniqueOptionIgnoringCase($user->currentWorkspace->getKey(), $field),
-            ],
-        ], [
-            'options.required' => 'At least one option must be provided.',
-            'options.max' => "Adding these options would exceed the {$maxOptions} options limit for this field (currently has {$existing}).",
-        ] + self::optionNameMessages())->validate();
+        if ($field->isActive() && $field->hasValues()) {
+            throw ValidationException::withMessages([
+                'code' => "\"{$field->name}\" is active and records still hold values for it. Deactivate the field first, then delete it.",
+            ]);
+        }
     }
 
     /**
      * @return array<string, string>
      */
-    private static function optionNameMessages(): array
+    public static function optionNameMessages(): array
     {
         return [
             'options.*.name.required' => 'Option names cannot be empty.',
@@ -224,31 +216,9 @@ final readonly class CustomFieldDefinitionValidator
         };
     }
 
-    /**
-     * The option-name twin of {@see uniqueNameIgnoringCase}, scoped to one field.
-     */
-    private static function uniqueOptionIgnoringCase(int|string $tenantId, CustomField $field): Closure
+    private static function withinFieldCap(int|string $tenantId, string $entityType, int $proposedAlongside): Closure
     {
-        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $field): void {
-            if (! is_string($value) || $value === '') {
-                return;
-            }
-
-            $taken = DB::table(self::optionsTable())
-                ->where('custom_field_id', $field->getKey())
-                ->where(self::tenantKey(), $tenantId)
-                ->whereRaw('lower(name) = ?', [mb_strtolower($value)])
-                ->exists();
-
-            if ($taken) {
-                $fail("Option \"{$value}\" already exists on this field.");
-            }
-        };
-    }
-
-    private static function withinFieldCap(int|string $tenantId, string $entityType): Closure
-    {
-        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $entityType): void {
+        return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $entityType, $proposedAlongside): void {
             $max = (int) config('chat.max_custom_fields_per_entity', 50);
 
             $existing = DB::table(self::definitionsTable())
@@ -256,7 +226,7 @@ final readonly class CustomFieldDefinitionValidator
                 ->where('entity_type', $entityType)
                 ->count();
 
-            if ($existing >= $max) {
+            if ($existing + $proposedAlongside >= $max) {
                 $fail("Cannot create more than {$max} custom fields for entity type \"{$entityType}\".");
             }
         };
@@ -295,7 +265,7 @@ final readonly class CustomFieldDefinitionValidator
         return in_array($type, CreateCustomField::CHOICE_TYPES, true);
     }
 
-    private static function maxOptions(): int
+    public static function maxOptions(): int
     {
         return (int) config('chat.max_field_options', 50);
     }
@@ -303,11 +273,6 @@ final readonly class CustomFieldDefinitionValidator
     private static function definitionsTable(): string
     {
         return (string) config('custom-fields.database.table_names.custom_fields');
-    }
-
-    private static function optionsTable(): string
-    {
-        return (string) config('custom-fields.database.table_names.custom_field_options');
     }
 
     private static function tenantKey(): string

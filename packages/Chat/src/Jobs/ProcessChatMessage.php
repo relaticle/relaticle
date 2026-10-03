@@ -21,13 +21,16 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Exceptions\FailoverableException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Exceptions\StreamErrorException;
+use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall as ToolCallData;
 use Laravel\Ai\Responses\StreamedAgentResponse;
 use Laravel\Ai\Streaming\Events\Error;
+use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
@@ -41,6 +44,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
+use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
@@ -77,7 +81,7 @@ final class ProcessChatMessage implements ShouldQueue
      * @param  list<array{type: string, id: string, label: string}>  $mentions
      * @param  array<string, mixed>  $document
      * @param  array{type: string, id: string, label: string}|null  $pageContext
-     * @param  array{id: string, name: string, row_count: int}|null  $attachment
+     * @param  array{id: string, name: string, kind: 'text'|'rows', row_count: int}|null  $attachment
      */
     public function __construct(
         private readonly User $user,
@@ -330,6 +334,8 @@ final class ProcessChatMessage implements ShouldQueue
             }
 
             $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
+                $refundedBlankTurn = $this->settleBlankTurn($streamedResponse, $creditService);
+
                 // input_tokens stays the UNCACHED remainder, with the cache legs next
                 // to it; credits are still priced on model + tool calls, not tokens.
                 ChatTelemetry::breadcrumb('stream.completed', [
@@ -344,17 +350,19 @@ final class ProcessChatMessage implements ShouldQueue
                     conversationId: $streamedResponse->conversationId,
                 ));
 
-                $creditService->settleReservation(
-                    workspace: $this->workspace,
-                    user: $this->user,
-                    type: AiCreditType::Chat,
-                    model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
-                    inputTokens: $streamedResponse->usage->uncachedInputTokens(),
-                    outputTokens: $streamedResponse->usage->outputTokens,
-                    toolCallsCount: $streamedResponse->toolCalls->count(),
-                    conversationId: $streamedResponse->conversationId,
-                    resolutionKey: $this->resolutionKey(),
-                );
+                if (! $refundedBlankTurn) {
+                    $creditService->settleReservation(
+                        workspace: $this->workspace,
+                        user: $this->user,
+                        type: AiCreditType::Chat,
+                        model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
+                        inputTokens: $streamedResponse->usage->uncachedInputTokens(),
+                        outputTokens: $streamedResponse->usage->outputTokens,
+                        toolCallsCount: $streamedResponse->toolCalls->count(),
+                        conversationId: $streamedResponse->conversationId,
+                        resolutionKey: $this->resolutionKey(),
+                    );
+                }
 
                 $this->persistMentions($streamedResponse->userMessageId);
                 $this->persistUserDocument($streamedResponse->userMessageId);
@@ -389,6 +397,16 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->release($delay);
 
                 return;
+            }
+
+            $rejection = $e instanceof RequestException ? $e : $e->getPrevious();
+
+            if ($rejection instanceof RequestException) {
+                ChatTelemetry::providerRejected($rejection, $this->resolved['model'] ?? 'unknown');
+            }
+
+            if ($e instanceof ProviderStreamRejectedException) {
+                ChatTelemetry::streamRejected($e->error, $this->resolved['model'] ?? 'unknown');
             }
 
             // The user's model choice was 'auto' and nothing has streamed yet: fail
@@ -555,6 +573,7 @@ final class ProcessChatMessage implements ShouldQueue
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
             message: $this->failureMessage($exception),
+            retryOnAuto: $this->offersAutoRetry($exception),
         ));
 
         // Last, after persistFailedTurn: a reload landing mid-failed() must
@@ -572,7 +591,7 @@ final class ProcessChatMessage implements ShouldQueue
     private function failureMessage(?Throwable $exception): string
     {
         if ($exception instanceof TimeoutExceededException) {
-            return __("This model didn't respond within the time limit (:seconds s). Try a shorter prompt, or switch to a faster model.", [
+            return __('This reply hit the :seconds-second limit before it finished. Ask for a shorter answer, or for it in parts.', [
                 'seconds' => self::TIMEOUT_SECONDS,
             ]);
         }
@@ -581,7 +600,29 @@ final class ProcessChatMessage implements ShouldQueue
             return __('The assistant is being rate-limited. Please try again in a moment. Anything you already approved was saved.');
         }
 
+        if ($this->offersAutoRetry($exception)) {
+            return __(':model is unavailable right now. Retry on Auto to get an answer from another model.', [
+                'model' => $this->modelLabel() ?? (string) $this->resolved['model'],
+            ]);
+        }
+
         return __('The assistant encountered an error. Please try again.');
+    }
+
+    private function offersAutoRetry(?Throwable $exception): bool
+    {
+        return $this->resolved['source'] === 'explicit'
+            && $this->isProviderFailure($exception)
+            && ! $this->isRateLimited($exception)
+            && ! $this->opensTheThread();
+    }
+
+    private function isProviderFailure(?Throwable $exception): bool
+    {
+        return $exception instanceof RequestException
+            || $exception instanceof FailoverableException
+            || $exception instanceof StreamErrorException
+            || $exception instanceof ProviderStreamRejectedException;
     }
 
     /**
@@ -853,7 +894,7 @@ final class ProcessChatMessage implements ShouldQueue
         // the document is built from that same text so both columns agree.
         $assistantContent = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
 
-        if ($assistantContent === '') {
+        if (trim($assistantContent) === '') {
             return;
         }
 
@@ -875,6 +916,57 @@ final class ProcessChatMessage implements ShouldQueue
                 'content' => $assistantContent,
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
                 'meta' => json_encode($meta, JSON_THROW_ON_ERROR),
+            ]);
+    }
+
+    private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
+    {
+        if ($this->sawToolCall) {
+            return false;
+        }
+
+        if (trim(AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall)) !== '') {
+            return false;
+        }
+
+        $creditService->refundReservation(
+            $this->workspace,
+            resolutionKey: $this->resolutionKey(),
+            conversationId: $this->conversationId,
+        );
+
+        $this->acknowledgeBlankTurn($streamedResponse->assistantMessageId, $this->blankTurnMessage($streamedResponse));
+
+        ChatTelemetry::breadcrumb('stream.blank_reply', ['model' => $this->resolved['model'] ?? null]);
+
+        return true;
+    }
+
+    private function blankTurnMessage(StreamedAgentResponse $streamedResponse): string
+    {
+        $reason = $streamedResponse->events->whereInstanceOf(StreamEnd::class)->last()?->reason;
+
+        return match ($reason) {
+            FinishReason::Length->value => __('This reply ran out of room before it said anything. Ask again, or ask for a shorter answer.'),
+            FinishReason::ContentFilter->value => __('The model declined to answer this. Try rephrasing your request.'),
+            default => __('Noted. Go on, or ask me a question.'),
+        };
+    }
+
+    private function acknowledgeBlankTurn(?string $assistantMessageId, string $acknowledgement): void
+    {
+        if ($assistantMessageId === null) {
+            return;
+        }
+
+        $document = $this->getParser()->buildFromText($acknowledgement, [], $this->workspace);
+
+        DB::table('agent_conversation_messages')
+            ->where('id', $assistantMessageId)
+            ->update([
+                'content' => $acknowledgement,
+                'document' => json_encode($document, JSON_THROW_ON_ERROR),
+                'steps' => StoredSteps::text($acknowledgement),
             ]);
     }
 

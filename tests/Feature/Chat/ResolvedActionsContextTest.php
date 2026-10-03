@@ -10,11 +10,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Messages\ToolResultMessage;
+use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
 
 function seedResolvedConv(string $id, User $user): void
 {
@@ -282,6 +284,113 @@ it('labels each record of an approved batch with its own title and url', functio
         ]);
 });
 
+it('labels each record of a batch update that changes only a custom field by its summary', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-U', $user);
+
+    $names = ['Ada Lovelace', 'Grace Hopper', 'Alan Turing'];
+
+    PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => 'conv-U', 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Update, 'entity_type' => 'people',
+        'action_data' => ['_batch' => true, 'records' => array_map(
+            static fn (int $position): array => ['_record_id' => "p-{$position}", '_model_class' => 'App\\Models\\People', 'custom_fields' => ['tier' => 'gold']],
+            [1, 2, 3],
+        )],
+        'display_data' => ['title' => 'Update People', 'summary' => 'Update 3 people', 'items' => array_map(
+            static fn (string $name): array => [
+                'title' => 'Update Person',
+                'summary' => "Update person \"{$name}\"",
+                'fields' => [['label' => 'Tier', 'old' => 'Silver', 'new' => 'Gold']],
+            ],
+            $names,
+        )],
+        'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+        'resolved_at' => now(), 'result_data' => [
+            'ids' => ['p-1', 'p-2', 'p-3'], 'count' => 3, 'type' => 'people',
+            'items' => ['0' => ['status' => 'approved', 'id' => 'p-1'], '1' => ['status' => 'approved', 'id' => 'p-2'], '2' => ['status' => 'approved', 'id' => 'p-3']],
+        ],
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-U', null);
+
+    expect($resolved[0]['label'])->toBe('Update person "Ada Lovelace", Update person "Grace Hopper", Update person "Alan Turing"')
+        ->and(array_column($resolved[0]['records'], 'label'))->toBe([
+            'Update person "Ada Lovelace"',
+            'Update person "Grace Hopper"',
+            'Update person "Alan Turing"',
+        ]);
+});
+
+it('labels an update by its summary when a custom field is named like a title row', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-E', $user);
+
+    PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => 'conv-E', 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Update, 'entity_type' => 'people',
+        'action_data' => ['_record_id' => 'p-1', '_model_class' => 'App\\Models\\People', 'custom_fields' => ['email' => 'ada@acme.test']],
+        'display_data' => [
+            'title' => 'Update Person',
+            'summary' => 'Update person "Ada Lovelace"',
+            'fields' => [['label' => 'Email', 'code' => 'email', 'old' => 'ada@old.test', 'new' => 'ada@acme.test']],
+        ],
+        'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+        'resolved_at' => now(), 'result_data' => ['id' => 'p-1'],
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-E', null);
+
+    expect($resolved[0]['label'])->toBe('Update person "Ada Lovelace"');
+});
+
+it('labels a delete by its Name row when the row label is translated', function (): void {
+    app('translator')->addLines(['*.Name' => 'Nom'], app()->getLocale());
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-T', $user);
+
+    PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(), 'user_id' => $user->getKey(),
+        'conversation_id' => 'conv-T', 'action_class' => CreateTask::class,
+        'operation' => PendingActionOperation::Delete, 'entity_type' => 'company',
+        'action_data' => ['_record_ids' => ['co-1'], '_model_class' => 'App\\Models\\Company'],
+        'display_data' => ['title' => 'Delete Company', 'summary' => 'Delete Company "Acme"', 'fields' => [['label' => 'Nom', 'value' => 'Acme']]],
+        'status' => PendingActionStatus::Approved, 'expires_at' => now(),
+        'resolved_at' => now(), 'result_data' => [],
+    ]);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation('conv-T', null);
+
+    expect($resolved[0]['label'])->toBe('Acme');
+});
+
+it('names each field of an approved custom field batch', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    seedResolvedConv('conv-F', $user);
+
+    resolve(CreateCustomFieldTool::class)->setConversationId('conv-F')->handle(new Request(['records' => [
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+        ['entity_type' => 'people', 'name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold']]],
+    ]]));
+
+    $pending = PendingAction::query()->where('conversation_id', 'conv-F')->sole();
+    $service = resolve(PendingActionService::class);
+    $service->approveItem($pending, $user, 0);
+    $service->approveItem($pending->fresh(), $user, 1);
+
+    $resolved = $service->resolvedForConversation('conv-F', null);
+
+    expect($resolved[0]['label'])->toBe('Region, Tier')
+        ->and(array_column($resolved[0]['records'], 'label'))->toBe(['Region', 'Tier']);
+});
+
 it('leaves superseded proposals to their own block instead of listing them as decided', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
@@ -410,5 +519,5 @@ it('keeps a proposal superseded on an earlier turn visible when a later turn sup
     $instructions = (new CrmAssistant)->withSupersededProposals($context)->instructions();
 
     expect($instructions)->toContain('<superseded_proposals>')
-        ->and($instructions)->toContain('Draft the outreach email');
+        ->and($instructions)->toContain('- create task "Draft the outreach email"');
 });

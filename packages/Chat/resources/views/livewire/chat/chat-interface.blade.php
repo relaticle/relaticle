@@ -154,7 +154,8 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'remove_sample_data' => __('Preparing sample data removal…'),
             'create_custom_field' => __('Drafting a custom field…'),
             'update_custom_field' => __('Preparing custom field changes…'),
-            'add_custom_field_options' => __('Preparing new field options…'),
+            'set_custom_field_options' => __('Preparing field option changes…'),
+            'delete_custom_field' => __('Preparing custom field deletion…'),
         ]),
     }),
 

@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Actions\Company\CreateCompany;
+use App\Actions\Company\DeleteCompany;
 use App\Actions\People\CreatePeople;
+use App\Actions\People\UpdatePeople;
 use App\Enums\Plan;
 use App\Features\OnboardSeed;
 use App\Models\User;
@@ -196,6 +198,75 @@ it('names an approved delete in the resumed turn by label, without the ids it re
         ProcessChatMessage::class,
         fn (ProcessChatMessage $job): bool => str_starts_with($job->message, "The user decided the proposals above:\n- APPROVED (written): delete company ")
             && ! str_contains($job->message, '01dd0000000000000000000001'),
+    );
+});
+
+it('names every record of the resumed decisions instead of leaving them unnamed', function (): void {
+    Queue::fake();
+    app('translator')->addLines(['*.Name' => 'Nom'], app()->getLocale());
+
+    $turnId = (string) Str::ulid();
+    $names = ['Ada Lovelace', 'Grace Hopper', 'Alan Turing'];
+    $ids = ['01ee0000000000000000000001', '01ee0000000000000000000002', '01ee0000000000000000000003'];
+
+    PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $turnId,
+        'action_class' => UpdatePeople::class,
+        'operation' => PendingActionOperation::Update,
+        'entity_type' => 'people',
+        'action_data' => ['_batch' => true, 'records' => array_map(
+            static fn (string $id): array => ['_record_id' => $id, '_model_class' => 'App\\Models\\People', 'custom_fields' => ['tier' => 'gold']],
+            $ids,
+        )],
+        'display_data' => ['title' => 'Update People', 'summary' => 'Update 3 people', 'items' => array_map(
+            static fn (string $name): array => [
+                'title' => 'Update Person',
+                'summary' => "Update person \"{$name}\"",
+                'fields' => [['label' => 'Tier', 'old' => 'Silver', 'new' => 'Gold']],
+            ],
+            $names,
+        )],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => [
+            'items' => ['0' => ['status' => 'approved', 'id' => $ids[0]], '1' => ['status' => 'approved', 'id' => $ids[1]], '2' => ['status' => 'approved', 'id' => $ids[2]]],
+            'ids' => $ids,
+            'type' => 'people',
+            'count' => 3,
+        ],
+    ]);
+    PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $turnId,
+        'action_class' => DeleteCompany::class,
+        'operation' => PendingActionOperation::Delete,
+        'entity_type' => 'company',
+        'action_data' => ['_record_ids' => ['01dd0000000000000000000009']],
+        'display_data' => ['title' => 'Delete Company', 'summary' => 'Delete Company "Acme"', 'fields' => [['label' => 'Nom', 'value' => 'Acme']]],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now()->addSecond(),
+        'result_data' => [],
+    ]);
+
+    resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId);
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => $job->message === implode("\n", [
+            'The user decided the proposals above:',
+            '- APPROVED (written): update 3 people records:',
+            '    - "Update person Ada Lovelace"',
+            '    - "Update person Grace Hopper"',
+            '    - "Update person Alan Turing"',
+            '- APPROVED (written): delete company "Acme"',
+        ]) && ! str_contains($job->message, '(unnamed)'),
     );
 });
 

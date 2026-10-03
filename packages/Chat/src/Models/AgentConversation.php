@@ -46,7 +46,7 @@ final class AgentConversation extends Model implements HasMedia
     public const string ATTACHMENTS_MEDIA_COLLECTION = MediaCollection::ChatAttachments->value;
 
     /** @var list<string> */
-    public const array ATTACHMENT_MIME_TYPES = ['text/csv', 'text/plain', 'application/csv'];
+    public const array ATTACHMENT_MIME_TYPES = ['text/csv', 'text/plain', 'text/html', 'application/csv'];
 
     protected $guarded = [];
 

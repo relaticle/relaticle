@@ -83,6 +83,13 @@ final class AgentConversationMessage extends Model
 
     /** @param Builder<self> $query */
     #[Scope]
+    protected function errored(Builder $query): void
+    {
+        $query->where('meta->error', true);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
     protected function sentBy(Builder $query, User $user): void
     {
         $query->where('participant_type', $user->getMorphClass())

@@ -128,7 +128,7 @@ final readonly class ResolvedActionText
         return $cite ? "{$label} (id: {$record['id']}, url: {$record['url']})" : $label;
     }
 
-    private static function quoted(?string $label): string
+    public static function quoted(?string $label): string
     {
         return $label !== null && $label !== ''
             ? '"'.PromptText::sanitize($label, 200).'"'

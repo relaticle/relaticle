@@ -1,4 +1,4 @@
-// One CSV or TXT file per message. Mounted as its own island inside the shared
+// One CSV, TXT or MD file per message. Mounted as its own island inside the shared
 // composer bar (like voiceRecorder), so every surface gets it from the one
 // partial. It uploads first and hands the sender an id; nothing is sent here.
 const csrf = () => document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -66,7 +66,7 @@ export function chatAttachment({ uploadUrl, deleteUrlTemplate, context, maxBytes
             if (this.uploading) return;
             this.attachError = null;
 
-            if (! /\.(csv|txt)$/i.test(file.name)) {
+            if (! /\.(csv|txt|md)$/i.test(file.name)) {
                 this.attachError = texts.wrongType;
                 return;
             }
@@ -92,7 +92,7 @@ export function chatAttachment({ uploadUrl, deleteUrlTemplate, context, maxBytes
                     this.attachError = json?.errors?.file?.[0] || json?.message || texts.failed;
                     return;
                 }
-                this.attachment = { id: json.id, name: json.name, row_count: json.row_count, conversation_id: json.conversation_id };
+                this.attachment = { id: json.id, name: json.name, kind: json.kind, row_count: json.row_count, conversation_id: json.conversation_id };
                 this.publish();
             } catch {
                 this.attachError = texts.failed;

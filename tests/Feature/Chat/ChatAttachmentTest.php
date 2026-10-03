@@ -9,6 +9,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteChatAttachment;
@@ -77,6 +78,7 @@ it('opens a conversation titled after the file and stores the csv on it', functi
 
     $response->assertOk()->assertJson([
         'name' => 'contacts.csv',
+        'kind' => 'rows',
         'row_count' => 3,
         'header' => ['Name', 'Email', 'Company'],
     ]);
@@ -191,10 +193,102 @@ it('hides an attachment from other members of the same team', function (): void 
     expect(ChatAttachment::find($member, $id))->toBeNull();
 });
 
-it('accepts a txt file that holds csv rows', function (): void {
-    $this->postJson(route('chat.attachments.store'), ['file' => csvUpload(2, 'contacts.txt')])
+it('stores a txt file as text instead of parsing it as rows', function (): void {
+    $response = $this->postJson(route('chat.attachments.store'), ['file' => csvUpload(2, 'contacts.txt')])
         ->assertOk()
-        ->assertJsonPath('row_count', 2);
+        ->assertJsonPath('kind', 'text')
+        ->assertJsonPath('row_count', 0)
+        ->assertJsonPath('header', []);
+
+    expect(ChatAttachment::find($this->user, $response->json('id'))?->isText())->toBeTrue();
+});
+
+it('accepts a markdown file as text', function (): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('brief.md', "# Launch brief\n\nShip the beta by Friday.\n"),
+    ])
+        ->assertOk()
+        ->assertJsonPath('name', 'brief.md')
+        ->assertJsonPath('kind', 'text');
+});
+
+it('accepts a prose txt file whose first line would be a duplicate csv header', function (): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('notes.txt', "Meeting notes, notes, notes\nWe agreed on the plan, then left.\n"),
+    ])
+        ->assertOk()
+        ->assertJsonPath('kind', 'text');
+});
+
+it('rejects a text file with nothing in it', function (): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('empty.txt', " \n\n"),
+    ])
+        ->assertStatus(422)
+        ->assertJsonPath('errors.file.0', 'The file is empty.');
+
+    expect(AgentConversation::query()->count())->toBe(0);
+});
+
+it('rejects a text file holding only a byte order mark or control characters', function (string $content): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('empty.txt', $content),
+    ])
+        ->assertStatus(422)
+        ->assertJsonPath('errors.file.0', 'The file is empty.');
+
+    expect(AgentConversation::query()->count())->toBe(0);
+})->with([
+    'utf-8 bom' => "\xEF\xBB\xBF",
+    'utf-16le bom' => "\xFF\xFE",
+    'utf-16le bom and blank lines' => "\xFF\xFE \x00\n\x00",
+    'control characters' => "\x01\x02 \x7F\n",
+]);
+
+it('accepts a markdown file with inline html as text', function (string $name): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent($name, "# Links\n\n<a href=\"https://x.test\">x</a>\n"),
+    ])
+        ->assertOk()
+        ->assertJsonPath('name', $name)
+        ->assertJsonPath('kind', 'text');
+})->with(['brief.md', 'brief.txt']);
+
+it('still rejects a csv file that is really html', function (): void {
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('page.csv', "<html><body><a href=\"https://x.test\">x</a></body></html>\n"),
+    ])->assertStatus(422);
+
+    expect(AgentConversation::query()->count())->toBe(0);
+});
+
+it('rejects html behind a name too long to keep its text extension', function (): void {
+    $path = storage_path('framework/testing/'.Str::ulid().'.txt');
+    File::ensureDirectoryExists(dirname($path));
+    File::put($path, "<b>Name</b>\n<a href=\"https://x.test\">x</a>\n<i>y</i>\n");
+
+    $this->postJson(route('chat.attachments.store'), [
+        'file' => new UploadedFile($path, str_repeat('a', 300).'.txt', null, null, true),
+    ])->assertStatus(422)->assertJsonValidationErrors('file');
+
+    File::delete($path);
+});
+
+it('serves a stored html-looking markdown file only as a download', function (): void {
+    $id = (string) $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('brief.md', "<script>alert(1)</script>\n<a href=\"https://x.test\">x</a>\n"),
+    ])->assertOk()->json('id');
+
+    $media = ChatAttachment::find($this->user, $id)?->media;
+
+    $this->get(route('media.show', ['media' => $media]))->assertForbidden();
+
+    $response = $this->get(URL::temporarySignedRoute('media.show', now()->addMinutes(5), ['media' => $media->uuid]))->assertOk();
+
+    expect($response->headers->get('Content-Disposition'))->toStartWith('attachment')
+        ->and($response->headers->get('X-Content-Type-Options'))->toBe('nosniff')
+        ->and($response->headers->get('Content-Security-Policy'))->toContain('sandbox')
+        ->and($media->getCustomHeaders())->toBe(['ContentType' => 'text/plain; charset=utf-8']);
 });
 
 it('caps a filename longer than the media name column', function (): void {

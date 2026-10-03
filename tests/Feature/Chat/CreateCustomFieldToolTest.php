@@ -54,17 +54,22 @@ function makeCreateFieldTool(string $convId): CreateCustomFieldTool
     return $tool;
 }
 
-it('creates a pending proposal for a select field with options', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
+/**
+ * @param  array<string, mixed>  ...$records
+ * @return array<string, mixed>
+ */
+function proposeCustomFields(string $convId, array ...$records): array
+{
+    return (array) json_decode(makeCreateFieldTool($convId)->handle(new Request(['records' => $records])), true);
+}
 
-    $result = $tool->handle(new Request([
+it('creates a pending proposal for a select field with options', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Priority',
         'type' => 'select',
         'options' => [['name' => 'High'], ['name' => 'Low']],
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded['type'])->toBe('pending_action')
         ->and($decoded['operation'])->toBe('create')
@@ -84,19 +89,16 @@ it('creates a pending proposal for a select field with options', function (): vo
 });
 
 it('executes the approved proposal and creates the field + options in the database', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-
-    $tool->handle(new Request([
+    proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Priority',
         'type' => 'select',
         'options' => [['name' => 'High'], ['name' => 'Low']],
-    ]));
+    ]);
 
     $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
 
-    $service = resolve(PendingActionService::class);
-    $service->approve($pending, $this->owner);
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
 
     $field = CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
         ->where('tenant_id', $this->workspace->getKey())
@@ -128,15 +130,12 @@ it('refuses a member with the role error and creates no proposal', function (): 
     Auth::guard('web')->setUser($member);
     $this->actingAs($member);
 
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Priority',
         'type' => 'select',
         'options' => [['name' => 'High']],
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded['error'])->toContain('workspace role does not allow that')
         ->and($decoded['error'])->toContain('Do not link to any page')
@@ -151,13 +150,13 @@ it('lets an admin propose a field that lands on approval', function (): void {
     Auth::guard('web')->setUser($admin);
     $this->actingAs($admin);
 
-    $result = makeCreateFieldTool($this->convId)->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Region',
         'type' => 'text',
-    ]));
+    ]);
 
-    expect(json_decode($result, true)['type'])->toBe('pending_action');
+    expect($decoded['type'])->toBe('pending_action');
 
     $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
 
@@ -171,15 +170,11 @@ it('lets an admin propose a field that lands on approval', function (): void {
 });
 
 it('returns error for a non-allowlisted field type', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Attachment',
         'type' => 'file-upload',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
@@ -195,45 +190,33 @@ it('rejects when over the max_custom_fields_per_entity cap', function (): void {
         'entity_type' => 'company',
     ]);
 
-    $tool = makeCreateFieldTool($this->convId);
-
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'One More',
         'type' => 'text',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('requires options for choice types', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Status',
         'type' => 'select',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('creates a text field without options successfully', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Website',
         'type' => 'text',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded['type'])->toBe('pending_action')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(1);
@@ -249,14 +232,11 @@ it('rejects a duplicate field name at proposal time', function (): void {
         'type' => 'number',
     ]);
 
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'people',
         'name' => 'Age',
         'type' => 'number',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and($decoded['error'])->toContain('already exists')
@@ -274,14 +254,11 @@ it('rejects a duplicate field name even when the existing field is deactivated',
         'active' => false,
     ]);
 
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'people',
         'name' => 'Age',
         'type' => 'number',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
@@ -297,26 +274,22 @@ it('allows the same field name on a different entity type', function (): void {
         'type' => 'number',
     ]);
 
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Age',
         'type' => 'number',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded['type'])->toBe('pending_action')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(1);
 });
 
 it('rejects approval when a field with the same name appeared after the proposal', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $tool->handle(new Request([
+    proposeCustomFields($this->convId, [
         'entity_type' => 'people',
         'name' => 'Age',
         'type' => 'number',
-    ]));
+    ]);
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
@@ -353,15 +326,12 @@ it('rejects a duplicate explicit code at proposal time', function (): void {
         'type' => 'number',
     ]);
 
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'people',
         'name' => 'Years',
         'type' => 'number',
         'code' => 'age',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and($decoded['error'])->toContain('already exists')
@@ -369,13 +339,12 @@ it('rejects a duplicate explicit code at proposal time', function (): void {
 });
 
 it('rejects approval with a friendly message when the explicit code was taken after the proposal', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $tool->handle(new Request([
+    proposeCustomFields($this->convId, [
         'entity_type' => 'people',
         'name' => 'Reference',
         'type' => 'text',
         'code' => 'ref_no',
-    ]));
+    ]);
 
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
     CustomField::factory()->create([
@@ -393,73 +362,58 @@ it('rejects approval with a friendly message when the explicit code was taken af
 });
 
 it('rejects an empty field name', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => '   ',
         'type' => 'text',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('rejects a field name longer than 50 characters', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => str_repeat('a', 51),
         'type' => 'text',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('rejects a code with invalid characters', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Reference',
         'type' => 'text',
         'code' => 'bad code!',
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('rejects duplicate option names within the options array', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Priority',
         'type' => 'select',
         'options' => [['name' => 'High'], ['name' => 'High']],
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
 it('rejects empty option names', function (): void {
-    $tool = makeCreateFieldTool($this->convId);
-    $result = $tool->handle(new Request([
+    $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',
         'name' => 'Priority',
         'type' => 'select',
         'options' => [['name' => ''], ['name' => 'Low']],
-    ]));
-
-    $decoded = json_decode($result, true);
+    ]);
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
@@ -475,11 +429,11 @@ it('rejects a field name that differs from an existing one only by case', functi
         'type' => 'number',
     ]);
 
-    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request([
+    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request(['records' => [[
         'entity_type' => 'people',
         'name' => 'age',
         'type' => 'number',
-    ])), true);
+    ]]])), true);
 
     expect($decoded)->toHaveKey('error')
         ->and($decoded['error'])->toContain('already exists')
@@ -519,11 +473,188 @@ it('still allows a name that merely shares a prefix with an existing field', fun
         'type' => 'number',
     ]);
 
-    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request([
+    $decoded = json_decode((new CreateCustomFieldTool)->handle(new Request(['records' => [[
         'entity_type' => 'people',
         'name' => 'Age Bracket',
         'type' => 'text',
-    ])), true);
+    ]]])), true);
 
     expect($decoded)->not->toHaveKey('error');
+});
+
+it('proposes fields across two entities as one batch approved item by item', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Priority', 'type' => 'select', 'options' => [['name' => 'High'], ['name' => 'Low']]],
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+        ['entity_type' => 'people', 'name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold'], ['name' => 'Silver']]],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($decoded['data']['_batch'])->toBeTrue()
+        ->and($decoded)->not->toHaveKey('skipped_records')
+        ->and($pending->action_data['records'])->toHaveCount(3)
+        ->and($pending->display_data['summary'])->toBe('Create 3 custom fields')
+        ->and($pending->display_data['items'][2]['summary'])->toBe('Create "Tier" (select) on people with options: Gold, Silver');
+
+    $service = resolve(PendingActionService::class);
+    $service->approveItem($pending, $this->owner, 0);
+    $service->approveItem($pending->fresh(), $this->owner, 1);
+    $service->approveItem($pending->fresh(), $this->owner, 2);
+
+    $created = CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('system_defined', false)
+        ->whereIn('name', ['Priority', 'Region', 'Tier'])
+        ->pluck('entity_type', 'name')
+        ->sortKeys()
+        ->all();
+
+    $tier = CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('name', 'Tier')
+        ->firstOrFail();
+
+    TenantContextService::setTenantId($this->workspace->getKey());
+    $tierOptions = CustomFieldOption::query()
+        ->where('custom_field_id', $tier->getKey())
+        ->orderBy('sort_order')
+        ->pluck('name')
+        ->all();
+
+    expect($created)->toBe(['Priority' => 'company', 'Region' => 'company', 'Tier' => 'people'])
+        ->and($tierOptions)->toBe(['Gold', 'Silver'])
+        ->and($pending->refresh()->status)->toBe(PendingActionStatus::Approved);
+});
+
+it('skips a field whose name repeats an earlier one in the batch on the same entity, ignoring case', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'people', 'name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold']]],
+        ['entity_type' => 'people', 'name' => 'tier', 'type' => 'text'],
+        ['entity_type' => 'company', 'name' => 'Tier', 'type' => 'text'],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($decoded['data']['_batch'])->toBeTrue()
+        ->and(array_column($pending->action_data['records'], 'entity_type'))->toBe(['people', 'company'])
+        ->and($decoded['skipped_records'])->toBe([
+            ['record' => 'tier', 'reason' => 'A field named "tier" is already in this batch on people.'],
+        ])
+        ->and($decoded['skipped_note'])->toContain('NOT part of the proposal');
+});
+
+it('skips a field whose explicit code repeats an earlier one in the batch on the same entity', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text', 'code' => 'region'],
+        ['entity_type' => 'company', 'name' => 'Territory', 'type' => 'text', 'code' => 'region'],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($pending->action_data['name'])->toBe('Region')
+        ->and($decoded['skipped_records'])->toBe([
+            ['record' => 'Territory', 'reason' => 'A field with code "region" is already in this batch on company.'],
+        ]);
+});
+
+it('skips an explicit code that matches the code generated for an earlier field in the batch', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+        ['entity_type' => 'company', 'name' => 'Territory', 'type' => 'text', 'code' => 'region'],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($pending->action_data['name'])->toBe('Region')
+        ->and($decoded['skipped_records'])->toBe([
+            ['record' => 'Territory', 'reason' => 'A field with code "region" is already in this batch on company.'],
+        ]);
+});
+
+it('skips a field whose generated code matches an earlier explicit code in the batch', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Territory', 'type' => 'text', 'code' => 'region'],
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($pending->action_data['name'])->toBe('Territory')
+        ->and($decoded['skipped_records'])->toBe([
+            ['record' => 'Region', 'reason' => 'A field with code "region" is already in this batch on company.'],
+        ]);
+});
+
+it('skips the fields that would cross the per-entity cap', function (): void {
+    CustomField::factory()->create([
+        config('custom-fields.database.column_names.tenant_foreign_key') => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'name' => 'Founded',
+        'code' => 'founded',
+        'type' => 'date',
+    ]);
+
+    $cap = DB::table('custom_fields')
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->count() + 2;
+
+    config(['chat.max_custom_fields_per_entity' => $cap]);
+
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+        ['entity_type' => 'company', 'name' => 'Industry', 'type' => 'text'],
+        ['entity_type' => 'company', 'name' => 'Segment', 'type' => 'text'],
+    );
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->sole();
+
+    expect($decoded['data']['_batch'])->toBeTrue()
+        ->and(array_column($pending->action_data['records'], 'name'))->toBe(['Region', 'Industry'])
+        ->and($decoded['skipped_records'])->toBe([
+            ['record' => 'Segment', 'reason' => "Cannot create more than {$cap} custom fields for entity type \"company\"."],
+        ]);
+
+    $service = resolve(PendingActionService::class);
+    $service->approveItem($pending, $this->owner, 0);
+    $service->approveItem($pending->fresh(), $this->owner, 1);
+
+    expect(CustomField::query()->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->whereIn('name', ['Region', 'Industry'])
+        ->count())->toBe(2);
+});
+
+it('returns one error and no proposal when every field fails', function (): void {
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Attachment', 'type' => 'file-upload'],
+        ['entity_type' => 'company', 'name' => 'Status', 'type' => 'select'],
+    );
+
+    expect($decoded['error'])->toStartWith('No proposal was created; every record failed validation.')
+        ->and($decoded['error'])->toContain('Attachment: ')
+        ->and($decoded['error'])->toContain('Status: ')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses more fields than one proposal holds', function (): void {
+    config(['chat.max_batch_size' => 1]);
+
+    $decoded = proposeCustomFields(
+        $this->convId,
+        ['entity_type' => 'company', 'name' => 'Region', 'type' => 'text'],
+        ['entity_type' => 'company', 'name' => 'Industry', 'type' => 'text'],
+    );
+
+    expect($decoded['error'])->toBe('Too many records: at most 1 per proposal.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });

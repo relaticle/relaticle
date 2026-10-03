@@ -21,7 +21,7 @@ final class ListCustomFieldsTool implements Tool
         return 'List the custom field definitions configured for this workspace, optionally filtered to one'
             .' entity type. Returns each field\'s entity_type, name, code, type, active status, whether it is'
             .' system-defined, and its options (for choice-type fields). Use this to answer "what custom fields'
-            .' do I have" and to find a field\'s entity_type + code before proposing an update or adding options.';
+            .' do I have" and to find a field\'s entity_type + code before proposing an update or an options change.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -75,7 +75,7 @@ final class ListCustomFieldsTool implements Tool
 
         return (string) json_encode([
             'custom_fields' => $data,
-            'note' => 'System-defined fields keep their name and cannot be deactivated, but their settings can change and an inactive one can be reactivated. `unique` says whether the field rejects duplicate values, which is what an upsert matches on. `settings` holds each field\'s current values for exactly the settings it accepts. To update a field, its options or its settings, use its entity_type + code.',
+            'note' => 'System-defined fields keep their name and cannot be deactivated, but their options and settings can change and an inactive one can be reactivated. `unique` says whether the field rejects duplicate values, which is what an upsert matches on. `settings` holds each field\'s current values for exactly the settings it accepts. To update a field, its options or its settings, use its entity_type + code.',
         ], JSON_UNESCAPED_SLASHES);
     }
 }

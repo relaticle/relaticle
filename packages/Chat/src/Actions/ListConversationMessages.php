@@ -26,7 +26,7 @@ final readonly class ListConversationMessages
     ) {}
 
     /**
-     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, row_count: int}|null}>
+     * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, kind: string, row_count: int}|null}>
      */
     public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
@@ -155,7 +155,7 @@ final readonly class ListConversationMessages
     }
 
     /**
-     * @return array{id: string, name: string, row_count: int}|null
+     * @return array{id: string, name: string, kind: 'text'|'rows', row_count: int}|null
      */
     private function attachmentFromMeta(?string $meta): ?array
     {
@@ -173,6 +173,7 @@ final readonly class ListConversationMessages
         return [
             'id' => $attachment['id'],
             'name' => (string) ($attachment['name'] ?? ''),
+            'kind' => ($attachment['kind'] ?? null) === 'text' ? 'text' : 'rows',
             'row_count' => (int) ($attachment['row_count'] ?? 0),
         ];
     }

@@ -13,6 +13,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\Chat\Support\StoredSteps;
+use Relaticle\ImportWizard\Enums\ImportEntityType;
 
 final readonly class StoreImportHandoff
 {
@@ -85,10 +86,7 @@ final readonly class StoreImportHandoff
 
     private function reply(ChatAttachment $attachment): string
     {
-        $people = route('chat.attachments.import', ['attachment' => $attachment->id(), 'entity' => 'people']);
-        $companies = route('chat.attachments.import', ['attachment' => $attachment->id(), 'entity' => 'company']);
-
         return __("That's :count rows. The import wizard handles files this size, with your columns already mapped.", ['count' => $attachment->rowCount()])
-            ."\n\n[".__('Import as people').']('.$people.') · ['.__('Import as companies').']('.$companies.')';
+            ."\n\n[".__('Import as people').']('.$attachment->importUrl(ImportEntityType::People).') · ['.__('Import as companies').']('.$attachment->importUrl(ImportEntityType::Company).')';
     }
 }

@@ -17,6 +17,7 @@ use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
+use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
 use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\ResolvesRecordNames;
 use Relaticle\Chat\Tools\Concerns\ValidatesOwnedForeignKeys;
@@ -26,6 +27,7 @@ abstract class BaseWriteCreateTool implements Tool
 {
     use GuardsRecordNames;
     use LimitsPlanSteps;
+    use ReportsSkippedRecords;
     use RequiresWorkspaceCapability;
     use ResolvesRecordNames;
     use ValidatesOwnedForeignKeys;
@@ -123,6 +125,8 @@ abstract class BaseWriteCreateTool implements Tool
 
         $actionRecords = [];
         $items = [];
+
+        /** @var list<array{record: string, reason: string}> $skipped */
         $skipped = [];
 
         // Per-record validation failures skip the record, never the whole call:
@@ -184,15 +188,7 @@ abstract class BaseWriteCreateTool implements Tool
         }
 
         if ($actionRecords === []) {
-            $reasons = implode(' ', array_map(
-                static fn (array $skip): string => "{$skip['record']}: ".rtrim($skip['reason'], '.').'.',
-                $skipped,
-            ));
-
-            return (string) json_encode([
-                'error' => "No proposal was created; every record failed validation. {$reasons}"
-                    .' Tell the user each reason. Do not retry with the same values.',
-            ], JSON_UNESCAPED_SLASHES);
+            return $this->everyRecordFailedError($skipped);
         }
 
         $isBatch = count($actionRecords) > 1;
@@ -232,37 +228,6 @@ abstract class BaseWriteCreateTool implements Tool
             'meta' => ['agent_should_stop' => true],
         ];
 
-        if ($skipped !== []) {
-            $envelope['skipped_records'] = $skipped;
-            $envelope['skipped_note'] = 'These records failed validation and are NOT part of the proposal.'
-                .' Tell the user each skipped record and its reason.';
-        }
-
-        return (string) json_encode($envelope, JSON_UNESCAPED_SLASHES);
-    }
-
-    /**
-     * The label a skipped record is reported under: whatever identity the model
-     * gave it, or its position when it has none.
-     *
-     * @param  array<string, mixed>  $record
-     * @return array{record: string, reason: string}
-     */
-    private function skippedRecord(array $record, int $index, string $reason): array
-    {
-        $label = null;
-
-        foreach (['name', 'title', 'email'] as $key) {
-            if (is_string($record[$key] ?? null) && trim($record[$key]) !== '') {
-                $label = trim($record[$key]);
-
-                break;
-            }
-        }
-
-        return [
-            'record' => $label ?? 'record '.($index + 1),
-            'reason' => $reason,
-        ];
+        return (string) json_encode($this->withSkippedRecords($envelope, $skipped), JSON_UNESCAPED_SLASHES);
     }
 }

@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Enums\CreationSource;
 use App\Models\Company;
@@ -325,9 +325,15 @@ it('can filter by an option added to an existing custom field', function (): voi
 
     (new ListCompaniesTool)->handle(new Request(['custom_fields' => ['segment' => ['eq' => 'Enterprise']]]));
 
-    app(AddCustomFieldOptions::class)->execute($user, [
-        '_record_id' => $field->getKey(),
-        'options' => ['Mid-Market'],
+    $enterpriseId = (string) CustomFieldOption::query()
+        ->withoutGlobalScopes()
+        ->where('custom_field_id', $field->getKey())
+        ->value('id');
+
+    app(SetCustomFieldOptions::class)->execute($user, $field, [
+        'options' => [['id' => $enterpriseId, 'name' => 'Enterprise'], ['name' => 'Mid-Market']],
+        'replacements' => [],
+        'removed' => [],
     ]);
 
     $result = json_decode((new ListCompaniesTool)->handle(new Request([

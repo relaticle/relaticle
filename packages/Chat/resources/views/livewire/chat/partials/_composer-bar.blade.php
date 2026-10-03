@@ -35,7 +35,7 @@
     <div class="flex items-center gap-2 px-3 pb-2">
         <div class="flex items-center gap-1.5">
             @php $attachTexts = [
-                'wrongType' => __('Attach a CSV or TXT file.'),
+                'wrongType' => __('Attach a CSV, TXT or MD file.'),
                 'tooLarge' => __('Files up to 10 MB.'),
                 'failed' => __('Could not upload that file. Try again.'),
             ]; @endphp
@@ -50,15 +50,15 @@
                 data-chat-attachment
                 class="contents"
             >
-                <input type="file" x-ref="fileInput" accept=".csv,.txt,text/csv,text/plain" class="sr-only" tabindex="-1" aria-hidden="true" x-on:change="onFileChosen($event)" data-chat-attachment-input>
+                <input type="file" x-ref="fileInput" accept=".csv,.txt,.md,text/csv,text/plain,text/markdown" class="sr-only" tabindex="-1" aria-hidden="true" x-on:change="onFileChosen($event)" data-chat-attachment-input>
 
                 <button
                     type="button"
                     x-on:click="pick()"
                     :disabled="uploading"
                     :aria-busy="uploading"
-                    aria-label="{{ __('Attach a CSV or TXT file') }}"
-                    title="{{ __('Attach a CSV or TXT file') }}"
+                    aria-label="{{ __('Attach a CSV, TXT or MD file') }}"
+                    title="{{ __('Attach a CSV, TXT or MD file') }}"
                     class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-progress dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
                 >
                     <x-heroicon-o-paper-clip x-show="!uploading" class="h-4 w-4" aria-hidden="true" />
@@ -73,7 +73,7 @@
                 >
                     <x-heroicon-m-paper-clip class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     <span class="truncate" x-text="attachment?.name"></span>
-                    <span class="shrink-0 text-gray-500 dark:text-gray-400" x-text="attachment ? (attachment.row_count === 1 ? @js(__(':count row', ['count' => 1])) : @js(__(':count rows')).replace(':count', attachment.row_count)) : ''"></span>
+                    <span x-show="attachment?.kind !== 'text'" class="shrink-0 text-gray-500 dark:text-gray-400" x-text="attachment ? (attachment.row_count === 1 ? @js(__(':count row', ['count' => 1])) : @js(__(':count rows')).replace(':count', attachment.row_count)) : ''"></span>
                     <button type="button" x-on:click="remove()" class="-me-1 shrink-0 rounded p-0.5 transition hover:bg-gray-900/10 dark:hover:bg-white/20" aria-label="{{ __('Remove attachment') }}">
                         <x-heroicon-m-x-mark class="h-3 w-3" aria-hidden="true" />
                     </button>

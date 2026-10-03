@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Health\ChatTurnFailureRateCheck;
 use App\Providers\HealthServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\HorizonCheck;
@@ -35,5 +36,6 @@ it('registers health checks when enabled', function () {
     expect($checkClasses)
         ->toContain(DatabaseCheck::class)
         ->toContain(RedisCheck::class)
-        ->toContain(HorizonCheck::class);
+        ->toContain(HorizonCheck::class)
+        ->toContain(ChatTurnFailureRateCheck::class);
 });

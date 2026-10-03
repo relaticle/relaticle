@@ -15,6 +15,7 @@ final class ChatStreamFailed implements ShouldBroadcastNow
     public function __construct(
         public readonly string $conversationId,
         public readonly string $message,
+        public readonly bool $retryOnAuto = false,
     ) {}
 
     /**
@@ -33,13 +34,14 @@ final class ChatStreamFailed implements ShouldBroadcastNow
     }
 
     /**
-     * @return array<string, string>
+     * @return array{conversationId: string, message: string, retryOnAuto: bool}
      */
     public function broadcastWith(): array
     {
         return [
             'conversationId' => $this->conversationId,
             'message' => $this->message,
+            'retryOnAuto' => $this->retryOnAuto,
         ];
     }
 }

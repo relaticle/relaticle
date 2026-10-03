@@ -42,6 +42,7 @@ use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\AttachedRows;
+use Relaticle\Chat\Support\AttachedText;
 use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
@@ -161,9 +162,12 @@ final readonly class ChatController
             }
         }
 
-        $message = $attachment instanceof ChatAttachment
-            ? AttachedRows::inline($parsed['text'], $attachment)
-            : $parsed['text'];
+        $message = match (true) {
+            ! $attachment instanceof ChatAttachment => $parsed['text'],
+            $attachment->isText() => AttachedText::inline($parsed['text'], $attachment),
+            default => AttachedRows::inline($parsed['text'], $attachment)
+                ?? ($parsed['text'] === '' ? null : AttachedRows::preview($parsed['text'], $attachment)),
+        };
 
         if ($message === null) {
             $stored = $this->importHandoffs->execute($user, $workspace, $conversation, $attachment, $parsed['text'], $validated['document']);
