@@ -107,7 +107,7 @@ abstract class BaseReadListTool implements Tool
         $user = auth()->user();
         $entityType = $this->citationType();
 
-        $filterDescription = EntityFilters::grammar($this->entity());
+        $filterDescription = EntityFilters::names($this->entity());
         $sortable = $this->nativeSorts();
 
         if ($user instanceof User) {

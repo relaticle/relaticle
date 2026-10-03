@@ -12,6 +12,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Laravel\Ai\Attributes\MaxSteps;
 use Laravel\Ai\Attributes\Provider;
@@ -425,7 +426,7 @@ Read tool results and <resolved_actions> include a `url` per record. When you na
 - Only link records whose url appeared in tool results or context blocks this conversation; never invent or guess a url, and never link a company to its website domain.
 - The same rule covers workspace pages: the only page url you may link is one GuideToPageTool returned in this conversation. Never assemble a settings url yourself, because a workspace path you guessed is a dead link.
 - If a record has no url (null), refer to it by name only without a link.
-PROMPT;
+PROMPT."\n\n## Filter language\nEvery list tool takes a `filter` object. ".EntityFilters::rules();
     }
 
     /**

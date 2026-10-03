@@ -17,6 +17,20 @@ final readonly class EntityFilters
 
     public static function grammar(CrmEntity $entity): string
     {
+        return self::rules().' '.self::names($entity);
+    }
+
+    public static function rules(): string
+    {
+        return implode(' ', [
+            'An object of conditions. Keys starting with $ are keywords: operators ('.implode(', ', CustomFieldFilterSchema::operatorNames()).') and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names.',
+            self::limits(),
+            CustomFieldFilterSchema::valueRules(),
+        ]);
+    }
+
+    public static function names(CrmEntity $entity): string
+    {
         $definitions = self::definitions($entity);
         $named = static fn (FilterKind ...$kinds): array => array_keys(array_filter(
             $definitions,
@@ -27,10 +41,7 @@ final readonly class EntityFilters
             $named(FilterKind::Relation),
         );
 
-        $sentences = [
-            'An object of conditions. Keys starting with $ are keywords: operators ('.implode(', ', CustomFieldFilterSchema::operatorNames()).') and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names.',
-            'Native fields: '.implode(', ', $named(FilterKind::Text, FilterKind::DateTime, FilterKind::Enum)).'.',
-        ];
+        $sentences = ['Native fields: '.implode(', ', $named(FilterKind::Text, FilterKind::DateTime, FilterKind::Enum)).'.'];
 
         if ($relations !== []) {
             $sentences[] = 'Relations take '.implode(', ', FilterDefinition::LINK_OPERATORS).' on record ids, or conditions on the related record: '.implode(', ', $relations).'.';
@@ -44,12 +55,9 @@ final readonly class EntityFilters
             $sentences[] = "{$name} takes {$definitions[$name]->operand()}, for example ".CustomFieldFilterSchema::json([$name => $definitions[$name]->example()]).'.';
         }
 
-        return implode(' ', [
-            ...$sentences,
-            'custom_fields takes an object keyed by custom field code, each value an operator object.',
-            self::limits(),
-            CustomFieldFilterSchema::valueRules(),
-        ]);
+        $sentences[] = 'custom_fields takes an object keyed by custom field code, each value an operator object.';
+
+        return implode(' ', $sentences);
     }
 
     public static function limits(): string

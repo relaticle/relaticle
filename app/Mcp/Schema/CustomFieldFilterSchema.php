@@ -21,6 +21,8 @@ final readonly class CustomFieldFilterSchema
     /** @var list<string> */
     public const array DOMAIN_OPERATORS = ['$in', '$not_in'];
 
+    public const string DOMAIN_MEANING = 'the host of each value';
+
     public const string EMPTINESS_RULE = '$is_empty takes true or false.';
 
     public const string EMPTY_MATCH_RULE = '$not_in and $has_none also match records where the field is empty.';
@@ -130,11 +132,15 @@ final readonly class CustomFieldFilterSchema
             $sentences[] = ucfirst(Arr::join($types, ', ', ' and '))." values match {$matching}.";
         }
 
-        $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as '.self::json(self::DOMAIN_EXAMPLE).', which matches the host of each value.';
-        $sentences[] = self::EMPTY_MATCH_RULE;
-        $sentences[] = self::EMPTINESS_RULE;
+        $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as '.self::json(self::DOMAIN_EXAMPLE).', which matches '.self::DOMAIN_MEANING.'.';
+        $sentences[] = self::generalRules();
 
         return implode(' ', $sentences);
+    }
+
+    public static function generalRules(): string
+    {
+        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE;
     }
 
     /**

@@ -633,19 +633,21 @@ it('lists option labels for a select but not for a tags-input field with suggest
         ->and($lines->first(fn (string $line): bool => str_starts_with($line, '- labels')))->not->toContain('one of:');
 });
 
-it('names the domain sub-field operators and the matching rule on email and phone fields', function (): void {
+it('names the domain sub-field operators and the matching rule once per email and phone type', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
     $lines = collect(explode("\n", resolve(CustomFieldsFilterDescriber::class)->describe($user, 'people')));
-    $email = $lines->first(fn (string $line): bool => str_starts_with($line, '- emails'));
-    $phone = $lines->first(fn (string $line): bool => str_starts_with($line, '- phone_number'));
+    $email = $lines->first(fn (string $line): bool => str_starts_with($line, '- email:'));
+    $phone = $lines->first(fn (string $line): bool => str_starts_with($line, '- phone:'));
+    $field = $lines->first(fn (string $line): bool => str_starts_with($line, '- emails ('));
     $filterDescription = (new ListPeopleTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
 
-    expect($email)->toContain('operators: $has_any, $has_none, $is_empty;', 'sub-field domain: $in, $not_in', CustomFieldType::EMAIL->filterMatching())
+    expect($email)->toContain('operators $has_any, $has_none, $is_empty;', 'sub-field domain takes $in, $not_in', CustomFieldType::EMAIL->filterMatching())
         ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
         ->and($phone)->not->toContain('sub-field')
-        ->and($filterDescription)->toContain(EntityFilters::grammar(CrmEntity::People))
+        ->and($field)->toBe('- emails (Emails, email)')
+        ->and($filterDescription)->toStartWith(EntityFilters::names(CrmEntity::People))
         ->and(CustomFieldFilterSchema::valueRules())->toContain('domain sub-field with $in or $not_in', CustomFieldType::PHONE->filterMatching());
 });
 
@@ -654,9 +656,7 @@ it('renders the related entity and the field type on chat and states emptiness o
     $this->actingAs($user);
 
     $opportunities = resolve(CustomFieldsFilterDescriber::class)->describe($user, 'opportunity');
-    $notes = (new ListNotesTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
 
-    expect($opportunities)->toContain('- contact (relation to people;', '- amount (Amount, currency;', '- close_date (Close Date, date;')
-        ->and($opportunities)->not->toContain('- amount (Amount;')
-        ->and($notes)->toContain('No filterable custom fields are defined', CustomFieldFilterSchema::EMPTINESS_RULE);
+    expect($opportunities)->toContain('- contact (relation to people;', '- amount (Amount, currency)', '- close_date (Close Date, date)')
+        ->and(resolve(CustomFieldsFilterDescriber::class)->describe($user, 'note'))->toContain('No filterable custom fields are defined');
 });

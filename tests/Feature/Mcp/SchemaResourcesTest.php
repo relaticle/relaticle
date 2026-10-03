@@ -339,13 +339,14 @@ it('serializes empty custom-field maps as objects in resources and tools', funct
         ->resource(CompanySchemaResource::class)
         ->assertOk()
         ->assertSee('"custom_fields": {}')
+        ->assertSee('"types": {}')
         ->assertDontSee('"custom_fields": []');
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'company'])
         ->assertOk()
         ->assertSee('"custom_fields":{}')
-        ->assertSee('"custom_fields":{}},"relationships"')
+        ->assertSee('"types":{},"custom_fields":{}},"relationships"')
         ->assertDontSee('"custom_fields":[]');
 });
 

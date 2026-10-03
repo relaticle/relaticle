@@ -60,7 +60,8 @@ it('returns the current active schema through a tool', function (): void {
             ->has('custom_fields.emails')
             ->has('filterable_fields.name.operators')
             ->has('filterable_fields.company.entity')
-            ->has('filterable_fields.custom_fields.emails.sub_fields.domain')
+            ->has('filterable_fields.types.email.sub_fields.domain')
+            ->has('filterable_fields.custom_fields.emails.type')
             ->has('relationships')
             ->etc());
 });

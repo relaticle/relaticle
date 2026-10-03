@@ -498,23 +498,30 @@ it('rejects a list operand longer than one hundred values', function (): void {
         ->assertHasErrors(['stage: pass at most 100 values.']);
 });
 
-it('publishes list and emptiness operators for email, phone, and link fields', function (): void {
+it('publishes list and emptiness operators for email, phone, and link types', function (): void {
     $operators = ['$has_any', '$has_none', '$is_empty'];
-    $domain = ['domain' => ['$in', '$not_in']];
+    $domain = [
+        'operators' => ['$in', '$not_in'],
+        'matches' => 'the host of each value',
+        'example' => ['domain' => ['$in' => ['acme.com']]],
+    ];
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('filterable_fields.custom_fields.emails.operators', $operators)
-            ->where('filterable_fields.custom_fields.emails.sub_fields', $domain)
-            ->where('filterable_fields.custom_fields.emails.matching', CustomFieldType::EMAIL->filterMatching())
-            ->where('filterable_fields.custom_fields.phone_number.operators', $operators)
-            ->where('filterable_fields.custom_fields.phone_number.matching', CustomFieldType::PHONE->filterMatching())
-            ->missing('filterable_fields.custom_fields.phone_number.sub_fields')
-            ->where('filterable_fields.custom_fields.linkedin.operators', $operators)
-            ->where('filterable_fields.custom_fields.linkedin.sub_fields', $domain)
-            ->where('filterable_fields.custom_fields.linkedin.matching', CustomFieldType::LINK->filterMatching())
+            ->where('filterable_fields.types.email.operators', $operators)
+            ->where('filterable_fields.types.email.sub_fields.domain', $domain)
+            ->where('filterable_fields.types.email.matching', CustomFieldType::EMAIL->filterMatching())
+            ->where('filterable_fields.types.phone.operators', $operators)
+            ->where('filterable_fields.types.phone.matching', CustomFieldType::PHONE->filterMatching())
+            ->missing('filterable_fields.types.phone.sub_fields')
+            ->where('filterable_fields.types.link.operators', $operators)
+            ->where('filterable_fields.types.link.sub_fields.domain', $domain)
+            ->where('filterable_fields.types.link.matching', CustomFieldType::LINK->filterMatching())
+            ->where('filterable_fields.custom_fields.emails', ['name' => 'Emails', 'type' => 'email'])
+            ->where('filterable_fields.custom_fields.phone_number.type', 'phone')
+            ->where('filterable_fields.custom_fields.linkedin.type', 'link')
             ->etc());
 });
 

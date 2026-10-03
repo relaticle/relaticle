@@ -26,7 +26,7 @@ final readonly class CustomFieldSchema
 {
     private const string WRITE_USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID.';
 
-    private const string FILTER_USAGE = 'Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object. Names, operators, operands and options are listed in filterable_fields.';
+    private const string FILTER_USAGE = 'Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object. Names, operands and options are listed in filterable_fields, and the operators, matching rule and example of each field type under filterable_fields.types.';
 
     public function __construct(private FilterVocabulary $vocabulary) {}
 
@@ -36,7 +36,7 @@ final readonly class CustomFieldSchema
             self::WRITE_USAGE,
             self::FILTER_USAGE,
             EntityFilters::limits(),
-            CustomFieldFilterSchema::valueRules(),
+            CustomFieldFilterSchema::generalRules(),
             'Filter example: '.CustomFieldFilterSchema::json(EntityFilters::example($entity)).'.',
         ]);
     }
@@ -63,6 +63,7 @@ final readonly class CustomFieldSchema
     public function filterableFields(User $user, CrmEntity $entity): stdClass
     {
         $vocabulary = $this->vocabulary->for($user, $entity);
+        $vocabulary['types'] = (object) $vocabulary['types'];
         $vocabulary['custom_fields'] = (object) $vocabulary['custom_fields'];
 
         return (object) $vocabulary;
