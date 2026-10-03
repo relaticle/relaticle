@@ -168,6 +168,11 @@
             "@putenv XDEBUG_MODE=coverage",
             "pest --parallel"
         ],
+        "test:affected": [
+            "Composer\\Config::disableProcessTimeout",
+            "@putenv XDEBUG_MODE=coverage",
+            "pest --parallel --tia --baselined --filtered"
+        ],
         "test:pest:full": [
             "Composer\\Config::disableProcessTimeout",
             "pest --parallel --no-tia"

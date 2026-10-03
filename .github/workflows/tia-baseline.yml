@@ -1,0 +1,110 @@
+name: TIA Baseline
+
+# Pest looks for this workflow filename and for an artifact named
+# pest-tia-baseline. Recording the test dependency graph on main lets
+# `composer test:affected` in any local checkout run only the tests a diff
+# can reach, instead of paying a full recording run per branch.
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/tia-baseline.yml
+
+# One baseline per ref is enough: a newer push makes the in-flight recording stale.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    name: Record TIA Baseline
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:alpine
+        env:
+          POSTGRES_DB: relaticle_testing
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      # tests/Helpers/PestTiaRuntime.php stores a complete run in the git common
+      # directory unless told otherwise. Pinning it gives the upload step a path.
+      RELATICLE_PEST_TIA_STORAGE: ${{ github.workspace }}/storage/framework/testing/pest-tia
+      RELATICLE_PEST_TIA_SHARED: '1'
+      # The run uses phpunit.xml, the file the graph fingerprint tracks, so the
+      # CI-only values of phpunit.ci.xml come from the environment instead.
+      # Without them .env.testing supplies the local Postgres user, with no password.
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5432
+      DB_DATABASE: relaticle_testing
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      BROADCAST_CONNECTION: log
+      PUSHER_APP_KEY: test-key
+      PUSHER_APP_SECRET: test-secret
+      PUSHER_APP_ID: test-id
+      PUSHER_APP_CLUSTER: mt1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Cache Dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
+          tools: composer:v2
+          coverage: pcov
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan passport:keys --force --no-interaction
+
+      - name: Record TIA baseline
+        run: vendor/bin/pest --parallel --tia --fresh
+
+      - name: Upload TIA baseline
+        uses: actions/upload-artifact@v7
+        with:
+          name: pest-tia-baseline
+          path: storage/framework/testing/pest-tia
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
