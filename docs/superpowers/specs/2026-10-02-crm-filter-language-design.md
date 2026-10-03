@@ -54,7 +54,7 @@ A flat namespace is not possible: production holds 9 custom fields coded `name`,
 
 - Keys in one object are ANDed. `$and` takes an array and exists for the case JSON cannot hold: two `$or` keys in one object.
 - `$or` takes an array of nodes.
-- `$not` takes one node and returns every record the node does not return, empty values included. It compiles as a set complement, `whereNotIn(<qualified key>, <inner query selecting the key>)`, with the inner query built through the same registry and no table alias (the architecture rules: `whereKey()` and `whereRelation()` qualify with the table name, which Postgres rejects under an alias). It never compiles as SQL `NOT (...)`, which drops rows where a nullable column is null. `$not_in`, `$has_none` and relation `$not_in` follow the same rule.
+- `$not` takes one node and returns every record the node does not return, empty values included. It compiles as a set complement: `NOT EXISTS` over a derived table of the matching keys, which Postgres plans as a hash anti-join. (`NOT IN` over the same subquery degrades sharply past about 150k inner ids at the production `work_mem` of 4MB.) The inner query is built through the same registry, bounded to the acting workspace, with no alias on the model table (the architecture rules: `whereKey()` and `whereRelation()` qualify with the table name, which Postgres rejects under an alias). It never compiles as SQL `NOT (...)`, which drops rows where a nullable column is null. `$not_in`, `$has_none` and relation `$not_in` follow the same rule.
 - An empty `$and` or `$or` array, an empty `$not` object, and an empty relation node are 422s. An empty top-level filter is no filter.
 
 ### 4. Relations
@@ -73,9 +73,9 @@ Relation names match the JSON:API relationship and `include` names.
 
 - Record relation operators: `$in`, `$not_in` (record ids), `$is_empty`, plus any nested node.
 - Member relation operators: `$in`, `$not_in` (member ids), `$is_empty`. Member names and emails are not filterable.
-- To-many means "at least one related record matches", and every condition in one relation node applies to the same related record. "None match" is `{"$not": {"people": {...}}}`.
+- To-many means "at least one related record matches", and every condition in one relation node applies to the same related record. "None match" is `{"$not": {"people": {...}}}`. A link `$in` in the same node joins that same-record match: `{"people": {"$in": [id], "name": {...}}}` asks for one person who is both. `$not_in` and `$is_empty` are statements about the link as a whole and stay separate.
 - Relations nest at most 2 hops: people, then company, then opportunities is allowed; a third relation is a 422.
-- Related records are same-workspace by construction (`TenantFkValidator` on write), so a relation node exposes nothing a list endpoint does not.
+- Every record relation subquery carries an explicit bound to the acting user's workspace. Related records are same-workspace by construction (`TenantFkValidator` on write), but queued chat jobs do not set the ambient workspace scope, so the filter never relies on it. A relation node exposes nothing a list endpoint does not.
 
 This replaces `company_id`, `contact_id`, `people_id`, `opportunity_id`, `assignee_ids`, `notable_type` and `notable_id`.
 
@@ -124,6 +124,8 @@ Reasons, from the sources checked:
 - Emails: RFC 5321 section 2.4 requires the local part to keep its case, and the app sends mail. 62 stored emails have an uppercase local part.
 - Links: RFC 3986 section 6.2.2.1 makes scheme and host case-insensitive. Dropping `www.` is a product convention, not a standard. The `link` type also holds LinkedIn URLs, whose paths matter, so only a field set to the domain variant loses its path. The package already strips the scheme of every link in `LinkFieldType::setValue()`, documented as "Normalize a value before storage and comparison", but only the panel's `LinkComponent` and `UniqueCustomFieldValue` call it, so API, MCP, chat and import store schemes.
 - Company `domains` declares `unique_per_entity_type`, but `UniqueCustomFieldValue` compares exact strings, so `https://acme.com` and `acme.com` both pass. 70% of stored values carry a scheme, and 144 hosts are shared by 426 companies through format differences alone.
+
+Every place the app stores, matches or compares a custom field value uses the canonical form through one owner, `App\Support\CustomFields\CanonicalValue`: writes, API upsert matching, CSV import matching, the activity log's no-op check and chat's proposal diff. Matching also tries the raw spelling, so rows written before the backfill still match.
 
 Uniqueness changes with it: `UniqueCustomFieldValue` normalizes each candidate with the field's normalizer. On save, it skips values the record already held before this change: a new or changed value must be unique; a record's existing values are grandfathered. Restoring a trashed record stays strict, because `takenUniqueCustomFieldValues()` exists to re-check exactly the values the record already holds. This unblocks the 291 companies whose identical duplicate domains already fail the panel form's uniqueness check, and keeps the 426 newly colliding ones saveable until #885 lets someone merge them.
 
@@ -232,7 +234,7 @@ Each filter class describes itself (name, kind, operators, options, related enti
 
 ### custom-fields package (3.12)
 
-Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint here, as v3.11 was for this PR.
+The package work is merged on `3.x` (PR #244). The app requires it as `3.x-dev as 3.12.0` until both PRs are finalized end to end; only then is `v3.12.0` tagged and the constraint switched to `^3.12`.
 
 1. The normalizer is the package's existing hook, `BaseFieldType::setValue(string): string`. A new `BaseFieldType::normalize(string $value, CustomField $field): string` defaults to `setValue($value)` so a setting can choose the form; existing third-party field types keep working. `SafeValueConverter::toDbSafe()` gains an optional `?CustomField` and runs `normalize()` on every string item. Every write path already calls `toDbSafe()`: `CustomFieldValue::setValue()` (panel, API, MCP, chat, actions), `ExecuteImportJob` and `BulkCustomFieldValueWriter`. `LinkComponent` and `UniqueCustomFieldValue` switch from `setValue()` to `normalize()`.
 2. `PhoneFieldType::setValue()`: E.164 plus RFC 3966 extension, through `CountryPhoneService`. Input it cannot parse comes back unchanged; validation stays the gate. `CountryPhoneService::formatToE164()` (the panel's input) and `parseE164()` (the panel's display) keep the extension too.
@@ -248,7 +250,7 @@ Branch from `3.x` in the package repo, release `v3.12.0`, bump the constraint he
 
 ## Rollout
 
-1. Release custom-fields `v3.12.0`; bump the constraint.
+1. Tag custom-fields `v3.12.0` after the end-to-end walk; switch the constraint from `3.x-dev as 3.12.0` to `^3.12`.
 2. Migration: set `link_variant` to `domain` on every company `domains` field (query builder, chunked with `eachById`). `CompanyField::DOMAINS` declares it for new workspaces.
 3. Command `custom-fields:normalize-values {--force}`: reports by default, writes on `--force`, idempotent, chunked, query builder only.
    - Every phone and link value is re-run through its field type's `normalize()`; a value already in canonical form is left alone, so a second run changes nothing.
