@@ -7,14 +7,34 @@ namespace App\Support\Filters;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\FilterKind;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\User;
 use Spatie\QueryBuilder\AllowedFilter;
 
 final readonly class EntityFilters
 {
-    public const string GRAMMAR = 'An object of conditions. Keys starting with $ are keywords: operators ($eq, $gt, $gte, $lt, $lte, $contains, $in, $not_in, $has_any, $has_none, $is_empty) and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names: native fields (name, title, created_at, updated_at, creation_source), relations (company, contact, people, opportunities, companies, creator, accountOwner, assignees), computed filters (stale_days on opportunities takes {"$gte": <days without activity>}, assigned_to_me on tasks takes {"$eq": true}) and custom_fields, an object keyed by custom field code. Each field takes an operator object such as {"$gte": "2026-10-01"}. A relation takes $in, $not_in or $is_empty on record ids, or conditions on the related record. Email and link custom fields also take a domain sub-field, {"domain": {"$in": ["acme.com"]}}, which matches the host of each value.';
+    private const string GRAMMAR = 'An object of conditions. Keys starting with $ are keywords: operators ($eq, $gt, $gte, $lt, $lte, $contains, $in, $not_in, $has_any, $has_none, $is_empty) and logic ($and and $or take a list of condition objects, $not takes one and also returns records where the inner fields are empty). Other keys are names: native fields (name, title, created_at, updated_at, creation_source), relations (company, contact, people, opportunities, companies, creator, accountOwner, assignees), computed filters (stale_days on opportunities takes {"$gte": <days without activity>}, assigned_to_me on tasks takes {"$eq": true}) and custom_fields, an object keyed by custom field code. Each field takes an operator object such as {"$gte": "2026-10-01"}. A relation takes $in, $not_in or $is_empty on record ids, or conditions on the related record.';
 
     public function __construct(private User $user) {}
+
+    public static function grammar(): string
+    {
+        return self::GRAMMAR.' '.CustomFieldFilterSchema::valueRules();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function example(CrmEntity $entity): array
+    {
+        return [
+            $entity->titleColumn() => ['$contains' => 'Acme'],
+            '$or' => [
+                ['creation_source' => ['$eq' => CreationSource::API->value]],
+                ['created_at' => ['$gte' => '2026-01-01']],
+            ],
+        ];
+    }
 
     /**
      * @return array<string, FilterDefinition>

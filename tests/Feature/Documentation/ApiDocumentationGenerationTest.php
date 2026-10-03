@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
+use App\Support\Filters\EntityFilters;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -64,14 +66,32 @@ it('generates the complete API documentation with company ownership fields', fun
     $user = User::factory()->withPersonalWorkspace()->create();
     Sanctum::actingAs($user);
 
-    foreach (['companies', 'people', 'opportunities', 'tasks', 'notes'] as $entity) {
-        $example = $spec['paths']["/api/v1/{$entity}/query"]['post']['requestBody']['content']['application/json']['schema']['properties']['filter']['examples'][0];
+    $entities = [
+        'companies' => CrmEntity::Company,
+        'people' => CrmEntity::People,
+        'opportunities' => CrmEntity::Opportunity,
+        'tasks' => CrmEntity::Task,
+        'notes' => CrmEntity::Note,
+    ];
 
-        $this->postJson("/api/v1/{$entity}/query", ['filter' => $example])->assertOk();
+    foreach ($entities as $path => $entity) {
+        $filter = $spec['paths']["/api/v1/{$path}/query"]['post']['requestBody']['content']['application/json']['schema']['properties']['filter'];
+
+        expect($filter['examples'][0])->toBe(EntityFilters::example($entity))
+            ->and($filter['description'])->toBe(EntityFilters::grammar());
+
+        $this->postJson("/api/v1/{$path}/query", ['filter' => $filter['examples'][0]])->assertOk();
+    }
+
+    foreach (GetFromSpatieQueryBuilder::CUSTOM_FIELD_EXAMPLES as $path => $example) {
+        expect($customFieldFilter['description'])->toContain($example);
+
+        $this->getJson("/api/v1/{$path}?{$example}")->assertOk();
     }
 
     expect($customFieldFilter)->not->toBeNull()
-        ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
+        ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([])
+        ->and($customFieldFilter['description'])->toContain(CustomFieldFilterSchema::valueRules(), CustomFieldType::PHONE->filterMatching(), 'domain sub-field with $in or $not_in');
 });
 
 it('generates the API documentation before the database is migrated', function (): void {

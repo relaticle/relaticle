@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scribe\Strategies;
 
 use App\Enums\CrmEntity;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Support\Filters\EntityFilters;
 use Knuckles\Camel\Extraction\ExtractedEndpointData;
 use Knuckles\Scribe\Extracting\Strategies\Strategy;
@@ -20,7 +21,10 @@ final class GetFromSpatieQueryBuilder extends Strategy
 {
     use DescribesListEndpoint;
 
-    public const string CUSTOM_FIELD_FILTER_DESCRIPTION = 'Filter by a custom field value. Single choice: $eq, $in, $not_in. Multi choice, tags, email, phone, link: $has_any, $has_none. Text: $eq, $contains. Numbers and dates: $eq, $gt, $gte, $lt, $lte. Checkbox, toggle: $eq. Every type: $is_empty (1, 0, true or false). Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma. Tags match the exact stored value. Email and link values match in any case and phones in any format; email and link take a domain sub-field, for example filter[custom_fields][emails][domain][$in]=acme.com. Repeat [] to send several values. $not_in and $has_none also match records where the field is empty. Up to 20 conditions per filter, 100 values per list. Example for an opportunity stage field: filter[custom_fields][stage][$in]=Qualification,Prospecting.';
+    public const array CUSTOM_FIELD_EXAMPLES = [
+        'opportunities' => 'filter[custom_fields][stage][$in]=Qualification,Prospecting',
+        'people' => 'filter[custom_fields][emails][domain][$not_in]=acme.com',
+    ];
 
     /**
      * @param  array<string, array<string, string|bool>>  $routeRules
@@ -63,10 +67,22 @@ final class GetFromSpatieQueryBuilder extends Strategy
         $params['filter[custom_fields][{code}][{operator}]'] = [
             'type' => 'string',
             'required' => false,
-            'description' => self::CUSTOM_FIELD_FILTER_DESCRIPTION,
+            'description' => $this->customFieldFilterDescription(),
             'example' => null,
         ];
 
         return $params;
+    }
+
+    private function customFieldFilterDescription(): string
+    {
+        return implode(' ', [
+            'Filter by a custom field value.',
+            CustomFieldFilterSchema::operatorSummary(),
+            'Every type: $is_empty (1, 0, true or false). Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID; an unknown one returns 422. Choice lists split on commas, so repeat the parameter with [] when a label contains a comma.',
+            CustomFieldFilterSchema::valueRules(),
+            'Repeat [] to send several values. $not_in and $has_none also match records where the field is empty. Up to 20 conditions per filter, 100 values per list.',
+            'Examples: '.implode(' and ', self::CUSTOM_FIELD_EXAMPLES).'.',
+        ]);
     }
 }

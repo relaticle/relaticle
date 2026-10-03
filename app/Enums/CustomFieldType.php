@@ -107,6 +107,16 @@ enum CustomFieldType: string
         };
     }
 
+    /** How a filter operand is matched against stored values, or null when it is compared as typed. */
+    public function filterMatching(): ?string
+    {
+        return match ($this) {
+            self::EMAIL, self::LINK => 'in any letter case',
+            self::PHONE => 'in any format, and the operand needs a country code such as +1 415 555 0100',
+            default => null,
+        };
+    }
+
     /** Whether values are picked from the field's own options rather than typed freely. */
     public function isChoice(): bool
     {

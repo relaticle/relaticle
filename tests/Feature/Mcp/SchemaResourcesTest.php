@@ -339,13 +339,14 @@ it('serializes empty custom-field maps as objects in resources and tools', funct
         ->resource(CompanySchemaResource::class)
         ->assertOk()
         ->assertSee('"custom_fields": {}')
-        ->assertSee('"filterable_fields": {}');
+        ->assertDontSee('"custom_fields": []');
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'company'])
         ->assertOk()
         ->assertSee('"custom_fields":{}')
-        ->assertSee('"filterable_fields":{}');
+        ->assertSee('"custom_fields":{}},"relationships"')
+        ->assertDontSee('"custom_fields":[]');
 });
 
 it('invalidates the entity schema cache when an option changes', function (): void {

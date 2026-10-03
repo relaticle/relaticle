@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Enums\CrmEntity;
 use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
@@ -37,13 +38,15 @@ abstract class BaseListTool extends Tool
     /** @return class-string */
     abstract protected function actionClass(): string;
 
+    abstract protected function entity(): CrmEntity;
+
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
 
     public function schema(JsonSchema $schema): array
     {
         return [
-            'filter' => $schema->object()->description(EntityFilters::GRAMMAR.' Native fields and relations sit at the top level of filter. Custom field codes go under filter.custom_fields, and filterable_fields in get-crm-schema lists those codes with their operators and options. Example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}.'),
+            'filter' => $schema->object()->description(EntityFilters::grammar().' Native fields and relations sit at the top level of filter. Custom field codes go under filter.custom_fields, and filterable_fields in get-crm-schema lists those codes with their operators and options. Example: '.json_encode(EntityFilters::example($this->entity())).'.'),
             'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
             'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
             'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),

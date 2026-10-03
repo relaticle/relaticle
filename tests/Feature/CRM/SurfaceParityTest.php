@@ -18,23 +18,34 @@ use App\Mcp\Resources\OpportunitySchemaResource;
 use App\Mcp\Resources\PeopleSchemaResource;
 use App\Mcp\Resources\TaskSchemaResource;
 use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Company\CreateCompanyTool as McpCreateCompany;
 use App\Mcp\Tools\Company\GetCompanyTool as McpGetCompany;
+use App\Mcp\Tools\Company\ListCompaniesTool as McpListCompanies;
+use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\Note\CreateNoteTool as McpCreateNote;
 use App\Mcp\Tools\Note\GetNoteTool as McpGetNote;
+use App\Mcp\Tools\Note\ListNotesTool as McpListNotes;
 use App\Mcp\Tools\Opportunity\CreateOpportunityTool as McpCreateOpportunity;
 use App\Mcp\Tools\Opportunity\GetOpportunityTool as McpGetOpportunity;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool as McpListOpportunities;
 use App\Mcp\Tools\People\CreatePeopleTool as McpCreatePeople;
 use App\Mcp\Tools\People\GetPeopleTool as McpGetPeople;
+use App\Mcp\Tools\People\ListPeopleTool as McpListPeople;
 use App\Mcp\Tools\Task\CreateTaskTool as McpCreateTask;
 use App\Mcp\Tools\Task\GetTaskTool as McpGetTask;
+use App\Mcp\Tools\Task\ListTasksTool as McpListTasks;
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterVocabulary;
+use App\Support\Filters\LogicFilter;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Ai\Tools\Request as ChatRequest;
 use Laravel\Sanctum\Sanctum;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompany;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompany;
@@ -51,18 +62,19 @@ use Relaticle\Chat\Tools\People\ListPeopleTool as ChatListPeople;
 use Relaticle\Chat\Tools\Task\CreateTaskTool as ChatCreateTask;
 use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTask;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasks;
+use Spatie\QueryBuilder\AllowedFilter;
 
 /**
- * @return array<string, array{0: CrmEntity, 1: class-string, 2: class-string, 3: class-string, 4: class-string, 5: class-string, 6: class-string, 7: class-string}>
+ * @return array<string, array{0: CrmEntity, 1: class-string, 2: class-string, 3: class-string, 4: class-string, 5: class-string, 6: class-string, 8: class-string}>
  */
 function crmSurfaces(): array
 {
     return [
-        'company' => [CrmEntity::Company, StoreCompanyRequest::class, McpCreateCompany::class, ChatCreateCompany::class, McpGetCompany::class, ChatGetCompany::class, ChatListCompanies::class, CompanySchemaResource::class],
-        'people' => [CrmEntity::People, StorePeopleRequest::class, McpCreatePeople::class, ChatCreatePerson::class, McpGetPeople::class, ChatGetPerson::class, ChatListPeople::class, PeopleSchemaResource::class],
-        'opportunity' => [CrmEntity::Opportunity, StoreOpportunityRequest::class, McpCreateOpportunity::class, ChatCreateOpportunity::class, McpGetOpportunity::class, ChatGetOpportunity::class, ChatListOpportunities::class, OpportunitySchemaResource::class],
-        'task' => [CrmEntity::Task, StoreTaskRequest::class, McpCreateTask::class, ChatCreateTask::class, McpGetTask::class, ChatGetTask::class, ChatListTasks::class, TaskSchemaResource::class],
-        'note' => [CrmEntity::Note, StoreNoteRequest::class, McpCreateNote::class, ChatCreateNote::class, McpGetNote::class, ChatGetNote::class, ChatListNotes::class, NoteSchemaResource::class],
+        'company' => [CrmEntity::Company, StoreCompanyRequest::class, McpCreateCompany::class, ChatCreateCompany::class, McpGetCompany::class, ChatGetCompany::class, ChatListCompanies::class, CompanySchemaResource::class, McpListCompanies::class],
+        'people' => [CrmEntity::People, StorePeopleRequest::class, McpCreatePeople::class, ChatCreatePerson::class, McpGetPeople::class, ChatGetPerson::class, ChatListPeople::class, PeopleSchemaResource::class, McpListPeople::class],
+        'opportunity' => [CrmEntity::Opportunity, StoreOpportunityRequest::class, McpCreateOpportunity::class, ChatCreateOpportunity::class, McpGetOpportunity::class, ChatGetOpportunity::class, ChatListOpportunities::class, OpportunitySchemaResource::class, McpListOpportunities::class],
+        'task' => [CrmEntity::Task, StoreTaskRequest::class, McpCreateTask::class, ChatCreateTask::class, McpGetTask::class, ChatGetTask::class, ChatListTasks::class, TaskSchemaResource::class, McpListTasks::class],
+        'note' => [CrmEntity::Note, StoreNoteRequest::class, McpCreateNote::class, ChatCreateNote::class, McpGetNote::class, ChatGetNote::class, ChatListNotes::class, NoteSchemaResource::class, McpListNotes::class],
     ];
 }
 
@@ -214,3 +226,51 @@ it('names every custom field filter operator in the mcp list tool description', 
     expect($publishedOperators)->not->toBeEmpty()
         ->and(array_diff($publishedOperators, str($description)->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
 });
+
+it('publishes one filter vocabulary on mcp, chat and the registry', function (CrmEntity $entity, string $chatTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
+    $registry = array_map(fn (AllowedFilter $filter): string => $filter->getName(), new EntityFilters($user)->for($entity));
+    $published = [];
+
+    RelaticleServer::actingAs($user)
+        ->tool(GetCrmSchemaTool::class, ['entity_type' => $entity->value])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) use (&$published): void {
+            $published = (array) $json->toArray()['filterable_fields'];
+            $json->etc();
+        });
+
+    $chatDescription = resolve($chatTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+
+    expect(array_keys($vocabulary))->toEqualCanonicalizing(array_values(array_diff($registry, LogicFilter::KEYWORDS)))
+        ->and(array_keys($published))->toEqualCanonicalizing(array_keys($vocabulary))
+        ->and(array_diff(array_keys($vocabulary), str($chatDescription)->matchAll('/[A-Za-z_]+/')->all()))->toBe([]);
+})->with(array_map(fn (array $row): array => [$row[0], $row[6]], crmSurfaces()));
+
+it('publishes filter examples the list action accepts on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Sanctum::actingAs($user);
+
+    $example = json_encode(EntityFilters::example($entity));
+    $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
+    $customFieldExamples = array_map(fn (array $field): array => ['custom_fields' => [$field['code'] => $field['example']]], array_map(fn (string $code, array $field): array => [...$field, 'code' => $code], array_keys($vocabulary['custom_fields']), $vocabulary['custom_fields']));
+    $chatDescription = resolve($chatTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+    $mcpDescription = resolve($mcpTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+    $usage = resolve($schemaResource)->toSchema($user)['usage'];
+
+    $chatExamples = [$example, ...array_map(json_encode(...), array_slice($customFieldExamples, 0, 1))];
+
+    expect($mcpDescription)->toContain($example)
+        ->and($usage)->toContain($example)
+        ->and($chatDescription)->toContain(...$chatExamples);
+
+    foreach ([EntityFilters::example($entity), ...$customFieldExamples] as $filter) {
+        RelaticleServer::actingAs($user)->tool($mcpTool, ['filter' => $filter])->assertHasNoErrors();
+
+        expect(json_decode(resolve($chatTool)->handle(new ChatRequest(['filter' => $filter])), true))->not->toHaveKey('error');
+    }
+})->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[7], $row[8]], crmSurfaces()));

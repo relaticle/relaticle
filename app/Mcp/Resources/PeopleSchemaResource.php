@@ -75,7 +75,7 @@ final class PeopleSchemaResource extends Resource implements ProvidesEntitySchem
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => CustomFieldSchema::USAGE,
+            'usage' => CustomFieldSchema::usage($this->entity()),
         ];
     }
 }

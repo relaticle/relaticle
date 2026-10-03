@@ -6,6 +6,8 @@ use App\Actions\CustomFields\AddCustomFieldOptions;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
 use App\Enums\CreationSource;
+use App\Enums\CustomFieldType;
+use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -14,6 +16,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Services\Tools\CustomFieldsFilterDescriber;
 use Relaticle\Chat\Tools\BaseReadListTool;
@@ -626,4 +630,20 @@ it('lists option labels for a select but not for a tags-input field with suggest
 
     expect($lines->first(fn (string $line): bool => str_starts_with($line, '- segment')))->toContain('one of: "Enterprise", "SMB"')
         ->and($lines->first(fn (string $line): bool => str_starts_with($line, '- labels')))->not->toContain('one of:');
+});
+
+it('names the domain sub-field operators and the matching rule on email and phone fields', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $lines = collect(explode("\n", resolve(CustomFieldsFilterDescriber::class)->describe($user, 'people')));
+    $email = $lines->first(fn (string $line): bool => str_starts_with($line, '- emails'));
+    $phone = $lines->first(fn (string $line): bool => str_starts_with($line, '- phone_number'));
+    $filterDescription = (new ListPeopleTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
+
+    expect($email)->toContain('operators: $has_any, $has_none, $is_empty;', 'sub-field domain: $in, $not_in', CustomFieldType::EMAIL->filterMatching())
+        ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
+        ->and($phone)->not->toContain('sub-field')
+        ->and($filterDescription)->toContain(EntityFilters::grammar())
+        ->and(CustomFieldFilterSchema::valueRules())->toContain('domain sub-field with $in or $not_in', CustomFieldType::PHONE->filterMatching());
 });

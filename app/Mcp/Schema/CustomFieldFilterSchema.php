@@ -9,6 +9,7 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\Filters\CustomFieldSort;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Spatie\QueryBuilder\AllowedSort;
@@ -16,6 +17,9 @@ use Spatie\QueryBuilder\AllowedSort;
 final readonly class CustomFieldFilterSchema
 {
     public const int MAX_LIST_VALUES = 100;
+
+    /** @var list<string> */
+    public const array DOMAIN_OPERATORS = ['$in', '$not_in'];
 
     /** @var array<int, string> */
     private const array NUMERIC_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte'];
@@ -77,7 +81,7 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
             CustomFieldType::EMAIL, CustomFieldType::LINK => [
                 ...self::listOperators(['$has_any', '$has_none']),
-                'domain' => ['type' => 'object', 'properties' => self::listOperators(['$in', '$not_in'])],
+                'domain' => ['type' => 'object', 'properties' => self::listOperators(self::DOMAIN_OPERATORS)],
             ],
             CustomFieldType::PHONE,
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['$has_any', '$has_none']),
@@ -94,6 +98,56 @@ final readonly class CustomFieldFilterSchema
         };
 
         return $operators === [] ? [] : [...$operators, '$is_empty' => ['type' => 'boolean']];
+    }
+
+    public static function valueRules(): string
+    {
+        $typesByMatching = [];
+        $domainTypes = [];
+
+        foreach (CustomFieldType::cases() as $type) {
+            $matching = $type->filterMatching();
+
+            if ($matching !== null) {
+                $typesByMatching[$matching][] = $type->value;
+            }
+
+            if (isset(self::operatorsForType($type->value)['domain'])) {
+                $domainTypes[] = $type->value;
+            }
+        }
+
+        $sentences = [];
+
+        foreach ($typesByMatching as $matching => $types) {
+            $sentences[] = ucfirst(Arr::join($types, ', ', ' and '))." values match {$matching}.";
+        }
+
+        $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as {"domain": {"$in": ["acme.com"]}}, which matches the host of each value.';
+
+        return implode(' ', $sentences);
+    }
+
+    public static function operatorSummary(): string
+    {
+        $typesByOperators = [];
+
+        foreach (CustomFieldType::cases() as $type) {
+            $operators = array_filter(
+                array_keys(self::operatorsForType($type->value)),
+                static fn (string $operator): bool => str_starts_with($operator, '$') && $operator !== '$is_empty',
+            );
+
+            if ($operators !== []) {
+                $typesByOperators[implode(', ', $operators)][] = $type->value;
+            }
+        }
+
+        return implode(' ', array_map(
+            static fn (string $operators, array $types): string => ucfirst(implode(', ', $types)).": {$operators}.",
+            array_keys($typesByOperators),
+            $typesByOperators,
+        ));
     }
 
     /**

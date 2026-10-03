@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Scribe\Strategies;
 
-use App\Enums\CreationSource;
-use App\Enums\CrmEntity;
 use App\Support\Filters\EntityFilters;
 use Knuckles\Camel\Extraction\ExtractedEndpointData;
 use Knuckles\Scribe\Extracting\Strategies\Strategy;
@@ -34,24 +32,10 @@ final class GetFilterBodyFromEntityFilters extends Strategy
             'filter' => [
                 'type' => 'object',
                 'required' => false,
-                'description' => EntityFilters::GRAMMAR,
-                'example' => $this->exampleFilter(self::LIST_ACTION_ENTITIES[$actionClass]),
+                'description' => EntityFilters::grammar(),
+                'example' => EntityFilters::example(self::LIST_ACTION_ENTITIES[$actionClass]),
             ],
             ...$this->listParameters($actionClass),
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function exampleFilter(CrmEntity $entity): array
-    {
-        return [
-            $entity->titleColumn() => ['$contains' => 'Acme'],
-            '$or' => [
-                ['creation_source' => ['$eq' => CreationSource::API->value]],
-                ['created_at' => ['$gte' => '2026-01-01']],
-            ],
         ];
     }
 }

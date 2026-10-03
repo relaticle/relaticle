@@ -9,6 +9,8 @@ use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\User;
+use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterVocabulary;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Relaticle\CustomFields\Services\ValidationService;
@@ -22,9 +24,21 @@ use stdClass;
  */
 final readonly class CustomFieldSchema
 {
-    public const string USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object such as {"$eq": "Closed Won"}, {"$not_in": ["Done"]} or {"$is_empty": true}. Operators per field are listed in filterable_fields. Filter example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags match the exact stored value. Email and link values match in any case and phones in any format. Email and link fields also take a domain sub-field, such as {"domain": {"$in": ["acme.com"]}}, which matches the host of each value.';
+    private const string WRITE_USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags match the exact stored value.';
 
-    public function __construct(private CustomFieldFilterSchema $filterSchema) {}
+    private const string FILTER_USAGE = 'Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object such as {"$not_in": ["Done"]} or {"$is_empty": true}. Names, operators and options are listed in filterable_fields.';
+
+    public function __construct(private FilterVocabulary $vocabulary) {}
+
+    public static function usage(CrmEntity $entity): string
+    {
+        return implode(' ', [
+            self::WRITE_USAGE,
+            self::FILTER_USAGE,
+            CustomFieldFilterSchema::valueRules(),
+            'Filter example: '.json_encode(EntityFilters::example($entity)).'.',
+        ]);
+    }
 
     public function fields(User $user, CrmEntity $entity): stdClass
     {
@@ -47,7 +61,10 @@ final readonly class CustomFieldSchema
 
     public function filterableFields(User $user, CrmEntity $entity): stdClass
     {
-        return (object) $this->filterSchema->build($user, $entity->value);
+        $vocabulary = $this->vocabulary->for($user, $entity);
+        $vocabulary['custom_fields'] = (object) $vocabulary['custom_fields'];
+
+        return (object) $vocabulary;
     }
 
     /**

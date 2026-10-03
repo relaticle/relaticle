@@ -77,7 +77,7 @@ final class CompanySchemaResource extends Resource implements ProvidesEntitySche
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => CustomFieldSchema::USAGE.' Example: {"name": "Acme", "custom_fields": {"icp": true}}.',
+            'usage' => CustomFieldSchema::usage($this->entity()).' Write example: {"name": "Acme", "custom_fields": {"icp": true}}.',
         ];
     }
 }

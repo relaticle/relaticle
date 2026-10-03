@@ -76,7 +76,7 @@ final class OpportunitySchemaResource extends Resource implements ProvidesEntity
                 'tasksCount' => 'Count of related tasks',
                 'notesCount' => 'Count of related notes',
             ],
-            'usage' => CustomFieldSchema::USAGE,
+            'usage' => CustomFieldSchema::usage($this->entity()),
         ];
     }
 }

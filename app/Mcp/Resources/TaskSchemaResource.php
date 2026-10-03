@@ -95,7 +95,7 @@ final class TaskSchemaResource extends Resource implements ProvidesEntitySchema
                 'peopleCount' => 'Count of related people',
                 'opportunitiesCount' => 'Count of related opportunities',
             ],
-            'usage' => CustomFieldSchema::USAGE,
+            'usage' => CustomFieldSchema::usage($this->entity()),
         ];
     }
 }

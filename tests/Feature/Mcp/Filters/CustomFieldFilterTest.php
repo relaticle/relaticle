@@ -499,23 +499,22 @@ it('rejects a list operand longer than one hundred values', function (): void {
 });
 
 it('publishes list and emptiness operators for email, phone, and link fields', function (): void {
-    $operators = [
-        '$has_any' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
-        '$has_none' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
-        '$is_empty' => ['type' => 'boolean'],
-    ];
-    $domain = ['type' => 'object', 'properties' => [
-        '$in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
-        '$not_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
-    ]];
+    $operators = ['$has_any', '$has_none', '$is_empty'];
+    $domain = ['domain' => ['$in', '$not_in']];
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('filterable_fields.emails.properties', [...array_slice($operators, 0, 2), 'domain' => $domain, '$is_empty' => $operators['$is_empty']])
-            ->where('filterable_fields.phone_number.properties', $operators)
-            ->where('filterable_fields.linkedin.properties', [...array_slice($operators, 0, 2), 'domain' => $domain, '$is_empty' => $operators['$is_empty']])
+            ->where('filterable_fields.custom_fields.emails.operators', $operators)
+            ->where('filterable_fields.custom_fields.emails.sub_fields', $domain)
+            ->where('filterable_fields.custom_fields.emails.matching', CustomFieldType::EMAIL->filterMatching())
+            ->where('filterable_fields.custom_fields.phone_number.operators', $operators)
+            ->where('filterable_fields.custom_fields.phone_number.matching', CustomFieldType::PHONE->filterMatching())
+            ->missing('filterable_fields.custom_fields.phone_number.sub_fields')
+            ->where('filterable_fields.custom_fields.linkedin.operators', $operators)
+            ->where('filterable_fields.custom_fields.linkedin.sub_fields', $domain)
+            ->where('filterable_fields.custom_fields.linkedin.matching', CustomFieldType::LINK->filterMatching())
             ->etc());
 });
 
