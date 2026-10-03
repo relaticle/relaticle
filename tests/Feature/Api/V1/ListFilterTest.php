@@ -6,6 +6,7 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\People\ListPeople;
 use App\Enums\CreationSource;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -411,7 +412,7 @@ it('caps logic depth at three and relation hops at two', function (): void {
     $deep = ['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]];
     $far = ['company' => ['people' => ['company' => ['name' => ['$eq' => 'x']]]]];
 
-    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => $deep]))->assertUnprocessable()->assertJsonValidationErrors(['filter']);
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => $deep]))->assertUnprocessable()->assertJsonValidationErrors(['filter.$not.$or.0.$and.0.$not']);
     $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => $far]))->assertUnprocessable()->assertJsonValidationErrors(['filter.company.people.company']);
 });
 
@@ -456,3 +457,48 @@ it('hints the sigil for a bare operator on a relation node', function (): void {
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.company.in' => 'Operators start with $. Use $in.']);
 });
+
+it('allows logic nested three levels deep', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $filter = ['$not' => ['$or' => [['$and' => [['name' => ['$eq' => 'Nope']]]]]]];
+
+    expect(listIds($this, 'companies', $filter))->toBe([$company->id]);
+});
+
+it('rejects an empty node at every level', function (array $filter, string $message): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListCompaniesTool::class, ['filter' => $filter])
+        ->assertHasErrors([$message]);
+})->with([
+    'custom_fields under $not' => [['$not' => ['custom_fields' => []]], 'filter.$not.custom_fields needs at least one condition.'],
+    'custom_fields under $not in a relation' => [['people' => ['$not' => ['custom_fields' => []]]], 'filter.people.$not.custom_fields needs at least one condition.'],
+    'custom_fields in a relation' => [['people' => ['custom_fields' => []]], 'filter.people.custom_fields needs at least one condition.'],
+    'custom_fields under $and' => [['$and' => [['custom_fields' => []]]], 'filter.$and.0.custom_fields needs at least one condition.'],
+    'a custom field code' => [['custom_fields' => ['stage' => []]], 'filter.custom_fields.stage needs at least one condition.'],
+    'a native field' => [['$not' => ['name' => []]], 'name takes an operator object'],
+    'a member relation' => [['$not' => ['creator' => []]], 'filter.$not.creator needs at least one condition.'],
+]);
+
+it('ignores an empty custom_fields object at the top level', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListCompaniesTool::class, ['filter' => ['custom_fields' => []]])
+        ->assertOk();
+});
+
+it('counts a member relation as a relation hop', function (): void {
+    $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => ['company' => ['people' => ['creator' => ['$is_empty' => 'false']]]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.company.people.creator' => 'Relations nest at most 2 levels.']);
+
+    $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => ['company' => ['creator' => ['$is_empty' => 'false']]]]))
+        ->assertOk();
+});
+
+it('names the replacement of a removed param at every level', function (array $filter, string $path): void {
+    $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => $filter]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$path => 'company_id was replaced. Use company (or companies) with $in.']);
+})->with([
+    'inside $or' => [['$or' => [['company_id' => 'x']]], 'filter.$or.0.company_id'],
+    'inside a relation node' => [['contact' => ['company_id' => 'x']], 'filter.contact.company_id'],
+]);

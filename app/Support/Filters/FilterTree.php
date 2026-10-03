@@ -67,16 +67,12 @@ final readonly class FilterTree
                 continue;
             }
 
-            if (isset(self::REPLACED[$name]) && $path === 'filter') {
+            if (isset(self::REPLACED[$name])) {
                 throw FilterErrors::at($child, __('validation.filter.replaced', ['name' => $name, 'replacement' => self::REPLACED[$name]]));
             }
 
             if ($name === 'custom_fields') {
-                if (($value === null || $value === '') && $path !== 'filter') {
-                    throw FilterErrors::at($child, __('validation.custom_field.filter_not_object'));
-                }
-
-                $conditions += self::countOperators($value);
+                $conditions += self::walkCustomFields($value, $child, $path === 'filter');
 
                 continue;
             }
@@ -105,7 +101,7 @@ final readonly class FilterTree
     private static function walkLogic(string $keyword, mixed $value, CrmEntity $entity, string $path, int $depth, int $hops): int
     {
         if ($depth + 1 > self::MAX_LOGIC_DEPTH) {
-            throw FilterErrors::at('filter', __('validation.filter.too_deep', ['max' => self::MAX_LOGIC_DEPTH]));
+            throw FilterErrors::at($path, __('validation.filter.too_deep', ['max' => self::MAX_LOGIC_DEPTH]));
         }
 
         $branches = $keyword === '$not' ? [$value] : (is_array($value) && array_is_list($value) && $value !== [] ? $value : null);
@@ -125,7 +121,7 @@ final readonly class FilterTree
 
     private static function walkRelation(string $name, mixed $value, FilterDefinition $definition, string $path, int $depth, int $hops): int
     {
-        if ($definition->related instanceof CrmEntity && $hops + 1 > self::MAX_HOPS) {
+        if ($hops + 1 > self::MAX_HOPS) {
             throw FilterErrors::at($path, __('validation.filter.too_many_hops', ['max' => self::MAX_HOPS]));
         }
 
@@ -158,6 +154,27 @@ final readonly class FilterTree
         }
 
         return $conditions + self::walk($nested, $definition->related, $path, $depth, $hops + 1);
+    }
+
+    private static function walkCustomFields(mixed $value, string $path, bool $topLevel): int
+    {
+        if (! $topLevel && ($value === null || $value === '')) {
+            throw FilterErrors::at($path, __('validation.custom_field.filter_not_object'));
+        }
+
+        if (! $topLevel && $value === []) {
+            throw FilterErrors::at($path, __('validation.filter.empty_node', ['name' => $path]));
+        }
+
+        if (is_array($value)) {
+            $empty = array_find_key($value, static fn (mixed $operators): bool => $operators === []);
+
+            if ($empty !== null) {
+                throw FilterErrors::at("{$path}.{$empty}", __('validation.filter.empty_node', ['name' => "{$path}.{$empty}"]));
+            }
+        }
+
+        return self::countOperators($value);
     }
 
     private static function countOperators(mixed $value): int
