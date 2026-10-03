@@ -75,7 +75,11 @@ final readonly class CustomFieldFilterSchema
 
         $operators = match ($fieldType) {
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
-            CustomFieldType::EMAIL, CustomFieldType::PHONE, CustomFieldType::LINK,
+            CustomFieldType::EMAIL, CustomFieldType::LINK => [
+                ...self::listOperators(['$has_any', '$has_none']),
+                'domain' => ['type' => 'object', 'properties' => self::listOperators(['$in', '$not_in'])],
+            ],
+            CustomFieldType::PHONE,
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::listOperators(['$has_any', '$has_none']),
             CustomFieldType::CURRENCY => self::buildOperators(self::NUMERIC_OPERATORS, 'number'),
             CustomFieldType::NUMBER => self::buildOperators(self::NUMERIC_OPERATORS, 'integer'),

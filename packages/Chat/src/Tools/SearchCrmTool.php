@@ -11,6 +11,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\LikePattern;
+use App\Support\PhoneSearch;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -52,7 +53,9 @@ final class SearchCrmTool implements Tool
 
     public function handle(Request $request): string
     {
-        $query = LikePattern::escape((string) $request->string('query'));
+        $rawQuery = (string) $request->string('query');
+        $query = LikePattern::escape($rawQuery);
+        $phonePattern = PhoneSearch::pattern($rawQuery);
         // Clamped at both ends like BaseReadListTool's per_page: limit 0 fetched one
         // row, sliced it away and then reported truncated=true, telling the model there
         // were more matches while handing it none.
@@ -65,45 +68,45 @@ final class SearchCrmTool implements Tool
         $results = [
             'companies' => Company::query()
                 ->whereBelongsTo($workspace)
-                ->where(function (Builder $q) use ($query, $tenantId): void {
+                ->where(function (Builder $q) use ($query, $phonePattern, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
-                    $this->orMatchesCustomFields($q, 'company', 'companies', $query, $tenantId);
+                    $this->orMatchesCustomFields($q, 'company', 'companies', $query, $phonePattern, $tenantId);
                 })
                 ->limit($limit + 1)
                 ->get(['id', 'name', 'created_at'])
                 ->toArray(),
             'people' => People::query()
                 ->whereBelongsTo($workspace)
-                ->where(function (Builder $q) use ($query, $tenantId): void {
+                ->where(function (Builder $q) use ($query, $phonePattern, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
-                    $this->orMatchesCustomFields($q, 'people', 'people', $query, $tenantId);
+                    $this->orMatchesCustomFields($q, 'people', 'people', $query, $phonePattern, $tenantId);
                 })
                 ->limit($limit + 1)
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'opportunities' => Opportunity::query()
                 ->whereBelongsTo($workspace)
-                ->where(function (Builder $q) use ($query, $tenantId): void {
+                ->where(function (Builder $q) use ($query, $phonePattern, $tenantId): void {
                     $q->where('name', 'ilike', "%{$query}%");
-                    $this->orMatchesCustomFields($q, 'opportunity', 'opportunities', $query, $tenantId);
+                    $this->orMatchesCustomFields($q, 'opportunity', 'opportunities', $query, $phonePattern, $tenantId);
                 })
                 ->limit($limit + 1)
                 ->get(['id', 'name', 'company_id', 'created_at'])
                 ->toArray(),
             'tasks' => Task::query()
                 ->whereBelongsTo($workspace)
-                ->where(function (Builder $q) use ($query, $tenantId): void {
+                ->where(function (Builder $q) use ($query, $phonePattern, $tenantId): void {
                     $q->where('title', 'ilike', "%{$query}%");
-                    $this->orMatchesCustomFields($q, 'task', 'tasks', $query, $tenantId);
+                    $this->orMatchesCustomFields($q, 'task', 'tasks', $query, $phonePattern, $tenantId);
                 })
                 ->limit($limit + 1)
                 ->get(['id', 'title', 'created_at'])
                 ->toArray(),
             'notes' => Note::query()
                 ->whereBelongsTo($workspace)
-                ->where(function (Builder $q) use ($query, $tenantId): void {
+                ->where(function (Builder $q) use ($query, $phonePattern, $tenantId): void {
                     $q->where('title', 'ilike', "%{$query}%");
-                    $this->orMatchesCustomFields($q, 'note', 'notes', $query, $tenantId);
+                    $this->orMatchesCustomFields($q, 'note', 'notes', $query, $phonePattern, $tenantId);
                 })
                 ->limit($limit + 1)
                 ->get(['id', 'title', 'created_at'])
@@ -133,9 +136,9 @@ final class SearchCrmTool implements Tool
      *
      * @param  Builder<TModel>  $builder
      */
-    private function orMatchesCustomFields(Builder $builder, string $entityType, string $table, string $query, string $tenantId): void
+    private function orMatchesCustomFields(Builder $builder, string $entityType, string $table, string $query, ?string $phonePattern, string $tenantId): void
     {
-        $builder->orWhereExists(function (QueryBuilder $sub) use ($entityType, $table, $query, $tenantId): void {
+        $builder->orWhereExists(function (QueryBuilder $sub) use ($entityType, $table, $query, $phonePattern, $tenantId): void {
             $sub->selectRaw('1')
                 ->from('custom_field_values as cfv')
                 ->join('custom_fields as cf', 'cf.id', '=', 'cfv.custom_field_id')
@@ -143,13 +146,17 @@ final class SearchCrmTool implements Tool
                 ->where('cfv.entity_type', $entityType)
                 ->where('cfv.tenant_id', $tenantId)
                 ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
-                ->where(function (QueryBuilder $w) use ($query): void {
+                ->where(function (QueryBuilder $w) use ($query, $phonePattern): void {
                     $w->where('cfv.text_value', 'ilike', "%{$query}%")
                         ->orWhere('cfv.string_value', 'ilike', "%{$query}%")
                         ->orWhereRaw(
                             "cfv.json_value is not null and json_typeof(cfv.json_value) = 'array' and exists (select 1 from json_array_elements_text(cfv.json_value) as elem(val) where elem.val ilike ?)",
                             ["%{$query}%"],
                         );
+
+                    if ($phonePattern !== null) {
+                        $w->orWhereRaw(PhoneSearch::ELEMENT_CONDITION, [$phonePattern]);
+                    }
                 });
         });
     }

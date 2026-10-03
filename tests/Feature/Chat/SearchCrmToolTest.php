@@ -117,3 +117,38 @@ it('reports no truncation when every match fits under the limit', function (): v
     expect($results['companies'])->toHaveCount(2)
         ->and($results['truncated']['companies'])->toBeFalse();
 });
+
+it('finds a phone typed in any format', function (string $query, array $expected): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+    People::factory()->for($workspace)->create(['name' => 'Ana Phone'])->update(['custom_fields' => ['phone_number' => ['+1 (415) 555-0100']]]);
+    People::factory()->for($workspace)->create(['name' => 'Bob Phone'])->update(['custom_fields' => ['phone_number' => ['+14155559999']]]);
+    TenantContextService::setTenantId(null);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => $query])), true);
+
+    expect(collect($results['people'])->pluck('name')->sort()->values()->all())->toBe($expected);
+})->with([
+    'dashes' => ['415-555-0100', ['Ana Phone']],
+    'brackets and spaces' => ['(415) 555 0100', ['Ana Phone']],
+    'full international' => ['+1 415 555 0100', ['Ana Phone']],
+    'another number' => ['(415) 555-9999', ['Bob Phone']],
+    'fewer than seven digits' => ['415 555', []],
+]);
+
+it('does not match digits inside a field that is not a phone', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+    People::factory()->for($workspace)->create(['name' => 'Cy Email'])->update(['custom_fields' => ['emails' => ['cy-415-555-0100@example.com']]]);
+    TenantContextService::setTenantId(null);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => '(415) 555 0100'])), true);
+
+    expect($results['people'])->toBeEmpty();
+});

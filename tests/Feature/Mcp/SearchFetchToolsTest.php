@@ -203,3 +203,24 @@ it('returns sanitized fetch payload without internal columns', function (): void
                 ->etc();
         });
 });
+
+it('finds a phone typed in any format', function (string $query, int $count): void {
+    $phone = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'phone_number')
+        ->firstOrFail();
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana Phone'])->saveCustomFieldValue($phone, ['+1 (415) 555-0100']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => $query])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', $count)
+            ->etc());
+})->with([
+    'dashes' => ['415-555-0100', 1],
+    'brackets and spaces' => ['(415) 555 0100', 1],
+    'fewer than seven digits' => ['415 555', 0],
+]);

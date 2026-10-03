@@ -8,6 +8,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\CustomFields\CanonicalValue;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
@@ -27,6 +28,13 @@ final readonly class CustomFieldFilter implements Filter
         '$gte' => '>=',
         '$lt' => '<',
         '$lte' => '<=',
+    ];
+
+    private const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
+
+    private const array DOMAIN_OF = [
+        'email' => "lower(split_part(element, '@', 2))",
+        'link' => "rtrim(regexp_replace(split_part(regexp_replace(split_part(split_part(split_part(regexp_replace(regexp_replace(lower(element), '[\\s\\u00A0\\u200B\\uFEFF\\u3000]+', '', 'g'), '^[a-z][a-z0-9+.-]*://', ''), '/', 1), '?', 1), '#', 1), '^.*@', ''), ':', 1), '^(www\\.)+', ''), '.')",
     ];
 
     public function __construct(
@@ -91,8 +99,15 @@ final readonly class CustomFieldFilter implements Filter
                     ]), "{$fieldCode}.{$operator}");
                 }
 
+                if ($operator === 'domain') {
+                    $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
+
+                    continue;
+                }
+
                 $operand = $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null);
                 $operand = $this->resolveOptions($optionMap, $fieldCode, $operator, $entry, $operand);
+                $operand = $this->spellings($field, $operator, $operand);
 
                 $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
             }
@@ -212,7 +227,7 @@ final readonly class CustomFieldFilter implements Filter
                 ->whereIn($valueColumn, $operand)),
             '$has_none' => $query->whereDoesntHave('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
-                $this->containsAny($q, $valueColumn, $operand);
+                $this->containsAny($q, $field, $valueColumn, $operand);
             }),
             '$is_empty' => $operand === true
                 ? $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $this->hasValue($q, $field, $valueColumn))
@@ -224,7 +239,7 @@ final readonly class CustomFieldFilter implements Filter
                     '$eq', '$gt', '$gte', '$lt', '$lte' => $q->where($valueColumn, self::OPERATOR_MAP[$operator], $operand),
                     '$contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
                     '$in' => $q->whereIn($valueColumn, $operand),
-                    '$has_any' => $this->containsAny($q, $valueColumn, $operand),
+                    '$has_any' => $this->containsAny($q, $field, $valueColumn, $operand),
                     default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
                 };
             }),
@@ -250,13 +265,99 @@ final readonly class CustomFieldFilter implements Filter
      * @param  Builder<Model>  $query
      * @param  array<int, string>  $values
      */
-    private function containsAny(Builder $query, string $valueColumn, array $values): void
+    private function containsAny(Builder $query, CustomField $field, string $valueColumn, array $values): void
     {
+        if (in_array($field->type, ['email', 'link'], true)) {
+            $query->whereRaw(
+                'exists (select 1 from '.self::LIST_ELEMENTS.' as element where lower(element) = any(?::text[]))',
+                [$this->textArray(array_map(mb_strtolower(...), $values))],
+            );
+
+            return;
+        }
+
         $query->where(function (Builder $anyValue) use ($valueColumn, $values): void {
             foreach ($values as $value) {
                 $anyValue->orWhereJsonContains($valueColumn, [$value]);
             }
         });
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array<string, array<string, mixed>>  $domainOperators
+     */
+    private function applyDomain(Builder $query, CustomField $field, mixed $operators, array $domainOperators): void
+    {
+        $path = "{$field->code}.domain";
+
+        if (! is_array($operators) || $operators === [] || array_is_list($operators)) {
+            $this->invalid(__('validation.filter.operator_object', ['name' => 'domain', 'operator' => '$in']), $path);
+        }
+
+        $expression = self::DOMAIN_OF[$field->type] ?? throw new \LogicException("Field type [{$field->type}] has no domain.");
+
+        foreach ($operators as $operator => $operand) {
+            $operator = (string) $operator;
+
+            $schema = $domainOperators[$operator] ?? $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
+                'operator' => $operator,
+                'field' => $path,
+                'supported' => implode(', ', array_keys($domainOperators)),
+            ]), "{$path}.{$operator}");
+
+            $domains = array_map(
+                static fn (string $domain): string => mb_strtolower(trim($domain)),
+                $this->normalizeOperand($path, $operator, $operand, $schema, true),
+            );
+
+            if (array_any($domains, static fn (string $domain): bool => preg_match('/^[a-z0-9.-]+$/', $domain) !== 1)) {
+                $this->invalid(__('validation.custom_field.operand_type', [
+                    'field' => $path,
+                    'operator' => $operator,
+                    'expected' => 'a list of domains such as acme.com',
+                ]), "{$path}.{$operator}");
+            }
+
+            $matching = fn (Builder $values): Builder => $values
+                ->where('custom_field_id', $field->getKey())
+                ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$expression} = any(?::text[]))", [$this->textArray($domains)]);
+
+            match ($operator) {
+                '$in' => $query->whereHas('customFieldValues', $matching),
+                '$not_in' => $query->whereDoesntHave('customFieldValues', $matching),
+                default => throw new \LogicException("Unsupported domain operator [{$operator}]."),
+            };
+        }
+    }
+
+    private function spellings(CustomField $field, string $operator, mixed $operand): mixed
+    {
+        if (! is_array($operand) || ! in_array($operator, ['$has_any', '$has_none'], true) || ! in_array($field->type, ['email', 'link', 'phone'], true)) {
+            return $operand;
+        }
+
+        $spellings = [];
+
+        foreach ($operand as $index => $value) {
+            $canonical = CanonicalValue::of($field, $value);
+
+            if ($field->type === 'phone' && ! str_starts_with($canonical, '+')) {
+                $this->invalid(__('validation.filter.phone_country_code', ['name' => $field->code]), "{$field->code}.{$operator}.{$index}");
+            }
+            $spellings[] = $canonical;
+            $spellings[] = $value;
+        }
+
+        return array_values(array_unique($spellings));
+    }
+
+    /**
+     * @param  array<int, string>  $values
+     */
+    private function textArray(array $values): string
+    {
+        return '{'.implode(',', array_map(static fn (string $value): string => '"'.addcslashes($value, '"\\').'"', $values)).'}';
     }
 
     /**

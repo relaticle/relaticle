@@ -502,3 +502,21 @@ it('names the replacement of a removed param at every level', function (array $f
     'inside $or' => [['$or' => [['company_id' => 'x']]], 'filter.$or.0.company_id'],
     'inside a relation node' => [['contact' => ['company_id' => 'x']], 'filter.contact.company_id'],
 ]);
+
+it('matches an email domain and a phone in any format over GET', function (): void {
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    $bob = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
+    $ana->saveCustomFieldValue(workspaceField($this, 'people', 'emails'), ['Ana@Acme.com']);
+    $ana->saveCustomFieldValue(workspaceField($this, 'people', 'phone_number'), ['+1 (415) 555-0100']);
+    $bob->saveCustomFieldValue(workspaceField($this, 'people', 'emails'), ['bob@globex.com']);
+
+    expect(listIds($this, 'people', ['custom_fields' => ['emails' => ['domain' => ['$in' => 'acme.com,initech.com']]]]))->toBe([$ana->getKey()])
+        ->and(listIds($this, 'people', ['custom_fields' => ['emails' => ['$has_any' => ['ANA@acme.com']]]]))->toBe([$ana->getKey()])
+        ->and(listIds($this, 'people', ['custom_fields' => ['phone_number' => ['$has_any' => ['+1 415 555 0100']]]]))->toBe([$ana->getKey()]);
+});
+
+it('keys a national phone operand by its position', function (): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['custom_fields' => ['phone_number' => ['$has_any' => ['+14155550100', '415 555 0100']]]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.custom_fields.phone_number.$has_any.1' => 'phone_number needs a country code, for example +1 415 555 0100.']);
+});

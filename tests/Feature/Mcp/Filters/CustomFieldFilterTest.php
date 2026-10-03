@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Opportunity\ListOpportunities;
+use App\Actions\People\ListPeople;
 use App\Enums\CrmEntity;
+use App\Enums\CustomFieldType;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseListTool;
@@ -25,6 +27,7 @@ use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Illuminate\Validation\ValidationException;
@@ -229,6 +232,19 @@ it('rejects more than 20 filter conditions', function (): void {
     ]);
 
     expect(fn (): LengthAwarePaginator|CursorPaginator => resolve(ListOpportunities::class)->execute($this->user, request: $request))
+        ->toThrow(function (ValidationException $exception): void {
+            expect($exception->errors())->toBe(['filter' => ['A filter holds at most 20 conditions. This one has 21.']]);
+        });
+});
+
+it('counts each domain condition toward the 20 condition limit', function (): void {
+    $filters = [];
+
+    for ($i = 0; $i < 21; $i++) {
+        $filters["field_{$i}"] = ['domain' => ['$in' => ['acme.com']]];
+    }
+
+    expect(fn (): LengthAwarePaginator|CursorPaginator => resolve(ListPeople::class)->execute($this->user, request: new Request(['filter' => ['custom_fields' => $filters]])))
         ->toThrow(function (ValidationException $exception): void {
             expect($exception->errors())->toBe(['filter' => ['A filter holds at most 20 conditions. This one has 21.']]);
         });
@@ -487,14 +503,18 @@ it('publishes list and emptiness operators for email, phone, and link fields', f
         '$has_none' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
         '$is_empty' => ['type' => 'boolean'],
     ];
+    $domain = ['type' => 'object', 'properties' => [
+        '$in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
+        '$not_in' => ['type' => 'array', 'items' => ['type' => 'string'], 'maxItems' => 100],
+    ]];
 
     RelaticleServer::actingAs($this->user)
         ->tool(GetCrmSchemaTool::class, ['entity_type' => 'people'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('filterable_fields.emails.properties', $operators)
+            ->where('filterable_fields.emails.properties', [...array_slice($operators, 0, 2), 'domain' => $domain, '$is_empty' => $operators['$is_empty']])
             ->where('filterable_fields.phone_number.properties', $operators)
-            ->where('filterable_fields.linkedin.properties', $operators)
+            ->where('filterable_fields.linkedin.properties', [...array_slice($operators, 0, 2), 'domain' => $domain, '$is_empty' => $operators['$is_empty']])
             ->etc());
 });
 
@@ -655,4 +675,116 @@ it('handles empty filter object as no-op', function (): void {
         ->get();
 
     expect($results)->toHaveCount($countBefore + 3);
+});
+
+/**
+ * @param  array<string, mixed>  $filter
+ * @return list<string>
+ */
+function peopleNamesMatching(User $user, array $filter): array
+{
+    return QueryBuilder::for(People::query()->withCustomFieldValues(), new Request(['filter' => $filter]))
+        ->allowedFilters(...new EntityFilters($user)->for(CrmEntity::People))
+        ->pluck('name')
+        ->sort()
+        ->values()
+        ->all();
+}
+
+it('matches an email in any case and by domain', function (): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($emails, ['bob@globex.com']);
+    $ana->saveCustomFieldValue($emails, ['Ana.Smith@Acme.com']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['$has_any' => ['ana.smith@acme.com']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['$has_none' => ['ANA.smith@acme.com']]]]))->toBe(['Bob'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['ACME.com']]]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => 'acme.com,globex.com']]]]))->toBe(['Ana', 'Bob'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$not_in' => ['acme.com']]]]]))->toBe(['Bob']);
+});
+
+it('matches a phone written in another format', function (): void {
+    $phone = filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($phone, ['+1 (415) 555-0100']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+1 415 555 0100']]]]))->toBe(['Ana']);
+});
+
+it('still finds a phone stored before normalization by its stored spelling', function (): void {
+    $phone = filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'entity_id' => $ana->getKey(),
+        'custom_field_id' => $phone->getKey(),
+        'json_value' => json_encode(['+1 (415) 555-0100']),
+    ]);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+1 (415) 555-0100']]]]))->toBe(['Ana']);
+});
+
+it('skips a stored value that is not a list', function (string $json): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'entity_id' => $ana->getKey(),
+        'custom_field_id' => $emails->getKey(),
+        'json_value' => $json,
+    ]);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['$has_any' => ['ana@acme.com']]]]))->toBe([])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['acme.com']]]]]))->toBe([]);
+})->with(['json null' => ['null'], 'json string' => ['"ana@acme.com"']]);
+
+it('matches a url-variant link by its host', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($site, ['https://www.Acme.com/team']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($site, ['https://globex.com?ref=a@acme.com']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Cy'])->saveCustomFieldValue($site, ['https://user:pw@acme.com:8080/x#top']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$in' => ['acme.com']]]]]))->toBe(['Ana', 'Cy'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$not_in' => ['acme.com']]]]]))->toBe(['Bob']);
+});
+
+it('finds a stored link by a raw url operand', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'homepage', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($site, ['https://acme.com/team, hiring']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['homepage' => ['$has_any' => ['HTTPS://acme.com/team, hiring']]]]))->toBe(['Ana']);
+});
+
+it('publishes only $ operators and the domain sub-field', function (): void {
+    $keys = collect(CustomFieldType::cases())
+        ->flatMap(fn (CustomFieldType $type): array => array_keys(CustomFieldFilterSchema::operatorsForType($type->value)))
+        ->unique()
+        ->reject(fn (string $key): bool => str_starts_with($key, '$'))
+        ->values()
+        ->all();
+
+    expect($keys)->toBe(['domain']);
+});
+
+it('asks for a country code on a national phone operand', function (): void {
+    filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+
+    expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['415 555 0100']]]]))
+        ->toThrow(ValidationException::class, 'mobile needs a country code');
+});
+
+it('rejects a domain operand that is not a bare host', function (): void {
+    filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+
+    expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['a"},{"b']]]]]))
+        ->toThrow(ValidationException::class, 'a list of domains');
+});
+
+it('offers the domain sub-field only on email and link fields', function (): void {
+    expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['job_title' => ['domain' => ['$in' => ['x']]]]]))
+        ->toThrow(ValidationException::class);
 });

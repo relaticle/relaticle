@@ -65,6 +65,7 @@ return [
         'too_many_conditions' => 'A filter holds at most :max conditions. This one has :count.',
         'too_deep' => '$and, $or and $not nest at most :max levels.',
         'too_many_hops' => 'Relations nest at most :max levels.',
+        'phone_country_code' => ':name needs a country code, for example +1 415 555 0100.',
     ],
     'date' => 'The :attribute field must be a valid date.',
     'date_equals' => 'The :attribute field must be a date equal to :date.',

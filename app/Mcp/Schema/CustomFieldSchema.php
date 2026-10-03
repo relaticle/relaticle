@@ -22,7 +22,7 @@ use stdClass;
  */
 final readonly class CustomFieldSchema
 {
-    public const string USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object such as {"$eq": "Closed Won"}, {"$not_in": ["Done"]} or {"$is_empty": true}. Operators per field are listed in filterable_fields. Filter example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags, email, phone and link values match the exact stored value.';
+    public const string USAGE = 'Pass custom field values in the "custom_fields" object using field codes as keys. Filter list tools with the "filter" param: native fields and relations sit at the top level, and custom field codes go under "filter.custom_fields", each value an operator object such as {"$eq": "Closed Won"}, {"$not_in": ["Done"]} or {"$is_empty": true}. Operators per field are listed in filterable_fields. Filter example on opportunities: {"custom_fields": {"stage": {"$in": ["Proposal"]}}, "company": {"$in": ["01J..."]}}. Select, radio, toggle-buttons, multi-select and checkbox-list values take an option label or ID. Tags match the exact stored value. Email and link values match in any case and phones in any format. Email and link fields also take a domain sub-field, such as {"domain": {"$in": ["acme.com"]}}, which matches the host of each value.';
 
     public function __construct(private CustomFieldFilterSchema $filterSchema) {}
 
