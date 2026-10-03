@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Enums\CustomFieldType;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Mcp\Schema\CustomFieldFilterSchema;
+use App\Models\User;
 use App\Providers\AppServiceProvider;
 use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Symfony\Component\Yaml\Yaml;
 
 mutates(AppServiceProvider::class, BaseCrmEntityRequest::class, GetFromSpatieQueryBuilder::class);
@@ -45,9 +47,28 @@ it('generates the complete API documentation with company ownership fields', fun
         ->unique()
         ->all();
 
-    expect($spec['paths']['/api/v1/companies/query']['post']['requestBody']['content']['application/json']['schema']['properties'])
-        ->toHaveKeys(['filter', 'sort', 'per_page'])
-        ->and($spec['paths']['/api/v1/companies/query']['post']['parameters'])->toBe([]);
+    $query = $spec['paths']['/api/v1/companies/query']['post'];
+    $queryBody = $query['requestBody']['content']['application/json']['schema']['properties'];
+    $listParameters = collect($spec['paths']['/api/v1/companies']['get']['parameters'])->keyBy('name');
+
+    expect($queryBody)->toHaveKeys(['filter', 'sort', 'include', 'per_page', 'cursor', 'page'])
+        ->and($query['parameters'])->toBe([])
+        ->and($query['description'])->toContain('re-send the same body with `page` or `cursor`')
+        ->and($queryBody['sort']['description'])->toBe($listParameters['sort']['description'])
+        ->and($queryBody['include']['description'])->toBe($listParameters['include']['description'])
+        ->and($queryBody['sort']['description'])->toContain('Allowed:')
+        ->and($queryBody['per_page']['description'])->toBe($listParameters['per_page']['description'])
+        ->and($queryBody['cursor']['description'])->toBe($listParameters['cursor']['description'])
+        ->and($queryBody['page']['description'])->toBe($listParameters['page']['description']);
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Sanctum::actingAs($user);
+
+    foreach (['companies', 'people', 'opportunities', 'tasks', 'notes'] as $entity) {
+        $example = $spec['paths']["/api/v1/{$entity}/query"]['post']['requestBody']['content']['application/json']['schema']['properties']['filter']['examples'][0];
+
+        $this->postJson("/api/v1/{$entity}/query", ['filter' => $example])->assertOk();
+    }
 
     expect($customFieldFilter)->not->toBeNull()
         ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([]);

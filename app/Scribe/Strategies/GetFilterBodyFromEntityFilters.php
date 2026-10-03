@@ -4,19 +4,29 @@ declare(strict_types=1);
 
 namespace App\Scribe\Strategies;
 
+use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Support\Filters\EntityFilters;
 use Knuckles\Camel\Extraction\ExtractedEndpointData;
 use Knuckles\Scribe\Extracting\Strategies\Strategy;
 
 final class GetFilterBodyFromEntityFilters extends Strategy
 {
+    use DescribesListEndpoint;
+
     /**
      * @param  array<string, array<string, string|bool>>  $routeRules
      * @return array<string, array<string, mixed>>|null
      */
     public function __invoke(ExtractedEndpointData $endpointData, array $routeRules = []): ?array
     {
-        if ($endpointData->method->getName() !== 'index' || ! in_array('POST', $endpointData->httpMethods, true)) {
+        if (! $this->isPostIndex($endpointData)) {
+            return null;
+        }
+
+        $actionClass = $this->findActionClass($endpointData);
+
+        if ($actionClass === null) {
             return null;
         }
 
@@ -25,37 +35,22 @@ final class GetFilterBodyFromEntityFilters extends Strategy
                 'type' => 'object',
                 'required' => false,
                 'description' => EntityFilters::GRAMMAR,
-                'example' => ['name' => ['$contains' => 'Acme'], '$or' => [['custom_fields' => ['icp' => ['$eq' => true]]]]],
+                'example' => $this->exampleFilter(self::LIST_ACTION_ENTITIES[$actionClass]),
             ],
-            'sort' => [
-                'type' => 'string',
-                'required' => false,
-                'description' => 'Sort field. Prefix with - for descending.',
-                'example' => '-created_at',
-            ],
-            'include' => [
-                'type' => 'string',
-                'required' => false,
-                'description' => 'Comma-separated relationships to include.',
-                'example' => null,
-            ],
-            'per_page' => [
-                'type' => 'integer',
-                'required' => false,
-                'description' => 'Results per page (max 100).',
-                'example' => 15,
-            ],
-            'cursor' => [
-                'type' => 'string',
-                'required' => false,
-                'description' => 'Cursor for cursor pagination.',
-                'example' => null,
-            ],
-            'page' => [
-                'type' => 'integer',
-                'required' => false,
-                'description' => 'Page number.',
-                'example' => 1,
+            ...$this->listParameters($actionClass),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function exampleFilter(CrmEntity $entity): array
+    {
+        return [
+            $entity->titleColumn() => ['$contains' => 'Acme'],
+            '$or' => [
+                ['creation_source' => ['$eq' => CreationSource::API->value]],
+                ['created_at' => ['$gte' => '2026-01-01']],
             ],
         ];
     }

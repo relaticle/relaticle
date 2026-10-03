@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Scribe\OpenApi\ErrorResponsesGenerator;
 use App\Scribe\Strategies\GetFilterBodyFromEntityFilters;
+use App\Scribe\Strategies\GetFilterQueryMetadata;
 use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
 use Knuckles\Scribe\Config\AuthIn;
 use Knuckles\Scribe\Config\Defaults;
@@ -30,11 +31,11 @@ return [
     'intro_text' => <<<'INTRO'
     Welcome to the Relaticle API documentation. This API follows the [JSON:API](https://jsonapi.org/) specification.
 
-    All endpoints require authentication via Bearer token. Generate an access token from **Settings > Access Tokens** in the Relaticle app. Tokens carry scoped abilities (`read`, `create`, `update`, `delete`) that map to the HTTP method of each request.
+    All endpoints require authentication via Bearer token. Generate an access token from **Settings > Access Tokens** in the Relaticle app. Tokens carry scoped abilities (`read`, `create`, `update`, `delete`). Listing and showing records, and the `POST` filter query endpoints, need `read`. Every other write needs `create` (`POST`), `update` (`PUT`, `PATCH`) or `delete` (`DELETE`).
 
     The API is versioned in the URL path (`/v1/`). Breaking changes ship under a new path version; the previous version keeps working for at least six months after the new one is announced.
 
-    Limits are 600 requests per minute per workspace, and per token 300 reads and 60 writes per minute. Every authenticated response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. When a limit is exceeded the API returns `429` with a `Retry-After` header giving the seconds to wait.
+    Limits are 600 requests per minute per workspace, and per token 300 reads and 60 writes per minute. Filter queries count as reads. Every authenticated response carries `X-RateLimit-Limit` and `X-RateLimit-Remaining`. When a limit is exceeded the API returns `429` with a `Retry-After` header giving the seconds to wait.
 
     Errors use a consistent JSON envelope: `{"message": "..."}`, and validation failures (`422`) add an `errors` object keyed by field name.
     INTRO
@@ -234,7 +235,10 @@ return [
     // Use configureStrategy() to specify settings for a strategy in the list.
     // Use removeStrategies() to remove an included strategy.
     'strategies' => [
-        'metadata' => [...Defaults::METADATA_STRATEGIES],
+        'metadata' => [
+            ...Defaults::METADATA_STRATEGIES,
+            GetFilterQueryMetadata::class,
+        ],
         'headers' => [
             ...Defaults::HEADERS_STRATEGIES,
             Strategies\StaticData::withSettings(

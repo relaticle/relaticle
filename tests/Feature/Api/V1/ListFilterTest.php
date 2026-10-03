@@ -617,3 +617,67 @@ it('rejects a filter sent as a string in a query body', function (): void {
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter']);
 });
+
+it('never returns another workspace record through a query body', function (): void {
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $mine = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    Company::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create(['name' => 'Acme']);
+
+    $ids = collect($this->postJson('/api/v1/companies/query', ['filter' => ['name' => ['$eq' => 'Acme']]])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($ids)->toBe([$mine->id]);
+});
+
+it('pages a query body with page and with cursor', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->count(5)->create();
+
+    $first = $this->postJson('/api/v1/companies/query', ['per_page' => 2, 'page' => 1])->assertOk();
+    $second = $this->postJson('/api/v1/companies/query', ['per_page' => 2, 'page' => 2])->assertOk();
+
+    expect($first->json('data'))->toHaveCount(2)
+        ->and($second->json('data'))->toHaveCount(2)
+        ->and(collect($first->json('data'))->pluck('id')->intersect(collect($second->json('data'))->pluck('id')))->toBeEmpty();
+
+    $cursorFirst = $this->postJson('/api/v1/companies/query', ['per_page' => 2, 'cursor' => 'true'])->assertOk();
+    parse_str((string) parse_url((string) $cursorFirst->json('links.next'), PHP_URL_QUERY), $next);
+    $cursorSecond = $this->postJson('/api/v1/companies/query', ['per_page' => 2, 'cursor' => $next['cursor']])->assertOk();
+
+    expect($cursorFirst->json('data'))->toHaveCount(2)
+        ->and($cursorSecond->json('data'))->toHaveCount(2)
+        ->and(collect($cursorFirst->json('data'))->pluck('id')->intersect(collect($cursorSecond->json('data'))->pluck('id')))->toBeEmpty();
+});
+
+it('treats a null or empty cursor, page and per_page as not sent', function (array $body): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->count(2)->create();
+
+    $this->postJson('/api/v1/companies/query', $body)->assertOk()->assertJsonCount(2, 'data');
+})->with([
+    'null cursor' => [['cursor' => null]],
+    'empty cursor' => [['cursor' => '']],
+    'null page' => [['page' => null]],
+    'null per_page' => [['per_page' => null]],
+    'all null' => [['cursor' => null, 'page' => null, 'per_page' => null]],
+]);
+
+it('rejects a query body that is not a json object', function (string $content, string $contentType): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+
+    $this->call('POST', '/api/v1/companies/query', [], [], [], ['CONTENT_TYPE' => $contentType, 'HTTP_ACCEPT' => 'application/json'], $content)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['body' => 'The request body must be a JSON object.']);
+})->with([
+    'truncated json' => ['{"filter":{"name":{"$eq":"zzzz-nope"}}', 'application/json'],
+    'json string' => ['"x"', 'application/json'],
+    'json number' => ['5', 'application/json'],
+    'json list' => ['[1]', 'application/json'],
+    'plain text' => ['{"filter":{"name":{"$eq":"zzzz-nope"}}}', 'text/plain'],
+    'form encoded' => ['filter%5Bname%5D%5B%24eq%5D=zzzz-nope', 'application/x-www-form-urlencoded'],
+]);
+
+it('treats an empty body and an empty object as no filter', function (string $content): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->count(2)->create();
+
+    $this->call('POST', '/api/v1/companies/query', [], [], [], ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'], $content)
+        ->assertOk()
+        ->assertJsonCount(2, 'data');
+})->with(['no body' => [''], 'empty object' => ['{}']]);

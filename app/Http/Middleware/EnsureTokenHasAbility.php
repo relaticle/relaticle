@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\PersonalAccessToken;
+use App\Support\Http\RequestAbility;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Passport\AccessToken as PassportAccessToken;
@@ -34,7 +35,7 @@ final readonly class EnsureTokenHasAbility
 
         // An upsert may create or update, so its route names both and the token must hold
         // each; deciding after the match would make the 403 an existence oracle.
-        foreach ($abilities ?: [$this->resolveAbility($request)] as $ability) {
+        foreach ($abilities ?: [RequestAbility::for($request)] as $ability) {
             throw_unless($token->can($ability), MissingAbilityException::class, [$ability]);
         }
 
@@ -51,19 +52,5 @@ final readonly class EnsureTokenHasAbility
     {
         return $token instanceof PassportAccessToken
             || ($token instanceof PersonalAccessToken && $token->getKey());
-    }
-
-    private function resolveAbility(Request $request): string
-    {
-        if ($request->route()?->getActionMethod() === 'index') {
-            return 'read';
-        }
-
-        return match ($request->method()) {
-            'POST' => 'create',
-            'PUT', 'PATCH' => 'update',
-            'DELETE' => 'delete',
-            default => 'read',
-        };
     }
 }

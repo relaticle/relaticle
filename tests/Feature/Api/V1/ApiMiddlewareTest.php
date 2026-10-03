@@ -87,6 +87,17 @@ describe('rate limiting', function (): void {
 });
 
 describe('rate limit headers', function (): void {
+    it('counts a filter query in the read bucket and a write in the write bucket', function (): void {
+        $token = $this->user->createToken('test', ['*'])->plainTextToken;
+        $limit = fn (string $method, string $uri, array $body = []): int => (int) $this->withToken($token)
+            ->json($method, $uri, $body)
+            ->headers->get('X-RateLimit-Limit');
+
+        expect($limit('GET', '/api/v1/companies'))->toBe(300)
+            ->and($limit('POST', '/api/v1/companies/query'))->toBe(300)
+            ->and($limit('POST', '/api/v1/companies', ['name' => 'Acme']))->toBe(60);
+    });
+
     it('reports the limit and remaining budget on every authenticated response', function (): void {
         $token = $this->user->createToken('test', ['*'])->plainTextToken;
 

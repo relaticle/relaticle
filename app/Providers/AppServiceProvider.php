@@ -50,6 +50,7 @@ use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\CustomFields\RestoreConflictMessage;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\Impersonator;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
@@ -506,7 +507,7 @@ final class AppServiceProvider extends ServiceProvider
                 Limit::perMinute(600)->by('workspace:'.($workspaceId ?? $request->ip())),
             ];
 
-            if ($request->isMethod('GET')) {
+            if (RequestAbility::isRead($request)) {
                 $limits[] = Limit::perMinute(300)->by("token:{$key}:read");
             } else {
                 $limits[] = Limit::perMinute(60)->by("token:{$key}:write");
