@@ -71,7 +71,7 @@ POST /v1/tasks/query
 POST /v1/notes/query
 ```
 
-The body is a JSON object. It takes `filter`, `sort`, `include`, `per_page`, and `page` or `cursor`. Every key is optional, and an empty object returns the first page of records, 15 by default.
+The body is a JSON object. It takes `filter`, `sort`, `include`, `per_page` and `page`. Every key is optional, and an empty object returns the first page of records, 15 by default.
 
 ```bash
 curl https://api.relaticle.com/v1/opportunities/query \
@@ -89,7 +89,7 @@ curl https://api.relaticle.com/v1/opportunities/query \
   }'
 ```
 
-The response has the same shape as the matching `GET` list. To fetch the next page, send the same body with the next `page`. To page by cursor, send `cursor` with the `meta.next_cursor` value from the previous response, in the same body. The `links` URLs in a response cannot be fetched with `GET`, so page a query by sending the body again.
+The response has the same shape as the matching `GET` list. To fetch the next page, send the same body with the next `page`. The `links` URLs in a response cannot be fetched with `GET`, so page a query by sending the body again.
 
 A body that is not a JSON object returns `422`. That includes truncated JSON, a bare string or number, and a body sent without the `application/json` content type. An empty body counts as no filter.
 

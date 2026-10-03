@@ -352,7 +352,7 @@ Stage labels and field codes belong to your workspace. Call `get-crm-schema-tool
 
 `get-crm-schema-tool` returns `filterable_fields` for one entity type. It holds three parts:
 
-- Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`. Relations, member relations and `stale_days` add an `operand` that states what they accept.
+- Each native field and relation by name, with its `type`, `operators` and an `example`. Relations add the related `entity`. `creation_source` adds its `values`. Relations, member relations, `stale_days` and `assigned_to_me` add an `operand` that states what they accept.
 - `types` maps each custom field type present in your workspace to its `operators`, its `matching` rule and any `sub_fields`. A type whose values you type freely also carries an `example`, and a choice type carries it on the field instead.
 - `custom_fields` lists each filterable custom field by code, with its `name` and `type`. A choice field also carries its `options` and an `example` built from them.
 
