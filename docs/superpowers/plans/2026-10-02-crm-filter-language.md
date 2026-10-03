@@ -2636,6 +2636,12 @@ Each list action calls it right after `abort_unless(...)` and the `$request ??=`
 
 MCP `BaseListTool::handle()` already turns a `ValidationException` into a tool error through laravel/mcp; chat's `BaseReadListTool::handle()` already catches it. Confirm both by running their filter tests.
 
+Three cases Task 11 left to this pre-pass, each a 422 with the node's path and each with a test:
+
+- A `null` or empty-string value for any name (`{"$not": {"name": null}}`, `filter[name]=`): `TreeAllowedFilter` skips nulls, so the node would silently match nothing or everything. `walk()` rejects it with `validation.filter.operator_object`.
+- A bare operator on a relation node (`{"company": {"in": ["01J..."]}}`): the `operator_sigil` hint (`Use $in`), not "Unknown filter in". Check link operators without their `$` before treating a key as a nested name.
+- An empty `$not` (`{"$not": {}}`) sent as JSON (MCP tool call in the test, since a GET cannot express it): `empty_node`.
+
 Chat's `BaseReadListTool::buildHttpRequest()` passes `filter` only when it is an array, so a JSON-string filter silently returns every row. Pass any `filled()` value through (`if (filled($filter)) { $input['filter'] = $filter; }`) so `FilterTree::validate()` answers it with the `not_object` 422, and add a test in `tests/Feature/Chat/ListToolFilterTest.php`: `filter: '{"name":"x"}'` returns the error, not a table.
 
 - [ ] **Step 4: Run tests**
