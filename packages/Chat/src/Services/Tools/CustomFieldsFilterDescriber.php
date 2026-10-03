@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Enums\CrmEntity;
+use App\Enums\FilterKind;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\User;
 use App\Support\Filters\EntityFilters;
@@ -36,12 +37,23 @@ final readonly class CustomFieldsFilterDescriber
         unset($vocabulary['custom_fields'], $vocabulary['types']);
 
         $lines = ['Names for this entity type:'];
+        $rules = [];
 
         foreach ($vocabulary as $name => $entry) {
             $line = "- {$name} ({$entry['type']}".(isset($entry['entity']) ? " to {$entry['entity']}" : '').'; operators: '.implode(', ', $entry['operators']);
             $line .= isset($entry['values']) ? '; one of: '.implode(', ', $entry['values']) : '';
-            $line .= isset($entry['operand']) ? "; takes {$entry['operand']}" : '';
+
+            if (isset($entry['operand']) && $entry['type'] === FilterKind::Computed->value) {
+                $line .= "; takes {$entry['operand']}";
+            } elseif (isset($entry['operand'])) {
+                $rules[$entry['type']] = "- {$entry['type']}: takes {$entry['operand']}";
+            }
+
             $lines[] = $line.'; example: '.CustomFieldFilterSchema::json($entry['example']).')';
+        }
+
+        if ($rules !== []) {
+            array_push($lines, '', 'Rules by type:', ...array_values($rules));
         }
 
         $lines[] = '';
@@ -64,19 +76,20 @@ final readonly class CustomFieldsFilterDescriber
             $line = "- {$type}: operators ".implode(', ', $entry['operators']);
             $line .= isset($entry['sub_fields']) ? '; sub-field domain takes '.implode(', ', $entry['sub_fields']['domain']['operators'])." and matches {$entry['sub_fields']['domain']['matches']}, example ".CustomFieldFilterSchema::json($entry['sub_fields']['domain']['example']) : '';
             $line .= isset($entry['matching']) ? "; values match {$entry['matching']}" : '';
-            $lines[] = $line.'; example '.CustomFieldFilterSchema::json($entry['example']);
+            $lines[] = $line.(isset($entry['example']) ? '; example '.CustomFieldFilterSchema::json($entry['example']) : '');
         }
 
         $lines[] = '';
         $lines[] = 'Fields:';
 
         foreach ($customFields as $code => $entry) {
-            $lines[] = "- {$code} ({$entry['name']}, {$entry['type']}".(isset($entry['options']) ? '; one of: "'.implode('", "', $entry['options']).'"' : '').')';
+            $line = "- {$code} ({$entry['name']}, {$entry['type']}".(isset($entry['options']) ? '; one of: "'.implode('", "', $entry['options']).'"' : '');
+            $lines[] = $line.(isset($entry['example']) ? '; example '.CustomFieldFilterSchema::json($entry['example']) : '').')';
         }
 
         $firstCode = array_key_first($customFields);
         $lines[] = '';
-        $lines[] = 'Custom field example: '.CustomFieldFilterSchema::json(['custom_fields' => [$firstCode => $types[$customFields[$firstCode]['type']]['example']]]);
+        $lines[] = 'Custom field example: '.CustomFieldFilterSchema::json(['custom_fields' => [$firstCode => $customFields[$firstCode]['example'] ?? $types[$customFields[$firstCode]['type']]['example']]]);
 
         return implode("\n", $lines);
     }

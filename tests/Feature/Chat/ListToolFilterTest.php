@@ -647,7 +647,8 @@ it('names the domain sub-field operators and the matching rule once per email an
         ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
         ->and($phone)->not->toContain('sub-field')
         ->and($field)->toBe('- emails (Emails, email)')
-        ->and($filterDescription)->toStartWith(EntityFilters::names(CrmEntity::People))
+        ->and($filterDescription)->toStartWith('Names for this entity type:')
+        ->and($filterDescription)->not->toContain(EntityFilters::names(CrmEntity::People))
         ->and(CustomFieldFilterSchema::valueRules())->toContain('domain sub-field with $in or $not_in', CustomFieldType::PHONE->filterMatching());
 });
 

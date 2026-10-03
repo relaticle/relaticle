@@ -112,7 +112,7 @@ abstract class BaseReadListTool implements Tool
 
         if ($user instanceof User) {
             $describer = resolve(CustomFieldsFilterDescriber::class);
-            $filterDescription .= "\n\n".$describer->describe($user, $entityType);
+            $filterDescription = $describer->describe($user, $entityType);
             $sortable = array_merge($sortable, $describer->sortableCodes($user, $entityType));
         }
 

@@ -44,7 +44,7 @@ final readonly class EntityFilters
         $sentences = ['Native fields: '.implode(', ', $named(FilterKind::Text, FilterKind::DateTime, FilterKind::Enum)).'.'];
 
         if ($relations !== []) {
-            $sentences[] = 'Relations take '.implode(', ', FilterDefinition::LINK_OPERATORS).' on record ids, or conditions on the related record: '.implode(', ', $relations).'.';
+            $sentences[] = 'Relations take '.FilterDefinition::RELATION_OPERAND.': '.implode(', ', $relations).'.';
         }
 
         if ($named(FilterKind::Members) !== []) {

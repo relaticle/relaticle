@@ -35,9 +35,11 @@ use App\Mcp\Tools\People\ListPeopleTool as McpListPeople;
 use App\Mcp\Tools\Task\CreateTaskTool as McpCreateTask;
 use App\Mcp\Tools\Task\GetTaskTool as McpGetTask;
 use App\Mcp\Tools\Task\ListTasksTool as McpListTasks;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterDefinition;
 use App\Support\Filters\FilterTree;
 use App\Support\Filters\FilterVocabulary;
 use App\Support\Filters\LogicFilter;
@@ -298,21 +300,21 @@ it('renders on chat what the registry and mcp publish for each name', function (
     $types = (array) $published['types'];
     unset($published['custom_fields'], $published['types']);
 
-    $names = EntityFilters::names($entity);
     $chatDescription = filterDescription($chatTool);
     $section = '';
-    $lines = ['names' => [], 'types' => [], 'fields' => []];
+    $lines = ['names' => [], 'rules' => [], 'types' => [], 'fields' => []];
 
-    foreach (explode("\n", str($chatDescription)->after($names)->toString()) as $line) {
+    foreach (explode("\n", $chatDescription) as $line) {
         $section = match ($line) {
             'Field types:' => 'types',
             'Fields:' => 'fields',
+            'Rules by type:' => 'rules',
             'Names for this entity type:' => 'names',
             default => $section,
         };
 
         if (str_starts_with($line, '- ')) {
-            $lines[$section][str($line)->after('- ')->before(str_starts_with($line, '- ') && $section === 'types' ? ':' : ' (')->toString()] = $line;
+            $lines[$section][str($line)->after('- ')->before(in_array($section, ['types', 'rules'], true) ? ':' : ' (')->toString()] = $line;
         }
     }
 
@@ -321,7 +323,7 @@ it('renders on chat what the registry and mcp publish for each name', function (
         ->and(array_keys($lines['types']))->toEqualCanonicalizing(array_keys($types))
         ->and(array_keys($lines['fields']))->toEqualCanonicalizing(array_keys($customFields))
         ->and(filterDescription($mcpTool))->toContain(EntityFilters::grammar($entity))
-        ->and($chatDescription)->toStartWith($names)
+        ->and($chatDescription)->toStartWith('Names for this entity type:')
         ->and($chatDescription)->not->toContain(EntityFilters::rules());
 
     foreach ($published as $name => $entry) {
@@ -336,12 +338,18 @@ it('renders on chat what the registry and mcp publish for each name', function (
         }
 
         if (isset($entry['operand'])) {
-            expect($lines['names'][$name])->toContain("takes {$entry['operand']}");
+            $carrier = $entry['type'] === 'computed' ? $lines['names'][$name] : $lines['rules'][$entry['type']];
+
+            expect($carrier)->toContain("takes {$entry['operand']}");
         }
     }
 
     foreach ($types as $type => $entry) {
-        expect($lines['types'][$type])->toContain("- {$type}: operators ".implode(', ', $entry['operators']), 'example '.CustomFieldFilterSchema::json($entry['example']));
+        expect($lines['types'][$type])->toContain("- {$type}: operators ".implode(', ', $entry['operators']));
+
+        if (isset($entry['example'])) {
+            expect($lines['types'][$type])->toContain('; example '.CustomFieldFilterSchema::json($entry['example']));
+        }
 
         if (isset($entry['sub_fields'])) {
             $domain = $entry['sub_fields']['domain'];
@@ -356,11 +364,15 @@ it('renders on chat what the registry and mcp publish for each name', function (
 
     foreach ($customFields as $code => $entry) {
         expect($lines['fields'][$code])->toContain("({$entry['name']}, {$entry['type']}")
-            ->and(array_keys($entry))->each->toBeIn(['name', 'type', 'options']);
+            ->and(array_keys($entry))->each->toBeIn(['name', 'type', 'options', 'example']);
 
         if (isset($entry['options'])) {
             expect($lines['fields'][$code])->toContain('one of: "'.implode('", "', $entry['options']).'"');
         }
+
+        isset($entry['example'])
+            ? expect($lines['fields'][$code])->toContain('; example '.CustomFieldFilterSchema::json($entry['example']))
+            : expect($lines['fields'][$code])->not->toContain('example');
     }
 })->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[8]], crmSurfaces()));
 
@@ -432,6 +444,29 @@ it('publishes filter examples the list action accepts on every surface', functio
         'type' => 'text',
     ]);
 
+    foreach ([['probe_a', ['Alpha', 'Beta']], ['probe_b', ['Gamma']]] as [$code, $options]) {
+        app(CreateCustomField::class)->execute($user, [
+            'entity_type' => $entity->value,
+            'name' => $code,
+            'code' => $code,
+            'type' => 'select',
+            'options' => $options,
+        ]);
+    }
+
+    CustomField::query()->create([
+        'tenant_id' => $user->currentWorkspace->getKey(),
+        'entity_type' => $entity->value,
+        'code' => 'probe_lookup',
+        'name' => 'Probe lookup',
+        'type' => 'select',
+        'lookup_type' => 'company',
+        'sort_order' => 0,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+
     $vocabulary = resolve(FilterVocabulary::class)->for($user, $entity);
     $customFields = $vocabulary['custom_fields'];
     $types = $vocabulary['types'];
@@ -445,19 +480,17 @@ it('publishes filter examples the list action accepts on every surface', functio
         array_push($known, CustomFieldFilterSchema::json($entry['example']), CustomFieldFilterSchema::json([$name => $entry['example']]));
     }
 
-    $firstFieldOfType = [];
-
-    foreach ($customFields as $code => $field) {
-        $firstFieldOfType[$field['type']] ??= $code;
+    foreach ($types as $entry) {
+        isset($entry['example']) && $known[] = CustomFieldFilterSchema::json($entry['example']);
     }
 
-    foreach ($types as $type => $entry) {
-        $code = $firstFieldOfType[$type];
-        $filters[] = ['custom_fields' => [$code => $entry['example']]];
-        array_push($known, CustomFieldFilterSchema::json($entry['example']), CustomFieldFilterSchema::json(['custom_fields' => [$code => $entry['example']]]));
+    foreach ($customFields as $code => $field) {
+        $example = $field['example'] ?? $types[$field['type']]['example'];
+        $filters[] = ['custom_fields' => [$code => $example]];
+        array_push($known, CustomFieldFilterSchema::json($example), CustomFieldFilterSchema::json(['custom_fields' => [$code => $example]]));
 
-        if (isset($entry['sub_fields'])) {
-            $filters[] = ['custom_fields' => [$code => $entry['sub_fields']['domain']['example']]];
+        if (isset($types[$field['type']]['sub_fields'])) {
+            $filters[] = ['custom_fields' => [$code => $types[$field['type']]['sub_fields']['domain']['example']]];
         }
     }
 
@@ -468,8 +501,11 @@ it('publishes filter examples the list action accepts on every surface', functio
         str(resolve($schemaResource)->toSchema($user)['usage'])->before(' Write example:')->toString(),
     ];
 
-    expect($types)->toHaveKey('text')
-        ->and($types['text']['example'])->toBe(CustomFieldType::TEXT->filterExample());
+    expect($types['text']['example'])->toBe(CustomFieldType::TEXT->filterExample())
+        ->and($types['select'])->not->toHaveKey('example')
+        ->and($customFields['probe_a']['example'])->toBe(['$in' => ['Alpha']])
+        ->and($customFields['probe_b']['example'])->toBe(['$in' => ['Gamma']])
+        ->and($customFields['probe_lookup']['example'])->toBe(CustomFieldType::SELECT->filterExample());
 
     foreach ($texts as $text) {
         foreach (jsonFragments($text) as $fragment) {
@@ -521,3 +557,28 @@ it('states each per-type filter rule once however many fields share the type', f
         ->and(array_keys($vocabularyField = (array) $schema['filterable_fields']->custom_fields->field_1))->toBe(['name', 'type'])
         ->and($vocabularyField)->not->toHaveKey('example');
 });
+
+it('names each filter and each rule once in a chat tool description', function (CrmEntity $entity, string $chatTool): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    $chat = filterDescription($chatTool);
+    $definitions = EntityFilters::definitions($entity);
+
+    foreach (array_keys($definitions) as $name) {
+        expect(substr_count($chat, "- {$name} ("))->toBe(1, "{$entity->value}: {$name}");
+    }
+
+    $kinds = array_unique(array_map(fn (FilterDefinition $definition): string => $definition->kind->value, $definitions));
+
+    expect($chat)->not->toContain('Native fields:')
+        ->and(substr_count($chat, FilterDefinition::MEMBER_OPERAND))->toBe(in_array('members', $kinds, true) ? 1 : 0)
+        ->and(substr_count($chat, FilterDefinition::RELATION_OPERAND))->toBe(in_array('relation', $kinds, true) ? 1 : 0);
+})->with(array_map(fn (array $row): array => [$row[0], $row[6]], crmSurfaces()));
+
+it('describes the real shape of filterable_fields in the mcp list tool', function (CrmEntity $entity, string $mcpTool): void {
+    $description = filterDescription($mcpTool);
+
+    expect($description)->toContain('filterable_fields.custom_fields', 'filterable_fields.types')
+        ->and($description)->not->toContain('with their operators and options');
+})->with(array_map(fn (array $row): array => [$row[0], $row[8]], crmSurfaces()));

@@ -15,6 +15,8 @@ final readonly class FilterDefinition
 {
     public const array LINK_OPERATORS = ['$in', '$not_in', '$is_empty'];
 
+    public const string RELATION_OPERAND = '$in, $not_in or $is_empty on record ids, or conditions on the related record';
+
     public const string MEMBER_OPERAND = '$in, $not_in or $is_empty on workspace member ids only, with no nested conditions';
 
     public const string SAMPLE_ID = '01J8Z4Y6T5Q2M9N3B7K1W0X8VD';
@@ -101,6 +103,7 @@ final readonly class FilterDefinition
     {
         return match ($this->kind) {
             FilterKind::Members => self::MEMBER_OPERAND,
+            FilterKind::Relation => self::RELATION_OPERAND,
             FilterKind::Computed => $this->computedOperand,
             default => null,
         };

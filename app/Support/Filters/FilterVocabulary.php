@@ -61,6 +61,7 @@ final readonly class FilterVocabulary
         $fields = $this->customFields->forEntity($user->currentWorkspace, $entity->value)->keyBy('code');
         $types = [];
         $entries = [];
+        $fieldBound = [];
 
         foreach ($schema as $code => $definition) {
             $field = $fields->get($code);
@@ -72,14 +73,29 @@ final readonly class FilterVocabulary
             $options = $this->optionMap->translates($field)
                 ? array_values(array_map(strval(...), $field->options->pluck('name')->all()))
                 : [];
+            $properties = is_array($definition['properties'] ?? null) ? $definition['properties'] : [];
             $entry = ['name' => $definition['description'] ?? $code, 'type' => $field->type];
 
             if ($options !== []) {
                 $entry['options'] = $options;
             }
 
+            if ($this->optionMap->translates($field) || $field->lookup_type !== null) {
+                $fieldBound[$field->type] = true;
+            }
+
+            $entries[$code] = ['entry' => $entry, 'field' => $field, 'options' => $options];
+            $types[$field->type] ??= $this->typeEntry($field, $properties);
+        }
+
+        foreach ($entries as $code => ['entry' => $entry, 'field' => $field, 'options' => $options]) {
+            if (isset($fieldBound[$field->type])) {
+                $entry['example'] = $this->example($field, $options);
+            } else {
+                $types[$field->type]['example'] ??= $this->example($field, []);
+            }
+
             $entries[$code] = $entry;
-            $types[$field->type] ??= $this->typeEntry($field, is_array($definition['properties'] ?? null) ? $definition['properties'] : [], $options);
         }
 
         return ['types' => $types, 'fields' => $entries];
@@ -87,10 +103,9 @@ final readonly class FilterVocabulary
 
     /**
      * @param  array<string, mixed>  $properties
-     * @param  list<string>  $options
      * @return array<string, mixed>
      */
-    private function typeEntry(CustomField $field, array $properties, array $options): array
+    private function typeEntry(CustomField $field, array $properties): array
     {
         $entry = ['operators' => array_values(array_filter(array_keys($properties), static fn (string $key): bool => str_starts_with($key, '$')))];
         $matching = CustomFieldType::tryFrom($field->type)?->filterMatching();
@@ -106,8 +121,6 @@ final readonly class FilterVocabulary
                 'example' => CustomFieldFilterSchema::DOMAIN_EXAMPLE,
             ]];
         }
-
-        $entry['example'] = $this->example($field, $options);
 
         return $entry;
     }
