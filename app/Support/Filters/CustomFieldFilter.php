@@ -21,8 +21,6 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class CustomFieldFilter implements Filter
 {
-    private const int MAX_CONDITIONS = 10;
-
     private const array OPERATOR_MAP = [
         '$eq' => '=',
         '$gt' => '>',
@@ -50,10 +48,6 @@ final readonly class CustomFieldFilter implements Filter
 
         if (! array_all($fieldCodes, static fn (mixed $fieldCode): bool => is_string($fieldCode))) {
             $this->invalid(__('validation.custom_field.filter_code_not_string'));
-        }
-
-        if (count($fieldCodes) > self::MAX_CONDITIONS) {
-            $this->invalid(__('validation.custom_field.too_many_conditions', ['max' => self::MAX_CONDITIONS]));
         }
 
         $fields = $this->filterableFields();

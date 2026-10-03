@@ -634,7 +634,7 @@ abstract class BaseReadListTool implements Tool
 
         $filter = $request['filter'] ?? null;
 
-        if (is_array($filter) && $filter !== []) {
+        if (filled($filter)) {
             $input['filter'] = $filter;
         }
 

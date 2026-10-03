@@ -431,7 +431,8 @@ describe('filtering and sorting', function (): void {
         Sanctum::actingAs($this->user);
 
         $this->getJson('/api/v1/tasks?filter[workspace_id]=fake')
-            ->assertStatus(400);
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['filter.workspace_id']);
     });
 
     it('rejects disallowed sort fields', function (): void {

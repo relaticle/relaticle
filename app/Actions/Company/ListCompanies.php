@@ -9,6 +9,7 @@ use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterTree;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
@@ -32,6 +33,7 @@ final readonly class ListCompanies
         abort_unless($user->can('viewAny', Company::class), 403);
 
         $request ??= new Request(['filter' => $filters]);
+        FilterTree::validate($request->input('filter'), CrmEntity::Company);
         $filterSchema = new CustomFieldFilterSchema;
 
         $query = QueryBuilder::for(

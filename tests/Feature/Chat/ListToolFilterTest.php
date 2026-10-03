@@ -566,6 +566,21 @@ it('treats an empty filter string as no filter', function (): void {
     expect(collect($rows)->pluck('attributes.title')->all())->toBe(['Anything']);
 });
 
+it('rejects a JSON string filter instead of returning every row', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+
+    Company::factory()->for($user->currentWorkspace)->create(['name' => 'Acme']);
+
+    $result = json_decode((new ListCompaniesTool)->handle(new Request([
+        'filter' => '{"name":{"$eq":"x"}}',
+    ])), true);
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toBe('The filter must be an object.')
+        ->and($result)->not->toHaveKey('data');
+});
+
 it('shows the operator example when a bare value is given', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

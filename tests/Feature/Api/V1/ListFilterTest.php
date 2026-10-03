@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\People\ListPeople;
 use App\Enums\CreationSource;
+use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -13,13 +15,14 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
 use App\Support\Filters\EntityFilters;
+use App\Support\Filters\FilterTree;
 use App\Support\Filters\LogicFilter;
 use App\Support\Filters\NativeFilter;
 use App\Support\Filters\RelationFilter;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
-mutates(EntityFilters::class, LogicFilter::class, NativeFilter::class, RelationFilter::class);
+mutates(EntityFilters::class, FilterTree::class, LogicFilter::class, NativeFilter::class, RelationFilter::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -367,4 +370,89 @@ it('keeps a top-level condition and an $or group in one workspace-bound conjunct
             ['creation_source' => ['$eq' => 'web']],
         ],
     ]))->toBe([$match->id]);
+});
+
+it('rejects a filter that is not an object', function (): void {
+    $this->getJson('/api/v1/companies?filter=acme')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter']);
+});
+
+it('names the replacement of a removed param', function (string $param, string $replacement): void {
+    $this->getJson("/api/v1/opportunities?filter[{$param}]=x")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(["filter.{$param}" => "{$param} was replaced. Use {$replacement}."]);
+})->with([
+    ['created_after', 'created_at with $gte'],
+    ['company_id', 'company (or companies) with $in'],
+    ['search', 'name or title with $contains'],
+]);
+
+it('caps a filter at twenty conditions', function (): void {
+    $conditions = array_fill(0, 21, ['name' => ['$eq' => 'x']]);
+
+    $this->postJson('/api/v1/companies/query', ['filter' => ['$or' => $conditions]])
+        ->assertUnprocessable()
+        ->assertJsonFragment(['A filter holds at most 20 conditions. This one has 21.']);
+})->skip('enabled in Task 14, when POST /query exists');
+
+it('counts every operator in the tree toward the twenty-condition cap', function (): void {
+    $conditions = array_fill(0, 21, ['name' => ['$eq' => 'x']]);
+
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => ['$or' => $conditions]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter' => 'A filter holds at most 20 conditions. This one has 21.']);
+
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => ['$or' => array_slice($conditions, 0, 20)]]))
+        ->assertOk();
+});
+
+it('caps logic depth at three and relation hops at two', function (): void {
+    $deep = ['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]];
+    $far = ['company' => ['people' => ['company' => ['name' => ['$eq' => 'x']]]]];
+
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => $deep]))->assertUnprocessable()->assertJsonValidationErrors(['filter']);
+    $this->getJson('/api/v1/opportunities?'.http_build_query(['filter' => $far]))->assertUnprocessable()->assertJsonValidationErrors(['filter.company.people.company']);
+});
+
+it('rejects an empty $or and an empty relation node', function (): void {
+    $this->getJson('/api/v1/companies?filter[$or]=')->assertUnprocessable();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['$or' => [['company' => []]]]])
+        ->assertHasErrors(['filter.$or.0.company needs at least one condition.']);
+});
+
+it('rejects an empty $not sent as JSON', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['$not' => []]])
+        ->assertHasErrors(['filter.$not needs at least one condition.']);
+});
+
+it('rejects a null or empty value for a name', function (): void {
+    $this->getJson('/api/v1/companies?filter[name]=')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.name' => 'name takes an operator object, for example {"$eq": ...}.']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['$not' => ['name' => null]]])
+        ->assertHasErrors(['name takes an operator object, for example {"$eq":']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['company' => null]])
+        ->assertHasErrors(['company takes an operator object, for example {"$in":']);
+});
+
+it('ignores an empty custom_fields at the top level and rejects it inside a group', function (): void {
+    $this->getJson('/api/v1/companies?filter[custom_fields]=')->assertOk();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListOpportunitiesTool::class, ['filter' => ['$not' => ['custom_fields' => null]]])
+        ->assertHasErrors(['Custom field filters must be an object keyed by field code.']);
+});
+
+it('hints the sigil for a bare operator on a relation node', function (): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['company' => ['in' => ['01J00000000000000000000000']]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.company.in' => 'Operators start with $. Use $in.']);
 });

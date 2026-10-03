@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
+use App\Actions\Opportunity\ListOpportunities;
 use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldFilterSchema;
 use App\Mcp\Servers\RelaticleServer;
@@ -20,6 +21,8 @@ use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use App\Support\Filters\CustomFieldFilter;
 use App\Support\Filters\EntityFilters;
+use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -214,10 +217,10 @@ it('rejects unknown operators', function (): void {
         });
 });
 
-it('rejects more than 10 filter conditions', function (): void {
+it('rejects more than 20 filter conditions', function (): void {
     $filters = [];
 
-    for ($i = 0; $i < 11; $i++) {
+    for ($i = 0; $i < 21; $i++) {
         $filters["field_{$i}"] = ['$eq' => 'test'];
     }
 
@@ -225,13 +228,9 @@ it('rejects more than 10 filter conditions', function (): void {
         'filter' => ['custom_fields' => $filters],
     ]);
 
-    expect(fn (): Collection => QueryBuilder::for(Opportunity::query()->withCustomFieldValues(), $request)
-        ->allowedFilters(
-            ...new EntityFilters($this->user)->for(CrmEntity::Opportunity),
-        )
-        ->get())
+    expect(fn (): LengthAwarePaginator|CursorPaginator => resolve(ListOpportunities::class)->execute($this->user, request: $request))
         ->toThrow(function (ValidationException $exception): void {
-            expect(array_keys($exception->errors()))->toBe(['filter.custom_fields']);
+            expect($exception->errors())->toBe(['filter' => ['A filter holds at most 20 conditions. This one has 21.']]);
         });
 });
 
