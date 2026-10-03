@@ -8,6 +8,7 @@ use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\On;
 
 /**
  * @mixin RelationManager
@@ -22,6 +23,12 @@ trait CountsRelatedRecords
     }
 
     protected static ?string $badgeColor = 'gray';
+
+    #[On('related-record-created')]
+    public function showRecordCreatedFromRail(): void
+    {
+        $this->flushCachedTableRecords();
+    }
 
     protected function afterActionCalled(Action $action): void
     {

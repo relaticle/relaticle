@@ -3,12 +3,15 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
+use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\CreateWorkspace;
 use App\Listeners\CreateWorkspaceCustomFields;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -16,6 +19,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
@@ -441,6 +445,47 @@ it('colours the preset stages', function (): void {
     $hired = $stageField->options()->withoutGlobalScopes()->where('name', 'Hired')->sole();
 
     expect($hired->settings->color)->toBe('#059669');
+});
+
+it('gives the default options the colours their field defines', function (): void {
+    $workspace = Workspace::factory()->create(['personal_workspace' => false]);
+
+    $priority = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)
+        ->forEntity(Task::class)
+        ->where('code', TaskField::PRIORITY->value)
+        ->sole();
+
+    $colours = $priority->options()
+        ->withoutGlobalScopes()
+        ->orderBy('sort_order')
+        ->get()
+        ->mapWithKeys(fn (CustomFieldOption $option): array => [$option->name => $option->settings->color])
+        ->all();
+
+    expect($colours)->toBe(TaskField::PRIORITY->getOptionColors());
+});
+
+it('seeds the default fields and their options in two queries', function (): void {
+    DB::enableQueryLog();
+
+    Workspace::factory()->create(['personal_workspace' => false]);
+
+    $customFieldQueries = collect(DB::getQueryLog())
+        ->pluck('query')
+        ->filter(fn (string $sql): bool => str_contains($sql, '"custom_fields"') || str_contains($sql, '"custom_field_options"'));
+
+    expect($customFieldQueries)->toHaveCount(2);
+});
+
+it('writes nothing to the activity log when it seeds the default fields', function (): void {
+    $workspace = Workspace::factory()->create(['personal_workspace' => false]);
+
+    expect(CustomField::withoutGlobalScopes()->where('tenant_id', $workspace->id)->count())->toBe(15)
+        ->and(Activity::query()->whereIn('subject_type', [
+            (new CustomField)->getMorphClass(),
+            (new CustomFieldOption)->getMorphClass(),
+        ])->count())->toBe(0);
 });
 
 it('seeds customer success demo data for the customer success use case', function (): void {

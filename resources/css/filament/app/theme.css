@@ -711,6 +711,14 @@ body:has(.fi-record-page) {
         @apply border-t border-gray-200 pt-4 dark:border-white/10;
     }
 
+    .fi-sc-actions .fi-ac {
+        @apply items-stretch;
+
+        & > .fi-dropdown {
+            @apply flex;
+        }
+    }
+
     .fi-section-header-heading {
         @apply text-sm font-medium text-gray-500 dark:text-gray-400;
     }

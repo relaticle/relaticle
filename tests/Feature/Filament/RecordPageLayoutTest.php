@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Features\EmailIntegration;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Filament\Resources\CompanyResource;
@@ -30,12 +32,18 @@ use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\TeamEmailBlocklist;
 
-mutates(HasRecordPageLayout::class, CountsRelatedRecords::class);
+mutates(HasRecordPageLayout::class, CountsRelatedRecords::class, CreateTaskAction::class, ComposeEmailAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -48,6 +56,19 @@ beforeEach(function (): void {
 function railAction(string $name): TestAction
 {
     return TestAction::make($name)->schemaComponent('recordActions', schema: 'infolist');
+}
+
+function quickAction(string $name): TestAction
+{
+    return TestAction::make($name)->schemaComponent('quickActions', schema: 'infolist');
+}
+
+function workspaceMember(): User
+{
+    $member = User::factory()->create();
+    test()->workspace->users()->attach($member, ['role' => 'admin']);
+
+    return $member;
 }
 
 dataset('record pages', [
@@ -326,3 +347,140 @@ it('offers no column picker on the :dataset page tabs', function (string $model,
     'person notes' => [People::class, ViewPeople::class, PeopleNotesRelationManager::class],
     'opportunity tasks' => [Opportunity::class, ViewOpportunity::class, OpportunityTasksRelationManager::class],
 ]);
+
+it('offers compose email, new note and new task under the :dataset name', function (string $model, string $page): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($page, ['record' => $record->getKey()])
+        ->assertActionVisible(quickAction('composeEmail'))
+        ->assertActionVisible(quickAction('createNote'))
+        ->assertActionVisible(quickAction('createTask'));
+})->with('record pages');
+
+it('links a note created from the rail to the :dataset record and reloads the open tab', function (string $model, string $page): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($page, ['record' => $record->getKey()])
+        ->callAction(quickAction('createNote'), data: ['title' => 'Discovery call recap'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('related-record-created');
+
+    expect($record->notes()->sole()->title)->toBe('Discovery call recap');
+})->with('record pages');
+
+it('links a task created from the rail to the :dataset record and notifies its assignee', function (string $model, string $page): void {
+    $this->withoutDefer();
+
+    $assignee = workspaceMember();
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($page, ['record' => $record->getKey()])
+        ->callAction(quickAction('createTask'), data: ['title' => 'Send the proposal', 'assignees' => [$assignee->id]])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('related-record-created');
+
+    expect($record->tasks()->sole()->title)->toBe('Send the proposal')
+        ->and($assignee->notifications()->count())->toBe(1);
+})->with('record pages');
+
+it('reloads the open tab on create and create another from the rail', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->callAction(quickAction('createNote')->arguments(['another' => true]), data: ['title' => 'First of several'])
+        ->assertHasNoActionErrors()
+        ->assertDispatched('related-record-created');
+
+    expect($company->notes()->count())->toBe(1);
+});
+
+it('keeps the :dataset record linked when the rail form offers other record pickers', function (string $model, string $page): void {
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+    $otherCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($page, ['record' => $record->getKey()])
+        ->callAction(quickAction('createNote'), data: ['title' => 'Shared note', 'companies' => [$otherCompany->getKey()]])
+        ->assertHasNoActionErrors();
+
+    expect($record->notes()->count())->toBe(1)
+        ->and($otherCompany->notes()->count())->toBe(1);
+})->with([
+    'person' => [People::class, ViewPeople::class],
+    'opportunity' => [Opportunity::class, ViewOpportunity::class],
+]);
+
+it('notifies the assignee of a task created from the :dataset tasks tab', function (string $model, string $page, string $relationManager): void {
+    $this->withoutDefer();
+
+    $assignee = workspaceMember();
+    $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire($relationManager, ['ownerRecord' => $record, 'pageClass' => $page])
+        ->callAction(TestAction::make('create')->table(), data: ['title' => 'Book the demo', 'assignees' => [$assignee->id]])
+        ->assertHasNoActionErrors();
+
+    expect($record->tasks()->count())->toBe(1)
+        ->and($assignee->notifications()->count())->toBe(1);
+})->with([
+    'company' => [Company::class, ViewCompany::class, TasksRelationManager::class],
+    'person' => [People::class, ViewPeople::class, PeopleTasksRelationManager::class],
+    'opportunity' => [Opportunity::class, ViewOpportunity::class, OpportunityTasksRelationManager::class],
+]);
+
+it('reloads the open tab when the rail creates a related record', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $tab = livewire(NotesRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->assertDontSee('Renewal terms');
+
+    $company->notes()->create(['title' => 'Renewal terms']);
+
+    $tab->dispatch('related-record-created')
+        ->assertSee('Renewal terms');
+});
+
+it('opens the composer from the rail once a mailbox is connected', function (): void {
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'workspace_id' => $this->workspace->id,
+    ]));
+
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertActionExists(
+            quickAction('composeEmail'),
+            fn (Action $action): bool => $action->getUrl() === null && $action->getEvent() === 'composer:open',
+        );
+});
+
+it('sends compose email to the mailbox settings while no mailbox is connected', function (): void {
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertActionHasUrl(quickAction('composeEmail'), EmailAccountsPage::getUrl());
+});
+
+it('hides compose email on the rail when email integration is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertActionDoesNotExist(quickAction('composeEmail'))
+        ->assertActionVisible(quickAction('createNote'));
+});
+
+it('hides compose email on the rail for a person whose mailbox is blocked', function (): void {
+    TeamEmailBlocklist::factory()->blocked()->email('blocked@contact.example')->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create([
+        'custom_fields' => ['emails' => ['blocked@contact.example']],
+    ]);
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->assertActionDoesNotExist(quickAction('composeEmail'));
+});

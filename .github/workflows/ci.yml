@@ -36,6 +36,7 @@ jobs:
           php-version: 8.5
           extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
+          coverage: none
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
@@ -65,28 +66,59 @@ jobs:
       - name: Run Refactor Check
         run: composer test:refactor
 
-      # pest-plugin-type-coverage v5 corrupts its own cache under fork
-      # contention: Cache::withinLock() gives up after 100 failed flock attempts
-      # and runs the write anyway, unlocked, so parallel forks interleave
-      # file_put_contents and the generated PHP file stops parsing.
-      #
-      # The cache only helps repeat runs, and every CI run starts from a fresh
-      # checkout, so make it unwritable. The plugin already treats a failed
-      # write as a cache miss. Warnings about the unwritable path are expected.
-      # Lowering fork concurrency is not an alternative: Analyser.php divides
-      # the process count by 3, so anything not divisible by 3 hits a TypeError.
-      - name: Run Type Coverage
-        run: |
-          rm -rf vendor/pestphp/pest-plugin-type-coverage/.temp
-          mkdir -p vendor/pestphp/pest-plugin-type-coverage/.temp
-          chmod 555 vendor/pestphp/pest-plugin-type-coverage/.temp
-          composer test:type-coverage
-
       - name: Run Static Analysis
         run: composer test:types
 
       # Architecture tests are not run here: tests/Arch is a testsuite in
       # phpunit.ci.xml, so the sharded `tests` job already executes all of them.
+
+  type-coverage:
+    runs-on: ubuntu-latest
+    name: Type Coverage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Cache Dependencies
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.composer/cache
+            vendor
+          key: ${{ runner.os }}-php-8.5-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-8.5-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.5
+          extensions: json, dom, curl, libxml, mbstring, zip, intl
+          tools: composer:v2
+          coverage: none
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
+
+      # The plugin keys each result on the file's content hash, so a cache saved on
+      # main is valid on every branch. A new composer.lock starts it empty again.
+      - name: Cache Type Coverage Results
+        uses: actions/cache@v6
+        with:
+          path: vendor/pestphp/pest-plugin-type-coverage/.temp
+          key: ${{ runner.os }}-type-coverage-${{ hashFiles('composer.lock') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-type-coverage-${{ hashFiles('composer.lock') }}-
+
+      - name: Prepare Laravel Application
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan passport:keys --force --no-interaction
+
+      - name: Run Type Coverage
+        run: composer test:type-coverage
 
   tests:
     runs-on: ubuntu-latest
@@ -108,9 +140,9 @@ jobs:
           POSTGRES_USER: postgres
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 30
         ports:
           - 5432:5432
 
@@ -182,9 +214,9 @@ jobs:
           POSTGRES_USER: postgres
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
+          --health-interval 2s
           --health-timeout 5s
-          --health-retries 5
+          --health-retries 30
         ports:
           - 5432:5432
 

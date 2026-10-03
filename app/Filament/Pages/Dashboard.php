@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Task\CompleteTask;
-use App\Actions\Task\NotifyTaskAssignees;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Task;
 use App\Models\User;
 use BackedEnum;
-use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Panel;
@@ -147,42 +146,27 @@ final class Dashboard extends Page
         ]);
     }
 
-    public function createTaskAction(): CreateAction
+    public function createTaskAction(): CreateTaskAction
     {
-        return $this->configureCreateTaskAction(CreateAction::make('createTask'))
+        return $this->configureCreateTaskAction(CreateTaskAction::make('createTask'))
             ->color('gray')
             ->label(__('filament/pages/dashboard.tasks.create_action_label'));
     }
 
-    public function createTaskHeaderAction(): CreateAction
+    public function createTaskHeaderAction(): CreateTaskAction
     {
-        return $this->configureCreateTaskAction(CreateAction::make('createTaskHeader'))
+        return $this->configureCreateTaskAction(CreateTaskAction::make('createTaskHeader'))
             ->iconButton()
             ->color('gray')
             ->label(__('filament/pages/dashboard.tasks.create_action_label'));
     }
 
-    private function configureCreateTaskAction(CreateAction $action): CreateAction
+    private function configureCreateTaskAction(CreateTaskAction $action): CreateTaskAction
     {
-        /** @var array<int, string> $submittedAssigneeIds */
-        $submittedAssigneeIds = [];
-
         return $action
             ->model(Task::class)
             ->icon('heroicon-o-plus')
             ->slideOver()
-            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema))
-            ->before(function () use ($action, &$submittedAssigneeIds): void {
-                $submittedAssignees = $action->getRawData()['assignees'] ?? [];
-
-                if (! is_array($submittedAssignees)) {
-                    $submittedAssignees = [];
-                }
-
-                $submittedAssigneeIds = array_values(array_filter($submittedAssignees, is_string(...)));
-            })
-            ->after(function (Task $record) use (&$submittedAssigneeIds): void {
-                resolve(NotifyTaskAssignees::class)->execute($record, $submittedAssigneeIds);
-            });
+            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema));
     }
 }

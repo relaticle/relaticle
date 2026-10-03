@@ -8,6 +8,9 @@ return [
             'label' => 'Compose',
             'tooltip' => 'Keyboard shortcut: C',
         ],
+        'compose_email' => [
+            'label' => 'Compose email',
+        ],
         'undo' => [
             'label' => 'Undo',
         ],

@@ -9,25 +9,27 @@ use App\Enums\CustomFields\NoteField as NoteCustomField;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\PeopleField as PeopleCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Enums\CustomFieldType;
 use App\Enums\OnboardingUseCase;
 use App\Events\WorkspaceCreated;
 use App\Features\OnboardSeed;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Contracts\CustomsFieldsMigrators;
-use Relaticle\CustomFields\Data\CustomFieldData;
 use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
-use Relaticle\CustomFields\Data\CustomFieldSectionData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
-use Relaticle\CustomFields\Enums\CustomFieldSectionType;
-use Relaticle\CustomFields\Models\CustomField;
-use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Exceptions\FieldTypeNotOptionableException;
+use Relaticle\CustomFields\Facades\Entities;
+use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
 use Relaticle\OnboardSeed\OnboardSeeder;
 
 final readonly class CreateWorkspaceCustomFields
@@ -42,7 +44,6 @@ final readonly class CreateWorkspaceCustomFields
     ];
 
     public function __construct(
-        private CustomsFieldsMigrators $migrator,
         private OnboardSeeder $onboardSeeder,
     ) {}
 
@@ -50,25 +51,11 @@ final readonly class CreateWorkspaceCustomFields
     {
         $workspace = $event->workspace;
 
-        $this->migrator->setTenantId($workspace->id);
-
         $stagePreset = $workspace->onboarding_use_case instanceof OnboardingUseCase
             ? $workspace->onboarding_use_case->pipelineStages()
             : null;
 
-        // The defaults every workspace starts with are not an edit anyone made, so
-        // seeding them writes nothing to the audit log.
-        activity()->withoutLogging(function () use ($stagePreset): void {
-            DB::transaction(function () use ($stagePreset): void {
-                foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
-                    foreach ($enumClass::cases() as $enum) {
-                        $optionColors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
-
-                        $this->createCustomField($modelClass, $enum, $optionColors);
-                    }
-                }
-            });
-        });
+        $this->seedDefaultFields($workspace, $stagePreset);
 
         if ($workspace->isPersonalWorkspace() && Feature::active(OnboardSeed::class)) {
             $workspace->loadMissing('owner');
@@ -85,94 +72,114 @@ final readonly class CreateWorkspaceCustomFields
     }
 
     /**
-     * @param  class-string  $model
-     * @param  array<string, string>|null  $optionColors
+     * @param  array<string, string>|null  $stagePreset
      */
-    private function createCustomField(string $model, CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum, ?array $optionColors = null): void
+    private function seedDefaultFields(Workspace $workspace, ?array $stagePreset): void
     {
-        $fieldData = new CustomFieldData(
-            name: $enum->getDisplayName(),
-            code: $enum->value,
-            type: $enum->getFieldType(),
-            section: new CustomFieldSectionData(
-                name: 'General',
-                code: 'general',
-                type: CustomFieldSectionType::HEADLESS
-            ),
-            systemDefined: $enum->isSystemDefined(),
-            width: $enum->getWidth(),
-            settings: new CustomFieldSettingsData(
+        $now = now();
+        $fields = [];
+        $options = [];
+        $entityTypes = [];
+
+        foreach (self::MODEL_ENUM_MAP as $modelClass => $enumClass) {
+            $entityType = Entities::getEntity($modelClass)?->getAlias() ?? $modelClass;
+            $entityTypes[] = $entityType;
+
+            foreach ($enumClass::cases() as $enum) {
+                $field = $this->fieldRow($workspace, $entityType, $enum, $now);
+                $colors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
+                $names = $colors !== null ? array_keys($colors) : $enum->getOptions();
+
+                $fields[] = $field;
+
+                array_push($options, ...$this->optionRows(
+                    $workspace,
+                    $field,
+                    $names ?? [],
+                    $colors ?? $enum->getOptionColors() ?? [],
+                    $now,
+                ));
+            }
+        }
+
+        // insert() fires no model events: the defaults every workspace starts with are
+        // not an edit anyone made, so seeding them writes nothing to the audit log.
+        DB::transaction(function () use ($fields, $options): void {
+            CustomField::query()->insert($fields);
+            CustomFieldOption::query()->insert($options);
+        });
+
+        foreach ($entityTypes as $entityType) {
+            BackendVisibilityService::clearCache($entityType);
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fieldRow(
+        Workspace $workspace,
+        string $entityType,
+        CompanyCustomField|OpportunityCustomField|PeopleCustomField|TaskCustomField|NoteCustomField $enum,
+        CarbonImmutable $now,
+    ): array {
+        $field = new CustomField;
+
+        return $field->forceFill([
+            'id' => $field->newUniqueId(),
+            'tenant_id' => $workspace->getKey(),
+            'entity_type' => $entityType,
+            'code' => $enum->value,
+            'name' => $enum->getDisplayName(),
+            'type' => $enum->getFieldType(),
+            'lookup_type' => null,
+            'width' => $enum->getWidth(),
+            'active' => true,
+            'system_defined' => $enum->isSystemDefined(),
+            'settings' => new CustomFieldSettingsData(
                 list_toggleable_hidden: $enum->isListToggleableHidden(),
                 enable_option_colors: $enum->hasColorOptions(),
                 allow_multiple: $enum->allowsMultipleValues(),
                 max_values: $enum->getMaxValues(),
                 unique_per_entity_type: $enum->isUniquePerEntityType(),
                 additional: $enum->additionalSettings(),
-            )
-        );
-
-        $migrator = $this->migrator->new(
-            model: $model,
-            fieldData: $fieldData
-        );
-
-        $options = $optionColors !== null ? array_keys($optionColors) : $enum->getOptions();
-
-        if ($options !== null) {
-            $migrator->options($options);
-        }
-
-        $customField = $migrator->create();
-
-        $this->applyColorsToOptions($customField, $optionColors ?? $enum->getOptionColors());
+            ),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ])->getAttributes();
     }
 
     /**
-     * @param  array<string, string>|null  $colorMapping
+     * @param  array<string, mixed>  $field
+     * @param  array<int|string, string>  $names
+     * @param  array<string, string>  $colors
+     * @return list<array<string, mixed>>
      */
-    private function applyColorsToOptions(CustomField $customField, ?array $colorMapping): void
+    private function optionRows(Workspace $workspace, array $field, array $names, array $colors, CarbonImmutable $now): array
     {
-        if ($colorMapping === null) {
-            return;
+        if ($names === []) {
+            return [];
         }
 
-        $options = $customField->options()->withoutGlobalScopes()->get();
+        throw_unless(CustomFieldType::from($field['type'])->isChoice(), FieldTypeNotOptionableException::class);
 
-        $updates = $options
-            ->filter(fn (CustomFieldOption $option): bool => isset($colorMapping[$option->name]))
-            ->map(fn (CustomFieldOption $option): array => [
-                'id' => $option->getKey(),
-                'settings' => json_encode(new CustomFieldOptionSettingsData(color: $colorMapping[$option->name])),
-            ])
-            ->values()
-            ->all();
+        $rows = [];
 
-        if ($updates === []) {
-            return;
+        foreach ($names as $sortOrder => $name) {
+            $rows[] = [
+                'id' => (new CustomFieldOption)->newUniqueId(),
+                'custom_field_id' => $field['id'],
+                'tenant_id' => $workspace->getKey(),
+                'name' => $name,
+                'sort_order' => $sortOrder,
+                'settings' => isset($colors[$name])
+                    ? json_encode(new CustomFieldOptionSettingsData(color: $colors[$name]))
+                    : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
         }
 
-        $table = $customField->options()->getModel()->getTable();
-        $ids = array_column($updates, 'id');
-        $cases = [];
-        $caseBindings = [];
-
-        foreach ($updates as $item) {
-            $cases[] = 'WHEN id = ? THEN ?';
-            $caseBindings[] = $item['id'];
-            $caseBindings[] = $item['settings'];
-        }
-
-        $casesSql = implode(' ', $cases);
-        $placeholders = implode(',', array_fill(0, count($ids), '?'));
-
-        $caseExpr = "(CASE {$casesSql} END)";
-        if (DB::getDriverName() === 'pgsql') {
-            $caseExpr .= '::json';
-        }
-
-        DB::update(
-            "UPDATE \"{$table}\" SET \"settings\" = {$caseExpr}, \"updated_at\" = ? WHERE \"id\" IN ({$placeholders})",
-            [...$caseBindings, now(), ...$ids],
-        );
+        return $rows;
     }
 }

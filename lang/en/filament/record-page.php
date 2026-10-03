@@ -15,6 +15,8 @@ return [
     'actions' => [
         'copy_page_url' => 'Copy page URL',
         'copy_record_id' => 'Copy record ID',
+        'new_note' => 'New note',
+        'new_task' => 'New task',
     ],
     'notifications' => [
         'url_copied' => 'URL copied to clipboard',

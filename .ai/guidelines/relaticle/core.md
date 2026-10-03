@@ -79,8 +79,9 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, type coverage, PHPStan, all five test shards
-and the Browser suite on every push to a pull request, in about 7 minutes.
+only full run: it executes lint, rector, PHPStan, type coverage, five test shards and
+six Browser shards on every push to a pull request. A run takes about 4 minutes when
+runners are free, and longer when several runs queue for them.
 
 After each change, while iterating:
 
@@ -94,6 +95,8 @@ Once, before pushing:
 4. `vendor/bin/phpstan analyse`: ensure no new static analysis errors
 5. `composer test:lint`: `--dirty` only covers uncommitted files, so a file committed
    earlier in the branch is checked here (`pint --test --parallel`, whole repo)
+6. `composer test:arch`: `ArchTest` and `ConventionsTest` fail CI on more branches than
+   any other test class, and the Arch suite runs in 30 seconds
 
 After a push, open the pull request if the branch has none, and watch the `Tests`
 workflow as a background task:

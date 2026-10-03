@@ -15,6 +15,8 @@ return [
     'actions' => [
         'copy_page_url' => "Copier l'URL de la page",
         'copy_record_id' => "Copier l'identifiant",
+        'new_note' => 'Nouvelle note',
+        'new_task' => 'Nouvelle tâche',
     ],
     'notifications' => [
         'url_copied' => 'URL copiée dans le presse-papiers',

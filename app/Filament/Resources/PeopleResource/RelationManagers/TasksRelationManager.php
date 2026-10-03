@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PeopleResource\RelationManagers;
 
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -37,7 +37,7 @@ final class TasksRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns(RelatedRecordColumns::tasks())
             ->headerActions([
-                CreateAction::make()->icon('heroicon-o-plus')->size(Size::Small),
+                CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small),
             ])
             ->recordActions([
                 ActionGroup::make([

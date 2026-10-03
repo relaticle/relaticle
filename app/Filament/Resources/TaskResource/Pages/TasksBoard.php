@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\TaskResource\Pages;
 
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasBoardViewSwitcher;
@@ -16,7 +17,6 @@ use App\Models\Task;
 use App\Models\Workspace;
 use Exception;
 use Filament\Actions\Action;
-use Filament\Actions\CreateAction;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
@@ -121,7 +121,7 @@ final class TasksBoard extends BoardResourcePage
                     ]);
             })
             ->columnActions([
-                CreateAction::make()
+                CreateTaskAction::make()
                     ->authorize(fn (): bool => Gate::allows('create', Task::class))
                     ->label(__('filament/pages/boards.tasks.actions.add'))
                     ->icon('heroicon-o-plus')
@@ -130,7 +130,7 @@ final class TasksBoard extends BoardResourcePage
                     ->slideOver(false)
                     ->model(Task::class)
                     ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
-                    ->using(function (array $data, CreateAction $action): Task {
+                    ->using(function (array $data, CreateTaskAction $action): Task {
                         /** @var Workspace $currentWorkspace */
                         $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
 

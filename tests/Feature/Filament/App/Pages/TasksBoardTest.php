@@ -3,19 +3,21 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Board;
 
-mutates(TasksBoard::class);
+mutates(TasksBoard::class, CreateTaskAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -183,4 +185,23 @@ it('buckets the due-date badge against the user calendar, not the server clock',
     livewire(TasksBoard::class)
         ->assertSee('Due Tomorrow')
         ->assertDontSee('Due Today');
+});
+
+it('notifies the assignee of a task added from a board column', function (): void {
+    $this->withoutDefer();
+
+    $assignee = User::factory()->create();
+    $this->workspace->users()->attach($assignee, ['role' => 'admin']);
+
+    $column = $this->statusField->options()->firstOrFail();
+
+    livewire(TasksBoard::class)
+        ->callAction(
+            TestAction::make('create')->arguments(['column' => (string) $column->getKey()]),
+            data: ['title' => 'Prepare the renewal deck', 'assignees' => [$assignee->id]],
+        )
+        ->assertHasNoActionErrors();
+
+    expect(Task::query()->where('title', 'Prepare the renewal deck')->exists())->toBeTrue()
+        ->and($assignee->notifications()->count())->toBe(1);
 });

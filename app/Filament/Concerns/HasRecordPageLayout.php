@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
+use App\Filament\Resources\NoteResource\Forms\NoteForm;
+use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Task;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Infolists\Components\Entry;
@@ -31,10 +38,13 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use Illuminate\Support\Js;
 use Livewire\Attributes\On;
 use Relaticle\CustomFields\Facades\CustomFields;
+use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
 /**
@@ -61,6 +71,7 @@ trait HasRecordPageLayout
                 $this->recordActions()->grow(false),
             ])
                 ->verticallyAlignCenter(),
+            $this->quickActions(),
             $this->detailsSection($schema),
             CommunicationIntelligenceInfolist::section()
                 ->contained(false)
@@ -122,9 +133,50 @@ trait HasRecordPageLayout
     }
 
     #[On('related-records-changed')]
+    #[On('related-record-created')]
     public function refreshRelatedRecordCounts(): void
     {
         $this->forceRender();
+    }
+
+    private function quickActions(): Actions
+    {
+        return Actions::make([
+            ComposeEmailAction::make()->size(Size::Small),
+            $this->quickCreateAction(CreateAction::make('createNote'), __('filament/record-page.actions.new_note'))
+                ->model(Note::class)
+                ->icon(CrmEntity::Note->icon())
+                ->authorize(fn (): bool => Gate::allows('create', Note::class))
+                ->relationship(fn (): MorphToMany => $this->crmRecord()->notes())
+                ->schema(fn (Schema $schema): Schema => NoteForm::get($schema, [$this->crmRecord()->getTable()])),
+            $this->quickCreateAction(CreateTaskAction::make('createTask'), __('filament/record-page.actions.new_task'))
+                ->model(Task::class)
+                ->icon(CrmEntity::Task->icon())
+                ->authorize(fn (): bool => Gate::allows('create', Task::class))
+                ->relationship(fn (): MorphToMany => $this->crmRecord()->tasks())
+                ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, [$this->crmRecord()->getTable()])),
+        ])
+            ->key('quickActions')
+            ->extraAttributes(['class' => 'fi-record-rail-quick-actions']);
+    }
+
+    private function quickCreateAction(CreateAction $action, string $label): CreateAction
+    {
+        return $action
+            ->label($label)
+            ->tooltip($label)
+            ->button()
+            ->hiddenLabel()
+            ->color('gray')
+            ->size(Size::Small)
+            ->slideOver()
+            ->after(fn () => $this->dispatch('related-record-created'));
+    }
+
+    private function crmRecord(): Company|People|Opportunity
+    {
+        /** @var Company|People|Opportunity */
+        return $this->getRecord();
     }
 
     private function recordActions(): Actions
