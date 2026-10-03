@@ -224,3 +224,20 @@ it('finds a phone typed in any format', function (string $query, int $count): vo
     'brackets and spaces' => ['(415) 555 0100', 1],
     'fewer than seven digits' => ['415 555', 0],
 ]);
+
+it('does not match phone digits held by a field that is not a phone', function (): void {
+    $emails = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Cy Email'])->saveCustomFieldValue($emails, ['cy-415-555-0100@example.com']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => '(415) 555 0100'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 0)
+            ->etc());
+});

@@ -520,3 +520,15 @@ it('keys a national phone operand by its position', function (): void {
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.custom_fields.phone_number.$has_any.1' => 'phone_number needs a country code, for example +1 415 555 0100.']);
 });
+
+it('rejects a phone operand that carries a plus but is not a number', function (string $operand): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['custom_fields' => ['phone_number' => ['$has_any' => ['+14155550100', $operand]]]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.custom_fields.phone_number.$has_any.1' => "phone_number: {$operand} is not a valid phone number."]);
+})->with(['too short' => ['+1 415 555 010'], 'letters' => ['+abc']]);
+
+it('names the sigil for a bare operator under domain', function (): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['custom_fields' => ['emails' => ['domain' => ['in' => ['acme.com']]]]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.custom_fields.emails.domain.in' => 'Operators start with $. Use $in.']);
+});

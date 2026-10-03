@@ -32,6 +32,8 @@ final readonly class CustomFieldFilter implements Filter
 
     private const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
 
+    private const string LOWERED_OPERANDS = 'array(select lower(operand) from unnest(?::text[]) as operand)';
+
     private const array DOMAIN_OF = [
         'email' => "lower(split_part(element, '@', 2))",
         'link' => "rtrim(regexp_replace(split_part(regexp_replace(split_part(split_part(split_part(regexp_replace(regexp_replace(lower(element), '[\\s\\u00A0\\u200B\\uFEFF\\u3000]+', '', 'g'), '^[a-z][a-z0-9+.-]*://', ''), '/', 1), '?', 1), '#', 1), '^.*@', ''), ':', 1), '^(www\\.)+', ''), '.')",
@@ -87,17 +89,7 @@ final readonly class CustomFieldFilter implements Filter
             $entry = $options[$fieldCode] ?? null;
 
             foreach ($operators as $operator => $operand) {
-                if (! str_starts_with((string) $operator, '$') && isset($supportedOperators['$'.$operator])) {
-                    $this->invalid(__('validation.filter.operator_sigil', ['operator' => '$'.$operator]), "{$fieldCode}.{$operator}");
-                }
-
-                if (! isset($supportedOperators[$operator])) {
-                    $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
-                        'operator' => $operator,
-                        'field' => $fieldCode,
-                        'supported' => implode(', ', array_keys($supportedOperators)),
-                    ]), "{$fieldCode}.{$operator}");
-                }
+                $this->assertSupported($fieldCode, (string) $operator, $supportedOperators);
 
                 if ($operator === 'domain') {
                     $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
@@ -269,8 +261,8 @@ final readonly class CustomFieldFilter implements Filter
     {
         if (in_array($field->type, ['email', 'link'], true)) {
             $query->whereRaw(
-                'exists (select 1 from '.self::LIST_ELEMENTS.' as element where lower(element) = any(?::text[]))',
-                [$this->textArray(array_map(mb_strtolower(...), $values))],
+                'exists (select 1 from '.self::LIST_ELEMENTS.' as element where lower(element) = any('.self::LOWERED_OPERANDS.'))',
+                [$this->textArray($values)],
             );
 
             return;
@@ -300,18 +292,18 @@ final readonly class CustomFieldFilter implements Filter
         foreach ($operators as $operator => $operand) {
             $operator = (string) $operator;
 
-            $schema = $domainOperators[$operator] ?? $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
-                'operator' => $operator,
-                'field' => $path,
-                'supported' => implode(', ', array_keys($domainOperators)),
-            ]), "{$path}.{$operator}");
+            $this->assertSupported($path, $operator, $domainOperators);
 
             $domains = array_map(
-                static fn (string $domain): string => mb_strtolower(trim($domain)),
-                $this->normalizeOperand($path, $operator, $operand, $schema, true),
+                static fn (string $domain): string => trim($domain),
+                $this->normalizeOperand($path, $operator, $operand, $domainOperators[$operator], true),
             );
 
-            if (array_any($domains, static fn (string $domain): bool => preg_match('/^[a-z0-9.-]+$/', $domain) !== 1)) {
+            if ($field->type === 'link') {
+                $domains = array_map(static fn (string $domain): string => rtrim((string) preg_replace('/^(www\.)+/i', '', $domain), '.'), $domains);
+            }
+
+            if (array_any($domains, static fn (string $domain): bool => preg_match('/^[^\s\/@:?#]+$/u', $domain) !== 1)) {
                 $this->invalid(__('validation.custom_field.operand_type', [
                     'field' => $path,
                     'operator' => $operator,
@@ -321,13 +313,31 @@ final readonly class CustomFieldFilter implements Filter
 
             $matching = fn (Builder $values): Builder => $values
                 ->where('custom_field_id', $field->getKey())
-                ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$expression} = any(?::text[]))", [$this->textArray($domains)]);
+                ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$expression} = any(".self::LOWERED_OPERANDS.'))', [$this->textArray($domains)]);
 
             match ($operator) {
                 '$in' => $query->whereHas('customFieldValues', $matching),
                 '$not_in' => $query->whereDoesntHave('customFieldValues', $matching),
                 default => throw new \LogicException("Unsupported domain operator [{$operator}]."),
             };
+        }
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $supported
+     */
+    private function assertSupported(string $path, string $operator, array $supported): void
+    {
+        if (! str_starts_with($operator, '$') && isset($supported['$'.$operator])) {
+            $this->invalid(__('validation.filter.operator_sigil', ['operator' => '$'.$operator]), "{$path}.{$operator}");
+        }
+
+        if (! isset($supported[$operator])) {
+            $this->invalid(__('validation.custom_field.unsupported_filter_operator', [
+                'operator' => $operator,
+                'field' => $path,
+                'supported' => implode(', ', array_keys($supported)),
+            ]), "{$path}.{$operator}");
         }
     }
 
@@ -345,6 +355,11 @@ final readonly class CustomFieldFilter implements Filter
             if ($field->type === 'phone' && ! str_starts_with($canonical, '+')) {
                 $this->invalid(__('validation.filter.phone_country_code', ['name' => $field->code]), "{$field->code}.{$operator}.{$index}");
             }
+
+            if ($field->type === 'phone' && preg_match('/^\+\d{1,15}(;ext=\d+)?$/', $canonical) !== 1) {
+                $this->invalid(__('validation.filter.phone_invalid', ['name' => $field->code, 'value' => $value]), "{$field->code}.{$operator}.{$index}");
+            }
+
             $spellings[] = $canonical;
             $spellings[] = $value;
         }

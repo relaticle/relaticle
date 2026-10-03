@@ -13,6 +13,7 @@ use App\Mcp\Tools\BaseListTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\People\ListPeopleTool;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
@@ -777,11 +778,99 @@ it('asks for a country code on a national phone operand', function (): void {
         ->toThrow(ValidationException::class, 'mobile needs a country code');
 });
 
-it('rejects a domain operand that is not a bare host', function (): void {
+it('treats array literal characters in a domain operand as plain text', function (): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($emails, ['ana@acme.com']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['a"},{"b', 'x\\y']]]]]))->toBe([]);
+});
+
+it('matches a link domain operand written with www or a trailing dot', function (string $operand): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($site, ['https://www.linkedin.com/in/ana']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($site, ['https://globex.com']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$in' => [$operand]]]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['domain' => ['$not_in' => [$operand]]]]]))->toBe(['Bob']);
+})->with(['www prefix' => ['www.linkedin.com'], 'repeated www' => ['WWW.www.linkedin.com'], 'trailing dot' => ['linkedin.com.']]);
+
+it('keeps www as typed on an email domain operand', function (): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($emails, ['ana@www.acme.com']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['www.acme.com']]]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['acme.com']]]]]))->toBe([]);
+});
+
+it('matches a mixed-case non-ascii email against its own spelling', function (): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($emails, ['ΟΔΟΣ@x.gr']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($emails, ['bob@x.gr']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['$has_any' => ['ΟΔΟΣ@x.gr']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['$has_none' => ['ΟΔΟΣ@x.gr']]]]))->toBe(['Bob']);
+});
+
+it('matches a domain operand that is a plausible host', function (string $host): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($emails, ["ana@{$host}"]);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($emails, ['bob@globex.com']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => [$host]]]]]))->toBe(['Ana']);
+})->with(['non-ascii' => ['münchen.de'], 'underscore label' => ['_dmarc.acme.com']]);
+
+it('rejects a domain operand that carries a path, user or port', function (string $operand): void {
     filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
 
-    expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['a"},{"b']]]]]))
+    expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => [$operand]]]]]))
         ->toThrow(ValidationException::class, 'a list of domains');
+})->with(['path' => ['acme.com/team'], 'user' => ['ana@acme.com'], 'port' => ['acme.com:8080'], 'query' => ['acme.com?x=1'], 'fragment' => ['acme.com#top'], 'space' => ['acme .com']]);
+
+it('does not match a link or phone that a second record holds instead', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $phone = filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    $bob = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
+    $ana->saveCustomFieldValue($site, ['https://acme.com/team']);
+    $ana->saveCustomFieldValue($phone, ['+1 415 555 0100']);
+    $bob->saveCustomFieldValue($site, ['https://globex.com/team']);
+    $bob->saveCustomFieldValue($phone, ['+1 415 555 0199']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_any' => ['ACME.com/team']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_none' => ['acme.com/team']]]]))->toBe(['Bob'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+14155550100']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_none' => ['+1 415 555 0100']]]]))->toBe(['Bob']);
+});
+
+it('matches a phone extension only on the number that holds it', function (): void {
+    $phone = filterTestField($this->workspace, 'people', 'mobile', 'phone', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($phone, ['+1 415 555 0100 ext. 12']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($phone, ['+1 415 555 0100']);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+14155550100;ext=12']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+1 415 555 0100 ext 12']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['mobile' => ['$has_any' => ['+1 415 555 0100']]]]))->toBe(['Bob']);
+});
+
+it('complements a domain condition under $not', function (): void {
+    $emails = filterTestField($this->workspace, 'people', 'work_emails', 'email', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana'])->saveCustomFieldValue($emails, ['ana@acme.com']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob'])->saveCustomFieldValue($emails, ['bob@globex.com']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Cy']);
+
+    expect(peopleNamesMatching($this->user, ['$not' => ['custom_fields' => ['work_emails' => ['domain' => ['$in' => ['acme.com']]]]]]))->toBe(['Bob', 'Cy']);
+});
+
+it('filters a person by the domain of a field on their company', function (): void {
+    $site = filterTestField($this->workspace, 'company', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $globex = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
+    $acme->saveCustomFieldValue($site, ['https://www.acme.com']);
+    $globex->saveCustomFieldValue($site, ['https://globex.com']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana', 'company_id' => $acme->getKey()]);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob', 'company_id' => $globex->getKey()]);
+
+    expect(peopleNamesMatching($this->user, ['company' => ['custom_fields' => ['site' => ['domain' => ['$in' => ['acme.com']]]]]]))->toBe(['Ana']);
 });
 
 it('offers the domain sub-field only on email and link fields', function (): void {
