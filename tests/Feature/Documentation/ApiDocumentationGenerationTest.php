@@ -45,6 +45,10 @@ it('generates the complete API documentation with company ownership fields', fun
         ->unique()
         ->all();
 
+    expect($spec['paths']['/api/v1/companies/query']['post']['requestBody']['content']['application/json']['schema']['properties'])
+        ->toHaveKeys(['filter', 'sort', 'per_page'])
+        ->and($spec['paths']['/api/v1/companies/query']['post']['parameters'])->toBe([]);
+
     expect($customFieldFilter)->not->toBeNull()
         ->and(array_diff($publishedOperators, str($customFieldFilter['description'])->matchAll('/\$[a-z_]+/')->all()))->toBe([]);
 });

@@ -20,6 +20,7 @@ use App\Support\Filters\FilterTree;
 use App\Support\Filters\LogicFilter;
 use App\Support\Filters\NativeFilter;
 use App\Support\Filters\RelationFilter;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
@@ -395,7 +396,7 @@ it('caps a filter at twenty conditions', function (): void {
     $this->postJson('/api/v1/companies/query', ['filter' => ['$or' => $conditions]])
         ->assertUnprocessable()
         ->assertJsonFragment(['A filter holds at most 20 conditions. This one has 21.']);
-})->skip('enabled in Task 14, when POST /query exists');
+});
 
 it('counts every operator in the tree toward the twenty-condition cap', function (): void {
     $conditions = array_fill(0, 21, ['name' => ['$eq' => 'x']]);
@@ -531,4 +532,88 @@ it('names the sigil for a bare operator under domain', function (): void {
     $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['custom_fields' => ['emails' => ['domain' => ['in' => ['acme.com']]]]]]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.custom_fields.emails.domain.in' => 'Operators start with $. Use $in.']);
+});
+
+it('answers a query body with the same records as the query string', function (): void {
+    $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
+    $filter = ['$or' => [['name' => ['$eq' => 'Acme']], ['name' => ['$eq' => 'Nope']]]];
+
+    $viaBody = collect($this->postJson('/api/v1/companies/query', ['filter' => $filter, 'per_page' => 5])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($viaBody)->toBe([$acme->id])->and(listIds($this, 'companies', $filter))->toBe([$acme->id]);
+});
+
+it('lets a read-only token query', function (): void {
+    auth()->forgetGuards();
+    $token = $this->user->createToken('read', ['read'])->plainTextToken;
+
+    $this->withToken($token)->postJson('/api/v1/companies/query', ['filter' => ['name' => ['$contains' => 'a']]])->assertOk();
+    $this->withToken($token)->postJson('/api/v1/companies', ['name' => 'Nope'])->assertForbidden();
+});
+
+it('refuses a query from a token without the read ability', function (): void {
+    auth()->forgetGuards();
+    $token = $this->user->createToken('write', ['create'])->plainTextToken;
+
+    $this->withToken($token)->postJson('/api/v1/companies/query', ['filter' => ['name' => ['$contains' => 'a']]])->assertForbidden();
+});
+
+it('queries every entity through its own route', function (string $entity): void {
+    $this->postJson("/api/v1/{$entity}/query", ['filter' => []])->assertOk()->assertJsonStructure(['data', 'links', 'meta']);
+})->with(['companies', 'people', 'opportunities', 'tasks', 'notes']);
+
+it('sorts, includes and paginates a query body like the query string', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zulu']);
+    $alpha = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Alpha']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $alpha->id]);
+
+    $body = $this->postJson('/api/v1/companies/query', ['sort' => 'name', 'include' => 'people', 'per_page' => 1])->assertOk();
+    $query = $this->getJson('/api/v1/companies?sort=name&include=people&per_page=1')->assertOk();
+
+    expect($body->json('data.0.id'))->toBe($alpha->id)
+        ->and($body->json('data'))->toHaveCount(1)
+        ->and($body->json('data.0.relationships.people'))->toHaveCount(1)
+        ->and($body->json('meta.total'))->toBe(2)
+        ->and($body->json('data'))->toEqual($query->json('data'))
+        ->and(Arr::except($body->json('meta'), ['links', 'path']))->toEqual(Arr::except($query->json('meta'), ['links', 'path']));
+});
+
+it('keeps a boolean true boolean and a text true text in a query body', function (): void {
+    $toggle = workspaceField($this, 'company', 'icp');
+    $motto = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Motto', 'code' => 'motto', 'type' => 'text']);
+    $icp = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Icp']);
+    $plain = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Plain']);
+    $icp->saveCustomFieldValue($toggle, true);
+    $icp->saveCustomFieldValue($motto, 'false');
+    $plain->saveCustomFieldValue($toggle, false);
+    $plain->saveCustomFieldValue($motto, 'true');
+
+    $ids = fn (array $filter): array => collect($this->postJson('/api/v1/companies/query', ['filter' => $filter])->assertOk()->json('data'))->pluck('id')->all();
+
+    expect($ids(['custom_fields' => ['icp' => ['$eq' => true]]]))->toBe([$icp->id])
+        ->and($ids(['custom_fields' => ['motto' => ['$eq' => 'true']]]))->toBe([$plain->id]);
+});
+
+it('returns every record for an empty query body', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->count(2)->create();
+
+    $this->postJson('/api/v1/companies/query', [])->assertOk()->assertJsonCount(2, 'data');
+});
+
+it('rejects a query body the pre-pass rejects, under the same keys', function (array $filter, string $key, string $message): void {
+    $this->postJson('/api/v1/companies/query', ['filter' => $filter])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$key => $message]);
+})->with([
+    'not an object' => [['acme'], 'filter', 'The filter must be an object.'],
+    'too many conditions' => [['$or' => array_fill(0, 21, ['name' => ['$eq' => 'x']])], 'filter', 'A filter holds at most 20 conditions. This one has 21.'],
+    'too deep' => [['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]], 'filter.$not.$or.0.$and.0.$not', '$and, $or and $not nest at most 3 levels.'],
+    'too many values' => [['creation_source' => ['$in' => array_fill(0, 101, 'api')]], 'filter.creation_source.$in', 'creation_source $in takes at most 100 values.'],
+]);
+
+it('rejects a filter sent as a string in a query body', function (): void {
+    $this->postJson('/api/v1/companies/query', ['filter' => 'acme'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter']);
 });

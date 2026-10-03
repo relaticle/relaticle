@@ -42,7 +42,7 @@ final class GetFromSpatieQueryBuilder extends Strategy
      */
     public function __invoke(ExtractedEndpointData $endpointData, array $routeRules = []): ?array
     {
-        if (! $this->isIndexMethod($endpointData)) {
+        if (! $this->isIndexMethod($endpointData) || in_array('POST', $endpointData->httpMethods, true)) {
             return null;
         }
 

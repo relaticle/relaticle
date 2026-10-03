@@ -34,7 +34,7 @@ final readonly class EnsureTokenHasAbility
 
         // An upsert may create or update, so its route names both and the token must hold
         // each; deciding after the match would make the 403 an existence oracle.
-        foreach ($abilities ?: [$this->resolveAbility($request->method())] as $ability) {
+        foreach ($abilities ?: [$this->resolveAbility($request)] as $ability) {
             throw_unless($token->can($ability), MissingAbilityException::class, [$ability]);
         }
 
@@ -53,9 +53,13 @@ final readonly class EnsureTokenHasAbility
             || ($token instanceof PersonalAccessToken && $token->getKey());
     }
 
-    private function resolveAbility(string $method): string
+    private function resolveAbility(Request $request): string
     {
-        return match ($method) {
+        if ($request->route()?->getActionMethod() === 'index') {
+            return 'read';
+        }
+
+        return match ($request->method()) {
             'POST' => 'create',
             'PUT', 'PATCH' => 'update',
             'DELETE' => 'delete',

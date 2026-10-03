@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Scribe\OpenApi\ErrorResponsesGenerator;
+use App\Scribe\Strategies\GetFilterBodyFromEntityFilters;
 use App\Scribe\Strategies\GetFromSpatieQueryBuilder;
 use Knuckles\Scribe\Config\AuthIn;
 use Knuckles\Scribe\Config\Defaults;
@@ -248,7 +249,10 @@ return [
             ...Defaults::QUERY_PARAMETERS_STRATEGIES,
             GetFromSpatieQueryBuilder::class,
         ],
-        'bodyParameters' => [...Defaults::BODY_PARAMETERS_STRATEGIES],
+        'bodyParameters' => [
+            ...Defaults::BODY_PARAMETERS_STRATEGIES,
+            GetFilterBodyFromEntityFilters::class,
+        ],
         'responses' => removeStrategies(
             Defaults::RESPONSES_STRATEGIES,
             [Strategies\Responses\ResponseCalls::class],
