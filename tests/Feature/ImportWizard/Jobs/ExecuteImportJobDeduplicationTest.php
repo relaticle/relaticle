@@ -470,6 +470,31 @@ it('matches a legacy-format value by the identical csv value and a canonical val
     'canonical value, formatted csv value' => ['+14155550100', '+1 (415) 555-0100'],
 ]);
 
+it('prefers the record storing the exact csv value over one storing its canonical form', function (): void {
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'phone_number')
+        ->firstOrFail();
+    $legacy = People::factory()->create(['workspace_id' => $this->workspace->id]);
+    $canonical = People::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    foreach ([[$legacy, '+1 415-555-0100'], [$canonical, '+14155550100']] as [$person, $stored]) {
+        CustomFieldValue::factory()->withJsonValue([$stored])->create([
+            'custom_field_id' => $field->id,
+            'entity_type' => 'people',
+            'entity_id' => $person->id,
+            'tenant_id' => $this->workspace->id,
+        ]);
+    }
+
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'people', targetModelClass: People::class);
+    $resolved = (new EntityLinkResolver((string) $this->workspace->id))
+        ->batchResolve($link, MatchableField::phone(), ['+1 415-555-0100']);
+
+    expect((string) $resolved['+1 415-555-0100'])->toBe((string) $legacy->id);
+});
+
 it('does not populate custom field when auto-creating via name matcher', function (): void {
     $relationships = json_encode([
         ['relationship' => 'company', 'action' => 'create', 'id' => null, 'name' => 'New Corp', 'behavior' => MatchBehavior::Create->value, 'matchField' => 'name'],

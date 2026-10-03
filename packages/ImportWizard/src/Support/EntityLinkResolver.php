@@ -289,7 +289,7 @@ final class EntityLinkResolver
         $matched = [];
 
         foreach ($canonicalByOriginal as $original => $canonical) {
-            $id = $results[$canonical] ?? $results[$original] ?? null;
+            $id = $results[$original] ?? $results[$canonical] ?? null;
 
             if ($id !== null) {
                 $matched[(string) $original] = $id;

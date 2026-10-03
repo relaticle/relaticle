@@ -309,6 +309,19 @@ final readonly class CustomFieldsDisplayFormatter
         return $carbon->isoFormat('MMM D, YYYY');
     }
 
+    private function comparable(CustomField $field, mixed $value): mixed
+    {
+        return match (true) {
+            is_string($value) => CanonicalValue::of($field, $value),
+            is_array($value) => collect($value)
+                ->map(fn (mixed $item): mixed => $this->comparable($field, $item))
+                ->unique(strict: true)
+                ->values()
+                ->all(),
+            default => $value,
+        };
+    }
+
     /**
      * Read the current value of a custom field on a model via the
      * directly-loaded customFieldValues relation.
@@ -319,15 +332,6 @@ final readonly class CustomFieldsDisplayFormatter
      * while the NEW side, fed a plain array from the payload, prints the option
      * names. Both sides of one card have to agree.
      */
-    private function comparable(CustomField $field, mixed $value): mixed
-    {
-        return match (true) {
-            is_string($value) => CanonicalValue::of($field, $value),
-            is_array($value) => array_map(fn (mixed $item): mixed => $this->comparable($field, $item), $value),
-            default => $value,
-        };
-    }
-
     private function lookupCurrentValue(CustomField $field, Model $model): mixed
     {
         if (! method_exists($model, 'customFieldValues')) {

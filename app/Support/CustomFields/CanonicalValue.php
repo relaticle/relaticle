@@ -26,6 +26,7 @@ final readonly class CanonicalValue
             ->filter(fn (mixed $item): bool => filled($item))
             ->map(fn (mixed $item): string => self::of($field, (string) $item))
             ->reject(fn (string $item): bool => $item === '')
+            ->unique(strict: true)
             ->values()
             ->all();
     }

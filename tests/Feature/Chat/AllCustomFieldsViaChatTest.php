@@ -134,6 +134,16 @@ it('proposes no change for a domain that only differs by spelling', function (st
         ->and(PendingAction::query()->count())->toBe(0);
 })->with(['https://www.acme.com', 'ACME.com/about']);
 
+it('proposes no change for a list repeating the stored value in another spelling', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $company->saveCustomFields(['domains' => ['acme.com']]);
+
+    $response = json_decode(runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $company, ['domains' => ['acme.com', 'www.acme.com']]), true);
+
+    expect($response['error'])->toContain('Nothing to update')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
 it('proposes no change for a phone that only differs by formatting', function (): void {
     $person = People::factory()->for($this->workspace)->create(['name' => 'Ana']);
     $person->saveCustomFields(['phone_number' => ['+14155550100']]);

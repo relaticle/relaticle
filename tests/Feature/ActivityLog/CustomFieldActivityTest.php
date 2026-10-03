@@ -130,7 +130,7 @@ it('does not log a link change that is only a URL-scheme normalization', functio
     expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
 });
 
-it('does not log a domain field rewrite that only normalizes the stored value', function (): void {
+it('does not log a domain field rewrite that only normalizes the stored value', function (array $legacy): void {
     $domains = CustomField::query()->create([
         'tenant_id' => $this->workspace->getKey(),
         'custom_field_section_id' => $this->field->custom_field_section_id,
@@ -151,18 +151,21 @@ it('does not log a domain field rewrite that only normalizes the stored value', 
         'entity_type' => 'company',
         'entity_id' => $company->getKey(),
         'custom_field_id' => $domains->getKey(),
-        'json_value' => json_encode(['https://www.acme.com']),
+        'json_value' => json_encode($legacy),
     ]);
     Activity::withoutGlobalScopes()->delete();
 
-    $company->saveCustomFields(['site_domains' => ['https://www.acme.com']]);
+    $company->saveCustomFields(['site_domains' => $legacy]);
 
     expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
 
-    $company->saveCustomFields(['site_domains' => ['https://www.acme.com', 'other.com']]);
+    $company->saveCustomFields(['site_domains' => [...$legacy, 'other.com']]);
 
     expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(1);
-});
+})->with([
+    'one legacy value' => [['https://www.acme.com']],
+    'two spellings of one domain' => [['https://two.com', 'two.com']],
+]);
 
 it('still logs a genuine link value change', function (): void {
     $linkField = CustomField::query()->create([
