@@ -5,15 +5,18 @@ declare(strict_types=1);
 use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CreationSource;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\Filters\EntityFilters;
+use App\Support\Filters\LogicFilter;
 use App\Support\Filters\NativeFilter;
 use App\Support\Filters\RelationFilter;
 use Laravel\Sanctum\Sanctum;
 
-mutates(EntityFilters::class, NativeFilter::class, RelationFilter::class);
+mutates(EntityFilters::class, LogicFilter::class, NativeFilter::class, RelationFilter::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -28,6 +31,16 @@ function listIds(mixed $test, string $entity, array $filter): array
         ->sort()
         ->values()
         ->all();
+}
+
+function workspaceField(mixed $test, string $entity, string $code): CustomField
+{
+    return CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $test->workspace->getKey())
+        ->where('entity_type', $entity)
+        ->where('code', $code)
+        ->firstOrFail();
 }
 
 it('filters a native text field by an operator object', function (): void {
@@ -136,4 +149,135 @@ it('rejects a relation id that is not a ULID', function (): void {
     $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['$in' => ['abc']]]]))
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['filter.assignees.$in' => 'assignees $in: abc is not a record ID.']);
+});
+
+it('combines two $or groups with $and', function (): void {
+    $stage = workspaceField($this, 'opportunity', 'stage');
+    $amount = workspaceField($this, 'opportunity', 'amount');
+    $big = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Big']);
+    $small = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Small']);
+    $big->saveCustomFieldValue($stage, (string) $stage->options->first()->id);
+    $big->saveCustomFieldValue($amount, 90000);
+    $small->saveCustomFieldValue($stage, (string) $stage->options->first()->id);
+    $small->saveCustomFieldValue($amount, 10);
+    $label = (string) $stage->options->first()->name;
+
+    expect(listIds($this, 'opportunities', ['$and' => [
+        ['$or' => [['custom_fields' => ['stage' => ['$in' => [$label]]]], ['name' => ['$eq' => 'nothing']]]],
+        ['$or' => [['custom_fields' => ['amount' => ['$gt' => 50000]]], ['name' => ['$eq' => 'nothing']]]],
+    ]]))->toBe([$big->id]);
+});
+
+it('returns records with an empty value under $not', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
+        'contact_id' => People::factory()->recycle([$this->user, $this->workspace])->create()->id,
+        'company_id' => $company->id,
+    ]);
+    $noContact = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => null]);
+
+    expect(listIds($this, 'opportunities', ['$not' => ['contact' => ['$is_empty' => false]]]))->toBe([$noContact->id]);
+});
+
+it('returns companies without people under $not of a to-many relation', function (): void {
+    $withCleo = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $withCleo->id, 'name' => 'Cleo']);
+    $empty = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    expect(listIds($this, 'companies', ['$not' => ['people' => ['name' => ['$eq' => 'Cleo']]]]))->toBe([$empty->id]);
+});
+
+it('applies every condition in a relation node to the same related record', function (): void {
+    $jobTitle = workspaceField($this, 'people', 'job_title');
+    $match = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $split = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $match->id, 'name' => 'Berlin CTO'])->saveCustomFieldValue($jobTitle, 'CTO');
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $split->id, 'name' => 'Berlin Sales'])->saveCustomFieldValue($jobTitle, 'Sales');
+    People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $split->id, 'name' => 'Paris CTO'])->saveCustomFieldValue($jobTitle, 'CTO');
+
+    expect(listIds($this, 'companies', ['people' => [
+        'name' => ['$contains' => 'Berlin'],
+        'custom_fields' => ['job_title' => ['$eq' => 'CTO']],
+    ]]))->toBe([$match->id]);
+});
+
+it('follows two relation hops', function (): void {
+    $icp = workspaceField($this, 'company', 'icp');
+    $icpCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $icpCompany->saveCustomFieldValue($icp, true);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $icpCompany->id]);
+    People::factory()->recycle([$this->user, $this->workspace])->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $icpCompany->id, 'name' => 'Deal']);
+
+    expect(listIds($this, 'people', ['company' => [
+        'custom_fields' => ['icp' => ['$eq' => true]],
+        'opportunities' => ['name' => ['$eq' => 'Deal']],
+    ]]))->toBe([$person->id]);
+});
+
+it('ignores a soft-deleted related record', function (): void {
+    $icp = workspaceField($this, 'company', 'icp');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $company->saveCustomFieldValue($icp, true);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+    $company->delete();
+
+    expect(listIds($this, 'opportunities', ['company' => ['custom_fields' => ['icp' => ['$eq' => true]]]]))->toBe([])
+        ->and(listIds($this, 'opportunities', ['company' => ['$in' => [$company->id]]]))->toBe([]);
+});
+
+it('complements inside a relation node', function (): void {
+    $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $globex = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $acme->id]);
+    $kept = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $globex->id]);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => null]);
+
+    expect(listIds($this, 'opportunities', ['company' => ['$not' => ['name' => ['$eq' => 'Acme']]]]))->toBe([$kept->id]);
+});
+
+it('matches a relation id sent in upper case', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+    $loose = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => null]);
+    $upper = strtoupper($company->id);
+
+    expect(listIds($this, 'opportunities', ['company' => ['$in' => [$upper]]]))->toBe([$linked->id])
+        ->and(listIds($this, 'opportunities', ['company' => ['$not_in' => [$upper]]]))->toBe([$loose->id]);
+});
+
+it('keys an error inside a logic node by the path of the node to fix', function (): void {
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => ['$or' => [
+        ['name' => ['$eq' => 'Acme']],
+        ['name' => ['$contains' => ['x']]],
+    ]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.$or.1.name.$contains']);
+});
+
+it('keys an error inside a relation node by the path of the node to fix', function (): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['company' => ['name' => ['$gte' => 'x']]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.company.name.$gte']);
+});
+
+it('rejects an empty logic node and a logic keyword without a list', function (array $filter, string $path): void {
+    $this->getJson('/api/v1/companies?'.http_build_query(['filter' => $filter]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors([$path]);
+})->with([
+    'empty $and item' => [['$and' => ['']], 'filter.$and.0'],
+    'object under $or' => [['$or' => ['name' => ['$eq' => 'x']]], 'filter.$or'],
+]);
+
+it('rejects an operator outside the link operators on a record relation', function (): void {
+    $this->getJson('/api/v1/people?'.http_build_query(['filter' => ['company' => ['$eq' => 'x']]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.company.$eq' => 'company takes $in, $not_in or $is_empty.']);
+});
+
+it('rejects a nested node on a member relation', function (): void {
+    $this->getJson('/api/v1/tasks?'.http_build_query(['filter' => ['assignees' => ['name' => ['$eq' => 'x']]]]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['filter.assignees.name']);
 });

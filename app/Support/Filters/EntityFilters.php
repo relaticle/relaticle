@@ -68,12 +68,16 @@ final readonly class EntityFilters
         foreach (self::definitions($entity) as $name => $definition) {
             $filters[] = TreeAllowedFilter::custom($name, match ($definition->kind) {
                 FilterKind::Text, FilterKind::DateTime, FilterKind::Enum => new NativeFilter($definition),
-                FilterKind::Members, FilterKind::Relation => new RelationFilter($definition),
+                FilterKind::Members, FilterKind::Relation => new RelationFilter($definition, $this),
                 FilterKind::Computed => new ($definition->filterClass)($this->user),
             });
         }
 
         $filters[] = TreeAllowedFilter::custom('custom_fields', new CustomFieldFilter($entity->value, $this->user));
+
+        foreach (LogicFilter::KEYWORDS as $keyword) {
+            $filters[] = TreeAllowedFilter::custom($keyword, new LogicFilter($keyword, $entity, $this, $this->user));
+        }
 
         return $filters;
     }
