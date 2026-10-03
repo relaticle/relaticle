@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CustomFields\CanonicalValue;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\PlainText;
 use DateTimeInterface;
@@ -82,8 +83,8 @@ final readonly class CustomFieldsDisplayFormatter
                 // Raw values ride along so the no-op check compares stored data,
                 // not rendered labels (two options can share a label). The write
                 // base strips them before the row is persisted or displayed.
-                $row['_oldValue'] = $oldValue;
-                $row['_newValue'] = $newValue;
+                $row['_oldValue'] = $this->comparable($field, $oldValue);
+                $row['_newValue'] = $this->comparable($field, $newValue);
             }
 
             $rows[] = $row;
@@ -318,6 +319,15 @@ final readonly class CustomFieldsDisplayFormatter
      * while the NEW side, fed a plain array from the payload, prints the option
      * names. Both sides of one card have to agree.
      */
+    private function comparable(CustomField $field, mixed $value): mixed
+    {
+        return match (true) {
+            is_string($value) => CanonicalValue::of($field, $value),
+            is_array($value) => array_map(fn (mixed $item): mixed => $this->comparable($field, $item), $value),
+            default => $value,
+        };
+    }
+
     private function lookupCurrentValue(CustomField $field, Model $model): mixed
     {
         if (! method_exists($model, 'customFieldValues')) {

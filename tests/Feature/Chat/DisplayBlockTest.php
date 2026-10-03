@@ -165,6 +165,7 @@ function forceDisplaySettings(User $user, string $entityType, string $code, arra
         'visible_in_list' => true,
         'list_toggleable_hidden' => false,
         'visible_in_view' => true,
+        'additional' => $field->settings->additional,
         ...$settings,
     ]);
     $field->save();
@@ -496,19 +497,19 @@ it('emits no block when the list matches no records', function (): void {
 it('keeps a long link value whole so a card href cannot break', function (): void {
     $user = $this->user;
 
-    forceDisplaySettings($user, 'company', 'domains');
+    forceDisplaySettings($user, 'company', 'linkedin');
 
     $long = 'example.com/?ref='.str_repeat('a', 600);
 
     $company = app(CreateCompany::class)->execute($user, [
         'name' => 'Acme',
-        'custom_fields' => ['domains' => ["https://{$long}"]],
+        'custom_fields' => ['linkedin' => ["https://{$long}"]],
     ]);
 
     $card = displayBlockOf(app(GetCompanyTool::class)->handle(new Request(['id' => (string) $company->getKey()])));
 
-    expect(blockFieldValue($card, 'Domains'))->toBe($long)
-        ->and(blockFieldValues($card, 'Domains'))->toBe([$long]);
+    expect(blockFieldValue($card, 'LinkedIn'))->toBe($long)
+        ->and(blockFieldValues($card, 'LinkedIn'))->toBe([$long]);
 });
 
 it('carries choice option names as a values list so the card renders chips', function (): void {

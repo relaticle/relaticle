@@ -20,6 +20,7 @@ use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\LegacyCompanyDomains;
 
 mutates(
     CompaniesController::class,
@@ -734,6 +735,25 @@ describe('custom fields', function (): void {
 
         $this->postJson('/api/v1/companies', ['name' => 'Acme 2', 'custom_fields' => ['domains' => ['https://www.acme.com/']]])
             ->assertUnprocessable();
+    });
+
+    it('accepts a company resubmitting its own legacy domain while another company holds the canonical form', function (): void {
+        Sanctum::actingAs($this->user);
+
+        ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+
+        $this->putJson("/api/v1/companies/{$own->id}", ['custom_fields' => ['domains' => ['https://acme.com']]])
+            ->assertOk();
+    });
+
+    it('rejects a domain another company holds in a different spelling', function (): void {
+        Sanctum::actingAs($this->user);
+
+        ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+
+        $this->putJson("/api/v1/companies/{$own->id}", ['custom_fields' => ['domains' => ['https://acme.com', 'www.other.com']]])
+            ->assertUnprocessable()
+            ->assertInvalid(['custom_fields.domains']);
     });
 
     it('rejects invalid email in email custom field', function (): void {

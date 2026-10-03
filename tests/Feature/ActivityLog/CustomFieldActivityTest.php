@@ -9,6 +9,8 @@ use App\Models\CustomFieldSection;
 use App\Models\User;
 use App\Support\ActivityLog\ActivityValue;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 beforeEach(function (): void {
@@ -126,6 +128,40 @@ it('does not log a link change that is only a URL-scheme normalization', functio
     $company->saveCustomFields(['website' => ['airbnb.com']]);
 
     expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
+});
+
+it('does not log a domain field rewrite that only normalizes the stored value', function (): void {
+    $domains = CustomField::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'site_domains',
+        'name' => 'Site domains',
+        'type' => 'link',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 5, additional: ['link_variant' => 'domain']),
+    ]);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => $domains->getKey(),
+        'json_value' => json_encode(['https://www.acme.com']),
+    ]);
+    Activity::withoutGlobalScopes()->delete();
+
+    $company->saveCustomFields(['site_domains' => ['https://www.acme.com']]);
+
+    expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(0);
+
+    $company->saveCustomFields(['site_domains' => ['https://www.acme.com', 'other.com']]);
+
+    expect(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->count())->toBe(1);
 });
 
 it('still logs a genuine link value change', function (): void {

@@ -30,6 +30,7 @@ use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\LegacyCompanyDomains;
 
 mutates(CustomFieldInput::class);
 
@@ -48,6 +49,10 @@ beforeEach(function (): void {
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+});
+
+afterEach(function (): void {
+    TenantContextService::setTenantId(null);
 });
 
 it('updates the task description via custom_fields and persists as text_value', function (): void {
@@ -96,6 +101,47 @@ it('updates company domains via custom_fields and persists as json_value', funct
 
     $stored = jsonValueForCustomFieldsTest($company, 'domains');
     expect($stored)->toBe(['acme.com', 'acme.io']);
+});
+
+it('accepts a company keeping its own legacy domain while another company holds the canonical form', function (): void {
+    ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $own, ['domains' => ['https://acme.com', 'fresh.com']]);
+    resolve(UpdateCompany::class)->execute($this->user, $own, latestPendingForCustomFieldsTest()->action_data);
+
+    expect(jsonValueForCustomFieldsTest($own, 'domains'))->toBe(['acme.com', 'fresh.com']);
+});
+
+it('rejects a domain another company holds in a different spelling', function (): void {
+    ['own' => $own] = LegacyCompanyDomains::seed($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    $response = runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $own, ['domains' => ['https://acme.com', 'www.other.com']]);
+
+    expect($response)->toContain('www.other.com')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('proposes no change for a domain that only differs by spelling', function (string $spelling): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+    $company->saveCustomFields(['domains' => ['acme.com']]);
+
+    $response = json_decode(runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $company, ['domains' => [$spelling]]), true);
+
+    expect($response['error'])->toContain('Nothing to update')
+        ->and($response['skipped'][0]['reason'])->toContain('Already up to date')
+        ->and(PendingAction::query()->count())->toBe(0);
+})->with(['https://www.acme.com', 'ACME.com/about']);
+
+it('proposes no change for a phone that only differs by formatting', function (): void {
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Ana']);
+    $person->saveCustomFields(['phone_number' => ['+14155550100']]);
+
+    $response = json_decode(runUpdateToolForCustomFieldsTest(UpdatePersonTool::class, $person, ['phone_number' => ['+1 (415) 555-0100']]), true);
+
+    expect($response['error'])->toContain('Nothing to update')
+        ->and(PendingAction::query()->count())->toBe(0);
 });
 
 it('updates the note body via custom_fields and persists as text_value', function (): void {

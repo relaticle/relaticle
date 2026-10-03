@@ -13,11 +13,15 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Relaticle\ImportWizard\Data\ColumnData;
+use Relaticle\ImportWizard\Data\EntityLink;
+use Relaticle\ImportWizard\Data\MatchableField;
+use Relaticle\ImportWizard\Enums\EntityLinkSource;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
 use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Jobs\ResolveMatchesJob;
+use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\EntityLinkResolver;
@@ -401,6 +405,70 @@ it('populates matching custom field when auto-creating company via domain MatchO
         ->and($cfv->json_value)->toBeInstanceOf(Collection::class)
         ->and($cfv->json_value->all())->toBe(['example.com']);
 });
+
+it('stores an auto-created company domain in its canonical form and matches it on re-import', function (string $csvCell): void {
+    $importCompanyRow = function (string $cell): void {
+        $column = ColumnData::toEntityLink(source: 'Company', matcherKey: 'custom_fields_domains', entityLinkKey: 'company');
+
+        ImportExecutionFixture::readyStore($this, ['Name', 'Company'], [
+            ImportExecutionFixture::row(2, ['Name' => 'John Doe', 'Company' => $cell], ['match_action' => RowMatchAction::Create->value]),
+        ], [
+            ColumnData::toField(source: 'Name', target: 'name'),
+            $column,
+        ]);
+
+        (new ValidateColumnJob($this->import->id, $column))->handle();
+
+        ImportExecutionFixture::run($this);
+    };
+
+    $importCompanyRow($csvCell);
+    $firstImport = $this->import;
+
+    $importCompanyRow($csvCell);
+    ImportStore::delete($firstImport->id);
+    $firstImport->delete();
+
+    $companies = Company::query()->where('workspace_id', $this->workspace->id)->get();
+    $domainField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    expect($companies)->toHaveCount(1)
+        ->and(People::query()->where('workspace_id', $this->workspace->id)->where('company_id', $companies->first()->id)->count())->toBe(2)
+        ->and(collect(ImportExecutionFixture::customFieldValue($this, (string) $companies->first()->id, (string) $domainField->id)->json_value)->all())->toBe(['acme.com']);
+})->with([
+    'url with path' => 'https://www.Acme.com/pricing',
+    'bare host' => 'acme.com',
+]);
+
+it('matches a legacy-format value by the identical csv value and a canonical value by a formatted one', function (string $stored, string $csvValue): void {
+    $field = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'phone_number')
+        ->firstOrFail();
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->withJsonValue([$stored])->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => 'people',
+        'entity_id' => $person->id,
+        'tenant_id' => $this->workspace->id,
+    ]);
+
+    $link = new EntityLink(key: 'self', source: EntityLinkSource::Relationship, targetEntity: 'people', targetModelClass: People::class);
+    $resolved = (new EntityLinkResolver((string) $this->workspace->id))
+        ->batchResolve($link, MatchableField::phone(), [$csvValue]);
+
+    expect((string) $resolved[$csvValue])->toBe((string) $person->id);
+})->with([
+    'legacy value, identical csv value' => ['+1 415-555-0100', '+1 415-555-0100'],
+    'canonical value, formatted csv value' => ['+14155550100', '+1 (415) 555-0100'],
+]);
 
 it('does not populate custom field when auto-creating via name matcher', function (): void {
     $relationships = json_encode([

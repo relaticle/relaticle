@@ -1229,10 +1229,12 @@ final class ExecuteImportJob implements ShouldQueue
 
         $valueColumn = CustomFieldValue::getValueColumn($cf->type);
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
-        $value = $match->name;
-
         $isJsonColumn = $valueColumn === 'json_value';
-        $safeValue = $isJsonColumn ? [$value] : $value;
+        $safeValue = SafeValueConverter::toDbSafe($isJsonColumn ? [$match->name] : $match->name, $cf->type, $cf);
+
+        if (blank($safeValue)) {
+            return;
+        }
 
         $this->pendingCustomFieldValues[] = [
             'id' => (string) Str::ulid(),

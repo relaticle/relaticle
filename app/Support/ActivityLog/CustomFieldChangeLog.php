@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
+use App\Support\CustomFields\CanonicalValue;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
-use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 
@@ -22,7 +22,7 @@ final readonly class CustomFieldChangeLog
 
         // A normalization-only rewrite (a link field stripping its scheme) is not a user edit.
         // A first value skips the check: nothing was rewritten, and `false` normalizes to empty.
-        if ($old !== null && $this->normalize($field, $old) === $this->normalize($field, $new)) {
+        if ($old !== null && CanonicalValue::each($field, $old) === CanonicalValue::each($field, $new)) {
             return;
         }
 
@@ -67,19 +67,6 @@ final readonly class CustomFieldChangeLog
         };
 
         return ['value' => $value, 'label' => $label];
-    }
-
-    private function normalize(CustomField $field, mixed $value): string
-    {
-        $type = CustomFieldsType::getFieldTypeInstance($field->type);
-
-        return collect(is_iterable($value) ? $value : [$value])
-            ->filter(fn (mixed $item): bool => filled($item))
-            ->map(fn (mixed $item): string => $type instanceof BaseFieldType
-                ? $type->setValue((string) $item)
-                : (string) $item)
-            ->values()
-            ->implode("\n");
     }
 
     private function optionLabel(CustomField $field, mixed $value): ?string
