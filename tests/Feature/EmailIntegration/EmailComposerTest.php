@@ -39,12 +39,13 @@ use Relaticle\EmailIntegration\Services\AllowedRecipientService;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Tests\Helpers\AllowedComposerRecipient;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, AllowedRecipientService::class, ComposerInlineImage::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -342,6 +343,62 @@ it('persists rich editor inline images when sending from the composer', function
         ->and($email->attachments->first()->is_inline)->toBeTrue()
         ->and($email->body?->body_html)->toContain('cid:')
         ->and($email->body?->body_html)->not->toContain($uploadId);
+});
+
+it('restores a saved inline image when a draft is reopened', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $uploadId = 'a2b7d3cd-3333-4ac2-b3aa-6a12efe24763';
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['draft@example.com'])
+        ->set('subject', 'Draft with inline image')
+        ->set('bodyHtml', '<p><img data-id="'.$uploadId.'" width="100" height="100"></p><p>Keep this image</p>')
+        ->set('componentFileAttachments.bodyHtml.'.$uploadId, UploadedFile::fake()->image('inline.jpg', 100, 100))
+        ->call('close')
+        ->assertHasNoErrors();
+
+    $draft = Email::query()->where('subject', 'Draft with inline image')->sole();
+    $storedHtml = (string) $draft->body?->body_html;
+
+    expect($storedHtml)->toMatch('/data-id="email-attachments\/[^"]+"/')
+        ->and($storedHtml)->not->toContain('/storage/');
+
+    preg_match('/data-id="([^"]+)"/', $storedHtml, $matches);
+    $path = $matches[1];
+
+    $reopened = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id);
+
+    /** @var array<string, mixed> $document */
+    $document = json_decode((string) json_encode($reopened->get('bodyHtml')), true);
+    $src = null;
+
+    $walk = function (mixed $node) use (&$walk, &$src): void {
+        if ($src !== null || ! is_array($node)) {
+            return;
+        }
+
+        if (($node['type'] ?? null) === 'image') {
+            $candidate = $node['attrs']['src'] ?? null;
+            $src = is_string($candidate) ? $candidate : null;
+
+            return;
+        }
+
+        foreach ($node as $child) {
+            $walk($child);
+        }
+    };
+
+    $walk($document);
+
+    expect($src)->toBe(route('email-compose-images.show', ['path' => $path]));
+
+    $this->get($src)
+        ->assertSuccessful()
+        ->assertHeader('content-type', 'image/jpeg');
 });
 
 it('does not attach a storage file referenced by a composer image url', function (): void {

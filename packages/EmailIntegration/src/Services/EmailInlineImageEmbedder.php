@@ -10,6 +10,7 @@ use DOMElement;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Symfony\Component\Mime\MimeTypes;
 
 final readonly class EmailInlineImageEmbedder
@@ -171,23 +172,14 @@ final readonly class EmailInlineImageEmbedder
             return $this->copyDataUri($sourcePath);
         }
 
-        $path = $this->authorizedStoragePath($user, $sourcePath);
+        $path = resolve(ComposerInlineImage::class)->readablePath($user, $sourcePath);
 
         if ($path === null) {
             return null;
         }
 
         $disk = Storage::disk(EmailAttachment::DISK);
-
-        if (! $disk->exists($path)) {
-            return null;
-        }
-
-        $mimeType = $disk->mimeType($path);
-
-        if (! is_string($mimeType) || ! str_starts_with(mb_strtolower($mimeType), 'image/')) {
-            return null;
-        }
+        $mimeType = (string) $disk->mimeType($path);
 
         $extension = $this->extensionFromMimeType($mimeType);
         $destination = 'email-attachments/'.Str::ulid().'.'.$extension;
@@ -205,65 +197,6 @@ final readonly class EmailInlineImageEmbedder
                 : "inline.{$extension}",
             'content_id' => $this->makeContentId(),
         ];
-    }
-
-    private function authorizedStoragePath(User $user, string $sourcePath): ?string
-    {
-        $path = $this->normalizeStoragePath($sourcePath);
-
-        if ($path === null) {
-            return null;
-        }
-
-        $teamId = $user->current_workspace_id;
-
-        if (blank($teamId)) {
-            return null;
-        }
-
-        $directory = EmailAttachment::composeImagesDirectory((string) $teamId).'/';
-
-        if (! str_starts_with($path, $directory)) {
-            return null;
-        }
-
-        return $path;
-    }
-
-    private function normalizeStoragePath(string $sourcePath): ?string
-    {
-        $path = str_replace('\\', '/', $sourcePath);
-        $path = ltrim($path, '/');
-
-        if ($path === '' || str_contains($path, "\0")) {
-            return null;
-        }
-
-        $segments = [];
-
-        foreach (explode('/', $path) as $segment) {
-            if ($segment === '' || $segment === '.') {
-                continue;
-            }
-
-            if ($segment === '..') {
-                if ($segments === []) {
-                    return null;
-                }
-
-                array_pop($segments);
-
-                continue;
-            }
-
-            $segments[] = $segment;
-        }
-
-        if ($segments === []) {
-            return null;
-        }
-
-        return implode('/', $segments);
     }
 
     /**

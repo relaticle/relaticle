@@ -170,7 +170,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'null', 'undefined', 'error', 'test', 'staging', 'preview',
 
         // Email Integration
-        'email-accounts', 'email-attachments',
+        'email-accounts', 'email-attachments', 'email-compose-images',
     ];
 
     /**

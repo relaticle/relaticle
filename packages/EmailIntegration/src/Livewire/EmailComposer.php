@@ -63,6 +63,7 @@ use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
+use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
@@ -1107,6 +1108,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->fileAttachmentsDisk(EmailAttachment::DISK)
                 ->fileAttachmentsDirectory(fn (): string => EmailAttachment::composeImagesDirectory((string) $this->authUser()->current_workspace_id))
                 ->fileAttachmentsVisibility('private')
+                // The local disk cannot sign a URL, and Storage::url() points at the public disk.
+                ->getFileAttachmentUrlUsing(fn (mixed $file): ?string => resolve(ComposerInlineImage::class)->previewUrl($this->authUser(), $file))
                 ->statePath('bodyHtml')
                 ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
                 ->customBlocks([SignatureBlock::class])
