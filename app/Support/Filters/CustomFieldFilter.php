@@ -303,7 +303,7 @@ final readonly class CustomFieldFilter implements Filter
                 $domains = array_map(static fn (string $domain): string => rtrim((string) preg_replace('/^(www\.)+/i', '', $domain), '.'), $domains);
             }
 
-            if (array_any($domains, static fn (string $domain): bool => preg_match('/^[^\s\/@:?#]+$/u', $domain) !== 1)) {
+            if (array_any($domains, static fn (string $domain): bool => preg_match('/^[^\s\p{Cc}\/@:?#]+$/u', $domain) !== 1)) {
                 $this->invalid(__('validation.custom_field.operand_type', [
                     'field' => $path,
                     'operator' => $operator,

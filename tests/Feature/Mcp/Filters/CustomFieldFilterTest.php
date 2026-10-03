@@ -824,7 +824,7 @@ it('rejects a domain operand that carries a path, user or port', function (strin
 
     expect(fn () => peopleNamesMatching($this->user, ['custom_fields' => ['work_emails' => ['domain' => ['$in' => [$operand]]]]]))
         ->toThrow(ValidationException::class, 'a list of domains');
-})->with(['path' => ['acme.com/team'], 'user' => ['ana@acme.com'], 'port' => ['acme.com:8080'], 'query' => ['acme.com?x=1'], 'fragment' => ['acme.com#top'], 'space' => ['acme .com']]);
+})->with(['path' => ['acme.com/team'], 'user' => ['ana@acme.com'], 'port' => ['acme.com:8080'], 'query' => ['acme.com?x=1'], 'fragment' => ['acme.com#top'], 'space' => ['acme .com'], 'control character' => ["a\0b.com"]]);
 
 it('does not match a link or phone that a second record holds instead', function (): void {
     $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
