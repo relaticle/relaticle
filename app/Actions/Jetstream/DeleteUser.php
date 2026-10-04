@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Jobs\Email\DeleteSubscriberJob;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
@@ -28,6 +29,7 @@ final readonly class DeleteUser implements DeletesUsers
             $user->deleteProfilePhoto();
             $user->loadMissing('tokens');
             $user->tokens->each->delete();
+            DeleteSubscriberJob::dispatchFor($user);
             $user->delete();
         });
     }

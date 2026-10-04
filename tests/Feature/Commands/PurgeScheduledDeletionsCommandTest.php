@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\DeleteUser;
 use App\Actions\Jetstream\DeleteWorkspace;
 use App\Enums\MediaCollection;
+use App\Jobs\Email\DeleteSubscriberJob;
 use App\Models\Note;
 use App\Models\User;
 use App\Models\Workspace;
@@ -17,9 +19,23 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Spatie\MailcoachSdk\Exceptions\RateLimited;
+use Spatie\MailcoachSdk\Exceptions\ResourceNotFound;
+use Spatie\MailcoachSdk\Facades\Mailcoach;
+use Spatie\MailcoachSdk\Resources\Subscriber;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(DeleteWorkspace::class);
+mutates(DeleteWorkspace::class, DeleteUser::class, DeleteSubscriberJob::class);
+
+function enableSubscriberSync(): void
+{
+    config([
+        'mailcoach-sdk.api_token' => 'fake-token',
+        'mailcoach-sdk.endpoint' => 'https://fake.mailcoach.test',
+        'mailcoach-sdk.subscribers_list_id' => 'test-list-id',
+        'mailcoach-sdk.enabled_subscribers_sync' => true,
+    ]);
+}
 
 test('expired users are permanently deleted', function () {
     $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create();
@@ -29,6 +45,112 @@ test('expired users are permanently deleted', function () {
         ->assertExitCode(0);
 
     expect(User::query()->find($userId))->toBeNull();
+});
+
+test('purging an account removes its Mailcoach subscriber', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => 'subscriber-uuid',
+    ]);
+
+    Mailcoach::shouldReceive('deleteSubscriber')->once()->with('subscriber-uuid');
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    expect(User::query()->find($user->id))->toBeNull();
+});
+
+test('purging an account that never stored a subscriber id finds the subscriber by email', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => null,
+    ]);
+
+    Mailcoach::shouldReceive('findByEmail')
+        ->once()
+        ->with('test-list-id', $user->email)
+        ->andReturn(new Subscriber(['uuid' => 'found-uuid', 'email' => $user->email, 'tags' => []]));
+    Mailcoach::shouldReceive('deleteSubscriber')->once()->with('found-uuid');
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+});
+
+test('purging an account with no Mailcoach subscriber deletes nothing there', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => null,
+    ]);
+
+    Mailcoach::shouldReceive('findByEmail')->once()->with('test-list-id', $user->email)->andReturnNull();
+    Mailcoach::shouldReceive('deleteSubscriber')->never();
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    expect(User::query()->find($user->id))->toBeNull();
+});
+
+test('purging an account leaves a different subscriber whose address only contains its email', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'email' => 'ada@example.com',
+        'mailcoach_subscriber_uuid' => null,
+    ]);
+
+    Mailcoach::shouldReceive('findByEmail')
+        ->once()
+        ->with('test-list-id', 'ada@example.com')
+        ->andReturn(new Subscriber(['uuid' => 'other-uuid', 'email' => 'nada@example.com', 'tags' => []]));
+    Mailcoach::shouldReceive('deleteSubscriber')->never();
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    expect(User::query()->find($user->id))->toBeNull();
+});
+
+test('a rate limit from Mailcoach does not fail the purge', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => 'subscriber-uuid',
+    ]);
+
+    Mailcoach::shouldReceive('deleteSubscriber')->once()->with('subscriber-uuid')->andThrow(new RateLimited(120));
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    expect(User::query()->find($user->id))->toBeNull();
+});
+
+test('a subscriber already gone from Mailcoach does not fail the purge', function (): void {
+    enableSubscriberSync();
+
+    $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => 'gone-uuid',
+    ]);
+
+    Mailcoach::shouldReceive('deleteSubscriber')->once()->with('gone-uuid')->andThrow(new ResourceNotFound);
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    expect(User::query()->find($user->id))->toBeNull();
+});
+
+test('purging an account leaves Mailcoach alone while subscriber sync is off', function (): void {
+    enableSubscriberSync();
+    config(['mailcoach-sdk.enabled_subscribers_sync' => false]);
+
+    User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create([
+        'mailcoach_subscriber_uuid' => 'subscriber-uuid',
+    ]);
+
+    Mailcoach::shouldReceive('deleteSubscriber')->never();
+    Mailcoach::shouldReceive('findByEmail')->never();
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
 });
 
 test('purging a user anonymises their chat participation in workspaces that survive', function () {

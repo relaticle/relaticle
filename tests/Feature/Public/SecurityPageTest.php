@@ -104,6 +104,11 @@ it('says an error report carries no account identity unless the install sends it
     [true, 'Error reports, which can include your account identity'],
 ]);
 
+it('says account deletion takes the product update subscription with it', function (): void {
+    $this->get('/security')->assertOk()
+        ->assertSee('removed after a 30-day grace period, together with its product update subscription');
+});
+
 it('says plainly that it holds no SOC 2 or ISO 27001 certification', function (): void {
     $text = securityPageText($this->get('/security')->assertOk()->getContent());
 
