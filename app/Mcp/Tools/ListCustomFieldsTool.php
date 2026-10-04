@@ -23,7 +23,7 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\CustomFields\Services\ValidationService;
 
 #[Title('List Custom Fields')]
-#[Description('List workspace custom-field definitions, including inactive fields and configured option labels. Use get-crm-schema-tool for the active write schema.')]
+#[Description('List workspace custom-field definitions, including inactive fields and configured option labels and categories. Use get-crm-schema-tool for the active write schema.')]
 final class ListCustomFieldsTool extends Tool
 {
     use ChecksTokenAbility;
@@ -99,7 +99,24 @@ final class ListCustomFieldsTool extends Tool
             ->orderBy('id')
             ->paginate($perPage, ['*'], 'page', $page);
 
-        $items = $fields->getCollection()->map(fn (CustomField $field): array => [
+        $items = $fields->getCollection()->map($this->describeField(...))->values()->all();
+
+        return Response::structured([
+            'items' => $items,
+            'page' => $fields->currentPage(),
+            'per_page' => $fields->perPage(),
+            'total' => $fields->total(),
+            'has_more' => $fields->hasMorePages(),
+            'next_page' => $fields->hasMorePages() ? $fields->currentPage() + 1 : null,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function describeField(CustomField $field): array
+    {
+        return [
             'id' => $field->id,
             'entity_type' => $field->entity_type,
             'code' => $field->code,
@@ -111,16 +128,8 @@ final class ListCustomFieldsTool extends Tool
             'options' => $field->options->map(fn (CustomFieldOption $option): array => [
                 'id' => $option->id,
                 'label' => $option->name,
+                'category' => $option->settings->category?->value,
             ])->values()->all(),
-        ])->values()->all();
-
-        return Response::structured([
-            'items' => $items,
-            'page' => $fields->currentPage(),
-            'per_page' => $fields->perPage(),
-            'total' => $fields->total(),
-            'has_more' => $fields->hasMorePages(),
-            'next_page' => $fields->hasMorePages() ? $fields->currentPage() + 1 : null,
-        ]);
+        ];
     }
 }

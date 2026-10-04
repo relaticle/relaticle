@@ -10,7 +10,10 @@ use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\Concerns\HasTableLayouts;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
+use App\Models\Workspace;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -29,9 +32,17 @@ trait HasCustomFieldColumns
 
     public function table(Table $table): Table
     {
+        $workspace = Filament::getTenant();
         $builder = CustomFields::table()->forModel($this->getModel());
 
-        $fields = $builder->getFields()->keyBy(fn (CustomField $field): string => $field->getFieldName());
+        $model = $this->getModel();
+
+        // 4.0 dropped the builder's getFields(); the host already caches the same rows.
+        $fields = $workspace instanceof Workspace
+            ? resolve(WorkspaceCustomFields::class)
+                ->forEntity($workspace, (new $model)->getMorphClass())
+                ->keyBy(fn (CustomField $field): string => $field->getFieldName())
+            : collect();
 
         $columns = $builder->columns()
             ->map(function (Column $column) use ($fields): Column {

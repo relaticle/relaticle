@@ -19,7 +19,6 @@ return [
                 'App\Mcp\Tools\BaseListTool::handle' => 89,
                 'App\Mcp\Tools\BaseShowTool::handle' => 119,
                 'App\Mcp\Tools\ListActivityTool::handle' => 66,
-                'App\Mcp\Tools\ListCustomFieldsTool::handle' => 64,
                 'App\Mcp\Tools\SearchTool::handle' => 77,
                 'App\Providers\AppServiceProvider::configureFilament' => 88,
                 'App\Providers\AppServiceProvider::register' => 68,

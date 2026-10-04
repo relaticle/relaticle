@@ -131,8 +131,9 @@ final readonly class ProposalFieldSchemaDescriber
     {
         return $field->type === CustomFieldType::FILE_UPLOAD->value
             || $dataType === FieldDataType::FILE
-            || $field->type === CustomFieldType::RECORD->value
-            || $field->lookup_type !== null;
+            // Every field type that points at records, whether or not a definition was
+            // ever created for this one: the picker behind it needs the record page.
+            || CustomFieldsType::getFieldType($field->type)?->requiresRelationship === true;
     }
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string

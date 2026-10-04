@@ -6,6 +6,7 @@ namespace App\Queries;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use App\Models\User;
 use App\Queries\Sorts\CustomFieldSort;
 use App\Support\CustomFields\CustomFieldSchemaCache;
@@ -39,6 +40,9 @@ final readonly class CustomFieldFilterSchema
 
     /** @var array<int, string> */
     private const array BOOLEAN_OPERATORS = ['$eq'];
+
+    /** @var array<int, string> */
+    private const array LINK_OPERATORS = ['$eq', '$contains'];
 
     /**
      * @return array<int, AllowedSort>
@@ -92,14 +96,23 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::DATE => self::buildOperators(array_keys(self::COMPARISONS), 'string', 'date'),
             CustomFieldType::DATE_TIME => self::buildOperators(array_keys(self::COMPARISONS), 'string', 'date-time'),
             CustomFieldType::CHECKBOX, CustomFieldType::TOGGLE => self::buildOperators(self::BOOLEAN_OPERATORS, 'boolean'),
-            CustomFieldType::SELECT, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
+            CustomFieldType::SELECT, CustomFieldType::STATUS, CustomFieldType::RADIO, CustomFieldType::TOGGLE_BUTTONS => [
                 ...self::buildOperators(['$eq'], 'string'),
                 ...self::buildOperators(['$in', '$not_in'], 'array'),
+            ],
+            CustomFieldType::RECORD, CustomFieldType::RELATIONSHIP => [
+                ...self::buildOperators(self::LINK_OPERATORS, 'string'),
+                ...self::buildOperators(['$in'], 'array'),
             ],
             default => [],
         };
 
-        return $operators === [] ? [] : [...$operators, '$is_empty' => ['type' => 'boolean']];
+        // A link field holds no value row, so the emptiness read of the value table does not reach it.
+        if ($operators === [] || in_array($fieldType, [CustomFieldType::RECORD, CustomFieldType::RELATIONSHIP], true)) {
+            return $operators;
+        }
+
+        return [...$operators, '$is_empty' => ['type' => 'boolean']];
     }
 
     public static function valueRules(): string
@@ -210,7 +223,7 @@ final readonly class CustomFieldFilterSchema
             $user->currentWorkspace,
             "sortable_fields:{$entityType}",
             fn (): array => $this->resolveFilterableFields($user, $entityType)
-                ->reject(fn (CustomField $field): bool => $field->getValueColumn() === 'json_value')
+                ->reject(fn (CustomField $field): bool => $field->getValueColumn() === 'json_value' && ! $field->relationshipDefinition() instanceof CustomFieldRelationship)
                 ->keyBy('code')
                 ->all(),
         ));

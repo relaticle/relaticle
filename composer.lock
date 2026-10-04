@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "39c9a143505adf12ccdc18b79a1f8a2d",
+    "content-hash": "077aca8bd45fa37d10828d0c4bdd5455",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10536,16 +10536,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.18.3",
+            "version": "dev-feat/4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "6aaf6090823b7ee4b6ba8bf6eca4a771b54021b1"
+                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/6aaf6090823b7ee4b6ba8bf6eca4a771b54021b1",
-                "reference": "6aaf6090823b7ee4b6ba8bf6eca4a771b54021b1",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
+                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
                 "shasum": ""
             },
             "require": {
@@ -10571,9 +10571,6 @@
                 "rector/rector": "2.8.4",
                 "spatie/laravel-ray": "^1.26"
             },
-            "bin": [
-                "bin/custom-fields-upgrade"
-            ],
             "type": "library",
             "extra": {
                 "laravel": {
@@ -10631,7 +10628,8 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-11-11T15:52:29+00:00"
+            "time": "2026-11-04T23:38:00+00:00",
+            "published-time": "2026-11-04T23:38:06+00:00"
         },
         {
             "name": "relaticle/flowforge",
@@ -24549,6 +24547,7 @@
     "minimum-stability": "beta",
     "stability-flags": {
         "pestphp/pest": 20,
+        "relaticle/custom-fields": 10,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,

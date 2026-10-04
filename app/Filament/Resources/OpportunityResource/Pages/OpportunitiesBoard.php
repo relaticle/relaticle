@@ -64,7 +64,7 @@ final class OpportunitiesBoard extends BoardResourcePage
 
         $customFields = CustomFields::infolist()
             ->forModel(Opportunity::class)
-            ->only([OpportunityCustomField::AMOUNT, OpportunityCustomField::CLOSE_DATE])
+            ->only([OpportunityCustomField::AMOUNT->value, OpportunityCustomField::CLOSE_DATE->value])
             ->hiddenLabels()
             ->visibleWhenFilled()
             ->withoutSections()
@@ -279,7 +279,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                     ->searchable()
                     ->preload(),
                 CustomFields::form()
-                    ->except([OpportunityCustomField::STAGE])
+                    ->except([OpportunityCustomField::STAGE->value])
                     ->build()
                     ->columnSpanFull()
                     ->columns(1),

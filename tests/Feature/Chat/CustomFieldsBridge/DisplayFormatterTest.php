@@ -13,6 +13,7 @@ use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(CustomFieldsDisplayFormatter::class, PlainText::class);
 
@@ -212,11 +213,12 @@ it('renders a record custom field on the proposal card as the record name, not i
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
 
     TenantContextService::setTenantId($user->currentWorkspace->getKey());
 
@@ -253,11 +255,12 @@ it('names the record on a stored record card, not its id', function (): void {
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
 
     $task = Task::factory()->create(['workspace_id' => $user->currentWorkspace->getKey()]);
     $task->saveCustomFieldValue($field, [$company->getKey()]);
@@ -266,7 +269,9 @@ it('names the record on a stored record card, not its id', function (): void {
 
     try {
         $rows = resolve(CustomFieldsDisplayFormatter::class)->formatStored(
-            $task->fresh('customFieldValues.customField.options'),
+            // The formatter renders links from loaded relations, the same way the read
+            // tools prime them, so the record arrives with its edges in memory.
+            $task->fresh(['customFieldValues.customField.options', 'outgoingLinks.toEntity', 'incomingLinks.fromEntity']),
             [$field->fresh('options')],
             200,
             $user->effectiveTimezone(),

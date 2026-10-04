@@ -37,6 +37,8 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
+use App\Support\LinkActorResolver;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -109,6 +111,10 @@ final readonly class PendingActionService
         RetryAssistantEmail::class,
         GrantWebAccess::class,
     ];
+
+    public function __construct(
+        private LinkActorResolver $linkActor,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $actionData
@@ -238,7 +244,7 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        $resolved = resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
+        $resolved = $this->asLinkActor($pendingAction, $user, fn (): PendingAction => resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
             /** @var PendingAction $pendingAction */
             $pendingAction = PendingAction::query()
                 ->lockForUpdate()
@@ -277,11 +283,26 @@ final readonly class PendingActionService
             ]);
 
             return $pendingAction->refresh();
-        }));
+        })));
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
         return $resolved;
+    }
+
+    /**
+     * Who a link written by this approval is credited to. Nothing is signed in when the
+     * resolution runs from a queue or a command, and the proposal's own user is the
+     * answer there; the relation is never read, because a plan approval hydrates every
+     * step and strict lazy loading arms on the second row.
+     */
+    private function actorFor(PendingAction $pendingAction, User $user): User
+    {
+        if ((string) $user->getKey() === (string) $pendingAction->user_id) {
+            return $user;
+        }
+
+        return User::query()->find($pendingAction->user_id) ?? $user;
     }
 
     public function reject(PendingAction $pendingAction, User $user): PendingAction
@@ -358,7 +379,7 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        [$finalized, $record, $itemStatus] = resolve(CurrentWorkspace::class)->within($workspace, fn (): array => DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
+        [$finalized, $record, $itemStatus] = $this->asLinkActor($pendingAction, $user, fn (): array => resolve(CurrentWorkspace::class)->within($workspace, fn (): array => DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
             /** @var PendingAction $locked */
             $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -398,7 +419,7 @@ final readonly class PendingActionService
             $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
 
             return [$finalized, $model, 'approved'];
-        }));
+        })));
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
 
@@ -1145,5 +1166,22 @@ final readonly class PendingActionService
                 ->findOrFail($ids)
                 ->all(),
         );
+    }
+
+    /**
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $write
+     * @return TResult
+     */
+    private function asLinkActor(PendingAction $pendingAction, User $user, Closure $write): mixed
+    {
+        $previousActor = $this->linkActor->override($this->actorFor($pendingAction, $user));
+
+        try {
+            return $write();
+        } finally {
+            $this->linkActor->override($previousActor);
+        }
     }
 }
