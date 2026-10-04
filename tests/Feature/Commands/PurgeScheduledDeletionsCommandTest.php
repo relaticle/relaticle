@@ -13,6 +13,7 @@ use App\Notifications\UserDeletionReminderNotification;
 use App\Notifications\WorkspaceDeletionReminderNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -151,6 +152,17 @@ test('purging an account leaves Mailcoach alone while subscriber sync is off', f
     Mailcoach::shouldReceive('findByEmail')->never();
 
     $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+});
+
+test('purging an account queues no Mailcoach removal while subscriber sync is off', function (): void {
+    Queue::fake([DeleteSubscriberJob::class]);
+    config(['mailcoach-sdk.enabled_subscribers_sync' => false]);
+
+    User::factory()->withPersonalWorkspace()->scheduledForDeletion(-1)->create();
+
+    $this->artisan('app:purge-scheduled-deletions')->assertExitCode(0);
+
+    Queue::assertNotPushed(DeleteSubscriberJob::class);
 });
 
 test('purging a user anonymises their chat participation in workspaces that survive', function () {
