@@ -147,6 +147,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'reschedule_email' => __('Preparing to reschedule an email…'),
             'retry_email' => __('Preparing to send an email again…'),
             'list_custom_fields' => __('Reading custom fields…'),
+            'get_related_records' => __('Following the links between records…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
             'get_credit_balance' => __('Checking your AI credits…'),

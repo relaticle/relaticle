@@ -50,7 +50,7 @@ final readonly class CustomFieldDefinitionValidator
         $maxOptions = self::maxOptions();
         $creatableTypes = self::creatableTypes();
         $lookupTypes = array_keys(Entities::getLookupOptions());
-        $requiresLookupType = in_array($type, $creatableTypes, true) && CustomFieldsType::getFieldType($type)?->requiresLookupType === true;
+        $requiresLookupType = in_array($type, $creatableTypes, true) && CustomFieldsType::getFieldType($type)?->requiresRelationship === true;
 
         $validated = Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],

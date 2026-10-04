@@ -107,20 +107,23 @@ final class EntityLink extends Data
 
     public static function fromCustomField(CustomField $customField): self
     {
-        $lookupType = $customField->lookup_type;
-        $modelClass = Relation::getMorphedModel($lookupType);
+        $targetEntity = $customField->targetEntityType();
 
-        throw_if($modelClass === null, \InvalidArgumentException::class, "Unknown lookup type: {$lookupType}");
+        throw_if($targetEntity === null, \InvalidArgumentException::class, "Record field has no relationship definition: {$customField->code}");
+
+        $modelClass = Relation::getMorphedModel($targetEntity);
+
+        throw_if($modelClass === null, \InvalidArgumentException::class, "Unknown target entity: {$targetEntity}");
 
         return new self(
             key: "custom_fields_{$customField->code}",
             source: EntityLinkSource::CustomField,
-            targetEntity: $lookupType,
+            targetEntity: $targetEntity,
             targetModelClass: $modelClass,
             matchableFields: self::getUniqueMatchableFieldsForEntity($modelClass),
             storageType: EntityLinkStorage::CustomFieldValue,
             label: $customField->name,
-            allowMultiple: $customField->typeData->supportsMultiValue ?? false,
+            allowMultiple: $customField->allowsMultipleRecords(),
             customFieldCode: $customField->code,
             guesses: [
                 $customField->code,

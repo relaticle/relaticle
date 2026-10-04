@@ -14,6 +14,7 @@ use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CanonicalValue;
+use App\Support\LinkActorResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Batch;
 use Illuminate\Bus\Batchable;
@@ -37,6 +38,7 @@ use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 use Relaticle\CustomFields\Rules\UniqueCustomFieldValue;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -225,12 +227,7 @@ final class ExecuteImportJob implements ShouldQueue
         $importer = $import->getImporter();
         $mappings = $import->columnMappings();
 
-        $results = [
-            'created' => $import->created_rows,
-            'updated' => $import->updated_rows,
-            'skipped' => $import->skipped_rows,
-            'failed' => $import->failed_rows,
-        ];
+        $results = $this->resumedCounts($import);
         $allowedKeys = $this->allowedAttributeKeys($importer);
         $customFieldDefs = $this->loadCustomFieldDefinitions($importer);
         $fieldMappings = $mappings->filter(fn (ColumnData $col): bool => $col->isFieldMapping());
@@ -247,6 +244,8 @@ final class ExecuteImportJob implements ShouldQueue
         $currentImport = resolve(CurrentImport::class);
         $currentImport->set($import->id, $import->file_name);
         $handedOff = false;
+
+        [$previousTenantId, $previousActor] = $this->enterImportContext($import);
 
         try {
             resolve(CauserResolver::class)->withCauser($import->user, function () use ($store, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $import, $startedAt): void {
@@ -315,6 +314,7 @@ final class ExecuteImportJob implements ShouldQueue
             throw $e;
         } finally {
             $currentImport->clear();
+            $this->leaveImportContext($previousTenantId, $previousActor);
         }
     }
 
@@ -502,9 +502,12 @@ final class ExecuteImportJob implements ShouldQueue
             ->with(['options' => fn (Relation $q): Relation => $q->withoutGlobalScopes()])
             ->where('tenant_id', $this->workspaceId)
             ->where('entity_type', $importer->entityName())
-            ->where('type', '!=', 'record')
             ->active()
             ->get()
+            // A field that links records is written through the ledger by the importer's
+            // own pass, not upserted as a value row here. Two field types link records,
+            // so the slot decides, never the type key.
+            ->reject(fn (CustomField $field): bool => $field->relationshipDefinition() instanceof CustomFieldRelationship)
             ->keyBy('code');
     }
 
@@ -1527,5 +1530,42 @@ final class ExecuteImportJob implements ShouldQueue
         foreach ($dedupKeys as $dedupKey) {
             $this->createdRecords[$dedupKey] = $id;
         }
+    }
+
+    /**
+     * The job runs with no panel request, so the custom-fields package has no ambient
+     * tenant and no signed-in user: without both, its field lookups span every tenant
+     * and the links this import writes are credited to nobody.
+     *
+     * @return array{0: int|string|null, 1: mixed}
+     */
+    private function enterImportContext(Import $import): array
+    {
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($this->workspaceId);
+
+        return [$previousTenantId, resolve(LinkActorResolver::class)->override($import->user)];
+    }
+
+    private function leaveImportContext(int|string|null $previousTenantId, mixed $previousActor): void
+    {
+        TenantContextService::setTenantId($previousTenantId);
+        resolve(LinkActorResolver::class)->override($previousActor);
+    }
+
+    /**
+     * Where the previous slice of this import left off, so a handed-off job continues the
+     * tally rather than restarting it.
+     *
+     * @return array<string, int>
+     */
+    private function resumedCounts(Import $import): array
+    {
+        return [
+            'created' => $import->created_rows,
+            'updated' => $import->updated_rows,
+            'skipped' => $import->skipped_rows,
+            'failed' => $import->failed_rows,
+        ];
     }
 }

@@ -20,7 +20,10 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Support\CustomFields\CustomFieldSchemaCache;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(
     AppServiceProvider::class,
@@ -326,6 +329,29 @@ it('describes tags-input values as arbitrary strings instead of option IDs', fun
         ->assertSee($expected);
 });
 
+it('publishes the relationship vocabulary of a link field', function (): void {
+    $workspace = $this->user->personalWorkspace();
+
+    TenantContextService::setTenantId($workspace->getKey());
+    RecordFieldFixture::paired($workspace, 'people', 'company', 'employer', 'staff', RelationshipCardinality::ManyToOne);
+
+    $schema = resolve(PeopleSchemaResource::class)->toSchema($this->user);
+    $field = ((array) $schema['custom_fields'])['employer'];
+
+    expect($field['type'])->toBe('relationship')
+        ->and($field['target_entity'])->toBe('company')
+        ->and($field['multiple'])->toBeFalse()
+        ->and($field['input_format'])->toBe('array holding at most one record ID')
+        ->and($field['relationship'])->toBe([
+            'code' => 'people_employer',
+            'cardinality' => 'many_to_one',
+            'symmetric' => false,
+            'from_entity' => 'people',
+            'to_entity' => 'company',
+            'other_end_field' => 'staff',
+        ]);
+});
+
 it('serializes empty custom-field maps as objects in resources and tools', function (): void {
     $workspace = $this->user->personalWorkspace();
 
@@ -402,18 +428,21 @@ it('publishes an input format for every custom field type', function (string $ty
         'sort_order' => 1,
         'active' => true,
     ]);
-    CustomField::query()->create([
+    $recordField5 = CustomField::query()->create([
         'tenant_id' => $workspace->id,
         'custom_field_section_id' => $section->id,
         'entity_type' => 'company',
         'code' => 'probe',
         'name' => 'Probe',
         'type' => $type,
-        'lookup_type' => $type === 'record' ? 'company' : null,
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
+
+    if (in_array($type, ['record', 'relationship'], true)) {
+        RecordFieldFixture::pointAt($recordField5, 'company');
+    }
 
     RelaticleServer::actingAs($this->user)
         ->resource(CompanySchemaResource::class)
@@ -445,7 +474,9 @@ function customFieldHintRows(): array
         ['color-picker', 'hex color string'],
         ['date', 'ISO 8601 date"'],
         ['date-time', 'ISO 8601 datetime string'],
-        ['record', 'array of record IDs of the lookup entity'],
+        ['record', 'array of record IDs'],
+        ['status', 'option label or option ID'],
+        ['relationship', 'array of record IDs'],
     ];
 }
 

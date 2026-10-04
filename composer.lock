@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b2f687adead2b00b3db1a65b7c664637",
+    "content-hash": "7afa910511e254c06b3e935144724741",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10532,16 +10532,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.15.2",
+            "version": "dev-feat/4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "8cca6d80e60da131084f9c73197e78e220bffb44"
+                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/8cca6d80e60da131084f9c73197e78e220bffb44",
-                "reference": "8cca6d80e60da131084f9c73197e78e220bffb44",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
+                "reference": "b3cd80fcc6b28bc229b9203aa1e7c59859fe7d5f",
                 "shasum": ""
             },
             "require": {
@@ -10564,12 +10564,9 @@
                 "pestphp/pest-plugin-type-coverage": "^4.0|^5.0",
                 "phpstan/phpstan-deprecation-rules": "^2.0",
                 "phpstan/phpstan-phpunit": "^2.0",
-                "rector/rector": "^2.6",
+                "rector/rector": "2.8.4",
                 "spatie/laravel-ray": "^1.26"
             },
-            "bin": [
-                "bin/custom-fields-upgrade"
-            ],
             "type": "library",
             "extra": {
                 "laravel": {
@@ -10627,7 +10624,8 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-10-20T23:06:07+00:00"
+            "time": "2026-11-04T23:38:00+00:00",
+            "published-time": "2026-11-04T23:38:06+00:00"
         },
         {
             "name": "relaticle/flowforge",
@@ -24451,6 +24449,7 @@
     "minimum-stability": "beta",
     "stability-flags": {
         "pestphp/pest": 20,
+        "relaticle/custom-fields": 20,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,
@@ -24460,5 +24459,5 @@
         "ext-intl": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }

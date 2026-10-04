@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
@@ -30,6 +31,11 @@ final class CustomFieldFactory extends Factory
             'created_at' => now(),
             'updated_at' => now(),
         ];
+    }
+
+    public function status(): static
+    {
+        return $this->state(['type' => CustomFieldType::STATUS->value]);
     }
 
     /** @phpstan-return static */

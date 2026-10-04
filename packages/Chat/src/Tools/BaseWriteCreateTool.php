@@ -16,6 +16,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Services\Tools\CustomFieldsValidationResult;
 use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
@@ -176,7 +177,7 @@ abstract class BaseWriteCreateTool implements Tool
                 continue;
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: $user->effectiveTimezone());
+            $validation = $this->validateCustomFields($validator, $user, $record['custom_fields'] ?? null);
 
             if ($validation->error !== null) {
                 $skipped[] = $this->skippedRecord($record, $index, $validation->error);
@@ -248,5 +249,22 @@ abstract class BaseWriteCreateTool implements Tool
         $envelope = PendingActionEnvelope::for($pending, class_basename($this->actionClass()), $pending->action_data);
 
         return (string) json_encode($this->withSkippedRecords($envelope, $skipped), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * A create carries the turn so a link may name a record an earlier step in the same
+     * plan proposed, which has no id yet.
+     */
+    private function validateCustomFields(CustomFieldsRequestValidator $validator, User $user, mixed $customFields): CustomFieldsValidationResult
+    {
+        return $validator->validate(
+            $user,
+            $this->entityType(),
+            $customFields,
+            isUpdate: false,
+            viewerZone: $user->effectiveTimezone(),
+            conversationId: $this->resolveConversationId(),
+            turnId: $this->resolveTurnId(),
+        );
     }
 }

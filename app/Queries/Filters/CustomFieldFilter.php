@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Queries\Filters;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -18,6 +20,7 @@ use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Relaticle\CustomFields\QueryBuilders\RecordLinkQuery;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -206,6 +209,14 @@ final readonly class CustomFieldFilter implements Filter
         string $operator,
         mixed $operand,
     ): void {
+        $definition = $field->relationshipDefinition();
+
+        if ($definition instanceof CustomFieldRelationship) {
+            $this->applyLinkCondition($query, $field, $definition, $operator, $operand);
+
+            return;
+        }
+
         match ($operator) {
             '$not_in' => $query->whereDoesntHave('customFieldValues', fn (Builder $q): Builder => $q
                 ->where('custom_field_id', $field->getKey())
@@ -229,6 +240,33 @@ final readonly class CustomFieldFilter implements Filter
                 };
             }),
         };
+    }
+
+    /**
+     * A link field holds no value row: its condition rides the edge ledger. `$eq` and `$in`
+     * name the linked records by id, `$contains` matches the name of the record on the far end.
+     *
+     * @param  Builder<Model>  $query
+     */
+    private function applyLinkCondition(
+        Builder $query,
+        CustomField $field,
+        CustomFieldRelationship $definition,
+        string $operator,
+        mixed $operand,
+    ): void {
+        $links = resolve(RecordLinkQuery::class);
+        $direction = $definition->readDirectionFor($field);
+
+        if ($operator === '$contains') {
+            $titleColumn = CrmEntity::tryFrom($definition->targetEntityTypeFor($field))?->titleColumn() ?? 'name';
+
+            $links->whereLinkedMatching($query, $definition, $direction, [$titleColumn], (string) $operand);
+
+            return;
+        }
+
+        $links->whereLinkedTo($query, $definition, $direction, is_array($operand) ? $operand : [$operand]);
     }
 
     /**

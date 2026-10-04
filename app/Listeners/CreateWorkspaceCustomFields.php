@@ -62,6 +62,7 @@ final readonly class CreateWorkspaceCustomFields
                     (string) $field['type'],
                     $enum->getOptions() ?? [],
                     $enum->getOptionColors() ?? [],
+                    $enum->getOptionCategories() ?? [],
                     $now,
                 ));
             }
@@ -97,7 +98,6 @@ final readonly class CreateWorkspaceCustomFields
             'code' => $enum->value,
             'name' => $enum->getDisplayName(),
             'type' => $enum->getFieldType(),
-            'lookup_type' => null,
             'width' => $enum->getWidth(),
             'active' => true,
             'system_defined' => $enum->isSystemDefined(),

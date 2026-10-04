@@ -74,7 +74,7 @@ final readonly class CustomFieldSettingsSchema
         if (FeatureManager::isEnabled(CustomFieldsFeature::FIELD_MULTI_VALUE) && $type?->supportsMultiValue === true) {
             $rules['allow_multiple'] = ['boolean'];
 
-            if (! $type->requiresLookupType && (bool) $resulting['allow_multiple']) {
+            if (! $type->requiresRelationship && (bool) $resulting['allow_multiple']) {
                 $rules['max_values'] = ['integer', 'min:'.self::MIN_MAX_VALUES, 'max:'.self::MAX_MAX_VALUES];
             }
         }

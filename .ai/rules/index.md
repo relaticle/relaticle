@@ -18,3 +18,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Notifications/**, app/Livewire/App/AppDatabaseNotifications.php, app/Contracts/Inbox/**, app/Support/Inbox/**, resources/views/livewire/app/database-notifications.blade.php, resources/views/livewire/app/notifications/**, packages/*/src/Notifications/**, packages/*/src/Inbox/**, packages/Cloud/src/**/Notifications/** | .ai/rules/notifications.md |
 | resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/**, packages/Cloud/src/**/Filament/** | .ai/rules/panel-links.md |
 | app/Queries/**, app/Data/ListQuery.php, app/Mcp/Tools/BaseListTool.php, packages/Chat/src/Tools/BaseReadListTool.php, packages/*/src/Queries/** | .ai/rules/queries.md |
+| config/custom-fields.php, app/Models/CustomField*.php, app/Rules/ValidCustomFields.php, packages/ImportWizard/src/Data/EntityLink.php | .ai/rules/custom-fields.md |
