@@ -8,6 +8,8 @@ use App\Models\CustomFieldSection;
 use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Sanctum\Sanctum;
+use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
+use Relaticle\CustomFields\Enums\OptionCategory;
 
 mutates(CustomFieldsController::class);
 
@@ -216,14 +218,14 @@ it('includes options for select fields', function (): void {
         'entity_type' => 'company',
         'code' => 'cf_status',
         'name' => 'Status',
-        'type' => 'select',
+        'type' => 'status',
         'sort_order' => 1,
         'active' => true,
         'validation_rules' => [],
     ]);
 
     $field->options()->createMany([
-        ['name' => 'Active', 'sort_order' => 1, 'tenant_id' => $this->workspace->id],
+        ['name' => 'Active', 'sort_order' => 1, 'tenant_id' => $this->workspace->id, 'settings' => new CustomFieldOptionSettingsData(category: OptionCategory::Started)],
         ['name' => 'Inactive', 'sort_order' => 2, 'tenant_id' => $this->workspace->id],
     ]);
 
@@ -237,7 +239,9 @@ it('includes options for select fields', function (): void {
     expect($fieldData)->not->toBeNull()
         ->and($fieldData['attributes']['options'])->toHaveCount(2)
         ->and($fieldData['attributes']['options'][0]['label'])->toBe('Active')
-        ->and($fieldData['attributes']['options'][0])->toHaveKey('value');
+        ->and($fieldData['attributes']['options'][0])->toHaveKey('value')
+        ->and($fieldData['attributes']['options'][0]['category'])->toBe('started')
+        ->and($fieldData['attributes']['options'][1]['category'])->toBeNull();
 });
 
 it('paginates results by default', function (): void {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Support\CustomFields;
 
 use App\Enums\CrmEntity;
-use App\Enums\CustomFieldType;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldValue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
@@ -40,14 +40,30 @@ final readonly class RecordNameResolver
                     continue;
                 }
 
-                if ($value->customField->type !== CustomFieldType::RECORD->value) {
+                $lookupType = $value->customField->targetEntityType();
+
+                if ($lookupType === null) {
                     continue;
                 }
 
-                $lookupType = (string) $value->customField->lookup_type;
-
                 foreach ($this->ids($value->getValue()) as $id) {
                     $wanted[$lookupType][] = $id;
+                }
+            }
+        }
+
+        foreach ($models as $model) {
+            foreach (['outgoingLinks' => 'to', 'incomingLinks' => 'from'] as $relation => $side) {
+                if (! $model->relationLoaded($relation)) {
+                    continue;
+                }
+
+                foreach ($model->getRelation($relation) as $link) {
+                    if (! $link instanceof CustomFieldLink) {
+                        continue;
+                    }
+
+                    $wanted[(string) $link->{$side.'_entity_type'}][] = (string) $link->{$side.'_entity_id'};
                 }
             }
         }

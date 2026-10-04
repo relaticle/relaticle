@@ -7,6 +7,7 @@ namespace App\Queries;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use App\Models\User;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
@@ -103,7 +104,7 @@ final readonly class FilterVocabulary
                 $entry['options'] = $options;
             }
 
-            if ($this->optionMap->translates($field) || $field->lookup_type !== null) {
+            if ($this->optionMap->translates($field) || $field->relationshipDefinition() instanceof CustomFieldRelationship) {
                 $fieldBound[$field->type] = true;
             }
 

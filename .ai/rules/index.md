@@ -16,3 +16,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/**, app/Casts/** | .ai/rules/models.md |
 | resources/views/filament/**, app/Filament/**, packages/*/src/Filament/**, packages/*/resources/views/** | .ai/rules/panel-links.md |
 | app/Queries/**, app/Data/ListQuery.php, app/Mcp/Tools/BaseListTool.php, packages/Chat/src/Tools/BaseReadListTool.php, packages/*/src/Queries/** | .ai/rules/queries.md |
+| config/custom-fields.php, app/Models/CustomField*.php, app/Rules/ValidCustomFields.php, packages/ImportWizard/src/Data/EntityLink.php | .ai/rules/custom-fields.md |

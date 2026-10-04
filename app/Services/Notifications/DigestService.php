@@ -8,10 +8,10 @@ use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
 use App\Enums\CreationSource;
-use App\Enums\CustomFields\TaskField;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\OptionsInCategory;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -60,14 +60,14 @@ final readonly class DigestService
             ->where('t.creation_source', '!=', CreationSource::SAMPLE->value)
             ->whereNotNull('due.datetime_value')
             ->where('due.datetime_value', '<', $windowEnd)
-            ->when($meta['done_option_id'] !== null, function (Builder $query) use ($meta): void {
+            ->when($meta['terminal_option_ids'] !== [], function (Builder $query) use ($meta): void {
                 $query->whereNotExists(function (Builder $sub) use ($meta): void {
                     $sub->select(DB::raw(1))
                         ->from('custom_field_values as st')
                         ->whereColumn('st.entity_id', 't.id')
                         ->where('st.entity_type', 'task')
                         ->where('st.custom_field_id', $meta['status_field_id'])
-                        ->where('st.string_value', $meta['done_option_id']);
+                        ->whereIn('st.string_value', $meta['terminal_option_ids']);
                 });
             })
             ->orderBy('due.datetime_value')
@@ -102,29 +102,26 @@ final readonly class DigestService
     }
 
     /**
-     * @return array{due_field_id: ?string, status_field_id: ?string, done_option_id: ?string}
+     * @return array{due_field_id: ?string, status_field_id: ?string, terminal_option_ids: list<string>}
      */
     private function resolveFieldMetadata(Workspace $workspace): array
     {
         $row = DB::table('custom_fields as cf')
-            ->leftJoin('custom_field_options as opt', function (JoinClause $join): void {
-                $join->on('opt.custom_field_id', '=', 'cf.id')
-                    ->where('opt.name', '=', TaskField::DONE_STATUS);
-            })
             ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')
             ->whereIn('cf.code', ['due_date', 'status'])
             ->selectRaw(implode(', ', [
                 "MAX(CASE WHEN cf.code = 'due_date' THEN cf.id END) AS due_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
-                "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
             ]))
             ->first();
 
+        $statusFieldId = $row?->status_field_id !== null ? (string) $row->status_field_id : null;
+
         return [
             'due_field_id' => $row?->due_field_id !== null ? (string) $row->due_field_id : null,
-            'status_field_id' => $row?->status_field_id !== null ? (string) $row->status_field_id : null,
-            'done_option_id' => $row?->done_option_id !== null ? (string) $row->done_option_id : null,
+            'status_field_id' => $statusFieldId,
+            'terminal_option_ids' => OptionsInCategory::terminalIds($workspace->getKey(), 'status', $statusFieldId),
         ];
     }
 }

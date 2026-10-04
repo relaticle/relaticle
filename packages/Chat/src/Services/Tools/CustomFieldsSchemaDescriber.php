@@ -9,7 +9,10 @@ use App\Models\CustomField;
 use App\Models\Workspace;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use Relaticle\Chat\Support\PromptText;
+use Relaticle\CustomFields\Enums\OptionCategory;
+use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
 final readonly class CustomFieldsSchemaDescriber
 {
@@ -43,6 +46,9 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         $lines[] = '';
+        $lines[] = 'A category in square brackets after an option label, such as [completed], is what that '
+            .'option means, never part of its value: write the label exactly as quoted, brackets excluded.';
+        $lines[] = '';
         $lines[] = 'Only include codes you want to set. Omit fields you do not want to change. '
             .'To clear a value, pass null (for a multi-value field, null or []). '
             .'If a field is required the write is rejected with a validation error naming it, '
@@ -68,6 +74,12 @@ final readonly class CustomFieldsSchemaDescriber
 
     private function describeField(CustomField $field): string
     {
+        $definition = $field->relationshipDefinition();
+
+        if ($definition instanceof CustomFieldRelationship) {
+            return "{$field->code} (".$this->describeLink($field, $definition).')';
+        }
+
         $type = CustomFieldType::tryFrom($field->type);
         $parts = [$field->type];
 
@@ -82,7 +94,7 @@ final readonly class CustomFieldsSchemaDescriber
             // forge extra schema lines, so they go through the same sanitizer every
             // label in the system prompt already uses.
             $parts[] = 'one of: '.$field->options
-                ->map(fn (CustomFieldOption $option): string => '"'.PromptText::sanitize($option->name, 120).'"')
+                ->map(fn (CustomFieldOption $option): string => $this->describeOption($option))
                 ->implode(', ');
         }
 
@@ -95,5 +107,75 @@ final readonly class CustomFieldsSchemaDescriber
         }
 
         return "{$field->code} (".implode(', ', $parts).')';
+    }
+
+    /**
+     * A field that links records. The value is always a list of record ids, so the
+     * assistant is told what it points at, how many it may hold, and, where the far end
+     * holds one record at a time, the flag that confirms taking it from its current
+     * holder. Without that last part the write comes back as a validation error the
+     * model cannot act on.
+     */
+    private function describeLink(CustomField $field, CustomFieldRelationship $definition): string
+    {
+        $target = $definition->targetEntityTypeFor($field);
+
+        $parts = [$field->allowsMultipleRecords()
+            ? "links to {$target} records, an array of record ids"
+            : "links to one {$target} record, an array holding at most one record id"];
+
+        $parts[] = 'ids only, never names: look the record up first (SearchCrmTool or a list tool with lookup: true), '
+            .'or reference a record proposed earlier in this same turn as "$ref:<pending_action_id>"';
+
+        $farField = $this->farField($definition, $field);
+
+        if ($farField instanceof BaseCustomField) {
+            $parts[] = 'the same link reads back on the '.$target.' as "'.PromptText::sanitize($farField->name, 120).'"';
+        }
+
+        $parts[] = 'relationship "'.PromptText::sanitize($definition->code, 120).'", '.$definition->cardinality->value;
+
+        if ($this->farSideHoldsOne($definition, $field)) {
+            $parts[] = "a {$target} already linked to another record is only moved when you send "
+                .'{"ids": ["<id>"], "replace": true}';
+        }
+
+        return implode(', ', $parts);
+    }
+
+    /**
+     * The slot the far end renders, when the relationship is paired. A one-way link has
+     * none, and its target shows nothing at all.
+     */
+    private function farField(CustomFieldRelationship $definition, CustomField $field): ?BaseCustomField
+    {
+        $farId = $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+            ? $definition->to_field_id
+            : $definition->from_field_id;
+
+        if ($farId === null || (string) $farId === (string) $field->getKey()) {
+            return null;
+        }
+
+        return CustomField::query()->withoutGlobalScopes()->find($farId);
+    }
+
+    private function farSideHoldsOne(CustomFieldRelationship $definition, CustomField $field): bool
+    {
+        return $definition->directionFor($field) === CustomFieldRelationship::DIRECTION_FROM
+            ? $definition->cardinality->toSideIsSingle()
+            : $definition->cardinality->fromSideIsSingle();
+    }
+
+    /**
+     * The category is what the option means, so the assistant can pick the finished
+     * or cancelled state of a workflow without reading the tenant's wording.
+     */
+    private function describeOption(CustomFieldOption $option): string
+    {
+        $label = '"'.PromptText::sanitize($option->name, 120).'"';
+        $category = $option->settings->category;
+
+        return $category instanceof OptionCategory ? "{$label} [{$category->value}]" : $label;
     }
 }

@@ -17,6 +17,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Services\Tools\CustomFieldsValidationResult;
 use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
@@ -172,7 +173,7 @@ abstract class BaseWriteUpdateTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, ignoreEntityId: $model->getKey(), viewerZone: $user->effectiveTimezone());
+            $validation = $this->validateCustomFields($validator, $user, $record['custom_fields'] ?? null, $model->getKey());
 
             if ($validation->error !== null) {
                 return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
@@ -328,5 +329,22 @@ abstract class BaseWriteUpdateTool implements Tool
         }
 
         return $old === $new;
+    }
+
+    /**
+     * An update carries the turn so a link may name a record an earlier step in the same
+     * plan proposed, which has no id yet.
+     */
+    private function validateCustomFields(CustomFieldsRequestValidator $validator, User $user, mixed $customFields, string|int|null $ignoreEntityId): CustomFieldsValidationResult
+    {
+        return $validator->validate(
+            $user,
+            $this->entityType(),
+            $customFields,
+            ignoreEntityId: $ignoreEntityId,
+            viewerZone: $user->effectiveTimezone(),
+            conversationId: $this->resolveConversationId(),
+            turnId: $this->resolveTurnId(),
+        );
     }
 }

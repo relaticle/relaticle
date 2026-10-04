@@ -27,11 +27,19 @@ use Relaticle\Chat\Tools\People\ListPeopleTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\FilterDescription;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(CustomFieldsSchemaDescriber::class, CustomFieldsFilterDescriber::class, WorkspaceCustomFields::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
+});
+
+it('says a bracketed category is metadata, not part of the value', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    expect(resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, 'task'))
+        ->toContain('never part of its value');
 });
 
 it('describes the system-seeded task custom fields with type hints', function (): void {
@@ -44,10 +52,10 @@ it('describes the system-seeded task custom fields with type hints', function ()
         ->toContain('due_date')
         ->toContain('date-time')
         ->toContain('ISO 8601')
-        ->toContain('status (select')
-        ->toContain('"To do"')
-        ->toContain('"In progress"')
-        ->toContain('"Done"')
+        ->toContain('status (status')
+        ->toContain('"To do" [unstarted]')
+        ->toContain('"In progress" [started]')
+        ->toContain('"Done" [completed]')
         ->toContain('priority')
         ->toContain('description');
 });
@@ -97,26 +105,25 @@ it('describes a record field as record ids and a multi-select field as option la
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspaceId = $user->currentWorkspace->getKey();
 
-    foreach ([['linked_company', 'Linked Company', 'record', 'company'], ['markets', 'Markets', 'multi-select', null]] as [$code, $name, $type, $lookup]) {
-        CustomField::query()->create([
-            'tenant_id' => $workspaceId,
-            'entity_type' => 'task',
-            'code' => $code,
-            'name' => $name,
-            'type' => $type,
-            'lookup_type' => $lookup,
-            'sort_order' => 60,
-            'validation_rules' => [],
-            'active' => true,
-            'system_defined' => false,
-        ]);
-    }
+    RecordFieldFixture::record($user->currentWorkspace, 'task', 'company', 'linked_company', name: 'Linked Company');
+
+    CustomField::query()->create([
+        'tenant_id' => $workspaceId,
+        'entity_type' => 'task',
+        'code' => 'markets',
+        'name' => 'Markets',
+        'type' => 'multi-select',
+        'sort_order' => 60,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
 
     $lines = collect(explode("\n", resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, 'task')));
 
     expect($lines->first(fn (string $line): bool => str_contains($line, 'linked_company')))
-        ->toContain('linked_company (record')
-        ->toContain('array of record IDs of the lookup entity; records must belong to this workspace')
+        ->toContain('linked_company (')
+        ->toContain('links to company records, an array of record ids')
         ->and($lines->first(fn (string $line): bool => str_contains($line, 'markets')))
         ->toContain('markets (multi-select')
         ->toContain('array of option labels or IDs');
@@ -455,3 +462,25 @@ it('names each filter and each rule once in a chat tool description', function (
         ->and(substr_count($chat, FilterDefinition::RELATION_OPERAND))->toBe(in_array('relation', $kinds, true) ? 1 : 0)
         ->and(substr_count($chat, 'nested custom field example'))->toBe($hasNestedCustom ? 1 : 0);
 })->with('chat list tools');
+
+it('names the option category so a renamed status still reads as finished', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $user->currentWorkspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'status')
+        ->firstOrFail()
+        ->options()
+        ->withoutGlobalScopes()
+        ->where('name', 'Done')
+        ->update(['name' => 'Shipped']);
+
+    $description = resolve(CustomFieldsSchemaDescriber::class)
+        ->describe($user->currentWorkspace, 'task');
+
+    expect($description)
+        ->toContain('"Shipped" [completed]')
+        ->not->toContain('"Done"');
+});

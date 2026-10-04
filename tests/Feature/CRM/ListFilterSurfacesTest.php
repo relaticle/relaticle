@@ -62,6 +62,8 @@ const COMPARISON_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte', '$is_empty'];
 const SINGLE_CHOICE_OPERATORS = ['$eq', '$in', '$not_in', '$is_empty'];
 const LIST_OPERATORS = ['$has_any', '$has_none', '$is_empty'];
 
+const LINK_OPERATORS = ['$eq', '$contains', '$in'];
+
 const FILTER_OPERATORS_BY_TYPE = [
     'text' => ['$eq', '$contains', '$is_empty'],
     'number' => COMPARISON_OPERATORS,
@@ -71,6 +73,7 @@ const FILTER_OPERATORS_BY_TYPE = [
     'checkbox' => ['$eq', '$is_empty'],
     'toggle' => ['$eq', '$is_empty'],
     'select' => SINGLE_CHOICE_OPERATORS,
+    'status' => SINGLE_CHOICE_OPERATORS,
     'radio' => SINGLE_CHOICE_OPERATORS,
     'toggle-buttons' => SINGLE_CHOICE_OPERATORS,
     'multi-select' => LIST_OPERATORS,
@@ -80,6 +83,8 @@ const FILTER_OPERATORS_BY_TYPE = [
     'phone' => LIST_OPERATORS,
     'link' => LIST_OPERATORS,
     'domain' => LIST_OPERATORS,
+    'record' => LINK_OPERATORS,
+    'relationship' => LINK_OPERATORS,
 ];
 
 const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
@@ -735,6 +740,12 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['$in' => ['Gold']], ['High']],
         [['$not_in' => ['Bronze']], ['High', 'Unset']],
         [['$not_in' => ['Bronze'], '$is_empty' => false], ['High']],
+    ], 'Bronze'],
+    'status' => ['status', ['Bronze', 'Gold'], 'Bronze', 'Gold', [
+        [['$eq' => 'Bronze'], ['Low']],
+        [['$in' => ['Gold']], ['High']],
+        [['$not_in' => ['Bronze']], ['High', 'Unset']],
+        [['$not_in' => ['Bronze', 'Gold'], '$is_empty' => true], ['Unset']],
     ], 'Bronze'],
     'radio' => ['radio', ['Bronze', 'Gold'], 'Bronze', 'Gold', [
         [['$eq' => 'Gold'], ['High']],

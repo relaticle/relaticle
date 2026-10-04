@@ -48,6 +48,7 @@ final readonly class ApplyStagePreset
                 (string) $stage->getRawOriginal('type'),
                 array_keys($preset),
                 $preset,
+                [],
                 now(),
             ));
         });

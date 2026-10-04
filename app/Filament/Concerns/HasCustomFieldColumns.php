@@ -7,6 +7,9 @@ namespace App\Filament\Concerns;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
 use App\Models\CustomField;
+use App\Models\Workspace;
+use App\Support\CustomFields\WorkspaceCustomFields;
+use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
@@ -18,9 +21,17 @@ trait HasCustomFieldColumns
 {
     public function table(Table $table): Table
     {
+        $workspace = Filament::getTenant();
         $builder = CustomFields::table()->forModel($this->getModel());
 
-        $fields = $builder->getFields()->keyBy(fn (CustomField $field): string => $field->getFieldName());
+        $model = $this->getModel();
+
+        // 4.0 dropped the builder's getFields(); the host already caches the same rows.
+        $fields = $workspace instanceof Workspace
+            ? resolve(WorkspaceCustomFields::class)
+                ->forEntity($workspace, (new $model)->getMorphClass())
+                ->keyBy(fn (CustomField $field): string => $field->getFieldName())
+            : collect();
 
         $columns = $builder->columns()
             ->map(function (Column $column) use ($fields): Column {

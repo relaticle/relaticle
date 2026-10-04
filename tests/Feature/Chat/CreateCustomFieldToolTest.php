@@ -671,3 +671,41 @@ it('refuses more fields than one proposal holds', function (): void {
     expect($decoded['error'])->toBe('Too many records: at most 1 per proposal.')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
+
+it('creates a status field with its options', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+        'options' => [['name' => 'Open'], ['name' => 'Shipped']],
+    ]);
+
+    expect($decoded)->not->toHaveKey('error');
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    resolve(PendingActionService::class)->approve($pending, $this->owner);
+
+    $field = CustomField::query()
+        ->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('name', 'Workflow')
+        ->firstOrFail();
+
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    expect($field->type)->toBe('status')
+        ->and(CustomFieldOption::query()->where('custom_field_id', $field->getKey())->pluck('name')->sort()->values()->all())
+        ->toBe(['Open', 'Shipped']);
+});
+
+it('rejects a status field with no options', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'task',
+        'name' => 'Workflow',
+        'type' => 'status',
+    ]);
+
+    expect($decoded)->toHaveKey('error');
+});

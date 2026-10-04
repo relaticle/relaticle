@@ -321,15 +321,18 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 
 | Field type | Operators |
 |---|---|
-| Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
+| Single choice (select, status, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
 | Multi choice (multi select, checkbox list), tags, email, phone, link, domain | `$has_any`, `$has_none`, `$is_empty` |
 | Text | `$eq`, `$contains`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
 | Checkbox, toggle | `$eq`, `$is_empty` |
+| Record, relationship | `$eq`, `$in`, `$contains` |
 
 Email and link fields also take a `domain` sub-field with `$in` and `$not_in`. It matches the domain of each value, so `{"domain": {"$in": ["canva.com"]}}` finds every address at `canva.com`. A domain is a bare host. A path, user or port is an error.
 
-Record, text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
+On a record or relationship field, `$eq` and `$in` take the IDs of the linked records, and `$contains` matches a linked record by its name.
+
+Text area, rich text and color fields take no filter. Neither does an encrypted or inactive field.
 
 #### How values match
 
