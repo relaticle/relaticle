@@ -6,7 +6,7 @@ use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
-use Relaticle\OnboardSeed\OnboardSeeder;
+use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(Dashboard::class);
 
@@ -49,7 +49,7 @@ it('greets a fresh seeded workspace by the clock, with no assistant message in t
     $this->travelTo(new DateTimeImmutable('2026-08-25 08:00:00', new DateTimeZone('UTC')));
 
     $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed', 'timezone' => 'UTC']);
-    resolve(OnboardSeeder::class)->run($owner, $owner->currentWorkspace, 'sales');
+    expect(resolve(OnboardSeedManager::class)->generateFor($owner, $owner->currentWorkspace, 'sales'))->toBeTrue();
     $this->actingAs($owner);
     Filament::setTenant($owner->currentWorkspace);
 

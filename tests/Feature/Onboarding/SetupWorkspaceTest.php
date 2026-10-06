@@ -307,7 +307,8 @@ it('keeps the use case and the finished step when the sample seeder fails', func
         ->onboarding_use_case->toBe(OnboardingUseCase::Recruiting)
         ->onboarding_step->toBeNull()
         ->and($stage->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())
-        ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()));
+        ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()))
+        ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
 });
 
 it('seeds no sample data for an additional workspace', function (): void {

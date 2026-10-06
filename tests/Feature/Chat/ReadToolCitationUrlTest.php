@@ -19,7 +19,7 @@ use Relaticle\Chat\Tools\People\GetPersonTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool;
 use Relaticle\Chat\Tools\Task\GetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
-use Relaticle\OnboardSeed\OnboardSeeder;
+use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(GetCompanyTool::class);
 mutates(ListCompaniesTool::class);
@@ -35,7 +35,7 @@ mutates(ListNotesTool::class);
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
-    resolve(OnboardSeeder::class)->run($this->user, $this->user->currentWorkspace, 'sales');
+    expect(resolve(OnboardSeedManager::class)->generateFor($this->user, $this->user->currentWorkspace, 'sales'))->toBeTrue();
     $this->actingAs($this->user);
     // Deliberately no Filament::setTenant(), mirroring job context
 });
