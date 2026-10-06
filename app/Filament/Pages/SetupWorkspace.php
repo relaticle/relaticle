@@ -183,7 +183,11 @@ final class SetupWorkspace extends Page
 
     public function connectMailbox(string $provider): void
     {
-        if ($this->step() !== OnboardingStep::Email || ! in_array($provider, $this->offeredProviders(), true)) {
+        if ($this->step() !== OnboardingStep::Email || ! Feature::active(EmailIntegration::class)) {
+            return;
+        }
+
+        if (! in_array($provider, $this->offeredProviders(), true)) {
             return;
         }
 

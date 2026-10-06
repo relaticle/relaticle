@@ -702,7 +702,8 @@ describe('connect email', function (): void {
 
         parse_str((string) parse_url($setup->effects['redirect'], PHP_URL_QUERY), $query);
 
-        expect($query['return'] ?? null)->toBe(SetupWorkspace::getUrl(['tenant' => $workspace]));
+        expect($query['return'] ?? null)->toBe(SetupWorkspace::getUrl(['tenant' => $workspace]))
+            ->and($setup->effects)->not->toHaveKey('redirectUsingNavigate');
     })->with(['gmail', 'azure']);
 
     it('ignores a connect for a provider the install does not offer', function (string $provider): void {
@@ -714,6 +715,19 @@ describe('connect email', function (): void {
             ->assertSuccessful()
             ->assertNoRedirect();
     })->with(['azure', 'yahoo', '']);
+
+    it('ignores a connect when the email feature was switched off while the step was open', function (): void {
+        workspaceInSetup(User::factory()->create());
+
+        $setup = livewire(SetupWorkspace::class);
+
+        Feature::define(EmailIntegration::class, false);
+        Feature::flushCache();
+
+        $setup->call('connectMailbox', 'gmail')
+            ->assertSuccessful()
+            ->assertNoRedirect();
+    });
 
     it('ignores a connect once the workspace has moved on from the connect step', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
