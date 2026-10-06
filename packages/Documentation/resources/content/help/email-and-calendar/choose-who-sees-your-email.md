@@ -15,11 +15,11 @@ own email in full.
 | Level | What your workspace sees |
 |---|---|
 | **Private** | Nothing. Only you can see the email. |
-| **Metadata only** | The participants and the time. |
-| **Subject line and metadata** | The subject line, the participants, and the time. |
+| **Participants only** | The participants and the time. |
+| **Subject line and participants** | The subject line, the participants, and the time. |
 | **Full access** | The body, the subject line, and the attachments. |
 
-A new workspace starts on **Metadata only**. Teammates see that you were in
+A new workspace starts on **Participants only**. Teammates see that you were in
 touch with a person or company, and not what was said.
 
 ## Set your default
