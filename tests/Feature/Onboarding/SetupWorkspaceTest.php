@@ -15,10 +15,14 @@ use App\Features\EmailIntegration;
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
 use App\Filament\Pages\ChatConversation;
+use App\Filament\Pages\Concerns\RunsInviteStep;
+use App\Filament\Pages\Concerns\RunsMailboxSteps;
+use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Jobs\Email\SyncSubscriberJob;
+use App\Livewire\App\Workspaces\Concerns\SendsWorkspaceInvitations;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
@@ -26,12 +30,14 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Js;
@@ -46,7 +52,7 @@ use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SetupWorkspace::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
+mutates(SetupWorkspace::class, RunsMailboxSteps::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
 
 beforeEach(function (): void {
     Feature::define(EmailIntegration::class, false);
@@ -1526,6 +1532,70 @@ describe('invite team', function (): void {
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
+
+    it('stays on the step for an address longer than an invitation can hold', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => str_repeat('a', 250).'@northwind.test'])
+            ->call('finish')
+            ->assertHasFormErrors(['emails']);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('finishes and warns when the invitations cannot be sent', function (): void {
+        Exceptions::fake();
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        Event::listen('eloquent.creating: '.WorkspaceInvitation::class, fn (): never => throw new RuntimeException('queue is down'));
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test'])
+            ->call('finish')
+            ->assertHasNoFormErrors()
+            ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+        $notifications = collect(session('filament.notifications'));
+
+        Exceptions::assertReported(RuntimeException::class);
+
+        expect($notifications->pluck('title', 'status')->all())->toEqual([
+            'warning' => __('filament/pages/workspaces.setup_workspace.invite.not_sent.title'),
+            'success' => __('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'),
+        ])
+            ->and($notifications->firstWhere('status', 'warning')['body'])->toBe(__('filament/pages/workspaces.setup_workspace.invite.not_sent.body'))
+            ->and($workspace->fresh()->onboarding_step)->toBeNull()
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('invites as a member when the submitted role is blank', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->set('data.emails', 'maya@northwind.test')
+            ->set('data.role', '')
+            ->call('finish')
+            ->assertHasNoFormErrors();
+
+        expect($workspace->workspaceInvitations()->sole()->role)->toBe(WorkspaceRole::Member->value);
+    });
+
+    it('finishes with only separators typed even while rate limited', function (string $separators): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        RateLimiter::increment('invite-workspace-members:'.$user->id, 60, 20);
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => $separators])
+            ->call('finish')
+            ->assertHasNoFormErrors();
+
+        expect($workspace->fresh()->onboarding_step)->toBeNull()
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    })->with([',,,', ';']);
 
     it('stays on the step for a disposable address', function (): void {
         $workspace = workspaceAtInvite(User::factory()->create());

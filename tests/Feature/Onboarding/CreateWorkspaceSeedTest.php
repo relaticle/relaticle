@@ -8,6 +8,8 @@ use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
 use App\Features\OnboardSeed;
+use App\Filament\Pages\Concerns\RunsInviteStep;
+use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Listeners\CreateWorkspaceCustomFields;
@@ -26,7 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
-mutates(CreateWorkspace::class, SetupWorkspace::class, CreateWorkspaceAction::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, OnboardSeedManager::class, CreateWorkspaceCustomFields::class, OnboardingUseCase::class);
+mutates(CreateWorkspace::class, SetupWorkspace::class, RunsUseCaseStep::class, RunsInviteStep::class, CreateWorkspaceAction::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, OnboardSeedManager::class, CreateWorkspaceCustomFields::class, OnboardingUseCase::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.

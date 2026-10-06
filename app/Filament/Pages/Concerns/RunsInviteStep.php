@@ -18,8 +18,10 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Flex;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\VerticalAlignment;
 use Illuminate\Support\Facades\Validator;
+use Throwable;
 
 trait RunsInviteStep
 {
@@ -27,13 +29,7 @@ trait RunsInviteStep
 
     public function finish(): void
     {
-        if ($this->step() !== OnboardingStep::Invite) {
-            $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
-
-            return;
-        }
-
-        $state = $this->form->getState();
+        $state = $this->inviteForm()->getState();
 
         if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Invite, null)) {
             $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
@@ -41,10 +37,7 @@ trait RunsInviteStep
             return;
         }
 
-        $this->sendInvitations(
-            $this->parseEmails((string) ($state['emails'] ?? '')),
-            (string) ($state['role'] ?? WorkspaceRole::Member->value),
-        );
+        $this->sendInvitationsOrWarn($state);
 
         Notification::make()
             ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
@@ -74,9 +67,35 @@ trait RunsInviteStep
         return route('workspaces.join', ['token' => $this->workspace->invite_link_token]);
     }
 
+    /**
+     * @param  array<string, mixed>  $state
+     */
+    private function sendInvitationsOrWarn(array $state): void
+    {
+        try {
+            $this->sendInvitations(
+                $this->parseEmails((string) ($state['emails'] ?? '')),
+                (string) ($state['role'] ?? WorkspaceRole::Member->value),
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+
+            $this->sendNotification(
+                __('filament/pages/workspaces.setup_workspace.invite.not_sent.title'),
+                __('filament/pages/workspaces.setup_workspace.invite.not_sent.body'),
+                'warning',
+            );
+        }
+    }
+
     protected function sendNotification(string $title, ?string $message = null, string $type = 'success'): void
     {
         Notification::make()->title($title)->body($message)->{$type}()->send();
+    }
+
+    private function inviteForm(): Schema
+    {
+        return Schema::make($this)->components($this->inviteComponents())->statePath('data');
     }
 
     /**
@@ -110,6 +129,10 @@ trait RunsInviteStep
     {
         $emails = $this->parseEmails($value);
 
+        if ($emails === []) {
+            return;
+        }
+
         if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
             $fail(__('workspaces.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
 
@@ -135,7 +158,7 @@ trait RunsInviteStep
     {
         return Validator::make(
             ['email' => EmailAddress::canonicalize($email)],
-            ['email' => RegistrableEmail::rules(checkDns: false)],
+            ['email' => ['max:255', ...RegistrableEmail::rules(checkDns: false)]],
         )->passes();
     }
 }
