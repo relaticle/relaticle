@@ -214,7 +214,7 @@ final class SetupWorkspace extends Page
             ->ownedBy($this->authUser(), $this->workspace)
             ->connected()
             ->latest()
-            ->first(['provider', 'email_address']);
+            ->first(['provider', 'email_address', 'status']);
     }
 
     /**
@@ -268,7 +268,7 @@ final class SetupWorkspace extends Page
             $this->selectedUseCase()?->pipelineStages() ?? [],
         );
 
-        if ($this->step() === OnboardingStep::Sharing) {
+        if ($this->step() === OnboardingStep::Sharing && $this->connectedMailbox()?->isActive()) {
             $preview['mailboxChip'] = $this->syncingChip();
         }
 

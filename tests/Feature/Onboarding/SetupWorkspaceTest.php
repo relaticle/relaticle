@@ -956,6 +956,8 @@ describe('connect email', function (): void {
             ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
             ->assertSee('olivia@northwind.test')
             ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.description'))
             ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
             ->assertDontSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'))
             ->assertSeeHtml('wire:poll.5s')
@@ -1263,6 +1265,59 @@ describe('connect email', function (): void {
 
         expect($member->fresh()->default_email_sharing_tier)->toBeNull()
             ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+    });
+
+    it('groups the two sharing options so the arrow keys move between them', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        $html = livewire(SetupWorkspace::class)->html();
+
+        expect(substr_count($html, 'type="radio"'))->toBe(2)
+            ->and(substr_count($html, 'name="sharingTier"'))->toBe(2);
+    });
+
+    it('claims no sync for a mailbox that is not active', function (EmailAccountStatus $status): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace, ['status' => $status]);
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
+            ->assertSee('olivia@northwind.test')
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.description'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'));
+
+        expect($setup->instance()->getPreview())->not->toHaveKey('mailboxChip');
+    })->with([EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
+
+    it('promises a sharing choice on the connect step to an owner who will be asked', function (): void {
+        workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'));
+    });
+
+    it('promises no sharing choice on the connect step to an owner who has a stored level', function (): void {
+        workspaceInSetup(User::factory()->create(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]));
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
+    });
+
+    it('promises no sharing choice on the connect step to an owner with a mailbox elsewhere', function (): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        connectedMailboxFor($user, $user->currentWorkspace);
+        workspaceInSetup($user, 'Second Corp');
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
     });
 });
 

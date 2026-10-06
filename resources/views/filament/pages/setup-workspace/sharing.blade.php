@@ -7,6 +7,9 @@
         {{ __('filament/pages/workspaces.setup_workspace.sharing.heading') }}
     </h3>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        @if ($mailbox?->isActive())
+            {{ __('filament/pages/workspaces.setup_workspace.sharing.syncing') }}
+        @endif
         {{ __('filament/pages/workspaces.setup_workspace.sharing.description') }}
     </p>
 
@@ -16,10 +19,12 @@
                 @include('filament.pages.setup-workspace.provider-logo', ['provider' => $mailbox->provider->value])
             </span>
             <span class="truncate">{{ $mailbox->email_address }}</span>
-            <span class="ms-auto flex shrink-0 items-center gap-1 text-xs font-medium text-success-700 dark:text-success-400">
-                <x-filament::icon icon="ri-checkbox-circle-fill" class="size-3.5" />
-                {{ __('filament/pages/workspaces.setup_workspace.sharing.connected') }}
-            </span>
+            @if ($mailbox->isActive())
+                <span class="ms-auto flex shrink-0 items-center gap-1 text-xs font-medium text-success-700 dark:text-success-400">
+                    <x-filament::icon icon="ri-checkbox-circle-fill" class="size-3.5" />
+                    {{ __('filament/pages/workspaces.setup_workspace.sharing.connected') }}
+                </span>
+            @endif
         </div>
     @endif
 
@@ -52,7 +57,7 @@
                     <span class="mt-0.5 block text-sm/4.5 text-gray-500 dark:text-gray-400">{{ $option['description'] }}</span>
                 </span>
 
-                <input type="radio" wire:model.live="sharingTier" value="{{ $value }}" class="fi-radio-input shrink-0" />
+                <input type="radio" name="sharingTier" wire:model.live="sharingTier" value="{{ $value }}" class="fi-radio-input shrink-0" />
             </label>
         @endforeach
     </div>

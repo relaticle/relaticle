@@ -80,6 +80,7 @@ return [
             'google' => 'Continue with Google',
             'microsoft' => 'Continue with Microsoft',
             'privacy' => 'Only you can read your emails. You choose what your team sees next.',
+            'privacy_existing' => 'Email sharing follows your existing settings. You can change them any time.',
             'benefit_records' => 'People and companies you email, added for you',
             'benefit_timeline' => 'Emails and meetings on the right record',
             'benefit_send' => 'Send from Relaticle with your own address',
@@ -87,7 +88,8 @@ return [
         ],
         'sharing' => [
             'heading' => 'Choose what your team sees',
-            'description' => 'Your mailbox is syncing. Only you can read your emails. Pick how they appear to other members.',
+            'syncing' => 'Your mailbox is syncing.',
+            'description' => 'Only you can read your emails. Pick how they appear to other members.',
             'connected' => 'Connected',
             'footer' => 'You can change this any time in settings.',
         ],
