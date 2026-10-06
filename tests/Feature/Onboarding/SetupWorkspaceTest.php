@@ -981,7 +981,7 @@ describe('connect email', function (): void {
             ->assertSee('Subject and message stay private.')
             ->assertSee(EmailPrivacyTier::SUBJECT->getLabel())
             ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
-            ->assertSee('The message stays private unless you share it.')
+            ->assertSee('The message stays private.')
             ->assertDontSee(EmailPrivacyTier::FULL->getLabel())
             ->assertDontSee(EmailPrivacyTier::PRIVATE->getLabel());
 
@@ -1178,18 +1178,41 @@ describe('connect email', function (): void {
             ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
     });
 
-    it('still asks about sharing when the only other mailbox is disconnected', function (): void {
+    it('still asks about sharing when the only other mailbox was removed, and leaves its mail alone', function (): void {
         $user = User::factory()->withPersonalWorkspace()->create();
-        connectedMailboxFor($user, $user->currentWorkspace, ['status' => EmailAccountStatus::DISCONNECTED]);
+        $other = $user->currentWorkspace;
+        $removed = connectedMailboxFor($user, $other);
+        $email = mailOf($user, $other, $removed, EmailPrivacyTier::FULL);
+        $removed->delete();
 
         $workspace = workspaceInSetup($user, 'Second Corp');
         connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
+            ->call('saveSharing')
+            ->assertHasNoErrors();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+            ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
     });
+
+    it('skips sharing while another workspace holds a mailbox of the owner in any status', function (EmailAccountStatus $status): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        $other = $user->currentWorkspace;
+        $email = mailOf($user, $other, connectedMailboxFor($user, $other, ['status' => $status]), EmailPrivacyTier::FULL);
+
+        $workspace = workspaceInSetup($user, 'Second Corp');
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
+    })->with([EmailAccountStatus::DISCONNECTED, EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
 
     it('moves on from sharing when the owner has stored a level elsewhere since', function (EmailPrivacyTier $stored): void {
         $user = User::factory()->create();

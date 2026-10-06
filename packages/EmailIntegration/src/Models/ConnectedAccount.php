@@ -282,14 +282,14 @@ final class ConnectedAccount extends Model
     }
 
     /**
-     * Whether the user has added a mailbox in any workspace other than the given one.
+     * Whether the user holds a mailbox in another workspace, in any status: a sharing change
+     * rewrites the mail of every account that is not removed, so the status must not narrow this.
      */
     public static function hasConnectedOutside(User $user, Workspace $workspace): bool
     {
         return self::query()
             ->where('user_id', $user->getKey())
             ->whereNot('workspace_id', $workspace->getKey())
-            ->connected()
             ->exists();
     }
 
