@@ -2,7 +2,7 @@
 title: Choose who sees your email
 description: Pick how much of your synced email your workspace can see, from nothing to the full message, as a default or for one email at a time.
 order: 5
-updated: "2026-10-05"
+updated: "2026-10-06"
 related: [help/email-and-calendar/set-workspace-email-privacy, help/email-and-calendar/request-access-to-an-email, help/email-and-calendar/connect-your-google-account]
 ---
 

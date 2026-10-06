@@ -2,7 +2,7 @@
 title: Request access to an email from a teammate
 description: Ask a teammate to share the subject or the full body of a restricted email, and approve or deny the requests teammates send you.
 order: 7
-updated: "2026-10-05"
+updated: "2026-10-06"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/set-workspace-email-privacy]
 ---
 
