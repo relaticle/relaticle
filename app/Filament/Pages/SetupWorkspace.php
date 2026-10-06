@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Onboarding\MailboxProviderHint;
+use App\Services\WorkspaceActivationFacts;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
@@ -21,8 +25,10 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Override;
+use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 /**
  * @property-read Schema $form
@@ -61,6 +67,8 @@ final class SetupWorkspace extends Page
 
             return;
         }
+
+        $this->leaveMailboxStepWhenSettled($workspace);
 
         $this->form->fill();
     }
@@ -116,6 +124,37 @@ final class SetupWorkspace extends Page
         $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
     }
 
+    public function skipMailbox(): void
+    {
+        resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+    }
+
+    public function backToMailbox(): void
+    {
+        abort_unless($this->canGoBackToMailbox(), 403);
+
+        resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::UseCase, OnboardingStep::Email);
+    }
+
+    public function canGoBackToMailbox(): bool
+    {
+        return $this->step() === OnboardingStep::UseCase
+            && Feature::active(EmailIntegration::class)
+            && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
+    }
+
+    public function mailboxConnectUrl(string $provider): string
+    {
+        $workspace = $this->workspace;
+
+        return MailboxOAuthWorkspace::redirectUrl($provider, $workspace, self::getUrl(['tenant' => $workspace]));
+    }
+
+    public function emphasizedProvider(): ?string
+    {
+        return MailboxProviderHint::for($this->authUser());
+    }
+
     public function step(): OnboardingStep
     {
         return $this->workspace->onboarding_step ?? OnboardingStep::UseCase;
@@ -123,11 +162,18 @@ final class SetupWorkspace extends Page
 
     public function stepView(): string
     {
-        return 'use-case';
+        return match ($this->step()) {
+            OnboardingStep::Email => 'email',
+            default => 'use-case',
+        };
     }
 
     public function previewPanel(): string
     {
+        if ($this->step() === OnboardingStep::Email) {
+            return 'people';
+        }
+
         return $this->selectedUseCase() instanceof OnboardingUseCase ? 'board' : 'dashboard';
     }
 
@@ -157,6 +203,19 @@ final class SetupWorkspace extends Page
             'maxContentWidth' => $this->getMaxContentWidth(),
             'maxWidth' => $this->getMaxContentWidth(),
         ];
+    }
+
+    private function leaveMailboxStepWhenSettled(Workspace $workspace): void
+    {
+        if ($workspace->onboarding_step !== OnboardingStep::Email) {
+            return;
+        }
+
+        $connected = resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $workspace);
+
+        if (! Feature::active(EmailIntegration::class) || $connected) {
+            resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+        }
     }
 
     private function selectedUseCase(): ?OnboardingUseCase

@@ -87,36 +87,70 @@
                 />
             </div>
 
-            <div
-                class="flex flex-1 flex-col px-5 pt-10"
-                x-show="! showBoard"
-                x-transition.opacity.duration.300ms
-            >
-                <p
-                    class="self-center rounded-lg px-2 py-1 text-center text-base font-semibold tracking-tight text-gray-950 transition duration-300 ease-out dark:text-white"
-                    x-bind:class="lens('user')"
-                >{{ $preview['greeting'] }}</p>
+            @if ($panel !== 'people')
+                <div
+                    class="flex flex-1 flex-col px-5 pt-10"
+                    x-show="! showBoard"
+                    x-transition.opacity.duration.300ms
+                >
+                    <p
+                        class="self-center rounded-lg px-2 py-1 text-center text-base font-semibold tracking-tight text-gray-950 transition duration-300 ease-out dark:text-white"
+                        x-bind:class="lens('user')"
+                    >{{ $preview['greeting'] }}</p>
 
-                <div class="mt-4 transition duration-300" x-bind:class="dim()">
-                    <div class="rounded-xl bg-white p-3 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
-                        <span class="block h-1.5 w-20 rounded-full bg-gray-100 dark:bg-white/10"></span>
-                        <div class="mt-6 flex justify-end">
-                            <span class="size-5 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                    <div class="mt-4 transition duration-300" x-bind:class="dim()">
+                        <div class="rounded-xl bg-white p-3 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                            <span class="block h-1.5 w-20 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                            <div class="mt-6 flex justify-end">
+                                <span class="size-5 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                            </div>
+                        </div>
+
+                        <span class="mt-6 block h-1.5 w-10 rounded-full bg-gray-200 dark:bg-white/15"></span>
+
+                        <div class="mt-3 space-y-3">
+                            @foreach (['w-3/4', 'w-1/2', 'w-2/3'] as $width)
+                                <div class="flex items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"></span>
+                                    <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $width])></span>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
+                </div>
+            @endif
 
-                    <span class="mt-6 block h-1.5 w-10 rounded-full bg-gray-200 dark:bg-white/15"></span>
+            @if ($panel === 'people')
+                <div class="flex flex-1 flex-col px-3 pt-4">
+                    <div class="flex items-center justify-between px-0.5">
+                        <span class="text-sm font-semibold text-gray-950 dark:text-white">{{ __('filament/pages/workspaces.setup_workspace.preview.people') }}</span>
+                        <span class="flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10">
+                            <x-filament::icon icon="ri-mail-line" class="size-3" />
+                            {{ __('filament/pages/workspaces.setup_workspace.preview.from_mailbox') }}
+                        </span>
+                    </div>
 
-                    <div class="mt-3 space-y-3">
-                        @foreach (['w-3/4', 'w-1/2', 'w-2/3'] as $width)
-                            <div class="flex items-center gap-2">
-                                <span class="size-3 shrink-0 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"></span>
-                                <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $width])></span>
+                    <div class="mt-3 overflow-hidden rounded-xl bg-white ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                        <div class="grid grid-cols-[1.3fr_1fr] gap-x-2 border-b border-gray-950/10 px-2.5 py-1.5 text-[10px] font-medium text-gray-500 dark:border-white/10 dark:text-gray-400">
+                            <span>{{ __('filament/pages/workspaces.setup_workspace.preview.person') }}</span>
+                            <span>{{ __('filament/pages/workspaces.setup_workspace.preview.company') }}</span>
+                        </div>
+
+                        @foreach ([['w-18', 'w-14'], ['w-14', 'w-12'], ['w-16', 'w-15'], ['w-12', 'w-10'], ['w-18', 'w-12'], ['w-14', 'w-14'], ['w-16', 'w-11'], ['w-13', 'w-12']] as $index => [$personWidth, $companyWidth])
+                            <div
+                                @class(['grid grid-cols-[1.3fr_1fr] items-center gap-x-2 px-2.5 py-2', 'border-t border-gray-950/10 dark:border-white/10' => $index > 0])
+                                style="opacity: {{ max(0.25, 1 - $index * 0.11) }}"
+                            >
+                                <div class="flex items-center gap-1.5">
+                                    <span class="size-4 shrink-0 rounded-full bg-gray-200 dark:bg-white/15"></span>
+                                    <span @class(['h-1.5 rounded-full bg-gray-200 dark:bg-white/15', $personWidth])></span>
+                                </div>
+                                <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $companyWidth])></span>
                             </div>
                         @endforeach
                     </div>
                 </div>
-            </div>
+            @endif
 
             @if ($hasStages)
                 <div

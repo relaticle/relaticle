@@ -5,7 +5,9 @@
         </div>
 
         <div class="hidden w-[48%] shrink-0 border-s border-gray-950/5 bg-gray-50 lg:block dark:border-white/10 dark:bg-gray-950">
-            <x-onboarding.crm-preview :preview="$this->getPreview()" :panel="$this->previewPanel()" />
+            <div wire:key="preview-{{ $this->step()->value }}" class="h-full">
+                <x-onboarding.crm-preview :preview="$this->getPreview()" :panel="$this->previewPanel()" />
+            </div>
         </div>
     </div>
 </x-onboarding.shell>

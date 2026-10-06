@@ -74,5 +74,22 @@ return [
     ],
     'setup_workspace' => [
         'title' => 'Set up your workspace',
+        'email' => [
+            'heading' => 'Start with the people you already email',
+            'description' => 'Connect your mailbox and Relaticle builds your CRM while you finish setup.',
+            'google' => 'Continue with Google',
+            'microsoft' => 'Continue with Microsoft',
+            'privacy' => 'Only you can read your emails. You choose what your team sees next.',
+            'benefit_records' => 'People and companies you email, added for you',
+            'benefit_timeline' => 'Emails and meetings on the right record',
+            'benefit_send' => 'Send from Relaticle with your own address',
+            'skip' => 'Skip for now',
+        ],
+        'preview' => [
+            'people' => 'People',
+            'person' => 'Person',
+            'company' => 'Company',
+            'from_mailbox' => 'From your mailbox',
+        ],
     ],
 ];

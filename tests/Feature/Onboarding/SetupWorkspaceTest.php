@@ -21,6 +21,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Models\UserSocialAccount;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -606,4 +607,167 @@ it('aborts the use case step for a workspace that already has a use case', funct
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
         ->onboarding_step->toBe(OnboardingStep::UseCase);
+});
+
+describe('connect email', function (): void {
+    beforeEach(function (): void {
+        Feature::define(EmailIntegration::class, true);
+    });
+
+    it('starts a new workspace on the connect step', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        expect($workspace->onboarding_step)->toBe(OnboardingStep::Email);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.skip'));
+    });
+
+    it('sends each provider button through the signed redirect and back to setup', function (string $provider): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        $url = livewire(SetupWorkspace::class)->instance()->mailboxConnectUrl($provider);
+
+        assertMailboxOAuthRedirectUrl($url, $provider, $workspace);
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        expect($query['return'] ?? null)->toBe(SetupWorkspace::getUrl(['tenant' => $workspace]));
+    })->with(['gmail', 'azure']);
+
+    it('moves on to the use case when the owner skips', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->call('skipMailbox')
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('lets the owner go back to connect from the use case while no mailbox is connected', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->call('skipMailbox')
+            ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            ->call('backToMailbox')
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
+    });
+
+    it('offers no way back to connect once a mailbox is connected', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+
+        livewire(SetupWorkspace::class)->call('skipMailbox');
+
+        ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'user_id' => $user->getKey(),
+            'workspace_id' => $workspace->getKey(),
+        ]));
+
+        livewire(SetupWorkspace::class)
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            ->call('backToMailbox')
+            ->assertForbidden();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('offers no way back to connect when the feature is off', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)->call('skipMailbox');
+
+        Feature::define(EmailIntegration::class, false);
+        Feature::flushCache();
+
+        livewire(SetupWorkspace::class)
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            ->call('backToMailbox')
+            ->assertForbidden();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('moves on to the use case when the feature is switched off mid-setup', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        Feature::define(EmailIntegration::class, false);
+        Feature::flushCache();
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('moves on to the use case when a mailbox is already connected', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+
+        ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+            'user_id' => $user->getKey(),
+            'workspace_id' => $workspace->getKey(),
+        ]));
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('puts the provider the owner signed up with first', function (string $socialProvider, string $expected, string $other): void {
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => $socialProvider]);
+        workspaceInSetup($user);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        expect($setup->instance()->emphasizedProvider())->toBe($expected);
+
+        $setup->assertSeeHtmlInOrder([
+            'data-provider="'.$expected.'"',
+            'data-provider="'.$other.'"',
+        ]);
+    })->with([
+        ['google', 'gmail', 'azure'],
+        ['microsoft', 'azure', 'gmail'],
+    ]);
+
+    it('reads the provider from a consumer mail domain when there is no social sign-in', function (string $email, ?string $expected): void {
+        workspaceInSetup(User::factory()->create(['email' => $email]));
+
+        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBe($expected);
+    })->with([
+        ['olivia@gmail.com', 'gmail'],
+        ['olivia@outlook.com', 'azure'],
+        ['olivia@northwind.test', null],
+    ]);
+
+    it('lists Google first with no emphasis when nothing hints at a provider', function (): void {
+        workspaceInSetup(User::factory()->create(['email' => 'olivia@northwind.test']));
+
+        livewire(SetupWorkspace::class)
+            ->assertSeeHtmlInOrder(['data-provider="gmail"', 'data-provider="azure"']);
+    });
+
+    it('ignores a social account that is not a mailbox provider', function (): void {
+        $user = User::factory()->create(['email' => 'olivia@northwind.test']);
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'github']);
+        workspaceInSetup($user);
+
+        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBeNull();
+    });
+});
+
+it('starts on the use case when the email feature is off', function (): void {
+    $workspace = workspaceInSetup(User::factory()->create());
+
+    expect($workspace->onboarding_step)->toBe(OnboardingStep::UseCase);
 });
