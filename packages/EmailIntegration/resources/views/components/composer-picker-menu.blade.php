@@ -7,7 +7,7 @@
     'emptyLabel' => null,
     /** 'wire' binds the expression to wire:click, 'alpine' to x-on:click. */
     'handler' => 'wire',
-    /** Builds the click expression for an option id (null = the "none" row). */
+    /** Builds the click expression for an option id. */
     'click',
     /** Optional trailing row that creates a new option; bound to wire:click. */
     'createLabel' => null,
@@ -30,7 +30,7 @@
         </button>
     </x-slot>
 
-    @if ($options !== [] || filled($emptyLabel))
+    @if ($options !== [] || filled($emptyLabel) || filled($noneLabel))
         <x-filament::dropdown.list>
             @foreach ($options as $id => $name)
                 <x-filament::dropdown.list.item
@@ -41,24 +41,9 @@
                 </x-filament::dropdown.list.item>
             @endforeach
 
-            @if ($options === [] && filled($emptyLabel))
-                <p class="composer-picker-note">{{ $emptyLabel }}</p>
+            @if ($options === [] && filled($emptyLabel ?? $noneLabel))
+                <p class="composer-picker-note">{{ $emptyLabel ?? $noneLabel }}</p>
             @endif
-        </x-filament::dropdown.list>
-    @endif
-
-    @if (filled($noneLabel))
-        <x-filament::dropdown.list>
-            <button
-                type="button"
-                @class([
-                    'composer-picker-note',
-                    'is-current' => blank($selected),
-                ])
-                {!! new \Illuminate\View\ComponentAttributeBag($bind(null)) !!}
-            >
-                {{ $noneLabel }}
-            </button>
         </x-filament::dropdown.list>
     @endif
 

@@ -27,7 +27,7 @@
                 class="shrink-0"
             />
             @if (count($accountOptions) > 1)
-                <select wire:model.live="accountId" class="composer-from-select border-0 bg-transparent text-sm text-gray-900 focus:ring-0 dark:text-gray-100">
+                <select wire:model.live="accountId" class="field-sizing-content w-fit max-w-full cursor-pointer rounded-md border-0 bg-transparent ps-1.5 pe-5 -ms-1.5 text-sm text-gray-900 hover:bg-gray-100 focus:ring-0 focus-visible:bg-gray-100 focus-visible:outline-none dark:text-gray-100 dark:hover:bg-white/10 dark:focus-visible:bg-white/10">
                     @foreach ($accountOptions as $id => $label)
                         <option value="{{ $id }}">{{ $label }}</option>
                     @endforeach
