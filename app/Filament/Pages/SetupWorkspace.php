@@ -225,9 +225,7 @@ final class SetupWorkspace extends Page
         return collect(SaveOnboardingSharing::OFFERED_TIERS)
             ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => [
                 'label' => $tier->getLabel(),
-                'description' => __($tier === EmailPrivacyTier::SUBJECT
-                    ? 'filament/pages/workspaces.setup_workspace.sharing.subject_description'
-                    : 'filament/pages/workspaces.setup_workspace.sharing.participants_description'),
+                'description' => $tier->getDescription(),
                 'subjectShown' => $tier === EmailPrivacyTier::SUBJECT,
             ]])
             ->all();

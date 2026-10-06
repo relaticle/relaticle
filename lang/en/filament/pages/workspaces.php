@@ -89,8 +89,6 @@ return [
             'heading' => 'Choose what your team sees',
             'description' => 'Your mailbox is syncing. Only you can read your emails. Pick how they appear to other members.',
             'connected' => 'Connected',
-            'participants_description' => 'Other members see who wrote and when. Subject and message stay private.',
-            'subject_description' => 'Other members also see the subject line. The message stays private unless you share it.',
             'footer' => 'You can change this any time in settings.',
         ],
         'preview' => [

@@ -971,7 +971,11 @@ describe('connect email', function (): void {
 
         $setup = livewire(SetupWorkspace::class)
             ->assertSee(EmailPrivacyTier::METADATA_ONLY->getLabel())
+            ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
+            ->assertSee('Subject and message stay private.')
             ->assertSee(EmailPrivacyTier::SUBJECT->getLabel())
+            ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
+            ->assertSee('The message stays private unless you share it.')
             ->assertDontSee(EmailPrivacyTier::FULL->getLabel())
             ->assertDontSee(EmailPrivacyTier::PRIVATE->getLabel());
 

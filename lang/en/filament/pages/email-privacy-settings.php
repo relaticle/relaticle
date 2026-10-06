@@ -117,11 +117,11 @@ return [
         ],
         'metadata_only' => [
             'label' => 'Participants only',
-            'description' => 'Your workspace sees the participants and timestamp.',
+            'description' => 'Your workspace sees the participants and timestamp. Subject and message stay private.',
         ],
         'subject' => [
             'label' => 'Subject line and participants',
-            'description' => 'Your workspace sees the subject line, participants, and timestamp.',
+            'description' => 'Your workspace sees the subject line, participants, and timestamp. The message stays private unless you share it.',
         ],
         'full' => [
             'label' => 'Full access',
