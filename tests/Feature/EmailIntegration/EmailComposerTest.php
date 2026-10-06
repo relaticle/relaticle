@@ -11,6 +11,9 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
@@ -28,8 +31,11 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Livewire\EmailComposer;
+use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -46,7 +52,7 @@ use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
 use function Pest\Laravel\actingAs;
 
-mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, ComposerInlineImage::class);
+mutates(EmailComposer::class, SaveEmailDraftAction::class, DeleteEmailDraftAction::class, RecipientSuggestionService::class, ConnectedAccount::class, QueuedSendNotifier::class, ComposerInlineImage::class, EmailTemplateForm::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1843,6 +1849,41 @@ it('fills subject and body from a template and keeps the signature below it', fu
     $email = Email::query()->where('subject', 'Renewal options')->sole();
     expect($email->body->body_html)->toContain('Here are your options.')
         ->and($email->body->body_html)->toContain('Ada');
+});
+
+it('saves a template from the composer with the templates page message editor', function (): void {
+    $fromTemplates = null;
+
+    Livewire::test(TemplatesTable::class)
+        ->mountTableAction('create')
+        ->assertSchemaComponentExists('body_html', checkComponentUsing: function (RichEditor $editor) use (&$fromTemplates): bool {
+            $fromTemplates = [
+                'toolbar' => $editor->getToolbarButtons(),
+                'tags' => $editor->getMergeTags(),
+                'panel' => $editor->getActivePanel(),
+            ];
+
+            return $fromTemplates['panel'] === 'mergeTags';
+        });
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Renewal outreach')
+        ->set('bodyHtml', '<p>Here are your options.</p><div data-type="customBlock" data-id="'.SignatureBlock::ID.'"></div>')
+        ->mountAction('createTemplate')
+        ->assertSchemaComponentExists('name', checkComponentUsing: fn (TextInput $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.name.label'))
+        ->assertSchemaComponentExists('subject', checkComponentUsing: fn (TextInput $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.subject.label'))
+        ->assertSchemaComponentExists('is_shared', checkComponentUsing: fn (Toggle $field): bool => $field->getLabel() === __('filament/resources/email-template.fields.is_shared.label'))
+        ->assertSchemaStateSet([
+            'name' => 'Renewal outreach',
+            'subject' => 'Renewal outreach',
+            'body_html' => '<p>Here are your options.</p>',
+        ])
+        ->assertSchemaComponentExists('body_html', checkComponentUsing: function (RichEditor $editor) use ($fromTemplates): bool {
+            return $editor->getToolbarButtons() === $fromTemplates['toolbar']
+                && $editor->getMergeTags() === $fromTemplates['tags']
+                && $editor->getActivePanel() === $fromTemplates['panel'];
+        });
 });
 
 it('saves the current message as a template from the composer', function (): void {

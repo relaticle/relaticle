@@ -5,6 +5,12 @@ declare(strict_types=1);
 return [
     'navigation_label' => 'Templates',
     'fields' => [
+        'name' => [
+            'label' => 'Template name',
+        ],
+        'subject' => [
+            'label' => 'Subject',
+        ],
         'body_html' => [
             'label' => 'Body',
         ],

@@ -48,6 +48,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -1482,23 +1483,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'subject' => $this->subject,
                 'body_html' => resolve(EmailTemplateRenderService::class)->stripSignatureBlock($this->bodyHtmlValue()),
             ])
-            ->schema([
-                TextInput::make('name')
-                    ->label(__('filament/emails/composer.fields.template_name'))
-                    ->required()
-                    ->maxLength(100),
-                TextInput::make('subject')
-                    ->label(__('filament/emails/composer.fields.subject'))
-                    ->required()
-                    ->maxLength(255),
-                RichEditor::make('body_html')
-                    ->label(__('filament/emails/composer.fields.message'))
-                    ->required()
-                    ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                    ->toolbarButtons(['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList']),
-                Toggle::make('is_shared')
-                    ->label(__('filament/emails/composer.fields.template_shared')),
-            ])
+            ->schema(fn (Schema $schema): Schema => EmailTemplateForm::configure($schema))
             ->action(function (array $data, CreateEmailTemplateAction $createEmailTemplate): void {
                 $createEmailTemplate->execute($this->authUser(), [
                     'name' => $data['name'],

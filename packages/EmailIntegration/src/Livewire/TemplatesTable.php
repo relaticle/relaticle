@@ -17,6 +17,7 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 
 /**
@@ -50,7 +51,7 @@ final class TemplatesTable extends Component implements HasActions, HasSchemas, 
             ->model(EmailTemplate::class)
             ->label(__('filament/resources/email-template.actions.create.label'))
             ->icon('heroicon-o-plus')
-            ->schema(fn (Schema $schema): Schema => EmailTemplateResource::form($schema))
+            ->schema(fn (Schema $schema): Schema => EmailTemplateForm::configure($schema))
             ->mutateFormDataUsing(function (array $data): array {
                 $data['workspace_id'] = filament()->getTenant()?->getKey();
                 $data['created_by'] = auth()->id();
