@@ -35,7 +35,9 @@ final readonly class AutoCreateCompanyAction
     {
         $host = $this->domainMatcher->host($domain);
 
-        return CurrentSource::during(CreationSource::MAILBOX, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
+        $source = CurrentSource::bound() ?? CreationSource::MAILBOX;
+
+        return CurrentSource::during($source, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.

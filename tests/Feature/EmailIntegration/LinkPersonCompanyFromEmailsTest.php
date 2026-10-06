@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\People\CreatePeople;
 use App\Actions\People\UpdatePeople;
-use App\Events\WorkspaceCreated;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\People\CreatePeopleTool;
@@ -15,7 +14,6 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\ImportWizard\Data\ColumnData;
@@ -244,7 +242,6 @@ it('links a company when a work email is added later on the panel', function ():
 });
 
 it('creates and links a company from a work email on CSV import', function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
     $this->actingAs($this->user);
     Filament::setTenant($this->workspace);
 

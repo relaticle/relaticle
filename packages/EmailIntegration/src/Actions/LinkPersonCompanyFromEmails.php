@@ -57,7 +57,7 @@ final readonly class LinkPersonCompanyFromEmails
             $company = $this->domainMatcher->firstMatching($workDomain, $workspaceId);
 
             if (! $company instanceof Company && $workspace->auto_create_companies) {
-                $company = $this->autoCreateCompany->execute($workDomain, $workspaceId, $workspace);
+                $company = $this->autoCreateCompany->execute($workDomain, $workspaceId);
             }
 
             if (! $company instanceof Company) {

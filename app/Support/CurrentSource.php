@@ -25,12 +25,17 @@ final readonly class CurrentSource
 
     public static function get(): CreationSource
     {
+        return self::bound() ?? CreationSource::WEB;
+    }
+
+    public static function bound(): ?CreationSource
+    {
         $value = Context::getHidden(self::KEY);
 
         if (! is_string($value)) {
-            return CreationSource::WEB;
+            return null;
         }
 
-        return CreationSource::tryFrom($value) ?? CreationSource::WEB;
+        return CreationSource::tryFrom($value);
     }
 }
