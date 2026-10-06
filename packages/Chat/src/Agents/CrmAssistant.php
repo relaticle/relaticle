@@ -535,7 +535,7 @@ PROMPT;
         }
 
         if ($facts->hasNonSampleRecord($workspace)) {
-            return "alongside records synced from the user's mailbox";
+            return 'alongside records synced from a connected mailbox';
         }
 
         return 'and the workspace holds only sample records so far';

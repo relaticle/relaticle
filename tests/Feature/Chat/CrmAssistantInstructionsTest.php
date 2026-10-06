@@ -360,7 +360,7 @@ it('does not call mail-synced records sample data in the workspace_state block',
 
     expect($agent->dynamicInstructions())
         ->toContain('<workspace_state>')
-        ->toContain("alongside records synced from the user's mailbox")
+        ->toContain('alongside records synced from a connected mailbox')
         ->not->toContain('only sample records')
         ->not->toContain("alongside the user's own records");
 });
