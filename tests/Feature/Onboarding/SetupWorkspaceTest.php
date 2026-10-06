@@ -31,6 +31,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
@@ -56,6 +57,20 @@ function workspaceInSetup(User $user, string $name = 'Northwind Studio'): Worksp
     Filament::setTenant($workspace);
 
     return $workspace;
+}
+
+/**
+ * @return list<string>
+ */
+function emphasizedProviderButtons(Testable $setup): array
+{
+    preg_match_all('/<button\b[^>]*\bdata-provider="(?<provider>[a-z]+)"[^>]*>/s', $setup->html(), $buttons, PREG_SET_ORDER);
+
+    return collect($buttons)
+        ->filter(fn (array $button): bool => str_contains($button[0], 'data-emphasized="true"'))
+        ->map(fn (array $button): string => $button['provider'])
+        ->values()
+        ->all();
 }
 
 function bindSeederFailingOnAQuery(): void
@@ -823,6 +838,49 @@ describe('connect email', function (): void {
         ['google', 'gmail', 'azure'],
         ['microsoft', 'azure', 'gmail'],
     ]);
+
+    it('emphasizes only the button of the provider the owner signed up with', function (string $socialProvider, string $expected): void {
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => $socialProvider]);
+        workspaceInSetup($user);
+
+        expect(emphasizedProviderButtons(livewire(SetupWorkspace::class)))->toBe([$expected]);
+    })->with([
+        ['google', 'gmail'],
+        ['microsoft', 'azure'],
+    ]);
+
+    it('emphasizes no button when nothing hints at a provider', function (): void {
+        workspaceInSetup(User::factory()->create(['email' => 'olivia@northwind.test']));
+
+        expect(emphasizedProviderButtons(livewire(SetupWorkspace::class)))->toBe([]);
+    });
+
+    it('lets the most recently linked provider win when both are linked', function (string $first, string $second, string $expected): void {
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => $first, 'created_at' => now()->subDays(2)]);
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => $second, 'created_at' => now()->subDay()]);
+        workspaceInSetup($user);
+
+        expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBe($expected);
+    })->with([
+        ['google', 'microsoft', 'azure'],
+        ['microsoft', 'google', 'gmail'],
+    ]);
+
+    it('refuses to save the use case while the workspace is still on the connect step', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+            ->call('saveUseCase')
+            ->assertStatus(409);
+
+        expect($workspace->fresh())
+            ->onboarding_use_case->toBeNull()
+            ->onboarding_other_use_case->toBeNull()
+            ->onboarding_step->toBe(OnboardingStep::Email);
+    });
 
     it('reads the provider from a consumer mail domain when there is no social sign-in', function (string $email, ?string $expected): void {
         workspaceInSetup(User::factory()->create(['email' => $email]));

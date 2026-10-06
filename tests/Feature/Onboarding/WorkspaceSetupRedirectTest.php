@@ -87,7 +87,7 @@ it('leaves a paused workspace in setup to billing instead of looping', function 
     $this->get($this->setupUrl)->assertRedirect($billingUrl);
 });
 
-it('returns the owner to setup from billing once the workspace is no longer paused', function (): void {
+it('sends the owner of an unfinished workspace to setup from billing while the workspace has access', function (): void {
     $this->actingAs($this->owner)
         ->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
         ->assertRedirect($this->setupUrl);

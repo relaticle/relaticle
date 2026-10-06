@@ -23,6 +23,7 @@
                 wire:loading.attr="disabled"
                 wire:target="connectMailbox"
                 data-provider="{{ $provider }}"
+                @if ($emphasized === $provider) data-emphasized="true" @endif
                 @class([
                     'flex h-11 w-full items-center justify-center gap-2.5 rounded-lg text-sm font-medium transition',
                     'bg-gray-900 text-white shadow-sm hover:bg-gray-800 dark:bg-white dark:text-gray-950 dark:hover:bg-gray-100' => $emphasized === $provider,
