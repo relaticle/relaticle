@@ -77,7 +77,7 @@ final readonly class CallbackController
         $user = auth()->user();
 
         if (! in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
-            return $this->redirectWithError($user, 'That email provider is not supported.');
+            return $this->redirectWithError($request, $user, 'That email provider is not supported.');
         }
 
         // Both 'gmail' (registered in EmailIntegrationServiceProvider from services.gmail)
@@ -89,11 +89,11 @@ final readonly class CallbackController
         } catch (InvalidStateException) {
             Log::warning('OAuth callback state mismatch.', ['provider' => $provider, 'user_id' => $user->getKey()]);
 
-            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.', $this->boundWorkspace($request, $user));
+            return $this->redirectWithError($request, $user, 'Your sign-in session expired. Please reconnect the account.', $this->boundWorkspace($request, $user));
         } catch (Throwable $e) {
             Log::error('OAuth callback failed.', ['provider' => $provider, 'user_id' => $user->getKey(), 'exception' => $e]);
 
-            return $this->redirectWithError($user, 'We could not connect that account. Please try again.', $this->boundWorkspace($request, $user));
+            return $this->redirectWithError($request, $user, 'We could not connect that account. Please try again.', $this->boundWorkspace($request, $user));
         }
 
         throw_unless($socialUser instanceof TwoUser, RuntimeException::class, "Socialite driver [{$provider}] returned an unexpected user type.");
@@ -101,11 +101,11 @@ final readonly class CallbackController
         $workspace = $this->consumeBoundWorkspace($request, $user);
 
         if (! $workspace instanceof Workspace) {
-            return $this->redirectWithError($user, 'Your sign-in session expired. Please reconnect the account.');
+            return $this->redirectWithError($request, $user, 'Your sign-in session expired. Please reconnect the account.');
         }
 
         if (! $this->grantsMailRead($provider, $socialUser->approvedScopes)) {
-            return $this->redirectWithError($user, 'Relaticle needs permission to read your mail. Reconnect and allow every permission.', $workspace);
+            return $this->redirectWithError($request, $user, 'Relaticle needs permission to read your mail. Reconnect and allow every permission.', $workspace);
         }
 
         $this->connect($user, $workspace, $provider, $socialUser);
@@ -153,8 +153,14 @@ final readonly class CallbackController
         return MailboxOAuthWorkspace::forUser($user, $request->session()->pull(RedirectController::WORKSPACE_SESSION_KEY));
     }
 
-    private function redirectWithError(User $user, string $message, ?Workspace $workspace = null): RedirectResponse
+    private function redirectWithError(Request $request, User $user, string $message, ?Workspace $workspace = null): RedirectResponse
     {
+        $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
+
+        if (is_string($returnUrl)) {
+            return redirect($returnUrl)->with('error', $message);
+        }
+
         $workspace ??= $user->currentWorkspace;
 
         if ($workspace === null) {

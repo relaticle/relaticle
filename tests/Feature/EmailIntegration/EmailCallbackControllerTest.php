@@ -87,6 +87,37 @@ it('returns to the page that started the connect with a success notification', f
     expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
 });
 
+it('returns a failed connect to the page that started it', function (): void {
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+
+    Socialite::shouldReceive('driver')->andReturnSelf();
+    Socialite::shouldReceive('user')->andThrow(new InvalidStateException);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup')
+        ->assertSessionHas('error', 'Your sign-in session expired. Please reconnect the account.');
+
+    expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
+});
+
+it('returns to the page that started the connect when the mail read permission was declined', function (): void {
+    Bus::fake();
+
+    $social = connectedGmailUser();
+    $social->approvedScopes = ['openid', 'https://www.googleapis.com/auth/gmail.send'];
+
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup')
+        ->assertSessionHas('error', 'Relaticle needs permission to read your mail. Reconnect and allow every permission.');
+
+    expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
+});
+
 it('lands on the account settings after a connect with no return page', function (): void {
     Bus::fake();
 

@@ -45,3 +45,14 @@ it('includes Calendars.ReadWrite even when the leftover capability query is sent
     expect($response->headers->get('Location'))
         ->toContain(urlencode('https://graph.microsoft.com/Calendars.ReadWrite'));
 });
+
+it('opens Microsoft on the signed-in address', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email' => 'olivia@northwind.test']);
+    $this->actingAs($user);
+
+    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('azure', $user->currentWorkspace))
+        ->headers->get('Location');
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+    expect($query['login_hint'] ?? null)->toBe('olivia@northwind.test');
+});
