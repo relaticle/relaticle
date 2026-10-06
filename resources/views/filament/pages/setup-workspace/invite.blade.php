@@ -90,6 +90,7 @@
                     data-invite-link-manual
                     x-ref="link"
                     x-on:click="$el.select(); $el.scrollLeft = 0"
+                    x-on:keydown.enter.prevent
                 />
             </x-filament::input.wrapper>
         @endif

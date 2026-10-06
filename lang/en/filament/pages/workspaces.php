@@ -105,8 +105,8 @@ return [
             'create_link' => 'Create link',
             'send_and_start' => 'Send invites and get started',
             'not_sent' => [
-                'title' => 'Invitations were not sent',
-                'body' => 'Your workspace is ready. Invite people again from Members in settings.',
+                'title' => 'Some invitations were not sent',
+                'body' => 'Your workspace is ready. Check Members in settings and invite anyone missing.',
             ],
         ],
         'preview' => [
