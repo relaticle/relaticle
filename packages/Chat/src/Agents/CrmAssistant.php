@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
+use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
@@ -519,13 +520,25 @@ PROMPT;
         }
 
         $count = $facts->sampleRecordCount($this->workspace);
-        $qualifier = $facts->hasOwnRecord($this->workspace)
-            ? "alongside the user's own records"
-            : 'and the workspace holds only sample records so far';
+        $source = CreationSource::SAMPLE->value;
+        $qualifier = $this->sampleQualifier($facts, $this->workspace);
 
         return "\n\n<workspace_state>\n"
-            ."This workspace contains {$count} seeded sample records (creation source \"system\") {$qualifier}.\n"
+            ."This workspace contains {$count} seeded sample records (creation source \"{$source}\") {$qualifier}.\n"
             .'</workspace_state>';
+    }
+
+    private function sampleQualifier(WorkspaceActivationFacts $facts, Workspace $workspace): string
+    {
+        if ($facts->hasOwnRecord($workspace)) {
+            return "alongside the user's own records";
+        }
+
+        if ($facts->hasNonSampleRecord($workspace)) {
+            return "alongside records synced from the user's mailbox";
+        }
+
+        return 'and the workspace holds only sample records so far';
     }
 
     private function turnBlock(): string
