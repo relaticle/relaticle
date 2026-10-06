@@ -612,6 +612,7 @@ it('aborts the use case step for a workspace that already has a use case', funct
 describe('connect email', function (): void {
     beforeEach(function (): void {
         Feature::define(EmailIntegration::class, true);
+        config()->set('services.azure.client_id', 'azure-client');
     });
 
     it('starts a new workspace on the connect step', function (): void {
@@ -624,6 +625,44 @@ describe('connect email', function (): void {
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.skip'));
+    });
+
+    it('offers only Google when no Microsoft client is configured', function (): void {
+        config()->set('services.azure.client_id');
+        workspaceInSetup(User::factory()->create());
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
+            ->assertSeeHtml('data-provider="gmail"')
+            ->assertDontSeeHtml('data-provider="azure"');
+
+        expect($setup->instance()->offeredProviders())->toBe(['gmail']);
+    });
+
+    it('offers both providers once the Microsoft client is configured', function (): void {
+        workspaceInSetup(User::factory()->create());
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
+            ->assertSeeHtmlInOrder(['data-provider="gmail"', 'data-provider="azure"']);
+
+        expect($setup->instance()->offeredProviders())->toBe(['gmail', 'azure']);
+    });
+
+    it('emphasizes no provider the install does not offer', function (): void {
+        config()->set('services.azure.client_id');
+        $user = User::factory()->create();
+        UserSocialAccount::factory()->for($user)->create(['provider_name' => 'microsoft']);
+        workspaceInSetup($user);
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'));
+
+        expect($setup->instance()->emphasizedProvider())->toBeNull()
+            ->and($setup->instance()->offeredProviders())->toBe(['gmail']);
     });
 
     it('sends each provider button through the signed redirect and back to setup', function (string $provider): void {

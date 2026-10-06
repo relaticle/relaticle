@@ -1,6 +1,6 @@
 @php
     $emphasized = $this->emphasizedProvider();
-    $providers = $emphasized === 'azure' ? ['azure', 'gmail'] : ['gmail', 'azure'];
+    $providers = $this->offeredProviders();
     $labels = [
         'gmail' => __('filament/pages/workspaces.setup_workspace.email.google'),
         'azure' => __('filament/pages/workspaces.setup_workspace.email.microsoft'),

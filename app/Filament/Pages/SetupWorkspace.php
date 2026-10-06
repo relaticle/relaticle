@@ -28,6 +28,7 @@ use Filament\Support\Facades\FilamentView;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Override;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 /**
@@ -152,7 +153,22 @@ final class SetupWorkspace extends Page
 
     public function emphasizedProvider(): ?string
     {
-        return MailboxProviderHint::for($this->authUser());
+        $hinted = MailboxProviderHint::for($this->authUser());
+
+        return in_array($hinted, $this->configuredProviders(), true) ? $hinted : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function offeredProviders(): array
+    {
+        $configured = $this->configuredProviders();
+        $emphasized = $this->emphasizedProvider();
+
+        return $emphasized === null
+            ? $configured
+            : [$emphasized, ...array_values(array_diff($configured, [$emphasized]))];
     }
 
     public function step(): OnboardingStep
@@ -203,6 +219,17 @@ final class SetupWorkspace extends Page
             'maxContentWidth' => $this->getMaxContentWidth(),
             'maxWidth' => $this->getMaxContentWidth(),
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function configuredProviders(): array
+    {
+        return array_values(array_map(
+            fn (EmailProvider $provider): string => $provider->value,
+            array_filter(EmailProvider::cases(), fn (EmailProvider $provider): bool => $provider->isConfigured()),
+        ));
     }
 
     private function leaveMailboxStepWhenSettled(Workspace $workspace): void
