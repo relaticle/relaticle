@@ -523,7 +523,7 @@ it('shows the invite row to the owner and hides it from a member', function (): 
         ->assertDontSee(__('filament/pages/dashboard.activation.invite_members'));
 });
 
-it('offers to remove sample data only once the workspace has an own record', function (): void {
+it('offers to remove sample data only once the workspace holds a record that is not a sample', function (): void {
     seedSampleRecords($this->workspace, $this->owner);
 
     livewire(ActivationChecklist::class)
@@ -569,7 +569,7 @@ it('removes sample data and keeps the records a mailbox sync created', function 
 
     livewire(ActivationChecklist::class)->call('removeSampleData');
 
-    expect($synced->fresh())->not->toBeNull()
+    expect(People::query()->whereKey($synced->getKey())->exists())->toBeTrue()
         ->and(People::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SAMPLE)->exists())->toBeFalse();
 });
 
@@ -611,7 +611,7 @@ it('keeps the contacts a mailbox sync created when removing sample data', functi
     expect(People::query()->whereKey($synced->getKey())->exists())->toBeTrue();
 });
 
-it('refuses removal while the workspace has no own record', function (): void {
+it('refuses removal while the workspace holds nothing but sample records', function (): void {
     seedSampleRecords($this->workspace, $this->owner);
 
     livewire(ActivationChecklist::class)
