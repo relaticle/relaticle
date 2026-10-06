@@ -16,6 +16,9 @@
         get showBoard() {
             return @js($hasStages && $panel === 'board')
         },
+        get activeNavigation() {
+            return this.showBoard ? 'opportunities' : @js($idleNavigationKey)
+        },
         get spotlight() {
             return @js($interactive) && wizardStep === 0 ? (focused ?? hovered) : null
         },
@@ -67,7 +70,9 @@
                     @foreach ($preview['navigationIcons'] as $key => $icon)
                         <div
                             class="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-300"
-                            x-bind:class="(showBoard ? 'opportunities' : @js($idleNavigationKey)) === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
+                            data-preview-nav="{{ $key }}"
+                            x-bind:data-active="activeNavigation === @js($key)"
+                            x-bind:class="activeNavigation === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
                         >
                             <x-filament::icon :icon="$icon" class="size-4 shrink-0" />
                             <span @class(['h-1.5 rounded-full bg-current opacity-25', $barWidths[$key] ?? 'w-12'])></span>
@@ -175,6 +180,7 @@
                     @foreach ($preview['stages'] as $position => $stage)
                         <div
                             class="w-[7.25rem] shrink-0 self-start rounded-xl bg-gray-100/80 p-1.5 dark:bg-white/5"
+                            data-preview-stage="{{ $stage['name'] }}"
                             x-show="showBoard"
                             x-transition:enter="transition duration-500 ease-out"
                             x-transition:enter-start="translate-y-3 opacity-0"

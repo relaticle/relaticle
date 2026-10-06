@@ -6,12 +6,50 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
+use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Services\WorkspaceActivationFacts;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
+use Pest\Browser\Api\AwaitableWebpage;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Symfony\Component\DomCrawler\Crawler;
 
-mutates(CreateWorkspace::class);
+mutates(CreateWorkspace::class, SetupWorkspace::class);
+
+function delaySetupPageFetch(AwaitableWebpage $page): void
+{
+    $page->script(<<<'JS'
+        (() => {
+            if (window.setupFetchDelayed) {
+                return;
+            }
+
+            window.setupFetchDelayed = true;
+            const nativeFetch = window.fetch;
+
+            window.fetch = (input, init) => /\/setup$/.test(String(input?.url ?? input))
+                ? new Promise((resolve) => setTimeout(resolve, 300)).then(() => nativeFetch(input, init))
+                : nativeFetch(input, init);
+        })()
+    JS);
+}
+
+function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
+{
+    return loginViaBrowser($user)
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->type('[id="form.name"]', $name)
+        ->type('[id="form.slug"]', $slug)
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('How did you hear about us?')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertPathIs("/app/{$slug}/setup");
+}
 
 it('records onboarding conversions after navigation without counting them again', function (string $event): void {
     $page = visit('/app/login');
@@ -45,29 +83,38 @@ it('records onboarding conversions after navigation without counting them again'
         ->assertNoJavaScriptErrors();
 })->with(['signup', 'workspace_created']);
 
-it('new user without workspaces is directed to onboarding wizard', function (): void {
+it('walks a new owner through every setup screen to the setup conversation', function (): void {
     Feature::define(SetupConversation::class, true);
+    config()->set('services.azure.client_id', 'azure-client');
     Queue::fake();
 
     $user = User::factory()->create();
 
-    loginViaBrowser($user)
+    $page = loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
-        ->assertSee('Your name')
-        // Step 1: Create workspace
-        ->type('[id="form.name"]', 'My First Workspace')
+        ->assertSee('Your name');
+
+    delaySetupPageFetch($page);
+
+    $page->type('[id="form.name"]', 'My First Workspace')
         ->type('[id="form.slug"]', 'my-first-workspace')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        // Step 2: Attribution (optional, just proceed)
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertPathIs('/app/my-first-workspace/setup')
+        ->assertSee('Continue with Google')
+        ->assertSee('Continue with Microsoft')
+        ->press('Skip for now')
         ->waitForText('Help us customize your workspace')
-        // Step 3: Use case (select "Other" which has no sub-options)
         ->click('[for$="onboarding_use_case-other"]')
         ->press('Get started')
-        ->assertPathContains('/my-first-workspace/chats/');
+        ->waitForText('Invite your team')
+        ->press('Get started')
+        ->assertPathContains('/my-first-workspace/chats/')
+        ->assertNoJavaScriptErrors();
 
     $user->refresh();
 
@@ -75,7 +122,99 @@ it('new user without workspaces is directed to onboarding wizard', function (): 
 
     expect($user->ownedWorkspaces)->toHaveCount(1)
         ->and($workspace->name)->toBe('My First Workspace')
+        ->and($workspace->onboarding_step)->toBeNull()
         ->and($workspace->setupConversation)->not->toBeNull();
+});
+
+it('returns an owner who left mid-setup to the step they were on', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    walkToMailboxStep($user, 'Resume Workspace', 'resume-workspace')
+        ->navigate('/app/resume-workspace')
+        ->assertPathIs('/app/resume-workspace/setup')
+        ->assertSee('Start with the people you already email')
+        ->press('Skip for now')
+        ->waitForText('Help us customize your workspace')
+        ->navigate('/app/resume-workspace/companies')
+        ->assertPathIs('/app/resume-workspace/setup')
+        ->assertSee('Help us customize your workspace')
+        ->assertDontSee('Start with the people you already email');
+});
+
+it('stores the sharing level an owner picks after a mailbox is connected', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    $page = walkToMailboxStep($user, 'Northwind Studio', 'northwind-studio');
+
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => Workspace::query()->where('slug', 'northwind-studio')->value('id'),
+        'email_address' => 'olivia@northwind.test',
+    ]));
+
+    app()->forgetInstance(WorkspaceActivationFacts::class);
+
+    $page->navigate('/app/northwind-studio/setup')
+        ->waitForText('Choose what your team sees')
+        ->assertSee('olivia@northwind.test')
+        ->assertSee('Subject line and participants')
+        ->click('[data-tier="subject"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Help us customize your workspace')
+        ->assertDontSee('Choose what your team sees');
+
+    expect($user->refresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('moves the preview panel with the setup step', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $activeNavigation = 'document.querySelector("[data-preview-nav][data-active]")?.dataset.previewNav';
+    $visibleStages = '[...document.querySelectorAll("[data-preview-stage]")].filter(stage => stage.offsetParent !== null).map(stage => stage.dataset.previewStage)';
+
+    walkToMailboxStep($user, 'Hiring Desk', 'hiring-desk')
+        ->assertScript($activeNavigation, 'people')
+        ->assertScript($visibleStages, [])
+        ->press('Skip for now')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript($activeNavigation, 'dashboard')
+        ->assertScript($visibleStages, [])
+        ->click('[for$="onboarding_use_case-recruiting"]')
+        ->waitForText('Pick what applies to you.')
+        ->assertScript($activeNavigation, 'opportunities')
+        ->assertScript($visibleStages, array_keys(OnboardingUseCase::Recruiting->pipelineStages()))
+        ->press('Back')
+        ->waitForText('Start with the people you already email')
+        ->assertScript($activeNavigation, 'people')
+        ->assertScript($visibleStages, []);
+});
+
+it('changes the invite button when an address is typed and confirms the copied link', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
+        ->press('Skip for now')
+        ->waitForText('Help us customize your workspace')
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('Get started')
+        ->waitForText('Invite your team')
+        ->assertDontSee('Send invites and get started')
+        ->type('[id="form.emails"]', 'maya@acme.com')
+        ->assertSee('Send invites and get started');
+
+    $page->assertSee('Copy link')
+        ->script('navigator.clipboard.writeText = () => Promise.resolve()');
+
+    $page->assertDontSee('Link copied.')
+        ->press('Copy link')
+        ->assertSee('Link copied.');
 });
 
 it('stores the use case and its sub-option chosen in the browser', function (): void {
@@ -88,15 +227,20 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
         ->type('[id="form.name"]', 'Hiring Desk')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->press('Skip for now')
         ->waitForText('Help us customize your workspace')
         ->click('[for$="onboarding_use_case-recruiting"]')
         ->waitForText('Pick what applies to you.')
         ->click('[for$="onboarding_context-sourcing"]')
         ->press('Get started')
-        ->assertPathContains('/hiring-desk');
+        ->waitForText('Invite your team')
+        ->press('Get started')
+        ->assertPathIs('/app/hiring-desk')
+        ->assertSee('Workspace created');
 
     $user->refresh();
 
@@ -117,18 +261,23 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
         ->type('[id="form.name"]', 'Assistant Desk')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
         ->assertDontSee('Which assistant was it?')
         ->click('[for$="onboarding_referral_source-ai"]')
         ->waitForText('Which assistant was it?')
         ->click('[for$="onboarding_referral_detail-claude"]')
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->press('Skip for now')
         ->waitForText('Help us customize your workspace')
         ->click('[for$="onboarding_use_case-other"]')
         ->press('Get started')
-        ->assertPathContains('/assistant-desk');
+        ->waitForText('Invite your team')
+        ->press('Get started')
+        ->assertPathIs('/app/assistant-desk')
+        ->assertSee('Workspace created');
 
     $workspace = $user->refresh()->ownedWorkspaces->first();
 
