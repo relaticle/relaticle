@@ -33,6 +33,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -62,13 +63,27 @@ function workspaceInSetup(User $user, string $name = 'Northwind Studio'): Worksp
     return $workspace;
 }
 
-function connectedMailboxFor(User $user, Workspace $workspace): ConnectedAccount
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function connectedMailboxFor(User $user, Workspace $workspace, array $attributes = []): ConnectedAccount
 {
     return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'user_id' => $user->getKey(),
         'workspace_id' => $workspace->getKey(),
         'email_address' => 'olivia@northwind.test',
+        ...$attributes,
     ]));
+}
+
+function mailOf(User $user, Workspace $workspace, ConnectedAccount $account, EmailPrivacyTier $tier): Email
+{
+    return Email::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'connected_account_id' => $account->getKey(),
+        'privacy_tier' => $tier,
+    ]);
 }
 
 /**
@@ -1101,6 +1116,106 @@ describe('connect email', function (): void {
         'one person' => [1, 'Syncing, 1 person'],
         'several people' => [3, 'Syncing, 3 people'],
     ]);
+
+    it('skips sharing for an owner with a mailbox in another workspace, and leaves that mail alone', function (): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        $other = $user->currentWorkspace;
+        $email = mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
+
+        $workspace = workspaceInSetup($user, 'Second Corp');
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    });
+
+    it('still asks about sharing when the only other mailbox is disconnected', function (): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        connectedMailboxFor($user, $user->currentWorkspace, ['status' => EmailAccountStatus::DISCONNECTED]);
+
+        $workspace = workspaceInSetup($user, 'Second Corp');
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+    });
+
+    it('moves on from sharing when the owner has stored a level elsewhere since', function (EmailPrivacyTier $stored): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+
+        $user->update(['default_email_sharing_tier' => $stored]);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBe($stored);
+    })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
+
+    it('moves on from sharing when the owner has connected a mailbox elsewhere since', function (): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        $other = $user->currentWorkspace;
+        $workspace = workspaceInSetup($user, 'Second Corp');
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+
+        mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+    });
+
+    it('saves nothing when a stale tab continues after the owner stored a level elsewhere', function (EmailPrivacyTier $stored): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        $account = connectedMailboxFor($user, $workspace);
+        $email = mailOf($user, $workspace, $account, EmailPrivacyTier::METADATA_ONLY);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        $user->update(['default_email_sharing_tier' => $stored]);
+
+        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)->call('saveSharing');
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBe($stored)
+            ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+    })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
+
+    it('saves nothing when a stale tab continues after the owner connected a mailbox elsewhere', function (): void {
+        $user = User::factory()->withPersonalWorkspace()->create();
+        $other = $user->currentWorkspace;
+        $workspace = workspaceInSetup($user, 'Second Corp');
+        connectedMailboxFor($user, $workspace);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        $otherEmail = mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
+
+        $setup->set('sharingTier', EmailPrivacyTier::METADATA_ONLY->value)->call('saveSharing');
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($otherEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    });
 });
 
 it('starts on the use case when the email feature is off', function (): void {

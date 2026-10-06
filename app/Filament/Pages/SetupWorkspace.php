@@ -151,7 +151,7 @@ final class SetupWorkspace extends Page
 
         $moved = resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
 
-        if (! $moved) {
+        if (! $moved || ! $this->asksForSharing()) {
             return;
         }
 
@@ -327,6 +327,10 @@ final class SetupWorkspace extends Page
         }
 
         if ($workspace->onboarding_step === OnboardingStep::Sharing) {
+            if (! $this->asksForSharing()) {
+                $move->execute($this->authUser(), $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+            }
+
             return;
         }
 
@@ -334,9 +338,15 @@ final class SetupWorkspace extends Page
             return;
         }
 
-        $next = $this->authUser()->default_email_sharing_tier === null ? OnboardingStep::Sharing : OnboardingStep::UseCase;
+        $next = $this->asksForSharing() ? OnboardingStep::Sharing : OnboardingStep::UseCase;
 
         $move->execute($this->authUser(), $workspace, OnboardingStep::Email, $next);
+    }
+
+    private function asksForSharing(): bool
+    {
+        return $this->authUser()->default_email_sharing_tier === null
+            && ! ConnectedAccount::hasConnectedOutside($this->authUser(), $this->workspace);
     }
 
     private function preselectedSharingTier(): string

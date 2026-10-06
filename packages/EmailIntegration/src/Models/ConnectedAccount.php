@@ -282,6 +282,18 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * Whether the user has added a mailbox in any workspace other than the given one.
+     */
+    public static function hasConnectedOutside(User $user, Workspace $workspace): bool
+    {
+        return self::query()
+            ->where('user_id', $user->getKey())
+            ->whereNot('workspace_id', $workspace->getKey())
+            ->connected()
+            ->exists();
+    }
+
+    /**
      * Whether the user has at least one account that is safe to sync or send through.
      */
     public static function hasActiveFor(User $user, ?Workspace $workspace): bool
