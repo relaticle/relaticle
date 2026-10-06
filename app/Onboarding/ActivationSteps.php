@@ -28,13 +28,14 @@ use Spatie\Onboard\OnboardingSteps;
  *
  * Registration order IS display order, and it is ordered by what production
  * data says the step is worth, not by how the feature was built. Measured on
- * the analytics clone (2026-08-23, workspaces at least 8 days old, n=3587, "returned"
- * excluding a later import so importing twice cannot count as returning):
- * a day-0 record predicts a 10.0% return against a 4.0% base, day-0 chat 11.0%,
- * while import reaches 0.5% of workspaces and invite 0.3%. Import and invite
- * stay because they are true facts about the workspace and the setup nudge
- * reads the same registry, but they sit last: a checklist that opens on two
- * rows almost nobody completes reads as unachievable.
+ * the analytics clone on 2026-10-06 (personal workspaces created since
+ * 2026-06-01 and at least 8 days old, n=666, back within 7 days): 3.9% with
+ * neither a record nor a chat on day 0, 7.4% with a chat only, 12.5% with an
+ * own record only, 20.0% with both, while import reaches 0.5% of workspaces
+ * and invite 0.3%. Import and invite stay because they are true facts about
+ * the workspace and the setup nudge reads the same registry, but they sit
+ * last: a checklist that opens on two rows almost nobody completes reads as
+ * unachievable.
  */
 final readonly class ActivationSteps
 {

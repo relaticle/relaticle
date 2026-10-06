@@ -91,7 +91,6 @@ trait RunsInviteStep
                 TextInput::make('emails')
                     ->label(__('filament/pages/workspaces.setup_workspace.invite.emails_label'))
                     ->placeholder(__('filament/pages/workspaces.setup_workspace.invite.emails_placeholder'))
-                    ->helperText(__('filament/pages/workspaces.setup_workspace.invite.emails_helper'))
                     ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
                         $this->failUnsendableInvites(is_string($value) ? $value : '', $fail);
                     }),

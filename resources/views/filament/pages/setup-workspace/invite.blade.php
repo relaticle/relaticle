@@ -15,6 +15,10 @@
 
     <div class="mt-6">
         {{ $this->form }}
+
+        <p class="mt-2 text-sm text-pretty text-gray-600 dark:text-gray-400">
+            {{ __('filament/pages/workspaces.setup_workspace.invite.helper') }}
+        </p>
     </div>
 
     <div class="mt-5 flex items-center justify-between gap-3 border-t border-gray-950/5 pt-4 text-sm text-gray-700 dark:border-white/10 dark:text-gray-300">
