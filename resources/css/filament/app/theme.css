@@ -1252,6 +1252,12 @@ html.fi-record-stacked .fi-record-layout {
 }
 
 /* Onboarding Wizard - split-screen layout overrides */
+html.fi:has(body.fi-onboarding-wizard),
+.fi-body.fi-onboarding-wizard {
+    height: auto;
+    overflow: visible;
+}
+
 .fi-body.fi-onboarding-wizard {
     @apply bg-white dark:bg-gray-950;
 }
