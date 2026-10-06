@@ -98,7 +98,7 @@ return [
             'person' => 'Person',
             'company' => 'Company',
             'from_mailbox' => 'From your mailbox',
-            'syncing' => '{0} Syncing|{1} Syncing, :count person|[2,*] Syncing, :count people',
+            'found' => '{0} Reading your mailbox|{1} :count person found|[2,*] :count people found',
         ],
     ],
 ];

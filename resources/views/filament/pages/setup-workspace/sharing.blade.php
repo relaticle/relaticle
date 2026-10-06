@@ -67,7 +67,7 @@
     @enderror
 
     <div class="mt-auto pt-6">
-        <x-filament::button type="submit" size="lg" class="w-full">
+        <x-filament::button type="submit" size="lg" class="w-full" wire:target="saveSharing">
             {{ __('filament/pages/workspaces.create_workspace.actions.continue') }}
         </x-filament::button>
         <p class="mt-3 flex items-center justify-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">

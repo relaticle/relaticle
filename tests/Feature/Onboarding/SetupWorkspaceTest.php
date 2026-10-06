@@ -1153,13 +1153,13 @@ describe('connect email', function (): void {
 
         $setup = livewire(SetupWorkspace::class);
 
-        expect($setup->instance()->getPreview()['mailboxChip'])->toBe($chip);
+        expect($setup->instance()->getPreview()['mailboxProgress'])->toBe($chip);
 
         $setup->assertSee($chip);
     })->with([
-        'none yet' => [0, 'Syncing'],
-        'one person' => [1, 'Syncing, 1 person'],
-        'several people' => [3, 'Syncing, 3 people'],
+        'none yet' => [0, 'Reading your mailbox'],
+        'one person' => [1, '1 person found'],
+        'several people' => [3, '3 people found'],
     ]);
 
     it('skips sharing for an owner with a mailbox in another workspace, and leaves that mail alone', function (): void {
@@ -1328,7 +1328,7 @@ describe('connect email', function (): void {
             ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'))
             ->assertSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'));
 
-        expect($setup->instance()->getPreview())->not->toHaveKey('mailboxChip');
+        expect($setup->instance()->getPreview())->not->toHaveKey('mailboxProgress');
     })->with([EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
 
     it('promises a sharing choice on the connect step to an owner who will be asked', function (): void {

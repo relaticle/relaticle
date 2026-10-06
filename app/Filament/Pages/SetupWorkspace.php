@@ -269,7 +269,7 @@ final class SetupWorkspace extends Page
         );
 
         if ($this->step() === OnboardingStep::Sharing && $this->connectedMailbox()?->isActive()) {
-            $preview['mailboxChip'] = $this->syncingChip();
+            $preview['mailboxProgress'] = $this->mailboxProgress();
         }
 
         return $preview;
@@ -343,7 +343,7 @@ final class SetupWorkspace extends Page
         return in_array($effective, SaveOnboardingSharing::OFFERED_TIERS, true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;
     }
 
-    private function syncingChip(): string
+    private function mailboxProgress(): string
     {
         $mailboxPeople = People::query()
             ->withoutGlobalScope(WorkspaceScope::class)
@@ -351,7 +351,7 @@ final class SetupWorkspace extends Page
             ->where('creation_source', CreationSource::MAILBOX)
             ->count();
 
-        return trans_choice('filament/pages/workspaces.setup_workspace.preview.syncing', $mailboxPeople);
+        return trans_choice('filament/pages/workspaces.setup_workspace.preview.found', $mailboxPeople);
     }
 
     private function selectedUseCase(): ?OnboardingUseCase
