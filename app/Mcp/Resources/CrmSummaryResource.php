@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Mcp\Resources;
 
-use App\Actions\Crm\GetCrmSummary;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
+use App\Queries\Crm\CrmSummaryQuery;
 use Laravel\Mcp\Enums\Role;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -25,7 +25,7 @@ use Laravel\Mcp\Server\Resource;
 final class CrmSummaryResource extends Resource
 {
     public function __construct(
-        private readonly GetCrmSummary $summary,
+        private readonly CrmSummaryQuery $summary,
     ) {}
 
     public function shouldRegister(): bool
@@ -44,6 +44,6 @@ final class CrmSummaryResource extends Resource
         /** @var User $user */
         $user = $request->user();
 
-        return Response::text(json_encode($this->summary->execute($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        return Response::text(json_encode($this->summary->get($user), JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     }
 }

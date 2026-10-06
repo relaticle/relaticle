@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-use App\Actions\Crm\GetCrmSummary;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\UpdateCustomField;
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Actions\Task\UpdateTask;
 use App\Console\Commands\ResetDemoAccountCommand;
@@ -29,6 +27,8 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use App\Queries\Crm\CrmSummaryQuery;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
@@ -42,13 +42,13 @@ use Relaticle\ImportWizard\Models\Import;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(
-    AggregateOpportunities::class,
+    OpportunityAggregatesQuery::class,
     AggregateOpportunitiesTool::class,
     CreateCustomField::class,
     ResetDemoAccountCommand::class,
     FetchTool::class,
     GetCrmSchemaTool::class,
-    GetCrmSummary::class,
+    CrmSummaryQuery::class,
     GetCrmSummaryTool::class,
     HostedWorkspaceAccess::class,
     ListActivityTool::class,

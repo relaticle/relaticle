@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Actions\Company\ListCompanies;
-use App\Actions\Opportunity\ListOpportunities;
-use App\Actions\People\ListPeople;
 use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Queries\Companies\CompaniesQuery;
+use App\Queries\Concerns\ListsEntity;
+use App\Queries\Opportunities\OpportunitiesQuery;
+use App\Queries\People\PeopleQuery;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
@@ -17,7 +18,7 @@ use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Opportunity\ListOpportunitiesTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool;
 
-mutates(ListOpportunities::class, ListCompanies::class, ListPeople::class);
+mutates(OpportunitiesQuery::class, CompaniesQuery::class, PeopleQuery::class, ListsEntity::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);

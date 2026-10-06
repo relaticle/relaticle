@@ -64,7 +64,7 @@ final readonly class LinkMeetingAction
                 $company = $this->domainMatcher->firstMatching($host, $workspaceId);
 
                 if (! $company && $wouldCreatePerson && $workspace->auto_create_companies) {
-                    $company = $this->autoCreateCompany->execute($host, $workspaceId, $workspace);
+                    $company = $this->autoCreateCompany->execute($host, $workspaceId);
                 }
 
                 if ($company instanceof Company) {

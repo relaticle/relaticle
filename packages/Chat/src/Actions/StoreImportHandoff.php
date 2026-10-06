@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Support\ChatAttachment;
@@ -20,7 +21,7 @@ final readonly class StoreImportHandoff
     public function __construct(
         private TipTapDocumentParser $documents,
         private MarkAttachmentSent $markSent,
-        private ListConversationMessages $messages,
+        private ConversationMessagesQuery $messages,
         private PendingActionService $pendingActions,
     ) {}
 
@@ -78,7 +79,7 @@ final readonly class StoreImportHandoff
             $this->markSent->execute($attachment);
         });
 
-        $assistant = collect($this->messages->execute($user, $conversationId, null, 2))
+        $assistant = collect($this->messages->get($user, $conversationId, null, 2))
             ->firstWhere('id', $assistantMessageId);
 
         return ['user_message_id' => $userMessageId, 'assistant' => $assistant ?? []];

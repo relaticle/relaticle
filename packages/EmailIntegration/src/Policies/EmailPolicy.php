@@ -46,17 +46,13 @@ final readonly class EmailPolicy
     /** Can the viewer see the subject line? */
     public function viewSubject(User $user, Email $email): bool
     {
-        $tier = $this->privacyService->effectiveTier($email, $user);
-
-        return $tier instanceof EmailPrivacyTier && $tier !== EmailPrivacyTier::METADATA_ONLY;
+        return $this->privacyService->effectiveTier($email, $user)?->showsSubject() ?? false;
     }
 
     /** Can the viewer see the body and attachments? */
     public function viewBody(User $user, Email $email): bool
     {
-        $tier = $this->privacyService->effectiveTier($email, $user);
-
-        return $tier === EmailPrivacyTier::FULL;
+        return $this->privacyService->effectiveTier($email, $user)?->showsBody() ?? false;
     }
 
     /** Can the viewer change sharing settings? Owner only. */

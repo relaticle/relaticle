@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Data\ListQuery;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
@@ -17,7 +18,6 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
@@ -69,9 +69,6 @@ abstract class BaseReadListTool implements Tool
     /** @var list<string> */
     private const array ARGUMENTS = ['filter', 'sort', 'per_page', 'page', 'lookup', 'include'];
 
-    /** @return class-string */
-    abstract protected function actionClass(): string;
-
     /** @return class-string<JsonResource> */
     abstract protected function resourceClass(): string;
 
@@ -95,24 +92,13 @@ abstract class BaseReadListTool implements Tool
         return [];
     }
 
-    /**
-     * Native columns every entity can be sorted by; custom-field codes are added
-     * per tenant.
-     *
-     * @return list<string>
-     */
-    protected function nativeSorts(): array
-    {
-        return [$this->entity()->titleColumn(), 'created_at', 'updated_at'];
-    }
-
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
         $entityType = $this->citationType();
 
         $filterDescription = EntityFilters::names($this->entity());
-        $sortable = $this->nativeSorts();
+        $sortable = $this->entity()->query()::sorts();
 
         if ($user instanceof User) {
             $describer = resolve(CustomFieldsFilterDescriber::class);
@@ -165,13 +151,7 @@ abstract class BaseReadListTool implements Tool
 
         try {
             FilterTree::rejectUnknownArguments($request->all(), self::ARGUMENTS);
-            $results = app()->make($this->actionClass())->execute(
-                user: $user,
-                perPage: $this->perPageFor($request),
-                page: isset($request['page']) ? (int) $request['page'] : null,
-                request: $this->buildHttpRequest($request),
-                viewerZone: $user->effectiveTimezone(),
-            );
+            $results = resolve($this->entity()->query())->paginate($user, $this->listQuery($request, $user));
         } catch (ValidationException $exception) {
             return (string) json_encode(['error' => FilterErrors::located($exception)], JSON_UNESCAPED_SLASHES);
         } catch (InvalidQuery $e) {
@@ -631,22 +611,17 @@ abstract class BaseReadListTool implements Tool
         return $ordered;
     }
 
-    private function buildHttpRequest(Request $request): HttpRequest
+    private function listQuery(Request $request, User $user): ListQuery
     {
-        $input = [];
-
-        $filter = $request['filter'] ?? null;
-
-        if (filled($filter)) {
-            $input['filter'] = FilterTree::trimmed($filter);
-        }
-
         $sort = $request['sort'] ?? null;
+        $page = $request['page'] ?? null;
 
-        if (is_string($sort) && $sort !== '') {
-            $input['sort'] = $sort;
-        }
-
-        return new HttpRequest($input);
+        return new ListQuery(
+            filter: FilterTree::trimmed($request['filter'] ?? null),
+            sort: is_string($sort) && $sort !== '' ? $sort : null,
+            perPage: $this->perPageFor($request),
+            page: is_numeric($page) ? (int) min($page, ListQuery::MAX_PAGE) : null,
+            viewerZone: $user->effectiveTimezone(),
+        );
     }
 }

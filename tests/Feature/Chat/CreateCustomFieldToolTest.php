@@ -180,6 +180,17 @@ it('returns error for a non-allowlisted field type', function (): void {
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('refuses to propose a domain field', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Second domains',
+        'type' => 'domain',
+    ]);
+
+    expect($decoded)->toHaveKey('error')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
 it('rejects when over the max_custom_fields_per_entity cap', function (): void {
     config(['chat.max_custom_fields_per_entity' => 2]);
 

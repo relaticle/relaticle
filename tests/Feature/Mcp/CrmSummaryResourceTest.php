@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Crm\GetCrmSummary;
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Mcp\Resources\CrmSummaryResource;
 use App\Mcp\Servers\RelaticleServer;
 use App\Models\Company;
@@ -15,12 +13,14 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Crm\CrmSummaryQuery;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use Laravel\Sanctum\Sanctum;
 
 mutates(
-    AggregateOpportunities::class,
+    OpportunityAggregatesQuery::class,
     CrmSummaryResource::class,
-    GetCrmSummary::class,
+    CrmSummaryQuery::class,
 );
 
 beforeEach(function (): void {
@@ -95,7 +95,7 @@ it('keeps unstaged and orphaned-stage opportunities in separate pipeline buckets
 
     CustomFieldOption::query()->withoutGlobalScopes()->whereKey($optionId)->delete();
 
-    $summary = app(GetCrmSummary::class)->execute($this->user)['opportunities'];
+    $summary = app(CrmSummaryQuery::class)->get($this->user)['opportunities'];
 
     expect($summary['truncated'])->toBeFalse()
         ->and($summary['by_stage'])->toHaveCount(2)

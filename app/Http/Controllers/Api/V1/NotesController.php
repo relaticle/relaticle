@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
-use App\Actions\Note\ListNotes;
 use App\Actions\Note\UpdateNote;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreNoteRequest;
@@ -14,6 +13,7 @@ use App\Http\Requests\Api\V1\UpdateNoteRequest;
 use App\Http\Resources\V1\NoteResource;
 use App\Models\Note;
 use App\Models\User;
+use App\Queries\Notes\NotesQuery;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -30,14 +30,11 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 final readonly class NotesController
 {
     #[ResponseFromApiResource(NoteResource::class, Note::class, collection: true, paginate: 15)]
-    public function index(IndexRequest $request, ListNotes $action, #[CurrentUser] User $user): AnonymousResourceCollection
+    public function index(IndexRequest $request, NotesQuery $query, #[CurrentUser] User $user): AnonymousResourceCollection
     {
-        return NoteResource::collection($action->execute(
-            user: $user,
-            perPage: $request->safe()->integer('per_page', 15),
-            useCursor: $request->safe()->has('cursor'),
-            request: $request,
-        )->appends($request->query()));
+        return NoteResource::collection(
+            $query->paginate($user, $request->toListQuery())->appends($request->query()),
+        );
     }
 
     #[ResponseFromApiResource(NoteResource::class, Note::class, status: 201)]

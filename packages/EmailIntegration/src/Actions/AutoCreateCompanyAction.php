@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
-use App\Models\CustomField;
-use App\Models\Workspace;
 use App\Support\CurrentSource;
 use App\Support\Database\AdvisoryLock;
-use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
@@ -32,11 +31,11 @@ final readonly class AutoCreateCompanyAction
      * stripped). Distinct hosts such as accounts.printtest.com and
      * ideas.printtest.com do not share a lock.
      */
-    public function execute(string $domain, string $workspaceId, Workspace $workspace): Company
+    public function execute(string $domain, string $workspaceId): Company
     {
         $host = $this->domainMatcher->host($domain);
 
-        return CurrentSource::during(CreationSource::MAILBOX, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId, $workspace): Company {
+        return CurrentSource::during(CreationSource::MAILBOX, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.
@@ -46,7 +45,7 @@ final readonly class AutoCreateCompanyAction
                 return $existing;
             }
 
-            return $this->createCompany($host, $workspaceId, $workspace);
+            return $this->createCompany($host, $workspaceId);
         }));
     }
 
@@ -60,28 +59,23 @@ final readonly class AutoCreateCompanyAction
      * sharing a first label (acme.com vs acme.org) are distinct companies, and
      * keying on name would clobber an unrelated same-named company's domains.
      */
-    private function createCompany(string $domain, string $workspaceId, Workspace $workspace): Company
+    private function createCompany(string $domain, string $workspaceId): Company
     {
-        $company = Company::query()->create([
-            'name' => $this->domainToCompanyName($domain),
-            'workspace_id' => $workspaceId,
-        ]);
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($workspaceId);
 
-        $domainsField = $this->customFieldByCode('domains', $workspaceId);
-
-        if ($domainsField instanceof BaseCustomField) {
-            $company->saveCustomFieldValue($domainsField, $domain, $workspace);
+        try {
+            return Company::query()->create([
+                'name' => $this->domainToCompanyName($domain),
+                'workspace_id' => $workspaceId,
+                'custom_fields' => [
+                    CompanyField::DOMAINS->value => [$domain],
+                    CompanyField::ICP->value => false,
+                ],
+            ]);
+        } finally {
+            TenantContextService::setTenantId($previousTenantId);
         }
-
-        // Seed the ICP toggle to false on creation so it renders as "No"
-        // rather than an empty/null cell.
-        $icpField = $this->customFieldByCode('icp', $workspaceId);
-
-        if ($icpField instanceof BaseCustomField) {
-            $company->saveCustomFieldValue($icpField, false, $workspace);
-        }
-
-        return $company;
     }
 
     /**
@@ -95,14 +89,5 @@ final readonly class AutoCreateCompanyAction
         $label = $this->publicSuffixList->registrableLabel($domain) ?? explode('.', $domain)[0];
 
         return ucfirst($label);
-    }
-
-    private function customFieldByCode(string $code, string $workspaceId): ?BaseCustomField
-    {
-        return CustomField::query()
-            ->where('code', $code)
-            ->where('entity_type', 'company')
-            ->where('tenant_id', $workspaceId)
-            ->first();
     }
 }

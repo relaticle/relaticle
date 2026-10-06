@@ -38,7 +38,8 @@ enum CompanyField: string
     {
         return match ($this) {
             self::ICP => CustomFieldType::TOGGLE->value,
-            self::DOMAINS, self::LINKEDIN => CustomFieldType::LINK->value,
+            self::DOMAINS => CustomFieldType::DOMAIN->value,
+            self::LINKEDIN => CustomFieldType::LINK->value,
         };
     }
 
@@ -72,17 +73,6 @@ enum CompanyField: string
         return match ($this) {
             self::DOMAINS => true,
             default => false,
-        };
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function additionalSettings(): array
-    {
-        return match ($this) {
-            self::DOMAINS => ['link_variant' => 'domain'],
-            default => [],
         };
     }
 

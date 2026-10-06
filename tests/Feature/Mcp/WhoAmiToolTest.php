@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
+use App\Features\EmailIntegration;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\WhoAmiTool;
 use App\Models\User;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Laravel\Pennant\Feature;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -80,4 +82,39 @@ describe('token abilities', function (): void {
             ->tool(WhoAmiTool::class)
             ->assertOk();
     });
+});
+
+it('reports no email ability for a token that holds the wildcard', function (): void {
+    $this->user->withAccessToken($this->user->createToken('test', ['*'])->accessToken);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('token_abilities', ['*'])
+            ->etc());
+});
+
+it('reports the email abilities a personal access token holds beside its record abilities', function (): void {
+    $this->user->withAccessToken($this->user->createToken('test', ['read', 'email:send', 'update', 'email:read'])->accessToken);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('token_abilities', ['read', 'update', 'email:read', 'email:send'])
+            ->etc());
+});
+
+it('reports no email ability while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    $this->user->withAccessToken($this->user->createToken('test', ['read', 'email:read'])->accessToken);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('token_abilities', ['read'])
+            ->etc());
 });

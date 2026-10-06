@@ -48,6 +48,7 @@ use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -467,15 +468,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $bodyHtml = $this->bodyHtmlForPersistence();
 
-        // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
-        // holds a structural `<p></p>` doc), so `required` can never catch a blank
-        // message. Check the dehydrated text instead. A signature-only email (no
-        // free text, just the signature block) is legitimate and must still send.
-        if (
-            trim(strip_tags($bodyHtml)) === ''
-            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
-            && ! str_contains($bodyHtml, '<img')
-        ) {
+        if ($this->isBlankBody($bodyHtml)) {
             $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
 
             return;
@@ -494,38 +487,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $renderer = resolve(EmailTemplateRenderService::class);
-
         [$pendingPaths, $pendingNames, $pendingAttributes] = $this->storeAttachments();
 
-        $attachmentPaths = [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths];
-        $attachmentNames = [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames];
-        $attachmentAttributes = [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes];
-
-        $mergeTagRecord = $this->mergeTagRecord();
-        $linkRecord = $this->linkRecord();
-
-        $email = resolve(SendEmailAction::class)->execute(
-            data: [
-                'connected_account_id' => (string) $this->accountId,
-                'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
-                'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
-                'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
-                'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
-                'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
-                'in_reply_to_email_id' => $this->inReplyToEmailId,
-                'creation_source' => $this->creationSource(),
-                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
-                'batch_id' => null,
-                // Interactive sends from the composer keep the undo-send window.
-                'priority' => EmailPriority::PRIORITY,
-                'attachments' => $attachmentPaths,
-                'attachment_file_names' => $attachmentNames,
-                'attachment_attributes' => $attachmentAttributes,
-            ],
-            linkToType: $linkRecord === null ? null : $linkRecord::class,
-            linkToId: $linkRecord?->getKey(),
+        $email = $this->queueEmail(
+            $bodyHtml,
+            [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths],
+            [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames],
+            [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes],
         );
+
+        if (! $email instanceof Email) {
+            return;
+        }
 
         if ($this->draftId !== null) {
             // Best-effort: two tabs open on the same draft, or a retried request,
@@ -544,6 +517,62 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
         $this->dispatch('outbox:changed');
+    }
+
+    /**
+     * @param  list<string>  $attachmentPaths
+     * @param  array<string, string>  $attachmentNames
+     * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attachmentAttributes
+     */
+    private function queueEmail(string $bodyHtml, array $attachmentPaths, array $attachmentNames, array $attachmentAttributes): ?Email
+    {
+        $renderer = resolve(EmailTemplateRenderService::class);
+        $mergeTagRecord = $this->mergeTagRecord();
+        $linkRecord = $this->linkRecord();
+
+        try {
+            return resolve(SendEmailAction::class)->execute(
+                user: $this->authUser(),
+                data: [
+                    'connected_account_id' => (string) $this->accountId,
+                    'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
+                    'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
+                    'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
+                    'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
+                    'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
+                    'in_reply_to_email_id' => $this->inReplyToEmailId,
+                    'creation_source' => $this->creationSource(),
+                    'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
+                    'batch_id' => null,
+                    // Interactive sends from the composer keep the undo-send window.
+                    'priority' => EmailPriority::PRIORITY,
+                    'attachments' => $attachmentPaths,
+                    'attachment_file_names' => $attachmentNames,
+                    'attachment_attributes' => $attachmentAttributes,
+                ],
+                linkToType: $linkRecord === null ? null : $linkRecord::class,
+                linkToId: $linkRecord?->getKey(),
+            );
+        } catch (OutboxFull $exception) {
+            $this->deleteCopiedAttachmentFiles($attachmentPaths);
+
+            Notification::make()
+                ->title(__('filament/emails/composer.notifications.outbox_full.title'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return null;
+        }
+    }
+
+    // An untouched RichEditor still holds `<p></p>`, so `required` never catches a blank
+    // message. A body with only a signature block or an image is a real email.
+    private function isBlankBody(string $bodyHtml): bool
+    {
+        return trim(strip_tags($bodyHtml)) === ''
+            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
+            && ! str_contains($bodyHtml, '<img');
     }
 
     private function sendMass(): void
@@ -2227,10 +2256,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return null;
         }
 
-        return EmailSignature::query()
-            ->where('connected_account_id', $accountId)
-            ->where('is_default', true)
-            ->first();
+        return EmailSignature::query()->defaultFor($accountId)->first();
     }
 
     /**

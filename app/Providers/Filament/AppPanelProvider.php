@@ -97,6 +97,7 @@ use Laravel\Jetstream\Features;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Filament\ActivityLogPlugin;
+use Relaticle\CustomFields\CustomFields as CustomFieldsConfig;
 use Relaticle\CustomFields\CustomFieldsPlugin;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\EmailIntegration\ActivityLog\TimelineEventRenderer;
@@ -178,9 +179,7 @@ final class AppPanelProvider extends PanelProvider
                 ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
             : $table);
 
-        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
-            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
-            : $schema);
+        $this->formatDateTimesInSchemas();
 
         /**
          * Filament's calendar decides which cell to circle as "today" with
@@ -200,6 +199,15 @@ final class AppPanelProvider extends PanelProvider
         DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
             ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
             : $picker);
+    }
+
+    private function formatDateTimesInSchemas(): void
+    {
+        Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
+            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            : $schema);
+
+        CustomFieldsConfig::useDateTimeDisplayFormat(self::DATE_TIME_FORMAT);
     }
 
     /**

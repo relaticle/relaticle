@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
-use App\Actions\CustomFields\FindEntitiesByFieldValue;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use App\Support\CustomFields\CanonicalValue;
 use Closure;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -110,8 +110,8 @@ trait ResolvesUpsertMatch
             return null;
         }
 
-        $matches = resolve(FindEntitiesByFieldValue::class)
-            ->execute($this->entity()->model(), $field, CanonicalValue::spellings($field, $value), self::REPORTED_MATCH_LIMIT);
+        $matches = resolve(EntitiesByFieldValueQuery::class)
+            ->get($this->entity()->model(), $field, CanonicalValue::spellings($field, $value), self::REPORTED_MATCH_LIMIT);
 
         // Uniqueness is checked on write only, case-sensitively and from the moment it is switched on,
         // so several records can still share a value.

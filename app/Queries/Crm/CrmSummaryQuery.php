@@ -2,9 +2,8 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Crm;
+namespace App\Queries\Crm;
 
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
@@ -12,6 +11,7 @@ use App\Models\Note;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use DateTimeInterface;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Query\JoinClause;
@@ -20,14 +20,14 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 
-final readonly class GetCrmSummary
+final readonly class CrmSummaryQuery
 {
     public function __construct(
-        private AggregateOpportunities $aggregateOpportunities,
+        private OpportunityAggregatesQuery $opportunityAggregates,
     ) {}
 
     /** @return array<string, mixed> */
-    public function execute(User $user): array
+    public function get(User $user): array
     {
         foreach (CrmEntity::cases() as $entity) {
             abort_unless($user->can('viewAny', $entity->model()), 403);
@@ -39,7 +39,7 @@ final readonly class GetCrmSummary
         $cacheKey = "crm_summary_{$workspaceId}_{$timezone}_{$today->toDateString()}";
 
         return Cache::remember($cacheKey, 60, function () use ($user, $workspaceId, $timezone, $today): array {
-            $opportunities = $this->aggregateOpportunities->execute($user, 'stage');
+            $opportunities = $this->opportunityAggregates->get($user, 'stage');
             $rows = collect($opportunities['rows']);
 
             // Two stage options may share a name, so group rather than assign by label:

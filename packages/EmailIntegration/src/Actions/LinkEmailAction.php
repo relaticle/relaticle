@@ -137,7 +137,7 @@ final readonly class LinkEmailAction
 
                 // 3. Auto-create Company only when a new person would also be created.
                 if (! $company && $wouldCreatePerson && $this->shouldCreateCompany($workspace, $participant->email_address, $email)) {
-                    $company = $this->autoCreateCompany->execute($host, $workspaceId, $workspace);
+                    $company = $this->autoCreateCompany->execute($host, $workspaceId);
                 }
 
                 if ($company instanceof Company) {

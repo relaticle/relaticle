@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\CustomFields;
+namespace App\Queries\CustomFields;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
-final readonly class FindEntitiesByFieldValue
+final readonly class EntitiesByFieldValueQuery
 {
     /**
      * @template TModel of Model
@@ -20,7 +20,7 @@ final readonly class FindEntitiesByFieldValue
      * @param  array<int, string>  $values
      * @return Collection<int, TModel>
      */
-    public function execute(string $modelClass, CustomField $field, array $values, int $limit): Collection
+    public function get(string $modelClass, CustomField $field, array $values, int $limit): Collection
     {
         $column = $field->getValueColumn();
         $patterns = array_values(array_map(LikePattern::escape(...), array_filter($values, filled(...))));

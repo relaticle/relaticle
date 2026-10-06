@@ -6,10 +6,12 @@ namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\CrmEntity;
+use App\Enums\EmailGrant;
 use App\Enums\Plan;
 use App\Events\WorkspaceCreated;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
+use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
@@ -246,19 +248,31 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(AccessTokenCreated::class, CopyWorkspaceIdToAccessToken::class);
         Passport::useAuthorizationServerResponseType(new WorkspaceBearerTokenResponse);
 
-        // laravel/mcp appends `mcp:use` from a later booted callback, so setting the catalog here keeps it.
-        Passport::tokensCan([
-            'read' => 'Read your CRM records',
-            'create' => 'Create new CRM records',
-            'update' => 'Update existing CRM records',
-            'delete' => 'Delete CRM records',
-        ]);
+        $this->configureTokenScopes();
 
         // Connectors are long-lived but must not be immortal: a user who revokes one from
         // the Access Tokens page should not be outlived by a year-long bearer token.
         Passport::tokensExpireIn(now()->addDays(30));
         Passport::refreshTokensExpireIn(now()->addDays(90));
 
+        $this->configureConsentScreen();
+
+        $this->configurePolicies();
+        $this->configureModels();
+        $this->configureFilament();
+        $this->configureCommunityCounts();
+        $this->configureLivewire();
+        $this->configureMacros();
+        $this->configureRateLimiting();
+        $this->configureScribe();
+
+        $this->configureActivityLog();
+        $this->configureBlog();
+        $this->configureDevCommands();
+    }
+
+    private function configureConsentScreen(): void
+    {
         Passport::authorizationView(function (array $parameters) {
             $user = $parameters['user'] ?? null;
 
@@ -290,21 +304,26 @@ final class AppServiceProvider extends ServiceProvider
                 ? $currentWorkspaceId
                 : $workspaces->first(fn (Workspace $workspace): bool => ! in_array((string) $workspace->getKey(), $pausedWorkspaceIds, true))?->getKey();
 
+            $parameters['abilitiesByWorkspace'] = $user instanceof User
+                ? $workspaces->mapWithKeys(fn (Workspace $workspace): array => [
+                    (string) $workspace->getKey() => $user->grantableTokenPermissions((string) $workspace->getKey()),
+                ])->all()
+                : [];
+
             return response()->view('mcp.authorize', $parameters);
         });
+    }
 
-        $this->configurePolicies();
-        $this->configureModels();
-        $this->configureFilament();
-        $this->configureCommunityCounts();
-        $this->configureLivewire();
-        $this->configureMacros();
-        $this->configureRateLimiting();
-        $this->configureScribe();
-
-        $this->configureActivityLog();
-        $this->configureBlog();
-        $this->configureDevCommands();
+    private function configureTokenScopes(): void
+    {
+        // laravel/mcp appends `mcp:use` from a later booted callback, so setting the catalog here keeps it.
+        Passport::tokensCan([
+            'read' => 'Read your CRM records',
+            'create' => 'Create new CRM records',
+            'update' => 'Update existing CRM records',
+            'delete' => 'Delete CRM records',
+            ...EmailGrant::passportScopes(),
+        ]);
     }
 
     /**
@@ -639,6 +658,7 @@ final class AppServiceProvider extends ServiceProvider
             'date-time' => DateTimeFieldType::class,
             'date' => DateFieldType::class,
             'rich-editor' => RichEditorFieldType::class,
+            'domain' => DomainFieldType::class,
         ]);
 
         $this->configureCustomFieldSchemaInvalidation();
@@ -767,17 +787,23 @@ final class AppServiceProvider extends ServiceProvider
             return in_array($timezone, timezone_identifiers_list(), true) ? $timezone : null;
         });
 
+        $this->registerPanelScripts();
+
+        // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
+        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
+    }
+
+    private function registerPanelScripts(): void
+    {
         // The browser loads the published copy: run `php artisan filament:assets` after editing it.
         FilamentAsset::register([
             Js::make('rich-editor-slash-menu', resource_path('js/filament/rich-content-plugins/slash-menu.js'))
                 ->loadedOnRequest(),
             Js::make('payload-guard', resource_path('js/filament/payload-guard.js')),
+            Js::make('linked-records-picker', resource_path('js/filament/linked-records-picker.js')),
         ]);
 
         FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
-
-        // App assets are otherwise versioned with Filament's release, so an edit would keep its cached URL.
-        FilamentAsset::appVersion((string) filemtime(public_path('js/app/rich-editor-slash-menu.js')));
     }
 
     private function configureCommunityCounts(): void

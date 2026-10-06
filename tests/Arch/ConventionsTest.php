@@ -37,6 +37,27 @@ function migrationFiles(): array
     return $files;
 }
 
+/**
+ * @param  list<string>  $directories
+ * @return list<string>
+ */
+function phpFilesUnder(array $directories): array
+{
+    $root = dirname(__DIR__, 2).'/';
+    $files = [];
+
+    foreach ($directories as $directory) {
+        /** @var SplFileInfo $file */
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+            if ($file->getExtension() === 'php') {
+                $files[] = str_replace($root, '', $file->getPathname());
+            }
+        }
+    }
+
+    return $files;
+}
+
 it('keeps migrations forward-only (no down methods)', function (): void {
     $offenders = array_values(array_filter(
         migrationFiles(),
@@ -963,6 +984,60 @@ it('keeps the role suffix on classes whose directory carries one', function (): 
     expect($offenders)->toBe(
         [],
         'A class in these directories is named for its role (.ai/guidelines/relaticle/core.md): '.implode(', ', $offenders),
+    );
+});
+
+it('names a class in a domain folder of Queries with the Query suffix', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $domainFolders = array_filter(
+        glob($root.'/app/Queries/*', GLOB_ONLYDIR) ?: [],
+        static fn (string $folder): bool => ! in_array(basename($folder), ['Filters', 'Sorts', 'Concerns', 'Contracts'], true),
+    );
+
+    $offenders = array_filter(
+        phpFilesUnder([...$domainFolders, ...glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: []]),
+        static fn (string $file): bool => ! str_ends_with(basename($file, '.php'), 'Query'),
+    );
+
+    expect($offenders)->toBeEmpty(
+        'A reusable read is a *Query class (.ai/rules/queries.md): '.implode(', ', $offenders),
+    );
+});
+
+it('keeps reads out of the Actions folders', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $offenders = array_filter(
+        phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+        static fn (string $file): bool => preg_match('/^(List|Find|Search|Get|Aggregate)[A-Z]/', basename($file, '.php')) === 1,
+    );
+
+    expect($offenders)->toBeEmpty(
+        'An action is a write. A reusable read is a *Query class under Queries (.ai/rules/queries.md): '.implode(', ', $offenders),
+    );
+});
+
+it('guards every Queries folder against writes in phpstan.neon', function (): void {
+    $root = dirname(__DIR__, 2);
+    $neon = (string) file_get_contents($root.'/phpstan.neon');
+
+    $namespaces = [
+        'App\\Queries',
+        ...array_map(
+            static fn (string $folder): string => 'Relaticle\\'.basename(dirname($folder, 2)).'\\Queries',
+            glob($root.'/packages/*/src/Queries', GLOB_ONLYDIR) ?: [],
+        ),
+    ];
+
+    $unguarded = array_values(array_filter(
+        $namespaces,
+        static fn (string $namespace): bool => ! str_contains($neon, "- {$namespace}\n"),
+    ));
+
+    expect($unguarded)->toBe(
+        [],
+        'List each under guardedNamespaces of EloquentWriteOutsideActionRule (.ai/rules/queries.md): '.implode(', ', $unguarded),
     );
 });
 

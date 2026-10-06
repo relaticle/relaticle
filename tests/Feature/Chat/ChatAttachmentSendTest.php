@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
 use Relaticle\Chat\Actions\CreateConversation;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
 use Relaticle\Chat\Actions\StoreImportHandoff;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -20,6 +19,7 @@ use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\AttachedText;
@@ -27,7 +27,7 @@ use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\Chat\Support\TurnPresence;
 use Tests\Helpers\ChatDocument;
 
-mutates(ChatController::class, AttachedRows::class, AttachedText::class, CreateConversation::class, MarkAttachmentSent::class, StoreImportHandoff::class, ProcessChatMessage::class, ListConversationMessages::class);
+mutates(ChatController::class, AttachedRows::class, AttachedText::class, CreateConversation::class, MarkAttachmentSent::class, StoreImportHandoff::class, ProcessChatMessage::class, ConversationMessagesQuery::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -378,7 +378,7 @@ it('keeps typed text that itself starts with the attached file lead', function (
     );
     $job->handle(resolve(CreditService::class));
 
-    $messages = resolve(ListConversationMessages::class)->execute($this->user, $this->conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($this->user, $this->conversationId);
 
     expect(collect($messages)->firstWhere('role', 'user')['content'])->toBe($typed);
 });
@@ -400,7 +400,7 @@ it('shows the attachment on the stored user message after the turn', function ()
     );
     $job->handle(resolve(CreditService::class));
 
-    $messages = resolve(ListConversationMessages::class)->execute($this->user, $this->conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($this->user, $this->conversationId);
     $userMessage = collect($messages)->firstWhere('role', 'user');
 
     expect($userMessage['attachment'])->toBe(['id' => $attachmentId, 'name' => 'contacts.csv', 'kind' => 'rows', 'row_count' => 2])
@@ -596,7 +596,7 @@ it('keeps the typed text when a text file carries its own attached file lead', f
     );
     $job->handle(resolve(CreditService::class));
 
-    $userMessage = collect(resolve(ListConversationMessages::class)->execute($this->user, $this->conversationId))->firstWhere('role', 'user');
+    $userMessage = collect(resolve(ConversationMessagesQuery::class)->get($this->user, $this->conversationId))->firstWhere('role', 'user');
 
     expect($userMessage['content'])->toBe('Summarise this')
         ->and($userMessage['attachment'])->toBe(['id' => $attachmentId, 'name' => 'notes.txt', 'kind' => 'text', 'row_count' => 0]);
@@ -683,7 +683,7 @@ it('keeps the typed text when a preview is stored on the user message', function
     );
     $job->handle(resolve(CreditService::class));
 
-    $userMessage = collect(resolve(ListConversationMessages::class)->execute($this->user, $this->conversationId))->firstWhere('role', 'user');
+    $userMessage = collect(resolve(ConversationMessagesQuery::class)->get($this->user, $this->conversationId))->firstWhere('role', 'user');
 
     expect($userMessage['content'])->toBe('Who here works at Company 3?');
 });

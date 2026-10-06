@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
-use App\Actions\Company\ListCompanies;
 use App\Actions\Company\UpdateCompany;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\CompaniesController;
@@ -15,6 +14,8 @@ use App\Models\CustomFieldSection;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Companies\CompaniesQuery;
+use App\Queries\Concerns\ListsEntity;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -28,7 +29,8 @@ mutates(
     CreateCompany::class,
     UpdateCompany::class,
     DeleteCompany::class,
-    ListCompanies::class,
+    CompaniesQuery::class,
+    ListsEntity::class,
     CompanyResource::class,
 );
 
@@ -196,6 +198,20 @@ describe('includes', function (): void {
         Company::factory()->recycle([$this->user, $this->workspace])->create();
 
         $this->getJson('/api/v1/companies?include=creator')
+            ->assertOk()
+            ->assertJson(fn (AssertableJson $json) => $json
+                ->has('data.0.relationships.creator')
+                ->has('included')
+                ->etc()
+            );
+    });
+
+    it('expands an include sent as a list', function (): void {
+        Sanctum::actingAs($this->user);
+
+        Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+        $this->getJson('/api/v1/companies?include[]=creator&include[]=accountOwner')
             ->assertOk()
             ->assertJson(fn (AssertableJson $json) => $json
                 ->has('data.0.relationships.creator')
@@ -722,6 +738,13 @@ describe('custom fields', function (): void {
         $domains = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
 
         expect(collect(Company::query()->with('customFieldValues.customField')->findOrFail($id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
+    });
+
+    it('creates the domains field as a domain type with no variant setting', function (): void {
+        $domains = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
+
+        expect($domains->type)->toBe('domain')
+            ->and($domains->settings->additional)->toBe([]);
     });
 
     it('rejects a domain another company already uses in another format', function (): void {

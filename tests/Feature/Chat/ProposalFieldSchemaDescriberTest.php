@@ -86,6 +86,23 @@ it('describes a company custom link field with kind link and a raw array value',
         ->and($linkedinField)->not->toHaveKey('options');
 });
 
+it('describes the company domains field with kind link and a raw array value', function (): void {
+    $record = [
+        'name' => 'Acme Corp',
+        'custom_fields' => ['domains' => ['acme.com']],
+    ];
+
+    $fields = describerFor()->describe($this->user, 'company', $record);
+
+    $domainsField = fieldByCode($fields, 'domains');
+    expect($domainsField)->not->toBeNull()
+        ->and($domainsField['label'])->toBe('Domains')
+        ->and($domainsField['kind'])->toBe('link')
+        ->and($domainsField['value'])->toBe(['acme.com'])
+        ->and($domainsField['required'])->toBeFalse()
+        ->and($domainsField)->not->toHaveKey('options');
+});
+
 it('describes a task single-choice status field with options and the raw id value', function (): void {
     $status = CustomField::query()
         ->where('tenant_id', $this->workspace->getKey())

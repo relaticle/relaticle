@@ -241,7 +241,19 @@ arch('avoid inheritance')
 // as the App rules above ignore those namespaces.
 // (tests/Arch/ConventionsTest.php forces this list to be revisited when a
 // package is added.)
+$packageRoots = [];
+$packageQueryLayers = [];
+
+foreach (glob(dirname(__DIR__, 2).'/packages/*/src', GLOB_ONLYDIR) ?: [] as $packageSource) {
+    $packageRoots[] = $packageRoot = 'Relaticle\\'.basename(dirname($packageSource));
+
+    if (is_dir($packageSource.'/Queries')) {
+        $packageQueryLayers[$packageRoot] = "{$packageRoot}\Queries";
+    }
+}
+
 $packageServiceLayers = [
+    ...array_values($packageQueryLayers),
     'Relaticle\Chat\Actions',
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
@@ -349,6 +361,36 @@ arch('the query language uses no transport')
     ->not
     ->toUse(['App\Mcp', 'App\Http', 'App\Filament', 'App\Livewire', 'App\Scribe', 'Relaticle\Chat']);
 
+foreach ($packageQueryLayers as $packageRoot => $packageQueryLayer) {
+    arch("{$packageQueryLayer} uses no transport of its package")
+        ->expect($packageQueryLayer)
+        ->not
+        ->toUse(["{$packageRoot}\Http", "{$packageRoot}\Livewire", "{$packageRoot}\Tools", "{$packageRoot}\Jobs"]);
+}
+
+foreach (['App\Queries', ...array_values($packageQueryLayers)] as $queryRoot) {
+    arch("{$queryRoot} takes the acting user and reads no ambient user, request or workspace")
+        ->expect($queryRoot)
+        ->not
+        ->toUse([
+            'auth',
+            'request',
+            'Illuminate\Support\Facades\Auth',
+            'Illuminate\Support\Facades\Request',
+            'Illuminate\Http\Request',
+            'Filament\Facades\Filament',
+            'App\Support\CurrentWorkspace',
+        ]);
+}
+
+foreach (['App', ...$packageRoots] as $codeRoot) {
+    arch("{$codeRoot} builds a list query only in a query layer")
+        ->expect($codeRoot)
+        ->not
+        ->toUse('Spatie\QueryBuilder\QueryBuilder')
+        ->ignoring(['App\Queries', ...array_values($packageQueryLayers)]);
+}
+
 arch('CRM API write requests share the custom field contract')
     ->expect('App\Http\Requests\Api\V1')
     ->classes()
@@ -374,6 +416,7 @@ arch('API controllers must depend on actions for write operations')
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Models',
+        'App\Queries',
         'Illuminate',
         'Knuckles\Scribe',
         'response',
@@ -424,6 +467,7 @@ foreach (['App', 'Relaticle\ImportWizard', 'Relaticle\OnboardSeed', 'Relaticle\D
             'App\Models\CustomFieldOption',
             'App\Models\CustomFieldSection',
             'App\Models\CustomFieldValue',
+            'App\Filament\CustomFields\DomainFieldType',
             // Slipped past while one check spanned all four layers and could not fail
             // (found 2026-10-04). Review each, then unlist:
             'App\Filament\CustomFields\DateTimeColumn',

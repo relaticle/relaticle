@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\People\CreatePeople;
 use App\Actions\People\DeletePeople;
-use App\Actions\People\ListPeople;
 use App\Actions\People\UpdatePeople;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\PeopleController;
@@ -13,6 +12,8 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Concerns\ListsEntity;
+use App\Queries\People\PeopleQuery;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -22,7 +23,8 @@ mutates(
     CreatePeople::class,
     UpdatePeople::class,
     DeletePeople::class,
-    ListPeople::class,
+    PeopleQuery::class,
+    ListsEntity::class,
     PeopleResource::class,
 );
 

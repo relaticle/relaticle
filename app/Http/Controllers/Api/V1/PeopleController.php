@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\People\CreatePeople;
 use App\Actions\People\DeletePeople;
-use App\Actions\People\ListPeople;
 use App\Actions\People\UpdatePeople;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StorePeopleRequest;
@@ -14,6 +13,7 @@ use App\Http\Requests\Api\V1\UpdatePeopleRequest;
 use App\Http\Resources\V1\PeopleResource;
 use App\Models\People;
 use App\Models\User;
+use App\Queries\People\PeopleQuery;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -31,14 +31,11 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 final readonly class PeopleController
 {
     #[ResponseFromApiResource(PeopleResource::class, People::class, collection: true, paginate: 15)]
-    public function index(IndexRequest $request, ListPeople $action, #[CurrentUser] User $user): AnonymousResourceCollection
+    public function index(IndexRequest $request, PeopleQuery $query, #[CurrentUser] User $user): AnonymousResourceCollection
     {
-        return PeopleResource::collection($action->execute(
-            user: $user,
-            perPage: $request->safe()->integer('per_page', 15),
-            useCursor: $request->safe()->has('cursor'),
-            request: $request,
-        )->appends($request->query()));
+        return PeopleResource::collection(
+            $query->paginate($user, $request->toListQuery())->appends($request->query()),
+        );
     }
 
     #[ResponseFromApiResource(PeopleResource::class, People::class, status: 201)]

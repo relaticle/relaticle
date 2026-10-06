@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\TaskField;
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
@@ -204,4 +205,38 @@ it('notifies the assignee of a task added from a board column', function (): voi
 
     expect(Task::query()->where('title', 'Prepare the renewal deck')->exists())->toBeTrue()
         ->and($assignee->notifications()->count())->toBe(1);
+});
+
+it('points the navigation link at the view the user opened last', function (): void {
+    expect(TaskResource::getNavigationUrl())->toBe(TaskResource::getUrl('index'));
+
+    livewire(TasksBoard::class)->assertOk();
+
+    expect(TaskResource::getNavigationUrl())->toBe(TaskResource::getUrl('board'));
+
+    livewire(ManageTasks::class)->assertOk();
+
+    expect(TaskResource::getNavigationUrl())->toBe(TaskResource::getUrl('index'));
+});
+
+it('falls back to the list when the remembered view no longer exists', function (): void {
+    TaskResource::rememberViewMode('timeline');
+
+    expect(TaskResource::getNavigationUrl())->toBe(TaskResource::getUrl('index'));
+});
+
+it('falls back to the list when the board the user opened last is no longer available', function (): void {
+    TaskResource::rememberViewMode('board');
+
+    $this->statusField->update(['active' => false]);
+
+    expect(TaskResource::getNavigationUrl())->toBe(TaskResource::getUrl('index'));
+});
+
+it('links the sidebar to the board on the next page after the user opens it', function (): void {
+    $this->get(TaskResource::getUrl('board'))->assertOk();
+
+    $this->get(CompanyResource::getUrl('index'))
+        ->assertOk()
+        ->assertSee('href="'.TaskResource::getUrl('board').'"', escape: false);
 });

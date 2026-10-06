@@ -6,10 +6,10 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Models\AgentConversation;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 
-it('returns the document column on each message from ListConversationMessages', function (): void {
+it('returns the document column on each message from ConversationMessagesQuery', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -50,7 +50,7 @@ it('returns the document column on each message from ListConversationMessages', 
         'updated_at' => now(),
     ]);
 
-    $messages = app(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = app(ConversationMessagesQuery::class)->get($user, $conversationId);
 
     expect($messages)->toHaveCount(1);
     expect($messages[0])->toHaveKey('document');
@@ -115,7 +115,7 @@ it('attaches a server-resolved url to each mention', function (): void {
         'updated_at' => now(),
     ]);
 
-    $messages = app(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = app(ConversationMessagesQuery::class)->get($user, $conversationId);
 
     expect($messages[0]['mentions'])->toHaveCount(1)
         ->and($messages[0]['mentions'][0]['type'])->toBe('company')

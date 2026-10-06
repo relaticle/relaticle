@@ -5,8 +5,8 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Models\ChatMessageFeedback;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 
 function seedFeedbackConversation(User $user): array
 {
@@ -132,7 +132,7 @@ it('includes the current user feedback in the rendered transcript', function ():
         'category' => 'too_slow',
     ])->assertOk();
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $conversationId);
 
     $assistant = collect($messages)->firstWhere('role', 'assistant');
 

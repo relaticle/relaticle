@@ -150,6 +150,9 @@ services:
                 - App\Filament
                 - Relaticle\Chat\Tools
                 - Relaticle\Chat\Livewire
+                - App\Queries
+                - Relaticle\Chat\Queries
+                - Relaticle\EmailIntegration\Queries
         tags:
             - phpstan.rules.rule
     -

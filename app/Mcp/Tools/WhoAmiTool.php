@@ -6,7 +6,6 @@ namespace App\Mcp\Tools;
 
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
-use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -51,13 +50,6 @@ final class WhoAmiTool extends Tool
         /** @var Workspace $workspace */
         $workspace = $user->currentWorkspace;
 
-        $tokenAbilities = ['*'];
-        $token = $user->currentAccessToken();
-
-        if ($token instanceof PersonalAccessToken && $token->getKey()) {
-            $tokenAbilities = $token->abilities;
-        }
-
         $workspaceMembers = $workspace->allUsers()->map(fn (User $member): array => [
             'id' => $member->id,
             'name' => $member->name,
@@ -77,7 +69,7 @@ final class WhoAmiTool extends Tool
                 'capabilities' => array_column($user->workspaceCapabilities($workspace->id), 'value'),
             ],
             'workspace_members' => $workspaceMembers,
-            'token_abilities' => $tokenAbilities,
+            'token_abilities' => $this->heldAbilities(),
         ];
 
         return Response::structured($result);

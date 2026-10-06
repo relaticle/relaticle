@@ -123,27 +123,7 @@ final class OpportunitiesBoard extends BoardResourcePage
                     ->modalWidth(Width::Large)
                     ->slideOver(false)
                     ->model(Opportunity::class)
-                    ->schema(fn (Schema $schema): Schema => $schema
-                        ->components([
-                            TextInput::make('name')
-                                ->required()
-                                ->placeholder(__('filament/pages/boards.opportunities.form.name_placeholder'))
-                                ->columnSpanFull(),
-                            RecordSelect::make('company_id')
-                                ->relationship('company', 'name')
-                                ->searchable()
-                                ->preload(),
-                            RecordSelect::make('contact_id')
-                                ->relationship('contact', 'name')
-                                ->searchable()
-                                ->preload(),
-                            CustomFields::form()
-                                ->except([OpportunityCustomField::STAGE])
-                                ->build()
-                                ->columnSpanFull()
-                                ->columns(1),
-                        ])
-                        ->columns(2))
+                    ->schema($this->quickCreateForm(...))
                     ->using(function (array $data, CreateAction $action): Opportunity {
                         /** @var Workspace $currentWorkspace */
                         $currentWorkspace = Auth::guard('web')->user()->currentWorkspace;
@@ -249,6 +229,32 @@ final class OpportunitiesBoard extends BoardResourcePage
             'columnId' => $targetColumnId,
             'position' => $newPosition,
         ]);
+    }
+
+    private function quickCreateForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                TextInput::make('name')
+                    ->required()
+                    ->placeholder(__('filament/pages/boards.opportunities.form.name_placeholder'))
+                    ->columnSpanFull(),
+                RecordSelect::make('company_id')
+                    ->relationship('company', 'name')
+                    ->searchable()
+                    ->preload(),
+                RecordSelect::make('contact_id')
+                    ->label(__('filament/resources/opportunity.fields.contact_id.label'))
+                    ->relationship('contact', 'name')
+                    ->searchable()
+                    ->preload(),
+                CustomFields::form()
+                    ->except([OpportunityCustomField::STAGE])
+                    ->build()
+                    ->columnSpanFull()
+                    ->columns(1),
+            ])
+            ->columns(2);
     }
 
     /**

@@ -4,28 +4,13 @@ declare(strict_types=1);
 
 namespace App\Scribe\Strategies;
 
-use App\Actions\Company\ListCompanies;
-use App\Actions\Note\ListNotes;
-use App\Actions\Opportunity\ListOpportunities;
-use App\Actions\People\ListPeople;
-use App\Actions\Task\ListTasks;
-use App\Enums\CrmEntity;
+use App\Data\ListQuery;
+use App\Queries\Contracts\EntityQuery;
 use Knuckles\Camel\Extraction\ExtractedEndpointData;
-use ReflectionClass;
-use ReflectionException;
-use ReflectionMethod;
 use ReflectionNamedType;
 
 trait DescribesListEndpoint
 {
-    private const array LIST_ACTION_ENTITIES = [
-        ListCompanies::class => CrmEntity::Company,
-        ListPeople::class => CrmEntity::People,
-        ListOpportunities::class => CrmEntity::Opportunity,
-        ListTasks::class => CrmEntity::Task,
-        ListNotes::class => CrmEntity::Note,
-    ];
-
     private function isIndexMethod(ExtractedEndpointData $endpointData): bool
     {
         return $endpointData->method->getName() === 'index';
@@ -36,15 +21,13 @@ trait DescribesListEndpoint
         return $this->isIndexMethod($endpointData) && in_array('POST', $endpointData->httpMethods, true);
     }
 
-    /**
-     * @return class-string|null
-     */
-    private function findActionClass(ExtractedEndpointData $endpointData): ?string
+    /** @return class-string<EntityQuery>|null */
+    private function findQueryClass(ExtractedEndpointData $endpointData): ?string
     {
         foreach ($endpointData->method->getParameters() as $parameter) {
             $type = $parameter->getType();
 
-            if ($type instanceof ReflectionNamedType && isset(self::LIST_ACTION_ENTITIES[$type->getName()])) {
+            if ($type instanceof ReflectionNamedType && is_subclass_of($type->getName(), EntityQuery::class)) {
                 return $type->getName();
             }
         }
@@ -53,66 +36,24 @@ trait DescribesListEndpoint
     }
 
     /**
-     * @param  class-string  $actionClass
+     * @param  class-string<EntityQuery>  $queryClass
      * @return array<string, array<string, mixed>>
      */
-    private function listParameters(string $actionClass): array
+    private function listParameters(string $queryClass): array
     {
-        try {
-            $source = $this->getMethodSource(new ReflectionClass($actionClass)->getMethod('execute'));
-        } catch (ReflectionException) {
-            return [];
-        }
-
         return [
-            ...$this->sortParameter($source),
-            ...$this->includeParameter($source),
+            ...$this->sortParameter($queryClass::sorts()),
+            ...$this->includeParameter($queryClass::includes()),
             ...$this->paginationParameters(),
         ];
     }
 
-    private function getMethodSource(ReflectionMethod $method): string
-    {
-        $fileName = $method->getFileName();
-
-        if ($fileName === false) {
-            return '';
-        }
-
-        $file = file($fileName);
-
-        if ($file === false) {
-            return '';
-        }
-
-        $start = $method->getStartLine() - 1;
-        $end = $method->getEndLine();
-
-        return implode('', array_slice($file, $start, $end - $start));
-    }
-
     /**
-     * @return list<string>
-     */
-    private function topLevelNames(string $arguments): array
-    {
-        // A quoted string inside a nested call is that call's own argument, never a name the list accepts.
-        preg_match_all("/'([^']+)'/", (string) preg_replace('/\\((?:[^()]*|\\([^()]*\\))*\\)/', '', $arguments), $matches);
-
-        return $matches[1];
-    }
-
-    /**
+     * @param  list<string>  $sorts
      * @return array<string, array<string, mixed>>
      */
-    private function sortParameter(string $source): array
+    private function sortParameter(array $sorts): array
     {
-        if (! preg_match("/allowedSorts\(((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*)\)/s", $source, $match)) {
-            return [];
-        }
-
-        $sorts = $this->topLevelNames($match[1]);
-
         if ($sorts === []) {
             return [];
         }
@@ -128,17 +69,11 @@ trait DescribesListEndpoint
     }
 
     /**
+     * @param  list<string>  $includes
      * @return array<string, array<string, mixed>>
      */
-    private function includeParameter(string $source): array
+    private function includeParameter(array $includes): array
     {
-        if (! preg_match("/allowedIncludes\(((?:[^()]*|\((?:[^()]*|\([^()]*\))*\))*)\)/s", $source, $match)) {
-            return [];
-        }
-
-        preg_match_all("/AllowedInclude::count\\('([^']+)'/", $match[1], $countMatches);
-        $includes = [...$this->topLevelNames($match[1]), ...$countMatches[1]];
-
         if ($includes === []) {
             return [];
         }
@@ -172,7 +107,7 @@ trait DescribesListEndpoint
             'page' => [
                 'type' => 'integer',
                 'required' => false,
-                'description' => 'Page number for offset pagination (when cursor is not used). Default: 1.',
+                'description' => 'Page number for offset pagination (1-'.number_format(ListQuery::MAX_PAGE).', when cursor is not used). Default: 1.',
                 'example' => 1,
             ],
         ];

@@ -432,6 +432,7 @@ function customFieldHintRows(): array
         ['email', 'array of email strings'],
         ['phone', 'array of phone strings'],
         ['link', 'array of URL strings'],
+        ['domain', 'array of domain strings'],
         ['checkbox', '"input_format": "boolean"'],
         ['toggle', '"input_format": "boolean"'],
         ['select', 'option label or option ID'],

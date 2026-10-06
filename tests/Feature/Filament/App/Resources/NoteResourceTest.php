@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Filament\Components\Forms\LinkedRecordsSelect;
 use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Filament\RichEditor\SlashMenuPlugin;
 use App\Models\Company;
 use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -18,7 +20,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Database\Eloquent\Model;
 
-mutates(NoteResource::class, NotesCards::class);
+mutates(NoteResource::class, NotesCards::class, LinkedRecordsSelect::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -39,15 +41,15 @@ it('can render the index page', function (): void {
 it('exposes the expected table columns', function (): void {
     $table = livewire(ManageNotes::class);
 
-    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
+    foreach (['title', 'relations', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
         $table->assertTableColumnExists($column);
     }
 
-    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
+    foreach (['title', 'relations', 'creator.name', 'deleted_at', 'created_at', 'updated_at'] as $column) {
         $table->assertTableColumnVisible($column);
     }
 
-    foreach (['title', 'companies.name', 'people.name', 'creator.name', 'created_at'] as $column) {
+    foreach (['title', 'relations', 'creator.name', 'created_at'] as $column) {
         $table->assertCanRenderTableColumn($column);
     }
 
@@ -137,6 +139,55 @@ it('can edit a note', function (): void {
         ->assertHasNoActionErrors();
 
     expect($record->refresh()->title)->toBe('Updated Note');
+});
+
+it('links companies, people and opportunities to a note from the relations picker', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageNotes::class)
+        ->callAction('create', data: [
+            'title' => 'Renewal call',
+            'relations' => ["company:{$company->id}", "people:{$person->id}", "opportunity:{$opportunity->id}"],
+        ])
+        ->assertHasNoActionErrors();
+
+    $note = Note::query()->where('title', 'Renewal call')->sole();
+
+    expect($note->companies->modelKeys())->toBe([$company->id])
+        ->and($note->people->modelKeys())->toBe([$person->id])
+        ->and($note->opportunities->modelKeys())->toBe([$opportunity->id]);
+});
+
+it('fills the relations picker from the linked records and unlinks the ones removed', function (): void {
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $kept = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $removed = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $note->companies()->attach($kept);
+    $note->people()->attach($removed);
+
+    livewire(ManageNotes::class)
+        ->mountAction(TestAction::make('edit')->table($note))
+        ->assertSchemaStateSet(['relations' => ["company:{$kept->id}", "people:{$removed->id}"]])
+        ->fillForm(['relations' => ["company:{$kept->id}"]])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    expect($note->companies()->pluck('companies.id')->all())->toBe([$kept->id])
+        ->and($note->people()->count())->toBe(0);
+});
+
+it('rejects a record from another workspace in the relations picker', function (): void {
+    $otherUser = User::factory()->withWorkspace()->create();
+    $foreign = Company::factory()->recycle([$otherUser, $otherUser->currentWorkspace])->create();
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageNotes::class)
+        ->callAction(TestAction::make('edit')->table($note), data: ['relations' => ["company:{$foreign->id}"]])
+        ->assertHasActionErrors(['relations.0']);
+
+    expect($note->companies()->count())->toBe(0);
 });
 
 it('can delete a note', function (): void {
@@ -406,4 +457,14 @@ it('offers a per page choice on note cards only once there is more than one page
         ->assertSeeHtml('fi-pagination-records-per-page-select');
 
     expect($component->instance()->getTable()->getPaginationPageOptions())->toBe([24, 48, 96]);
+});
+
+it('points the navigation link at the view the user opened last', function (): void {
+    livewire(ManageNotes::class)->assertOk();
+
+    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('list'));
+
+    livewire(NotesCards::class)->assertOk();
+
+    expect(NoteResource::getNavigationUrl())->toBe(NoteResource::getUrl('index'));
 });

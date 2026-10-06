@@ -35,7 +35,7 @@ final class ChatBrowser
     }
 
     /**
-     * Ids are sortable strings, not uuid7, so ORDER BY id in ListConversationMessages
+     * Ids are sortable strings, not uuid7, so ORDER BY id in ConversationMessagesQuery
      * does not rest on uuid7 staying monotonic under a tight insert loop.
      */
     public static function seedSequencedMessages(string $conversationId, User $user, int $count, CarbonImmutable $baseline, string $prefix = 'seq'): void

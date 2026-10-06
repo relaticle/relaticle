@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\People;
 
-use App\Actions\People\ListPeople;
 use App\Concerns\OperatesOnCrmEntity;
 use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
@@ -20,11 +19,6 @@ final class ListPeopleTool extends BaseReadListTool
     public function description(): string
     {
         return 'List people/contacts in the CRM with optional filters and pagination.';
-    }
-
-    protected function actionClass(): string
-    {
-        return ListPeople::class;
     }
 
     protected function resourceClass(): string

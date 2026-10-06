@@ -3,8 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Company\UpdateCompany;
-use App\Actions\Crm\GetCrmSummary;
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
@@ -27,15 +25,17 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Crm\CrmSummaryQuery;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use App\Support\CurrentSource;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Testing\Fluent\AssertableJson;
 
 mutates(
-    AggregateOpportunities::class,
+    OpportunityAggregatesQuery::class,
     AggregateOpportunitiesTool::class,
     BaseListTool::class,
-    GetCrmSummary::class,
+    CrmSummaryQuery::class,
     GetCrmSchemaTool::class,
     GetCrmSummaryTool::class,
     ListActivityTool::class,

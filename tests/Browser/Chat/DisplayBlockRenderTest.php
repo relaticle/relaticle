@@ -5,13 +5,13 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Tests\Helpers\ChatBrowser;
 use Tests\Helpers\ChatDocument;
 
 mutates(ChatInterface::class);
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 
 /**
  * A read tool's `display_block` envelope, painted as a real table/card in the

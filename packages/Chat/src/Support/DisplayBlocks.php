@@ -8,7 +8,7 @@ namespace Relaticle\Chat\Support;
  * The `display_block` key on a read-tool result, in one place.
  *
  * A block is presentation, not reasoning. It travels to the UI two ways
- * (`ListConversationMessages` on reload, `ChatInterface::latestAssistantMessage()`
+ * (`ConversationMessagesQuery` on reload, `ChatInterface::latestAssistantMessage()`
  * at stream-end reconcile) and travels back to the model zero ways: the store
  * strips it from the replayed history, because tool results are replayed on
  * every later turn and a block re-read is pure token cost forever.

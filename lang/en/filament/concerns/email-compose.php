@@ -14,6 +14,9 @@ return [
         'undo' => [
             'label' => 'Undo',
         ],
+        'cancel_send' => [
+            'label' => 'Cancel send',
+        ],
     ],
     'notifications' => [
         'queued' => [
@@ -23,8 +26,16 @@ return [
         'cancelled' => [
             'title' => 'Send cancelled',
         ],
+        'held' => [
+            'title' => ':via queued an email',
+            'body' => '":subject" goes to :recipients in :minutes. Workspace: :workspace. Cancel it if you did not ask for it.',
+            'minutes' => ':count minute|:count minutes',
+        ],
         'too_late' => [
             'title' => 'Too late, the email has already been sent',
+        ],
+        'not_found' => [
+            'title' => 'That email could not be found',
         ],
     ],
     'fields' => [

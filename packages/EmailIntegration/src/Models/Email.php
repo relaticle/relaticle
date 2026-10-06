@@ -147,6 +147,16 @@ final class Email extends Model
      * @return Builder<Email>
      */
     #[Scope]
+    protected function createdOverMcp(Builder $query): Builder
+    {
+        return $query->where('creation_source', EmailCreationSource::MCP);
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
     protected function inbox(Builder $query): Builder
     {
         return $query->where('direction', EmailDirection::INBOUND);

@@ -9,7 +9,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Relaticle\Chat\Actions\DeleteConversation;
-use Relaticle\Chat\Actions\ListConversations;
+use Relaticle\Chat\Queries\ConversationsQuery;
 
 final class ChatSidebarNav extends BaseLivewireComponent
 {
@@ -55,7 +55,7 @@ final class ChatSidebarNav extends BaseLivewireComponent
             return view('chat::components.empty-container');
         }
 
-        $conversations = (new ListConversations)->execute($user, self::SIDEBAR_LIMIT + 1);
+        $conversations = new ConversationsQuery()->recent($user, self::SIDEBAR_LIMIT + 1);
         $hasMore = $conversations->count() > self::SIDEBAR_LIMIT;
 
         return view('chat::livewire.app.chat.chat-sidebar-nav', [

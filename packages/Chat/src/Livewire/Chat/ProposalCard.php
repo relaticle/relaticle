@@ -1424,7 +1424,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         // A step cancelled because the step it depended on was rejected has to say
-        // so live, not only after a reload. ListConversationMessages sets this on
+        // so live, not only after a reload. ConversationMessagesQuery sets this on
         // the way back in; without it here the transcript shows a bare "Rejected"
         // in the very session where the cascade happened, which is the outcome
         // PendingActionService::cancelStep() records it to prevent.

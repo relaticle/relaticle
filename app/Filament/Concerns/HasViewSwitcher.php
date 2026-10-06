@@ -17,6 +17,11 @@ use Relaticle\Flowforge\BoardResourcePage;
  */
 trait HasViewSwitcher
 {
+    public function mountHasViewSwitcher(): void
+    {
+        static::getResource()::rememberViewMode(static::getResourcePageName());
+    }
+
     public function getHeader(): ?View
     {
         $header = parent::getHeader();

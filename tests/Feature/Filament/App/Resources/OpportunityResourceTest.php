@@ -138,6 +138,16 @@ it('can create an opportunity', function (): void {
     ]);
 });
 
+it('labels the contact select point of contact in the `:dataset` modal', function (string $action): void {
+    $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $page = livewire(ListOpportunities::class)
+        ->mountAction($action === 'edit' ? TestAction::make('edit')->table($record) : $action)
+        ->instance();
+
+    expect($page->getSchema($page->getMountedActionSchemaName())->toHtml())->toContain('Point of Contact');
+})->with(['create', 'edit']);
+
 it('can edit an opportunity', function (): void {
     $record = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 

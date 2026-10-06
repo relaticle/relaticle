@@ -103,7 +103,7 @@ it('falls back to the full list when search is whitespace', function (): void {
     expect($component->viewData('conversations'))->toHaveCount(2);
 });
 
-it('matches by message content via SearchConversations', function (): void {
+it('matches by message content via ConversationsQuery::search', function (): void {
     DB::table('agent_conversations')->insert([
         'id' => 'm1',
         'participant_type' => 'user',

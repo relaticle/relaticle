@@ -18,8 +18,8 @@ use Filament\Schemas\Schema;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\Computed;
-use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Data\MyTaskItem;
+use Relaticle\Chat\Queries\ConversationsQuery;
 use Relaticle\Chat\Services\MyTasksService;
 
 final class Dashboard extends Page
@@ -62,7 +62,7 @@ final class Dashboard extends Page
         /** @var User $user */
         $user = Filament::auth()->user();
 
-        $recentChat = (new ListConversations)->execute($user, 1)->first();
+        $recentChat = new ConversationsQuery()->recent($user, 1)->first();
 
         if ($recentChat) {
             $this->recentChatId = $recentChat->id;

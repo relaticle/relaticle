@@ -7,13 +7,13 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Tests\Helpers\ChatDocument;
 
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 
 it('approved actions expose record.url after conversation reload', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -84,7 +84,7 @@ it('approved actions expose record.url after conversation reload', function (): 
         'updated_at' => now(),
     ] + $base);
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $convId);
 
     $assistant = collect($messages)->firstWhere('role', 'assistant');
     $action = $assistant['pending_actions'][0] ?? null;
@@ -166,7 +166,7 @@ it('reconstructs per-item batch chips so resolved items survive reload', functio
         'updated_at' => now(),
     ] + $base);
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $convId);
     $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0] ?? null;
 
     expect($action)->not->toBeNull();
@@ -250,7 +250,7 @@ it('does not expose record on pending or rejected actions', function (): void {
         'updated_at' => now(),
     ] + $base);
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $convId);
     $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0] ?? null;
 
     expect($action)->not->toBeNull();
@@ -315,7 +315,7 @@ it('rehydrates a pending proposal with the instant it lapses', function (): void
         'updated_at' => now(),
     ]);
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $convId);
     $action = collect($messages)->firstWhere('role', 'assistant')['pending_actions'][0];
 
     // Without this the client cannot tell a lapsed proposal from a live one, and

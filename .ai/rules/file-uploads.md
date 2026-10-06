@@ -7,6 +7,8 @@ paths:
   - 'app/Mcp/Tools/**'
   - 'app/Http/Controllers/Media/**'
   - 'app/Observers/**'
+  - 'app/Jobs/FetchFaviconForCompany.php'
+  - 'app/Services/Favicon/**'
   - 'app/Console/Commands/**'
   - 'packages/Chat/src/**'
   - 'packages/ImportWizard/src/**'
@@ -46,6 +48,13 @@ and outbound email compose/template images on `EmailAttachment::DISK`.
   --force` moves those onto their records.
 - Never call `Media::move()`. It copies and deletes, changing `uuid` and path.
   Ownership changes are attribute writes on the existing row.
+- A company logo is replaced only on evidence. `HighQualityDriver::fetch()` returns null when a
+  site answers and no source has an icon, and throws the fetcher's `ConnectionException` when the
+  host does not resolve or the site is unreachable with no fallback icon. `FetchFaviconForCompany`
+  drops the logo of a previous domain on null and keeps it on a throw. Catching the exception
+  inside the driver turns a dead host into "no favicon" and wipes a working logo.
+  `tests/Feature/Services/Favicon/HighQualityDriverTest.php` and
+  `tests/Feature/Jobs/FetchFaviconForCompanyTest.php` fail when either half changes.
 - `logo` collections stay on the public disk. Everything else, `chat-attachments`
   included, follows `MEDIA_DISK`, default `local`, which must name a disk in
   `config/filesystems.php`. A row keeps the disk it was uploaded to.

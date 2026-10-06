@@ -168,7 +168,7 @@ final readonly class CustomFieldsDisplayFormatter
      */
     private function storedValues(CustomField $field, mixed $value, ?FieldDataType $dataType): ?array
     {
-        if ($field->type === CustomFieldType::LINK->value) {
+        if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return is_array($value) ? $this->optionNames($field, $value) : null;
         }
 
@@ -276,7 +276,7 @@ final readonly class CustomFieldsDisplayFormatter
 
     private function displayType(CustomField $field, ?FieldDataType $dataType): string
     {
-        if ($field->type === CustomFieldType::LINK->value) {
+        if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return 'link';
         }
 
@@ -309,7 +309,7 @@ final readonly class CustomFieldsDisplayFormatter
 
     private function storedForm(CustomField $field, mixed $value): mixed
     {
-        return in_array($field->type, [CustomFieldType::LINK->value, CustomFieldType::PHONE->value], true)
+        return in_array($field->type, [CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::PHONE->value], true)
             ? $this->comparable($field, $value)
             : $value;
     }

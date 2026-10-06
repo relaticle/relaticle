@@ -137,14 +137,6 @@ trait CustomFieldTrait
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    public function additionalSettings(): array
-    {
-        return [];
-    }
-
-    /**
      * Get complete field configuration
      *
      * @return array{

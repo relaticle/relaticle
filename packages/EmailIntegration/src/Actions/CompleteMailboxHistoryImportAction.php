@@ -76,7 +76,7 @@ final readonly class CompleteMailboxHistoryImportAction
             if ($hasEmailFailures || $hasCalendarIssues) {
                 $this->mailboxHistoryImport->markAwaitingRetrySuccessNotice($batchId);
 
-                if ($this->alreadyNotified($user, $batchId)) {
+                if ($account->history_import_notified_batch_id !== null) {
                     return;
                 }
 
@@ -95,17 +95,15 @@ final readonly class CompleteMailboxHistoryImportAction
 
             $afterRetry = $this->mailboxHistoryImport->pullAwaitingRetrySuccessNotice($batchId);
 
-            if ($afterRetry) {
+            if ($account->history_import_notified_batch_id === null) {
+                $this->notifyImportComplete($user, $account, $batchId, afterRetry: false);
+
+                return;
+            }
+
+            if ($afterRetry && $account->history_import_notified_batch_id === $batchId) {
                 $this->notifyImportComplete($user, $account, $batchId, afterRetry: true);
-
-                return;
             }
-
-            if ($this->alreadyNotified($user, $batchId)) {
-                return;
-            }
-
-            $this->notifyImportComplete($user, $account, $batchId, afterRetry: false);
         });
     }
 
@@ -118,14 +116,6 @@ final readonly class CompleteMailboxHistoryImportAction
         return ($batch->pendingJobs - count($batch->failedJobIds)) === 0;
     }
 
-    private function alreadyNotified(User $user, string $batchId): bool
-    {
-        return $user->notifications()
-            ->where('type', MailboxHistoryImportCompletedNotification::class)
-            ->where('data->viewData->batch_id', $batchId)
-            ->exists();
-    }
-
     private function notifyImportComplete(
         User $user,
         ConnectedAccount $account,
@@ -135,6 +125,10 @@ final readonly class CompleteMailboxHistoryImportAction
         int $failedCalendarCount = 0,
         bool $calendarDidNotFinish = false,
     ): void {
+        if (! $afterRetry) {
+            $account->update(['history_import_notified_batch_id' => $batchId]);
+        }
+
         $notification = new MailboxHistoryImportCompletedNotification(
             $account,
             $batchId,

@@ -17,8 +17,8 @@ use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Messages\ToolResultMessage;
 use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\DisplayFieldSelector;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
@@ -41,7 +41,7 @@ mutates(GetCompanyTool::class);
 mutates(ListOpportunitiesTool::class);
 mutates(GetOpportunityTool::class);
 mutates(ListTasksTool::class);
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 mutates(SupersededAwareConversationStore::class);
 
 beforeEach(function (): void {
@@ -589,7 +589,7 @@ it('derives display_blocks from persisted tool results on reload', function (): 
 
     $conversationId = seedBlockConversation($user, blockToolResults());
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $conversationId);
     $assistant = collect($messages)->firstWhere('role', 'assistant');
 
     expect($assistant['display_blocks'])->toHaveCount(1)
@@ -611,7 +611,7 @@ it('preserves tool-call order when an earlier tool emits no display block', func
     ];
 
     $conversationId = seedBlockConversation($user, $toolResults);
-    $messages = resolve(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $conversationId);
     $assistant = collect($messages)->firstWhere('role', 'assistant');
 
     expect($assistant['display_blocks'])->toHaveCount(1)

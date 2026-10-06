@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Note;
 
-use App\Actions\Note\ListNotes;
 use App\Concerns\OperatesOnCrmEntity;
 use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
@@ -21,11 +20,6 @@ final class ListNotesTool extends BaseReadListTool
     public function description(): string
     {
         return 'List notes with optional filters and pagination.';
-    }
-
-    protected function actionClass(): string
-    {
-        return ListNotes::class;
     }
 
     protected function resourceClass(): string

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
-use App\Actions\Crm\GetCrmSummary;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\User;
+use App\Queries\Crm\CrmSummaryQuery;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
@@ -24,7 +24,7 @@ final class GetCrmSummaryTool extends Tool
     use HasReadOnlyToolAnnotations;
 
     public function __construct(
-        private readonly GetCrmSummary $summary,
+        private readonly CrmSummaryQuery $summary,
     ) {}
 
     public function schema(JsonSchema $schema): array
@@ -53,6 +53,6 @@ final class GetCrmSummaryTool extends Tool
         /** @var User $user */
         $user = $request->user();
 
-        return Response::structured($this->summary->execute($user));
+        return Response::structured($this->summary->get($user));
     }
 }

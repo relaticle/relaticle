@@ -74,6 +74,7 @@ final readonly class CustomFieldInput
             CustomFieldType::EMAIL,
             CustomFieldType::PHONE,
             CustomFieldType::LINK,
+            CustomFieldType::DOMAIN,
             CustomFieldType::TEXTAREA,
             CustomFieldType::CHECKBOX,
             CustomFieldType::TAGS_INPUT,

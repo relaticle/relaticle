@@ -28,7 +28,6 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
-use Relaticle\Chat\Actions\ListConversations;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
 use Relaticle\Chat\Actions\RenameConversation;
 use Relaticle\Chat\Actions\StoreImportHandoff;
@@ -36,6 +35,7 @@ use Relaticle\Chat\Jobs\GenerateConversationTitle;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Queries\ConversationsQuery;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelAccess;
@@ -640,7 +640,7 @@ final readonly class ChatController
         $user = $request->user();
 
         return response()->json([
-            'data' => (new ListConversations)->execute($user),
+            'data' => new ConversationsQuery()->recent($user),
         ]);
     }
 

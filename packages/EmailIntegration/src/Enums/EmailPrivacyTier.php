@@ -16,6 +16,16 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
     case SUBJECT = 'subject';
     case FULL = 'full';
 
+    public function showsSubject(): bool
+    {
+        return in_array($this, [self::SUBJECT, self::FULL], true);
+    }
+
+    public function showsBody(): bool
+    {
+        return $this === self::FULL;
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

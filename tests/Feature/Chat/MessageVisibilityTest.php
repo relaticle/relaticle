@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Actions\ListConversationMessages;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Tests\Helpers\ChatDocument;
 
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 
 it('hides synthetic user messages from the visible message list', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -44,7 +44,7 @@ it('hides synthetic user messages from the visible message list', function (): v
         ['id' => '019df800-2222-7000-8000-000000000013', 'role' => 'assistant', 'content' => 'Now proposing the linked task.', 'created_at' => now(), 'updated_at' => now()] + $base,
     ]);
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $convId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $convId);
 
     $contents = collect($messages)->pluck('content')->all();
 

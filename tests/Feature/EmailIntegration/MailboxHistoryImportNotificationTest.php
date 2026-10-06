@@ -207,6 +207,11 @@ function mailboxImportQueueContains(string $jobClass): bool
     });
 }
 
+function queuedMailboxImportMailCount(): int
+{
+    return DB::table('jobs')->where('payload', 'like', '%SendQueuedNotifications%')->count();
+}
+
 function retryMailboxImportFromNotification(ConnectedAccount $account): void
 {
     $batchId = $account->history_import_batch_id;
@@ -603,6 +608,101 @@ it('does not send duplicate import notices from repeated completion callbacks or
     expect(resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($user, $account->fresh(), $batchId))->toBeFalse()
         ->and($user->notifications()->count())->toBe(1)
         ->and($user->notifications()->sole()->data['viewData']['kind'])->toBe('partial');
+});
+
+it('does not repeat the import summary after the notice is dismissed', function (): void {
+    config()->set('queue.default', 'database');
+    $user = mailboxImportNotificationUser();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    $account = mailboxImportNotificationAccount($user, [
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]);
+
+    bindMailboxImportMailService(['ok-1'], function (MailServiceInterface $service): void {
+        $service->shouldReceive('fetchMessage')->with('ok-1')->andReturn(mailboxImportFetchedEmail('ok-1'));
+    });
+    bindMailboxImportCalendarService([mailboxImportCalendarEvent('evt-1')]);
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+    workMailboxImportQueueUntilEmpty();
+
+    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1)
+        ->and(queuedMailboxImportMailCount())->toBe(1);
+
+    $user->notifications()->delete();
+
+    (new IncrementalCalendarSyncJob($account->fresh()))->handle(resolve(CalendarServiceFactoryInterface::class));
+    workMailboxImportQueueUntilEmpty();
+
+    expect($user->notifications()->count())->toBe(0)
+        ->and(queuedMailboxImportMailCount())->toBe(1);
+});
+
+it('sends no import summary when a mailbox is imported again', function (): void {
+    config()->set('queue.default', 'database');
+    $user = mailboxImportNotificationUser();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    $account = mailboxImportNotificationAccount($user);
+
+    bindMailboxImportMailService(['ok-1'], function (MailServiceInterface $service): void {
+        $service->shouldReceive('fetchMessage')->with('ok-1')->andReturn(mailboxImportFetchedEmail('ok-1'));
+    });
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+    workMailboxImportQueueUntilEmpty();
+
+    $firstBatchId = $account->fresh()->history_import_batch_id;
+
+    bindMailboxImportMailService(['ok-1', 'ok-2'], function (MailServiceInterface $service): void {
+        $service->shouldReceive('fetchMessage')->with('ok-2')->andReturn(mailboxImportFetchedEmail('ok-2'));
+    });
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account->fresh());
+    workMailboxImportQueueUntilEmpty();
+
+    expect($account->fresh()->history_import_batch_id)->not->toBe($firstBatchId)
+        ->and($account->emails()->count())->toBe(2)
+        ->and($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1)
+        ->and($user->notifications()->sole()->data['viewData']['batch_id'])->toBe($firstBatchId)
+        ->and(queuedMailboxImportMailCount())->toBe(1);
+});
+
+it('sends no recovery notice when a repeated import repairs its calendar failure', function (): void {
+    config()->set('queue.default', 'database');
+    $user = mailboxImportNotificationUser();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    $account = mailboxImportNotificationAccount($user, [
+        'capabilities' => ['email' => true, 'calendar' => true],
+    ]);
+
+    bindMailboxImportMailService(['ok-1'], function (MailServiceInterface $service): void {
+        $service->shouldReceive('fetchMessage')->with('ok-1')->andReturn(mailboxImportFetchedEmail('ok-1'));
+    });
+    bindMailboxImportCalendarService([mailboxImportCalendarEvent('evt-1')]);
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+    workMailboxImportQueueUntilEmpty();
+
+    bindMailboxImportCalendarService(fetchDeltaException: new RuntimeException('Calendar API unavailable'));
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account->fresh());
+    workMailboxImportQueueUntilEmpty(tries: 1);
+
+    expect($account->fresh()->showsMailboxHistoryImportFailureSummary())->toBeTrue();
+
+    bindMailboxImportCalendarService([mailboxImportCalendarEvent('evt-2')]);
+
+    (new IncrementalCalendarSyncJob($account->fresh()))->handle(resolve(CalendarServiceFactoryInterface::class));
+    workMailboxImportQueueUntilEmpty();
+
+    $notification = $user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->sole();
+
+    expect($account->fresh()->showsMailboxHistoryImportFailureSummary())->toBeFalse()
+        ->and($notification->data['viewData']['kind'])->toBe('complete')
+        ->and(queuedMailboxImportMailCount())->toBe(1);
 });
 
 it('does not carry calendar failures from a previous import into a new import summary', function (): void {

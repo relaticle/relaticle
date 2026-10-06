@@ -522,3 +522,15 @@ it('names every known channel and null in its description', function (): void {
 
     expect($description)->toContain('null');
 });
+
+it('serves an empty page for a page number no activity list can reach', function (mixed $page): void {
+    app(CreateCompany::class)->execute($this->user, ['name' => 'Acme']);
+
+    $payload = activityPayload(['page' => $page]);
+
+    expect($payload['data'])->toBe([])
+        ->and($payload['total'])->toBeGreaterThan(0);
+})->with([
+    'the largest integer' => [PHP_INT_MAX],
+    'a float past the integer range' => [1.0e30],
+]);

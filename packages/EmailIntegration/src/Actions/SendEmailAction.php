@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -28,7 +29,6 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
-use RuntimeException;
 
 final readonly class SendEmailAction
 {
@@ -59,11 +59,8 @@ final readonly class SendEmailAction
      * }  $data
      * @param  class-string|null  $linkToType
      */
-    public function execute(array $data, ?string $linkToType = null, ?string $linkToId = null): Email
+    public function execute(User $user, array $data, ?string $linkToType = null, ?string $linkToId = null): Email
     {
-        /** @var User $user */
-        $user = auth()->user();
-
         /** @var ConnectedAccount $account */
         $account = ConnectedAccount::query()
             ->ownedBy($user, $user->currentWorkspace)
@@ -254,7 +251,7 @@ final readonly class SendEmailAction
             ->where('status', EmailStatus::QUEUED)
             ->count();
 
-        throw_if($queued >= $maxQueued, RuntimeException::class, "You have {$queued} emails queued. Clear the outbox before queuing more.");
+        throw_if($queued >= $maxQueued, OutboxFull::withQueued($queued));
     }
 
     /**

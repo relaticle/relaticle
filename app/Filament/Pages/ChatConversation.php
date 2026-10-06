@@ -8,7 +8,7 @@ use App\Models\User;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
-use Relaticle\Chat\Actions\FindConversation;
+use Relaticle\Chat\Queries\ConversationsQuery;
 
 final class ChatConversation extends Page
 {
@@ -36,8 +36,8 @@ final class ChatConversation extends Page
             /** @var User $user */
             $user = Filament::auth()->user();
 
-            $this->conversationTitle = (new FindConversation)
-                ->execute($user, $this->conversationId)?->title;
+            $this->conversationTitle = new ConversationsQuery()
+                ->find($user, $this->conversationId)?->title;
         }
 
         $this->initialMessage = null;

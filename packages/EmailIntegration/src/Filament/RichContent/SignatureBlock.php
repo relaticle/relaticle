@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\RichContent;
 
+use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor\RichContentCustomBlock;
 use Illuminate\Support\Facades\Auth;
@@ -63,16 +64,17 @@ final class SignatureBlock extends RichContentCustomBlock
             return null;
         }
 
-        $userId = Auth::id();
-        $workspaceId = Filament::getTenant()?->getKey();
+        $user = Auth::user();
+        $workspaceId = Filament::getTenant()?->getKey()
+            ?? ($user instanceof User ? $user->current_workspace_id : null);
 
-        if ($userId === null || $workspaceId === null) {
+        if (! $user instanceof User || $workspaceId === null) {
             return null;
         }
 
         return EmailSignature::query()
             ->whereKey($signatureId)
-            ->where('user_id', $userId)
+            ->where('user_id', $user->getKey())
             ->where('workspace_id', $workspaceId)
             ->value('content_html');
     }

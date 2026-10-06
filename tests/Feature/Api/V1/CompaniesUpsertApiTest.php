@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Actions\CustomFields\FindEntitiesByFieldValue;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\CompaniesUpsertController;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use App\Support\CustomFields\CanonicalValue;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Cache;
@@ -21,7 +21,7 @@ use Tests\Helpers\WorkspaceCustomField;
 
 mutates(
     CompaniesUpsertController::class,
-    FindEntitiesByFieldValue::class,
+    EntitiesByFieldValueQuery::class,
     CanonicalValue::class,
 );
 

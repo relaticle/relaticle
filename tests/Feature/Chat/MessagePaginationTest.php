@@ -5,10 +5,10 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Actions\ListConversationMessages;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Tests\Helpers\ChatDocument;
 
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -47,13 +47,13 @@ beforeEach(function (): void {
 });
 
 it('returns the last 50 messages by default', function (): void {
-    $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page');
+    $result = resolve(ConversationMessagesQuery::class)->get($this->user, 'c-page');
 
     expect($result)->toHaveCount(50);
 });
 
 it('returns earlier messages with beforeMessageId cursor', function (): void {
-    $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page', beforeMessageId: 'm-026');
+    $result = resolve(ConversationMessagesQuery::class)->get($this->user, 'c-page', beforeMessageId: 'm-026');
 
     expect($result)->toHaveCount(25);
     expect($result[0]['content'])->toContain('msg 1');
@@ -65,7 +65,7 @@ it('still fills a whole page when an approval marker sits inside the window', fu
         ->where('id', 'm-050')
         ->update(['role' => 'user', 'origin' => 'resume', 'content' => 'The user decided the proposals above.']);
 
-    $result = resolve(ListConversationMessages::class)->execute($this->user, 'c-page');
+    $result = resolve(ConversationMessagesQuery::class)->get($this->user, 'c-page');
 
     expect($result)->toHaveCount(50)
         ->and(array_column($result, 'id'))->not->toContain('m-050');

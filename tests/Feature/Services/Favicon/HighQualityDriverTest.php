@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Services\Favicon\Drivers\HighQualityDriver;
 use App\Support\Http\HostResolver;
+use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
+use AshAllenDesign\FaviconFetcher\Favicon;
 use Illuminate\Http\Client\Request as HttpClientRequest;
 use Illuminate\Support\Facades\Http;
 
@@ -150,4 +152,44 @@ test('sends nothing when a host resolves to a private address at send time', fun
     expect((new HighQualityDriver)->fetch('https://rebind.example.com'))->toBeNull();
 
     Http::assertNothingSent();
+});
+
+test('reports a host that does not resolve as a connection failure', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (): array => []));
+
+    Http::fake();
+
+    expect(fn (): ?Favicon => (new HighQualityDriver)->fetch('https://no-such-host.example.com'))
+        ->toThrow(ConnectionException::class);
+
+    Http::assertNothingSent();
+});
+
+test('reports an unreachable site with no icon from any other source as a connection failure', function (): void {
+    Http::fake([
+        'https://1.1.1.1' => Http::failedConnection(),
+        '*' => Http::response('', 404),
+    ]);
+
+    expect(fn (): ?Favicon => (new HighQualityDriver)->fetch('https://1.1.1.1'))
+        ->toThrow(ConnectionException::class);
+});
+
+test('uses another source when the site is unreachable', function (): void {
+    app()->instance(HostResolver::class, new HostResolver(fn (): array => ['93.184.216.34']));
+
+    Http::fake([
+        'https://1.1.1.1' => Http::failedConnection(),
+        'https://www.google.com/*' => Http::response('', 200),
+        '*' => Http::response('', 404),
+    ]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1')?->getFaviconUrl())
+        ->toBe('https://www.google.com/s2/favicons?sz=256&domain=1.1.1.1');
+});
+
+test('finds no favicon when the site answers and no source has an icon', function (): void {
+    Http::fake(['*' => Http::response('', 404)]);
+
+    expect((new HighQualityDriver)->fetch('https://1.1.1.1'))->toBeNull();
 });

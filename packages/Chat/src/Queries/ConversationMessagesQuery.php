@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Chat\Actions;
+namespace Relaticle\Chat\Queries;
 
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +18,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\StoredSteps;
 use stdClass;
 
-final readonly class ListConversationMessages
+final readonly class ConversationMessagesQuery
 {
     public function __construct(
         private RecordReferenceResolver $resolver,
@@ -28,7 +28,7 @@ final readonly class ListConversationMessages
     /**
      * @return array<int, array{id: string, role: string, content: string, document: array<string, mixed>, created_at: ?string, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: ?array{rating: string, category: ?string}, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: string|null}|null, attachment: array{id: string, name: string, kind: string, row_count: int}|null}>
      */
-    public function execute(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
+    public function get(User $user, string $conversationId, ?string $beforeMessageId = null, int $limit = 50): array
     {
         $messages = AgentConversationMessage::query()
             ->visibleTo($user, $conversationId)

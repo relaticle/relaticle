@@ -22,13 +22,13 @@ final class GetFilterQueryMetadata extends Strategy
             return null;
         }
 
-        $actionClass = $this->findActionClass($endpointData);
+        $queryClass = $this->findQueryClass($endpointData);
 
-        if ($actionClass === null) {
+        if ($queryClass === null) {
             return null;
         }
 
-        $records = Str::of(self::LIST_ACTION_ENTITIES[$actionClass]->singularName())->lower()->plural();
+        $records = Str::of($queryClass::entity()->singularName())->lower()->plural();
 
         return [
             'title' => "Query {$records}",

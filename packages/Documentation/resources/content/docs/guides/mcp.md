@@ -22,7 +22,7 @@ With the Relaticle MCP server, your AI assistant can:
 - **Read entity schemas** to understand your custom fields
 - **Get a CRM overview** with record counts and recent activity
 
-Writes made over MCP apply immediately. The approval card belongs to the assistant built into Relaticle, and an MCP client relies on its own confirmation prompts. The server exposes CRM records only: it does not send email or read synced mail and meetings.
+Writes made over MCP apply immediately. The approval card belongs to the assistant built into Relaticle, and an MCP client relies on its own confirmation prompts. Email tools exist for a connection that was given email access. Meetings are not exposed. A sent email is the one write that does not apply immediately: it is held first and its user can cancel it.
 
 ---
 
@@ -57,6 +57,8 @@ Clients that support Dynamic Client Registration (RFC 7591), including Claude.ai
 
 At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected. Subscribe first, or the connector would have no data to read.
 
+The consent screen lists what the connector will be able to do, and the list follows your role in the workspace you pick. Where email is on, every role gets reading and drafting, and the Owner, Admin and Member roles get sending. The client cannot ask for more or less. Where email is on, Relaticle shows this screen every time a connector authorizes, so it always holds what its user saw.
+
 Access tokens last 30 days and refresh tokens 90 days; supported clients refresh silently in the background.
 
 ### Revoking a connector
@@ -66,6 +68,8 @@ Access tokens last 30 days and refresh tokens 90 days; supported clients refresh
 ### Personal access tokens (recommended for developer tools)
 
 For Cursor, VS Code, MCP Inspector, or any client without OAuth support, create a personal access token from your account settings and pass it as `Authorization: Bearer YOUR_TOKEN`.
+
+A token gets email access through its permissions: **Read email**, **Draft email**, and **Send email**. A new token has none of them until you tick one.
 
 ---
 
@@ -155,7 +159,7 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 39 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, and file uploads.
+The server provides 44 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, saving email drafts, and sending email. A connection without email access sees 39 tools.
 
 ### Cross-entity discovery
 
@@ -234,6 +238,20 @@ The server provides 39 tools. They cover account context, cross-entity discovery
 | `attach-note-to-entities-tool` | Link a note to companies, people, or opportunities. Adds without removing existing links. |
 | `detach-note-from-entities-tool` | Unlink a note from companies, people, or opportunities |
 
+### Email
+
+These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose. The mailbox, draft and send tools work on the user's own mailboxes.
+
+The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the draft tool for one allowed to draft. The send tool needs the send permission and a role that may send through an assistant. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
+
+| Tool | Description |
+|------|-------------|
+| `list-emails-tool` | List synced emails newest first, with optional search, linked record, direction, thread and date filters. Subject and snippet appear only where the sharing level allows. |
+| `get-email-tool` | Get one synced email by ID. The body and attachment names appear only at full access, and a long body is cut. |
+| `list-email-accounts-tool` | List the mailboxes the user has connected in this workspace, with the ID to use when drafting and whether each can send. |
+| `create-email-draft-tool` | Save a draft in one of the user's mailboxes, as plain text or markdown, with the default signature unless you turn it off. Nothing is sent: the user reviews the draft in Relaticle. |
+| `send-email-tool` | Send an email from one of the user's mailboxes. Each email waits a few minutes before it leaves, and its user can cancel it from notifications or the Outbox. |
+
 ### Files
 
 | Tool | Description |
@@ -247,7 +265,7 @@ Entity list tools take `filter`, `sort`, `include`, `per_page` (default 15, maxi
 
 `sort` takes a native field or a custom field that holds one value. A field that holds a list, such as email, phone, link or tags, cannot be sorted.
 
-List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs. A write stores a phone in E.164 form, a domain link as a bare host, and a date-time as its UTC instant.
+List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs. A write stores a phone in E.164 form, a domain as a bare host, and a date-time as its UTC instant.
 
 ### Filter records
 
@@ -304,7 +322,7 @@ Native fields take the operators of the field type they match. `$is_empty` takes
 | Field type | Operators |
 |---|---|
 | Single choice (select, radio, toggle buttons), `creation_source` | `$eq`, `$in`, `$not_in`, `$is_empty` |
-| Multi choice (multi select, checkbox list), tags, email, phone, link | `$has_any`, `$has_none`, `$is_empty` |
+| Multi choice (multi select, checkbox list), tags, email, phone, link, domain | `$has_any`, `$has_none`, `$is_empty` |
 | Text | `$eq`, `$contains`, `$is_empty` |
 | Number, currency, date, date and time | `$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$is_empty` |
 | Checkbox, toggle | `$eq`, `$is_empty` |
@@ -317,6 +335,7 @@ Record, text area, rich text and color fields take no filter. Neither does an en
 
 - Choice values take the option label or its ID. An unknown label returns an error listing the valid labels. An ambiguous label asks for the option ID.
 - Email and link values match in any letter case. A link also matches with or without its scheme, so `acme.com/team` finds `https://acme.com/team`.
+- Domain values match as a bare host or a full URL, with or without `www.`, so `https://www.acme.com/about` finds `acme.com`.
 - Phone values match in any format. A phone operand needs a country code, such as `+1 415 555 0100`. An operand without one returns the error `phone_number needs a country code, for example +1 415 555 0100.`
 - Tags match the exact stored value.
 - `$not_in` and `$has_none` also match records where the field is empty.

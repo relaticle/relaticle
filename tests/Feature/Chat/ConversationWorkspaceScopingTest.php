@@ -5,9 +5,8 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Actions\FindConversation;
-use Relaticle\Chat\Actions\ListConversationMessages;
-use Relaticle\Chat\Actions\ListConversations;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
+use Relaticle\Chat\Queries\ConversationsQuery;
 use Tests\Helpers\ChatDocument;
 
 it('lists only conversations scoped to the current workspace', function (): void {
@@ -36,13 +35,13 @@ it('lists only conversations scoped to the current workspace', function (): void
         ],
     ]);
 
-    $rows = (new ListConversations)->execute($user);
+    $rows = new ConversationsQuery()->recent($user);
 
     expect($rows)->toHaveCount(1)
         ->and($rows->first()->id)->toBe('conv-current');
 });
 
-it('returns null from FindConversation for cross-workspace conversation ids', function (): void {
+it('returns null from ConversationsQuery::find for cross-workspace conversation ids', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $otherWorkspace = Workspace::factory()->create(['user_id' => $user->getKey()]);
     $user->workspaces()->attach($otherWorkspace, ['role' => 'admin']);
@@ -57,7 +56,7 @@ it('returns null from FindConversation for cross-workspace conversation ids', fu
         'updated_at' => now(),
     ]);
 
-    expect((new FindConversation)->execute($user, 'conv-foreign'))->toBeNull();
+    expect(new ConversationsQuery()->find($user, 'conv-foreign'))->toBeNull();
 });
 
 it('lists no messages from a conversation in another workspace of the same user', function (): void {
@@ -92,7 +91,7 @@ it('lists no messages from a conversation in another workspace of the same user'
         'updated_at' => now(),
     ]);
 
-    expect(resolve(ListConversationMessages::class)->execute($user, 'conv-foreign-messages'))->toBe([]);
+    expect(resolve(ConversationMessagesQuery::class)->get($user, 'conv-foreign-messages'))->toBe([]);
 });
 
 it('scopes a conversation listing to the participant type, not just the id', function (): void {
@@ -119,5 +118,5 @@ it('scopes a conversation listing to the participant type, not just the id', fun
         ],
     ]);
 
-    expect((new ListConversations)->execute($user)->pluck('id')->all())->toBe(['conv-mine']);
+    expect(new ConversationsQuery()->recent($user)->pluck('id')->all())->toBe(['conv-mine']);
 });

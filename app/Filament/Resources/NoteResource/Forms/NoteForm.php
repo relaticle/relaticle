@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\NoteResource\Forms;
 
-use App\Filament\Components\Forms\RecordSelect;
+use App\Enums\CustomFields\NoteField;
+use App\Filament\Components\Forms\LinkedRecordsSelect;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -12,44 +13,22 @@ use Relaticle\CustomFields\Facades\CustomFields;
 final class NoteForm
 {
     /**
-     * @param  array<string>  $excludeFields  Fields to exclude from the form.
-     * @return Schema The modified form instance with the schema applied.
+     * @param  array<string>  $excludeFields
      *
      * @throws \Exception
      */
     public static function get(Schema $schema, array $excludeFields = []): Schema
     {
-        $components = [
-            TextInput::make('title')
-                ->label(__('filament/resources/note.fields.title.label'))
-                ->rules(['max:255'])
-                ->columnSpanFull()
-                ->required(),
-        ];
-
-        if (! in_array('companies', $excludeFields)) {
-            $components[] = RecordSelect::make('companies')
-                ->label(__('filament/resources/note.fields.companies.label'))
-                ->multiple()
-                ->relationship('companies', 'name')
-                ->preload();
-        }
-
-        if (! in_array('people', $excludeFields)) {
-            $components[] = RecordSelect::make('people')
-                ->label(__('filament/resources/note.fields.people.label'))
-                ->multiple()
-                ->relationship('people', 'name')
-                ->preload()
-                ->nullable();
-        }
-
-        $components[] = CustomFields::form()->build()
-            ->columnSpanFull()
-            ->columns(1);
-
         return $schema
-            ->components($components)
-            ->columns(2);
+            ->components([
+                TextInput::make('title')
+                    ->label(__('filament/resources/note.fields.title.label'))
+                    ->rules(['max:255'])
+                    ->required(),
+                LinkedRecordsSelect::make('relations')->withoutRelations($excludeFields),
+                CustomFields::form()->only([NoteField::BODY->value])->build(),
+                CustomFields::form()->except([NoteField::BODY->value])->build(),
+            ])
+            ->columns(1);
     }
 }

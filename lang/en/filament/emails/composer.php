@@ -77,6 +77,7 @@ return [
             'body' => '{1}Sending to 1 recipient.|[2,*]Sending to :count recipients.',
         ],
         'queued' => ['title' => 'Email queued for sending'],
+        'outbox_full' => ['title' => 'Could not queue the email'],
         'signature_created' => ['title' => 'Signature created'],
         'template_created' => ['title' => 'Template saved'],
         'attachment_too_large' => [

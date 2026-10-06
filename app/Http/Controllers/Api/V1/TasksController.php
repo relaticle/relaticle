@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\DeleteTask;
-use App\Actions\Task\ListTasks;
 use App\Actions\Task\UpdateTask;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreTaskRequest;
@@ -14,6 +13,7 @@ use App\Http\Requests\Api\V1\UpdateTaskRequest;
 use App\Http\Resources\V1\TaskResource;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Tasks\TasksQuery;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -30,14 +30,11 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 final readonly class TasksController
 {
     #[ResponseFromApiResource(TaskResource::class, Task::class, collection: true, paginate: 15)]
-    public function index(IndexRequest $request, ListTasks $action, #[CurrentUser] User $user): AnonymousResourceCollection
+    public function index(IndexRequest $request, TasksQuery $query, #[CurrentUser] User $user): AnonymousResourceCollection
     {
-        return TaskResource::collection($action->execute(
-            user: $user,
-            perPage: $request->safe()->integer('per_page', 15),
-            useCursor: $request->safe()->has('cursor'),
-            request: $request,
-        )->appends($request->query()));
+        return TaskResource::collection(
+            $query->paginate($user, $request->toListQuery())->appends($request->query()),
+        );
     }
 
     #[ResponseFromApiResource(TaskResource::class, Task::class, status: 201)]

@@ -210,20 +210,21 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
         return match ($tab) {
             OutboxTab::SCHEDULED => $query->where('status', EmailStatus::QUEUED)
-                ->whereNotNull('scheduled_for')->where('scheduled_for', '>', $dueCutoff),
+                ->whereNotNull('scheduled_for')->where('scheduled_for', '>', $dueCutoff)
+                ->whereNot(fn (Builder $held): Builder => $held->createdOverMcp()),
             OutboxTab::QUEUED => $query->where('status', EmailStatus::QUEUED)
-                ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', $dueCutoff)),
+                ->where(fn (Builder $dueQuery): Builder => $dueQuery
+                    ->whereNull('scheduled_for')
+                    ->orWhere('scheduled_for', '<=', $dueCutoff)
+                    ->orWhere(fn (Builder $held): Builder => $held->createdOverMcp())),
             OutboxTab::SENDING => $query->where('status', EmailStatus::SENDING),
             OutboxTab::FAILED => $query->where('status', EmailStatus::FAILED),
             OutboxTab::SENT => $query->where('status', EmailStatus::SENT)->where('sent_at', '>=', now()->subDay()),
         };
     }
 
-    /**
-     * Interactive sends stamp scheduled_for a few seconds ahead so the user can
-     * undo. That delay is not a scheduled send; the queued tab should show it
-     * immediately, matching the outbox badge.
-     */
+    // An undo window and an assistant's hold are not scheduled sends, so the queued tab
+    // shows both at once, matching the outbox badge.
     private function queuedDueCutoff(): CarbonInterface
     {
         return now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));

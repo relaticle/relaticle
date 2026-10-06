@@ -6,12 +6,18 @@ use App\Actions\Task\NotifyTaskAssignees;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Mail\TaskAssignedMail;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
 use Filament\Schemas\Components\Component;
+use Filament\Support\Enums\IconSize;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +25,8 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+
+use function Filament\Support\generate_icon_html;
 
 mutates(ManageTasks::class, NotifyTaskAssignees::class, TaskResource::class);
 
@@ -42,22 +50,30 @@ it('heads every column but the task title with an icon', function (): void {
 
     livewire(ManageTasks::class)
         ->assertTableColumnExists('title', fn (Column $column): bool => ! $hasIcon($column))
+        ->assertTableColumnExists('relations', $hasIcon)
         ->assertTableColumnExists('assignees.name', $hasIcon)
         ->assertTableColumnExists('created_at', $hasIcon);
+});
+
+it('heads the relations column with the link icon', function (): void {
+    $linkIcon = generate_icon_html(Heroicon::OutlinedLink, size: IconSize::Small)->toHtml();
+
+    livewire(ManageTasks::class)
+        ->assertTableColumnExists('relations', fn (Column $column): bool => str_contains((string) $column->getLabel(), $linkIcon));
 });
 
 it('exposes the expected table columns', function (): void {
     $table = livewire(ManageTasks::class);
 
-    foreach (['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
+    foreach (['title', 'relations', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
         $table->assertTableColumnExists($column);
     }
 
-    foreach (['title', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
+    foreach (['title', 'relations', 'assignees.name', 'creator.name', 'created_at', 'updated_at', 'deleted_at'] as $column) {
         $table->assertTableColumnVisible($column);
     }
 
-    foreach (['title', 'creator.name'] as $column) {
+    foreach (['title', 'relations', 'creator.name'] as $column) {
         $table->assertCanRenderTableColumn($column);
     }
 
@@ -221,6 +237,25 @@ it('notifies only the assignees submitted through the create action', function (
     Mail::assertNotQueued(TaskAssignedMail::class, fn (TaskAssignedMail $mail): bool => $mail->hasTo($concurrentAssignee->email));
 });
 
+it('links companies, people and opportunities to a task from the relations picker', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->callAction('create', data: [
+            'title' => 'Send the renewal quote',
+            'relations' => ["company:{$company->id}", "people:{$person->id}", "opportunity:{$opportunity->id}"],
+        ])
+        ->assertHasNoActionErrors();
+
+    $task = Task::query()->where('title', 'Send the renewal quote')->sole();
+
+    expect($task->companies->modelKeys())->toBe([$company->id])
+        ->and($task->people->modelKeys())->toBe([$person->id])
+        ->and($task->opportunities->modelKeys())->toBe([$opportunity->id]);
+});
+
 it('can edit a task', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
@@ -371,6 +406,17 @@ it('renders a custom-field datetime in the same format as the table default', fu
     livewire(ManageTasks::class)
         ->assertOk()
         ->assertSee(Date::parse('2026-08-19 08:30:00', 'Asia/Tokyo')->translatedFormat($format));
+});
+
+it('shows a due date in the task form the way tables and record pages write it', function (): void {
+    $page = livewire(ManageTasks::class)
+        ->mountAction('create')
+        ->instance();
+
+    $picker = collect($page->getSchema($page->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof DateTimePicker);
+
+    expect(Date::parse('2026-10-09 19:56:31')->format($picker->getDisplayFormat()))->toBe('Oct 9, 2026 19:56');
 });
 
 it('gives the task description the borderless document canvas', function (): void {

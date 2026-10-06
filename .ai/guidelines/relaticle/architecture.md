@@ -28,7 +28,8 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 - `packages/EmailIntegration` owns its controllers, jobs, policies, views, config and
   timeline entries. `App\Http`, `App\Jobs`, `App\Policies`, `App\ActivityLog` and
   `App\Console` must not use it. The app reaches it only from CRM resources, models,
-  onboarding and panel wiring, and anything it exposes to them checks the feature flag
+  onboarding, panel wiring and the MCP email tools in `app/Mcp/Tools/Email`, and
+  anything it exposes to them checks the feature flag
 - Never use the custom-fields package models directly. Use the `App\Models\CustomField*`
   subclasses (runtime model swapping is configured in `AppServiceProvider`)
 - `packages/SystemAdmin` is excluded from PHPStan. When adding or removing enum
@@ -79,10 +80,53 @@ final readonly class CreateOpportunity
   canonical `abort_unless` plus `assertOwned` shape does not apply. Give a command an
   action when a second caller shares the write, otherwise the logic lives in `handle()`
 - When reviewing or refactoring code, extract inline business logic into action classes
-- Use `App\Data` (spatie/laravel-data) objects for structured payloads where they
-  already exist; don't introduce new patterns
+- A structured payload is a class in a `Data` folder. Use spatie/laravel-data when untyped
+  data becomes an object: a request, a stored JSON value, Livewire state
+  (`Relaticle\ImportWizard\Data\ColumnData`). Use a plain `final readonly` class when code
+  builds the object with `new` (`App\Data\ListQuery`). No test tells the two apart, so a
+  reviewer reads for a data object that only ever meets `new`
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
+
+## Queries (the read path)
+
+A reusable read is a query class. An action is a write. `tests/Arch/ConventionsTest.php` fails a
+class under `Actions` named `List*`, `Find*`, `Search*`, `Get*` or `Aggregate*` ("keeps reads out
+of the Actions folders").
+
+| A read that is | Lives in |
+|---|---|
+| a predicate over one model's columns | a `#[Scope]` on the model |
+| one entity's list, or a read across models | `app/Queries/<Domain>/<Name>Query.php` |
+| a read over a package's own models | `packages/<Name>/src/Queries/<Name>Query.php` |
+| a read with one caller | inline in that caller |
+
+A query class is `final readonly`. The five list queries implement
+`App\Queries\Contracts\EntityQuery` and use `App\Queries\Concerns\ListsEntity`. The shape is
+an interface plus a trait, not a base class, because three arch tests forbid inheritance in `App`.
+The trait authorizes and bounds the workspace itself, so a transport cannot forget either:
+
+````php
+final readonly class CompaniesQuery implements EntityQuery
+{
+    use ListsEntity;
+
+    // fields() and includes()
+}
+
+$page = $query->paginate($user, $request->toListQuery());
+````
+
+- Each transport maps its own input to `App\Data\ListQuery`. A query class reads no ambient
+  user, request or workspace, because chat tools run in queued jobs. `tests/Arch/ArchTest.php`
+  fails it ("takes the acting user and reads no ambient user, request or workspace")
+- `CrmEntity::query()` owns which query lists which entity. A list query declares `fields()` and
+  `includes()`, and the trait derives the rest
+- `paginate()` is the one entry. The builder behind it stays private until a caller needs more
+  than a page, and `.ai/rules/queries.md` says how to open it
+- A query class never writes. `EloquentWriteOutsideActionRule` (PHPStan) covers every `Queries`
+  folder, and `tests/Arch/ConventionsTest.php` fails one that `phpstan.neon` does not list
+- `.ai/rules/queries.md` holds the filter grammar and the rest of the rules
 
 ## One fact, one owner
 

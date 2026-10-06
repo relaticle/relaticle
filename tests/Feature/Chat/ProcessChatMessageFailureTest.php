@@ -22,7 +22,6 @@ use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Streaming\Events\Error;
 use Laravel\Pennant\Feature;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -33,6 +32,7 @@ use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
 use Tests\Helpers\AnthropicSse;
 
@@ -144,7 +144,7 @@ it('leaves the thread empty when the opening turn dies, so the next open greets 
     )->failed(new RuntimeException('boom'));
 
     expect(DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->count())->toBe(0)
-        ->and(resolve(ListConversationMessages::class)->execute($user, $conversationId))->toBe([]);
+        ->and(resolve(ConversationMessagesQuery::class)->get($user, $conversationId))->toBe([]);
 
     Queue::fake();
 
@@ -193,7 +193,7 @@ it('records a dead resumed turn as its opener, never as words the user typed', f
     expect($userRows)->toHaveCount(1)
         ->and($userRows->first()->origin)->toBe(MessageOrigin::Resume->value)
         ->and($userRows->first()->content)->toBe("The user decided the proposals above:\n- REJECTED (nothing was written): delete sample_data \"All sample records\"")
-        ->and(array_column(resolve(ListConversationMessages::class)->execute($user, $conversationId), 'role'))
+        ->and(array_column(resolve(ConversationMessagesQuery::class)->get($user, $conversationId), 'role'))
         ->toBe(['assistant']);
 });
 

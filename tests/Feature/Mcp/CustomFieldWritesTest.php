@@ -21,6 +21,7 @@ use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Rules\OwnedLookupRecords;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
@@ -30,6 +31,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\LegacyCompanyDomains;
@@ -560,6 +562,7 @@ it('sets then clears a value for every writable custom field type', function (st
     'email' => ['email', ['ada@example.com'], ['ada@example.com']],
     'phone' => ['phone', ['+14155552671'], ['+14155552671']],
     'link' => ['link', ['https://Example.com/Pricing/'], ['https://example.com/Pricing']],
+    'domain' => ['domain', ['https://www.Acme.com/pricing?x=1#top'], ['acme.com']],
     'checkbox' => ['checkbox', true, true],
     'toggle' => ['toggle', true, true],
     'tags-input' => ['tags-input', ['priority', 'customer'], ['priority', 'customer']],
@@ -663,3 +666,62 @@ it('rejects a domain another company holds in a different spelling', function ()
         ->tool(UpdateCompanyTool::class, ['id' => $own->getKey(), 'custom_fields' => ['domains' => ['https://acme.com', 'www.other.com']]])
         ->assertHasErrors(['The value "www.other.com" is already assigned to another record.']);
 });
+
+function domainProbeField(Workspace $workspace): CustomField
+{
+    return CustomField::query()->create([
+        'tenant_id' => $workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'probe_domains',
+        'name' => 'Probe domains',
+        'type' => 'domain',
+        'sort_order' => 70,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => true,
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 5),
+    ]);
+}
+
+it('stores every spelling of a domain as its bare lowercase host', function (string $input): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$input]);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe(['acme.com']);
+})->with([
+    'scheme, www and path' => 'https://www.Acme.com/pricing?x=1#top',
+    'bare' => 'acme.com',
+    'userinfo and port' => 'http://user:secret@acme.com:8080/',
+    'trailing dot' => 'ACME.COM.',
+    'padded' => '  www.acme.com  ',
+    'at sign in the query' => 'acme.com?ref=a@b.com',
+    'repeated www' => 'www.www.acme.com',
+    'non-breaking space' => "\u{00A0}https://acme.com",
+    'zero-width characters' => "https://\u{200B}acme.com\u{FEFF}",
+    'stacked schemes split by whitespace' => "http:// HTTPS://\thttp://\u{00A0}acme.com",
+    'two hundred stacked schemes' => str_repeat('http://', 200).'Acme.com/x',
+]);
+
+it('keeps a domain value it cannot read as a host', function (string $input, string $stored): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$input]);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe([$stored]);
+})->with([
+    'not a link' => ['N/A', 'N/A'],
+    'tel uri' => ['tel:+14155550100', 'tel:+14155550100'],
+    'www host with no registrable part' => ['WWW.CO', 'www.co'],
+]);
+
+it('drops a domain value that holds no host', function (string $empty): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$empty, 'https://www.Acme.com/x']);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe(['acme.com']);
+})->with(['scheme only' => 'https://', 'slash' => '/', 'www only' => 'www.']);

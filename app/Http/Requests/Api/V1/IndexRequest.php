@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Data\ListQuery;
 use App\Queries\FilterTree;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,7 +29,7 @@ final class IndexRequest extends FormRequest
         return [
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'cursor' => ['sometimes'],
-            'page' => ['sometimes', 'integer', 'min:1'],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.ListQuery::MAX_PAGE],
             'include' => ['sometimes', 'string'],
             'sort' => ['sometimes', 'string'],
             'fields' => ['sometimes', $this->fieldNames(...)],
@@ -57,6 +58,18 @@ final class IndexRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    public function toListQuery(): ListQuery
+    {
+        return new ListQuery(
+            filter: $this->input('filter'),
+            sort: $this->validated('sort'),
+            include: $this->validated('include'),
+            fields: $this->validated('fields'),
+            perPage: $this->safe()->integer('per_page', 15),
+            cursor: $this->safe()->has('cursor'),
+        );
     }
 
     protected function prepareForValidation(): void
@@ -96,7 +109,7 @@ final class IndexRequest extends FormRequest
     private function fieldNames(string $attribute, mixed $value, Closure $fail): void
     {
         $isNameList = static fn (mixed $names, int|string $recordType): bool => is_string($names)
-            || (is_string($recordType) && is_array($names) && array_all($names, static fn (mixed $name): bool => is_string($name)));
+            || (! is_numeric($recordType) && is_array($names) && array_all($names, static fn (mixed $name): bool => is_string($name)));
 
         if (! array_all(Arr::wrap($value), $isNameList)) {
             $fail(__('validation.filter.field_names'));

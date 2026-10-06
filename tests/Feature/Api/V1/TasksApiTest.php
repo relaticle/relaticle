@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Task\CreateTask;
 use App\Actions\Task\DeleteTask;
-use App\Actions\Task\ListTasks;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\TasksController;
@@ -14,6 +13,8 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Concerns\ListsEntity;
+use App\Queries\Tasks\TasksQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -24,7 +25,8 @@ mutates(
     CreateTask::class,
     UpdateTask::class,
     DeleteTask::class,
-    ListTasks::class,
+    TasksQuery::class,
+    ListsEntity::class,
 );
 
 beforeEach(function () {

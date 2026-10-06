@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Actions\Opportunity;
+namespace App\Queries\Opportunities;
 
 use App\Enums\CustomFields\OpportunityField;
 use App\Models\CustomField;
@@ -10,7 +10,7 @@ use App\Models\Opportunity;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-final readonly class AggregateOpportunities
+final readonly class OpportunityAggregatesQuery
 {
     /**
      * Cap on the number of grouped rows returned. Grand totals are computed
@@ -23,7 +23,7 @@ final readonly class AggregateOpportunities
      *
      * @return array{group_by: string, rows: list<array{label: string, count: int, total_amount: float}>, total_count: int, total_amount: float, truncated: bool}
      */
-    public function execute(
+    public function get(
         User $user,
         string $groupBy,
         ?string $dateFrom = null,

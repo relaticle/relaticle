@@ -9,6 +9,7 @@ use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Models\CustomField;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use Filament\Actions\Action;
@@ -16,6 +17,8 @@ use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportTesting\Testable;
+use Relaticle\CustomFields\Livewire\ManageFieldsTable;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
@@ -191,6 +194,21 @@ test('a workspace admin can open the custom fields tab, and a member cannot', fu
     $this->actingAs($member)
         ->get(CustomFields::getUrl(tenant: $this->workspace))
         ->assertForbidden();
+});
+
+test('the custom fields form refuses the domain type and still creates a text field', function (): void {
+    $create = fn (string $name, string $type): Testable => livewire(ManageFieldsTable::class, ['entityType' => 'company'])
+        ->callAction('createField', ['name' => $name, 'type' => $type, 'entity_type' => 'company']);
+
+    $create('Second domains', 'domain')->assertHasActionErrors(['type']);
+    $create('Plain probe', 'text')->assertHasNoActionErrors();
+
+    $created = CustomField::query()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->whereIn('name', ['Second domains', 'Plain probe'])
+        ->pluck('type', 'name');
+
+    expect($created->all())->toBe(['Plain probe' => 'text']);
 });
 
 test('the tab strip drops billing when the feature is off', function (): void {

@@ -62,8 +62,9 @@ trait HasCustomFieldColumns
         return match ($name) {
             'accountOwner.name' => Heroicon::OutlinedUser,
             'creator.name' => Heroicon::OutlinedUserCircle,
-            'assignees.name', 'people.name' => Heroicon::OutlinedUsers,
-            'company.name', 'companies.name' => Heroicon::OutlinedBuildingOffice2,
+            'assignees.name' => Heroicon::OutlinedUsers,
+            'company.name' => Heroicon::OutlinedBuildingOffice2,
+            'relations' => Heroicon::OutlinedLink,
             'created_at' => Heroicon::OutlinedCalendar,
             'updated_at' => Heroicon::OutlinedClock,
             'deleted_at' => Heroicon::OutlinedTrash,

@@ -79,6 +79,7 @@ const FILTER_OPERATORS_BY_TYPE = [
     'email' => LIST_OPERATORS,
     'phone' => LIST_OPERATORS,
     'link' => LIST_OPERATORS,
+    'domain' => LIST_OPERATORS,
 ];
 
 const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
@@ -791,6 +792,24 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['domain' => ['$in' => ['globex.com']], '$is_empty' => false], ['High']],
     ], ['acme.com']],
 ]);
+
+it('filters company domains by any spelling on the api and mcp', function (): void {
+    $domains = WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains');
+    unlinkedRecord($this->user, 'companies', 'Acme')->saveCustomFieldValue($domains, ['acme.com']);
+    unlinkedRecord($this->user, 'companies', 'Globex')->saveCustomFieldValue($domains, ['globex.com']);
+    unlinkedRecord($this->user, 'companies', 'Unset');
+    $on = fn (array $condition): array => ['custom_fields' => ['domains' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'companies', [
+        [$on(['$has_any' => ['https://www.ACME.com/about?x=1']]), ['Acme']],
+        [$on(['$has_any' => ['acme.com', 'GLOBEX.com']]), ['Acme', 'Globex']],
+        [$on(['$has_none' => ['https://acme.com/']]), ['Globex', 'Unset']],
+        [$on(['$is_empty' => true]), ['Unset']],
+        [$on(['$is_empty' => false]), ['Acme', 'Globex']],
+    ]);
+
+    expectErrorOnEverySurface($this, $this->user, 'companies', $on(['domain' => ['$in' => ['acme.com']]]), 'filter.custom_fields.domains.domain', 'domains does not support domain.');
+});
 
 it('rejects a custom field that takes no filter on the api and mcp', function (string $type): void {
     resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Probe', 'code' => 'probe', 'type' => $type]);

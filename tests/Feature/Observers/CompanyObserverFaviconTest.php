@@ -75,3 +75,37 @@ test('observer does not dispatch when domain custom field is empty', function ()
 
     Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
+
+test('observer dispatches favicon job when the domain no longer matches the stored logo', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['old-domain.com']],
+    ]);
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->withCustomProperties(['domain' => 'https://old-domain.com'])
+        ->toMediaCollection('logo');
+
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $company->update(['custom_fields' => [CompanyField::DOMAINS->value => ['new-domain.com']]]);
+
+    Bus::assertDispatched(FetchFaviconForCompany::class);
+});
+
+test('observer does not dispatch favicon job when the stored logo matches the domain', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->withCustomProperties(['domain' => 'https://example.com'])
+        ->toMediaCollection('logo');
+
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $company->update(['name' => 'Renamed']);
+
+    Bus::assertNotDispatched(FetchFaviconForCompany::class);
+});

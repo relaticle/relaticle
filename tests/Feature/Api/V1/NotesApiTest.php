@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
-use App\Actions\Note\ListNotes;
 use App\Actions\Note\UpdateNote;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\NotesController;
@@ -14,6 +13,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Concerns\ListsEntity;
+use App\Queries\Notes\NotesQuery;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -24,7 +25,8 @@ mutates(
     CreateNote::class,
     UpdateNote::class,
     DeleteNote::class,
-    ListNotes::class,
+    NotesQuery::class,
+    ListsEntity::class,
 );
 
 beforeEach(function () {

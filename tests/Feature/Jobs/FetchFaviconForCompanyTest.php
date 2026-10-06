@@ -220,3 +220,102 @@ test('the company logo collection refuses svg content from any writer', function
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION))
         ->toThrow(FileUnacceptableForCollection::class);
 });
+
+test('replaces the logo fetched for a previous domain', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['new-domain.com']],
+    ]);
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->withCustomProperties(['domain' => 'https://old-domain.com'])
+        ->toMediaCollection('logo');
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://1.1.1.1/favicon.png');
+    $favicon->shouldReceive('getIconSize')->andReturn(180);
+    $favicon->shouldReceive('getIconType')->andReturn('apple-touch-icon');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+    Http::fake(['https://1.1.1.1/favicon.png' => Http::response(onePixelPng(), 200)]);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    $logos = $company->fresh()->getMedia('logo');
+
+    expect($logos)->toHaveCount(1)
+        ->and($logos->first()->getCustomProperty('domain'))->toBe('https://new-domain.com');
+});
+
+test('drops the logo of a previous domain when the new domain has no favicon', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['new-domain.com']],
+    ]);
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->withCustomProperties(['domain' => 'https://old-domain.com'])
+        ->toMediaCollection('logo');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn(null);
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    expect($company->fresh()->getMedia('logo'))->toBeEmpty();
+});
+
+test('ignores a domain stored against another workspace field', function (): void {
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+
+    $foreignDomainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $otherWorkspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', CompanyField::DOMAINS->value)
+        ->firstOrFail();
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
+
+    CustomFieldValue::withoutEvents(function () use ($company, $otherWorkspace, $foreignDomainsField): void {
+        $company->customFieldValues()->delete();
+
+        CustomFieldValue::forceCreate([
+            'tenant_id' => $otherWorkspace->getKey(),
+            'entity_type' => 'company',
+            'entity_id' => $company->getKey(),
+            'custom_field_id' => $foreignDomainsField->getKey(),
+            'json_value' => ['foreign.com'],
+        ]);
+    });
+
+    Filament::setTenant(null);
+    Favicon::shouldReceive('driver')->never();
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+});
+
+test('keeps the logo of a previous domain when the fetch for the new domain throws', function (): void {
+    Storage::fake('public');
+
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['new-domain.com']],
+    ]);
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->withCustomProperties(['domain' => 'https://old-domain.com'])
+        ->toMediaCollection('logo');
+
+    Favicon::shouldReceive('driver->fetch')->andThrow(new RuntimeException('Could not resolve host'));
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    $logos = $company->fresh()->getMedia('logo');
+
+    expect($logos)->toHaveCount(1)
+        ->and($logos->first()->getCustomProperty('domain'))->toBe('https://old-domain.com');
+});

@@ -30,15 +30,15 @@ final class GetFromSpatieQueryBuilder extends Strategy
             return null;
         }
 
-        $actionClass = $this->findActionClass($endpointData);
+        $queryClass = $this->findQueryClass($endpointData);
 
-        if ($actionClass === null) {
+        if ($queryClass === null) {
             return null;
         }
 
         return [
-            ...$this->filterParameters(self::LIST_ACTION_ENTITIES[$actionClass]),
-            ...$this->listParameters($actionClass),
+            ...$this->filterParameters($queryClass::entity()),
+            ...$this->listParameters($queryClass),
         ];
     }
 

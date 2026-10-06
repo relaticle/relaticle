@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
-use App\Actions\Opportunity\ListOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\OpportunitiesController;
@@ -17,6 +16,8 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Concerns\ListsEntity;
+use App\Queries\Opportunities\OpportunitiesQuery;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -27,7 +28,8 @@ mutates(
     CreateOpportunity::class,
     UpdateOpportunity::class,
     DeleteOpportunity::class,
-    ListOpportunities::class,
+    OpportunitiesQuery::class,
+    ListsEntity::class,
     OpportunityResource::class,
 );
 

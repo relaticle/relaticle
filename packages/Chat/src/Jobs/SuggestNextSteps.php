@@ -72,7 +72,7 @@ final class SuggestNextSteps implements ShouldQueue
         }
 
         // The message row is the durable home: a reload reads them back through
-        // ListConversationMessages, so the strip survives a refresh exactly as
+        // ConversationMessagesQuery, so the strip survives a refresh exactly as
         // the transcript above it does.
         if (! $this->persist($steps)) {
             return;

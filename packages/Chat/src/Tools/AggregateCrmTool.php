@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Query\JoinClause;
 use Laravel\Ai\Contracts\Tool;
@@ -83,7 +83,7 @@ final class AggregateCrmTool implements Tool
         }
 
         try {
-            $result = resolve(AggregateOpportunities::class)->execute(
+            $result = resolve(OpportunityAggregatesQuery::class)->get(
                 user: $user,
                 groupBy: $groupBy,
                 dateFrom: $dateFrom,
@@ -136,7 +136,7 @@ final class AggregateCrmTool implements Tool
 
         // Counted separately rather than summed off $rows: the group list is
         // capped, so summing it would under-report the moment a workspace has more
-        // than MAX_COMPANY_GROUPS companies. Mirrors AggregateOpportunities::grandTotals().
+        // than MAX_COMPANY_GROUPS companies. Mirrors OpportunityAggregatesQuery::grandTotals().
         return (string) json_encode([
             'group_by' => 'people_per_company',
             'rows' => $mappedRows,

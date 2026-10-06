@@ -2,20 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Filament\Components\Forms\LinkedRecordsSelect;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
-use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Company;
 use App\Models\Note;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Select;
 use Filament\Schemas\Schema;
 
-mutates(TaskForm::class, NoteForm::class);
+mutates(TaskForm::class, NoteForm::class, LinkedRecordsSelect::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -25,92 +26,85 @@ beforeEach(function (): void {
 });
 
 /**
- * A searchable Filament select that is not preloaded returns null from
- * getOptionsFromRelationship() (Select.php:1065), which renders as an empty
- * dropdown until the user types. ->multiple() makes a select searchable by
- * default (Select.php:787), so every multiple relationship select needs
- * ->preload() to show an initial list.
- *
- * @return array<string, Select>
+ * @param  array<string>  $excludeFields
  */
-function entityPickers(Schema $schema): array
+function relationsPicker(string $form = NoteForm::class, string $model = Note::class, array $excludeFields = []): LinkedRecordsSelect
 {
-    $schema->getComponents();
-
-    $found = [];
-
-    foreach ($schema->getComponents() as $component) {
-        if ($component instanceof Select && $component->hasRelationship()) {
-            $found[$component->getName()] = $component;
-        }
-    }
-
-    return $found;
+    return $form::get(Schema::make(app(ManageTasks::class))->model($model), $excludeFields)->getFlatFields()['relations'];
 }
 
 /**
- * Option labels carry the record's avatar as markup, so the assertions below
- * compare the text a user reads rather than the chip HTML around it.
- *
- * @param  array<string|int, string>  $options
- * @return array<int, string>
+ * @param  list<array{label: string, options: list<array{name: string}>}>  $groups
+ * @return array<string, list<string>>
  */
-function pickerOptionText(array $options): array
+function recordNamesByGroup(array $groups): array
 {
-    return array_values(array_map(
-        fn (string $label): string => trim((string) preg_replace('/\s+/', ' ', strip_tags($label))),
-        $options,
-    ));
+    return collect($groups)
+        ->mapWithKeys(fn (array $group): array => [$group['label'] => array_column($group['options'], 'name')])
+        ->all();
 }
 
-it('shows companies and people without typing on the task form', function (): void {
-    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zeta Industries']);
-    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
-    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zoe Baker']);
+it('offers the most recently updated companies, people and opportunities before the user types on the :dataset form', function (string $form, string $model): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp', 'updated_at' => now()->subDay()]);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Zeta Industries', 'updated_at' => now()]);
     People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme renewal']);
 
-    $livewire = app(ManageTasks::class);
-    $pickers = entityPickers(TaskForm::get(Schema::make($livewire)->model(Task::class)));
+    expect(recordNamesByGroup(relationsPicker($form, $model)->getRecordGroupsForJs()))->toBe([
+        'Companies' => ['Zeta Industries', 'Acme Corp'],
+        'People' => ['Adam Clark'],
+        'Opportunities' => ['Acme renewal'],
+    ]);
+})->with([
+    'task' => [TaskForm::class, Task::class],
+    'note' => [NoteForm::class, Note::class],
+]);
 
-    expect($pickers)->toHaveKeys(['companies', 'people']);
+it('searches every record type on the server and treats wildcards as text', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Northwind Traders']);
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => '100% Organic']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Nora Northwind']);
 
-    foreach (['companies', 'people'] as $name) {
-        expect($pickers[$name]->isPreloaded())->toBeTrue("{$name} must preload or it renders empty until the user types");
-        expect($pickers[$name]->getOptionsFromRelationship())->not->toBeNull()
-            ->and($pickers[$name]->getOptionsFromRelationship())->not->toBeEmpty();
-    }
-
-    expect(pickerOptionText($pickers['companies']->getOptionsFromRelationship()))->toBe(['Acme Corp', 'Zeta Industries'])
-        ->and(pickerOptionText($pickers['people']->getOptionsFromRelationship()))->toBe(['Adam Clark', 'Zoe Baker']);
+    expect(recordNamesByGroup(relationsPicker()->getRecordGroupsForJs('northwind')))->toBe([
+        'Companies' => ['Northwind Traders'],
+        'People' => ['Nora Northwind'],
+    ])->and(recordNamesByGroup(relationsPicker()->getRecordGroupsForJs('%')))->toBe([
+        'Companies' => ['100% Organic'],
+    ]);
 });
 
-it('shows companies and people without typing on the note form', function (): void {
-    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
-    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark']);
+it('offers a short list before the user types and a longer one for a search', function (): void {
+    Company::factory()->count(12)->recycle([$this->user, $this->workspace])->create(['name' => 'Harbor Freight']);
 
-    $livewire = app(ManageTasks::class);
-    $pickers = entityPickers(NoteForm::get(Schema::make($livewire)->model(Note::class)));
-
-    expect($pickers)->toHaveKeys(['companies', 'people']);
-
-    foreach (['companies', 'people'] as $name) {
-        expect($pickers[$name]->isPreloaded())->toBeTrue("{$name} must preload or it renders empty until the user types");
-        expect($pickers[$name]->getOptionsFromRelationship())->not->toBeEmpty();
-    }
+    expect(relationsPicker()->getRecordGroupsForJs()[0]['options'])->toHaveCount(5)
+        ->and(relationsPicker()->getRecordGroupsForJs('harbor')[0]['options'])->toHaveCount(10);
 });
 
-it('scopes the preloaded options to the acting tenant', function (): void {
+it('leaves the parent record type out of the relations picker', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create();
+    People::factory()->recycle([$this->user, $this->workspace])->create();
+
+    expect(array_column(relationsPicker(excludeFields: ['companies'])->getRecordGroupsForJs(), 'label'))->toBe(['People']);
+});
+
+it('never offers a record from another workspace, even outside a panel request', function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Mine Co']);
 
     $otherUser = User::factory()->withWorkspace()->create();
     Company::factory()->recycle([$otherUser, $otherUser->currentWorkspace])->create(['name' => 'Theirs Co']);
 
-    // WorkspaceScope is installed by ApplyTenantScopes, which is panel middleware:
-    // building the schema without a panel request would read every tenant's rows.
-    $this->get(TaskResource::getUrl('index', tenant: $this->workspace));
+    expect(recordNamesByGroup(relationsPicker()->getRecordGroupsForJs()))->toBe(['Companies' => ['Mine Co']])
+        ->and(relationsPicker()->getRecordGroupsForJs('Theirs'))->toBe([]);
+});
 
-    $pickers = entityPickers(TaskForm::get(Schema::make(app(ManageTasks::class))->model(Task::class)));
-    $options = pickerOptionText($pickers['companies']->getOptionsFromRelationship());
+it('describes a person by their company and links each option to its record', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Adam Clark', 'company_id' => $company->id]);
 
-    expect($options)->toContain('Mine Co')->not->toContain('Theirs Co');
+    $options = collect(relationsPicker()->getRecordGroupsForJs())->flatMap(fn (array $group): array => $group['options'])->keyBy('value');
+
+    expect($options["people:{$person->id}"])
+        ->hint->toBe('Acme Corp')
+        ->url->toBe(PeopleResource::getUrl('view', ['record' => $person], tenant: $this->workspace))
+        ->and($options["company:{$company->id}"]['hint'])->toBeNull();
 });

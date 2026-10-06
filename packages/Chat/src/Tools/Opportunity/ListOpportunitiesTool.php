@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Opportunity;
 
-use App\Actions\Opportunity\ListOpportunities;
 use App\Concerns\OperatesOnCrmEntity;
 use App\Enums\CrmEntity;
 use App\Http\Resources\V1\NoteResource;
@@ -20,11 +19,6 @@ final class ListOpportunitiesTool extends BaseReadListTool
     public function description(): string
     {
         return 'List opportunities/deals with optional filters and pagination.';
-    }
-
-    protected function actionClass(): string
-    {
-        return ListOpportunities::class;
     }
 
     protected function resourceClass(): string

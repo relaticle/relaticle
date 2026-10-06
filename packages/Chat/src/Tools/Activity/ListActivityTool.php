@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools\Activity;
 
+use App\Data\ListQuery;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceCapability;
 use App\Models\ActivityLog\Activity;
@@ -643,7 +644,7 @@ final readonly class ListActivityTool implements Tool
             return 1;
         }
 
-        return max(1, (int) $page);
+        return max(1, (int) min($page, ListQuery::MAX_PAGE));
     }
 
     private function stringOrNull(mixed $value): ?string

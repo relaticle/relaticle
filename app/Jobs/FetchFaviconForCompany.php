@@ -11,14 +11,17 @@ use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use finfo;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -35,32 +38,21 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
     public function handle(): void
     {
         try {
-            // The custom-fields package registers the tenant relation under the name
-            // `team`, so the relation has to be named rather than guessed.
-            $customFieldDomain = $this->company->customFields()
-                ->whereBelongsTo($this->company->workspace, 'team')
-                ->where('code', CompanyField::DOMAINS->value)
-                ->first();
+            $sourceUrl = self::sourceUrl($this->company);
 
-            // Reading a value walks every custom field value on the company, and a company
-            // with more than one of them trips strict lazy loading outside production.
-            $this->company->load('customFieldValues.customField.options');
-
-            $domains = $this->company->getCustomFieldValue($customFieldDomain);
-            $domainName = is_array($domains) ? ($domains[0] ?? null) : $domains;
-
-            if ($domainName === null || $domainName === '') {
+            if ($sourceUrl === null) {
                 return;
             }
 
-            if (! Str::startsWith($domainName, ['http://', 'https://'])) {
-                $domainName = 'https://'.$domainName;
-            }
-
-            $favicon = Favicon::driver('high-quality')->fetch($domainName);
+            $favicon = Favicon::driver('high-quality')->fetch($sourceUrl);
             $url = $favicon?->getFaviconUrl();
 
             if ($url === null) {
+                $this->company->getMedia(Company::LOGO_MEDIA_COLLECTION)
+                    ->reject(fn (Media $logo): bool => self::fetchedFrom($logo, $sourceUrl))
+                    ->each
+                    ->delete();
+
                 return;
             }
 
@@ -90,7 +82,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
                 ->usingFileName("logo.{$extension}")
                 ->usingName('company_logo')
                 ->withCustomProperties([
-                    'domain' => $domainName,
+                    'domain' => $sourceUrl,
                     'original_size' => $favicon->getIconSize(),
                     'icon_type' => $favicon->getIconType(),
                     'fetched_at' => now()->toIso8601String(),
@@ -101,6 +93,30 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
         } catch (Throwable $exception) {
             report($exception);
         }
+    }
+
+    public static function sourceUrl(Company $company): ?string
+    {
+        $domains = $company->customFieldValues()
+            ->whereHas('customField', fn (Builder $field): Builder => $field
+                ->where('code', CompanyField::DOMAINS->value)
+                ->where('tenant_id', $company->workspace_id))
+            ->with('customField')
+            ->first()
+            ?->getValue();
+
+        $domain = is_iterable($domains) ? Arr::first($domains) : $domains;
+
+        if (blank($domain)) {
+            return null;
+        }
+
+        return Str::startsWith($domain, ['http://', 'https://']) ? $domain : "https://{$domain}";
+    }
+
+    public static function fetchedFrom(Media $logo, string $sourceUrl): bool
+    {
+        return $logo->getCustomProperty('domain', $sourceUrl) === $sourceUrl;
     }
 
     public function uniqueId(): string

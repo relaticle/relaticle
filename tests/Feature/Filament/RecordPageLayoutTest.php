@@ -400,7 +400,7 @@ it('keeps the :dataset record linked when the rail form offers other record pick
     $otherCompany = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire($page, ['record' => $record->getKey()])
-        ->callAction(quickAction('createNote'), data: ['title' => 'Shared note', 'companies' => [$otherCompany->getKey()]])
+        ->callAction(quickAction('createNote'), data: ['title' => 'Shared note', 'relations' => ["company:{$otherCompany->getKey()}"]])
         ->assertHasNoActionErrors();
 
     expect($record->notes()->count())->toBe(1)

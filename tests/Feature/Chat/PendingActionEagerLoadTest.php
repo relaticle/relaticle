@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Tests\Helpers\ChatDocument;
 
-mutates(ListConversationMessages::class);
+mutates(ConversationMessagesQuery::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -70,7 +70,7 @@ beforeEach(function (): void {
 it('fetches pending_actions in a single batch', function (): void {
     DB::enableQueryLog();
 
-    resolve(ListConversationMessages::class)->execute($this->user, 'c-perf');
+    resolve(ConversationMessagesQuery::class)->get($this->user, 'c-perf');
 
     $queries = collect(DB::getQueryLog())
         ->filter(fn (array $q): bool => str_contains($q['query'], 'pending_actions'));

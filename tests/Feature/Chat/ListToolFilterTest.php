@@ -75,6 +75,21 @@ it('applies a filter when searching for the literal term "0" instead of returnin
     expect($rows)->toHaveCount(1);
 });
 
+it('serves an empty page for a page number no list can reach', function (mixed $page): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Company::factory()->for($user->currentWorkspace)->create(['name' => 'Acme']);
+
+    $data = json_decode(new ListCompaniesTool()->handle(new Request(['page' => $page])), true);
+
+    expect($data['data'])->toBe([])
+        ->and($data['total'])->toBeGreaterThan(0);
+})->with([
+    'the largest integer' => [PHP_INT_MAX],
+    'a float past the integer range' => [1.0e30],
+    'a numeric string' => ['9223372036854775807'],
+]);
+
 it('restricts tasks to the current user when assigned_to_me is true', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);

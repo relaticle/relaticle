@@ -25,7 +25,7 @@ WORKDIR /app
 
 # Corepack is gone from Node 25+, and letting pnpm fetch its own pinned version
 # needs glibc, so install the exact version package.json already pins.
-COPY package.json pnpm-lock.yaml ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN npm install -g "$(node -p 'require("./package.json").packageManager')" \
     && pnpm install --frozen-lockfile --ignore-scripts
 

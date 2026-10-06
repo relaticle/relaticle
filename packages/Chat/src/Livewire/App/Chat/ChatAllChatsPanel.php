@@ -11,8 +11,7 @@ use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Relaticle\Chat\Actions\DeleteConversation;
-use Relaticle\Chat\Actions\ListConversations;
-use Relaticle\Chat\Actions\SearchConversations;
+use Relaticle\Chat\Queries\ConversationsQuery;
 
 final class ChatAllChatsPanel extends BaseLivewireComponent
 {
@@ -67,8 +66,8 @@ final class ChatAllChatsPanel extends BaseLivewireComponent
 
         /** @var Collection<int, \stdClass> $conversations */
         $conversations = $query === ''
-            ? (new ListConversations)->execute($user, 50)
-            : (new SearchConversations)->execute($user, $query);
+            ? new ConversationsQuery()->recent($user)
+            : new ConversationsQuery()->search($user, $query);
 
         return view('chat::livewire.app.chat.chat-all-chats-panel', [
             'conversations' => $conversations,

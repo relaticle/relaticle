@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
+use App\Data\ListQuery;
 use App\Enums\CrmEntity;
 use App\Mcp\Schema\CustomFieldSchema;
 use App\Mcp\Tools\Concerns\BoundsToManyIncludes;
@@ -19,7 +20,6 @@ use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -38,13 +38,8 @@ abstract class BaseListTool extends Tool
 
     private const int MAX_PER_PAGE = 25;
 
-    private const int MAX_PAGE = 1_000_000;
-
     /** @var list<string> */
     private const array ARGUMENTS = ['filter', 'sort', 'include', 'per_page', 'page'];
-
-    /** @return class-string */
-    abstract protected function actionClass(): string;
 
     abstract protected function entity(): CrmEntity;
 
@@ -58,7 +53,7 @@ abstract class BaseListTool extends Tool
             'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
             'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
             'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
-            'page' => $schema->integer()->description('Page number (max 1,000,000).')->default(1),
+            'page' => $schema->integer()->description('Page number (max '.number_format(ListQuery::MAX_PAGE).').')->default(1),
         ];
     }
 
@@ -89,7 +84,7 @@ abstract class BaseListTool extends Tool
             'sort.field' => ['string'],
             'sort.direction' => ['sometimes', 'string', Rule::in(['asc', 'desc'])],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
-            'page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
+            'page' => ['sometimes', 'integer', 'min:1', 'max:'.ListQuery::MAX_PAGE],
             'include' => ['sometimes', 'array', 'list', 'max:20'],
             'include.*' => ['string', 'distinct'],
         ]);
@@ -107,12 +102,7 @@ abstract class BaseListTool extends Tool
         FilterTree::rejectUnknownArguments($request->all(), self::ARGUMENTS);
 
         try {
-            $results = app()->make($this->actionClass())->execute(
-                user: $user,
-                perPage: (int) ($validated['per_page'] ?? 15),
-                page: (int) ($validated['page'] ?? 1),
-                request: $this->buildHttpRequest($request),
-            );
+            $results = resolve($this->entity()->query())->paginate($user, $this->listQuery($request, $validated));
         } catch (ValidationException $exception) {
             return Response::error(FilterErrors::located($exception));
         } catch (InvalidQuery $e) {
@@ -180,29 +170,26 @@ abstract class BaseListTool extends Tool
         };
     }
 
-    private function buildHttpRequest(Request $mcpRequest): HttpRequest
+    /** @param  array<string, mixed>  $validated */
+    private function listQuery(Request $request, array $validated): ListQuery
     {
-        $input = [];
+        return new ListQuery(
+            filter: FilterTree::trimmed($request->get('filter')),
+            sort: $this->sortExpression($request->get('sort')),
+            include: $validated['include'] ?? null,
+            perPage: (int) ($validated['per_page'] ?? 15),
+            page: (int) ($validated['page'] ?? 1),
+        );
+    }
 
-        $filter = $mcpRequest->get('filter');
-
-        if (is_array($filter) && $filter !== []) {
-            $input['filter'] = FilterTree::trimmed($filter);
+    private function sortExpression(mixed $sort): ?string
+    {
+        if (! is_array($sort) || ! isset($sort['field'])) {
+            return null;
         }
 
-        $sort = $mcpRequest->get('sort');
+        $direction = ($sort['direction'] ?? 'asc') === 'desc' ? '-' : '';
 
-        if (is_array($sort) && isset($sort['field'])) {
-            $direction = ($sort['direction'] ?? 'asc') === 'desc' ? '-' : '';
-            $input['sort'] = $direction.$sort['field'];
-        }
-
-        $include = $mcpRequest->get('include');
-
-        if (is_array($include) && $include !== []) {
-            $input['include'] = $include;
-        }
-
-        return new HttpRequest($input);
+        return $direction.$sort['field'];
     }
 }

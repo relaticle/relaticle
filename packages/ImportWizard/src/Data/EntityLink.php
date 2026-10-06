@@ -157,6 +157,7 @@ final class EntityLink extends Data
                 MatchableField::name(),
             ])
             ->foreignKey('contact_id')
+            ->label('Point of Contact')
             ->guess([
                 'contact', 'contact_name', 'person', 'contact_id',
                 'person_id', 'people_id', 'point of contact', 'contact person',

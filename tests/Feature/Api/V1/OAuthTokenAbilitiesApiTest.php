@@ -20,9 +20,9 @@ beforeEach(function (): void {
 });
 
 describe('scope catalog', function (): void {
-    it('offers exactly the four REST abilities alongside the MCP scope', function (): void {
+    it('offers exactly the four REST abilities and the three email scopes alongside the MCP scope', function (): void {
         expect(array_keys(Passport::$scopes ?? []))
-            ->toEqualCanonicalizing(['read', 'create', 'update', 'delete', Registrar::OAUTH_SCOPE]);
+            ->toEqualCanonicalizing(['read', 'create', 'update', 'delete', 'email:read', 'email:draft', 'email:send', Registrar::OAUTH_SCOPE]);
     });
 
     it('gives every REST ability a human-readable description', function (): void {

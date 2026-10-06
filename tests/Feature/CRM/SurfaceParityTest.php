@@ -67,6 +67,7 @@ use Relaticle\Chat\Tools\Task\CreateTaskTool as ChatCreateTask;
 use Relaticle\Chat\Tools\Task\GetTaskTool as ChatGetTask;
 use Relaticle\Chat\Tools\Task\ListTasksTool as ChatListTasks;
 use Spatie\QueryBuilder\AllowedFilter;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\FilterDescription;
 
 mutates(FilterVocabulary::class);
@@ -310,7 +311,19 @@ it('publishes the same names, types and fields on the registry, mcp and chat', f
         ->and($chatDescription)->not->toContain(EntityFilters::rules());
 })->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[8]], crmSurfaces()));
 
-it('publishes exactly the filter names the list action accepts for each entity', function (CrmEntity $entity, string $chatTool): void {
+it('refuses the list to a user with an unverified email on the api, mcp and chat', function (CrmEntity $entity, string $chatTool, string $mcpTool): void {
+    $user = User::factory()->unverified()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Sanctum::actingAs($user);
+
+    $this->getJson("/api/v1/{$entity->table()}")->assertForbidden();
+
+    RelaticleServer::actingAs($user)->tool($mcpTool)->assertHasErrors();
+
+    expect(fn (): string => resolve($chatTool)->handle(new ChatRequest([])))->toThrow(HttpException::class);
+})->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[8]], crmSurfaces()));
+
+it('publishes exactly the filter names the list query accepts for each entity', function (CrmEntity $entity, string $chatTool): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
 
@@ -389,7 +402,7 @@ it('states the custom_fields rule and the choice rule once on every surface that
         ->and($choiceRule)->toBe('Checkbox-list, radio, toggle-buttons, select and multi-select values take an option label or ID.');
 })->with(array_map(fn (array $row): array => [$row[0], $row[6], $row[7], $row[8]], crmSurfaces()));
 
-it('publishes filter examples the list action accepts on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
+it('publishes filter examples the list query accepts on every surface', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     Sanctum::actingAs($user);

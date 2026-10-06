@@ -12,11 +12,11 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use RuntimeException;
 
 final readonly class SaveEmailDraftAction
 {
@@ -77,7 +77,7 @@ final readonly class SaveEmailDraftAction
             abort_if($draftId !== null && $existing === null, 403);
 
             if ($this->isEmpty($data)) {
-                throw_if($existing === null, RuntimeException::class, 'Cannot save an empty draft.');
+                throw_if($existing === null, EmptyDraft::create());
 
                 return $existing;
             }

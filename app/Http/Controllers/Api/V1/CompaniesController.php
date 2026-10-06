@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
-use App\Actions\Company\ListCompanies;
 use App\Actions\Company\UpdateCompany;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreCompanyRequest;
@@ -14,6 +13,7 @@ use App\Http\Requests\Api\V1\UpdateCompanyRequest;
 use App\Http\Resources\V1\CompanyResource;
 use App\Models\Company;
 use App\Models\User;
+use App\Queries\Companies\CompaniesQuery;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -30,14 +30,11 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 final readonly class CompaniesController
 {
     #[ResponseFromApiResource(CompanyResource::class, Company::class, collection: true, paginate: 15)]
-    public function index(IndexRequest $request, ListCompanies $action, #[CurrentUser] User $user): AnonymousResourceCollection
+    public function index(IndexRequest $request, CompaniesQuery $query, #[CurrentUser] User $user): AnonymousResourceCollection
     {
-        return CompanyResource::collection($action->execute(
-            user: $user,
-            perPage: $request->safe()->integer('per_page', 15),
-            useCursor: $request->safe()->has('cursor'),
-            request: $request,
-        )->appends($request->query()));
+        return CompanyResource::collection(
+            $query->paginate($user, $request->toListQuery())->appends($request->query()),
+        );
     }
 
     #[ResponseFromApiResource(CompanyResource::class, Company::class, status: 201)]

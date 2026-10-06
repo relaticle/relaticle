@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools;
 
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\User;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
@@ -25,7 +25,7 @@ final class AggregateOpportunitiesTool extends Tool
     use HasReadOnlyToolAnnotations;
 
     public function __construct(
-        private readonly AggregateOpportunities $aggregate,
+        private readonly OpportunityAggregatesQuery $aggregate,
     ) {}
 
     public function schema(JsonSchema $schema): array
@@ -63,7 +63,7 @@ final class AggregateOpportunitiesTool extends Tool
         /** @var User $user */
         $user = $request->user();
 
-        return Response::structured($this->aggregate->execute(
+        return Response::structured($this->aggregate->get(
             $user,
             $validated['group_by'],
             $validated['date_from'] ?? null,

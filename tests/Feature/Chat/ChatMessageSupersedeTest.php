@@ -6,8 +6,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
-use Relaticle\Chat\Actions\ListConversationMessages;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 
 function seedSupersedeConversation(User $user): array
@@ -133,7 +133,7 @@ it('excludes superseded messages from the rendered transcript', function (): voi
         ->postJson("/chat/conversations/{$conversationId}/messages/supersede", ['anchor_id' => $ids[2]])
         ->assertOk();
 
-    $messages = resolve(ListConversationMessages::class)->execute($user, $conversationId);
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $conversationId);
 
     $contents = array_map(
         static fn (array $message): string => trim(strip_tags($message['content'])),

@@ -907,6 +907,9 @@ it('rejects a sort or a field list that is not made of names', function (array $
     'sort number' => [['sort' => 5], 'sort'],
     'nested field list' => [['fields' => [['id']]], 'fields'],
     'field list of numbers' => [['fields' => [1, 2]], 'fields'],
+    'field map keyed by a zero-padded number' => [['fields' => ['01' => ['id']]], 'fields'],
+    'field map keyed by a decimal' => [['fields' => ['1.5' => ['id']]], 'fields'],
+    'field map keyed by an exponent' => [['fields' => ['1e3' => ['id']]], 'fields'],
 ]);
 
 it('takes sort as a list and fields as a string, a list or a map', function (array $body): void {
@@ -923,6 +926,20 @@ it('takes sort as a list and fields as a string, a list or a map', function (arr
     'fields map' => [['sort' => 'name', 'fields' => ['companies' => 'id,name']]],
     'empty include list' => [['sort' => 'name', 'include' => []]],
 ]);
+
+it('returns only the fields a list request asks for by record type', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+
+    $this->getJson('/api/v1/companies?fields[companies]=id,name')
+        ->assertOk()
+        ->assertJsonPath('data.0.attributes', ['name' => 'Acme']);
+});
+
+it('rejects a field a record does not publish', function (): void {
+    $this->getJson('/api/v1/companies?fields[companies]=id,workspace_id')
+        ->assertBadRequest()
+        ->assertJsonPath('message', fn (string $message): bool => str_contains($message, 'workspace_id'));
+});
 
 it('refuses a sort by a custom field that holds a list instead of failing', function (): void {
     $this->getJson('/api/v1/people?sort=emails')
@@ -980,6 +997,25 @@ it('treats a null or empty cursor, page and per_page as not sent', function (arr
     'null per_page' => [['per_page' => null]],
     'all null' => [['cursor' => null, 'page' => null, 'per_page' => null]],
 ]);
+
+it('rejects a page number past the last one a list serves', function (int $page): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $this->getJson("/api/v1/companies?page={$page}")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['page']);
+})->with([
+    'one past the cap' => [1_000_001],
+    'the largest integer' => [PHP_INT_MAX],
+]);
+
+it('serves the last page number a list accepts', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $this->getJson('/api/v1/companies?page=1000000')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+});
 
 it('rejects a query body that is not a json object', function (string $content, string $contentType): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);

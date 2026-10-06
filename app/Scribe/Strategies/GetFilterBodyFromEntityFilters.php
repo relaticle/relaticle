@@ -22,13 +22,13 @@ final class GetFilterBodyFromEntityFilters extends Strategy
             return null;
         }
 
-        $actionClass = $this->findActionClass($endpointData);
+        $queryClass = $this->findQueryClass($endpointData);
 
-        if ($actionClass === null) {
+        if ($queryClass === null) {
             return null;
         }
 
-        $entity = self::LIST_ACTION_ENTITIES[$actionClass];
+        $entity = $queryClass::entity();
 
         return [
             'filter' => [
@@ -37,7 +37,7 @@ final class GetFilterBodyFromEntityFilters extends Strategy
                 'description' => EntityFilters::grammar($entity),
                 'example' => EntityFilters::example($entity),
             ],
-            ...$this->listParameters($actionClass),
+            ...$this->listParameters($queryClass),
         ];
     }
 }

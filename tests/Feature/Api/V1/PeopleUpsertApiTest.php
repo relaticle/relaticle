@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\CustomFields\FindEntitiesByFieldValue;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\PeopleUpsertController;
 use App\Http\Middleware\EnsureTokenHasAbility;
@@ -11,6 +10,7 @@ use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use App\Support\CustomFields\CanonicalValue;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -23,7 +23,7 @@ use Tests\Helpers\WorkspaceCustomField;
 
 mutates(
     PeopleUpsertController::class,
-    FindEntitiesByFieldValue::class,
+    EntitiesByFieldValueQuery::class,
     EnsureTokenHasAbility::class,
     CanonicalValue::class,
 );
@@ -352,13 +352,13 @@ it('updates a person a concurrent upsert created after this request was validate
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Grace Hopper']);
     writeUpsertCustomFieldValue($this->workspace->id, 'people', $person->id, 'emails', ['grace@navy.mil']);
 
-    app()->instance(FindEntitiesByFieldValue::class, new class
+    app()->instance(EntitiesByFieldValueQuery::class, new class
     {
         private int $calls = 0;
 
-        public function execute(mixed ...$arguments): Collection
+        public function get(mixed ...$arguments): Collection
         {
-            return $this->calls++ === 0 ? new Collection : new FindEntitiesByFieldValue()->execute(...$arguments);
+            return $this->calls++ === 0 ? new Collection : new EntitiesByFieldValueQuery()->get(...$arguments);
         }
     });
 
@@ -382,13 +382,13 @@ it('keeps the emails of a person a concurrent upsert created after validation', 
         return $person;
     };
 
-    app()->instance(FindEntitiesByFieldValue::class, new class($createConcurrentPerson)
+    app()->instance(EntitiesByFieldValueQuery::class, new class($createConcurrentPerson)
     {
         private int $calls = 0;
 
         public function __construct(private readonly Closure $createConcurrentPerson) {}
 
-        public function execute(mixed ...$arguments): Collection
+        public function get(mixed ...$arguments): Collection
         {
             if ($this->calls++ < 2) {
                 return new Collection;
@@ -396,7 +396,7 @@ it('keeps the emails of a person a concurrent upsert created after validation', 
 
             ($this->createConcurrentPerson)();
 
-            return new FindEntitiesByFieldValue()->execute(...$arguments);
+            return new EntitiesByFieldValueQuery()->get(...$arguments);
         }
     });
 

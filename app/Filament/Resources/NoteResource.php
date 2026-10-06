@@ -6,7 +6,8 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
-use App\Filament\Components\Tables\RecordChipColumn;
+use App\Filament\Components\Tables\LinkedRecordsColumn;
+use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\NoteExporter;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
@@ -34,6 +35,8 @@ use Override;
 
 final class NoteResource extends Resource
 {
+    use RemembersViewMode;
+
     protected static ?string $model = Note::class;
 
     protected static ?string $recordTitleAttribute = 'title';
@@ -73,11 +76,7 @@ final class NoteResource extends Resource
             ->columns([
                 TextColumn::make('title')
                     ->searchable(),
-                RecordChipColumn::make('companies.name')
-                    ->label(__('filament/resources/note.fields.companies.label'))
-                    ->toggleable(),
-                RecordChipColumn::make('people.name')
-                    ->label(__('filament/resources/note.fields.people.label'))
+                LinkedRecordsColumn::make('relations')
                     ->toggleable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/note.fields.creator.label'))
@@ -142,7 +141,7 @@ final class NoteResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['companies.media', 'people', 'customFieldValues.customField.options'])
+            ->with(['companies.media', 'people', 'opportunities', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

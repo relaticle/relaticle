@@ -576,6 +576,211 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
     @apply rounded-lg;
 }
 
+/* A record picked in a Filament select is a flat pill, the same one the relations picker draws. */
+.fi-select-input-value-badges-ctn .fi-badge:has(.fi-record-chip) {
+    @apply h-6 gap-x-0.5 rounded-md bg-gray-950/5 py-0 ps-1 pe-2 text-gray-800 ring-0 dark:bg-white/10 dark:text-gray-100;
+
+    .fi-badge-label-ctn,
+    .fi-badge-label,
+    .fi-record-chip {
+        @apply flex min-w-0 items-center;
+    }
+
+    .fi-record-chip {
+        @apply gap-1.5 leading-6;
+    }
+
+    .fi-record-chip > :first-child:not(:last-child) {
+        @apply size-4 bg-transparent ring-0;
+    }
+
+    .fi-badge-delete-btn {
+        @apply -my-0 -me-1.5 self-center rounded p-0.5;
+    }
+
+    .fi-badge-delete-btn-icon {
+        @apply text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-badge-delete-btn:hover .fi-badge-delete-btn-icon,
+    .fi-badge-delete-btn:focus-visible .fi-badge-delete-btn-icon {
+        @apply text-gray-900 dark:text-white;
+    }
+}
+
+/* Relations picker (`LinkedRecordsSelect`): one row of record links closed, a search panel open. */
+.fi-linked-records {
+    @apply relative w-full;
+}
+
+.fi-linked-records-anchor {
+    @apply pointer-events-none absolute inset-0;
+}
+
+.fi-linked-records-field {
+    @apply flex min-h-9 w-full cursor-pointer items-center gap-1.5 py-1.5 ps-3 pe-2 text-sm;
+}
+
+.fi-linked-records-disabled .fi-linked-records-field {
+    @apply cursor-not-allowed opacity-70;
+}
+
+.fi-linked-records-chips {
+    @apply relative flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 overflow-hidden;
+}
+
+.fi-linked-records-placeholder {
+    @apply truncate text-gray-400 dark:text-gray-500;
+}
+
+.fi-linked-records-chip {
+    @apply inline-flex h-6 max-w-full shrink-0 items-center gap-1 rounded-md bg-gray-950/5 ps-1 pe-2 text-xs font-medium text-gray-800 dark:bg-white/10 dark:text-gray-100;
+
+    .fi-record-chip {
+        @apply gap-1.5;
+    }
+
+    .fi-record-chip > :first-child:not(:last-child) {
+        @apply size-4 bg-transparent ring-0;
+    }
+
+    &.fi-shrinkable {
+        @apply min-w-0 shrink;
+    }
+}
+
+a.fi-linked-records-chip {
+    @apply transition duration-75 hover:bg-gray-950/10 dark:hover:bg-white/20;
+}
+
+.fi-linked-records-count {
+    @apply shrink-0 text-xs font-medium text-gray-500 tabular-nums dark:text-gray-400;
+}
+
+.fi-linked-records-chip.fi-overflowed,
+.fi-linked-records-count.fi-overflowed {
+    @apply invisible absolute;
+}
+
+.fi-linked-records-trigger {
+    @apply focus-visible:ring-primary-600 dark:focus-visible:ring-primary-500 flex size-6 shrink-0 items-center justify-center rounded-md text-gray-400 outline-none hover:text-gray-600 focus-visible:ring-2 dark:text-gray-500 dark:hover:text-gray-300;
+
+    .fi-icon {
+        @apply size-5 transition duration-150;
+    }
+
+    &[aria-expanded='true'] .fi-icon {
+        @apply rotate-180;
+    }
+}
+
+.fi-linked-records-panel {
+    @apply absolute z-20 w-full rounded-xl bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10;
+}
+
+.fi-linked-records-panel-body {
+    @apply flex flex-col overflow-hidden rounded-xl;
+
+    max-height: inherit;
+}
+
+.fi-linked-records-search {
+    @apply flex shrink-0 items-center gap-2 border-b border-gray-100 px-3 dark:border-white/5;
+
+    .fi-icon {
+        @apply size-4 shrink-0 text-gray-400 dark:text-gray-500;
+    }
+
+    input {
+        @apply h-10 w-full min-w-0 border-0 bg-transparent p-0 text-sm text-gray-950 placeholder:text-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder:text-gray-500;
+    }
+}
+
+.fi-linked-records-selected {
+    @apply flex max-h-24 shrink-0 flex-wrap gap-1.5 overflow-y-auto border-b border-gray-100 px-3 py-2 dark:border-white/5;
+
+    .fi-linked-records-chip {
+        @apply pe-1;
+    }
+}
+
+.fi-linked-records-remove {
+    @apply flex size-4 shrink-0 items-center justify-center rounded text-gray-400 transition duration-75 hover:bg-gray-950/10 hover:text-gray-900 dark:text-gray-500 dark:hover:bg-white/10 dark:hover:text-white;
+
+    .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.fi-linked-records-list {
+    @apply max-h-72 min-h-0 flex-1 overflow-y-auto overscroll-contain p-1;
+}
+
+.fi-linked-records-group + .fi-linked-records-group {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
+}
+
+.fi-linked-records-group-label {
+    @apply px-2 pt-1.5 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
+}
+
+.fi-linked-records-option {
+    @apply flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-950 dark:text-white;
+
+    &.fi-active {
+        @apply bg-gray-100 dark:bg-white/10;
+    }
+}
+
+.fi-linked-records-option-label {
+    @apply flex min-w-0 items-center;
+}
+
+.fi-linked-records-option-hint {
+    @apply min-w-0 flex-1 truncate text-xs text-gray-500 dark:text-gray-400;
+}
+
+.fi-linked-records-message {
+    @apply px-2 py-6 text-center text-sm text-gray-500 dark:text-gray-400;
+}
+
+/* Relations cell (`LinkedRecordsColumn`): the first linked record, then a count that lists the rest. */
+.fi-linked-records-cell {
+    @apply flex max-w-xs min-w-0 items-center gap-1.5 px-3 py-2 text-sm text-gray-950 dark:text-white;
+}
+
+.fi-linked-records-cell-empty {
+    @apply text-gray-400 dark:text-gray-500;
+}
+
+.fi-linked-records-cell-link {
+    @apply -mx-1 flex min-w-0 items-center rounded-md px-1 py-0.5 transition duration-75;
+
+    &[href] {
+        @apply hover:bg-gray-950/5 dark:hover:bg-white/10;
+
+        .fi-record-chip .truncate {
+            @apply underline decoration-gray-300 underline-offset-2 dark:decoration-gray-600;
+        }
+    }
+}
+
+.fi-linked-records-cell-more {
+    @apply focus-visible:ring-primary-600 dark:focus-visible:ring-primary-500 shrink-0 rounded-md bg-gray-950/5 px-1.5 py-0.5 text-xs font-medium text-gray-600 tabular-nums transition duration-75 outline-none hover:bg-gray-950/10 hover:text-gray-950 focus-visible:ring-2 dark:bg-white/10 dark:text-gray-300 dark:hover:bg-white/20 dark:hover:text-white;
+
+    &[aria-expanded='true'] {
+        @apply bg-gray-950/10 text-gray-950 dark:bg-white/20 dark:text-white;
+    }
+}
+
+.fi-linked-records-cell-panel {
+    @apply absolute z-50 max-h-72 w-64 overflow-y-auto overscroll-contain rounded-xl bg-white p-1 text-sm text-gray-950 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:text-white dark:ring-white/10;
+
+    .fi-linked-records-cell-link {
+        @apply mx-0 rounded-lg px-2 py-1.5;
+    }
+}
+
 /* Tables */
 
 .fi-ta-ctn {
@@ -696,10 +901,64 @@ body:has([data-sidebar-workspace-toggle]) .fi-topbar-collapse-sidebar-btn-ctn {
 }
 
 /* Modals */
-.fi-modal-slide-over {
-    .fi-modal-window {
-        @apply backdrop-blur-sm rounded-xl shadow-xl max-h-[calc(100vh-2rem)] mt-2.5 mr-3;
+
+/* A slide-over carries the panel's own bar: topbar height, topbar heading, list hairlines. */
+.fi-modal.fi-modal-slide-over > .fi-modal-window-ctn > .fi-modal-window {
+    & > .fi-modal-header {
+        @apply min-h-(--topbar-height) items-center border-gray-200/60 py-3 dark:border-white/10;
     }
+
+    .fi-modal-heading {
+        @apply text-sm leading-5;
+    }
+
+    .fi-modal-description {
+        @apply mt-0.5;
+    }
+
+    .fi-modal-close-btn {
+        @apply end-4.5 top-2.5 m-0 size-7 rounded-md text-gray-500 hover:bg-gray-950/5 hover:text-gray-950 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white;
+
+        .fi-icon {
+            @apply size-4.5;
+        }
+    }
+
+    .fi-modal-content {
+        @apply rounded-none py-5;
+    }
+
+    .fi-modal-content .fi-sc {
+        @apply gap-4;
+    }
+
+    .fi-modal-content .fi-fo-field {
+        @apply gap-y-1.5;
+    }
+
+    .fi-modal-content :is(.fi-input, select.fi-select-input, .fi-select-input-btn, .fi-fo-date-time-picker-display-text-input) {
+        @apply py-1;
+    }
+
+    .fi-modal-content :is(.fi-select-input-btn, div[x-ref='select'], .fi-linked-records-field) {
+        @apply min-h-8;
+    }
+
+    .fi-modal-content .fi-linked-records-field {
+        @apply py-1;
+    }
+
+    & > .fi-modal-footer {
+        @apply border-gray-200/60 py-4 dark:border-white/10;
+    }
+
+    .fi-modal-footer-actions {
+        @apply flex-row-reverse;
+    }
+}
+
+.fi-modal.fi-modal-slide-over > .fi-modal-close-overlay {
+    @apply bg-gray-950/20 dark:bg-gray-950/60;
 }
 
 .fi-modal-content {
@@ -1036,8 +1295,9 @@ html.fi-record-stacked .fi-record-layout {
         }
     }
 
+    /* Positioned, so a card's screen-reader labels scroll with the column instead of stretching the page. */
     .flowforge-column-content {
-        @apply px-2 pt-0 pb-2;
+        @apply relative px-2 pt-0 pb-2;
 
         /* The empty state is a hint, not a drop zone the size of the column. */
         & > .border-dashed {
@@ -1569,8 +1829,10 @@ html.fi:has(body.fi-onboarding-wizard),
             @apply absolute end-3 top-3 w-auto p-0 opacity-0 transition duration-75;
         }
 
+        /* WebKit does not focus a clicked button, so an open menu holds the actions itself. */
         &:hover .fi-ta-actions,
-        &:focus-within .fi-ta-actions {
+        &:focus-within .fi-ta-actions,
+        & .fi-ta-actions:has(.fi-dropdown-panel[style*='display: block']) {
             @apply opacity-100;
         }
     }

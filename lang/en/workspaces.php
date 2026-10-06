@@ -156,6 +156,10 @@ return [
 
     'edit_workspace' => 'Workspace Settings',
 
+    'custom_field_types' => [
+        'domain' => 'Domain',
+    ],
+
     'tabs' => [
         'general' => 'General',
         'members' => 'Members',
@@ -276,6 +280,7 @@ return [
         ],
         'email' => [
             'manage' => ['label' => 'Manage workspace email settings'],
+            'agent_send' => ['label' => 'Send email through an AI assistant'],
         ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],

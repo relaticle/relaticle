@@ -25,6 +25,7 @@ final class OpportunityForm
                     ->preload()
                     ->columnSpan(2),
                 RecordSelect::make('contact_id')
+                    ->label(__('filament/resources/opportunity.fields.contact_id.label'))
                     ->relationship('contact', 'name')
                     ->searchable()
                     ->preload()

@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
 use App\Http\Controllers\Mcp\ReceiveUploadController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Http\Middleware\RequireConsentForEmailGrants;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Http\Middleware\ValidateMcpOrigin;
 use App\Mcp\Servers\RelaticleServer;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
+use Laravel\Passport\Http\Controllers\AuthorizationController;
 use Symfony\Component\HttpFoundation\Response;
 
 $mcpDomain = config('app.mcp_domain');
@@ -24,6 +26,10 @@ app()->booted(static function (): void {
     Route::middleware(['web', 'auth', 'throttle:mcp-oauth'])
         ->post('/oauth/authorize', [ApproveAuthorizationController::class, 'approve'])
         ->name('passport.authorizations.approve');
+
+    Route::middleware(['web', RequireConsentForEmailGrants::class])
+        ->get('/oauth/authorize', [AuthorizationController::class, 'authorize'])
+        ->name('passport.authorizations.authorize');
 });
 
 // The challenge is served from whichever host the MCP endpoint answers on.

@@ -663,7 +663,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // wire:navigate round trip resolves. Server truth always wins: whatever
     // this paints is provisional only, because the navigation that follows
     // always finishes by destroying this instance and mounting a fresh one
-    // from ChatInterface::mount()'s ListConversationMessages fetch, which wholesale
+    // from ChatInterface::mount()'s ConversationMessagesQuery fetch, which wholesale
     // replaces it regardless of whether the cache was right, stale, or
     // (via the ownership tag) refused outright. Returns true on a cache hit.
     switchConversation(targetConversationId) {
@@ -1195,7 +1195,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             // A saved category survives reload (msg.feedback.category comes back
             // from the server); a saved comment only survives within this same
             // session (feedbackComment resets to '' on load, the server never
-            // sends it back, see ListConversationMessages). Either one means the
+            // sends it back, see ConversationMessagesQuery). Either one means the
             // user typed real detail that a silent toggle-off would discard.
             const hasSavedDetail = rating === 'down'
                 && (msg.feedback?.category || (msg.feedbackComment || '').trim() !== '');

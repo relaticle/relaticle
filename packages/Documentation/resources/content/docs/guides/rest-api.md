@@ -2,7 +2,7 @@
 title: REST API
 description: Connect to the Relaticle REST API with a personal access token, scoped permissions, rate limits, upserts and the full endpoint reference.
 order: 3
-updated: "2026-10-05"
+updated: "2026-10-06"
 ---
 
 Relaticle has a REST API for companies, people, opportunities, tasks, notes and custom fields. Use it to sync records with another system or to build your own integration. The [API reference](/developers/api) lists every endpoint, parameter and response, and the OpenAPI spec is at [/openapi.json](/openapi.json).
@@ -29,9 +29,9 @@ curl https://api.relaticle.com/v1/companies \
 
 Create a token from **Settings > Access Tokens** in the app. Choose the workspace it can reach, when it expires, and its permissions. The same token also works for the [MCP server](/developers/mcp).
 
-## Permissions
+## Token permissions
 
-A token carries one or more of four permissions. Each request needs the permission that matches its HTTP method.
+An access token carries one or more permissions. Four of them cover the REST API, and each request needs the permission that matches its HTTP method.
 
 | Permission | Allows |
 |---|---|
@@ -41,6 +41,8 @@ A token carries one or more of four permissions. Each request needs the permissi
 | `delete` | `DELETE` requests |
 
 A filter query, `POST /v1/{resource}/query`, is a read. It needs the `read` permission, not `create`.
+
+An access token can also carry three email permissions: **Read email**, **Draft email** and **Send email**. The REST API has no email endpoint, so these permissions apply to the [MCP server](/developers/mcp) only.
 
 ## Resources
 
@@ -108,7 +110,7 @@ Relaticle stores some custom field values in one form, whatever spelling a reque
 | Field | Stored as |
 |---|---|
 | Phone | E.164, such as `+14155550100`. An extension is kept as `;ext=12` |
-| A link that holds domains, such as a company's `domains` | The bare host in lower case, with no scheme, `www.` or path |
+| A domain field, such as a company's `domains` | The bare host in lower case, with no scheme, `www.` or path |
 | Other links | The URL, with its host in lower case |
 | Date and time | The UTC instant. `2026-10-01T13:00:00+05:00` is stored as 08:00 UTC |
 

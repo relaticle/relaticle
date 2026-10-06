@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Concerns;
 
+use App\Enums\EmailGrant;
+use App\Enums\WorkspaceCapability;
 use App\Models\PersonalAccessToken;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\AccessToken as PassportAccessToken;
+use Laravel\Passport\Passport;
 
 trait ChecksTokenAbility
 {
@@ -43,5 +46,78 @@ trait ChecksTokenAbility
         }
 
         return null;
+    }
+
+    protected function denyIfTokenLacks(EmailGrant $grant): ?Response
+    {
+        if ($this->holdsAnyEmailGrant($grant)) {
+            return null;
+        }
+
+        return Response::error('This connection has no email access. Reconnect and allow it on the consent screen, or add the permission to the access token.');
+    }
+
+    protected function holdsAnyEmailGrant(EmailGrant ...$grants): bool
+    {
+        $held = $this->heldEmailGrants();
+
+        return array_any($grants, fn (EmailGrant $grant): bool => in_array($grant, $held, true));
+    }
+
+    protected function connectionName(): string
+    {
+        $token = $this->currentToken();
+
+        $name = match (true) {
+            $token instanceof PassportAccessToken => Passport::client()->newQuery()->whereKey($token->oauth_client_id)->value('name'),
+            $token instanceof PersonalAccessToken => $token->name,
+            default => null,
+        };
+
+        return is_string($name) && $name !== '' ? $name : __('mcp.connection.fallback_name');
+    }
+
+    /** @return list<string> */
+    protected function heldAbilities(): array
+    {
+        $token = $this->currentToken();
+
+        $emailAbilities = array_column($this->heldEmailGrants(), 'value');
+
+        if ($token instanceof PassportAccessToken) {
+            return $token->can(Registrar::OAUTH_SCOPE)
+                ? [...WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), ...$emailAbilities]
+                : [];
+        }
+
+        if ($token instanceof PersonalAccessToken && $token->getKey()) {
+            $otherAbilities = array_filter(
+                $token->abilities ?? [],
+                fn (string $ability): bool => EmailGrant::tryFrom($ability) === null,
+            );
+
+            return [...array_values($otherAbilities), ...$emailAbilities];
+        }
+
+        return ['*'];
+    }
+
+    /** @return list<EmailGrant> */
+    protected function heldEmailGrants(): array
+    {
+        $token = $this->currentToken();
+
+        return match (true) {
+            $token instanceof PassportAccessToken => $token->can(Registrar::OAUTH_SCOPE)
+                ? EmailGrant::fromValues((array) $token->oauth_scopes)
+                : [],
+            $token instanceof PersonalAccessToken && (bool) $token->getKey() => EmailGrant::fromValues((array) $token->abilities),
+            default => EmailGrant::offered(),
+        };
+    }
+
+    private function currentToken(): ?object
+    {
+        return auth()->user()?->currentAccessToken();
     }
 }

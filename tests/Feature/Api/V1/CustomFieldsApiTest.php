@@ -376,3 +376,14 @@ it('excludes inactive custom fields', function (): void {
     expect($codes)->toContain('cf_active_field');
     expect($codes)->not->toContain('cf_inactive_field');
 });
+
+it('rejects a page number past the last one the custom field list serves', function (int $page): void {
+    Sanctum::actingAs($this->user);
+
+    $this->getJson("/api/v1/custom-fields?page={$page}")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['page']);
+})->with([
+    'one past the cap' => [1_000_001],
+    'the largest integer' => [PHP_INT_MAX],
+]);

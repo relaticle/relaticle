@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Support\CustomFields;
 
-use App\Actions\CustomFields\FindEntitiesByFieldValue;
 use App\Models\CustomField;
+use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 
 final readonly class RestoreConflictMessage
 {
-    public function __construct(private FindEntitiesByFieldValue $findEntities) {}
+    public function __construct(private EntitiesByFieldValueQuery $entitiesByFieldValue) {}
 
     /** @param  Closure(Model): ?string  $recordTitle */
     public function for(Model $record, Closure $recordTitle): ?string
@@ -27,7 +27,7 @@ final readonly class RestoreConflictMessage
             return null;
         }
 
-        $holder = $this->findEntities->execute($record::class, $taken['customField'], [$taken['value']], 1)->first();
+        $holder = $this->entitiesByFieldValue->get($record::class, $taken['customField'], [$taken['value']], 1)->first();
         $holderTitle = $holder instanceof Model ? $recordTitle($holder) : null;
 
         return $holderTitle === null

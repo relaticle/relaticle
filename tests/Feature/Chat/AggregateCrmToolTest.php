@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Opportunity\AggregateOpportunities;
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Task\CreateTask;
 use App\Features\OnboardSeed;
@@ -12,6 +11,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Queries\Opportunities\OpportunityAggregatesQuery;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
@@ -19,7 +19,7 @@ use Relaticle\Chat\Tools\AggregateCrmTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(AggregateCrmTool::class, AggregateOpportunities::class);
+mutates(AggregateCrmTool::class, OpportunityAggregatesQuery::class);
 
 function resolveTaskOptionId(string $workspaceId, string $code, string $label): string
 {

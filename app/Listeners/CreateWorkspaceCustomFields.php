@@ -107,7 +107,6 @@ final readonly class CreateWorkspaceCustomFields
                 allow_multiple: $enum->allowsMultipleValues(),
                 max_values: $enum->getMaxValues(),
                 unique_per_entity_type: $enum->isUniquePerEntityType(),
-                additional: $enum->additionalSettings(),
             ),
             'created_at' => $now,
             'updated_at' => $now,

@@ -367,7 +367,7 @@ Records have core fields (set directly in the write tool schemas, e.g. a company
 - A task "for" someone: a workspace member goes in assignee_ids. A contact goes in people_ids, and you say the task is linked to them with no assignee. For someone who is neither, say so in one sentence and propose the task unassigned now; when the current user's capabilities include `members.manage`, also offer to invite them with InviteWorkspaceMemberTool, since they can be assigned once they accept. Never assign it to the current user unless they ask.
 - A task needs a title. Ask for it at most once. If the reply still has none, draft a short title from the request and say they can edit it on the card.
 - The workspace has exactly five record types: companies, people, opportunities, tasks and notes. Nobody can add another. When the user asks for a new table, object, entity or record type, say so in your FIRST reply, then offer the closest fit: custom fields on the record type the new thing belongs to (a select or multi-select for its categories) through CreateCustomFieldTool, or one note per item when it has no lasting fields. When they bring a file, propose the fields first, then give the matching "import_*" destination so its columns map onto them. Never call those fields a new table. Fields cannot be grouped into sections: suggest a shared name prefix instead.
-- Opportunities have ONE stage list shared by every deal, and the board shows one column per stage. Separate pipelines with their own stages do not exist. When asked for several pipelines, say so in your FIRST reply, then offer a "Pipeline" select field on opportunities through CreateCustomFieldTool, with one option per pipeline: each deal then carries its pipeline, and the opportunities table view filters by it. Never say the board can filter by pipeline.
+- Opportunities have ONE stage list shared by every deal, and the board shows one column per stage. Separate pipelines with their own stages do not exist. When asked for several pipelines, say so in your FIRST reply, then offer a "Pipeline" select field on opportunities through CreateCustomFieldTool, with one option per pipeline: each deal then carries its pipeline, and the opportunities table view filters by it. Never say the board can filter by pipeline. The purpose picked at signup has no setting, and nobody can change it: when the user asks to change what the workspace is used for, say so in your FIRST reply, then offer to reshape the opportunity stages to fit the new purpose through SetCustomFieldOptionsTool, when their capabilities include `fields.manage`.
 - Before claiming a field doesn't exist, check the write tool schema AND the custom fields description. If the field exists, use it.
 - If a field truly does not exist on the entity, say so in your FIRST reply and offer the closest real action. Never suggest creating a custom field that duplicates a core field.
 - If the user pushes back that a field exists, re-check the tool schema once and answer definitively. Do not apologize and then repeat the same conclusion: either correct yourself with the real field, or explain concretely what IS available.
@@ -559,30 +559,13 @@ PROMPT;
         }
 
         $useCase = $this->workspace->onboarding_use_case;
-
-        if (! $useCase instanceof OnboardingUseCase && ! $this->setupMode) {
-            return '';
-        }
-
         $lines = [];
 
         if ($useCase instanceof OnboardingUseCase) {
             $lines[] = "use_case: {$useCase->getLabel()}";
 
-            $subOptions = $useCase->getSubOptions();
-            $contextLabels = collect($this->workspace->onboarding_context ?? [])
-                ->map(fn (string $value): ?string => $subOptions[$value] ?? null)
-                ->filter()
-                ->values();
-
-            if ($contextLabels->isNotEmpty()) {
-                $lines[] = 'context: '.$contextLabels->implode(', ');
-            }
-
-            $stages = $this->stageNames($this->workspace);
-
-            if ($stages !== []) {
-                $lines[] = 'stages: '.implode(', ', $stages);
+            if ($this->setupMode) {
+                array_push($lines, ...$this->setupPipelineLines($this->workspace, $useCase));
             }
 
             $other = $this->workspace->onboarding_other_use_case;
@@ -592,17 +575,44 @@ PROMPT;
             }
         }
 
-        $referral = $this->workspace->onboarding_referral_source;
-
-        if ($referral instanceof OnboardingReferralSource) {
-            $lines[] = "referral: {$referral->getLabel()}";
-        }
-
         if ($this->setupMode) {
+            $referral = $this->workspace->onboarding_referral_source;
+
+            if ($referral instanceof OnboardingReferralSource) {
+                $lines[] = "referral: {$referral->getLabel()}";
+            }
+
             $lines[] = 'setup_mode: true';
         }
 
+        if ($lines === []) {
+            return '';
+        }
+
         return "\n\n<onboarding>\n".implode("\n", $lines)."\n</onboarding>";
+    }
+
+    /** @return list<string> */
+    private function setupPipelineLines(Workspace $workspace, OnboardingUseCase $useCase): array
+    {
+        $lines = [];
+        $subOptions = $useCase->getSubOptions();
+        $contextLabels = collect($workspace->onboarding_context ?? [])
+            ->map(fn (string $value): ?string => $subOptions[$value] ?? null)
+            ->filter()
+            ->values();
+
+        if ($contextLabels->isNotEmpty()) {
+            $lines[] = 'context: '.$contextLabels->implode(', ');
+        }
+
+        $stages = $this->stageNames($workspace);
+
+        if ($stages !== []) {
+            $lines[] = 'stages: '.implode(', ', $stages);
+        }
+
+        return $lines;
     }
 
     /** @return list<string> */

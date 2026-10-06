@@ -6,7 +6,6 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Opportunity\CreateOpportunity;
 use App\Actions\Opportunity\DeleteOpportunity;
-use App\Actions\Opportunity\ListOpportunities;
 use App\Actions\Opportunity\UpdateOpportunity;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Http\Requests\Api\V1\StoreOpportunityRequest;
@@ -14,6 +13,7 @@ use App\Http\Requests\Api\V1\UpdateOpportunityRequest;
 use App\Http\Resources\V1\OpportunityResource;
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Queries\Opportunities\OpportunitiesQuery;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -31,14 +31,11 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 final readonly class OpportunitiesController
 {
     #[ResponseFromApiResource(OpportunityResource::class, Opportunity::class, collection: true, paginate: 15)]
-    public function index(IndexRequest $request, ListOpportunities $action, #[CurrentUser] User $user): AnonymousResourceCollection
+    public function index(IndexRequest $request, OpportunitiesQuery $query, #[CurrentUser] User $user): AnonymousResourceCollection
     {
-        return OpportunityResource::collection($action->execute(
-            user: $user,
-            perPage: $request->safe()->integer('per_page', 15),
-            useCursor: $request->safe()->has('cursor'),
-            request: $request,
-        )->appends($request->query()));
+        return OpportunityResource::collection(
+            $query->paginate($user, $request->toListQuery())->appends($request->query()),
+        );
     }
 
     #[ResponseFromApiResource(OpportunityResource::class, Opportunity::class, status: 201)]

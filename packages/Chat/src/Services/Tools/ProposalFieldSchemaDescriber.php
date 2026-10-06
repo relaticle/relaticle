@@ -137,7 +137,7 @@ final readonly class ProposalFieldSchemaDescriber
 
     private function kindFor(CustomField $field, ?FieldDataType $dataType): ?string
     {
-        if ($field->type === CustomFieldType::LINK->value) {
+        if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return 'link';
         }
 

@@ -9,6 +9,12 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Queries\Companies\CompaniesQuery;
+use App\Queries\Contracts\EntityQuery;
+use App\Queries\Notes\NotesQuery;
+use App\Queries\Opportunities\OpportunitiesQuery;
+use App\Queries\People\PeopleQuery;
+use App\Queries\Tasks\TasksQuery;
 use App\Support\IconPath;
 use Illuminate\Database\Eloquent\Model;
 
@@ -40,6 +46,18 @@ enum CrmEntity: string
             self::Opportunity => Opportunity::class,
             self::Task => Task::class,
             self::Note => Note::class,
+        };
+    }
+
+    /** @return class-string<EntityQuery> */
+    public function query(): string
+    {
+        return match ($this) {
+            self::Company => CompaniesQuery::class,
+            self::People => PeopleQuery::class,
+            self::Opportunity => OpportunitiesQuery::class,
+            self::Task => TasksQuery::class,
+            self::Note => NotesQuery::class,
         };
     }
 
@@ -107,6 +125,12 @@ enum CrmEntity: string
     public function iconPath(): string
     {
         return IconPath::for($this->icon());
+    }
+
+    /** @return list<self> */
+    public static function linkable(): array
+    {
+        return [self::Company, self::People, self::Opportunity];
     }
 
     public static function tryFromModel(Model $record): ?self

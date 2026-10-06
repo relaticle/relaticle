@@ -159,7 +159,7 @@ test('workspace_id and expiration are required', function () {
         ->assertHasFormErrors(['workspace_id' => 'required', 'expiration' => 'required']);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
-test('a viewer is offered only read, and cannot create a token that writes', function () {
+test('a viewer is offered read and email read and draft, and cannot create a token that writes', function () {
     $owner = User::factory()->withWorkspace()->create();
     $workspace = $owner->currentWorkspace;
     $viewer = User::factory()->create();
@@ -169,7 +169,7 @@ test('a viewer is offered only read, and cannot create a token that writes', fun
 
     livewire(CreateAccessToken::class)
         ->fillForm(['workspace_id' => $workspace->id])
-        ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['read'])
+        ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => array_keys($field->getOptions()) === ['read', 'email:read', 'email:draft'])
         ->fillForm([
             'name' => 'Viewer Token',
             'expiration' => '30',
@@ -179,4 +179,33 @@ test('a viewer is offered only read, and cannot create a token that writes', fun
         ->assertHasFormErrors(['permissions.1']);
 
     expect($viewer->fresh()->tokens)->toBeEmpty();
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('a member creates a pinned token holding every email ability', function () {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($workspace);
+    $this->actingAs($member = $member->fresh());
+
+    livewire(CreateAccessToken::class)
+        ->fillForm([
+            'name' => 'Mail Token',
+            'workspace_id' => $workspace->id,
+            'expiration' => '30',
+            'permissions' => ['read', 'email:read', 'email:draft', 'email:send'],
+        ])
+        ->call('createToken')
+        ->assertHasNoFormErrors();
+
+    expect($member->fresh()->tokens->first()->abilities)->toBe(['read', 'email:read', 'email:draft', 'email:send']);
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('a token not pinned to a workspace is offered no email ability', function () {
+    $this->actingAs(User::factory()->withWorkspace()->create());
+
+    livewire(CreateAccessToken::class)
+        ->fillForm(['workspace_id' => null])
+        ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => $field->getOptions() !== []
+            && array_filter(array_keys($field->getOptions()), fn (int|string $key): bool => str_starts_with((string) $key, 'email:')) === []);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');

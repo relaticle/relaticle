@@ -194,7 +194,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     pageContextConsumed: false,
 
     // Snapshot of the record this message is bound to, in the same shape
-    // ListConversationMessages returns after a reload. The optimistic bubble
+    // ConversationMessagesQuery returns after a reload. The optimistic bubble
     // and the reloaded one must render identically. `url` isn't resolvable
     // client-side, so the chip falls back to its non-clickable branch until
     // a reload fills it in from the server.

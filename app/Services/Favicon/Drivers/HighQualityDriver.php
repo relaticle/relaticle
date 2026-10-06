@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Favicon\Drivers;
 
+use App\Support\Http\HostResolver;
 use App\Support\Http\SsrfGuard;
 use AshAllenDesign\FaviconFetcher\Collections\FaviconCollection;
 use AshAllenDesign\FaviconFetcher\Concerns\HasDefaultFunctionality;
 use AshAllenDesign\FaviconFetcher\Concerns\MakesHttpRequests;
 use AshAllenDesign\FaviconFetcher\Concerns\ValidatesUrls;
 use AshAllenDesign\FaviconFetcher\Contracts\Fetcher;
+use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Exceptions\InvalidUrlException;
 use AshAllenDesign\FaviconFetcher\Favicon;
 use Illuminate\Http\Client\PendingRequest;
@@ -34,6 +36,8 @@ final class HighQualityDriver implements Fetcher
     {
         throw_unless($this->urlIsValid($url), InvalidUrlException::class, $url.' is not a valid URL');
 
+        throw_if($this->hostDoesNotResolve($url), ConnectionException::class, "Could not resolve host for {$url}");
+
         if (! SsrfGuard::isAllowed($url)) {
             return null;
         }
@@ -42,6 +46,40 @@ final class HighQualityDriver implements Fetcher
             return $favicon;
         }
 
+        $siteUnreachable = null;
+
+        try {
+            $favicon = $this->fromSite($url);
+        } catch (ConnectionException $exception) {
+            $favicon = null;
+            $siteUnreachable = $exception;
+        }
+
+        if ($favicon instanceof Favicon) {
+            return $favicon;
+        }
+
+        $favicon = $this->tryGoogleHighRes($url);
+        if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
+            return $favicon;
+        }
+
+        $favicon = $this->tryDuckDuckGo($url);
+
+        throw_if(! $favicon instanceof Favicon && $siteUnreachable instanceof ConnectionException, $siteUnreachable);
+
+        return $favicon;
+    }
+
+    private function hostDoesNotResolve(string $url): bool
+    {
+        $host = trim((string) parse_url($url, PHP_URL_HOST), '[]');
+
+        return $host !== '' && resolve(HostResolver::class)->addresses($host) === [];
+    }
+
+    private function fromSite(string $url): ?Favicon
+    {
         $favicon = $this->tryAppleTouchIcon($url);
         if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
             return $favicon;
@@ -52,12 +90,7 @@ final class HighQualityDriver implements Fetcher
             return $favicon;
         }
 
-        $favicon = $this->tryGoogleHighRes($url);
-        if ($favicon instanceof Favicon && $this->faviconIsAccessible($favicon)) {
-            return $favicon;
-        }
-
-        return $this->tryDuckDuckGo($url);
+        return null;
     }
 
     public function fetchAll(string $url): FaviconCollection
@@ -120,6 +153,8 @@ final class HighQualityDriver implements Fetcher
                     ->setIconSize(180);
             }
 
+        } catch (ConnectionException $exception) {
+            throw $exception;
         } catch (\Exception) {
             // Fall through to next strategy
         }
@@ -157,6 +192,8 @@ final class HighQualityDriver implements Fetcher
                 }
             }
 
+        } catch (ConnectionException $exception) {
+            throw $exception;
         } catch (\Exception) {
             // Fall through
         }

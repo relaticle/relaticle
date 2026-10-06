@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Mcp\Tools\Company;
 
-use App\Actions\Company\ListCompanies;
 use App\Enums\CrmEntity;
 use App\Http\Resources\V1\CompanyResource;
 use App\Mcp\Tools\BaseListTool;
@@ -15,11 +14,6 @@ use Laravel\Mcp\Server\Attributes\Title;
 #[Description('List companies in the CRM with optional filters and pagination.')]
 final class ListCompaniesTool extends BaseListTool
 {
-    protected function actionClass(): string
-    {
-        return ListCompanies::class;
-    }
-
     protected function entity(): CrmEntity
     {
         return CrmEntity::Company;
