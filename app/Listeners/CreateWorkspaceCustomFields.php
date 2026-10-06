@@ -9,7 +9,6 @@ use App\Enums\CustomFields\NoteField as NoteCustomField;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\PeopleField as PeopleCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
-use App\Enums\CustomFieldType;
 use App\Enums\OnboardingUseCase;
 use App\Events\WorkspaceCreated;
 use App\Features\OnboardSeed;
@@ -21,13 +20,12 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\Workspace;
+use App\Onboarding\FieldOptionRows;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
-use Relaticle\CustomFields\Exceptions\FieldTypeNotOptionableException;
 use Relaticle\CustomFields\Facades\Entities;
 use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
 use Relaticle\OnboardSeed\OnboardSeeder;
@@ -92,9 +90,10 @@ final readonly class CreateWorkspaceCustomFields
 
                 $fields[] = $field;
 
-                array_push($options, ...$this->optionRows(
-                    $workspace,
-                    $field,
+                array_push($options, ...FieldOptionRows::build(
+                    (string) $workspace->getKey(),
+                    $field['id'],
+                    (string) $field['type'],
                     $names ?? [],
                     $colors ?? $enum->getOptionColors() ?? [],
                     $now,
@@ -147,39 +146,5 @@ final readonly class CreateWorkspaceCustomFields
             'created_at' => $now,
             'updated_at' => $now,
         ])->getAttributes();
-    }
-
-    /**
-     * @param  array<string, mixed>  $field
-     * @param  array<int|string, string>  $names
-     * @param  array<string, string>  $colors
-     * @return list<array<string, mixed>>
-     */
-    private function optionRows(Workspace $workspace, array $field, array $names, array $colors, CarbonImmutable $now): array
-    {
-        if ($names === []) {
-            return [];
-        }
-
-        throw_unless(CustomFieldType::from($field['type'])->isChoice(), FieldTypeNotOptionableException::class);
-
-        $rows = [];
-
-        foreach ($names as $sortOrder => $name) {
-            $rows[] = [
-                'id' => (new CustomFieldOption)->newUniqueId(),
-                'custom_field_id' => $field['id'],
-                'tenant_id' => $workspace->getKey(),
-                'name' => $name,
-                'sort_order' => $sortOrder,
-                'settings' => isset($colors[$name])
-                    ? json_encode(new CustomFieldOptionSettingsData(color: $colors[$name]))
-                    : null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        return $rows;
     }
 }

@@ -1,9 +1,12 @@
 @props([
     'preview',
+    'panel' => 'dashboard',
+    'interactive' => false,
 ])
 
 @php
     $hasStages = $preview['stages'] !== [];
+    $idleNavigationKey = $panel === 'people' ? 'people' : 'dashboard';
     $barWidths = ['dashboard' => 'w-10', 'people' => 'w-12', 'companies' => 'w-16', 'opportunities' => 'w-20', 'tasks' => 'w-9', 'notes' => 'w-11', 'emails' => 'w-12'];
 @endphp
 
@@ -11,10 +14,10 @@
     class="relative h-full overflow-hidden"
     x-data="{
         get showBoard() {
-            return wizardStep === 2 && @js($hasStages)
+            return @js($hasStages) && (@js($panel === 'board') || (@js($interactive) && wizardStep === 2))
         },
         get spotlight() {
-            return wizardStep === 0 ? (focused ?? hovered) : null
+            return @js($interactive) && wizardStep === 0 ? (focused ?? hovered) : null
         },
         lens(region) {
             if (this.spotlight === region) {
@@ -46,8 +49,10 @@
                 <span
                     class="text-sm font-semibold text-gray-950 dark:text-white"
                     x-bind:class="spotlight === 'workspace' ? 'whitespace-nowrap' : 'truncate'"
-                    x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
-                >{{ $preview['companyPlaceholder'] }}</span>
+                    @if ($interactive)
+                        x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
+                    @endif
+                >{{ $preview['workspaceName'] }}</span>
                 <x-filament::icon icon="ri-arrow-down-s-line" class="ms-auto size-4 shrink-0 text-gray-400" />
             </div>
 
@@ -62,7 +67,7 @@
                     @foreach ($preview['navigationIcons'] as $key => $icon)
                         <div
                             class="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-300"
-                            x-bind:class="(showBoard ? 'opportunities' : 'dashboard') === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
+                            x-bind:class="(showBoard ? 'opportunities' : @js($idleNavigationKey)) === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
                         >
                             <x-filament::icon :icon="$icon" class="size-4 shrink-0" />
                             <span @class(['h-1.5 rounded-full bg-current opacity-25', $barWidths[$key] ?? 'w-12'])></span>

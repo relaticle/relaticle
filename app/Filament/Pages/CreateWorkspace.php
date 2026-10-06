@@ -8,13 +8,8 @@ use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
-use App\Features\EmailIntegration;
 use App\Filament\Components\Forms\WorkspaceLogoUpload;
-use App\Filament\Resources\CompanyResource;
-use App\Filament\Resources\NoteResource;
-use App\Filament\Resources\OpportunityResource;
-use App\Filament\Resources\PeopleResource;
-use App\Filament\Resources\TaskResource;
+use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
@@ -42,13 +37,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
-use Laravel\Pennant\Feature;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Override;
-use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 
 final class CreateWorkspace extends RegisterTenant
 {
+    use BuildsOnboardingPreview;
+
     protected string $view = 'filament.pages.create-workspace';
 
     protected array $extraBodyAttributes = [
@@ -485,6 +480,7 @@ final class CreateWorkspace extends RegisterTenant
     /**
      * @return array{
      *     companyPlaceholder: string,
+     *     workspaceName: string,
      *     workspaceAvatarUrl: string,
      *     userAvatarUrl: string,
      *     greeting: string,
@@ -502,21 +498,7 @@ final class CreateWorkspace extends RegisterTenant
         $userName = trim((string) ($this->data['user_name'] ?? '')) ?: $user->name;
         $stages = OnboardingUseCase::tryFrom((string) ($this->data['onboarding_use_case'] ?? ''))?->pipelineStages() ?? [];
 
-        $previewUser = clone $user;
-        $previewUser->name = $userName;
-
-        return [
-            'companyPlaceholder' => $companyPlaceholder,
-            'workspaceAvatarUrl' => $this->previewLogoUrl() ?? new Workspace(['name' => $workspaceName])->getFilamentAvatarUrl(),
-            'userAvatarUrl' => $previewUser->getFilamentAvatarUrl(),
-            'greeting' => Dashboard::greetingFor($user, explode(' ', $userName)[0]),
-            'navigationIcons' => $this->previewNavigationIcons(),
-            'stages' => array_map(
-                fn (string $name, string $color): array => ['name' => $name, 'color' => $color],
-                array_keys($stages),
-                $stages,
-            ),
-        ];
+        return $this->onboardingPreview($workspaceName, $this->previewLogoUrl(), $userName, $stages);
     }
 
     private function previewLogoUrl(): ?string
@@ -534,26 +516,5 @@ final class CreateWorkspace extends RegisterTenant
         }
 
         return null;
-    }
-
-    /**
-     * @return array<string, string|BackedEnum|Htmlable|null>
-     */
-    private function previewNavigationIcons(): array
-    {
-        $icons = [
-            'dashboard' => Dashboard::getNavigationIcon(),
-            'people' => PeopleResource::getNavigationIcon(),
-            'companies' => CompanyResource::getNavigationIcon(),
-            'opportunities' => OpportunityResource::getNavigationIcon(),
-            'tasks' => TaskResource::getNavigationIcon(),
-            'notes' => NoteResource::getNavigationIcon(),
-        ];
-
-        if (Feature::active(EmailIntegration::class)) {
-            $icons['emails'] = EmailInboxPage::getNavigationIcon();
-        }
-
-        return $icons;
     }
 }
