@@ -132,7 +132,9 @@ final class SetupWorkspace extends Page
 
     public function backToMailbox(): void
     {
-        abort_unless($this->canGoBackToMailbox(), 403);
+        if (! $this->canGoBackToMailbox()) {
+            return;
+        }
 
         resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::UseCase, OnboardingStep::Email);
     }
@@ -144,11 +146,15 @@ final class SetupWorkspace extends Page
             && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
     }
 
-    public function mailboxConnectUrl(string $provider): string
+    public function connectMailbox(string $provider): void
     {
+        if ($this->step() !== OnboardingStep::Email || ! in_array($provider, $this->offeredProviders(), true)) {
+            return;
+        }
+
         $workspace = $this->workspace;
 
-        return MailboxOAuthWorkspace::redirectUrl($provider, $workspace, self::getUrl(['tenant' => $workspace]));
+        $this->redirect(MailboxOAuthWorkspace::redirectUrl($provider, $workspace, self::getUrl(['tenant' => $workspace])));
     }
 
     public function emphasizedProvider(): ?string

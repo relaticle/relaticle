@@ -17,8 +17,11 @@
 
     <div class="mt-6 flex flex-col gap-2.5">
         @foreach ($providers as $provider)
-            <a
-                href="{{ $this->mailboxConnectUrl($provider) }}"
+            <button
+                type="button"
+                wire:click="connectMailbox('{{ $provider }}')"
+                wire:loading.attr="disabled"
+                wire:target="connectMailbox"
                 data-provider="{{ $provider }}"
                 @class([
                     'flex h-11 w-full items-center justify-center gap-2.5 rounded-lg text-sm font-medium transition',
@@ -28,7 +31,7 @@
             >
                 @include('filament.pages.setup-workspace.provider-logo', ['provider' => $provider])
                 <span>{{ $labels[$provider] }}</span>
-            </a>
+            </button>
         @endforeach
     </div>
 

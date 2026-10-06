@@ -665,17 +665,49 @@ describe('connect email', function (): void {
             ->and($setup->instance()->offeredProviders())->toBe(['gmail']);
     });
 
-    it('sends each provider button through the signed redirect and back to setup', function (string $provider): void {
+    it('signs the connect link for the offered provider when it is clicked', function (string $provider): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
-        $url = livewire(SetupWorkspace::class)->instance()->mailboxConnectUrl($provider);
+        $setup = livewire(SetupWorkspace::class)->call('connectMailbox', $provider);
 
-        assertMailboxOAuthRedirectUrl($url, $provider, $workspace);
+        assertRedirectedToMailboxOAuth($setup, $provider, $workspace);
 
-        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        parse_str((string) parse_url($setup->effects['redirect'], PHP_URL_QUERY), $query);
 
         expect($query['return'] ?? null)->toBe(SetupWorkspace::getUrl(['tenant' => $workspace]));
     })->with(['gmail', 'azure']);
+
+    it('ignores a connect for a provider the install does not offer', function (string $provider): void {
+        config()->set('services.azure.client_id');
+        workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->call('connectMailbox', $provider)
+            ->assertSuccessful()
+            ->assertNoRedirect();
+    })->with(['azure', 'yahoo', '']);
+
+    it('ignores a connect once the workspace has moved on from the connect step', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        $setup = livewire(SetupWorkspace::class);
+
+        $workspace->update(['onboarding_step' => OnboardingStep::UseCase]);
+
+        $setup->call('connectMailbox', 'gmail')
+            ->assertSuccessful()
+            ->assertNoRedirect();
+    });
+
+    it('renders the connect buttons as Livewire actions that stay inside the page', function (): void {
+        workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->assertSeeHtml("wire:click=\"connectMailbox('gmail')\"")
+            ->assertSeeHtml("wire:click=\"connectMailbox('azure')\"")
+            ->assertDontSeeHtml('wire:navigate')
+            ->assertDontSeeHtml('/email-accounts/redirect/');
+    });
 
     it('moves on to the use case when the owner skips', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
@@ -699,6 +731,19 @@ describe('connect email', function (): void {
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
     });
 
+    it('stays quiet when back is called twice', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->call('skipMailbox')
+            ->call('backToMailbox')
+            ->assertSuccessful()
+            ->call('backToMailbox')
+            ->assertSuccessful();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
+    });
+
     it('offers no way back to connect once a mailbox is connected', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
@@ -713,7 +758,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
             ->call('backToMailbox')
-            ->assertForbidden();
+            ->assertSuccessful();
 
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
     });
@@ -729,7 +774,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
             ->call('backToMailbox')
-            ->assertForbidden();
+            ->assertSuccessful();
 
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
     });
