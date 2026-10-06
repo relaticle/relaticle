@@ -34,7 +34,7 @@ final readonly class RedirectToWorkspaceSetup
             return $next($request);
         }
 
-        if (! $request->isMethod('GET') || $request->expectsJson() || $request->routeIs(self::SETUP_ROUTE)) {
+        if ($request->expectsJson() || $request->routeIs(self::SETUP_ROUTE)) {
             return $next($request);
         }
 

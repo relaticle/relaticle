@@ -11,9 +11,6 @@ use App\Filament\Pages\SetupWorkspace;
 use App\Filament\Resources\PeopleResource;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Models\User;
-use Filament\Facades\Filament;
-use Illuminate\Routing\RouteCollection;
-use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
 mutates(RedirectToWorkspaceSetup::class);
@@ -74,25 +71,6 @@ it('does not redirect a request that expects JSON', function (): void {
         ->assertOk();
 });
 
-it('does not redirect a request that is not a GET', function (): void {
-    Route::post('/_setup-redirect-probe', fn (): string => 'ran')
-        ->middleware(RedirectToWorkspaceSetup::class);
-
-    $routes = new RouteCollection;
-
-    foreach (Route::getRoutes()->getRoutes() as $route) {
-        $routes->add($route);
-    }
-
-    Route::setRoutes($routes);
-
-    $this->actingAs($this->owner);
-
-    Filament::setTenant($this->workspace);
-
-    $this->post('/_setup-redirect-probe')->assertOk();
-});
-
 it('leaves a paused workspace in setup to billing instead of looping', function (): void {
     $this->workspace->forceFill([
         'plan' => Plan::Free,
@@ -107,4 +85,10 @@ it('leaves a paused workspace in setup to billing instead of looping', function 
     $this->get(Dashboard::getUrl(['tenant' => $this->workspace]))->assertRedirect($billingUrl);
     $this->get($billingUrl)->assertOk();
     $this->get($this->setupUrl)->assertRedirect($billingUrl);
+});
+
+it('returns the owner to setup from billing once the workspace is no longer paused', function (): void {
+    $this->actingAs($this->owner)
+        ->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect($this->setupUrl);
 });
