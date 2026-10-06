@@ -93,6 +93,18 @@ return [
             'connected' => 'Connected',
             'footer' => 'You can change this any time in settings.',
         ],
+        'invite' => [
+            'heading' => 'Invite your team',
+            'description' => 'Add the people you work with. They get an email with a link to join.',
+            'emails_label' => 'Email addresses',
+            'emails_placeholder' => 'maya@company.com, leo@company.com',
+            'emails_helper' => 'Paste several at once. Everyone here joins with the same role.',
+            'invalid_emails' => 'Check these addresses: :emails',
+            'link_label' => 'Or share an invite link',
+            'copy_link' => 'Copy link',
+            'create_link' => 'Create link',
+            'send_and_start' => 'Send invites and get started',
+        ],
         'preview' => [
             'people' => 'People',
             'person' => 'Person',

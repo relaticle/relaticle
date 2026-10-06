@@ -4,31 +4,42 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
+use App\Livewire\App\Workspaces\Concerns\SendsWorkspaceInvitations;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
+use App\Rules\RegistrableEmail;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\EmailAddress;
+use App\Support\Workspaces\RoleOptions;
+use Closure;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\VerticalAlignment;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
@@ -45,6 +56,7 @@ use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 final class SetupWorkspace extends Page
 {
     use BuildsOnboardingPreview;
+    use SendsWorkspaceInvitations;
 
     protected static string $layout = 'filament-panels::components.layout.simple';
 
@@ -116,27 +128,63 @@ final class SetupWorkspace extends Page
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components($this->useCaseComponents())
+            ->components($this->step() === OnboardingStep::Invite ? $this->inviteComponents() : $this->useCaseComponents())
             ->statePath('data');
     }
 
     public function saveUseCase(): void
     {
-        $workspace = $this->workspace;
+        resolve(SaveOnboardingUseCase::class)->execute($this->authUser(), $this->workspace, $this->form->getState(), OnboardingStep::Invite);
 
-        resolve(SaveOnboardingUseCase::class)->execute($this->authUser(), $workspace, $this->form->getState(), null);
+        $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
+    }
 
-        $workspace->refresh();
+    public function finish(): void
+    {
+        if ($this->step() !== OnboardingStep::Invite) {
+            $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
+
+            return;
+        }
+
+        $state = $this->form->getState();
+
+        if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Invite, null)) {
+            $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
+
+            return;
+        }
+
+        $this->sendInvitations(
+            $this->parseEmails((string) ($state['emails'] ?? '')),
+            (string) ($state['role'] ?? WorkspaceRole::Member->value),
+        );
 
         Notification::make()
             ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $workspace->name]))
+            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $this->workspace->name]))
             ->success()
             ->send();
 
-        $url = $this->landingUrl($workspace);
+        $this->redirectTo($this->landingUrl($this->workspace));
+    }
 
-        $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
+    public function createInviteLink(): void
+    {
+        if ($this->step() !== OnboardingStep::Invite || $this->inviteLinkUrl() !== null) {
+            return;
+        }
+
+        resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->workspace);
+    }
+
+    public function inviteLinkUrl(): ?string
+    {
+        if (! $this->workspace->hasInviteLink() || $this->workspace->isInviteLinkTokenExpired()) {
+            return null;
+        }
+
+        return route('workspaces.join', ['token' => $this->workspace->invite_link_token]);
     }
 
     public function saveSharing(): void
@@ -241,6 +289,7 @@ final class SetupWorkspace extends Page
         return match ($this->step()) {
             OnboardingStep::Email => 'email',
             OnboardingStep::Sharing => 'sharing',
+            OnboardingStep::Invite => 'invite',
             default => 'use-case',
         };
     }
@@ -249,6 +298,10 @@ final class SetupWorkspace extends Page
     {
         if (in_array($this->step(), [OnboardingStep::Email, OnboardingStep::Sharing], true)) {
             return 'people';
+        }
+
+        if ($this->step() === OnboardingStep::Invite) {
+            return 'members';
         }
 
         return $this->selectedUseCase() instanceof OnboardingUseCase ? 'board' : 'dashboard';
@@ -273,6 +326,11 @@ final class SetupWorkspace extends Page
         }
 
         return $preview;
+    }
+
+    protected function sendNotification(string $title, ?string $message = null, string $type = 'success'): void
+    {
+        Notification::make()->title($title)->body($message)->{$type}()->send();
     }
 
     /**
@@ -359,6 +417,11 @@ final class SetupWorkspace extends Page
         return OnboardingUseCase::tryFrom((string) ($this->data['onboarding_use_case'] ?? ''));
     }
 
+    private function redirectTo(string $url): void
+    {
+        $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
+    }
+
     private function landingUrl(Workspace $workspace): string
     {
         $conversationId = $workspace->setupConversation()->value('id');
@@ -366,6 +429,67 @@ final class SetupWorkspace extends Page
         return is_string($conversationId)
             ? ChatConversation::getUrl(['conversationId' => $conversationId, 'tenant' => $workspace])
             : Dashboard::getUrl(['tenant' => $workspace]);
+    }
+
+    /**
+     * @return array<Component>
+     */
+    private function inviteComponents(): array
+    {
+        $assignableRoles = fn (): array => RoleOptions::assignable($this->authUser(), $this->workspace);
+
+        return [
+            Flex::make([
+                TextInput::make('emails')
+                    ->label(__('filament/pages/workspaces.setup_workspace.invite.emails_label'))
+                    ->placeholder(__('filament/pages/workspaces.setup_workspace.invite.emails_placeholder'))
+                    ->helperText(__('filament/pages/workspaces.setup_workspace.invite.emails_helper'))
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        $this->failUnsendableInvites(is_string($value) ? $value : '', $fail);
+                    }),
+                Select::make('role')
+                    ->label(__('workspaces.form.invite_as.label'))
+                    ->options($assignableRoles)
+                    ->in(fn (): array => array_keys($assignableRoles()))
+                    ->default(WorkspaceRole::Member->value)
+                    ->native(false)
+                    ->selectablePlaceholder(false)
+                    ->grow(false),
+            ])->from('sm')->verticalAlignment(VerticalAlignment::Start)->extraAttributes(['class' => 'gap-3']),
+        ];
+    }
+
+    private function failUnsendableInvites(string $value, Closure $fail): void
+    {
+        $emails = $this->parseEmails($value);
+
+        if (count($emails) > self::MAX_INVITES_PER_SUBMISSION) {
+            $fail(__('workspaces.validation.too_many_invites', ['max' => self::MAX_INVITES_PER_SUBMISSION]));
+
+            return;
+        }
+
+        $malformed = array_filter($emails, fn (string $email): bool => ! $this->isInvitableAddress($email));
+
+        if ($malformed !== []) {
+            $fail(__('filament/pages/workspaces.setup_workspace.invite.invalid_emails', ['emails' => implode(', ', $malformed)]));
+
+            return;
+        }
+
+        $retryAfter = $this->inviteRetryAfterSeconds();
+
+        if ($retryAfter !== null) {
+            $fail(__('workspaces.notifications.invite_rate_limited.body', ['seconds' => $retryAfter]));
+        }
+    }
+
+    private function isInvitableAddress(string $email): bool
+    {
+        return Validator::make(
+            ['email' => EmailAddress::canonicalize($email)],
+            ['email' => RegistrableEmail::rules(checkDns: false)],
+        )->passes();
     }
 
     /**

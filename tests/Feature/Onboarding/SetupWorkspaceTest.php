@@ -10,6 +10,7 @@ use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
@@ -32,6 +33,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
@@ -140,6 +143,39 @@ function bindSeederFailingOnAQuery(): void
     });
 }
 
+function workspaceAtInvite(User $user, string $name = 'Northwind Studio'): Workspace
+{
+    $workspace = workspaceInSetup($user, $name);
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
+        ->call('saveUseCase')
+        ->assertHasNoFormErrors();
+
+    $workspace = $workspace->fresh();
+
+    Filament::setTenant($workspace);
+
+    return $workspace;
+}
+
+function joinAsMember(Workspace $workspace, WorkspaceRole $role = WorkspaceRole::Member): User
+{
+    $member = User::factory()->create();
+
+    $workspace->users()->attach($member, ['role' => $role->value]);
+
+    test()->actingAs($member);
+    Filament::setTenant($workspace);
+
+    return $member;
+}
+
+function inviteLinkUrl(Workspace $workspace): string
+{
+    return route('workspaces.join', ['token' => $workspace->fresh()->invite_link_token]);
+}
+
 it('creates the workspace at the referral step and sends the owner to setup', function (): void {
     $user = User::factory()->create();
 
@@ -191,7 +227,7 @@ it('requires a use case', function (): void {
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
-it('stores the use case and finishes setup', function (): void {
+it('stores the use case and moves on to the invite step', function (): void {
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
 
@@ -199,16 +235,15 @@ it('stores the use case and finishes setup', function (): void {
         ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
         ->call('saveUseCase')
         ->assertHasNoFormErrors()
-        ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
         ->onboarding_context->toBe(['outbound'])
-        ->onboarding_step->toBeNull();
+        ->onboarding_step->toBe(OnboardingStep::Invite);
 });
 
-it('lands a first workspace on its setup conversation', function (): void {
+it('stays on the setup page after the use case even when a setup conversation exists', function (): void {
     Feature::define(SetupConversation::class, true);
 
     $user = User::factory()->create();
@@ -217,14 +252,13 @@ it('lands a first workspace on its setup conversation', function (): void {
     livewire(SetupWorkspace::class)
         ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
         ->call('saveUseCase')
-        ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-        ->assertRedirect(ChatConversation::getUrl([
-            'conversationId' => $workspace->setupConversation->id,
-            'tenant' => $workspace,
-        ]));
+        ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
+
+    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
 });
 
-it('lands an additional workspace on the dashboard', function (): void {
+it('lands an additional workspace on the dashboard once the invite step is done', function (): void {
     Feature::define(SetupConversation::class, true);
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -233,6 +267,10 @@ it('lands an additional workspace on the dashboard', function (): void {
     livewire(SetupWorkspace::class)
         ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
         ->call('saveUseCase')
+        ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
+
+    livewire(SetupWorkspace::class)
+        ->call('finish')
         ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 });
 
@@ -336,7 +374,7 @@ it('seeds no sample data for an owner who connected a mailbox', function (): voi
     expect(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
 });
 
-it('keeps the use case and the finished step when the sample seeder fails', function (): void {
+it('keeps the use case and moves on to the invite step when the sample seeder fails', function (): void {
     Feature::define(OnboardSeed::class, true);
     bindSeederFailingOnAQuery();
 
@@ -354,7 +392,7 @@ it('keeps the use case and the finished step when the sample seeder fails', func
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Recruiting)
-        ->onboarding_step->toBeNull()
+        ->onboarding_step->toBe(OnboardingStep::Invite)
         ->and($stage->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())
         ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()))
         ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
@@ -1385,4 +1423,282 @@ it('starts on the use case when the email feature is off', function (): void {
     $workspace = workspaceInSetup(User::factory()->create());
 
     expect($workspace->onboarding_step)->toBe(OnboardingStep::UseCase);
+});
+
+describe('invite team', function (): void {
+    it('shows the invite step after the use case', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        expect($workspace->onboarding_step)->toBe(OnboardingStep::Invite);
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.heading'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.description'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.link_label'))
+            ->assertSee(__('filament/pages/workspaces.create_workspace.actions.get_started'))
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            ->assertDontSee('filament/pages/workspaces.setup_workspace')
+            ->assertFormFieldExists('emails')
+            ->assertFormFieldExists('role')
+            ->assertFormSet(['role' => WorkspaceRole::Member->value]);
+
+        expect($setup->instance()->previewPanel())->toBe('members');
+    });
+
+    it('finishes with nothing typed', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertHasNoFormErrors()
+            ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+        expect($workspace->fresh()->onboarding_step)->toBeNull()
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('invites every pasted address with the chosen role and finishes', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => "maya@northwind.test, leo@northwind.test;\nsam@northwind.test", 'role' => WorkspaceRole::Admin->value])
+            ->call('finish')
+            ->assertHasNoFormErrors()
+            ->assertNotified(__('workspaces.notifications.workspace_invitation_sent.success'));
+
+        expect($workspace->workspaceInvitations()->pluck('role', 'email')->all())->toEqual([
+            'maya@northwind.test' => WorkspaceRole::Admin->value,
+            'leo@northwind.test' => WorkspaceRole::Admin->value,
+            'sam@northwind.test' => WorkspaceRole::Admin->value,
+        ])->and($workspace->fresh()->onboarding_step)->toBeNull();
+    });
+
+    it('invites as a member unless another role is chosen', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test'])
+            ->call('finish')
+            ->assertHasNoFormErrors();
+
+        expect($workspace->workspaceInvitations()->sole()->role)->toBe(WorkspaceRole::Member->value);
+    });
+
+    it('refuses a role that is not on offer', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test', 'role' => 'owner'])
+            ->call('finish')
+            ->assertHasFormErrors(['role']);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('stays on the step when more addresses are pasted than one send allows', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+        $emails = collect(range(1, 11))->map(fn (int $n): string => "person{$n}@northwind.test")->implode(', ');
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => $emails])
+            ->call('finish')
+            ->assertHasFormErrors(['emails']);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('stays on the step and sends nothing when one pasted address is malformed', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test, leo.northwind.test'])
+            ->call('finish')
+            ->assertHasFormErrors(['emails'])
+            ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->assertNoRedirect();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('stays on the step for a disposable address', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@mailinator.com'])
+            ->call('finish')
+            ->assertHasFormErrors(['emails']);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
+    });
+
+    it('finishes and reports the addresses the invite action rejects', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+        $teammate = User::factory()->create(['email' => 'leo@northwind.test']);
+        $workspace->users()->attach($teammate, ['role' => WorkspaceRole::Member->value]);
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test, leo@northwind.test'])
+            ->call('finish')
+            ->assertHasNoFormErrors()
+            ->assertNotified(__('workspaces.notifications.some_invites_failed.title'));
+
+        expect($workspace->workspaceInvitations()->pluck('email')->all())->toBe(['maya@northwind.test'])
+            ->and($workspace->fresh()->onboarding_step)->toBeNull();
+    });
+
+    it('stays on the step when the owner has hit the invitation rate limit', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        RateLimiter::increment('invite-workspace-members:'.$user->id, 60, 20);
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test'])
+            ->call('finish')
+            ->assertHasFormErrors(['emails'])
+            ->assertNoRedirect();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('finishes with nothing typed even while rate limited', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        RateLimiter::increment('invite-workspace-members:'.$user->id, 60, 20);
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertHasNoFormErrors();
+
+        expect($workspace->fresh()->onboarding_step)->toBeNull();
+    });
+
+    it('lands a first workspace on its setup conversation', function (): void {
+        Feature::define(SetupConversation::class, true);
+
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->call('finish')
+            ->assertNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->assertRedirect(ChatConversation::getUrl([
+                'conversationId' => $workspace->setupConversation->id,
+                'tenant' => $workspace,
+            ]));
+    });
+
+    it('sends nothing and goes back to setup when the workspace already finished', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceAtInvite($user);
+
+        $staleTab = livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'maya@northwind.test']);
+
+        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Invite, null);
+
+        $staleTab->call('finish')
+            ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
+            ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
+
+        expect($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('refuses to finish for an admin who does not own the workspace', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+        $ownerSetup = livewire(SetupWorkspace::class);
+
+        joinAsMember($workspace, WorkspaceRole::Admin);
+
+        $ownerSetup
+            ->set('data.emails', 'maya@northwind.test')
+            ->call('finish')
+            ->assertForbidden();
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+            ->and($workspace->workspaceInvitations()->count())->toBe(0);
+    });
+
+    it('offers the live invite link for copying in the browser from the first render', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.copy_link'))
+            ->assertSee(__('workspaces.invite_link.copied'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.create_link'))
+            ->assertSeeHtml(e('navigator.clipboard.writeText('.Js::from(inviteLinkUrl($workspace)).')'));
+    });
+
+    it('offers to create a link once the old one is gone, and then offers it for copying', function (string $reason): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        match ($reason) {
+            'expired' => $this->travelTo(now()->addDays(Workspace::INVITE_LINK_TTL_DAYS + 1)),
+            'disabled' => $workspace->disableInviteLink(),
+        };
+
+        $oldToken = $workspace->fresh()->invite_link_token;
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.create_link'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.copy_link'))
+            ->assertSeeHtml('wire:target="createInviteLink"')
+            ->call('createInviteLink')
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.copy_link'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.invite.create_link'));
+
+        $fresh = $workspace->fresh();
+
+        expect($fresh->invite_link_token)->not->toBe($oldToken)
+            ->and($fresh->isInviteLinkTokenExpired())->toBeFalse();
+
+        $setup->assertSeeHtml(e('navigator.clipboard.writeText('.Js::from(inviteLinkUrl($workspace)).')'));
+    })->with(['expired', 'disabled']);
+
+    it('never rotates a live invite link', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+        $token = $workspace->invite_link_token;
+
+        livewire(SetupWorkspace::class)->call('createInviteLink');
+
+        expect($workspace->fresh()->invite_link_token)->toBe($token);
+    });
+
+    it('creates no link before the invite step', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+        $workspace->disableInviteLink();
+
+        livewire(SetupWorkspace::class)->call('createInviteLink');
+
+        expect($workspace->fresh()->hasInviteLink())->toBeFalse();
+    });
+
+    it('refuses to create a link for a member without the capability', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+        $workspace->disableInviteLink();
+        $ownerSetup = livewire(SetupWorkspace::class);
+
+        joinAsMember($workspace, WorkspaceRole::Member);
+
+        $ownerSetup
+            ->call('createInviteLink')
+            ->assertForbidden();
+
+        expect($workspace->fresh()->hasInviteLink())->toBeFalse();
+    });
+
+    it('gives the finish button and the link button their own loading target', function (): void {
+        workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)->assertSeeHtml('wire:target="finish"');
+    });
 });

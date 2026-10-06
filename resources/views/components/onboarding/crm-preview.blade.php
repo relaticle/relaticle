@@ -79,6 +79,13 @@
 
         <div class="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/60 dark:bg-gray-950/40">
             <div class="flex h-12 shrink-0 items-center justify-end border-b border-gray-950/5 px-4 dark:border-white/10">
+                @if ($panel === 'members')
+                    <span class="me-2 flex items-center">
+                        @foreach (['opacity-100', 'opacity-80', 'opacity-60'] as $index => $opacity)
+                            <span @class(['size-6 rounded-full bg-gray-200 ring-2 ring-gray-50 dark:bg-white/15 dark:ring-gray-950', $opacity, '-ms-1.5' => $index > 0])></span>
+                        @endforeach
+                    </span>
+                @endif
                 <img
                     src="{{ $preview['userAvatarUrl'] }}"
                     alt=""
