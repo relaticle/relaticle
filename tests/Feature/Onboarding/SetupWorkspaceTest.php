@@ -23,10 +23,16 @@ use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
+use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetupWorkspace::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
@@ -49,6 +55,40 @@ function workspaceInSetup(User $user, string $name = 'Northwind Studio'): Worksp
     Filament::setTenant($workspace);
 
     return $workspace;
+}
+
+function bindSeederFailingOnAQuery(): void
+{
+    app()->bind(CompanySeeder::class, fn (): ModelSeederInterface => new class implements ModelSeederInterface
+    {
+        public function seed(Workspace $workspace, Authenticatable $user): void
+        {
+            $level = DB::transactionLevel();
+            $savepoint = $level > 1 ? "trans{$level}" : 'seeder_probe';
+
+            if ($level === 1) {
+                DB::unprepared("savepoint {$savepoint}");
+            }
+
+            try {
+                DB::select('select * from a_table_that_does_not_exist');
+            } catch (QueryException $exception) {
+                DB::unprepared("rollback to savepoint {$savepoint}");
+
+                throw $exception;
+            }
+        }
+
+        public function customFields(): Collection
+        {
+            return collect();
+        }
+
+        public function initialize(): ModelSeederInterface
+        {
+            return $this;
+        }
+    });
 }
 
 it('creates the workspace at the referral step and sends the owner to setup', function (): void {
@@ -245,6 +285,29 @@ it('seeds no sample data for an owner who connected a mailbox', function (): voi
         ->call('saveUseCase');
 
     expect(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
+});
+
+it('keeps the use case and the finished step when the sample seeder fails', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    bindSeederFailingOnAQuery();
+
+    $workspace = workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Recruiting->value, 'onboarding_context' => ['sourcing']])
+        ->call('saveUseCase')
+        ->assertHasNoFormErrors();
+
+    $stage = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('code', OpportunityField::STAGE->value)
+        ->sole();
+
+    expect($workspace->fresh())
+        ->onboarding_use_case->toBe(OnboardingUseCase::Recruiting)
+        ->onboarding_step->toBeNull()
+        ->and($stage->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())
+        ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()));
 });
 
 it('seeds no sample data for an additional workspace', function (): void {

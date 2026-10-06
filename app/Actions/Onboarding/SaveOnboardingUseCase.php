@@ -37,7 +37,7 @@ final readonly class SaveOnboardingUseCase
 
         $useCase = OnboardingUseCase::from((string) $input['onboarding_use_case']);
 
-        DB::transaction(function () use ($user, $workspace, $input, $useCase, $then): void {
+        DB::transaction(function () use ($workspace, $input, $useCase, $then): void {
             $locked = Workspace::query()->whereKey($workspace->getKey())->lockForUpdate()->sole();
 
             abort_unless($locked->onboarding_step === OnboardingStep::UseCase, 409);
@@ -58,13 +58,16 @@ final readonly class SaveOnboardingUseCase
             if ($preset !== null) {
                 $this->applyStagePreset->execute($locked, $preset);
             }
-
-            if ($this->seedsSamples($user, $locked)) {
-                $this->onboardSeeder->run($user, $locked, $useCase->getFixtureSet());
-            }
         });
 
         $workspace->refresh();
+
+        // The seeder swallows its own failures, but a SQL error aborts any open Postgres
+        // transaction and turns its COMMIT into a ROLLBACK, so it runs after this one commits.
+        if ($this->seedsSamples($user, $workspace)) {
+            $this->onboardSeeder->run($user, $workspace, $useCase->getFixtureSet());
+        }
+
         $this->facts->forget($workspace);
 
         SyncSubscriberJob::dispatchFor((string) $workspace->user_id);
