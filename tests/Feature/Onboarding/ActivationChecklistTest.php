@@ -543,6 +543,36 @@ it('offers to remove sample data only once the workspace has an own record', fun
         ->assertSee(__('filament/pages/dashboard.activation.remove_sample_data'));
 });
 
+it('offers to remove sample data once a mailbox sync has brought in a record', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => null,
+        'creation_source' => CreationSource::MAILBOX,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($this->workspace);
+
+    livewire(ActivationChecklist::class)
+        ->assertSet('canRemoveSampleData', true)
+        ->assertSee(__('filament/pages/dashboard.activation.remove_sample_data'));
+});
+
+it('removes sample data and keeps the records a mailbox sync created', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    $synced = People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => null,
+        'creation_source' => CreationSource::MAILBOX,
+    ]);
+
+    livewire(ActivationChecklist::class)->call('removeSampleData');
+
+    expect($synced->fresh())->not->toBeNull()
+        ->and(People::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SAMPLE)->exists())->toBeFalse();
+});
+
 it('removes every system record and keeps the workspace\'s own', function (): void {
     seedSampleRecords($this->workspace, $this->owner);
     $own = People::factory()->create([
