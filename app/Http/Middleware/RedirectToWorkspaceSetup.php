@@ -43,6 +43,6 @@ final readonly class RedirectToWorkspaceSetup
             return $next($request);
         }
 
-        return redirect()->route(self::SETUP_ROUTE, ['tenant' => $workspace->slug]);
+        return to_route(self::SETUP_ROUTE, ['tenant' => $workspace->slug]);
     }
 }
