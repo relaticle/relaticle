@@ -98,7 +98,7 @@ return [
             'description' => 'Add the people you work with. They get an email with a link to join.',
             'emails_label' => 'Email addresses',
             'emails_placeholder' => 'maya@acme.com, leo@acme.com',
-            'helper' => 'Paste several at once. Everyone here joins with the same role.',
+            'helper' => 'Paste several at once. Everyone gets the same role.',
             'invalid_emails' => 'Check these addresses: :emails',
             'link_label' => 'Or share an invite link',
             'copy_link' => 'Copy link',

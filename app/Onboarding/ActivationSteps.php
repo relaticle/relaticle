@@ -32,7 +32,7 @@ use Spatie\Onboard\OnboardingSteps;
  * 2026-06-01 and at least 8 days old, n=666, back within 7 days): 3.9% with
  * neither a record nor a chat on day 0, 7.4% with a chat only, 12.5% with an
  * own record only, 20.0% with both, while import reaches 0.5% of workspaces
- * and invite 0.3%. Import and invite stay because they are true facts about
+ * and invite 0.3% (measured 2026-08-23). Import and invite stay because they are true facts about
  * the workspace and the setup nudge reads the same registry, but they sit
  * last: a checklist that opens on two rows almost nobody completes reads as
  * unachievable.
