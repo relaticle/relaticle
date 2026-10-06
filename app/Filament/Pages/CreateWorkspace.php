@@ -120,7 +120,7 @@ final class CreateWorkspace extends RegisterTenant
             ->components([
                 Wizard::make([
                     $this->getWorkspaceStep(),
-                    ...($this->isFirstWorkspace() ? [$this->getAttributionStep()] : []),
+                    ...($this->ownsNoWorkspace() ? [$this->getAttributionStep()] : []),
                 ])
                     ->view('components.onboarding.wizard')
                     ->hiddenHeader()
@@ -233,6 +233,14 @@ final class CreateWorkspace extends RegisterTenant
         $slug = $get('slug');
 
         return blank($slug) || $slug === $get('slug_derived');
+    }
+
+    private function ownsNoWorkspace(): bool
+    {
+        /** @var User $user */
+        $user = auth('web')->user();
+
+        return ! $user->ownedWorkspaces()->exists();
     }
 
     private function isFirstWorkspace(): bool

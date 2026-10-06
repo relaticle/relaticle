@@ -13,7 +13,6 @@ return [
             'continue' => 'Continue',
             'get_started' => 'Get started',
             'cancel' => 'Cancel',
-            'skip' => 'Skip',
             'back' => 'Back',
         ],
 

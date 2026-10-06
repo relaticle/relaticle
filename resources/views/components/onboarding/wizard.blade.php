@@ -223,18 +223,5 @@
         <div x-show="isLastStep()" x-cloak>
             {{ $getSubmitAction() }}
         </div>
-
-        {{-- Only the attribution step is optional: the first step and the last
-             (use case) are required. --}}
-        <div x-cloak class="mt-3 text-center">
-            <button
-                x-show="! isFirstStep() && ! isLastStep()"
-                type="button"
-                x-on:click="goToNextStep()"
-                class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-            >
-                {{ __('filament/pages/workspaces.create_workspace.actions.skip') }}
-            </button>
-        </div>
     </div>
 </div>

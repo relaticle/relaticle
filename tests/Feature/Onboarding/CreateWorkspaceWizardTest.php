@@ -433,6 +433,28 @@ it('does not ask a second workspace how the owner heard of us', function (): voi
         ->and($workspace->onboarding_referral_source)->toBeNull();
 });
 
+it('asks an invited member who owns no workspace how they heard of us', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $member = User::factory()->create();
+    $owner->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->forceFill(['current_workspace_id' => $owner->currentWorkspace->getKey()])->save();
+
+    $this->actingAs($member);
+
+    livewire(CreateWorkspace::class)
+        ->assertFormFieldExists('onboarding-attribution.onboarding_referral_source')
+        ->fillForm([
+            'name' => 'Member Corp',
+            'onboarding_referral_source' => OnboardingReferralSource::Google->value,
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $workspace = $member->fresh()->ownedWorkspaces()->where('name', 'Member Corp')->sole();
+
+    expect($workspace->onboarding_referral_source)->toBe(OnboardingReferralSource::Google);
+});
+
 it('stores referral source', function (): void {
     $user = User::factory()->create();
 
