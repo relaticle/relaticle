@@ -2,12 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\OnboardSeed\OnboardSeeder;
 
 mutates(Dashboard::class);
 
@@ -49,9 +48,8 @@ it('greets a fresh seeded workspace by the clock, with no assistant message in t
     // wall-clock luck.
     $this->travelTo(new DateTimeImmutable('2026-08-25 08:00:00', new DateTimeZone('UTC')));
 
-    Feature::define(OnboardSeed::class, true);
-
     $owner = User::factory()->withPersonalWorkspace()->create(['name' => 'Dana Reed', 'timezone' => 'UTC']);
+    resolve(OnboardSeeder::class)->run($owner, $owner->currentWorkspace, 'sales');
     $this->actingAs($owner);
     Filament::setTenant($owner->currentWorkspace);
 

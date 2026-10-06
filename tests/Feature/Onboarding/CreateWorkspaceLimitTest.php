@@ -2,20 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Features\OnboardSeed;
 use App\Filament\Pages\CreateWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Policies\WorkspacePolicy;
-use Laravel\Pennant\Feature;
 
 mutates(CreateWorkspace::class, WorkspacePolicy::class);
-
-// This file is the coverage for demo seeding itself, so it opts back into the
-// feature that TestCase switches off for the rest of the suite.
-beforeEach(function (): void {
-    Feature::define(OnboardSeed::class, true);
-});
 
 it('allows a fourth workspace under the default cap', function (): void {
     $user = User::factory()->create();

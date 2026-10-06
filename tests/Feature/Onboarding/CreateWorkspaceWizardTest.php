@@ -413,12 +413,13 @@ it('creates a workspace with a derived handle and no use case yet', function ():
         ->and($workspace->onboarding_use_case)->toBeNull();
 });
 
-it('subsequent workspaces can skip optional referral source', function (): void {
+it('does not ask a second workspace how the owner heard of us', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
+        ->assertFormFieldDoesNotExist('onboarding-attribution.onboarding_referral_source')
         ->fillForm([
             'name' => 'Second Workspace',
             'slug' => 'second-workspace',

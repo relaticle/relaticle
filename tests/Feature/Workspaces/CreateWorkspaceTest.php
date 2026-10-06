@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Events\WorkspaceCreated;
+use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Jetstream\Http\Livewire\CreateTeamForm;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 
 mutates(Workspace::class);
@@ -36,22 +37,14 @@ test('reserved slug is rejected on workspace creation', function () {
 });
 
 test('non-personal workspaces do not get demo data seeded', function (): void {
-    Event::fake()->except([
-        'eloquent.creating: App\\Models\\Workspace',
-        WorkspaceCreated::class,
-    ]);
+    Feature::define(OnboardSeed::class, true);
 
-    $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
+    $user = User::factory()->withPersonalWorkspace()->create();
 
-    Livewire::test(CreateTeamForm::class)
-        ->set(['state' => ['name' => 'Work Workspace', 'slug' => 'work-workspace']])
-        ->call('createTeam');
+    $workWorkspace = onboardWorkspace($user, ['name' => 'Work Workspace']);
 
-    $workWorkspace = $user->fresh()->ownedWorkspaces()->where('name', 'Work Workspace')->first();
-    expect($workWorkspace)->not->toBeNull()
-        ->and($workWorkspace->personal_workspace)->toBeFalse();
-
-    expect(Company::where('workspace_id', $workWorkspace->id)->count())->toBe(0)
+    expect($workWorkspace->personal_workspace)->toBeFalse()
+        ->and(Company::where('workspace_id', $workWorkspace->id)->count())->toBe(0)
         ->and(People::where('workspace_id', $workWorkspace->id)->count())->toBe(0)
         ->and(Opportunity::where('workspace_id', $workWorkspace->id)->count())->toBe(0)
         ->and(Task::where('workspace_id', $workWorkspace->id)->count())->toBe(0)
