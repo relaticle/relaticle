@@ -85,11 +85,20 @@ return [
             'benefit_send' => 'Send from Relaticle with your own address',
             'skip' => 'Skip for now',
         ],
+        'sharing' => [
+            'heading' => 'Choose what your team sees',
+            'description' => 'Your mailbox is syncing. Only you can read your emails. Pick how they appear to other members.',
+            'connected' => 'Connected',
+            'participants_description' => 'Other members see who wrote and when. Subject and message stay private.',
+            'subject_description' => 'Other members also see the subject line. The message stays private unless you share it.',
+            'footer' => 'You can change this any time in settings.',
+        ],
         'preview' => [
             'people' => 'People',
             'person' => 'Person',
             'company' => 'Company',
             'from_mailbox' => 'From your mailbox',
+            'syncing' => '{0} Syncing|{1} Syncing, :count person|[2,*] Syncing, :count people',
         ],
     ],
 ];

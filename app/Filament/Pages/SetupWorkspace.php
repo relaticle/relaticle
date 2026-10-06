@@ -6,10 +6,13 @@ namespace App\Filament\Pages;
 
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
+use App\Enums\CreationSource;
 use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
+use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
@@ -25,10 +28,15 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
+use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Override;
+use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
 /**
@@ -37,6 +45,12 @@ use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 final class SetupWorkspace extends Page
 {
     use BuildsOnboardingPreview;
+
+    /** @var list<string> */
+    private const array OFFERED_SHARING_TIERS = [
+        EmailPrivacyTier::METADATA_ONLY->value,
+        EmailPrivacyTier::SUBJECT->value,
+    ];
 
     protected static string $layout = 'filament-panels::components.layout.simple';
 
@@ -56,6 +70,8 @@ final class SetupWorkspace extends Page
     /** @var array<string, mixed>|null */
     public ?array $data = [];
 
+    public string $sharingTier = EmailPrivacyTier::METADATA_ONLY->value;
+
     public function mount(): void
     {
         /** @var Workspace $workspace */
@@ -72,6 +88,10 @@ final class SetupWorkspace extends Page
         $this->leaveMailboxStepWhenSettled($workspace);
 
         $this->form->fill();
+
+        if ($this->step() === OnboardingStep::Sharing) {
+            $this->sharingTier = $this->preselectedSharingTier();
+        }
     }
 
     public function authUser(): User
@@ -123,6 +143,21 @@ final class SetupWorkspace extends Page
         $url = $this->landingUrl($workspace);
 
         $this->redirect($url, navigate: FilamentView::hasSpaMode($url));
+    }
+
+    public function saveSharing(): void
+    {
+        $this->validate(['sharingTier' => ['required', Rule::in(self::OFFERED_SHARING_TIERS)]]);
+
+        $moved = resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+
+        if (! $moved) {
+            return;
+        }
+
+        $tier = EmailPrivacyTier::from($this->sharingTier);
+
+        resolve(SaveUserEmailSharingDefaultAction::class)->execute($this->authUser(), $tier, $tier);
     }
 
     public function skipMailbox(): void
@@ -177,6 +212,34 @@ final class SetupWorkspace extends Page
             : [$emphasized, ...array_values(array_diff($configured, [$emphasized]))];
     }
 
+    public function connectedMailbox(): ?ConnectedAccount
+    {
+        return ConnectedAccount::query()
+            ->ownedBy($this->authUser(), $this->workspace)
+            ->connected()
+            ->latest()
+            ->first(['provider', 'email_address']);
+    }
+
+    /**
+     * @return array<string, array{label: string, description: string, subjectShown: bool}>
+     */
+    public function sharingOptions(): array
+    {
+        return [
+            EmailPrivacyTier::METADATA_ONLY->value => [
+                'label' => EmailPrivacyTier::METADATA_ONLY->getLabel(),
+                'description' => __('filament/pages/workspaces.setup_workspace.sharing.participants_description'),
+                'subjectShown' => false,
+            ],
+            EmailPrivacyTier::SUBJECT->value => [
+                'label' => EmailPrivacyTier::SUBJECT->getLabel(),
+                'description' => __('filament/pages/workspaces.setup_workspace.sharing.subject_description'),
+                'subjectShown' => true,
+            ],
+        ];
+    }
+
     public function step(): OnboardingStep
     {
         return $this->workspace->onboarding_step ?? OnboardingStep::UseCase;
@@ -186,13 +249,14 @@ final class SetupWorkspace extends Page
     {
         return match ($this->step()) {
             OnboardingStep::Email => 'email',
+            OnboardingStep::Sharing => 'sharing',
             default => 'use-case',
         };
     }
 
     public function previewPanel(): string
     {
-        if ($this->step() === OnboardingStep::Email) {
+        if (in_array($this->step(), [OnboardingStep::Email, OnboardingStep::Sharing], true)) {
             return 'people';
         }
 
@@ -206,12 +270,18 @@ final class SetupWorkspace extends Page
     {
         $workspace = $this->workspace;
 
-        return $this->onboardingPreview(
+        $preview = $this->onboardingPreview(
             $workspace->name,
             $workspace->getFilamentAvatarUrl(),
             $this->authUser()->name,
             $this->selectedUseCase()?->pipelineStages() ?? [],
         );
+
+        if ($this->step() === OnboardingStep::Sharing) {
+            $preview['mailboxChip'] = $this->syncingChip();
+        }
+
+        return $preview;
     }
 
     /**
@@ -240,15 +310,47 @@ final class SetupWorkspace extends Page
 
     private function leaveMailboxStepWhenSettled(Workspace $workspace): void
     {
-        if ($workspace->onboarding_step !== OnboardingStep::Email) {
+        if (! in_array($workspace->onboarding_step, [OnboardingStep::Email, OnboardingStep::Sharing], true)) {
             return;
         }
 
-        $connected = resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $workspace);
+        $move = resolve(MoveWorkspaceSetup::class);
 
-        if (! Feature::active(EmailIntegration::class) || $connected) {
-            resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+        if (! Feature::active(EmailIntegration::class)) {
+            $move->execute($this->authUser(), $workspace, $workspace->onboarding_step, OnboardingStep::UseCase);
+
+            return;
         }
+
+        if ($workspace->onboarding_step === OnboardingStep::Sharing) {
+            return;
+        }
+
+        if (! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $workspace)) {
+            return;
+        }
+
+        $next = $this->authUser()->default_email_sharing_tier === null ? OnboardingStep::Sharing : OnboardingStep::UseCase;
+
+        $move->execute($this->authUser(), $workspace, OnboardingStep::Email, $next);
+    }
+
+    private function preselectedSharingTier(): string
+    {
+        $effective = resolve(PrivacyService::class)->effectiveSharingTierForUser($this->authUser())->value;
+
+        return in_array($effective, self::OFFERED_SHARING_TIERS, true) ? $effective : EmailPrivacyTier::METADATA_ONLY->value;
+    }
+
+    private function syncingChip(): string
+    {
+        $mailboxPeople = People::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $this->workspace->getKey())
+            ->where('creation_source', CreationSource::MAILBOX)
+            ->count();
+
+        return trans_choice('filament/pages/workspaces.setup_workspace.preview.syncing', $mailboxPeople);
     }
 
     private function selectedUseCase(): ?OnboardingUseCase

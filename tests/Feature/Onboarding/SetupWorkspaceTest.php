@@ -20,6 +20,7 @@ use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Models\Workspace;
@@ -32,7 +33,9 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -57,6 +60,15 @@ function workspaceInSetup(User $user, string $name = 'Northwind Studio'): Worksp
     Filament::setTenant($workspace);
 
     return $workspace;
+}
+
+function connectedMailboxFor(User $user, Workspace $workspace): ConnectedAccount
+{
+    return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'email_address' => 'olivia@northwind.test',
+    ]));
 }
 
 /**
@@ -639,7 +651,8 @@ describe('connect email', function (): void {
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'))
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.google'))
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.skip'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.skip'))
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'));
     });
 
     it('offers only Google when no Microsoft client is configured', function (): void {
@@ -806,19 +819,15 @@ describe('connect email', function (): void {
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
     });
 
-    it('moves on to the use case when a mailbox is already connected', function (): void {
+    it('moves on to the sharing step when a mailbox is already connected', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-
-        ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
-            'user_id' => $user->getKey(),
-            'workspace_id' => $workspace->getKey(),
-        ]));
+        connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
     });
 
     it('puts the provider the owner signed up with first', function (string $socialProvider, string $expected, string $other): void {
@@ -906,6 +915,178 @@ describe('connect email', function (): void {
 
         expect(livewire(SetupWorkspace::class)->instance()->emphasizedProvider())->toBeNull();
     });
+
+    it('lands on sharing after a successful connect, with participants only chosen', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
+            ->assertSee('olivia@northwind.test')
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.preview.from_mailbox'))
+            ->assertSeeHtml('wire:poll.5s')
+            ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+    });
+
+    it('offers exactly participants only and subject line', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(EmailPrivacyTier::METADATA_ONLY->getLabel())
+            ->assertSee(EmailPrivacyTier::SUBJECT->getLabel())
+            ->assertDontSee(EmailPrivacyTier::FULL->getLabel())
+            ->assertDontSee(EmailPrivacyTier::PRIVATE->getLabel());
+
+        expect(array_keys($setup->instance()->sharingOptions()))
+            ->toBe([EmailPrivacyTier::METADATA_ONLY->value, EmailPrivacyTier::SUBJECT->value]);
+    });
+
+    it('preselects the level the owner would get, falling back to participants only', function (EmailPrivacyTier $workspaceDefault, EmailPrivacyTier $expected): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        $workspace->update(['default_email_sharing_tier' => $workspaceDefault]);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)->assertSet('sharingTier', $expected->value);
+    })->with([
+        [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::METADATA_ONLY],
+        [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::SUBJECT],
+        [EmailPrivacyTier::FULL, EmailPrivacyTier::METADATA_ONLY],
+        [EmailPrivacyTier::PRIVATE, EmailPrivacyTier::METADATA_ONLY],
+    ]);
+
+    it('stores the chosen level as the owner\'s own and moves on', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+            ->call('saveSharing')
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
+            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('applies the chosen level to mail that synced before the choice', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        $account = connectedMailboxFor($user, $workspace);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $workspace->getKey(),
+            'user_id' => $user->getKey(),
+            'connected_account_id' => $account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        livewire(SetupWorkspace::class)
+            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+            ->call('saveSharing');
+
+        expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+    });
+
+    it('refuses a level the step does not offer', function (string $tier): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->set('sharingTier', $tier)
+            ->call('saveSharing')
+            ->assertHasErrors('sharingTier');
+
+        expect($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+    })->with([EmailPrivacyTier::FULL->value, EmailPrivacyTier::PRIVATE->value, 'nonsense']);
+
+    it('leaves the owner\'s level alone when a stale tab saves after the setup moved on', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+
+        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+            ->call('saveSharing')
+            ->assertSuccessful();
+
+        expect($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('skips sharing for an owner who already chose a level, and leaves it alone', function (): void {
+        $user = User::factory()->create(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+            ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
+    });
+
+    it('moves on to the use case when the feature is switched off on the sharing step', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+
+        Feature::define(EmailIntegration::class, false);
+        Feature::flushCache();
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('offers no way back to connect after the sharing step', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)
+            ->call('saveSharing')
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
+    });
+
+    it('shows how many people the mailbox has created so far', function (int $mailboxPeople, string $chip): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        People::factory()->for($workspace)->count($mailboxPeople)->create(['creation_source' => CreationSource::MAILBOX]);
+        People::factory()->for($workspace)->create(['creation_source' => CreationSource::SAMPLE]);
+        People::factory()->for($workspace)->create(['creation_source' => CreationSource::MAILBOX, 'deleted_at' => now()]);
+        People::factory()->create(['creation_source' => CreationSource::MAILBOX]);
+
+        $setup = livewire(SetupWorkspace::class);
+
+        expect($setup->instance()->getPreview()['mailboxChip'])->toBe($chip);
+
+        $setup->assertSee($chip);
+    })->with([
+        'none yet' => [0, 'Syncing'],
+        'one person' => [1, 'Syncing, 1 person'],
+        'several people' => [3, 'Syncing, 3 people'],
+    ]);
 });
 
 it('starts on the use case when the email feature is off', function (): void {

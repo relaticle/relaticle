@@ -125,8 +125,12 @@
                     <div class="flex items-center justify-between px-0.5">
                         <span class="text-sm font-semibold text-gray-950 dark:text-white">{{ __('filament/pages/workspaces.setup_workspace.preview.people') }}</span>
                         <span class="flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10">
-                            <x-filament::icon icon="ri-mail-line" class="size-3" />
-                            {{ __('filament/pages/workspaces.setup_workspace.preview.from_mailbox') }}
+                            @if (isset($preview['mailboxChip']))
+                                <span class="size-1.5 rounded-full bg-success-500"></span>
+                            @else
+                                <x-filament::icon icon="ri-mail-line" class="size-3" />
+                            @endif
+                            {{ $preview['mailboxChip'] ?? __('filament/pages/workspaces.setup_workspace.preview.from_mailbox') }}
                         </span>
                     </div>
 
