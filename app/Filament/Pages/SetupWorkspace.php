@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Actions\Onboarding\MoveWorkspaceSetup;
+use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingStep;
@@ -32,7 +33,6 @@ use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Override;
-use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -45,12 +45,6 @@ use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 final class SetupWorkspace extends Page
 {
     use BuildsOnboardingPreview;
-
-    /** @var list<string> */
-    private const array OFFERED_SHARING_TIERS = [
-        EmailPrivacyTier::METADATA_ONLY->value,
-        EmailPrivacyTier::SUBJECT->value,
-    ];
 
     protected static string $layout = 'filament-panels::components.layout.simple';
 
@@ -147,17 +141,15 @@ final class SetupWorkspace extends Page
 
     public function saveSharing(): void
     {
-        $this->validate(['sharingTier' => ['required', Rule::in(self::OFFERED_SHARING_TIERS)]]);
+        $this->validate(['sharingTier' => ['required', Rule::enum(EmailPrivacyTier::class)->only(SaveOnboardingSharing::OFFERED_TIERS)]]);
 
-        $moved = resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+        if (! $this->asksForSharing()) {
+            resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
 
-        if (! $moved || ! $this->asksForSharing()) {
             return;
         }
 
-        $tier = EmailPrivacyTier::from($this->sharingTier);
-
-        resolve(SaveUserEmailSharingDefaultAction::class)->execute($this->authUser(), $tier, $tier);
+        resolve(SaveOnboardingSharing::class)->execute($this->authUser(), $this->workspace, EmailPrivacyTier::from($this->sharingTier));
     }
 
     public function skipMailbox(): void
@@ -230,18 +222,15 @@ final class SetupWorkspace extends Page
      */
     public function sharingOptions(): array
     {
-        return [
-            EmailPrivacyTier::METADATA_ONLY->value => [
-                'label' => EmailPrivacyTier::METADATA_ONLY->getLabel(),
-                'description' => __('filament/pages/workspaces.setup_workspace.sharing.participants_description'),
-                'subjectShown' => false,
-            ],
-            EmailPrivacyTier::SUBJECT->value => [
-                'label' => EmailPrivacyTier::SUBJECT->getLabel(),
-                'description' => __('filament/pages/workspaces.setup_workspace.sharing.subject_description'),
-                'subjectShown' => true,
-            ],
-        ];
+        return collect(SaveOnboardingSharing::OFFERED_TIERS)
+            ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => [
+                'label' => $tier->getLabel(),
+                'description' => __($tier === EmailPrivacyTier::SUBJECT
+                    ? 'filament/pages/workspaces.setup_workspace.sharing.subject_description'
+                    : 'filament/pages/workspaces.setup_workspace.sharing.participants_description'),
+                'subjectShown' => $tier === EmailPrivacyTier::SUBJECT,
+            ]])
+            ->all();
     }
 
     public function step(): OnboardingStep
@@ -351,9 +340,9 @@ final class SetupWorkspace extends Page
 
     private function preselectedSharingTier(): string
     {
-        $effective = resolve(PrivacyService::class)->effectiveSharingTierForUser($this->authUser())->value;
+        $effective = resolve(PrivacyService::class)->effectiveSharingTierForUser($this->authUser());
 
-        return in_array($effective, self::OFFERED_SHARING_TIERS, true) ? $effective : EmailPrivacyTier::METADATA_ONLY->value;
+        return in_array($effective, SaveOnboardingSharing::OFFERED_TIERS, true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;
     }
 
     private function syncingChip(): string

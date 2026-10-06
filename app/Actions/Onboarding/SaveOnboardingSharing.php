@@ -1,0 +1,37 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Actions\Onboarding;
+
+use App\Enums\OnboardingStep;
+use App\Models\User;
+use App\Models\Workspace;
+use Illuminate\Support\Facades\DB;
+use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+
+final readonly class SaveOnboardingSharing
+{
+    public const array OFFERED_TIERS = [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT];
+
+    public function __construct(
+        private MoveWorkspaceSetup $moveSetup,
+        private SaveUserEmailSharingDefaultAction $saveSharingDefault,
+    ) {}
+
+    public function execute(User $user, Workspace $workspace, EmailPrivacyTier $tier): bool
+    {
+        abort_unless(in_array($tier, self::OFFERED_TIERS, true), 422);
+
+        return DB::transaction(function () use ($user, $workspace, $tier): bool {
+            if (! $this->moveSetup->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase)) {
+                return false;
+            }
+
+            $this->saveSharingDefault->execute($user, $tier, $tier);
+
+            return true;
+        });
+    }
+}

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\ApplyStagePreset;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
+use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
@@ -29,6 +30,7 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
@@ -41,7 +43,7 @@ use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(SetupWorkspace::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
+mutates(SetupWorkspace::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
 
 beforeEach(function (): void {
     Feature::define(EmailIntegration::class, false);
@@ -1215,6 +1217,48 @@ describe('connect email', function (): void {
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
             ->and($otherEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    });
+
+    it('keeps the setup on sharing when saving the level fails', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        $setup = livewire(SetupWorkspace::class)->set('sharingTier', EmailPrivacyTier::SUBJECT->value);
+
+        Event::listen('eloquent.updating: '.User::class, fn (): never => throw new RuntimeException('lock timeout'));
+
+        expect(fn () => $setup->call('saveSharing'))->toThrow(RuntimeException::class);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+    });
+
+    it('refuses to save a level the sharing step does not offer when the action runs directly', function (EmailPrivacyTier $tier): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+        livewire(SetupWorkspace::class);
+
+        expect(fn () => resolve(SaveOnboardingSharing::class)->execute($user, $workspace, $tier))
+            ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(422));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing)
+            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+    })->with([EmailPrivacyTier::FULL, EmailPrivacyTier::PRIVATE]);
+
+    it('refuses to save a sharing level for someone who does not own the workspace', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+        livewire(SetupWorkspace::class);
+        $member = User::factory()->create();
+
+        expect(fn () => resolve(SaveOnboardingSharing::class)->execute($member, $workspace, EmailPrivacyTier::SUBJECT))
+            ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(403));
+
+        expect($member->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
     });
 });
 
