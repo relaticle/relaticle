@@ -78,13 +78,17 @@ function connectedMailboxFor(User $user, Workspace $workspace, array $attributes
     ]));
 }
 
-function mailOf(User $user, Workspace $workspace, ConnectedAccount $account, EmailPrivacyTier $tier): Email
+/**
+ * @param  array<string, mixed>  $attributes
+ */
+function mailOf(User $user, Workspace $workspace, ConnectedAccount $account, EmailPrivacyTier $tier, array $attributes = []): Email
 {
     return Email::factory()->create([
         'workspace_id' => $workspace->getKey(),
         'user_id' => $user->getKey(),
         'connected_account_id' => $account->getKey(),
         'privacy_tier' => $tier,
+        ...$attributes,
     ]);
 }
 
@@ -1013,23 +1017,56 @@ describe('connect email', function (): void {
             ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
     });
 
-    it('applies the chosen level to mail that synced before the choice', function (): void {
+    it('applies the chosen level to the owner\'s mail that synced before the choice and to no other mail', function (EmailPrivacyTier $chosen, EmailPrivacyTier $before): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        $account = connectedMailboxFor($user, $workspace);
+        $colleague = User::factory()->create();
+
+        $ownMail = mailOf($user, $workspace, $account, $before);
+        $customizedMail = mailOf($user, $workspace, $account, $before, ['privacy_tier_customized' => true]);
+        $colleagueMail = mailOf($colleague, $workspace, connectedMailboxFor($colleague, $workspace, ['email_address' => 'sam@northwind.test']), $before);
+
+        livewire(SetupWorkspace::class)
+            ->set('sharingTier', $chosen->value)
+            ->call('saveSharing');
+
+        expect($ownMail->fresh()->privacy_tier)->toBe($chosen)
+            ->and($customizedMail->fresh()->privacy_tier)->toBe($before)
+            ->and($colleagueMail->fresh()->privacy_tier)->toBe($before);
+    })->with([
+        'subject' => [EmailPrivacyTier::SUBJECT, EmailPrivacyTier::METADATA_ONLY],
+        'participants only' => [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT],
+    ]);
+
+    it('stores participants only as the owner\'s own level when the default choice is submitted', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        connectedMailboxFor($user, $workspace);
+
+        livewire(SetupWorkspace::class)->call('saveSharing');
+
+        expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('renders the sharing step without an address row once the mailbox is gone', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
         $account = connectedMailboxFor($user, $workspace);
 
-        $email = Email::factory()->create([
-            'workspace_id' => $workspace->getKey(),
-            'user_id' => $user->getKey(),
-            'connected_account_id' => $account->getKey(),
-            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        ]);
+        livewire(SetupWorkspace::class);
+
+        $account->update(['status' => EmailAccountStatus::DISCONNECTED]);
 
         livewire(SetupWorkspace::class)
-            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
-            ->call('saveSharing');
+            ->assertSuccessful()
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
+            ->assertDontSee('olivia@northwind.test')
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'));
 
-        expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
     });
 
     it('refuses a level the step does not offer', function (string $tier): void {
