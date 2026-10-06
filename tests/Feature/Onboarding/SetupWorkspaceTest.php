@@ -32,6 +32,7 @@ use App\Models\UserSocialAccount;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
@@ -183,6 +184,8 @@ function inviteLinkUrl(Workspace $workspace): string
 }
 
 it('creates the workspace at the referral step and sends the owner to setup', function (): void {
+    FilamentView::spa();
+
     $user = User::factory()->create();
 
     $this->actingAs($user);
@@ -198,6 +201,8 @@ it('creates the workspace at the referral step and sends the owner to setup', fu
         ->and($workspace->onboarding_use_case)->toBeNull();
 
     $component->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
+
+    expect($component->effects)->not->toHaveKey('redirectUsingNavigate');
 });
 
 it('asks for the use case on the setup page', function (): void {

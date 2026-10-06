@@ -19,24 +19,6 @@ use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class);
 
-function delaySetupPageFetch(AwaitableWebpage $page): void
-{
-    $page->script(<<<'JS'
-        (() => {
-            if (window.setupFetchDelayed) {
-                return;
-            }
-
-            window.setupFetchDelayed = true;
-            const nativeFetch = window.fetch;
-
-            window.fetch = (input, init) => /\/setup$/.test(String(input?.url ?? input))
-                ? new Promise((resolve) => setTimeout(resolve, 300)).then(() => nativeFetch(input, init))
-                : nativeFetch(input, init);
-        })()
-    JS);
-}
-
 function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
 {
     return loginViaBrowser($user)
@@ -90,21 +72,19 @@ it('walks a new owner through every setup screen to the setup conversation', fun
 
     $user = User::factory()->create();
 
-    $page = loginViaBrowser($user)
+    loginViaBrowser($user)
         ->assertPathIs('/app/new')
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
-        ->assertSee('Your name');
-
-    delaySetupPageFetch($page);
-
-    $page->type('[id="form.name"]', 'My First Workspace')
+        ->assertSee('Your name')
+        ->type('[id="form.name"]', 'My First Workspace')
         ->type('[id="form.slug"]', 'my-first-workspace')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
         ->assertPathIs('/app/my-first-workspace/setup')
+        ->assertNoJavaScriptErrors()
         ->assertSee('Continue with Google')
         ->assertSee('Continue with Microsoft')
         ->press('Skip for now')

@@ -322,7 +322,7 @@ final class CreateWorkspace extends RegisterTenant
         /** @var User $user */
         $user = auth('web')->user();
 
-        // Flagged here, not inside CreateWorkspaceAction: getRedirectUrl() sends the user to
+        // Flagged here, not inside CreateWorkspaceAction: the redirect below sends the user to
         // the setup page next, so this one event marks the workspace as created AND the
         // user as landed.
         //
@@ -334,15 +334,19 @@ final class CreateWorkspace extends RegisterTenant
         if ($user->ownedWorkspaces()->count() === 1) {
             session()->put('fathom.track_workspace_created', true);
         }
-    }
 
-    #[Override]
-    protected function getRedirectUrl(): string
-    {
         /** @var Workspace $tenant */
         $tenant = $this->tenant;
 
-        return SetupWorkspace::getUrl(['tenant' => $tenant]);
+        // A full page load: the wizard's Alpine state does not survive a client-side hop,
+        // and the torn-down component logs a burst of undefined-variable errors.
+        $this->redirect(SetupWorkspace::getUrl(['tenant' => $tenant]));
+    }
+
+    #[Override]
+    protected function getRedirectUrl(): ?string
+    {
+        return null;
     }
 
     #[Override]
