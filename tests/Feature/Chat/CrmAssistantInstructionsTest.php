@@ -7,7 +7,6 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
-use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -419,16 +418,10 @@ it('tells the model to use the onboarding vocabulary when the block is present',
 it('renders the onboarding block with the use case and the stage names the workspace really has', function (): void {
     $owner = User::factory()->create();
 
-    $this->actingAs($owner);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'name' => 'Hiring',
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['sourcing'],
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($owner, ['name' => 'Hiring'], [
+        'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        'onboarding_context' => ['sourcing'],
+    ]);
 
     $agent = resolve(CrmAssistant::class)->withWorkspace($owner->fresh()->personalWorkspace());
 

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Enums\OnboardingUseCase;
 use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\Note;
@@ -20,7 +19,7 @@ test('workspaces can be created', function () {
     $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test(CreateTeamForm::class)
-        ->set(['state' => ['name' => 'Test Workspace', 'slug' => 'test-workspace', 'onboarding_use_case' => OnboardingUseCase::Other->value]])
+        ->set(['state' => ['name' => 'Test Workspace', 'slug' => 'test-workspace']])
         ->call('createTeam');
 
     expect($user->fresh()->ownedWorkspaces)->toHaveCount(2);
@@ -45,7 +44,7 @@ test('non-personal workspaces do not get demo data seeded', function (): void {
     $this->actingAs($user = User::factory()->withPersonalWorkspace()->create());
 
     Livewire::test(CreateTeamForm::class)
-        ->set(['state' => ['name' => 'Work Workspace', 'slug' => 'work-workspace', 'onboarding_use_case' => OnboardingUseCase::Other->value]])
+        ->set(['state' => ['name' => 'Work Workspace', 'slug' => 'work-workspace']])
         ->call('createTeam');
 
     $workWorkspace = $user->fresh()->ownedWorkspaces()->where('name', 'Work Workspace')->first();

@@ -53,11 +53,7 @@ it('seeds one empty setup conversation when the wizard creates a workspace', fun
     $this->actingAs($user);
 
     livewire(CreateWorkspace::class)
-        ->fillForm([
-            'name' => 'Northwind',
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['sourcing'],
-        ])
+        ->fillForm(['name' => 'Northwind'])
         ->call('register')
         ->assertHasNoFormErrors();
 

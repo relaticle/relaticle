@@ -6,7 +6,7 @@ namespace App\Actions\Jetstream;
 
 use App\Actions\Billing\StartProTrial;
 use App\Enums\OnboardingReferralSource;
-use App\Enums\OnboardingUseCase;
+use App\Enums\OnboardingStep;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
@@ -38,21 +38,13 @@ final readonly class CreateWorkspace implements CreatesTeams
 
         $this->validate($input);
 
-        $useCase = OnboardingUseCase::from((string) $input['onboarding_use_case']);
-
         event(new AddingTeam($user));
 
         $workspace = new Workspace([
             'name' => $input['name'],
             'slug' => $input['slug'] ?? null,
             'personal_workspace' => $isFirstWorkspace,
-            'onboarding_use_case' => $useCase,
-            'onboarding_context' => $useCase->getSubOptions() === []
-                ? null
-                : array_values($input['onboarding_context']),
-            'onboarding_other_use_case' => $useCase === OnboardingUseCase::Other
-                ? ($input['onboarding_other_use_case'] ?? null)
-                : null,
+            'onboarding_step' => OnboardingStep::UseCase,
             ...$this->referralAttributes($input),
         ]);
         $workspace->plan = Plan::default();
@@ -77,59 +69,14 @@ final readonly class CreateWorkspace implements CreatesTeams
             // Null hands the handle to Workspace's HasSlug pass, which settles it inside
             // the insert instead of between a check and a write.
             'slug' => ['nullable', 'string', 'max:255', new ValidWorkspaceSlug, 'unique:workspaces,slug'],
-            'onboarding_use_case' => ['required', 'string', Rule::enum(OnboardingUseCase::class)],
-            'onboarding_context' => ['nullable', 'array'],
-            'onboarding_context.*' => ['string'],
-            'onboarding_other_use_case' => ['nullable', 'string', 'max:120'],
             'onboarding_referral_source' => ['nullable', 'string', Rule::enum(OnboardingReferralSource::class)],
             'onboarding_referral_detail' => ['nullable', 'string'],
             'onboarding_referral_prompt' => ['nullable', 'string', 'max:200'],
         ])
             ->after(function (ValidatorInstance $validator) use ($input): void {
-                $this->validateContext($validator, $input);
                 $this->validateReferralDetail($validator, $input);
             })
             ->validateWithBag('createWorkspace');
-    }
-
-    /**
-     * @param  array<string, mixed>  $input
-     */
-    private function validateContext(ValidatorInstance $validator, array $input): void
-    {
-        $useCase = OnboardingUseCase::tryFrom((string) ($input['onboarding_use_case'] ?? ''));
-
-        if (! $useCase instanceof OnboardingUseCase) {
-            return;
-        }
-
-        $subOptions = $useCase->getSubOptions();
-
-        if ($subOptions === []) {
-            return;
-        }
-
-        $context = $input['onboarding_context'] ?? null;
-
-        if (! is_array($context) || $context === []) {
-            $validator->errors()->add(
-                'onboarding_context',
-                __('filament/pages/workspaces.create_workspace.validation.context_required'),
-            );
-
-            return;
-        }
-
-        foreach ($context as $value) {
-            if (! is_string($value) || ! array_key_exists($value, $subOptions)) {
-                $validator->errors()->add(
-                    'onboarding_context',
-                    __('filament/pages/workspaces.create_workspace.validation.context_invalid'),
-                );
-
-                return;
-            }
-        }
     }
 
     /**

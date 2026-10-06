@@ -14,7 +14,7 @@
     class="relative h-full overflow-hidden"
     x-data="{
         get showBoard() {
-            return @js($hasStages) && (@js($panel === 'board') || (@js($interactive) && wizardStep === 2))
+            return @js($hasStages && $panel === 'board')
         },
         get spotlight() {
             return @js($interactive) && wizardStep === 0 ? (focused ?? hovered) : null

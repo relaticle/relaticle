@@ -16,7 +16,6 @@ return [
                 'App\Filament\Actions\ConfirmIdentityAction::identityFields' => 66,
                 'App\Filament\Actions\ConfirmIdentityAction::setUp' => 88,
                 'App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation::getSubNavigation' => 64,
-                'App\Filament\Pages\CreateWorkspace::getUseCaseStep' => 70,
                 'App\Filament\Pages\CreateWorkspace::getWorkspaceFormComponents' => 62,
                 'App\Filament\Pages\Workspace\ActivityLog::table' => 122,
                 'App\Filament\Resources\CompanyResource::table' => 70,

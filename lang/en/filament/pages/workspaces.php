@@ -8,7 +8,6 @@ return [
         'steps' => [
             'workspace' => 'Workspace',
             'attribution' => 'Attribution',
-            'use_case' => 'Use case',
         ],
         'actions' => [
             'continue' => 'Continue',
@@ -73,5 +72,8 @@ return [
             'context_invalid' => 'One of the picked options does not belong to the selected use case.',
             'referral_detail_invalid' => 'The picked assistant does not belong to the selected source.',
         ],
+    ],
+    'setup_workspace' => [
+        'title' => 'Set up your workspace',
     ],
 ];

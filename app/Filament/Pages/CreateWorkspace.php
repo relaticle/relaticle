@@ -7,7 +7,6 @@ namespace App\Filament\Pages;
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
-use App\Enums\OnboardingUseCase;
 use App\Filament\Components\Forms\WorkspaceLogoUpload;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Models\User;
@@ -121,8 +120,7 @@ final class CreateWorkspace extends RegisterTenant
             ->components([
                 Wizard::make([
                     $this->getWorkspaceStep(),
-                    $this->getAttributionStep(),
-                    $this->getUseCaseStep(),
+                    ...($this->isFirstWorkspace() ? [$this->getAttributionStep()] : []),
                 ])
                     ->view('components.onboarding.wizard')
                     ->hiddenHeader()
@@ -135,7 +133,7 @@ final class CreateWorkspace extends RegisterTenant
                     )
                     ->submitAction(
                         Action::make('register')
-                            ->label(__('filament/pages/workspaces.create_workspace.actions.get_started'))
+                            ->label(__('filament/pages/workspaces.create_workspace.actions.continue'))
                             ->size(Size::Large)
                             ->submit('register')
                             ->extraAttributes(['class' => 'w-full'])
@@ -215,77 +213,6 @@ final class CreateWorkspace extends RegisterTenant
                 ->maxLength(200)
                 ->visible(fn (Get $get): bool => $subOptions($get) !== []),
         ];
-    }
-
-    private function getUseCaseStep(): Step
-    {
-        return Step::make(__('filament/pages/workspaces.create_workspace.steps.use_case'))
-            ->key('onboarding-use-case')
-            ->schema([
-                Placeholder::make('use_case_heading')
-                    ->label(__('filament/pages/workspaces.create_workspace.headings.use_case'))
-                    ->hiddenLabel()
-                    ->content($this->stepHeading(
-                        __('filament/pages/workspaces.create_workspace.headings.use_case'),
-                        __('filament/pages/workspaces.create_workspace.headings.use_case_description'),
-                        __('filament/pages/workspaces.create_workspace.headings.use_case_hint'),
-                    ))
-                    ->dehydrated(false),
-
-                ToggleButtons::make('onboarding_use_case')
-                    ->label(__('filament/pages/workspaces.create_workspace.form.use_case_label'))
-                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.use_case_validation_attribute'))
-                    ->required()
-                    ->options(
-                        collect(OnboardingUseCase::cases())
-                            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
-                                $case->value => $case->getLabel(),
-                            ])
-                            ->all()
-                    )
-                    ->icons(
-                        collect(OnboardingUseCase::cases())
-                            ->mapWithKeys(fn (OnboardingUseCase $case): array => [
-                                $case->value => $case->getIcon(),
-                            ])
-                            ->all()
-                    )
-                    ->inline()
-                    ->live()
-                    // Stale sub-options from the previous use case are invisible yet
-                    // fail validation, stranding the wizard on this step.
-                    ->afterStateUpdated(function (Set $set): void {
-                        $set('onboarding_context', []);
-                    }),
-
-                ToggleButtons::make('onboarding_context')
-                    ->label(__('filament/pages/workspaces.create_workspace.form.use_case_context_label'))
-                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.use_case_context_validation_attribute'))
-                    ->required()
-                    ->options(function (Get $get): array {
-                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
-
-                        if (! $useCase instanceof OnboardingUseCase) {
-                            return [];
-                        }
-
-                        return $useCase->getSubOptions();
-                    })
-                    ->inline()
-                    ->multiple()
-                    ->visible(function (Get $get): bool {
-                        $useCase = OnboardingUseCase::tryFrom($get('onboarding_use_case') ?? '');
-
-                        return $useCase instanceof OnboardingUseCase && $useCase->getSubOptions() !== [];
-                    }),
-
-                TextInput::make('onboarding_other_use_case')
-                    ->label(__('filament/pages/workspaces.create_workspace.form.other_use_case_label'))
-                    ->placeholder(__('filament/pages/workspaces.create_workspace.form.other_use_case_placeholder'))
-                    ->validationAttribute(__('filament/pages/workspaces.create_workspace.form.other_use_case_validation_attribute'))
-                    ->maxLength(120)
-                    ->visible(fn (Get $get): bool => $get('onboarding_use_case') === OnboardingUseCase::Other->value),
-            ]);
     }
 
     private function stepHeading(string $title, string ...$paragraphs): HtmlString
@@ -388,7 +315,7 @@ final class CreateWorkspace extends RegisterTenant
         $user = auth('web')->user();
 
         // Flagged here, not inside CreateWorkspaceAction: getRedirectUrl() sends the user to
-        // the dashboard next, so this one event marks the workspace as created AND the
+        // the setup page next, so this one event marks the workspace as created AND the
         // user as landed.
         //
         // First workspace only. A later one is expansion, not conversion: its
@@ -399,34 +326,15 @@ final class CreateWorkspace extends RegisterTenant
         if ($user->ownedWorkspaces()->count() === 1) {
             session()->put('fathom.track_workspace_created', true);
         }
-
-        /** @var Workspace $tenant */
-        $tenant = $this->tenant;
-
-        Notification::make()
-            ->title(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
-            ->body(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.body', ['name' => $tenant->name]))
-            ->success()
-            ->send();
     }
 
-    /**
-     * Signup ends on the setup conversation, where the assistant greets the
-     * owner and asks for their data. The listener that seeds it runs
-     * synchronously on WorkspaceCreated; a workspace without one (feature off,
-     * or an additional non-personal workspace) still lands on the dashboard.
-     */
     #[Override]
     protected function getRedirectUrl(): string
     {
         /** @var Workspace $tenant */
         $tenant = $this->tenant;
 
-        $setupConversationId = $tenant->setupConversation()->value('id');
-
-        return is_string($setupConversationId)
-            ? ChatConversation::getUrl(['conversationId' => $setupConversationId, 'tenant' => $tenant])
-            : Dashboard::getUrl(['tenant' => $tenant]);
+        return SetupWorkspace::getUrl(['tenant' => $tenant]);
     }
 
     #[Override]
@@ -496,9 +404,8 @@ final class CreateWorkspace extends RegisterTenant
         $companyPlaceholder = (string) __('filament/pages/workspaces.create_workspace.preview.company_placeholder');
         $workspaceName = trim((string) ($this->data['name'] ?? '')) ?: $companyPlaceholder;
         $userName = trim((string) ($this->data['user_name'] ?? '')) ?: $user->name;
-        $stages = OnboardingUseCase::tryFrom((string) ($this->data['onboarding_use_case'] ?? ''))?->pipelineStages() ?? [];
 
-        return $this->onboardingPreview($workspaceName, $this->previewLogoUrl(), $userName, $stages);
+        return $this->onboardingPreview($workspaceName, $this->previewLogoUrl(), $userName, []);
     }
 
     private function previewLogoUrl(): ?string
