@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\VerticalAlignment;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
 
@@ -60,6 +61,10 @@ trait RunsInviteStep
 
     public function inviteLinkUrl(): ?string
     {
+        if (! Gate::forUser($this->authUser())->allows('addWorkspaceMember', $this->workspace)) {
+            return null;
+        }
+
         if (! $this->workspace->hasInviteLink() || $this->workspace->isInviteLinkTokenExpired()) {
             return null;
         }

@@ -1766,6 +1766,15 @@ describe('invite team', function (): void {
         expect($workspace->fresh()->hasInviteLink())->toBeFalse();
     });
 
+    it('returns no invite link to a member who replays the owner snapshot', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+        $ownerSetup = livewire(SetupWorkspace::class);
+
+        joinAsMember($workspace, WorkspaceRole::Member);
+
+        $ownerSetup->call('inviteLinkUrl')->assertReturned(null);
+    });
+
     it('gives the finish button and the link button their own loading target', function (): void {
         workspaceAtInvite(User::factory()->create());
 
