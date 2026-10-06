@@ -121,7 +121,7 @@ return [
         ],
         'subject' => [
             'label' => 'Subject line and participants',
-            'description' => 'Your workspace sees the subject line, participants, and timestamp. The message stays private unless you share it.',
+            'description' => 'Your workspace sees the subject line, participants, and timestamp. The message stays private.',
         ],
         'full' => [
             'label' => 'Full access',
