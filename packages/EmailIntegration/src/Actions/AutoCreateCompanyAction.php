@@ -67,14 +67,19 @@ final readonly class AutoCreateCompanyAction
         TenantContextService::setTenantId($workspaceId);
 
         try {
-            return Company::query()->create([
+            $company = Company::query()->create([
                 'name' => $this->domainToCompanyName($domain),
                 'workspace_id' => $workspaceId,
-                'custom_fields' => [
-                    CompanyField::DOMAINS->value => [$domain],
-                    CompanyField::ICP->value => false,
-                ],
             ]);
+
+            $company->saveCustomFields([
+                CompanyField::DOMAINS->value => [$domain],
+                CompanyField::ICP->value => false,
+            ]);
+
+            $company->touch();
+
+            return $company;
         } finally {
             TenantContextService::setTenantId($previousTenantId);
         }
