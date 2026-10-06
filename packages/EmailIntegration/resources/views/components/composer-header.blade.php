@@ -17,7 +17,7 @@
 @endphp
 
 <div {{ $attributes->class(['shrink-0 divide-y divide-gray-100 text-sm dark:divide-white/5']) }}>
-    <label @class([$rowClass, 'cursor-default'])>
+    <div @class([$rowClass])>
         <span class="{{ $labelClass }}">{{ __('filament/emails/composer.fields.from') }}</span>
         <span class="flex h-10 min-w-0 flex-1 items-center gap-2">
             <x-filament::avatar
@@ -27,7 +27,7 @@
                 class="shrink-0"
             />
             @if (count($accountOptions) > 1)
-                <select wire:model.live="accountId" class="w-full border-0 bg-transparent p-0 text-sm text-gray-900 focus:ring-0 dark:text-gray-100">
+                <select wire:model.live="accountId" class="composer-from-select border-0 bg-transparent text-sm text-gray-900 focus:ring-0 dark:text-gray-100">
                     @foreach ($accountOptions as $id => $label)
                         <option value="{{ $id }}">{{ $label }}</option>
                     @endforeach
@@ -36,7 +36,7 @@
                 <span class="truncate text-sm text-gray-900 dark:text-gray-100">{{ $fromAccount?->label }}</span>
             @endif
         </span>
-    </label>
+    </div>
     @error('accountId')
         <p class="{{ $errorClass }}">{{ $message }}</p>
     @enderror

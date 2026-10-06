@@ -30,31 +30,37 @@
         </button>
     </x-slot>
 
-    <x-filament::dropdown.list>
-        @if (filled($noneLabel))
-            <x-filament::dropdown.list.item
-                :attributes="new \Illuminate\View\ComponentAttributeBag($bind(null))"
-                :color="filled($selected) ? 'gray' : 'primary'"
+    @if ($options !== [] || filled($emptyLabel))
+        <x-filament::dropdown.list>
+            @foreach ($options as $id => $name)
+                <x-filament::dropdown.list.item
+                    :attributes="new \Illuminate\View\ComponentAttributeBag($bind((string) $id))"
+                    :color="$selected === (string) $id ? 'primary' : 'gray'"
+                >
+                    {{ $name }}
+                </x-filament::dropdown.list.item>
+            @endforeach
+
+            @if ($options === [] && filled($emptyLabel))
+                <p class="composer-picker-note">{{ $emptyLabel }}</p>
+            @endif
+        </x-filament::dropdown.list>
+    @endif
+
+    @if (filled($noneLabel))
+        <x-filament::dropdown.list>
+            <button
+                type="button"
+                @class([
+                    'composer-picker-note',
+                    'is-current' => blank($selected),
+                ])
+                {!! new \Illuminate\View\ComponentAttributeBag($bind(null)) !!}
             >
                 {{ $noneLabel }}
-            </x-filament::dropdown.list.item>
-        @endif
-
-        @foreach ($options as $id => $name)
-            <x-filament::dropdown.list.item
-                :attributes="new \Illuminate\View\ComponentAttributeBag($bind((string) $id))"
-                :color="$selected === (string) $id ? 'primary' : 'gray'"
-            >
-                {{ $name }}
-            </x-filament::dropdown.list.item>
-        @endforeach
-
-        @if ($options === [] && filled($emptyLabel))
-            <x-filament::dropdown.list.item tag="div" color="gray">
-                {{ $emptyLabel }}
-            </x-filament::dropdown.list.item>
-        @endif
-    </x-filament::dropdown.list>
+            </button>
+        </x-filament::dropdown.list>
+    @endif
 
     @if (filled($createLabel))
         <x-filament::dropdown.list>

@@ -327,3 +327,32 @@
 .fi-meetings-date:hover .fi-fo-date-time-picker-display-text-input {
     @apply text-gray-900 dark:text-white;
 }
+
+/* The mailbox control sizes to its label. A full-width select runs to the row edge, so the click target has no visible end. */
+.composer-from-select {
+    field-sizing: content;
+    width: fit-content;
+    max-width: 100%;
+    cursor: pointer;
+    border-radius: 0.375rem;
+    padding-inline: 0.375rem 1.25rem;
+    margin-inline: -0.375rem 0;
+}
+
+.composer-from-select:hover,
+.composer-from-select:focus-visible {
+    @apply bg-gray-100 outline-none dark:bg-white/10;
+}
+
+/* Empty picker copy is a caption. The same row style as a real choice reads as a signature or template named "No …". */
+.composer-picker-note {
+    @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
+}
+
+button.composer-picker-note {
+    @apply w-full cursor-pointer rounded-lg transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/10 dark:hover:text-gray-300;
+}
+
+button.composer-picker-note.is-current {
+    @apply not-italic text-primary-600 dark:text-primary-400;
+}
