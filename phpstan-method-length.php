@@ -38,7 +38,7 @@ return [
                 'App\Providers\AppServiceProvider::configureRateLimiting' => 70,
                 'App\Providers\AppServiceProvider::register' => 82,
                 'App\Providers\Filament\AppPanelProvider::boot' => 77,
-                'App\Providers\Filament\AppPanelProvider::panel' => 328,
+                'App\Providers\Filament\AppPanelProvider::panel' => 322,
                 'App\Providers\HealthServiceProvider::boot' => 65,
                 'App\Services\AvatarService::getInitials' => 70,
                 'App\Services\Notifications\DigestService::sectionForWorkspace' => 61,
