@@ -294,6 +294,24 @@ test('inviting a case-variant of an already-invited email is rejected as a dupli
     expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(1);
 });
 
+test('inviting an address longer than the database holds is reported, not thrown', function (): void {
+    $address = str_repeat('a', 250).'@northwind.test';
+
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->callAction('invitePeople', [
+            'emails' => $address,
+            'role' => 'member',
+        ])
+        ->assertNotified(
+            Notification::make()
+                ->title(__('workspaces.notifications.some_invites_failed.title'))
+                ->body("{$address}: ".__('validation.max.string', ['attribute' => 'email', 'max' => 255]))
+                ->warning()
+        );
+
+    expect($this->workspace->fresh()->workspaceInvitations)->toHaveCount(0);
+});
+
 test('inviting someone who already belongs to the workspace names the workspace, not the workspace', function (): void {
     $member = User::factory()->create(['email' => 'member@example.test']);
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);

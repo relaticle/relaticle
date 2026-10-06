@@ -107,7 +107,7 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
     {
         return [
             'email' => [
-                'required', ...RegistrableEmail::rules(checkDns: false),
+                'required', 'max:255', ...RegistrableEmail::rules(checkDns: false),
                 Rule::unique(Jetstream::teamInvitationModel())->where(function (Builder $query) use ($workspace): void {
                     $query->where('workspace_id', $workspace->id);
                 }),
