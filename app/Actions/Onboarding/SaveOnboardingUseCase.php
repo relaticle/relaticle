@@ -40,7 +40,7 @@ final readonly class SaveOnboardingUseCase
         DB::transaction(function () use ($workspace, $input, $useCase, $then): void {
             $locked = Workspace::query()->whereKey($workspace->getKey())->lockForUpdate()->sole();
 
-            abort_unless($locked->onboarding_step === OnboardingStep::UseCase, 409);
+            abort_unless($locked->onboarding_step === OnboardingStep::UseCase && $locked->onboarding_use_case === null, 409);
 
             $locked->update([
                 'onboarding_use_case' => $useCase,

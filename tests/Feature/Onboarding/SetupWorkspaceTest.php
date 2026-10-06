@@ -539,3 +539,70 @@ it('requires a use case for an additional workspace as well', function (): void 
         ->call('saveUseCase')
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
+
+it('moves the setup only from the step it is on', function (): void {
+    $user = User::factory()->create();
+    $workspace = workspaceInSetup($user);
+
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::UseCase, OnboardingStep::Invite);
+
+    expect($moved)->toBeTrue()
+        ->and($workspace->onboarding_step)->toBe(OnboardingStep::Invite)
+        ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
+});
+
+it('does not move the setup when the workspace is on another step', function (): void {
+    $user = User::factory()->create();
+    $workspace = workspaceInSetup($user);
+
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::Invite);
+
+    expect($moved)->toBeFalse()
+        ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+});
+
+it('does not move a finished workspace back into setup', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::UseCase, OnboardingStep::Invite);
+
+    expect($moved)->toBeFalse()
+        ->and($workspace->fresh()->onboarding_step)->toBeNull();
+});
+
+it('reloads the passed workspace when another request already moved the step', function (): void {
+    $user = User::factory()->create();
+    $workspace = workspaceInSetup($user);
+    $stale = $workspace->fresh();
+
+    $workspace->update(['onboarding_step' => OnboardingStep::Sharing]);
+
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $stale, OnboardingStep::UseCase, OnboardingStep::Invite);
+
+    expect($moved)->toBeFalse()
+        ->and($stale->onboarding_step)->toBe(OnboardingStep::Sharing);
+});
+
+it('refuses to move the setup for someone who does not own the workspace', function (): void {
+    $workspace = workspaceInSetup(User::factory()->create());
+
+    expect(fn () => resolve(MoveWorkspaceSetup::class)->execute(User::factory()->create(), $workspace, OnboardingStep::UseCase, OnboardingStep::Invite))
+        ->toThrow(HttpException::class);
+
+    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+});
+
+it('aborts the use case step for a workspace that already has a use case', function (): void {
+    $user = User::factory()->create();
+    $workspace = workspaceInSetup($user);
+
+    $workspace->update(['onboarding_use_case' => OnboardingUseCase::Sales]);
+
+    expect(fn () => resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, ['onboarding_use_case' => 'other'], null))
+        ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(409));
+
+    expect($workspace->fresh())
+        ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
+        ->onboarding_step->toBe(OnboardingStep::UseCase);
+});
