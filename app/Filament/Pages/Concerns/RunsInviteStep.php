@@ -52,7 +52,8 @@ trait RunsInviteStep
             ->success()
             ->send();
 
-        $this->redirectTo($this->landingUrl($this->workspace));
+        // Full page load: the panel's sidebar store initialises only on a page's first load.
+        $this->redirect($this->landingUrl($this->workspace));
     }
 
     public function createInviteLink(): void
