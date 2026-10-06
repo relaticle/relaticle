@@ -158,7 +158,12 @@ final readonly class CallbackController
         $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
 
         if (is_string($returnUrl)) {
-            return redirect($returnUrl)->with('error', $message);
+            Notification::make()
+                ->title($message)
+                ->danger()
+                ->send();
+
+            return redirect($returnUrl);
         }
 
         $workspace ??= $user->currentWorkspace;

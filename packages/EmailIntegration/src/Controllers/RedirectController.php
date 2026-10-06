@@ -30,7 +30,7 @@ final readonly class RedirectController
                 $user,
                 $this->driver('gmail')
                     ->scopes($this->gmailScopes())
-                    ->with(['access_type' => 'offline', 'prompt' => 'consent', 'login_hint' => $user->email]),
+                    ->with(['access_type' => 'offline', 'prompt' => 'consent']),
             ),
 
             'azure' => $this->startOAuth(
@@ -38,7 +38,7 @@ final readonly class RedirectController
                 $user,
                 $this->driver('azure')
                     ->setScopes($this->azureScopes())
-                    ->with(['prompt' => 'consent', 'login_hint' => $user->email]),
+                    ->with(['prompt' => 'consent']),
             ),
 
             default => back(),

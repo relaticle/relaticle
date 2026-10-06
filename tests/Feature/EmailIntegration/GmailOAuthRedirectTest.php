@@ -44,17 +44,6 @@ it('redirects to Google using the Gmail OAuth client and the email-account callb
     expect(session(RedirectController::WORKSPACE_SESSION_KEY))->toBe($user->currentWorkspace->getKey());
 });
 
-it('opens Google on the signed-in address', function (): void {
-    $user = User::factory()->withWorkspace()->create(['email' => 'olivia@northwind.test']);
-    $this->actingAs($user);
-
-    $location = (string) $this->get(MailboxOAuthWorkspace::redirectUrl('gmail', $user->currentWorkspace))
-        ->headers->get('Location');
-    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
-
-    expect($query['login_hint'] ?? null)->toBe('olivia@northwind.test');
-});
-
 it('does not start Google consent when the user has no workspace', function (): void {
     $user = User::factory()->create();
     $this->actingAs($user);

@@ -96,7 +96,11 @@ it('returns a failed connect to the page that started it', function (): void {
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect('https://relaticle.test/app/acme/setup')
-        ->assertSessionHas('error', 'Your sign-in session expired. Please reconnect the account.');
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(
+        Notification::make()->title('Your sign-in session expired. Please reconnect the account.')->danger(),
+    );
 
     expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
 });
@@ -113,7 +117,11 @@ it('returns to the page that started the connect when the mail read permission w
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
         ->assertRedirect('https://relaticle.test/app/acme/setup')
-        ->assertSessionHas('error', 'Relaticle needs permission to read your mail. Reconnect and allow every permission.');
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(
+        Notification::make()->title('Relaticle needs permission to read your mail. Reconnect and allow every permission.')->danger(),
+    );
 
     expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
 });
