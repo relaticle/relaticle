@@ -7,6 +7,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
@@ -14,6 +15,7 @@ use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -778,4 +780,55 @@ it('queues from the mailbox of the user it is given, not the signed-in one', fun
 
     expect($email->user_id)->toBe($this->user->id)
         ->and($email->connected_account_id)->toBe($this->account->id);
+});
+
+it('stores the chat creation source on an email sent through the assistant', function (): void {
+    $this->freezeSecond();
+
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello',
+        'body_html' => '<p>Test</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::CHAT,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'priority' => EmailPriority::PRIORITY,
+    ]);
+
+    $stored = Email::query()->findOrFail($email->getKey());
+
+    expect($stored->creation_source)->toBe(EmailCreationSource::CHAT)
+        ->and($stored->status)->toBe(EmailStatus::QUEUED)
+        ->and($stored->scheduled_for)->not->toBeNull()
+        ->and($stored->scheduled_for->equalTo(now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'))))->toBeTrue()
+        ->and($stored->scheduled_for->lessThan(now()->addMinute()))->toBeTrue();
+});
+
+it('labels the chat creation source with the assistant name', function (): void {
+    config(['chat.assistant_name' => 'Nova']);
+
+    expect(EmailCreationSource::CHAT->getLabel())->toBe('Nova');
+});
+
+it('does not count a chat email as held over mcp', function (): void {
+    app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Hello',
+        'body_html' => '<p>Test</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => null]],
+        'cc' => [],
+        'bcc' => [],
+        'in_reply_to_email_id' => null,
+        'creation_source' => EmailCreationSource::CHAT,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'batch_id' => null,
+        'priority' => EmailPriority::PRIORITY,
+    ]);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1)
+        ->and(Email::query()->createdOverMcp()->count())->toBe(0);
 });
