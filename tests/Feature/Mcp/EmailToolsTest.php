@@ -1136,6 +1136,38 @@ it('shows a held email in the default view of its owner outbox', function (): vo
         ->assertCanNotSeeTableRecords([$held]);
 });
 
+it('schedules email sent through rela like composer mail in the owner outbox', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $inUndoWindow = Email::factory()->outbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'connected_account_id' => $this->viewerAccount->getKey(),
+        'status' => EmailStatus::QUEUED,
+        'creation_source' => EmailCreationSource::CHAT,
+        'scheduled_for' => now()->addSeconds(3),
+    ]);
+
+    $scheduled = Email::factory()->outbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'connected_account_id' => $this->viewerAccount->getKey(),
+        'status' => EmailStatus::QUEUED,
+        'creation_source' => EmailCreationSource::CHAT,
+        'scheduled_for' => now()->addHour(),
+    ]);
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$inUndoWindow])
+        ->assertCanNotSeeTableRecords([$scheduled])
+        ->filterTable('status_tab', 'scheduled')
+        ->assertCanSeeTableRecords([$scheduled])
+        ->assertCanNotSeeTableRecords([$inUndoWindow]);
+});
+
 it('sends with the sender default sharing level', function (): void {
     $this->viewerAccount->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
@@ -1595,6 +1627,23 @@ it('does not count the user own queued mail toward the assistant cap', function 
             'status' => EmailStatus::QUEUED,
             'creation_source' => EmailCreationSource::COMPOSE,
             'scheduled_for' => now()->addMinutes(5),
+        ]);
+    }
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount));
+
+    expect($data['status'])->toBe('queued');
+});
+
+it('does not count email sent through rela toward the ten held assistant emails', function (): void {
+    foreach (range(1, 10) as $number) {
+        Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->viewer->id,
+            'connected_account_id' => $this->viewerAccount->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'creation_source' => EmailCreationSource::CHAT,
+            'scheduled_for' => now()->addSeconds(5),
         ]);
     }
 
