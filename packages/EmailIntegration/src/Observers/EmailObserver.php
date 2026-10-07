@@ -31,6 +31,8 @@ final readonly class EmailObserver
 
         if ($mailbox instanceof ConnectedAccount) {
             $email->privacy_tier = $this->privacyService->tierForMailbox($mailbox);
+            // LinkEmailAction reads the email's workspace next.
+            $email->setRelation('workspace', $mailbox->workspace);
         }
     }
 
