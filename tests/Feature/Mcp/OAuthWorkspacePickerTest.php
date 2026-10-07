@@ -824,6 +824,28 @@ it('gives a REST client no email scope when it asks for one', function (): void 
     expect(liveTokenScopes())->toBe(['read']);
 });
 
+it('drops a record scope the role lacks when an MCP client asks for it', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'mcp:use delete');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft']);
+});
+
+it('drops a record scope the role lacks when a REST client asks for it', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    expect(liveTokenScopes())->toBe(['read']);
+});
+
+it('grants a workspace owner every record scope a REST client asks for', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read delete');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['read', 'delete']);
+});
+
 function reportedAbilities(string $accessToken): array
 {
     return json_decode(whoAmI($accessToken), true)['result']['structuredContent']['token_abilities'];
