@@ -91,6 +91,44 @@ it('lists no sending and no writing for a workspace where the user is a viewer',
         ->assertSee('data-abilities="read email:read email:draft"', false);
 });
 
+/** @return list<string> */
+function shownConsentLines(string $content): array
+{
+    preg_match_all('/data-abilities-any="([^"]+)"(\s+hidden)?/', $content, $lines, PREG_SET_ORDER);
+
+    return array_values(array_map(
+        fn (array $line): string => $line[1],
+        array_filter($lines, fn (array $line): bool => ! isset($line[2])),
+    ));
+}
+
+it('lists every record line a viewer\'s MCP connector gets, though the request names one record scope', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+    $this->user->refresh()->switchWorkspace($this->otherWorkspace);
+
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'email:read', 'email:draft']);
+});
+
+it('lists every line to an owner whose MCP connector names one record scope', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'create update', 'delete', 'email:read', 'email:draft', 'email:send']);
+});
+
+it('lists only the named record lines to an owner whose REST client names two record scopes', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'read delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'delete']);
+});
+
 it('hides the permissions the role lacks in the preselected workspace', function (): void {
     $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
     $this->user->refresh()->switchWorkspace($this->otherWorkspace);

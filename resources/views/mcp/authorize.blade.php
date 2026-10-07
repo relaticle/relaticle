@@ -50,11 +50,12 @@
                 $requestedScopes = collect($scopes)->pluck('id');
                 $asksForRestScopes = $requestedScopes->intersect(['read', 'create', 'update', 'delete'])->isNotEmpty();
                 $connectsOverMcp = $requestedScopes->contains(\Laravel\Mcp\Server\Registrar::OAUTH_SCOPE);
+                $namesRecordLines = $asksForRestScopes && ! $connectsOverMcp;
 
                 $permissions = collect([
-                    ['abilities' => ['read'], 'label' => __('mcp.consent.permissions.read'), 'asked' => ! $asksForRestScopes || $requestedScopes->contains('read')],
-                    ['abilities' => ['create', 'update'], 'label' => __('mcp.consent.permissions.write'), 'asked' => ! $asksForRestScopes || $requestedScopes->intersect(['create', 'update'])->isNotEmpty()],
-                    ['abilities' => ['delete'], 'label' => __('mcp.consent.permissions.delete'), 'asked' => ! $asksForRestScopes || $requestedScopes->contains('delete')],
+                    ['abilities' => ['read'], 'label' => __('mcp.consent.permissions.read'), 'asked' => ! $namesRecordLines || $requestedScopes->contains('read')],
+                    ['abilities' => ['create', 'update'], 'label' => __('mcp.consent.permissions.write'), 'asked' => ! $namesRecordLines || $requestedScopes->intersect(['create', 'update'])->isNotEmpty()],
+                    ['abilities' => ['delete'], 'label' => __('mcp.consent.permissions.delete'), 'asked' => ! $namesRecordLines || $requestedScopes->contains('delete')],
                     ...collect(\App\Enums\EmailGrant::offered())->map(fn (\App\Enums\EmailGrant $grant): array => [
                         'abilities' => [$grant->value],
                         'label' => $grant->consentTitle(),
