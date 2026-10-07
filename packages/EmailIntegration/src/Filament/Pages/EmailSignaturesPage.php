@@ -181,9 +181,9 @@ final class EmailSignaturesPage extends Page
                 $signature = $this->ownedSignatures()->whereKey($arguments['signature_id'])->first();
 
                 return [
-                    'name' => $signature === null ? '' : $signature->name,
-                    'content_html' => $signature === null ? '' : $signature->content_html,
-                    'is_default' => $signature === null ? false : $signature->is_default,
+                    'name' => $signature->name ?? '',
+                    'content_html' => $signature->content_html ?? '',
+                    'is_default' => $signature->is_default ?? false,
                 ];
             })
             ->schema([
