@@ -27,6 +27,7 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -54,7 +55,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, PrepareAgentEmailAction::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -1615,6 +1616,16 @@ it('refuses more than twenty recipients across to, cc and bcc', function (): voi
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
+
+it('names the total limit when one list alone holds more than twenty recipients', function (string $field): void {
+    $addresses = array_map(fn (int $number): string => "person{$number}@acme.test", range(1, 21));
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailTool::class, sendArguments($this->viewerAccount, [$field => $addresses]))
+        ->assertHasErrors(['An email can go to at most 20 recipients in total across to, cc and bcc.']);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+})->with(['to', 'cc', 'bcc']);
 
 it('accepts twenty recipients across to, cc and bcc', function (): void {
     $addresses = fn (string $prefix, int $count): array => array_map(fn (int $number): string => "{$prefix}{$number}@acme.test", range(1, $count));

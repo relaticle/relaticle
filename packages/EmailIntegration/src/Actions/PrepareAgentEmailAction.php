@@ -19,6 +19,8 @@ final readonly class PrepareAgentEmailAction
 {
     public const int MAX_RECIPIENTS = 20;
 
+    public const string RECIPIENT_LIMIT_MESSAGE = 'An email can go to at most '.self::MAX_RECIPIENTS.' recipients in total across to, cc and bcc.';
+
     public function __construct(
         private AgentEmailBody $body,
         private VisibleEmailsQuery $emails,
@@ -86,7 +88,7 @@ final readonly class PrepareAgentEmailAction
 
         if ($total > self::MAX_RECIPIENTS) {
             throw ValidationException::withMessages([
-                'to' => 'An email can go to at most '.self::MAX_RECIPIENTS.' recipients in total across to, cc and bcc.',
+                'to' => self::RECIPIENT_LIMIT_MESSAGE,
             ]);
         }
     }

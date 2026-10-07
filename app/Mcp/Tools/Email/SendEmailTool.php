@@ -71,7 +71,11 @@ final class SendEmailTool extends Tool
         $user = auth()->user();
 
         /** @var array{connected_account_id: string, to: list<string>, cc?: list<string>, bcc?: list<string>, subject: string, body: string, include_signature?: bool|int|string, in_reply_to_email_id?: string} $validated */
-        $validated = $request->validate($this->rules());
+        $validated = $request->validate($this->rules(), [
+            'to.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
+            'cc.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
+            'bcc.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
+        ]);
 
         if (array_key_exists('include_signature', $validated)) {
             $validated['include_signature'] = (bool) $validated['include_signature'];
