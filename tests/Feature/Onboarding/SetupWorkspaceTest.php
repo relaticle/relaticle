@@ -1513,6 +1513,18 @@ describe('invite team', function (): void {
         expect($workspace->workspaceInvitations()->sole()->role)->toBe(WorkspaceRole::Member->value);
     });
 
+    it('invites an address once when it is pasted twice in different case', function (): void {
+        $workspace = workspaceAtInvite(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->fillForm(['emails' => 'Maya@northwind.test, maya@northwind.test'])
+            ->call('finish')
+            ->assertHasNoFormErrors()
+            ->assertNotNotified(__('workspaces.notifications.some_invites_failed.title'));
+
+        expect($workspace->workspaceInvitations()->pluck('email')->all())->toBe(['maya@northwind.test']);
+    });
+
     it('refuses a role that is not on offer', function (): void {
         $workspace = workspaceAtInvite(User::factory()->create());
 

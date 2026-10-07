@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\Workspaces\Concerns;
 
 use App\Actions\Jetstream\InviteWorkspaceMember;
+use App\Support\EmailAddress;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -29,10 +30,11 @@ trait SendsWorkspaceInvitations
     {
         $parts = preg_split('/[\s,;]+/', trim($input)) ?: [];
 
-        return array_values(array_unique(array_filter(
-            array_map(trim(...), $parts),
-            fn (string $email): bool => $email !== '',
-        )));
+        return collect($parts)
+            ->filter(fn (string $email): bool => $email !== '')
+            ->unique(EmailAddress::canonicalize(...))
+            ->values()
+            ->all();
     }
 
     private function inviteRateLimitKey(): string
