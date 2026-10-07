@@ -7,10 +7,10 @@ namespace App\Actions\Onboarding;
 use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Onboarding\SharingQuestion;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class SaveOnboardingSharing
 {
@@ -25,7 +25,7 @@ final readonly class SaveOnboardingSharing
     {
         abort_unless(in_array($tier, self::OFFERED_TIERS, true), 422);
 
-        if (! $this->asks($user, $workspace)) {
+        if (! SharingQuestion::appliesTo($user, $workspace)) {
             return $this->moveSetup->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
         }
 
@@ -38,11 +38,5 @@ final readonly class SaveOnboardingSharing
 
             return true;
         });
-    }
-
-    public function asks(User $user, Workspace $workspace): bool
-    {
-        return $user->default_email_sharing_tier === null
-            && ! ConnectedAccount::hasConnectedOutside($user, $workspace);
     }
 }

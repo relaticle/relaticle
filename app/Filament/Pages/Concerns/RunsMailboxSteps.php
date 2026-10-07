@@ -13,6 +13,7 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
+use App\Onboarding\SharingQuestion;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Actions\Action;
 use Filament\Support\Enums\Alignment;
@@ -176,7 +177,7 @@ trait RunsMailboxSteps
 
     private function asksForSharing(): bool
     {
-        return resolve(SaveOnboardingSharing::class)->asks($this->authUser(), $this->workspace);
+        return SharingQuestion::appliesTo($this->authUser(), $this->workspace);
     }
 
     private function preselectedSharingTier(): string
