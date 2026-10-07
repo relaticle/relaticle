@@ -7,7 +7,7 @@
     // singular: the card can never commit anything that is not rendered.
     $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
     $primaryLabel = $isPlan
-        ? __('Approve all :count', ['count' => $approveAllCount])
+        ? trans_choice('Approve :count step|Approve all :count', $approveAllCount, ['count' => $approveAllCount])
         : \Relaticle\Chat\Support\ProposalVerbs::action($proposal?->entity_type ?? '', $operation ?? 'create');
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
     $showPrimary = ! $isPlan || $approveAllCount > 0;

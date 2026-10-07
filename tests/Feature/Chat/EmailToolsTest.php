@@ -1290,6 +1290,15 @@ describe('a send inside a plan', function (): void {
             ->assertDontSee(__('Approved together, in order'));
     });
 
+    it('names a single approvable step beside a send without calling it all', function (): void {
+        $task = ($this->planTask)();
+        ($this->planSend)();
+
+        openChatEmailDock($task)
+            ->assertSee('Approve 1 step')
+            ->assertDontSee('Approve all');
+    });
+
     it('offers no approve all for a plan made only of sends', function (): void {
         $first = ($this->planSend)('First');
         ($this->planSend)('Second');
