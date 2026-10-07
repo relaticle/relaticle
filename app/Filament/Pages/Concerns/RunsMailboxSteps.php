@@ -98,9 +98,11 @@ trait RunsMailboxSteps
 
     public function emphasizedProvider(): ?string
     {
-        $hinted = MailboxProviderHint::for($this->authUser());
+        return once(function (): ?string {
+            $hinted = MailboxProviderHint::for($this->authUser());
 
-        return in_array($hinted, $this->configuredProviders(), true) ? $hinted : null;
+            return in_array($hinted, $this->configuredProviders(), true) ? $hinted : null;
+        });
     }
 
     /**
@@ -118,11 +120,11 @@ trait RunsMailboxSteps
 
     public function connectedMailbox(): ?ConnectedAccount
     {
-        return ConnectedAccount::query()
+        return once(fn (): ?ConnectedAccount => ConnectedAccount::query()
             ->ownedBy($this->authUser(), $this->workspace)
             ->connected()
             ->latest()
-            ->first(['provider', 'email_address', 'status']);
+            ->first(['provider', 'email_address', 'status']));
     }
 
     /**
