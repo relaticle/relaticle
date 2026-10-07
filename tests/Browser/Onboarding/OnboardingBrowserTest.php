@@ -19,6 +19,8 @@ use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CreateWorkspace::class, SetupWorkspace::class);
 
+const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
+
 function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
 {
     return loginViaBrowser($user)
@@ -87,7 +89,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->assertNoJavaScriptErrors()
         ->assertSee('Continue with Google')
         ->assertSee('Continue with Microsoft')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -118,7 +120,7 @@ it('returns an owner who left mid-setup to the step they were on', function (): 
         ->navigate('/app/resume-workspace')
         ->assertPathIs('/app/resume-workspace/setup')
         ->assertSee('Start with the people you already email')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -166,7 +168,7 @@ it('moves the preview panel with the setup step', function (): void {
     walkToMailboxStep($user, 'Hiring Desk', 'hiring-desk')
         ->assertScript($activeNavigation, 'people')
         ->assertScript($visibleStages, [])
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -189,7 +191,7 @@ it('changes the invite button when an address is typed and confirms the copied l
     $user = User::factory()->create();
 
     $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -216,7 +218,7 @@ it('shows the invite link to copy by hand when the clipboard is unavailable', fu
     $manualLink = '[data-invite-link-manual]';
 
     $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -254,7 +256,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->waitForText('How did you hear about us?')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
@@ -296,7 +298,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Start with the people you already email')
-        ->waitForEvent('load')
+        ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
