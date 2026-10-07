@@ -1646,7 +1646,7 @@ it('holds for at least a minute whatever the config says', function (int $config
     'negative' => -5,
 ]);
 
-it('cancels the email when the notice cannot be stored', function (): void {
+it('leaves no email behind when the notice cannot be stored', function (): void {
     config(['app.debug' => false]);
     DatabaseNotification::creating(fn (): never => throw new RuntimeException('notifications down'));
 
@@ -1654,8 +1654,10 @@ it('cancels the email when the notice cannot be stored', function (): void {
         ->tool(SendEmailTool::class, sendArguments($this->viewerAccount))
         ->assertHasErrors(['An internal server error occurred.']);
 
-    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0)
-        ->and(Email::query()->where('status', EmailStatus::CANCELLED)->count())->toBe(1);
+    expect(Email::query()->count())->toBe(0)
+        ->and(EmailBody::query()->count())->toBe(0)
+        ->and(EmailParticipant::query()->count())->toBe(0)
+        ->and(DatabaseNotification::query()->count())->toBe(0);
 });
 
 it('stops an assistant from holding more than ten emails at once', function (): void {

@@ -7,12 +7,12 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
-use Throwable;
 
 final readonly class QueueAgentEmailAction
 {
@@ -22,7 +22,6 @@ final readonly class QueueAgentEmailAction
         private SendEmailAction $sendEmail,
         private PrepareAgentEmail $prepareEmail,
         private QueuedSendNotifier $notifier,
-        private CancelQueuedEmailAction $cancelEmail,
     ) {}
 
     /**
@@ -45,21 +44,24 @@ final readonly class QueueAgentEmailAction
 
         $payload = $this->prepareEmail->execute($user, $data, $source);
 
-        $this->assertUnderAgentLimit($user);
-
         $holdSeconds = $this->holdSeconds();
 
-        $email = $this->sendEmail->execute($user, [...$payload, 'scheduled_for' => now()->addSeconds($holdSeconds)]);
+        return DB::transaction(function () use ($user, $workspace, $payload, $via, $holdSeconds): Email {
+            $this->lockOutboxOf($user);
 
-        try {
+            $this->assertUnderAgentLimit($user);
+
+            $email = $this->sendEmail->execute($user, [...$payload, 'scheduled_for' => now()->addSeconds($holdSeconds)]);
+
             $this->notifier->sendHeld($email, $user, $workspace, $via, $holdSeconds);
-        } catch (Throwable $exception) {
-            rescue(fn (): Email => $this->cancelEmail->execute($email));
 
-            throw $exception;
-        }
+            return $email;
+        });
+    }
 
-        return $email;
+    private function lockOutboxOf(User $user): void
+    {
+        User::query()->whereKey($user->getKey())->lockForUpdate()->first();
     }
 
     private function holdSeconds(): int
