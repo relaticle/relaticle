@@ -15,10 +15,7 @@ enum EmailProvider: string implements HasColor, HasIcon, HasLabel
 
     public function isConfigured(): bool
     {
-        return match ($this) {
-            self::GMAIL => true,
-            self::AZURE => filled(config('services.azure.client_id')),
-        };
+        return filled(config("services.{$this->value}.client_id"));
     }
 
     public function getLabel(): string

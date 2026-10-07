@@ -650,6 +650,8 @@ it('shows one copy when two calendars share an ical uid', function (): void {
 });
 
 it('asks the user to sync a calendar when no mailbox is connected', function (): void {
+    config()->set('services.gmail.client_id', 'gmail-client');
+
     config()->set('services.azure.client_id');
     $this->account->delete();
 
@@ -683,6 +685,8 @@ it('offers a Microsoft mailbox on Home once a Microsoft mailbox client is config
 });
 
 it('still asks to sync when the only mailbox is disconnected', function (): void {
+    config()->set('services.gmail.client_id', 'gmail-client');
+
     $this->account->delete();
 
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->disconnected()->create([

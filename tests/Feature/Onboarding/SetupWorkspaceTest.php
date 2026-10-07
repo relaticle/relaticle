@@ -739,6 +739,7 @@ it('leaves a workspace that already has a use case as it is', function (): void 
 describe('connect email', function (): void {
     beforeEach(function (): void {
         Feature::define(EmailIntegration::class, true);
+        config()->set('services.gmail.client_id', 'gmail-client');
         config()->set('services.azure.client_id', 'azure-client');
     });
 
@@ -766,6 +767,30 @@ describe('connect email', function (): void {
             ->assertDontSeeHtml('data-provider="azure"');
 
         expect($setup->instance()->offeredProviders())->toBe(['gmail']);
+    });
+
+    it('offers only Microsoft when no Google client is configured', function (): void {
+        config()->set('services.gmail.client_id');
+        workspaceInSetup(User::factory()->create());
+
+        $setup = livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.microsoft'))
+            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.google'))
+            ->assertDontSeeHtml('data-provider="gmail"');
+
+        expect($setup->instance()->offeredProviders())->toBe(['azure']);
+    });
+
+    it('moves on to the use case when the install offers no provider', function (): void {
+        config()->set('services.gmail.client_id');
+        config()->set('services.azure.client_id');
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
+            ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.back'));
+
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('offers both providers once the Microsoft client is configured', function (): void {

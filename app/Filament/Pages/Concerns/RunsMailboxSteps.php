@@ -70,6 +70,7 @@ trait RunsMailboxSteps
     {
         return $this->step() === WorkspaceSetupStep::UseCase
             && Feature::active(EmailIntegration::class)
+            && $this->configuredProviders() !== []
             && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
     }
 
@@ -152,7 +153,7 @@ trait RunsMailboxSteps
 
         $move = resolve(MoveWorkspaceSetup::class);
 
-        if (! Feature::active(EmailIntegration::class)) {
+        if (! Feature::active(EmailIntegration::class) || $this->configuredProviders() === []) {
             $move->execute($this->authUser(), $workspace, $workspace->onboarding_step, WorkspaceSetupStep::UseCase);
 
             return;
