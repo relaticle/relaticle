@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Database\Seeders\Personas;
 
 use App\Actions\Onboarding\SaveOnboardingUseCase;
-use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Date;
@@ -163,7 +163,7 @@ final readonly class PersonaSeeder
             return Workspace::factory()->create($attributes);
         }
 
-        $workspace = Workspace::factory()->create([...$attributes, 'onboarding_step' => OnboardingStep::UseCase]);
+        $workspace = Workspace::factory()->create([...$attributes, 'onboarding_step' => WorkspaceSetupStep::UseCase]);
 
         resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, [
             'onboarding_use_case' => $useCase->value,

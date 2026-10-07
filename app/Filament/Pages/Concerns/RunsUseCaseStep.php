@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Concerns;
 
 use App\Actions\Onboarding\SaveOnboardingUseCase;
-use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceSetupStep;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Schemas\Components\Component;
@@ -17,7 +17,7 @@ trait RunsUseCaseStep
 {
     public function saveUseCase(): void
     {
-        resolve(SaveOnboardingUseCase::class)->execute($this->authUser(), $this->workspace, $this->form->getState(), OnboardingStep::Invite);
+        resolve(SaveOnboardingUseCase::class)->execute($this->authUser(), $this->workspace, $this->form->getState(), WorkspaceSetupStep::Invite);
 
         $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
     }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
-use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\Concerns\BuildsOnboardingPreview;
 use App\Filament\Pages\Concerns\RunsInviteStep;
 use App\Filament\Pages\Concerns\RunsMailboxSteps;
@@ -65,7 +65,7 @@ final class SetupWorkspace extends Page
 
         $this->form->fill();
 
-        if ($this->step() === OnboardingStep::Sharing) {
+        if ($this->step() === WorkspaceSetupStep::Sharing) {
             $this->sharingTier = $this->preselectedSharingTier();
         }
     }
@@ -98,13 +98,13 @@ final class SetupWorkspace extends Page
     public function form(Schema $schema): Schema
     {
         return $schema
-            ->components($this->step() === OnboardingStep::Invite ? $this->inviteComponents() : $this->useCaseComponents())
+            ->components($this->step() === WorkspaceSetupStep::Invite ? $this->inviteComponents() : $this->useCaseComponents())
             ->statePath('data');
     }
 
-    public function step(): OnboardingStep
+    public function step(): WorkspaceSetupStep
     {
-        return $this->workspace->onboarding_step ?? OnboardingStep::UseCase;
+        return $this->workspace->onboarding_step ?? WorkspaceSetupStep::UseCase;
     }
 
     public function stepView(): string
@@ -114,11 +114,11 @@ final class SetupWorkspace extends Page
 
     public function previewPanel(): string
     {
-        if (in_array($this->step(), [OnboardingStep::Email, OnboardingStep::Sharing], true)) {
+        if (in_array($this->step(), [WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing], true)) {
             return 'people';
         }
 
-        if ($this->step() === OnboardingStep::Invite) {
+        if ($this->step() === WorkspaceSetupStep::Invite) {
             return 'members';
         }
 
@@ -139,7 +139,7 @@ final class SetupWorkspace extends Page
             $this->selectedUseCase()?->pipelineStages() ?? [],
         );
 
-        if ($this->step() === OnboardingStep::Sharing && $this->connectedMailbox()?->isActive()) {
+        if ($this->step() === WorkspaceSetupStep::Sharing && $this->connectedMailbox()?->isActive()) {
             $preview['mailboxProgress'] = $this->mailboxProgress();
         }
 

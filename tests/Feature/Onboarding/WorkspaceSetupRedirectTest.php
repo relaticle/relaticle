@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\OnboardingStep;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
@@ -23,7 +23,7 @@ beforeEach(function (): void {
     $this->workspace->forceFill([
         'plan' => Plan::Pro,
         'trial_ends_at' => now()->addDays(14),
-        'onboarding_step' => OnboardingStep::UseCase,
+        'onboarding_step' => WorkspaceSetupStep::UseCase,
     ])->save();
 
     $this->setupUrl = SetupWorkspace::getUrl(['tenant' => $this->workspace]);

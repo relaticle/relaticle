@@ -7,8 +7,8 @@ namespace App\Filament\Pages\Concerns;
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
-use App\Enums\OnboardingStep;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStep;
 use App\Livewire\App\Workspaces\Concerns\SendsWorkspaceInvitations;
 use App\Support\EmailAddress;
 use App\Support\Workspaces\RoleOptions;
@@ -32,7 +32,7 @@ trait RunsInviteStep
     {
         $state = $this->inviteForm()->getState();
 
-        if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Invite, null)) {
+        if (! resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Invite, null)) {
             $this->redirectTo(self::getUrl(['tenant' => $this->workspace]));
 
             return;
@@ -52,7 +52,7 @@ trait RunsInviteStep
 
     public function createInviteLink(): void
     {
-        if ($this->step() !== OnboardingStep::Invite || $this->inviteLinkUrl() !== null) {
+        if ($this->step() !== WorkspaceSetupStep::Invite || $this->inviteLinkUrl() !== null) {
             return;
         }
 

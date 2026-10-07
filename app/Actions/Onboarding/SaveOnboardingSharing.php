@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Onboarding;
 
-use App\Enums\OnboardingStep;
+use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +25,7 @@ final readonly class SaveOnboardingSharing
         abort_unless(in_array($tier, self::OFFERED_TIERS, true), 422);
 
         return DB::transaction(function () use ($user, $workspace, $tier): bool {
-            if (! $this->moveSetup->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase)) {
+            if (! $this->moveSetup->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase)) {
                 return false;
             }
 

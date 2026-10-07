@@ -14,7 +14,7 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
-use App\Enums\OnboardingStep;
+use App\Enums\WorkspaceSetupStep;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
@@ -373,13 +373,13 @@ function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboa
 
     $setup = livewire(SetupWorkspace::class);
 
-    if ($created->onboarding_step === OnboardingStep::Email) {
+    if ($created->onboarding_step === WorkspaceSetupStep::Email) {
         $setup->callAction('skipMailbox');
     }
 
     $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
 
-    if ($created->fresh()->onboarding_step === OnboardingStep::Invite) {
+    if ($created->fresh()->onboarding_step === WorkspaceSetupStep::Invite) {
         $setup->call('finish');
     }
 

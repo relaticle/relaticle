@@ -8,9 +8,9 @@ use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
-use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\EmailIntegration;
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
@@ -198,7 +198,7 @@ it('creates the workspace at the referral step and sends the owner to setup', fu
 
     $workspace = $user->fresh()->currentWorkspace;
 
-    expect($workspace->onboarding_step)->toBe(OnboardingStep::UseCase)
+    expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
         ->and($workspace->onboarding_use_case)->toBeNull();
 
     $component->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
@@ -252,7 +252,7 @@ it('stores the use case and moves on to the invite step', function (): void {
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
         ->onboarding_context->toBe(['outbound'])
-        ->onboarding_step->toBe(OnboardingStep::Invite);
+        ->onboarding_step->toBe(WorkspaceSetupStep::Invite);
 });
 
 it('stays on the setup page after the use case even when a setup conversation exists', function (): void {
@@ -267,7 +267,7 @@ it('stays on the setup page after the use case even when a setup conversation ex
         ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
         ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
 
-    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
+    expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
 });
 
 it('lands an additional workspace on the dashboard once the invite step is done', function (): void {
@@ -404,7 +404,7 @@ it('keeps the use case and moves on to the invite step when the sample seeder fa
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Recruiting)
-        ->onboarding_step->toBe(OnboardingStep::Invite)
+        ->onboarding_step->toBe(WorkspaceSetupStep::Invite)
         ->and($stage->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())
         ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()))
         ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
@@ -437,7 +437,7 @@ it('leaves no partial sample set when the sample seeder fails halfway', function
         ->call('saveUseCase')
         ->assertHasNoFormErrors();
 
-    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+    expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
         ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
 });
 
@@ -569,7 +569,7 @@ it('rejects Other text over 120 characters when the action runs directly', funct
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBeNull()
-        ->onboarding_step->toBe(OnboardingStep::UseCase);
+        ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
 });
 
 it('drops Other text when the action runs directly with a named use case', function (): void {
@@ -674,28 +674,28 @@ it('moves the setup only from the step it is on', function (): void {
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
 
-    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::UseCase, OnboardingStep::Invite);
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Invite);
 
     expect($moved)->toBeTrue()
-        ->and($workspace->onboarding_step)->toBe(OnboardingStep::Invite)
-        ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
+        ->and($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
+        ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
 });
 
 it('does not move the setup when the workspace is on another step', function (): void {
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
 
-    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::Invite);
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::Invite);
 
     expect($moved)->toBeFalse()
-        ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
 });
 
 it('does not move a finished workspace back into setup', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
-    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::UseCase, OnboardingStep::Invite);
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Invite);
 
     expect($moved)->toBeFalse()
         ->and($workspace->fresh()->onboarding_step)->toBeNull();
@@ -706,21 +706,21 @@ it('reloads the passed workspace when another request already moved the step', f
     $workspace = workspaceInSetup($user);
     $stale = $workspace->fresh();
 
-    $workspace->update(['onboarding_step' => OnboardingStep::Sharing]);
+    $workspace->update(['onboarding_step' => WorkspaceSetupStep::Sharing]);
 
-    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $stale, OnboardingStep::UseCase, OnboardingStep::Invite);
+    $moved = resolve(MoveWorkspaceSetup::class)->execute($user, $stale, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Invite);
 
     expect($moved)->toBeFalse()
-        ->and($stale->onboarding_step)->toBe(OnboardingStep::Sharing);
+        ->and($stale->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
 });
 
 it('refuses to move the setup for someone who does not own the workspace', function (): void {
     $workspace = workspaceInSetup(User::factory()->create());
 
-    expect(fn () => resolve(MoveWorkspaceSetup::class)->execute(User::factory()->create(), $workspace, OnboardingStep::UseCase, OnboardingStep::Invite))
+    expect(fn () => resolve(MoveWorkspaceSetup::class)->execute(User::factory()->create(), $workspace, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Invite))
         ->toThrow(HttpException::class);
 
-    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
 });
 
 it('leaves a workspace that already has a use case as it is', function (): void {
@@ -733,7 +733,7 @@ it('leaves a workspace that already has a use case as it is', function (): void 
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
-        ->onboarding_step->toBe(OnboardingStep::UseCase);
+        ->onboarding_step->toBe(WorkspaceSetupStep::UseCase);
 });
 
 describe('connect email', function (): void {
@@ -745,7 +745,7 @@ describe('connect email', function (): void {
     it('starts a new workspace on the connect step', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
-        expect($workspace->onboarding_step)->toBe(OnboardingStep::Email);
+        expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Email);
 
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'))
@@ -834,7 +834,7 @@ describe('connect email', function (): void {
 
         $setup = livewire(SetupWorkspace::class);
 
-        $workspace->update(['onboarding_step' => OnboardingStep::UseCase]);
+        $workspace->update(['onboarding_step' => WorkspaceSetupStep::UseCase]);
 
         $setup->call('connectMailbox', 'gmail')
             ->assertSuccessful()
@@ -858,7 +858,7 @@ describe('connect email', function (): void {
             ->callAction('skipMailbox')
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('stays on the connect step until the owner confirms the skip', function (): void {
@@ -871,7 +871,7 @@ describe('connect email', function (): void {
                 __('filament/pages/workspaces.setup_workspace.email.benefit_records'),
             ]);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
     });
 
     it('lets the owner go back to connect from the use case while no mailbox is connected', function (): void {
@@ -883,7 +883,7 @@ describe('connect email', function (): void {
             ->call('backToMailbox')
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
     });
 
     it('stays quiet when back is called twice', function (): void {
@@ -896,7 +896,7 @@ describe('connect email', function (): void {
             ->call('backToMailbox')
             ->assertSuccessful();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
     });
 
     it('offers no way back to connect once a mailbox is connected', function (): void {
@@ -915,7 +915,7 @@ describe('connect email', function (): void {
             ->call('backToMailbox')
             ->assertSuccessful();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('offers no way back to connect when the feature is off', function (): void {
@@ -931,7 +931,7 @@ describe('connect email', function (): void {
             ->call('backToMailbox')
             ->assertSuccessful();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('moves on to the use case when the feature is switched off mid-setup', function (): void {
@@ -943,7 +943,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('moves on to the sharing step when a mailbox is already connected', function (): void {
@@ -954,7 +954,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     });
 
     it('puts the provider the owner signed up with first', function (string $socialProvider, string $expected, string $other): void {
@@ -1015,7 +1015,7 @@ describe('connect email', function (): void {
         expect($workspace->fresh())
             ->onboarding_use_case->toBeNull()
             ->onboarding_other_use_case->toBeNull()
-            ->onboarding_step->toBe(OnboardingStep::Email);
+            ->onboarding_step->toBe(WorkspaceSetupStep::Email);
     });
 
     it('reads the provider from a consumer mail domain when there is no social sign-in', function (string $email, ?string $expected): void {
@@ -1059,7 +1059,7 @@ describe('connect email', function (): void {
             ->assertSeeHtml('wire:poll.5s')
             ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     });
 
     it('offers exactly participants only and subject line', function (): void {
@@ -1106,7 +1106,7 @@ describe('connect email', function (): void {
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
         expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
-            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('applies the chosen level to the owner\'s mail that synced before the choice and to no other mail', function (EmailPrivacyTier $chosen, EmailPrivacyTier $before): void {
@@ -1139,7 +1139,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)->call('saveSharing');
 
         expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
-            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('renders the sharing step without an address row once the mailbox is gone', function (): void {
@@ -1158,7 +1158,7 @@ describe('connect email', function (): void {
             ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.connected'))
             ->assertDontSee(__('filament/pages/workspaces.setup_workspace.sharing.syncing'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     });
 
     it('refuses a level the step does not offer', function (string $tier): void {
@@ -1172,7 +1172,7 @@ describe('connect email', function (): void {
             ->assertHasErrors('sharingTier');
 
         expect($user->fresh()->default_email_sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     })->with([EmailPrivacyTier::FULL->value, EmailPrivacyTier::PRIVATE->value, 'nonsense']);
 
     it('leaves the owner\'s level alone when a stale tab saves after the setup moved on', function (): void {
@@ -1182,14 +1182,14 @@ describe('connect email', function (): void {
 
         $setup = livewire(SetupWorkspace::class);
 
-        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
 
         $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
             ->call('saveSharing')
             ->assertSuccessful();
 
         expect($user->fresh()->default_email_sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('skips sharing for an owner who already chose a level, and leaves it alone', function (): void {
@@ -1200,7 +1200,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
     });
 
@@ -1211,7 +1211,7 @@ describe('connect email', function (): void {
 
         livewire(SetupWorkspace::class);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
 
         Feature::define(EmailIntegration::class, false);
         Feature::flushCache();
@@ -1219,7 +1219,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
     it('offers no way back to connect after the sharing step', function (): void {
@@ -1265,7 +1265,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
             ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
     });
@@ -1285,7 +1285,7 @@ describe('connect email', function (): void {
             ->call('saveSharing')
             ->assertHasNoErrors();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
             ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
     });
@@ -1301,7 +1301,7 @@ describe('connect email', function (): void {
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
             ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
     })->with([EmailAccountStatus::DISCONNECTED, EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
@@ -1313,14 +1313,14 @@ describe('connect email', function (): void {
 
         livewire(SetupWorkspace::class);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
 
         $user->update(['default_email_sharing_tier' => $stored]);
 
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBe($stored);
     })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
 
@@ -1332,14 +1332,14 @@ describe('connect email', function (): void {
 
         livewire(SetupWorkspace::class);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
 
         mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
 
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
     });
 
@@ -1355,7 +1355,7 @@ describe('connect email', function (): void {
 
         $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)->call('saveSharing');
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBe($stored)
             ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
     })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
@@ -1372,7 +1372,7 @@ describe('connect email', function (): void {
 
         $setup->set('sharingTier', EmailPrivacyTier::METADATA_ONLY->value)->call('saveSharing');
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
             ->and($otherEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
     });
@@ -1388,7 +1388,7 @@ describe('connect email', function (): void {
 
         expect(fn () => $setup->call('saveSharing'))->toThrow(RuntimeException::class);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
     });
 
@@ -1401,7 +1401,7 @@ describe('connect email', function (): void {
         expect(fn () => resolve(SaveOnboardingSharing::class)->execute($user, $workspace, $tier))
             ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(422));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
             ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
     })->with([EmailPrivacyTier::FULL, EmailPrivacyTier::PRIVATE]);
 
@@ -1416,7 +1416,7 @@ describe('connect email', function (): void {
             ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(403));
 
         expect($member->fresh()->default_email_sharing_tier)->toBeNull()
-            ->and($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Sharing);
+            ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     });
 
     it('groups the two sharing options so the arrow keys move between them', function (): void {
@@ -1476,14 +1476,14 @@ describe('connect email', function (): void {
 it('starts on the use case when the email feature is off', function (): void {
     $workspace = workspaceInSetup(User::factory()->create());
 
-    expect($workspace->onboarding_step)->toBe(OnboardingStep::UseCase);
+    expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
 });
 
 describe('invite team', function (): void {
     it('shows the invite step after the use case', function (): void {
         $workspace = workspaceAtInvite(User::factory()->create());
 
-        expect($workspace->onboarding_step)->toBe(OnboardingStep::Invite);
+        expect($workspace->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
 
         $setup = livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.setup_workspace.invite.heading'))
@@ -1562,7 +1562,7 @@ describe('invite team', function (): void {
             ->call('finish')
             ->assertHasFormErrors(['role']);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 
@@ -1575,7 +1575,7 @@ describe('invite team', function (): void {
             ->call('finish')
             ->assertHasFormErrors(['emails']);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 
@@ -1589,7 +1589,7 @@ describe('invite team', function (): void {
             ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
             ->assertNoRedirect();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 
@@ -1601,7 +1601,7 @@ describe('invite team', function (): void {
             ->call('finish')
             ->assertHasFormErrors(['emails']);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 
@@ -1665,7 +1665,7 @@ describe('invite team', function (): void {
             ->call('finish')
             ->assertHasFormErrors(['emails']);
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite);
     });
 
     it('finishes and reports the addresses the invite action rejects', function (): void {
@@ -1696,7 +1696,7 @@ describe('invite team', function (): void {
             ->assertHasFormErrors(['emails'])
             ->assertNoRedirect();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 
@@ -1734,7 +1734,7 @@ describe('invite team', function (): void {
         $staleTab = livewire(SetupWorkspace::class)
             ->fillForm(['emails' => 'maya@northwind.test']);
 
-        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, OnboardingStep::Invite, null);
+        resolve(MoveWorkspaceSetup::class)->execute($user, $workspace, WorkspaceSetupStep::Invite, null);
 
         $staleTab->call('finish')
             ->assertNotNotified(__('filament/pages/workspaces.create_workspace.notifications.workspace_created.title'))
@@ -1754,7 +1754,7 @@ describe('invite team', function (): void {
             ->call('finish')
             ->assertForbidden();
 
-        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Invite)
             ->and($workspace->workspaceInvitations()->count())->toBe(0);
     });
 

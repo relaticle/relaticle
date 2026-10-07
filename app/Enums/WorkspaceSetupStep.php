@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
-enum OnboardingStep: string
+enum WorkspaceSetupStep: string
 {
     case Email = 'email';
     case Sharing = 'sharing';

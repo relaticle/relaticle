@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Onboarding;
 
-use App\Enums\OnboardingStep;
 use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\OnboardSeed;
 use App\Jobs\Email\SyncSubscriberJob;
 use App\Models\User;
@@ -29,7 +29,7 @@ final readonly class SaveOnboardingUseCase
     /**
      * @param  array<string, mixed>  $input
      */
-    public function execute(User $user, Workspace $workspace, array $input, ?OnboardingStep $then): bool
+    public function execute(User $user, Workspace $workspace, array $input, ?WorkspaceSetupStep $then): bool
     {
         abort_unless($workspace->user_id === $user->getKey(), 403);
 
@@ -40,7 +40,7 @@ final readonly class SaveOnboardingUseCase
         $saved = DB::transaction(function () use ($workspace, $input, $useCase, $then): bool {
             $locked = Workspace::query()->whereKey($workspace->getKey())->lockForUpdate()->sole();
 
-            if ($locked->onboarding_step !== OnboardingStep::UseCase || $locked->onboarding_use_case !== null) {
+            if ($locked->onboarding_step !== WorkspaceSetupStep::UseCase || $locked->onboarding_use_case !== null) {
                 return false;
             }
 

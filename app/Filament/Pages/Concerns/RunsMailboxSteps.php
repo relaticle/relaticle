@@ -7,7 +7,7 @@ namespace App\Filament\Pages\Concerns;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Actions\Onboarding\SaveOnboardingSharing;
 use App\Enums\CreationSource;
-use App\Enums\OnboardingStep;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\EmailIntegration;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
@@ -34,7 +34,7 @@ trait RunsMailboxSteps
         $this->validate(['sharingTier' => ['required', Rule::enum(EmailPrivacyTier::class)->only(SaveOnboardingSharing::OFFERED_TIERS)]]);
 
         if (! $this->asksForSharing()) {
-            resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+            resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
 
             return;
         }
@@ -58,7 +58,7 @@ trait RunsMailboxSteps
                 ->color('danger'))
             ->modalFooterActionsAlignment(Alignment::End)
             ->action(function (): void {
-                resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+                resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::Email, WorkspaceSetupStep::UseCase);
             });
     }
 
@@ -68,19 +68,19 @@ trait RunsMailboxSteps
             return;
         }
 
-        resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::UseCase, OnboardingStep::Email);
+        resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, WorkspaceSetupStep::UseCase, WorkspaceSetupStep::Email);
     }
 
     public function canGoBackToMailbox(): bool
     {
-        return $this->step() === OnboardingStep::UseCase
+        return $this->step() === WorkspaceSetupStep::UseCase
             && Feature::active(EmailIntegration::class)
             && ! resolve(WorkspaceActivationFacts::class)->hasConnectedMailbox($this->authUser(), $this->workspace);
     }
 
     public function connectMailbox(string $provider): void
     {
-        if ($this->step() !== OnboardingStep::Email || ! Feature::active(EmailIntegration::class)) {
+        if ($this->step() !== WorkspaceSetupStep::Email || ! Feature::active(EmailIntegration::class)) {
             return;
         }
 
@@ -151,21 +151,21 @@ trait RunsMailboxSteps
 
     private function leaveMailboxStepWhenSettled(Workspace $workspace): void
     {
-        if (! in_array($workspace->onboarding_step, [OnboardingStep::Email, OnboardingStep::Sharing], true)) {
+        if (! in_array($workspace->onboarding_step, [WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing], true)) {
             return;
         }
 
         $move = resolve(MoveWorkspaceSetup::class);
 
         if (! Feature::active(EmailIntegration::class)) {
-            $move->execute($this->authUser(), $workspace, $workspace->onboarding_step, OnboardingStep::UseCase);
+            $move->execute($this->authUser(), $workspace, $workspace->onboarding_step, WorkspaceSetupStep::UseCase);
 
             return;
         }
 
-        if ($workspace->onboarding_step === OnboardingStep::Sharing) {
+        if ($workspace->onboarding_step === WorkspaceSetupStep::Sharing) {
             if (! $this->asksForSharing()) {
-                $move->execute($this->authUser(), $workspace, OnboardingStep::Sharing, OnboardingStep::UseCase);
+                $move->execute($this->authUser(), $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
             }
 
             return;
@@ -175,9 +175,9 @@ trait RunsMailboxSteps
             return;
         }
 
-        $next = $this->asksForSharing() ? OnboardingStep::Sharing : OnboardingStep::UseCase;
+        $next = $this->asksForSharing() ? WorkspaceSetupStep::Sharing : WorkspaceSetupStep::UseCase;
 
-        $move->execute($this->authUser(), $workspace, OnboardingStep::Email, $next);
+        $move->execute($this->authUser(), $workspace, WorkspaceSetupStep::Email, $next);
     }
 
     private function asksForSharing(): bool

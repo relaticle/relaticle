@@ -6,8 +6,8 @@ namespace App\Actions\Jetstream;
 
 use App\Actions\Billing\StartProTrial;
 use App\Enums\OnboardingReferralSource;
-use App\Enums\OnboardingStep;
 use App\Enums\Plan;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Models\User;
@@ -45,7 +45,7 @@ final readonly class CreateWorkspace implements CreatesTeams
             'name' => $input['name'],
             'slug' => $input['slug'] ?? null,
             'personal_workspace' => $isFirstWorkspace,
-            'onboarding_step' => Feature::active(EmailIntegration::class) ? OnboardingStep::Email : OnboardingStep::UseCase,
+            'onboarding_step' => Feature::active(EmailIntegration::class) ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase,
             ...$this->referralAttributes($input),
         ]);
         $workspace->plan = Plan::default();
