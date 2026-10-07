@@ -281,6 +281,7 @@ final class ActivityResource extends Resource
                             ->hiddenLabel()
                             ->listWithLineBreaks()
                             ->bulleted()
+                            ->limit(500)
                             ->placeholder('No field changes recorded.')
                             ->state(fn (Activity $record): array => self::buildChangeSummary($record))
                             ->columnSpanFull(),

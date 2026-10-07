@@ -178,6 +178,25 @@ it('renders the view page for a custom-field-changes activity', function (): voi
         ->assertSee('High');
 });
 
+it('cuts a long change short on the view page', function (): void {
+    $activity = seedActivity($this->workspaceA, $this->ownerA, [
+        'event' => 'custom_field_changes',
+        'description' => 'custom_field_changes',
+        'properties' => ['custom_field_changes' => [[
+            'label' => 'Body',
+            'old' => 'Draft',
+            'new' => str_repeat('lorem ', 500).'closing words',
+        ]]],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Body: Draft → lorem')
+        ->assertDontSee('closing words');
+});
+
 it('renders the view page for a deleted activity with an itemized old→new diff', function (): void {
     $activity = seedActivity($this->workspaceA, $this->ownerA, [
         'event' => 'deleted',
