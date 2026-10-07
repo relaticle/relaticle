@@ -534,3 +534,41 @@ it('serves an empty page for a page number no activity list can reach', function
     'the largest integer' => [PHP_INT_MAX],
     'a float past the integer range' => [1.0e30],
 ]);
+
+it('hands the model an excerpt of a long rich text change, not the whole body', function (): void {
+    $company = app(CreateCompany::class)->execute($this->user, ['name' => 'Acme']);
+    $body = '<p>'.str_repeat('a renewal note that keeps going. ', 200).'</p><p>closing words</p>';
+
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->user->getKey(),
+        'workspace_id' => $company->workspace_id,
+        'attribute_changes' => ['attributes' => ['name' => str_repeat('n', 600)], 'old' => ['name' => 'Acme']],
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => '<p>Draft</p>', 'label' => '<p>Draft</p>'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    $payload = activityPayload([
+        'record_type' => 'company',
+        'record_id' => (string) $company->getKey(),
+    ]);
+
+    $changes = collect(array_merge(...array_column($payload['data'], 'changes')));
+    $change = $changes->firstWhere('field', 'Description');
+
+    expect($change['old'])->toBe('Draft')
+        ->and($changes->firstWhere('field', 'Name')['new'])->toEndWith('(shortened)')
+        ->and($change['new'])->toStartWith('a renewal note')
+        ->and($change['new'])->toEndWith('(shortened)')
+        ->and(mb_strlen((string) $change['new']))->toBeLessThan(600);
+});

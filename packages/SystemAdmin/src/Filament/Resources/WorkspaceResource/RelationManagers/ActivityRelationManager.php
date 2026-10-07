@@ -79,6 +79,7 @@ final class ActivityRelationManager extends RelationManager
                     ->state(fn (Activity $record): array => ActivityResource::buildChangeSummary($record))
                     ->listWithLineBreaks()
                     ->limitList(1)
+                    ->limit(120)
                     ->placeholder('—')
                     ->wrap(),
             ])

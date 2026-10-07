@@ -17,7 +17,7 @@ return [
                 'App\Filament\Actions\ConfirmIdentityAction::setUp' => 88,
                 'App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation::getSubNavigation' => 64,
                 'App\Filament\Pages\CreateWorkspace::getWorkspaceFormComponents' => 62,
-                'App\Filament\Pages\Workspace\ActivityLog::table' => 122,
+                'App\Filament\Pages\Workspace\ActivityLog::table' => 115,
                 'App\Filament\Resources\CompanyResource::table' => 70,
                 'App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard::board' => 136,
                 'App\Filament\Resources\PeopleResource::table' => 62,

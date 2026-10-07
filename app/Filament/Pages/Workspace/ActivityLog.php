@@ -79,6 +79,9 @@ final class ActivityLog extends Page implements HasTable
     /** Characters of the full sentence the title carries before it, too, is clipped. */
     private const int TITLE_LENGTH = 240;
 
+    /** @var array<int|string, list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>> */
+    private array $changeRows = [];
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClock;
 
     protected static ?string $slug = 'workspace/activity';
@@ -239,14 +242,7 @@ final class ActivityLog extends Page implements HasTable
                     ->tooltip($this->destroyedNotice(...))
                     ->searchable(query: $this->searchByRecordName(...))
                     ->wrap(),
-                TextColumn::make('batch_uuid')
-                    ->label(__('workspaces.activity.columns.changes'))
-                    ->state(ActivityChangeSummary::for(...))
-                    ->formatStateUsing($this->changeLine(...))
-                    ->listWithLineBreaks()
-                    ->limitList(1)
-                    ->placeholder(ActivityValue::EMPTY)
-                    ->action($this->viewChangesAction()),
+                $this->changesColumn(),
             ])
             ->filters([
                 SelectFilter::make('event')
@@ -281,6 +277,19 @@ final class ActivityLog extends Page implements HasTable
             ]);
     }
 
+    private function changesColumn(): TextColumn
+    {
+        return TextColumn::make('batch_uuid')
+            ->label(__('workspaces.activity.columns.changes'))
+            ->state($this->changes(...))
+            ->formatStateUsing($this->changeLine(...))
+            ->listWithLineBreaks()
+            ->limitList(1)
+            ->placeholder(ActivityValue::EMPTY)
+            ->description($this->slideOverHint(...))
+            ->action($this->viewChangesAction());
+    }
+
     /**
      * A save that moved one field is the common case and reads inline. Anything
      * longer would stretch the row and truncate the values that make it worth
@@ -295,11 +304,46 @@ final class ActivityLog extends Page implements HasTable
             ->modalDescription($this->changesDescription(...))
             ->modalIcon(fn (Activity $record): Heroicon => $this->eventIcon($record->event))
             ->modalContent(fn (Activity $record): View => view('filament.pages.workspace.activity-changes', [
-                'rows' => ActivityChangeSummary::for($record),
+                'rows' => $this->changes($record),
             ]))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel(__('workspaces.activity.changes_modal.close'))
-            ->visible(fn (Activity $record): bool => count(ActivityChangeSummary::for($record)) > 1);
+            ->visible(fn (Activity $record): bool => $this->needsSlideOver($this->changes($record)));
+    }
+
+    /**
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
+     */
+    private function changes(Activity $record): array
+    {
+        return $this->changeRows[$record->getKey()] ??= ActivityChangeSummary::for($record);
+    }
+
+    private function slideOverHint(Activity $record): ?HtmlString
+    {
+        $rows = $this->changes($record);
+
+        if (! $this->needsSlideOver($rows)) {
+            return null;
+        }
+
+        return new HtmlString(view('filament.pages.workspace.activity-more', [
+            'label' => count($rows) > 1
+                ? __('workspaces.activity.changes_modal.trigger')
+                : __('workspaces.activity.changes_modal.trigger_full'),
+        ])->render());
+    }
+
+    /**
+     * @param  list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>  $rows
+     */
+    private function needsSlideOver(array $rows): bool
+    {
+        if (count($rows) > 1) {
+            return true;
+        }
+
+        return array_any($rows, fn (array $row): bool => $row['full'] !== null);
     }
 
     /**
@@ -531,7 +575,7 @@ final class ActivityLog extends Page implements HasTable
      * body arrives here stripped but not shortened, and uncapped it would ship
      * the whole note into the title of every row on the page.
      *
-     * @param  array{label: string, old: string, new: string}  $state
+     * @param  array{label: string, old: string, new: string, full: array{old: string, new: string}|null}  $state
      */
     private function changeLine(array $state): HtmlString
     {

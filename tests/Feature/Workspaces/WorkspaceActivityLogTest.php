@@ -504,6 +504,8 @@ test('a row whose only change fits inline offers no slide-over', function (): vo
 
     livewire(ActivityLog::class)
         ->assertOk()
+        ->assertDontSee(__('workspaces.activity.changes_modal.trigger'))
+        ->assertDontSee(__('workspaces.activity.changes_modal.trigger_full'))
         ->assertActionHidden(TestAction::make('viewChanges')->table($updated));
 });
 
@@ -762,4 +764,67 @@ test('a company account owner change names both owners', function (): void {
     livewire(ActivityLog::class)
         ->assertOk()
         ->assertSeeInOrder(['Owned Co', __('filament/resources/company.fields.account_owner_id.label'), 'Ada Owner', 'Bea Seller']);
+});
+
+test('a single change too long to read inline opens whole in the slide-over', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Long Note Co']);
+    $body = '<p>'.str_repeat('a renewal note that keeps going. ', 200).'</p><p>closing words</p>';
+
+    $activity = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => '<p>Draft</p>', 'label' => '<p>Draft</p>'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    $component = livewire(ActivityLog::class)
+        ->assertOk()
+        ->assertDontSee('closing words')
+        ->assertSee(__('workspaces.activity.changes_modal.trigger_full'))
+        ->mountAction(TestAction::make('viewChanges')->table($activity));
+
+    expect(slideOverChanges($component))
+        ->toContain('Draft')
+        ->toContain("going.\nclosing words")
+        ->not->toContain('<p>');
+});
+
+test('a long plain text change keeps its line breaks in the slide-over', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Plain Note Co']);
+    $body = str_repeat("a renewal line that keeps going\n", 10)."\nclosing words";
+
+    $activity = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'summary',
+            'label' => 'Summary',
+            'type' => 'textarea',
+            'old' => ['value' => 'Draft', 'label' => 'Draft'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    $component = livewire(ActivityLog::class)
+        ->assertOk()
+        ->mountAction(TestAction::make('viewChanges')->table($activity));
+
+    expect(slideOverChanges($component))->toContain("keeps going\nclosing words");
 });

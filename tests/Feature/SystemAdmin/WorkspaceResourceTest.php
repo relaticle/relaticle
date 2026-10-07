@@ -221,6 +221,24 @@ it('reads a custom-field edit as the update it is, and names the field that move
         ->assertSee('Name: Acme → Acme Global');
 });
 
+it('cuts a long change short in the activity table', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->ownedWorkspaces()->firstOrFail();
+
+    logWorkspaceActivity($workspace, null, [
+        'event' => 'custom_field_changes',
+        'description' => 'custom_field_changes',
+        'properties' => ['custom_field_changes' => [['label' => 'Body', 'old' => 'Draft', 'new' => str_repeat('lorem ', 500).'closing words']]],
+    ]);
+
+    livewire(ActivityRelationManager::class, [
+        'ownerRecord' => $workspace,
+        'pageClass' => ViewWorkspace::class,
+    ])
+        ->assertSuccessful()
+        ->assertSee('Body: Draft → lorem')
+        ->assertDontSee('closing words');
+});
+
 it('counts a workspace activity on the tab badge', function (): void {
     $workspace = User::factory()->withPersonalWorkspace()->create()->ownedWorkspaces()->firstOrFail();
 

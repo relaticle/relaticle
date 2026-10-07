@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 final readonly class ActivityChangeSummary
 {
     /**
-     * @return list<array{label: string, old: string, new: string}>
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
      */
     public static function for(Activity $activity): array
     {
@@ -30,7 +30,7 @@ final readonly class ActivityChangeSummary
     }
 
     /**
-     * @return list<array{label: string, old: string, new: string}>
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
      */
     private static function nativeChanges(Activity $activity): array
     {
@@ -52,18 +52,13 @@ final readonly class ActivityChangeSummary
                 continue;
             }
 
-            $before = ActivityValue::display($old[$key] ?? null);
-            $after = ActivityValue::display($value);
+            $row = ActivityValue::row(Str::headline((string) $key), $old[$key] ?? null, $value);
 
-            if ($before === $after) {
+            if (ActivityValue::isUnchanged($row)) {
                 continue;
             }
 
-            $rows[] = [
-                'label' => Str::headline((string) $key),
-                'old' => $before,
-                'new' => $after,
-            ];
+            $rows[] = $row;
         }
 
         return $rows;
@@ -72,7 +67,7 @@ final readonly class ActivityChangeSummary
     /**
      * @param  array<string, mixed>  $old
      * @param  array<string, mixed>  $new
-     * @return list<array{label: string, old: string, new: string}>
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
      */
     private static function settingsChanges(array $old, array $new): array
     {
@@ -97,6 +92,7 @@ final readonly class ActivityChangeSummary
                 'label' => CustomFieldSettingsSchema::label((string) $key),
                 'old' => $oldDisplay,
                 'new' => $newDisplay,
+                'full' => null,
             ];
         }
 
@@ -110,7 +106,7 @@ final readonly class ActivityChangeSummary
      * `batch_custom_field_properties`. Rows written outside a batch have no
      * aggregate and speak for themselves.
      *
-     * @return list<array{label: string, old: string, new: string}>
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
      */
     private static function customFieldChanges(Activity $activity): array
     {
@@ -132,14 +128,15 @@ final readonly class ActivityChangeSummary
                 }
 
                 $label = $change['label'] ?? $change['code'] ?? null;
-                $before = ActivityValue::display($change['old'] ?? null);
-                $after = ActivityValue::display($change['new'] ?? null);
-
-                if (! is_string($label) || $before === $after) {
+                if (! is_string($label)) {
                     continue;
                 }
 
-                $row = ['label' => $label, 'old' => $before, 'new' => $after];
+                $row = ActivityValue::row($label, $change['old'] ?? null, $change['new'] ?? null);
+
+                if (ActivityValue::isUnchanged($row)) {
+                    continue;
+                }
 
                 if (! in_array($row, $rows, true)) {
                     $rows[] = $row;
