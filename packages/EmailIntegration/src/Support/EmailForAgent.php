@@ -9,6 +9,7 @@ use Dom\HTMLDocument;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -53,6 +54,28 @@ final readonly class EmailForAgent
                     ->values()
                     ->all()
                 : [],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     id: string,
+     *     email: string,
+     *     name: ?string,
+     *     provider: string,
+     *     is_default: bool,
+     *     can_send: bool
+     * }
+     */
+    public function mailbox(ConnectedAccount $account): array
+    {
+        return [
+            'id' => (string) $account->getKey(),
+            'email' => $account->email_address,
+            'name' => $account->display_name,
+            'provider' => $account->provider->value,
+            'is_default' => (bool) $account->is_default,
+            'can_send' => $account->isSendable(),
         ];
     }
 

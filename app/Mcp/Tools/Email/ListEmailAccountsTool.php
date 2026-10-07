@@ -16,6 +16,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Support\EmailForAgent;
 
 #[Title('List Email Accounts')]
 #[Description('List the mailboxes the current user has connected in this workspace. Use an `id` as `connected_account_id` when drafting or sending. `can_send` is false for a mailbox that cannot send right now, such as one that only receives or needs reconnecting.')]
@@ -41,7 +42,7 @@ final class ListEmailAccountsTool extends Tool
         ];
     }
 
-    public function handle(Request $request): Response|ResponseFactory
+    public function handle(Request $request, EmailForAgent $presenter): Response|ResponseFactory
     {
         if (! $this->holdsAnyEmailGrant(EmailGrant::Draft, EmailGrant::Send)) {
             return Response::error('This connection has no email access.');
@@ -55,14 +56,7 @@ final class ListEmailAccountsTool extends Tool
             ->connected()
             ->defaultFirst()
             ->get()
-            ->map(fn (ConnectedAccount $account): array => [
-                'id' => (string) $account->getKey(),
-                'email' => $account->email_address,
-                'name' => $account->display_name,
-                'provider' => $account->provider->value,
-                'is_default' => (bool) $account->is_default,
-                'can_send' => $account->isSendable(),
-            ])
+            ->map(fn (ConnectedAccount $account): array => $presenter->mailbox($account))
             ->all();
 
         return Response::structured(['items' => $items]);

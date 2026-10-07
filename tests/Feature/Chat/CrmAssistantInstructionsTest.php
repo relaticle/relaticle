@@ -293,6 +293,16 @@ it('tells the model to end every answer with exactly one offered next action', f
         ->toContain('the next action is mandatory and must offer to create or import the missing data');
 });
 
+it('tells the model the email list carries no total and no table, and to offer the next page', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('ListEmailsTool is the exception: it has no `total` and no table, so when `has_more` is true, say there is more and offer the next page.');
+});
+
+it('tells the model an empty email list means no email matched and offers no create or import', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('An empty email list means no email matched: say so, and do not offer to create or import.');
+});
+
 it('tells the model to name sample data as sample data when the workspace state block says so', function (): void {
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
 

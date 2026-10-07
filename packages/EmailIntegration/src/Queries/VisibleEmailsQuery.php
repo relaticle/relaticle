@@ -12,6 +12,8 @@ use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Validation\Rule;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -38,6 +40,20 @@ final readonly class VisibleEmailsQuery
     public static function recordTypes(): array
     {
         return array_keys(self::RECORDS);
+    }
+
+    /** @return array<string, list<mixed>> */
+    public static function filterRules(): array
+    {
+        return [
+            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
+            'record_type' => ['required_with:record_id', 'string', Rule::in(self::recordTypes())],
+            'record_id' => ['required_with:record_type', 'string', 'max:64'],
+            'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
+            'thread_id' => ['sometimes', 'string', 'max:255'],
+            'sent_after' => ['sometimes', 'date'],
+            'sent_before' => ['sometimes', 'date'],
+        ];
     }
 
     /**

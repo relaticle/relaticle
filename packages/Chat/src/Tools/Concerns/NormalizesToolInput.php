@@ -8,6 +8,15 @@ use Laravel\Ai\Tools\Request;
 
 trait NormalizesToolInput
 {
+    protected function withoutNullArguments(Request $request): Request
+    {
+        return new Request(
+            array_filter($request->all(), static fn (mixed $argument): bool => $argument !== null),
+            $request->toolCallId(),
+            $request->toolInvocationId(),
+        );
+    }
+
     /**
      * Coerce a tool-provided value into a clean list of non-empty string ids.
      * A lone scalar is wrapped into a single-element list (LLMs sometimes emit

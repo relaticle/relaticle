@@ -11,7 +11,6 @@ use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Arr;
-use Illuminate\Validation\Rule;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\ResponseFactory;
@@ -76,13 +75,7 @@ final class ListEmailsTool extends Tool
 
         /** @var array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, sent_after?: string, sent_before?: string, per_page?: int, page?: int} $validated */
         $validated = $request->validate([
-            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
-            'record_type' => ['required_with:record_id', 'string', Rule::in(VisibleEmailsQuery::recordTypes())],
-            'record_id' => ['required_with:record_type', 'string', 'max:64'],
-            'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
-            'thread_id' => ['sometimes', 'string', 'max:255'],
-            'sent_after' => ['sometimes', 'date'],
-            'sent_before' => ['sometimes', 'date'],
+            ...VisibleEmailsQuery::filterRules(),
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
             'page' => ['sometimes', 'integer', 'min:1', 'max:'.ListQuery::MAX_PAGE],
         ]);

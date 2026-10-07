@@ -9,6 +9,8 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Tools\Concerns\LocalisesDatetimes;
+use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
@@ -16,6 +18,8 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 
 final readonly class GetEmailTool implements Tool
 {
+    use LocalisesDatetimes;
+    use NormalizesToolInput;
     use ReportsValidationFailures;
 
     public function __construct(
@@ -43,7 +47,7 @@ final readonly class GetEmailTool implements Tool
 
         try {
             /** @var array{id: string} $validated */
-            $validated = $request->validate(['id' => ['required', 'string', 'max:64']]);
+            $validated = $this->withoutNullArguments($request)->validate(['id' => ['required', 'string', 'max:64']]);
         } catch (ValidationException $exception) {
             return $this->validationError($exception);
         }
@@ -55,9 +59,9 @@ final readonly class GetEmailTool implements Tool
             return (string) json_encode(['error' => 'Email not found.'], JSON_UNESCAPED_SLASHES);
         }
 
-        return (string) json_encode([
+        return (string) json_encode($this->localiseDatetimes([
             'data' => $data,
             'note' => ListEmailsTool::DATA_NOTE,
-        ], JSON_UNESCAPED_SLASHES);
+        ], $user), JSON_UNESCAPED_SLASHES);
     }
 }

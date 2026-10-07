@@ -9,9 +9,12 @@ use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Support\EmailForAgent;
 
-final class ListEmailAccountsTool implements Tool
+final readonly class ListEmailAccountsTool implements Tool
 {
+    public function __construct(private EmailForAgent $presenter) {}
+
     public function description(): string
     {
         return 'List the mailboxes the user has connected in this workspace, default first.'
@@ -33,14 +36,7 @@ final class ListEmailAccountsTool implements Tool
             ->connected()
             ->defaultFirst()
             ->get()
-            ->map(fn (ConnectedAccount $account): array => [
-                'id' => (string) $account->getKey(),
-                'email' => $account->email_address,
-                'name' => $account->display_name,
-                'provider' => $account->provider->value,
-                'is_default' => (bool) $account->is_default,
-                'can_send' => $account->isSendable(),
-            ])
+            ->map(fn (ConnectedAccount $account): array => $this->presenter->mailbox($account))
             ->all();
 
         return (string) json_encode([
