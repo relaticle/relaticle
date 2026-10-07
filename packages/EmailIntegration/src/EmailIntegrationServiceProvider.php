@@ -22,6 +22,7 @@ use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
+use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
@@ -189,5 +190,9 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         });
 
         Event::listen(TeamMemberRemoved::class, DisconnectRemovedMemberMailboxesListener::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([DisconnectFormerMemberMailboxesCommand::class]);
+        }
     }
 }
