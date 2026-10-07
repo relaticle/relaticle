@@ -158,15 +158,18 @@ it('does not let the second click of a double-click send the email that replaces
         (() => {
             const button = document.elementFromPoint({$spot['x']}, {$spot['y']}).closest('button');
             const wasDisabled = button.disabled;
+            const discard = document.querySelector('[wire\\\\:click="discardCurrent"]');
+            const discardWasDisabled = discard.disabled;
             button.click();
+            discard.click();
 
-            return { wasDisabled, action: button.getAttribute('wire:click') };
+            return { wasDisabled, discardWasDisabled, action: button.getAttribute('wire:click') };
         })();
     JS);
 
     $page->wait(0.4);
 
-    expect($clicked)->toBe(['wasDisabled' => true, 'action' => 'createCurrent'])
+    expect($clicked)->toBe(['wasDisabled' => true, 'discardWasDisabled' => true, 'action' => 'createCurrent'])
         ->and(Email::query()->count())->toBe(0)
         ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
 

@@ -123,8 +123,14 @@
                 <div class="ms-auto flex items-center gap-2">
                 <button
                     type="button"
+                    wire:key="discard-{{ $discardAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $discardAction }}"
                     wire:loading.attr="disabled"
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $editingFieldCode !== null ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
