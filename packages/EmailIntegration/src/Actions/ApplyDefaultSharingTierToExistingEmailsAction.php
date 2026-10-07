@@ -6,8 +6,8 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use App\Models\Workspace;
-use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
@@ -15,21 +15,20 @@ final readonly class ApplyDefaultSharingTierToExistingEmailsAction
 {
     public function executeForWorkspace(Workspace $workspace, EmailPrivacyTier $tier): int
     {
-        $userIds = User::query()
-            ->whereNull('default_email_sharing_tier')
-            ->where(function (Builder $query) use ($workspace): void {
-                $query->whereHas('workspaces', fn (Builder $workspaceQuery) => $workspaceQuery->whereKey($workspace->getKey()))
-                    ->orWhereKey($workspace->user_id);
-            })
-            ->pluck('id');
-
-        if ($userIds->isEmpty()) {
-            return 0;
-        }
-
         return Email::query()
             ->where('workspace_id', $workspace->getKey())
-            ->whereIn('user_id', $userIds)
+            ->whereIn('connected_account_id', ConnectedAccount::query()
+                ->where('workspace_id', $workspace->getKey())
+                ->whereNull('sharing_tier')
+                ->select('id'))
+            ->where('privacy_tier_customized', false)
+            ->update(['privacy_tier' => $tier->value]);
+    }
+
+    public function executeForMailbox(ConnectedAccount $mailbox, EmailPrivacyTier $tier): int
+    {
+        return Email::query()
+            ->where('connected_account_id', $mailbox->getKey())
             ->where('privacy_tier_customized', false)
             ->update(['privacy_tier' => $tier->value]);
     }

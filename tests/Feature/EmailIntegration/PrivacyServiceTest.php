@@ -342,10 +342,10 @@ it('defaultTierForUser uses the mailbox workspace default instead of the owner c
 });
 
 it('tierFromPreference resolves an empty selection to the workspace default', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
 
-    $tier = $this->service->tierFromPreference('', $this->owner->fresh());
+    $tier = $this->service->tierFromPreference('', $this->account->fresh());
 
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
@@ -353,7 +353,7 @@ it('tierFromPreference resolves an empty selection to the workspace default', fu
 it('tierFromPreference resolves an explicit selection to that tier', function (): void {
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
 
-    $tier = $this->service->tierFromPreference(EmailPrivacyTier::PRIVATE->value, $this->owner->fresh());
+    $tier = $this->service->tierFromPreference(EmailPrivacyTier::PRIVATE->value, $this->account->fresh());
 
     expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
 });

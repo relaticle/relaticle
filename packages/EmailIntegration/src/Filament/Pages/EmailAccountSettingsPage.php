@@ -36,7 +36,7 @@ use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
-use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountBlocklistAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
@@ -54,9 +54,7 @@ use Relaticle\EmailIntegration\Support\SharingTierChangeConfirmation;
  * Per-account settings, reached from the "Settings" entry of an account's action
  * group on {@see EmailAccountsPage}.
  *
- * Sharing tier is stored per user + workspace (not per account), so the General and
- * Sharing tabs edit settings that apply to every mailbox this user has connected.
- * Blocklist and signatures are per account.
+ * Every tab edits this one mailbox: sync, limits, sharing level, blocklist and signatures.
  *
  * @property-read Schema $form
  * @property-read Collection<int, EmailBlocklist> $blocklistEntries
@@ -89,15 +87,12 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         $this->accountId = $this->ownedAccountsQuery()->findOrFail($account)->getKey();
 
-        /** @var User $user */
-        $user = auth()->user();
-
         $this->form->fill([
             'sync_inbox' => $this->account()->sync_inbox,
             'sync_sent' => $this->account()->sync_sent,
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
-            'default_email_sharing_tier' => $user->default_email_sharing_tier->value ?? '',
+            'default_email_sharing_tier' => $this->account()->sharing_tier->value ?? '',
         ]);
 
         $this->signatures = $this->loadSignatures();
@@ -240,17 +235,9 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
         ];
     }
 
-    /**
-     * Radio cards for the mailbox sharing tier. The tier is stored on the user,
-     * not the account, and the leading card hands the decision back to the
-     * workspace default.
-     */
     private function sharingTierField(): ViewField
     {
-        /** @var User $user */
-        $user = auth()->user();
-
-        $workspaceTier = $user->currentWorkspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
+        $workspaceTier = $this->privacy()->workspaceSharingTier($this->account()->workspace);
 
         return ViewField::make('default_email_sharing_tier')
             ->label($this->labelWithInfo(__('filament/pages/email-account-settings.sharing.label'), __('filament/pages/email-account-settings.sharing.hint')))
@@ -569,7 +556,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 ? SharingTierChangeConfirmation::modalHeading()
                 : null)
             ->modalDescription(fn (): ?string => $this->accountSharingTierChanged()
-                ? SharingTierChangeConfirmation::modalDescription($this->resolvedAccountSharingTier())
+                ? SharingTierChangeConfirmation::mailboxModalDescription($this->resolvedAccountSharingTier())
                 : null)
             ->schema(fn (): array => $this->accountSharingTierChanged()
                 ? SharingTierChangeConfirmation::schema($this->resolvedAccountSharingTier())
@@ -587,12 +574,10 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 $updateSettings->execute($this->account(), $data);
 
                 if ($sharingPreferenceChanged) {
-                    $tier = $data['default_email_sharing_tier'] ?? null;
-
-                    resolve(SaveUserEmailSharingDefaultAction::class)->execute(
+                    resolve(SaveMailboxSharingTierAction::class)->execute(
                         $user,
-                        $this->storedSharingTierFromForm($tier),
-                        $this->privacy()->tierFromPreference($tier, $user),
+                        $this->account(),
+                        $this->storedSharingTierFromForm($data['default_email_sharing_tier'] ?? null),
                     );
                 }
 
@@ -607,21 +592,15 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
 
     private function accountSharingTierChanged(): bool
     {
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $this->resolvedAccountSharingTier() !== $this->privacy()->effectiveSharingTierForUser($user);
+        return $this->resolvedAccountSharingTier() !== $this->privacy()->tierForMailbox($this->account());
     }
 
     private function accountSharingPreferenceChanged(): bool
     {
-        /** @var User $user */
-        $user = auth()->user();
-
         $data = $this->form->getState();
 
         return $this->storedSharingTierFromForm($data['default_email_sharing_tier'] ?? null)
-            !== $user->default_email_sharing_tier;
+            !== $this->account()->sharing_tier;
     }
 
     private function storedSharingTierFromForm(mixed $tierValue): ?EmailPrivacyTier
@@ -637,10 +616,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         $data = $this->form->getState();
 
-        /** @var User $user */
-        $user = auth()->user();
-
-        return $this->privacy()->tierFromPreference($data['default_email_sharing_tier'] ?? null, $user);
+        return $this->privacy()->tierFromPreference($data['default_email_sharing_tier'] ?? null, $this->account());
     }
 
     private function privacy(): PrivacyService

@@ -30,7 +30,7 @@ beforeEach(function (): void {
 });
 
 it('loads the account form and existing blocklist entries on mount', function (): void {
-    $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     EmailBlocklist::factory()->create([
         'user_id' => $this->user->id,
@@ -72,7 +72,23 @@ it('saves account settings and the sharing tier from the save action', function 
         ->hourly_send_limit->toBe(25)
         ->daily_send_limit->toBe(100);
 
-    expect($this->user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::FULL);
+});
+
+it('saves the level on this mailbox and leaves the owner other mailbox alone', function (): void {
+    $other = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'email_address' => 'second@northwind.test',
+    ]));
+
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
+        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value])
+        ->callAction('save')
+        ->assertHasNoFormErrors();
+
+    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
+        ->and($other->fresh()->sharing_tier)->toBeNull();
 });
 
 it('requires confirmation when changing the account sharing tier to private', function (): void {
@@ -94,11 +110,11 @@ it('rejects an incorrect full access confirmation phrase on account settings', f
         ])
         ->assertHasActionErrors(['full_access_confirmation']);
 
-    expect($this->user->fresh()->default_email_sharing_tier)->toBeNull();
+    expect($this->account->fresh()->sharing_tier)->toBeNull();
 });
 
 it('saves account settings without confirmation when the sharing tier is unchanged', function (): void {
-    $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
@@ -109,22 +125,22 @@ it('saves account settings without confirmation when the sharing tier is unchang
         ->assertNotified();
 
     expect($this->account->fresh()->sync_inbox)->toBeFalse()
-        ->and($this->user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
+        ->and($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('clears a sharing override when selecting use workspace default even if the effective tier stays equal', function (): void {
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
-    $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->set('data.default_email_sharing_tier', '')
         ->callAction('save')
         ->assertNotified();
 
-    expect($this->user->fresh()->default_email_sharing_tier)->toBeNull();
+    expect($this->account->fresh()->sharing_tier)->toBeNull();
 });
 
-it('persists an explicit sharing override when the effective tier matches the workspace default', function (): void {
+it('persists an explicit sharing override equal to the workspace default without touching other workspaces', function (): void {
     $metadataTeam = Workspace::factory()->create([
         'user_id' => $this->user->getKey(),
         'default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY,
@@ -149,8 +165,8 @@ it('persists an explicit sharing override when the effective tier matches the wo
         ->callAction('save')
         ->assertNotified();
 
-    expect($this->user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($metadataWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($metadataWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
 it('adds blocklist entries from the blocklist modal', function (): void {

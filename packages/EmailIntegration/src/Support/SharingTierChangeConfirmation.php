@@ -58,4 +58,14 @@ final readonly class SharingTierChangeConfirmation
             ]),
         };
     }
+
+    public static function mailboxModalDescription(EmailPrivacyTier $newTier): string
+    {
+        return match ($newTier) {
+            EmailPrivacyTier::FULL => __('email/privacy-settings.sharing_confirmation.mailbox_full_access_description'),
+            default => __('email/privacy-settings.sharing_confirmation.mailbox_description', [
+                'tier' => $newTier->getLabel(),
+            ]),
+        };
+    }
 }
