@@ -6,11 +6,12 @@ use App\Enums\CrmEntity;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Support\IconPath;
 use Filament\Support\Enums\IconSize;
+use Relaticle\Chat\Support\ImageAltTextRenderer;
 use Relaticle\Chat\Support\MarkdownRenderer;
 use Relaticle\Chat\Support\RecordChipRenderer;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 
-mutates(MarkdownRenderer::class, RecordChipRenderer::class);
+mutates(MarkdownRenderer::class, RecordChipRenderer::class, ImageAltTextRenderer::class);
 
 it('renders record reference links as chips', function (): void {
     $html = (new MarkdownRenderer)->render('See [Acme](/r/company/01ABC) today.');
@@ -78,6 +79,53 @@ it('keeps inline markup inside a chip label', function (): void {
     $html = (new MarkdownRenderer)->render('[**Acme** Inc](/r/company/01ABC)');
 
     expect($html)->toContain('<strong>Acme</strong> Inc');
+});
+
+it('shows an image as its alt text and never as an img', function (): void {
+    $html = (new MarkdownRenderer)->render('![logo](https://example.com/a.png?d=secret)');
+
+    expect($html)->toContain('logo')
+        ->not->toContain('<img')
+        ->not->toContain('example.com/a.png');
+});
+
+it('renders nothing for an image without alt text', function (): void {
+    $html = (new MarkdownRenderer)->render('![](https://example.com/a.png?d=secret)');
+
+    expect(trim(strip_tags($html)))->toBe('')
+        ->and($html)->not->toContain('example.com');
+});
+
+it('escapes the alt text of an image', function (): void {
+    $html = (new MarkdownRenderer)->render('![<b onmouseover=x>"](https://example.com/a.png)');
+
+    expect($html)->not->toContain('<b')
+        ->not->toContain('<img')
+        ->toContain('&lt;b onmouseover=x&gt;&quot;');
+});
+
+it('keeps the words of a formatted alt text and drops its markup', function (): void {
+    $html = (new MarkdownRenderer)->render('![the **big** logo](https://example.com/a.png)');
+
+    expect($html)->toContain('the big logo')
+        ->not->toContain('<strong>')
+        ->not->toContain('<img');
+});
+
+it('shows the alt text of an image inside a link and keeps the link', function (): void {
+    $html = (new MarkdownRenderer)->render('[![logo](https://example.com/a.png)](https://example.com)');
+
+    expect($html)->toContain('<a href="https://example.com">logo</a>')
+        ->not->toContain('<img');
+});
+
+it('leaves links and record chips alone next to an image', function (): void {
+    $html = (new MarkdownRenderer)->render('![logo](https://example.com/a.png) [site](https://example.com) [Acme](/r/company/01ABC)');
+
+    expect($html)->not->toContain('<img')
+        ->toContain('<a href="https://example.com">site</a>')
+        ->toContain('class="chat-chip"')
+        ->toContain('href="/r/company/01ABC"');
 });
 
 it('isolates single-newline-separated block markers into their own paragraphs', function (): void {

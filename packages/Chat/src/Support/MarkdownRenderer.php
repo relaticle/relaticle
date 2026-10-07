@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Support;
 
 use League\CommonMark\Environment\Environment;
 use League\CommonMark\Extension\CommonMark\CommonMarkCoreExtension;
+use League\CommonMark\Extension\CommonMark\Node\Inline\Image;
 use League\CommonMark\Extension\CommonMark\Node\Inline\Link;
 use League\CommonMark\Extension\Table\TableExtension;
 use League\CommonMark\MarkdownConverter;
@@ -27,6 +28,10 @@ final readonly class MarkdownRenderer
         // Above the core LinkRenderer (priority 0): a `/r/` citation becomes a
         // record chip, everything else falls through to it untouched.
         $environment->addRenderer(Link::class, new RecordChipRenderer, 10);
+
+        // A reply can quote text an outside sender wrote, and a browser fetches an
+        // image URL, with whatever it carries, the moment the reply is painted.
+        $environment->addRenderer(Image::class, new ImageAltTextRenderer, 10);
 
         $this->converter = new MarkdownConverter($environment);
     }
