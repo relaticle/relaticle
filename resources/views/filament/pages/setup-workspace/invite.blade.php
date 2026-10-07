@@ -62,8 +62,10 @@
                     wire:target="createInviteLink"
                     x-on:click="copy(() => {{ $writeInviteLink }})"
                 >
-                    <span x-show="! copied">{{ __('filament/pages/workspaces.setup_workspace.invite.copy_link') }}</span>
-                    <span x-show="copied" x-cloak>{{ __('workspaces.invite_link.copied') }}</span>
+                    <span aria-live="polite">
+                        <span x-show="! copied">{{ __('filament/pages/workspaces.setup_workspace.invite.copy_link') }}</span>
+                        <span x-show="copied" x-cloak>{{ __('workspaces.invite_link.copied') }}</span>
+                    </span>
                 </x-filament::button>
             @else
                 <x-filament::button
