@@ -51,6 +51,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
+use Relaticle\OnboardSeed\ModelSeeders\PeopleSeeder;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetupWorkspace::class, RunsMailboxSteps::class, RunsUseCaseStep::class, RunsInviteStep::class, SendsWorkspaceInvitations::class, SaveOnboardingSharing::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, MoveWorkspaceSetup::class);
@@ -406,6 +407,37 @@ it('keeps the use case and moves on to the invite step when the sample seeder fa
         ->onboarding_step->toBe(OnboardingStep::Invite)
         ->and($stage->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())
         ->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()))
+        ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
+});
+
+it('leaves no partial sample set when the sample seeder fails halfway', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    app()->bind(PeopleSeeder::class, fn (): ModelSeederInterface => new class implements ModelSeederInterface
+    {
+        public function seed(Workspace $workspace, Authenticatable $user): void
+        {
+            throw new RuntimeException('The people fixtures could not be read.');
+        }
+
+        public function customFields(): Collection
+        {
+            return collect();
+        }
+
+        public function initialize(): ModelSeederInterface
+        {
+            return $this;
+        }
+    });
+
+    $workspace = workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->fillForm(['onboarding_use_case' => OnboardingUseCase::Sales->value, 'onboarding_context' => ['outbound']])
+        ->call('saveUseCase')
+        ->assertHasNoFormErrors();
+
+    expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Invite)
         ->and(Company::query()->where('workspace_id', $workspace->getKey())->exists())->toBeFalse();
 });
 
