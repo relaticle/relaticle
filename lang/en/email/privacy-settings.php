@@ -13,17 +13,4 @@ return [
         'phrase' => 'I understand',
         'phrase_mismatch' => 'Type ":phrase" exactly to confirm.',
     ],
-    'sharing_preference' => [
-        'heading' => 'My email sharing preference',
-        'description' => 'Overrides the workspace default for emails you sync. Changes apply to existing synced emails that still follow your default. Emails you changed individually are left as they are.',
-        'tier_label' => 'Default sharing tier',
-        'use_workspace_default' => 'Use workspace default',
-        'workspace_default_description' => 'Follow whatever the workspace has set. Currently :tier',
-    ],
-    'actions' => [
-        'save' => 'Save',
-    ],
-    'notifications' => [
-        'saved' => 'Email privacy settings saved.',
-    ],
 ];

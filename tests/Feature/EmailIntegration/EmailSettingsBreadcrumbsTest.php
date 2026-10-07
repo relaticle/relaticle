@@ -8,7 +8,6 @@ use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsHeader;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
-use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 
 mutates(HasEmailSettingsHeader::class, EmailAccountsPage::class, ManageEmailTemplates::class);
@@ -19,14 +18,13 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentWorkspace);
 });
 
-it('renders a breadcrumb trail back to email settings on signature, privacy, and access-request pages', function (string $page, string $crumb): void {
+it('renders a breadcrumb trail back to email settings on signature and access-request pages', function (string $page, string $crumb): void {
     livewire($page)
         ->assertSeeHtml('fi-breadcrumbs')
         ->assertSeeHtml('href="'.e(EmailAccountsPage::getUrl()).'"')
         ->assertSee(__($crumb));
 })->with([
     [EmailSignaturesPage::class, 'filament/pages/email-signatures.title'],
-    [UserEmailPrivacyPage::class, 'filament/pages/user-email-privacy.navigation_label'],
     [EmailAccessRequestsPage::class, 'filament/pages/email-access-requests.navigation_label'],
 ]);
 

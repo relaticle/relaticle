@@ -46,7 +46,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     /**
      * Workspace email settings use the email.manage capability, which the owner
-     * and admins have. Other roles use the per-user My Email Privacy page.
+     * and admins have.
      *
      * @param  array<string, mixed>  $parameters
      */

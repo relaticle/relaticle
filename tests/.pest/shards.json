@@ -341,7 +341,6 @@
         "Tests\\Feature\\EmailIntegration\\StoreEmailJobTest": 5.8237,
         "Tests\\Feature\\EmailIntegration\\SyncQueueRoutingTest": 5.4343,
         "Tests\\Feature\\EmailIntegration\\UndoSendFlowTest": 5.4772,
-        "Tests\\Feature\\EmailIntegration\\UserEmailPrivacyPageTest": 7.9364,
         "Tests\\Feature\\EmailIntegration\\VisibleEmailScopeTest": 10.9273,
         "Tests\\Feature\\EmailIntegration\\VisibleMeetingScopeTest": 12.1011,
         "Tests\\Feature\\Email\\AccountAndWorkspaceNotificationsTest": 3.4023,

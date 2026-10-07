@@ -36,7 +36,6 @@ use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
-use Relaticle\EmailIntegration\Livewire\UserEmailPrivacySettings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -139,7 +138,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
-        Livewire::component('email-integration.user-email-privacy-settings', UserEmailPrivacySettings::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the

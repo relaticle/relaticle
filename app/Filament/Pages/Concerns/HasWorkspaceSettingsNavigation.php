@@ -22,7 +22,6 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
-use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
@@ -81,7 +80,6 @@ trait HasWorkspaceSettingsNavigation
                     ManageEmailTemplates::class,
                     EmailPrivacySettingsPage::class,
                     EmailSignaturesPage::class,
-                    UserEmailPrivacyPage::class,
                     EmailAccessRequestsPage::class,
                 ))
                 ->visible(fn (): bool => EmailAccountsPage::canAccess()),
