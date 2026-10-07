@@ -45,7 +45,8 @@ it('builds ONE per-item batch proposal holding every requested record id', funct
         ->and($pending->display_data['items'])->toHaveCount(3)
         ->and($payload['operation'])->toBe('delete')
         ->and($payload['data']['ids'])->toEqualCanonicalizing($ids)
-        ->and($payload['meta']['agent_should_stop'])->toBeTrue();
+        ->and($payload['meta']['agent_should_stop'])->toBeTrue()
+        ->and(array_keys($payload))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'skipped', 'display', 'meta']);
 });
 
 it('treats a single-element ids array as one record (_record_ids with one entry, Name field)', function (): void {

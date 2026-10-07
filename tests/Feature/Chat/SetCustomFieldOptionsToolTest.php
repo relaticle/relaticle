@@ -161,6 +161,7 @@ it('renames an option in place, keeping its id and the records on it', function 
 
     expect($decoded['type'])->toBe('pending_action')
         ->and($decoded['operation'])->toBe('update')
+        ->and(array_keys($decoded))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta'])
         ->and($decoded['data']['options'][0])->toBe(['id' => $leadId, 'name' => 'Prospect', 'was' => 'Lead'])
         ->and($decoded['display']['fields'])->toContain(['label' => 'Renamed', 'old' => 'Lead', 'new' => 'Prospect']);
 

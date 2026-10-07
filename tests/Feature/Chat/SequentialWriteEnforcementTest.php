@@ -134,7 +134,8 @@ it('write tool result includes agent_should_stop=true in meta', function (): voi
     $result = json_decode($resultJson, true);
 
     expect($result)->toHaveKey('meta')
-        ->and($result['meta']['agent_should_stop'] ?? null)->toBeTrue();
+        ->and($result['meta']['agent_should_stop'] ?? null)->toBeTrue()
+        ->and(array_keys($result))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta']);
 });
 
 it('system prompt chains the writes of one request and stops after the last', function (): void {

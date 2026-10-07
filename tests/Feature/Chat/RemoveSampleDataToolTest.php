@@ -68,6 +68,8 @@ it('proposes one removal listing the sample count of every entity', function ():
     $pending = PendingAction::query()->where('workspace_id', $this->workspace->getKey())->sole();
 
     expect($result['type'])->toBe('pending_action')
+        ->and(array_keys($result))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta'])
+        ->and($result['meta'])->toBe(['agent_should_stop' => true])
         ->and($pending->action_class)->toBe(RemoveSampleData::class)
         ->and($pending->operation)->toBe(PendingActionOperation::Delete)
         ->and($pending->entity_type)->toBe('sample_data')

@@ -14,6 +14,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
 use Relaticle\Chat\Tools\Concerns\WithConversationContext;
@@ -106,18 +107,10 @@ abstract class BaseWriteDeleteTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        return (string) json_encode([
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => class_basename($this->actionClass()),
-            'entity_type' => $this->entityType(),
-            'operation' => 'delete',
-            'data' => ['ids' => $foundIds],
-            'skipped' => $skipped,
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ], JSON_UNESCAPED_SLASHES);
+        return (string) json_encode(
+            PendingActionEnvelope::for($pending, class_basename($this->actionClass()), ['ids' => $foundIds], ['skipped' => $skipped]),
+            JSON_UNESCAPED_SLASHES,
+        );
     }
 
     /** @return list<string> */

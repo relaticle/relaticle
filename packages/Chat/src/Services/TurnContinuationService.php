@@ -64,6 +64,12 @@ final readonly class TurnContinuationService
             return false;
         }
 
+        $inFlight = TurnPresence::current($conversationId);
+
+        if ($inFlight !== null && $inFlight['turn_id'] === $resolvedTurnId && ($inFlight['retried'] ?? false)) {
+            return false;
+        }
+
         if (! Cache::add($this->dedupeKey($resolvedTurnId), true, self::DEDUPE_TTL_SECONDS)) {
             return false;
         }

@@ -181,3 +181,57 @@ it('does not let the second click of a double-click send the email that replaces
 
     expect($armed)->toBeTrue();
 });
+
+it('renders a streamed proposal the user already decided as a decided card and docks nothing', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'retried turn', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.messages = [];
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-decided',
+                    turn_id: 'turn-1',
+                    status: 'approved',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Call Lena"', fields: [] },
+                    meta: { agent_should_stop: false },
+                }),
+            });
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-open',
+                    turn_id: 'turn-1',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Email Lena"', fields: [] },
+                    meta: { agent_should_stop: true },
+                }),
+            });
+
+            const actions = data.messages.flatMap((m) => m.pending_actions || []);
+
+            return {
+                statuses: actions.map((a) => a.status),
+                docked: data.visiblePendingActions().map((a) => a.pending_action_id),
+            };
+        })();
+    JS);
+
+    expect($result)->toBe(['statuses' => ['approved', 'pending'], 'docked' => ['pa-open']]);
+});

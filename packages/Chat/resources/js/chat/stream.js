@@ -452,11 +452,12 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             const result = typeof event.result === 'string' ? JSON.parse(event.result) : event.result;
             if (result.type !== 'pending_action') return;
             // A retried job re-emits the same proposal (server collapses it to the
-            // same id), rendering it twice would show two identical cards.
+            // same id), rendering it twice would show two identical cards. A proposal
+            // the user already decided arrives with its status and renders as decided.
             const seen = this.messages.some((m) =>
                 (m.pending_actions || []).some((a) => a.pending_action_id === result.pending_action_id));
             if (seen) return;
-            result.status = 'pending';
+            result.status = result.status ?? 'pending';
             assistantMsg.pending_actions.push(result);
             this.scrollToBottom();
         } catch { /* not pending action JSON */ }

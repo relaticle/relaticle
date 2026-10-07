@@ -15,6 +15,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
@@ -233,17 +234,7 @@ abstract class BaseWriteCreateTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        $envelope = [
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => class_basename($this->actionClass()),
-            'entity_type' => $this->entityType(),
-            'operation' => 'create',
-            'data' => $pending->action_data,
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ];
+        $envelope = PendingActionEnvelope::for($pending, class_basename($this->actionClass()), $pending->action_data);
 
         return (string) json_encode($this->withSkippedRecords($envelope, $skipped), JSON_UNESCAPED_SLASHES);
     }

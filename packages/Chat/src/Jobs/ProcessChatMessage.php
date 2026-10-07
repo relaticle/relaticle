@@ -273,6 +273,12 @@ final class ProcessChatMessage implements ShouldQueue
         );
     }
 
+    private function releaseForRetry(int $delay): void
+    {
+        TurnPresence::markRetried($this->conversationId, $this->turnId);
+        $this->release($delay);
+    }
+
     private function streamTurn(CrmAssistant $agent, StreamEventBroadcaster $broadcaster, CreditService $creditService, float $startedAt): void
     {
         try {
@@ -394,7 +400,7 @@ final class ProcessChatMessage implements ShouldQueue
                     maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
                     delaySeconds: $delay,
                 ));
-                $this->release($delay);
+                $this->releaseForRetry($delay);
 
                 return;
             }

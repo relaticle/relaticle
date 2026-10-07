@@ -114,21 +114,10 @@ final readonly class PendingActionService
     ): PendingAction {
         $expiryMinutes = $this->expiryMinutesFor($conversationId);
 
-        // Idempotency across job retries. A continuation creates its proposal mid-stream; if a
-        // later chunk throws a transient error (429/529/503) the job is retried from the top and
-        // re-emits the identical tool call. Without this guard every retry inserts another
-        // duplicate proposal card. Collapse an identical still-pending proposal in the same
-        // conversation instead of inserting a duplicate. Only PENDING rows match, so an already
-        // approved/rejected proposal never absorbs a legitimate fresh one.
+        // A retried job re-emits its tool calls: reuse the identical pending proposal,
+        // or the one the user decided earlier in this same turn.
         if ($conversationId !== null) {
-            $duplicate = PendingAction::query()
-                ->where('conversation_id', $conversationId)
-                ->where('action_class', $actionClass)
-                ->where('operation', $operation)
-                ->where('entity_type', $entityType)
-                ->pending()
-                ->get()
-                ->first(fn (PendingAction $existing): bool => $this->withSortedKeys($existing->action_data) === $this->withSortedKeys($actionData));
+            $duplicate = $this->identicalProposal($conversationId, $turnId, $actionClass, $operation, $entityType, $actionData);
 
             if ($duplicate instanceof PendingAction) {
                 return $duplicate;
@@ -149,6 +138,32 @@ final readonly class PendingActionService
             'status' => PendingActionStatus::Pending,
             'expires_at' => now()->addMinutes($expiryMinutes),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $actionData
+     */
+    private function identicalProposal(string $conversationId, ?string $turnId, string $actionClass, PendingActionOperation $operation, string $entityType, array $actionData): ?PendingAction
+    {
+        $sameWrite = fn (): Builder => PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->where('action_class', $actionClass)
+            ->where('operation', $operation)
+            ->where('entity_type', $entityType);
+
+        $isIdentical = fn (PendingAction $existing): bool => $this->withSortedKeys($existing->action_data) === $this->withSortedKeys($actionData);
+
+        $pending = $sameWrite()->pending()->get()->first($isIdentical);
+
+        if ($pending instanceof PendingAction || $turnId === null) {
+            return $pending;
+        }
+
+        return $sameWrite()
+            ->where('turn_id', $turnId)
+            ->whereIn('status', [PendingActionStatus::Approved, PendingActionStatus::Rejected])
+            ->get()
+            ->first($isIdentical);
     }
 
     /**
