@@ -219,22 +219,24 @@ it('keeps each Boost guideline override a copy of the bundled file minus its pin
 it('keeps every action on the canonical single-execute() shape', function (): void {
     $root = dirname(__DIR__, 2);
 
-    $files = new RegexIterator(
-        new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/app/Actions')),
-        '/\.php$/',
-    );
+    $predatesTheCheck = [
+        'Relaticle\Chat\Actions\StoreChatAttachment',
+        'Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction',
+        'Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction',
+        'Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction',
+        'Relaticle\EmailIntegration\Actions\LinkEmailAction',
+    ];
 
     $violations = [];
 
-    foreach ($files as $file) {
-        $path = (string) $file;
-
-        // Fortify/Jetstream action shapes are dictated by their framework contracts.
+    foreach (phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]) as $path) {
         if (str_contains($path, '/Actions/Fortify/') || str_contains($path, '/Actions/Jetstream/')) {
             continue;
         }
 
-        $class = 'App\\'.str_replace(['/', '.php'], ['\\', ''], mb_substr($path, mb_strlen($root.'/app/')));
+        $class = str_starts_with($path, 'app/')
+            ? 'App\\'.str_replace(['/', '.php'], ['\\', ''], mb_substr($path, mb_strlen('app/')))
+            : 'Relaticle\\'.str_replace(['/src/', '/', '.php'], ['\\', '\\', ''], mb_substr($path, mb_strlen('packages/')));
 
         if (! class_exists($class)) {
             continue;
@@ -246,7 +248,6 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
             continue;
         }
 
-        // An action replacing a vendor class must keep that class's shape.
         if (str_starts_with((string) ($reflection->getParentClass() ?: null)?->getName(), 'Laravel\\')) {
             continue;
         }
@@ -266,9 +267,14 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
         }
     }
 
-    expect($violations)->toBe(
+    expect(array_diff_key($violations, array_flip($predatesTheCheck)))->toBe(
         [],
         'Actions expose exactly one public method, execute() (.ai/guidelines/relaticle/architecture.md). Fix: '.json_encode($violations),
+    );
+
+    expect(array_values(array_diff($predatesTheCheck, array_keys($violations))))->toBe(
+        [],
+        'These actions now have the single-execute() shape. Remove them from $predatesTheCheck.',
     );
 });
 
@@ -1019,7 +1025,7 @@ it('keeps reads out of the Actions folders', function (): void {
     );
 
     expect($offenders)->toBeEmpty(
-        'An action is a write. A reusable read is a *Query class under Queries (.ai/rules/queries.md): '.implode(', ', $offenders),
+        'A reusable read is a *Query class under Queries, never an action (.ai/rules/queries.md): '.implode(', ', $offenders),
     );
 });
 

@@ -46,16 +46,25 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
 
-## Actions (the write path)
+## Actions (business operations)
 
-Write operations (create, update, delete) that reach the domain from a transport
-surface go through action classes in `app/Actions/<Domain>/`. Never inline business
+An action is one business operation: a class that takes input, does something, and gives
+output. Most are writes. Write operations (create, update, delete) that reach the domain from
+a transport surface go through action classes in `app/Actions/<Domain>/`. Never inline business
 logic in controllers, MCP tools, Livewire components, or Filament resources.
 Actions are the single source of truth for business logic and side effects
 (notifications, syncs, etc.).
 
+A step or a rule that two actions share is an action too, and they inject it.
+`PrepareAgentEmailAction` checks the capability, the mailbox and the recipient limit, and
+`QueueAgentEmailAction` composes it. A reusable read that returns records is a query class,
+never an action.
+
 The canonical shape is `final readonly`, with a single `execute()` method and
-authorization plus tenant-ownership checks inside the action itself:
+authorization plus tenant-ownership checks inside the action itself.
+`tests/Arch/ConventionsTest.php` fails an action in `app/Actions` or in a package's `Actions`
+folder that exposes another public method. Five package actions predate the check. They are
+listed in that test, and the list only shrinks:
 
 ```php
 final readonly class CreateOpportunity
@@ -90,10 +99,14 @@ final readonly class CreateOpportunity
   reviewer reads for a data object that only ever meets `new`
 - Name domain concepts plainly (`Plan`, not `AiPlan`). Context comes from the
   namespace
+- `Support` holds code with no business rule in it: code that could ship as a standalone
+  package, such as `App\Support\EmailAddress`. A class that knows a capability, a role, a
+  sharing level or a workspace rule is an action, a query, a policy or a model method. No test
+  reads for this, so a reviewer reads for a `Support` class that knows one
 
 ## Queries (the read path)
 
-A reusable read is a query class. An action is a write. `tests/Arch/ConventionsTest.php` fails a
+A reusable read is a query class, never an action. `tests/Arch/ConventionsTest.php` fails a
 class under `Actions` named `List*`, `Find*`, `Search*`, `Get*` or `Aggregate*` ("keeps reads out
 of the Actions folders").
 
