@@ -2,7 +2,7 @@
 title: Use your email with an AI assistant
 description: Let Claude, ChatGPT, or another connected assistant read email you can see, save drafts, and send for you with a five minute window to cancel.
 order: 9
-updated: "2026-10-06"
+updated: "2026-10-07"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/ai-assistant/connect-claude-or-chatgpt, help/workspace/manage-members-and-roles]
 ---
 
@@ -50,8 +50,8 @@ The level names are the ones in
 |---|---|
 | Your own email | Everything, including BCC recipients. |
 | **Full access** | The sender, the To and CC recipients, the subject, the message text, and the names of attachments. |
-| **Subject line and metadata** | The sender, the To recipients, the subject, and the time. |
-| **Metadata only** | The sender, the To recipients, and the time. |
+| **Subject line and participants** | The sender, the To recipients, the subject, and the time. |
+| **Participants only** | The sender, the To recipients, and the time. |
 | **Private** | Nothing. The email does not appear. |
 
 A very long message is cut, and the assistant is told it was cut. It never
