@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use App\Notifications\WorkspaceMemberRemovedNotification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Jetstream\Events\TeamMemberRemoved;
@@ -214,4 +215,27 @@ test('removing a member leaves a teammate mailbox connected', function () {
     resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
 
     expect($ownersMailbox->fresh()->trashed())->toBeFalse();
+});
+
+test('removing a member disconnects their other mailboxes when one disconnect fails', function () {
+    Http::fake();
+    Exceptions::fake();
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $failing = syncingMailbox($member, $workspace, ['email_address' => 'first@northwind.test']);
+    $other = syncingMailbox($member, $workspace, ['email_address' => 'second@northwind.test']);
+
+    ConnectedAccount::deleting(function (ConnectedAccount $mailbox) use ($failing): void {
+        throw_if($mailbox->is($failing), RuntimeException::class, 'The disconnect failed.');
+    });
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect($member->fresh()->belongsToWorkspace($workspace))->toBeFalse()
+        ->and(ConnectedAccount::withTrashed()->findOrFail($other->getKey())->trashed())->toBeTrue()
+        ->and($failing->fresh()->trashed())->toBeFalse();
+
+    Exceptions::assertReported(RuntimeException::class);
 });
