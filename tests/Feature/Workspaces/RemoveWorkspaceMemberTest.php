@@ -16,9 +16,12 @@ use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 mutates(User::class);
 
@@ -238,4 +241,29 @@ test('removing a member disconnects their other mailboxes when one disconnect fa
         ->and($failing->fresh()->trashed())->toBeFalse();
 
     Exceptions::assertReported(RuntimeException::class);
+});
+
+test('removing a member cancels the mail they had queued and leaves a teammate mail queued', function () {
+    Http::fake();
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+
+    $queue = fn (User $sender): Email => Email::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $sender->getKey(),
+        'connected_account_id' => syncingMailbox($sender, $workspace)->getKey(),
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::QUEUED,
+        'scheduled_for' => now()->addDay(),
+    ]);
+
+    $membersMail = $queue($member);
+    $ownersMail = $queue($owner);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect(Email::withoutGlobalScope(ActiveAccountScope::class)->findOrFail($membersMail->getKey())->status)->toBe(EmailStatus::CANCELLED)
+        ->and($ownersMail->fresh()->status)->toBe(EmailStatus::QUEUED);
 });

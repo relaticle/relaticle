@@ -5,7 +5,11 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 mutates(DisconnectFormerMemberMailboxesCommand::class);
 
@@ -59,4 +63,23 @@ it('disconnects only the mailboxes whose owner left the workspace', function ():
     $this->artisan('email:disconnect-former-member-mailboxes', ['--force' => true])
         ->expectsOutputToContain('0 mailbox(es) of former members disconnected.')
         ->assertSuccessful();
+});
+
+it('cancels the mail a former member had queued', function (): void {
+    $queued = Email::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->former->getKey(),
+        'connected_account_id' => $this->formerMailbox->getKey(),
+        'direction' => EmailDirection::OUTBOUND,
+        'status' => EmailStatus::QUEUED,
+        'scheduled_for' => now()->addDay(),
+    ]);
+
+    $this->artisan('email:disconnect-former-member-mailboxes')->assertSuccessful();
+
+    expect($queued->fresh()->status)->toBe(EmailStatus::QUEUED);
+
+    $this->artisan('email:disconnect-former-member-mailboxes', ['--force' => true])->assertSuccessful();
+
+    expect(Email::withoutGlobalScope(ActiveAccountScope::class)->findOrFail($queued->getKey())->status)->toBe(EmailStatus::CANCELLED);
 });
