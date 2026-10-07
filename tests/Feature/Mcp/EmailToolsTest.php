@@ -754,6 +754,17 @@ it('escapes raw html in a draft body', function (): void {
         ->toContain('<strong>safe</strong>');
 });
 
+it('keeps merge tags literal in a draft body', function (): void {
+    $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
+        'body' => 'Dated {today} and {{ today }} and {first_name}',
+    ]));
+
+    $html = Email::query()->with('body')->findOrFail($data['id'])->body->body_html;
+
+    expect(html_entity_decode(strip_tags($html)))->toBe('Dated {today} and {{ today }} and {first_name}')
+        ->and($html)->not->toContain(now()->toFormattedDateString());
+});
+
 it('drops an unsafe link and keeps a single line break in a draft body', function (): void {
     $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
         'body' => "Thanks,\nDana [click](javascript:alert(1)) [site](https://acme.test)",
@@ -1242,6 +1253,42 @@ it('escapes raw html in a sent body', function (): void {
         ->not->toContain('<script')
         ->not->toContain('<img')
         ->toContain('<strong>safe</strong>');
+});
+
+it('keeps merge tags literal in a sent body', function (): void {
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, [
+        'body' => 'Dated {today} and {{ today }} and {first_name}',
+    ]));
+
+    $html = Email::query()->with('body')->findOrFail($data['id'])->body->body_html;
+
+    expect(html_entity_decode(strip_tags($html)))->toBe('Dated {today} and {{ today }} and {first_name}')
+        ->and($html)->not->toContain(now()->toFormattedDateString());
+});
+
+it('fills a merge tag in the mailbox signature while the body keeps its own literal', function (): void {
+    EmailSignature::factory()->default()->create([
+        'connected_account_id' => $this->viewerAccount->id,
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'content_html' => '<p>Dana, {today}</p>',
+    ]);
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['body' => 'Dated {today}']));
+
+    expect(Email::query()->with('body')->findOrFail($data['id'])->body->body_html)
+        ->toContain('Dated {today}')
+        ->toContain('<p>Dana, '.now()->toFormattedDateString().'</p>');
+});
+
+it('keeps a link whose address holds braces working in a sent body', function (): void {
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, [
+        'body' => 'Read [the docs](https://acme.test/a/{id}) now',
+    ]));
+
+    expect(Email::query()->with('body')->findOrFail($data['id'])->body->body_html)
+        ->toContain('<a href="https://acme.test/a/%7Bid%7D">the docs</a>')
+        ->not->toContain(now()->toFormattedDateString());
 });
 
 it('tells the user an email is held, with a way to cancel it', function (): void {
