@@ -476,6 +476,7 @@ it('returns an excerpt of a long rich text change, not the whole body', function
         'causer_type' => 'user',
         'causer_id' => $this->user->getKey(),
         'workspace_id' => $this->workspace->getKey(),
+        'attribute_changes' => ['attributes' => ['name' => str_repeat('n', 600)], 'old' => ['name' => 'Acme']],
         'properties' => ['custom_field_changes' => [[
             'code' => 'description',
             'label' => 'Description',
@@ -489,8 +490,10 @@ it('returns an excerpt of a long rich text change, not the whole body', function
         ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
-            ->where('items.0.changes.0.field', 'Description')
-            ->where('items.0.changes.0.old', 'Draft')
-            ->where('items.0.changes.0.new', fn (string $new): bool => str_ends_with($new, '(shortened)') && mb_strlen($new) < 600)
+            ->where('items.0.changes.0.field', 'Name')
+            ->where('items.0.changes.0.new', fn (string $new): bool => str_ends_with($new, '(shortened)'))
+            ->where('items.0.changes.1.field', 'Description')
+            ->where('items.0.changes.1.old', 'Draft')
+            ->where('items.0.changes.1.new', fn (string $new): bool => str_ends_with($new, '(shortened)') && mb_strlen($new) < 600)
             ->etc());
 });

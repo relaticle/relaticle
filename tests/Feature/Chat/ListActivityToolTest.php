@@ -548,6 +548,7 @@ it('hands the model an excerpt of a long rich text change, not the whole body', 
         'causer_type' => 'user',
         'causer_id' => $this->user->getKey(),
         'workspace_id' => $company->workspace_id,
+        'attribute_changes' => ['attributes' => ['name' => str_repeat('n', 600)], 'old' => ['name' => 'Acme']],
         'properties' => ['custom_field_changes' => [[
             'code' => 'description',
             'label' => 'Description',
@@ -562,9 +563,11 @@ it('hands the model an excerpt of a long rich text change, not the whole body', 
         'record_id' => (string) $company->getKey(),
     ]);
 
-    $change = collect(array_merge(...array_column($payload['data'], 'changes')))->firstWhere('field', 'Description');
+    $changes = collect(array_merge(...array_column($payload['data'], 'changes')));
+    $change = $changes->firstWhere('field', 'Description');
 
     expect($change['old'])->toBe('Draft')
+        ->and($changes->firstWhere('field', 'Name')['new'])->toEndWith('(shortened)')
         ->and($change['new'])->toStartWith('a renewal note')
         ->and($change['new'])->toEndWith('(shortened)')
         ->and(mb_strlen((string) $change['new']))->toBeLessThan(600);
