@@ -37,6 +37,7 @@ return [
             'email_read' => 'Read the email you can see in this workspace',
             'email_draft' => 'Save email drafts for you to review',
             'email_send' => 'Send email as you, after a hold you can cancel',
+            'none' => 'Your role in this workspace allows nothing :client asked for.',
             'excluded' => 'It cannot reach your other workspaces, workspace members, billing, or account settings.',
         ],
 

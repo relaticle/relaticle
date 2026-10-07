@@ -70,6 +70,8 @@
                 }
 
                 $selectedAbilities = $abilitiesByWorkspace[$selectedWorkspaceId] ?? [];
+
+                $grantsNothingAsked = $permissions->every(fn (array $permission): bool => array_intersect($permission['abilities'], $selectedAbilities) === []);
             @endphp
 
             <!-- Header -->
@@ -144,7 +146,20 @@
                         <div>
                             <h2 id="permissions-heading" class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.heading', ['client' => $client->name]) }}</h2>
 
-                            <ul class="mt-2 space-y-1.5" aria-labelledby="permissions-heading" aria-live="polite">
+                            <p
+                                id="consentNone"
+                                @if(! $grantsNothingAsked) hidden @endif
+                                role="status"
+                                class="mt-2 text-sm text-gray-700 dark:text-gray-300"
+                            >{{ __('mcp.consent.permissions.none', ['client' => $client->name]) }}</p>
+
+                            <ul
+                                id="permissionList"
+                                @if($grantsNothingAsked) hidden @endif
+                                class="mt-2 space-y-1.5"
+                                aria-labelledby="permissions-heading"
+                                aria-live="polite"
+                            >
                                 @foreach($permissions as $permission)
                                     <li
                                         data-abilities-any="{{ implode(' ', $permission['abilities']) }}"
@@ -197,7 +212,7 @@
                     <input type="hidden" name="state" value="{{ $request->state }}">
                     <input type="hidden" name="client_id" value="{{ $client->id }}">
                     <input type="hidden" name="auth_token" value="{{ $authToken }}">
-                    <button type="submit" @disabled($workspaces->count() === 0 || $workspaces->count() === count($pausedWorkspaceIds)) class="inline-flex h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50" id="authorizeButton">
+                    <button type="submit" @disabled($workspaces->count() === 0 || $workspaces->count() === count($pausedWorkspaceIds) || $grantsNothingAsked) class="inline-flex h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50" id="authorizeButton">
                         <svg id="loadingSpinner" class="hidden size-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -226,8 +241,11 @@
         const authorizeText = document.getElementById('authorizeText');
         const loadingSpinner = document.getElementById('loadingSpinner');
 
+        let submitting = false;
+
         form.addEventListener('submit', function(e) {
             // Show loading state...
+            submitting = true;
             button.disabled = true;
             authorizeText.textContent = @js(__('mcp.consent.actions.authorizing'));
             loadingSpinner.classList.remove('hidden');
@@ -253,6 +271,8 @@
         });
 
         const permissions = document.querySelectorAll('[data-abilities-any]');
+        const permissionList = document.getElementById('permissionList');
+        const nothingAllowed = document.getElementById('consentNone');
 
         const workspaceRadios = document.querySelectorAll('input[type="radio"][name="workspace_id"]');
 
@@ -266,12 +286,21 @@
             }
 
             const held = checked.dataset.abilities.split(' ');
+            let listed = 0;
 
             permissions.forEach(function(permission) {
                 permission.hidden = ! permission.dataset.abilitiesAny.split(' ').some(function(ability) {
                     return held.includes(ability);
                 });
+
+                if (! permission.hidden) {
+                    listed++;
+                }
             });
+
+            permissionList.hidden = listed === 0;
+            nothingAllowed.hidden = listed !== 0;
+            button.disabled = submitting || listed === 0;
         }
 
         workspaceRadios.forEach(function(radio) {

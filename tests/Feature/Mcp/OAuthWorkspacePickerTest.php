@@ -840,6 +840,98 @@ it('grants a workspace owner every record scope a REST client asks for', functio
     expect(liveTokenScopes())->toEqualCanonicalizing(['read', 'delete']);
 });
 
+it('names the granted scope in the token response', function (): void {
+    $consent = consentToWorkspace($this->user, $this->client, $this->personalWorkspace);
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'code_verifier' => $consent['verifier'],
+        'code' => $consent['code'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'mcp:use email:read email:draft email:send');
+});
+
+it('names the trimmed scope, not the requested one, in the token response', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $consent = consentToWorkspace($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'code_verifier' => $consent['verifier'],
+        'code' => $consent['code'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'read');
+});
+
+it('names the granted scope when the client refreshes its access token', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+        'refresh_token' => $tokens['refresh_token'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'mcp:use email:read email:draft email:send');
+});
+
+it('redirects the client with access_denied and mints nothing when the role grants nothing it asked for', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $this->actingAs($this->user->refresh());
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk();
+
+    $location = (string) $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertRedirect()->headers->get('Location');
+
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+    expect($location)->toStartWith('https://example.com/callback')
+        ->and($query['error'])->toBe('access_denied')
+        ->and($query['state'])->toBe('test-state')
+        ->and(DB::table('oauth_auth_codes')->count())->toBe(0)
+        ->and(DB::table('oauth_access_tokens')->count())->toBe(0);
+});
+
+it('swaps the list for one sentence and disables Authorize when the role grants nothing the client asked for', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+    $this->user->refresh()->switchWorkspace($this->otherWorkspace);
+
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk()->getContent();
+
+    expect($content)
+        ->toContain('Your role in this workspace allows nothing Test MCP Client asked for.')
+        ->toMatch('/id="permissionList"\s+hidden/')
+        ->not->toMatch('/id="consentNone"\s+hidden/')
+        ->toMatch('/<button type="submit"\s+disabled\s+class=/');
+});
+
+it('keeps the list and an enabled Authorize when the role grants what the client asked for', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk()->getContent();
+
+    expect($content)
+        ->not->toMatch('/id="permissionList"\s+hidden/')
+        ->toMatch('/id="consentNone"\s+hidden/')
+        ->not->toMatch('/<button type="submit"\s+disabled/')
+        ->and(shownConsentLines($content))->toBe(['delete']);
+});
+
 function reportedAbilities(string $accessToken): array
 {
     return json_decode(whoAmI($accessToken), true)['result']['structuredContent']['token_abilities'];
