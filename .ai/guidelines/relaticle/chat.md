@@ -29,6 +29,11 @@ production: message ordering, approval races, duplicate proposals.
   single card and approved once (`ProposalPlanService`). A new foreign key on a
   write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
   it will accept neither reference validation nor ownership checks.
+- A write that leaves the workspace is approved on its own. `SendEmailTool` takes
+  one email per call, and `PendingAction::needsOwnApproval()` owns that fact.
+  `ProposalPlanService::approveAll()` skips such a step: it stays pending, shown in
+  full, with its own Send button. `tests/Feature/Chat/EmailToolsTest.php` fails when
+  "Approve all" or its shortcut sends an email.
 - Resolve a reference only at approval time (`PlanReferenceResolver`), never at
   proposal time, and never let a `$ref` fall out of a card's display: a plan card
   that hides the link being approved is the failure this design exists to
