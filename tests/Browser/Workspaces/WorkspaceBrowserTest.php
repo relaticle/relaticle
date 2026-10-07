@@ -23,6 +23,7 @@ it('can create a new workspace through the browser', function (): void {
         ->waitForText('Start with the people you already email')
         ->assertPathIs('/app/second-workspace/setup')
         ->assertDontSee('How did you hear about us?')
+        ->waitForEvent('load')
         ->press("I'll add people and companies myself")
         ->waitForText('Continue without your mailbox?')
         ->press('button:visible:has-text("Yes, I\'m sure")')
