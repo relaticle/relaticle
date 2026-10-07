@@ -87,7 +87,7 @@ trait ChecksTokenAbility
 
         if ($token instanceof PassportAccessToken) {
             return $token->can(Registrar::OAUTH_SCOPE)
-                ? $this->abilitiesTheRoleGrants($emailAbilities)
+                ? $this->abilitiesTheRoleGrants([...WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), ...$emailAbilities])
                 : [];
         }
 
@@ -97,7 +97,7 @@ trait ChecksTokenAbility
                 fn (string $ability): bool => EmailGrant::tryFrom($ability) === null,
             );
 
-            return [...array_values($otherAbilities), ...$emailAbilities];
+            return $this->abilitiesTheRoleGrants([...array_values($otherAbilities), ...$emailAbilities]);
         }
 
         return ['*'];
@@ -123,10 +123,10 @@ trait ChecksTokenAbility
     }
 
     /**
-     * @param  list<string>  $emailAbilities
+     * @param  list<string>  $abilities
      * @return list<string>
      */
-    private function abilitiesTheRoleGrants(array $emailAbilities): array
+    private function abilitiesTheRoleGrants(array $abilities): array
     {
         $user = auth()->user();
 
@@ -135,8 +135,8 @@ trait ChecksTokenAbility
         }
 
         return array_values(array_intersect(
-            [...WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), ...$emailAbilities],
-            $user->grantableTokenPermissions($user->currentWorkspace?->getKey()),
+            $abilities,
+            [...$user->grantableTokenPermissions($user->currentWorkspace?->getKey()), '*'],
         ));
     }
 }
