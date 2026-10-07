@@ -16,7 +16,6 @@ use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
-use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Throwable;
@@ -29,7 +28,6 @@ final readonly class QueueAgentEmailAction
         private SendEmailAction $sendEmail,
         private AgentEmailBody $body,
         private VisibleEmailsQuery $emails,
-        private PrivacyService $privacy,
         private QueuedSendNotifier $notifier,
         private CancelQueuedEmailAction $cancelEmail,
     ) {}
@@ -89,7 +87,6 @@ final readonly class QueueAgentEmailAction
             'bcc' => $this->recipients($data['bcc'] ?? []),
             'in_reply_to_email_id' => $replyTo?->getKey(),
             'creation_source' => $source,
-            'privacy_tier' => $this->privacy->tierForMailbox($account),
             'batch_id' => null,
             'priority' => EmailPriority::PRIORITY,
             'scheduled_for' => now()->addSeconds($holdSeconds),

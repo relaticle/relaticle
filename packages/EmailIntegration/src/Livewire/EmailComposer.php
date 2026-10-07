@@ -544,7 +544,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
                     'in_reply_to_email_id' => $this->inReplyToEmailId,
                     'creation_source' => $this->creationSource(),
-                    'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
+                    ...$this->chosenPrivacyTier(),
                     'batch_id' => null,
                     // Interactive sends from the composer keep the undo-send window.
                     'priority' => EmailPriority::PRIORITY,
@@ -645,7 +645,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'connected_account_id' => (string) $this->accountId,
                 'subject' => (string) $this->subject,
                 'body_html' => $bodyHtml,
-                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
+                ...$this->chosenPrivacyTier(),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
                 'attachment_attributes' => $attachmentAttributes,
@@ -1674,6 +1674,20 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $signature = $this->defaultSignatureFor($value);
         $this->signatureId = $signature?->getKey();
         $this->updatedSignatureId($this->signatureId);
+    }
+
+    /**
+     * @return array{privacy_tier?: EmailPrivacyTier}
+     */
+    private function chosenPrivacyTier(): array
+    {
+        $mailbox = $this->activeAccounts()->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->accountId);
+
+        if ($mailbox instanceof ConnectedAccount && $this->privacyTier === resolve(PrivacyService::class)->tierForMailbox($mailbox)->value) {
+            return [];
+        }
+
+        return ['privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier)];
     }
 
     private function useMailboxSharingTier(ConnectedAccount $account): void

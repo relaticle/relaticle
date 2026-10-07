@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\User;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -49,7 +50,7 @@ final readonly class SendEmailAction
      *     bcc?: array<array{email: string, name: ?string}>,
      *     in_reply_to_email_id?: ?string,
      *     creation_source: EmailCreationSource,
-     *     privacy_tier: EmailPrivacyTier,
+     *     privacy_tier?: EmailPrivacyTier,
      *     batch_id?: ?string,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
@@ -150,7 +151,7 @@ final readonly class SendEmailAction
                 'folder' => EmailFolder::Sent,
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
-                'privacy_tier' => $data['privacy_tier'],
+                ...Arr::only($data, ['privacy_tier']),
                 'has_attachments' => $hasDownloadableAttachments,
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],

@@ -13,14 +13,12 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailBatch;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
-use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class SendEmailBatchAction
 {
     public function __construct(
         private EmailTemplateRenderService $renderService,
         private SendEmailAction $sendEmail,
-        private PrivacyService $privacy,
     ) {}
 
     /**
@@ -51,14 +49,12 @@ final readonly class SendEmailBatchAction
         // Authorize the sender owns the chosen account in the current workspace; the
         // per-recipient People records are this workspace's own selection from the
         // PeopleResource table, already tenant-scoped by Filament.
-        $account = ConnectedAccount::query()
+        ConnectedAccount::query()
             ->ownedBy($user, $user->currentWorkspace)
             ->whereKey($accountId)
             ->firstOrFail();
 
-        $privacyTier = $payload['privacy_tier'] ?? $this->privacy->tierForMailbox($account);
-
-        return DB::transaction(function () use ($user, $recipients, $payload, $accountId, $privacyTier): EmailBatch {
+        return DB::transaction(function () use ($user, $recipients, $payload, $accountId): EmailBatch {
             $batch = EmailBatch::query()->create([
                 'workspace_id' => $user->currentWorkspace?->getKey(),
                 'user_id' => $user->getKey(),
@@ -82,7 +78,7 @@ final readonly class SendEmailBatchAction
                         'bcc' => [],
                         'in_reply_to_email_id' => null,
                         'creation_source' => EmailCreationSource::MASS_SEND,
-                        'privacy_tier' => $privacyTier,
+                        ...(isset($payload['privacy_tier']) ? ['privacy_tier' => $payload['privacy_tier']] : []),
                         'batch_id' => $batch->getKey(),
                         'attachments' => $payload['attachments'] ?? [],
                         'attachment_file_names' => $payload['attachment_file_names'] ?? [],
