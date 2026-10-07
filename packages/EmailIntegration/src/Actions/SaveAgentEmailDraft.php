@@ -13,15 +13,15 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 
-final readonly class SaveAgentEmailDraftAction
+final readonly class SaveAgentEmailDraft
 {
     public const array RULES = [
         'connected_account_id' => ['required', 'string', 'max:64'],
-        'to' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+        'to' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
         'to.*' => ['required', 'string', 'email', 'max:255'],
-        'cc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+        'cc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
         'cc.*' => ['required', 'string', 'email', 'max:255'],
-        'bcc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+        'bcc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
         'bcc.*' => ['required', 'string', 'email', 'max:255'],
         'subject' => ['sometimes', 'nullable', 'string', 'max:255'],
         'body' => ['sometimes', 'nullable', 'string', 'max:50000'],

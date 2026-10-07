@@ -20,7 +20,7 @@ final readonly class QueueAgentEmailAction
 
     public function __construct(
         private SendEmailAction $sendEmail,
-        private PrepareAgentEmailAction $prepareEmail,
+        private PrepareAgentEmail $prepareEmail,
         private QueuedSendNotifier $notifier,
         private CancelQueuedEmailAction $cancelEmail,
     ) {}

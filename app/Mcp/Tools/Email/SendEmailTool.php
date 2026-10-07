@@ -16,7 +16,7 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Relaticle\EmailIntegration\Actions\PrepareAgentEmailAction;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
@@ -38,7 +38,7 @@ final class SendEmailTool extends Tool
     {
         return [
             'connected_account_id' => $schema->string()->description('The mailbox to send from, from the list email accounts tool. It must have can_send true.')->required(),
-            'to' => $schema->array()->items($schema->string())->description('Recipient email addresses. At most '.PrepareAgentEmailAction::MAX_RECIPIENTS.' recipients in total across to, cc and bcc.')->required(),
+            'to' => $schema->array()->items($schema->string())->description('Recipient email addresses. At most '.PrepareAgentEmail::MAX_RECIPIENTS.' recipients in total across to, cc and bcc.')->required(),
             'cc' => $schema->array()->items($schema->string())->description('CC email addresses.'),
             'bcc' => $schema->array()->items($schema->string())->description('BCC email addresses.'),
             'subject' => $schema->string()->description('Subject line, up to 255 characters.')->required(),
@@ -72,9 +72,9 @@ final class SendEmailTool extends Tool
 
         /** @var array{connected_account_id: string, to: list<string>, cc?: list<string>, bcc?: list<string>, subject: string, body: string, include_signature?: bool|int|string, in_reply_to_email_id?: string} $validated */
         $validated = $request->validate($this->rules(), [
-            'to.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
-            'cc.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
-            'bcc.max' => PrepareAgentEmailAction::RECIPIENT_LIMIT_MESSAGE,
+            'to.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
+            'cc.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
+            'bcc.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
         ]);
 
         if (array_key_exists('include_signature', $validated)) {
@@ -104,11 +104,11 @@ final class SendEmailTool extends Tool
     {
         return [
             'connected_account_id' => ['required', 'string', 'max:64'],
-            'to' => ['required', 'array', 'list', 'min:1', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+            'to' => ['required', 'array', 'list', 'min:1', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
             'to.*' => ['required', 'string', 'email', 'max:255'],
-            'cc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+            'cc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
             'cc.*' => ['required', 'string', 'email', 'max:255'],
-            'bcc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmailAction::MAX_RECIPIENTS],
+            'bcc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
             'bcc.*' => ['required', 'string', 'email', 'max:255'],
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string', 'max:50000'],

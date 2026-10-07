@@ -11,7 +11,7 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\Concerns\NormalizesToolInput;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
-use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
@@ -22,7 +22,7 @@ final readonly class CreateEmailDraftTool implements Tool
     use NormalizesToolInput;
     use ReportsValidationFailures;
 
-    public function __construct(private SaveAgentEmailDraftAction $saveDraft) {}
+    public function __construct(private SaveAgentEmailDraft $saveDraft) {}
 
     public function description(): string
     {
@@ -51,7 +51,7 @@ final readonly class CreateEmailDraftTool implements Tool
 
         try {
             /** @var array{connected_account_id: string, to?: list<string>, cc?: list<string>, bcc?: list<string>, subject?: ?string, body?: ?string, include_signature?: bool, in_reply_to_email_id?: string} $validated */
-            $validated = $this->withoutNullArguments($request)->validate(SaveAgentEmailDraftAction::RULES);
+            $validated = $this->withoutNullArguments($request)->validate(SaveAgentEmailDraft::RULES);
 
             $draft = $this->saveDraft->execute($user, $validated, EmailCreationSource::CHAT);
         } catch (ValidationException $exception) {

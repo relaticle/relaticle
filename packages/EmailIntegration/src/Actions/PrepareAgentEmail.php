@@ -15,7 +15,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 
-final readonly class PrepareAgentEmailAction
+final readonly class PrepareAgentEmail
 {
     public const int MAX_RECIPIENTS = 20;
 

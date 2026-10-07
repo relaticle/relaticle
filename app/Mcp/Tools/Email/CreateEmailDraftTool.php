@@ -15,7 +15,7 @@ use Laravel\Mcp\ResponseFactory;
 use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
-use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
 
@@ -54,7 +54,7 @@ final class CreateEmailDraftTool extends Tool
         ];
     }
 
-    public function handle(Request $request, SaveAgentEmailDraftAction $saveDraft): Response|ResponseFactory
+    public function handle(Request $request, SaveAgentEmailDraft $saveDraft): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenLacks(EmailGrant::Draft)) instanceof Response) {
             return $denied;
@@ -64,7 +64,7 @@ final class CreateEmailDraftTool extends Tool
         $user = auth()->user();
 
         /** @var array{connected_account_id: string, to?: list<string>, cc?: list<string>, bcc?: list<string>, subject?: ?string, body?: ?string, include_signature?: bool, in_reply_to_email_id?: string} $validated */
-        $validated = $request->validate(SaveAgentEmailDraftAction::RULES);
+        $validated = $request->validate(SaveAgentEmailDraft::RULES);
 
         try {
             $draft = $saveDraft->execute($user, $validated, EmailCreationSource::MCP);
