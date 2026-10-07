@@ -13,6 +13,6 @@ final readonly class SharingQuestion
     public static function appliesTo(User $user, Workspace $workspace): bool
     {
         return $user->default_email_sharing_tier === null
-            && ! ConnectedAccount::hasConnectedOutside($user, $workspace);
+            && ! ConnectedAccount::hasMailboxOutside($user, $workspace);
     }
 }
