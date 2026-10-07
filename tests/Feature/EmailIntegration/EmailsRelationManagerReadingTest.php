@@ -508,6 +508,51 @@ describe('subject privacy enforcement', function (): void {
             ->assertDontSee('(subject hidden)');
     });
 
+    it('keeps the opening of the message out of the reader for a viewer at the subject level', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Renewal terms',
+            'snippet' => 'The discount is forty percent',
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $email->getKey())
+            ->assertSee('Renewal terms')
+            ->assertDontSee('The discount is forty percent');
+    });
+
+    it('shows the opening of the message in the reader to a viewer with full access', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Renewal terms',
+            'snippet' => 'The discount is forty percent',
+            'privacy_tier' => EmailPrivacyTier::FULL,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $email->getKey())
+            ->assertSee('The discount is forty percent');
+    });
+
     it('does not match a guessed subject when the viewer cannot view the subject', function (): void {
         $this->actingAs($this->viewer);
 

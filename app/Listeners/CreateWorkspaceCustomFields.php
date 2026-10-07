@@ -9,10 +9,7 @@ use App\Enums\CustomFields\NoteField as NoteCustomField;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
 use App\Enums\CustomFields\PeopleField as PeopleCustomField;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
-use App\Enums\CustomFieldType;
-use App\Enums\OnboardingUseCase;
 use App\Events\WorkspaceCreated;
-use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -21,16 +18,12 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\Workspace;
+use App\Onboarding\FieldOptionRows;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
-use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
-use Relaticle\CustomFields\Exceptions\FieldTypeNotOptionableException;
 use Relaticle\CustomFields\Facades\Entities;
 use Relaticle\CustomFields\Services\Visibility\BackendVisibilityService;
-use Relaticle\OnboardSeed\OnboardSeeder;
 
 final readonly class CreateWorkspaceCustomFields
 {
@@ -43,38 +36,12 @@ final readonly class CreateWorkspaceCustomFields
         Task::class => TaskCustomField::class,
     ];
 
-    public function __construct(
-        private OnboardSeeder $onboardSeeder,
-    ) {}
-
     public function handle(WorkspaceCreated $event): void
     {
-        $workspace = $event->workspace;
-
-        $stagePreset = $workspace->onboarding_use_case instanceof OnboardingUseCase
-            ? $workspace->onboarding_use_case->pipelineStages()
-            : null;
-
-        $this->seedDefaultFields($workspace, $stagePreset);
-
-        if ($workspace->isPersonalWorkspace() && Feature::active(OnboardSeed::class)) {
-            $workspace->loadMissing('owner');
-
-            /** @var Authenticatable $owner */
-            $owner = $workspace->owner;
-
-            $fixtureSet = $workspace->onboarding_use_case instanceof OnboardingUseCase
-                ? $workspace->onboarding_use_case->getFixtureSet()
-                : 'sales';
-
-            $this->onboardSeeder->run($owner, $workspace, $fixtureSet);
-        }
+        $this->seedDefaultFields($event->workspace);
     }
 
-    /**
-     * @param  array<string, string>|null  $stagePreset
-     */
-    private function seedDefaultFields(Workspace $workspace, ?array $stagePreset): void
+    private function seedDefaultFields(Workspace $workspace): void
     {
         $now = now();
         $fields = [];
@@ -87,16 +54,14 @@ final readonly class CreateWorkspaceCustomFields
 
             foreach ($enumClass::cases() as $enum) {
                 $field = $this->fieldRow($workspace, $entityType, $enum, $now);
-                $colors = $enum === OpportunityCustomField::STAGE ? $stagePreset : null;
-                $names = $colors !== null ? array_keys($colors) : $enum->getOptions();
-
                 $fields[] = $field;
 
-                array_push($options, ...$this->optionRows(
-                    $workspace,
-                    $field,
-                    $names ?? [],
-                    $colors ?? $enum->getOptionColors() ?? [],
+                array_push($options, ...FieldOptionRows::build(
+                    (string) $workspace->getKey(),
+                    $field['id'],
+                    (string) $field['type'],
+                    $enum->getOptions() ?? [],
+                    $enum->getOptionColors() ?? [],
                     $now,
                 ));
             }
@@ -146,39 +111,5 @@ final readonly class CreateWorkspaceCustomFields
             'created_at' => $now,
             'updated_at' => $now,
         ])->getAttributes();
-    }
-
-    /**
-     * @param  array<string, mixed>  $field
-     * @param  array<int|string, string>  $names
-     * @param  array<string, string>  $colors
-     * @return list<array<string, mixed>>
-     */
-    private function optionRows(Workspace $workspace, array $field, array $names, array $colors, CarbonImmutable $now): array
-    {
-        if ($names === []) {
-            return [];
-        }
-
-        throw_unless(CustomFieldType::from($field['type'])->isChoice(), FieldTypeNotOptionableException::class);
-
-        $rows = [];
-
-        foreach ($names as $sortOrder => $name) {
-            $rows[] = [
-                'id' => (new CustomFieldOption)->newUniqueId(),
-                'custom_field_id' => $field['id'],
-                'tenant_id' => $workspace->getKey(),
-                'name' => $name,
-                'sort_order' => $sortOrder,
-                'settings' => isset($colors[$name])
-                    ? json_encode(new CustomFieldOptionSettingsData(color: $colors[$name]))
-                    : null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ];
-        }
-
-        return $rows;
     }
 }

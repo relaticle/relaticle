@@ -33,6 +33,7 @@ use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Listeners\SwitchWorkspace;
 use App\Livewire\App\AppDatabaseNotifications;
@@ -434,13 +435,7 @@ final class AppPanelProvider extends PanelProvider
             ->persistentMiddleware([
                 EnsureAuthenticationComplete::class,
             ])
-            ->tenantMiddleware(
-                [
-                    EnsureHostedWorkspaceAccess::class,
-                    ApplyTenantScopes::class,
-                ],
-                isPersistent: true
-            )
+            ->tenantMiddleware($this->tenantMiddlewareStack(), isPersistent: true)
             ->plugins([
                 CustomFieldsPlugin::make()
                     ->authorize(function (): bool {
@@ -641,6 +636,18 @@ final class AppPanelProvider extends PanelProvider
             ]);
 
         return $panel;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function tenantMiddlewareStack(): array
+    {
+        return [
+            EnsureHostedWorkspaceAccess::class,
+            RedirectToWorkspaceSetup::class,
+            ApplyTenantScopes::class,
+        ];
     }
 
     /**

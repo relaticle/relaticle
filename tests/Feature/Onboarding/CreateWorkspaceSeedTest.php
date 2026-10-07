@@ -3,10 +3,15 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
+use App\Actions\Onboarding\ApplyStagePreset;
+use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
 use App\Features\OnboardSeed;
+use App\Filament\Pages\Concerns\RunsInviteStep;
+use App\Filament\Pages\Concerns\RunsUseCaseStep;
 use App\Filament\Pages\CreateWorkspace;
+use App\Filament\Pages\SetupWorkspace;
 use App\Listeners\CreateWorkspaceCustomFields;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
@@ -23,7 +28,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 
-mutates(CreateWorkspace::class, CreateWorkspaceAction::class, OnboardSeedManager::class, CreateWorkspaceCustomFields::class, OnboardingUseCase::class);
+mutates(CreateWorkspace::class, SetupWorkspace::class, RunsUseCaseStep::class, RunsInviteStep::class, CreateWorkspaceAction::class, SaveOnboardingUseCase::class, ApplyStagePreset::class, OnboardSeedManager::class, CreateWorkspaceCustomFields::class, OnboardingUseCase::class);
 
 // This file is the coverage for demo seeding itself, so it opts back into the
 // feature that TestCase switches off for the rest of the suite.
@@ -34,16 +39,10 @@ beforeEach(function (): void {
 it('seeds sales demo data for sales use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-            'name' => 'Sales Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Sales Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -58,16 +57,10 @@ it('seeds sales demo data for sales use case', function (): void {
 it('seeds recruiting demo data for recruiting use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['applications'],
-            'name' => 'Hiring Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Hiring Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        'onboarding_context' => ['applications'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -82,16 +75,10 @@ it('seeds recruiting demo data for recruiting use case', function (): void {
 it('seeds marketing demo data for marketing use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Marketing->value,
-            'onboarding_context' => ['content'],
-            'name' => 'Marketing Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Marketing Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Marketing->value,
+        'onboarding_context' => ['content'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -104,15 +91,9 @@ it('seeds marketing demo data for marketing use case', function (): void {
 it('seeds general demo data for other use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Other->value,
-            'name' => 'General Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'General Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Other->value,
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -125,16 +106,10 @@ it('seeds general demo data for other use case', function (): void {
 it('seeds fundraising demo data for fundraising use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Fundraising->value,
-            'onboarding_context' => ['early_stage'],
-            'name' => 'Fundraising Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Fundraising Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Fundraising->value,
+        'onboarding_context' => ['early_stage'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -151,8 +126,6 @@ it('creates all custom fields for the first workspace', function (): void {
 
     livewire(CreateWorkspace::class)
         ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
             'name' => 'Custom Fields Workspace',
         ])
         ->call('register')
@@ -175,15 +148,10 @@ it('creates all custom fields for the first workspace', function (): void {
 it('seeds people linked to their correct companies for sales', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-            'name' => 'Link Test Workspace',
-        ])
-        ->call('register');
+    onboardWorkspace($user, ['name' => 'Link Test Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
     $companies = Company::where('workspace_id', $workspace->id)->pluck('id', 'name');
@@ -205,15 +173,10 @@ it('seeds people linked to their correct companies for sales', function (): void
 it('seeds tasks and opportunities with board positions', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-            'name' => 'Board Test Workspace',
-        ])
-        ->call('register');
+    onboardWorkspace($user, ['name' => 'Board Test Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -233,15 +196,10 @@ it('seeds tasks and opportunities with board positions', function (): void {
 it('seeds custom field values correctly for sales', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-            'name' => 'Values Test Workspace',
-        ])
-        ->call('register');
+    onboardWorkspace($user, ['name' => 'Values Test Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -260,20 +218,6 @@ it('seeds custom field values correctly for sales', function (): void {
     expect($appleValues[$companyFields['domains']]->json_value)->toContain('apple.com')
         ->and($appleValues[$companyFields['icp']]->boolean_value)->toBeTrue()
         ->and($appleValues[$companyFields['linkedin']]->json_value)->toContain('www.linkedin.com/company/apple');
-});
-
-it('subsequent workspaces still require use case selection', function (): void {
-    $user = User::factory()->withPersonalWorkspace()->create();
-
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'name' => 'Second Workspace',
-            'slug' => 'second-workspace',
-        ])
-        ->call('register')
-        ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
 it('provides one axis of sub-options for each use case', function (): void {
@@ -304,23 +248,14 @@ it('maps use case to correct fixture set', function (): void {
 it('seeds all entity types for each fixture set', function (OnboardingUseCase $useCase): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    $formData = [
-        'onboarding_use_case' => $useCase->value,
-        'name' => "Workspace {$useCase->value}",
-    ];
-
+    $useCaseInput = ['onboarding_use_case' => $useCase->value];
     $context = array_key_first($useCase->getSubOptions());
 
     if ($context !== null) {
-        $formData['onboarding_context'] = [$context];
+        $useCaseInput['onboarding_context'] = [$context];
     }
 
-    livewire(CreateWorkspace::class)
-        ->fillForm($formData)
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => "Workspace {$useCase->value}"], $useCaseInput);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -356,16 +291,10 @@ it('generates a fallback handle for names that transliterate to nothing', functi
 it('assigns seeded demo tasks to the workspace owner so the dashboard is not empty', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Sales->value,
-            'onboarding_context' => ['outbound'],
-            'name' => 'Assigned Tasks Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Assigned Tasks Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::Sales->value,
+        'onboarding_context' => ['outbound'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -381,23 +310,14 @@ it('assigns seeded demo tasks to the workspace owner so the dashboard is not emp
 it('creates the stage preset for the chosen use case', function (OnboardingUseCase $useCase, array $expectedStages): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    $formData = [
-        'onboarding_use_case' => $useCase->value,
-        'name' => "Preset {$useCase->value}",
-    ];
-
+    $useCaseInput = ['onboarding_use_case' => $useCase->value];
     $context = array_key_first($useCase->getSubOptions());
 
     if ($context !== null) {
-        $formData['onboarding_context'] = [$context];
+        $useCaseInput['onboarding_context'] = [$context];
     }
 
-    livewire(CreateWorkspace::class)
-        ->fillForm($formData)
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => "Preset {$useCase->value}"], $useCaseInput);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -423,16 +343,10 @@ it('creates the stage preset for the chosen use case', function (OnboardingUseCa
 it('colours the preset stages', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['sourcing'],
-            'name' => 'Coloured Hiring',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Coloured Hiring'], [
+        'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        'onboarding_context' => ['sourcing'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -488,19 +402,33 @@ it('writes nothing to the activity log when it seeds the default fields', functi
         ])->count())->toBe(0);
 });
 
+it('writes nothing to the activity log when it applies a stage preset', function (): void {
+    $workspace = onboardWorkspace(
+        User::factory()->create(),
+        ['name' => 'Quiet Hiring'],
+        ['onboarding_use_case' => OnboardingUseCase::Recruiting->value, 'onboarding_context' => ['sourcing']],
+    );
+
+    $stageField = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)
+        ->forEntity(Opportunity::class)
+        ->where('code', 'stage')
+        ->sole();
+
+    expect($stageField->options()->withoutGlobalScopes()->orderBy('sort_order')->pluck('name')->all())->toBe(array_keys(OnboardingUseCase::Recruiting->stagePreset()))
+        ->and(Activity::query()->whereIn('subject_type', [
+            (new CustomField)->getMorphClass(),
+            (new CustomFieldOption)->getMorphClass(),
+        ])->count())->toBe(0);
+});
+
 it('seeds customer success demo data for the customer success use case', function (): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'onboarding_use_case' => OnboardingUseCase::CustomerSuccess->value,
-            'onboarding_context' => ['high_touch'],
-            'name' => 'Success Workspace',
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => 'Success Workspace'], [
+        'onboarding_use_case' => OnboardingUseCase::CustomerSuccess->value,
+        'onboarding_context' => ['high_touch'],
+    ]);
 
     $workspace = $user->fresh()->personalWorkspace();
 
@@ -513,23 +441,14 @@ it('seeds customer success demo data for the customer success use case', functio
 it('seeds every demo opportunity at a stage that exists in the preset', function (OnboardingUseCase $useCase): void {
     $user = User::factory()->create();
 
-    $this->actingAs($user);
-
-    $formData = [
-        'onboarding_use_case' => $useCase->value,
-        'name' => "Stages {$useCase->value}",
-    ];
-
+    $useCaseInput = ['onboarding_use_case' => $useCase->value];
     $context = array_key_first($useCase->getSubOptions());
 
     if ($context !== null) {
-        $formData['onboarding_context'] = [$context];
+        $useCaseInput['onboarding_context'] = [$context];
     }
 
-    livewire(CreateWorkspace::class)
-        ->fillForm($formData)
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($user, ['name' => "Stages {$useCase->value}"], $useCaseInput);
 
     $workspace = $user->fresh()->personalWorkspace();
 

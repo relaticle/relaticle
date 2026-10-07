@@ -116,12 +116,12 @@ return [
             'description' => 'Nothing is shared. Only you can see these emails.',
         ],
         'metadata_only' => [
-            'label' => 'Metadata only',
-            'description' => 'Your workspace sees the participants and timestamp.',
+            'label' => 'Participants only',
+            'description' => 'Your workspace sees the participants and timestamp. Subject and message stay private.',
         ],
         'subject' => [
-            'label' => 'Subject line and metadata',
-            'description' => 'Your workspace sees the subject line, participants, and timestamp.',
+            'label' => 'Subject line and participants',
+            'description' => 'Your workspace sees the subject line, participants, and timestamp. The message stays private.',
         ],
         'full' => [
             'label' => 'Full access',

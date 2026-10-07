@@ -284,6 +284,18 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * Whether the user holds a mailbox in another workspace, in any status: a sharing change
+     * rewrites the mail of every account that is not removed, so the status must not narrow this.
+     */
+    public static function hasMailboxOutside(User $user, Workspace $workspace): bool
+    {
+        return self::query()
+            ->where('user_id', $user->getKey())
+            ->whereNot('workspace_id', $workspace->getKey())
+            ->exists();
+    }
+
+    /**
      * Whether the user has at least one account that is safe to sync or send through.
      */
     public static function hasActiveFor(User $user, ?Workspace $workspace): bool

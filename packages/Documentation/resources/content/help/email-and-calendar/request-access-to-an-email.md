@@ -2,7 +2,7 @@
 title: Request access to an email from a teammate
 description: Ask a teammate to share the subject or the full body of a restricted email, and approve or deny the requests teammates send you.
 order: 7
-updated: "2026-10-05"
+updated: "2026-10-06"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/set-workspace-email-privacy]
 ---
 
@@ -14,7 +14,7 @@ approve or deny the request, and the email opens up for you alone.
 1. Open the record's **Emails** tab.
 2. On the restricted email, click **Request access from** and the
    teammate's name.
-3. Choose the **Access level requested**: **Subject line and metadata**, or
+3. Choose the **Access level requested**: **Subject line and participants**, or
    **Full access**.
 4. Click **Submit**.
 

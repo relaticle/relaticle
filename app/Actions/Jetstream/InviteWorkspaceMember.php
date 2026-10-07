@@ -99,6 +99,14 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
     }
 
     /**
+     * @return list<mixed>
+     */
+    public static function emailRules(): array
+    {
+        return ['max:255', ...RegistrableEmail::rules(checkDns: false)];
+    }
+
+    /**
      * Get the validation rules for inviting a workspace member.
      *
      * @return array<string, list<Unique|Role|string>>
@@ -107,7 +115,7 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
     {
         return [
             'email' => [
-                'required', ...RegistrableEmail::rules(checkDns: false),
+                'required', ...self::emailRules(),
                 Rule::unique(Jetstream::teamInvitationModel())->where(function (Builder $query) use ($workspace): void {
                     $query->where('workspace_id', $workspace->id);
                 }),

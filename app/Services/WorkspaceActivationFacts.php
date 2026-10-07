@@ -33,7 +33,7 @@ final class WorkspaceActivationFacts
 {
     private const array ENTITY_TABLES = ['companies', 'people', 'tasks', 'notes', 'opportunities'];
 
-    /** @var array<string, array{own: bool, any: bool, import: bool, sample: bool}> */
+    /** @var array<string, array{own: bool, any: bool, import: bool, sample: bool, real: bool}> */
     private array $facts = [];
 
     /**
@@ -64,6 +64,11 @@ final class WorkspaceActivationFacts
     public function hasSampleData(Workspace $workspace): bool
     {
         return $this->facts($workspace)['sample'];
+    }
+
+    public function hasNonSampleRecord(Workspace $workspace): bool
+    {
+        return $this->facts($workspace)['real'];
     }
 
     public function hasAnotherMember(Workspace $workspace): bool
@@ -116,14 +121,14 @@ final class WorkspaceActivationFacts
     }
 
     /**
-     * All four creation-source facts in ONE round trip, memoised per workspace.
+     * All five creation-source facts in ONE round trip, memoised per workspace.
      *
      * Each fact is an OR of one EXISTS per entity table, so Postgres stops at the
      * first row that answers it and never counts. The previous shape unioned
      * SELECT DISTINCT creation_source across the five tables, which had to read
      * every live row of every table to prove a source was absent.
      *
-     * @return array{own: bool, any: bool, import: bool, sample: bool}
+     * @return array{own: bool, any: bool, import: bool, sample: bool, real: bool}
      */
     private function facts(Workspace $workspace): array
     {
@@ -143,6 +148,7 @@ final class WorkspaceActivationFacts
             'any' => [null, []],
             'import' => ['creation_source = ?', [CreationSource::IMPORT->value]],
             'sample' => ['creation_source = ?', [CreationSource::SAMPLE->value]],
+            'real' => ['creation_source <> ?', [CreationSource::SAMPLE->value]],
         ] as $name => [$predicate, $values]) {
             $parts = [];
 
@@ -162,6 +168,7 @@ final class WorkspaceActivationFacts
             'any' => (bool) ($row->any ?? false),
             'import' => (bool) ($row->import ?? false),
             'sample' => (bool) ($row->sample ?? false),
+            'real' => (bool) ($row->real ?? false),
         ];
     }
 }

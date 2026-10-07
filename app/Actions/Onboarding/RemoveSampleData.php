@@ -31,7 +31,7 @@ final readonly class RemoveSampleData
     public function execute(User $user, Workspace $workspace, bool $allowEmptyWorkspace = false): int
     {
         abort_unless($user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::WorkspaceManage), 403);
-        abort_unless($allowEmptyWorkspace || $this->facts->hasOwnRecord($workspace), 422);
+        abort_unless($allowEmptyWorkspace || $this->facts->hasNonSampleRecord($workspace), 422);
 
         $removed = DB::transaction(function () use ($workspace): int {
             $removed = 0;

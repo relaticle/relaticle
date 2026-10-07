@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Features\OnboardSeed;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -10,7 +9,6 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Laravel\Ai\Tools\Request;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Tools\Company\GetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool;
 use Relaticle\Chat\Tools\Note\GetNoteTool;
@@ -21,6 +19,7 @@ use Relaticle\Chat\Tools\People\GetPersonTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool;
 use Relaticle\Chat\Tools\Task\GetTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
+use Relaticle\OnboardSeed\OnboardSeedManager;
 
 mutates(GetCompanyTool::class);
 mutates(ListCompaniesTool::class);
@@ -34,13 +33,9 @@ mutates(GetNoteTool::class);
 mutates(ListNotesTool::class);
 
 beforeEach(function (): void {
-    // The List*Tool cases below assert over every row the tool returns, so demo
-    // records are part of what they cover. Keep seeding on here rather than let
-    // those loops quietly shrink to the handful of rows each test creates.
-    Feature::define(OnboardSeed::class, true);
-
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->user->switchWorkspace($this->user->ownedWorkspaces()->first());
+    expect(resolve(OnboardSeedManager::class)->generateFor($this->user, $this->user->currentWorkspace, 'sales'))->toBeTrue();
     $this->actingAs($this->user);
     // Deliberately no Filament::setTenant(), mirroring job context
 });

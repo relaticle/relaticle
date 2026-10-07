@@ -14,11 +14,15 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Enums\WorkspaceSetupStep;
+use App\Filament\Pages\CreateWorkspace;
+use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Http\HostResolver;
 use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
@@ -348,4 +352,36 @@ function actAsOAuthClient(User $user, array $scopes, ?Workspace $workspace): voi
 
     auth()->guard('api')->setUser($user);
     auth()->shouldUse('api');
+}
+
+/**
+ * @param  array<string, mixed>  $workspace
+ * @param  array<string, mixed>  $useCase
+ */
+function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboarding_use_case' => 'other']): Workspace
+{
+    test()->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm($workspace)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $created = $user->fresh()->currentWorkspace;
+
+    Filament::setTenant($created);
+
+    $setup = livewire(SetupWorkspace::class);
+
+    if ($created->onboarding_step === WorkspaceSetupStep::Email) {
+        $setup->callAction('skipMailbox');
+    }
+
+    $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
+
+    if ($created->fresh()->onboarding_step === WorkspaceSetupStep::Invite) {
+        $setup->call('finish');
+    }
+
+    return $created->fresh();
 }

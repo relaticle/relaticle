@@ -38,15 +38,6 @@ final readonly class Persona
     ) {}
 
     /**
-     * Whether this workspace should come with CRM records. The app seeds those
-     * from the onboarding use case, so a persona without one stays empty.
-     */
-    public function wantsRecords(): bool
-    {
-        return $this->useCase instanceof OnboardingUseCase;
-    }
-
-    /**
      * Whether this persona bills against the Stripe sandbox rather than getting
      * its state force-filled onto the workspace.
      */

@@ -13,6 +13,11 @@ enum EmailProvider: string implements HasColor, HasIcon, HasLabel
     case GMAIL = 'gmail';
     case AZURE = 'azure';
 
+    public function isConfigured(): bool
+    {
+        return filled(config("services.{$this->value}.client_id"));
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

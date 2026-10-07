@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Features\AccountDeletion;
 use App\Features\Billing;
 use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
-use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\EditProfile;
 use App\Livewire\App\Profile\DeleteAccount;
 use App\Models\Company;
@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(AccountDeletion::class, OnboardSeed::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, EditProfile::class);
+mutates(AccountDeletion::class, OnboardSeed::class, SaveOnboardingUseCase::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, EditProfile::class);
 
 describe('AccountDeletion', function (): void {
     it('hides account deletion from Profile by default', function (): void {
@@ -61,15 +61,7 @@ describe('OnboardSeed', function (): void {
 
         $user = User::factory()->create();
 
-        $this->actingAs($user);
-
-        livewire(CreateWorkspace::class)
-            ->fillForm([
-                'name' => 'Seed Enabled Workspace',
-                'onboarding_use_case' => 'other',
-            ])
-            ->call('register')
-            ->assertHasNoFormErrors();
+        onboardWorkspace($user, ['name' => 'Seed Enabled Workspace']);
 
         $workspace = $user->fresh()->personalWorkspace();
 
@@ -81,15 +73,7 @@ describe('OnboardSeed', function (): void {
 
         $user = User::factory()->create();
 
-        $this->actingAs($user);
-
-        livewire(CreateWorkspace::class)
-            ->fillForm([
-                'name' => 'Seed Disabled Workspace',
-                'onboarding_use_case' => 'other',
-            ])
-            ->call('register')
-            ->assertHasNoFormErrors();
+        onboardWorkspace($user, ['name' => 'Seed Disabled Workspace']);
 
         $workspace = $user->fresh()->personalWorkspace();
 

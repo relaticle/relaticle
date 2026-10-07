@@ -10,6 +10,7 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
+use App\Enums\WorkspaceSetupStep;
 use App\Events\WorkspaceCreated;
 use App\Events\WorkspaceDeleted;
 use App\Events\WorkspaceUpdated;
@@ -64,6 +65,7 @@ use Spatie\Sluggable\SlugOptions;
  * @property ?OnboardingReferralSource $onboarding_referral_source
  * @property ?string $onboarding_referral_detail
  * @property ?string $onboarding_referral_prompt
+ * @property WorkspaceSetupStep|null $onboarding_step
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property ?string $stripe_id
  * @property ?string $pm_type
@@ -88,6 +90,7 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_referral_source',
     'onboarding_referral_detail',
     'onboarding_referral_prompt',
+    'onboarding_step',
     'invite_link_default_role',
 ])]
 #[Hidden([
@@ -222,6 +225,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'onboarding_use_case' => OnboardingUseCase::class,
             'onboarding_context' => 'array',
             'onboarding_referral_source' => OnboardingReferralSource::class,
+            'onboarding_step' => WorkspaceSetupStep::class,
             'activation_checklist_dismissed_at' => 'datetime',
             'setup_nudge_sent_at' => 'datetime',
             'invite_link_token_expires_at' => 'datetime',

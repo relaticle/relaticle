@@ -7,7 +7,6 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
-use App\Filament\Pages\CreateWorkspace;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -323,7 +322,46 @@ it('renders the workspace_state block naming the seeded sample count when the wo
 
     expect($agent->dynamicInstructions())
         ->toContain('<workspace_state>')
-        ->toContain('only sample records');
+        ->toContain('and the workspace holds only sample records so far');
+});
+
+it('names the sample creation source in the workspace_state block', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    People::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'creation_source' => CreationSource::SAMPLE,
+    ]);
+
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('(creation source "'.CreationSource::SAMPLE->value.'")')
+        ->not->toContain('creation source "system"');
+});
+
+it('does not call mail-synced records sample data in the workspace_state block', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    People::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'creation_source' => CreationSource::SAMPLE,
+    ]);
+    People::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'creator_id' => null,
+        'creation_source' => CreationSource::MAILBOX,
+    ]);
+
+    resolve(WorkspaceActivationFacts::class)->forget($workspace);
+
+    $agent = resolve(CrmAssistant::class)->withWorkspace($workspace);
+
+    expect($agent->dynamicInstructions())
+        ->toContain('<workspace_state>')
+        ->toContain('alongside records synced from a connected mailbox')
+        ->not->toContain('only sample records')
+        ->not->toContain("alongside the user's own records");
 });
 
 it('stops claiming only sample records once the user has a record of their own', function (): void {
@@ -380,16 +418,10 @@ it('tells the model to use the onboarding vocabulary when the block is present',
 it('renders the onboarding block with the use case and the stage names the workspace really has', function (): void {
     $owner = User::factory()->create();
 
-    $this->actingAs($owner);
-
-    livewire(CreateWorkspace::class)
-        ->fillForm([
-            'name' => 'Hiring',
-            'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
-            'onboarding_context' => ['sourcing'],
-        ])
-        ->call('register')
-        ->assertHasNoFormErrors();
+    onboardWorkspace($owner, ['name' => 'Hiring'], [
+        'onboarding_use_case' => OnboardingUseCase::Recruiting->value,
+        'onboarding_context' => ['sourcing'],
+    ]);
 
     $agent = resolve(CrmAssistant::class)->withWorkspace($owner->fresh()->personalWorkspace())->withSetupMode(true);
 

@@ -1,9 +1,12 @@
 @props([
     'preview',
+    'panel' => 'dashboard',
+    'interactive' => false,
 ])
 
 @php
     $hasStages = $preview['stages'] !== [];
+    $idleNavigationKey = $panel === 'people' ? 'people' : 'dashboard';
     $barWidths = ['dashboard' => 'w-10', 'people' => 'w-12', 'companies' => 'w-16', 'opportunities' => 'w-20', 'tasks' => 'w-9', 'notes' => 'w-11', 'emails' => 'w-12'];
 @endphp
 
@@ -11,10 +14,13 @@
     class="relative h-full overflow-hidden"
     x-data="{
         get showBoard() {
-            return wizardStep === 2 && @js($hasStages)
+            return @js($hasStages && $panel === 'board')
+        },
+        get activeNavigation() {
+            return this.showBoard ? 'opportunities' : @js($idleNavigationKey)
         },
         get spotlight() {
-            return wizardStep === 0 ? (focused ?? hovered) : null
+            return @js($interactive) && wizardStep === 0 ? (focused ?? hovered) : null
         },
         lens(region) {
             if (this.spotlight === region) {
@@ -46,8 +52,10 @@
                 <span
                     class="text-sm font-semibold text-gray-950 dark:text-white"
                     x-bind:class="spotlight === 'workspace' ? 'whitespace-nowrap' : 'truncate'"
-                    x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
-                >{{ $preview['companyPlaceholder'] }}</span>
+                    @if ($interactive)
+                        x-text="$wire.data?.name || @js($preview['companyPlaceholder'])"
+                    @endif
+                >{{ $preview['workspaceName'] }}</span>
                 <x-filament::icon icon="ri-arrow-down-s-line" class="ms-auto size-4 shrink-0 text-gray-400" />
             </div>
 
@@ -62,7 +70,9 @@
                     @foreach ($preview['navigationIcons'] as $key => $icon)
                         <div
                             class="flex items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-300"
-                            x-bind:class="(showBoard ? 'opportunities' : 'dashboard') === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
+                            data-preview-nav="{{ $key }}"
+                            x-bind:data-active="activeNavigation === @js($key)"
+                            x-bind:class="activeNavigation === @js($key) ? 'bg-gray-100 text-primary-600 dark:bg-white/5 dark:text-primary-400' : 'text-gray-400 dark:text-gray-500'"
                         >
                             <x-filament::icon :icon="$icon" class="size-4 shrink-0" />
                             <span @class(['h-1.5 rounded-full bg-current opacity-25', $barWidths[$key] ?? 'w-12'])></span>
@@ -74,6 +84,13 @@
 
         <div class="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-gray-50/60 dark:bg-gray-950/40">
             <div class="flex h-12 shrink-0 items-center justify-end border-b border-gray-950/5 px-4 dark:border-white/10">
+                @if ($panel === 'members')
+                    <span class="me-2 flex items-center">
+                        @foreach (['opacity-100', 'opacity-80', 'opacity-60'] as $index => $opacity)
+                            <span @class(['size-6 rounded-full bg-gray-200 ring-2 ring-gray-50 dark:bg-white/15 dark:ring-gray-950', $opacity, '-ms-1.5' => $index > 0])></span>
+                        @endforeach
+                    </span>
+                @endif
                 <img
                     src="{{ $preview['userAvatarUrl'] }}"
                     alt=""
@@ -82,36 +99,77 @@
                 />
             </div>
 
-            <div
-                class="flex flex-1 flex-col px-5 pt-10"
-                x-show="! showBoard"
-                x-transition.opacity.duration.300ms
-            >
-                <p
-                    class="self-center rounded-lg px-2 py-1 text-center text-base font-semibold tracking-tight text-gray-950 transition duration-300 ease-out dark:text-white"
-                    x-bind:class="lens('user')"
-                >{{ $preview['greeting'] }}</p>
+            @if ($panel !== 'people')
+                <div
+                    class="flex flex-1 flex-col px-5 pt-10"
+                    x-show="! showBoard"
+                    x-transition.opacity.duration.300ms
+                >
+                    <p
+                        class="self-center rounded-lg px-2 py-1 text-center text-base font-semibold tracking-tight text-gray-950 transition duration-300 ease-out dark:text-white"
+                        x-bind:class="lens('user')"
+                    >{{ $preview['greeting'] }}</p>
 
-                <div class="mt-4 transition duration-300" x-bind:class="dim()">
-                    <div class="rounded-xl bg-white p-3 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
-                        <span class="block h-1.5 w-20 rounded-full bg-gray-100 dark:bg-white/10"></span>
-                        <div class="mt-6 flex justify-end">
-                            <span class="size-5 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                    <div class="mt-4 transition duration-300" x-bind:class="dim()">
+                        <div class="rounded-xl bg-white p-3 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                            <span class="block h-1.5 w-20 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                            <div class="mt-6 flex justify-end">
+                                <span class="size-5 rounded-full bg-gray-100 dark:bg-white/10"></span>
+                            </div>
+                        </div>
+
+                        <span class="mt-6 block h-1.5 w-10 rounded-full bg-gray-200 dark:bg-white/15"></span>
+
+                        <div class="mt-3 space-y-3">
+                            @foreach (['w-3/4', 'w-1/2', 'w-2/3'] as $width)
+                                <div class="flex items-center gap-2">
+                                    <span class="size-3 shrink-0 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"></span>
+                                    <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $width])></span>
+                                </div>
+                            @endforeach
                         </div>
                     </div>
+                </div>
+            @endif
 
-                    <span class="mt-6 block h-1.5 w-10 rounded-full bg-gray-200 dark:bg-white/15"></span>
+            @if ($panel === 'people')
+                <div class="flex flex-1 flex-col px-3 pt-4">
+                    <div class="flex items-center justify-between px-0.5">
+                        <span class="text-sm font-semibold text-gray-950 dark:text-white">{{ __('filament/pages/workspaces.setup_workspace.preview.people') }}</span>
+                        @if (isset($preview['mailboxProgress']))
+                            <span class="flex items-center gap-1.5 text-pico font-medium tabular-nums text-primary-600 dark:text-primary-400">
+                                <x-filament::icon icon="ri-loader-4-line" class="size-3 motion-safe:animate-spin" />
+                                {{ $preview['mailboxProgress'] }}
+                            </span>
+                        @else
+                            <span class="flex items-center gap-1.5 rounded-full bg-white px-2 py-0.5 text-pico font-medium text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:text-gray-400 dark:ring-white/10">
+                                <x-filament::icon icon="ri-mail-line" class="size-3" />
+                                {{ __('filament/pages/workspaces.setup_workspace.preview.from_mailbox') }}
+                            </span>
+                        @endif
+                    </div>
 
-                    <div class="mt-3 space-y-3">
-                        @foreach (['w-3/4', 'w-1/2', 'w-2/3'] as $width)
-                            <div class="flex items-center gap-2">
-                                <span class="size-3 shrink-0 rounded-full ring-1 ring-gray-300 dark:ring-gray-600"></span>
-                                <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $width])></span>
+                    <div class="mt-3 overflow-hidden rounded-xl bg-white ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+                        <div class="grid grid-cols-[1.3fr_1fr] gap-x-2 border-b border-gray-950/10 px-2.5 py-1.5 text-pico font-medium text-gray-500 dark:border-white/10 dark:text-gray-400">
+                            <span>{{ __('filament/pages/workspaces.setup_workspace.preview.person') }}</span>
+                            <span>{{ __('filament/pages/workspaces.setup_workspace.preview.company') }}</span>
+                        </div>
+
+                        @foreach ([['w-18', 'w-14'], ['w-14', 'w-12'], ['w-16', 'w-15'], ['w-12', 'w-10'], ['w-18', 'w-12'], ['w-14', 'w-14'], ['w-16', 'w-11'], ['w-13', 'w-12']] as $index => [$personWidth, $companyWidth])
+                            <div
+                                @class(['grid grid-cols-[1.3fr_1fr] items-center gap-x-2 px-2.5 py-2', 'border-t border-gray-950/10 dark:border-white/10' => $index > 0])
+                                style="opacity: {{ max(0.25, 1 - $index * 0.11) }}"
+                            >
+                                <div class="flex items-center gap-1.5">
+                                    <span class="size-4 shrink-0 rounded-full bg-gray-200 dark:bg-white/15"></span>
+                                    <span @class(['h-1.5 rounded-full bg-gray-200 dark:bg-white/15', $personWidth])></span>
+                                </div>
+                                <span @class(['h-1.5 rounded-full bg-gray-100 dark:bg-white/10', $companyWidth])></span>
                             </div>
                         @endforeach
                     </div>
                 </div>
-            </div>
+            @endif
 
             @if ($hasStages)
                 <div
@@ -122,6 +180,7 @@
                     @foreach ($preview['stages'] as $position => $stage)
                         <div
                             class="w-[7.25rem] shrink-0 self-start rounded-xl bg-gray-100/80 p-1.5 dark:bg-white/5"
+                            data-preview-stage="{{ $stage['name'] }}"
                             x-show="showBoard"
                             x-transition:enter="transition duration-500 ease-out"
                             x-transition:enter-start="translate-y-3 opacity-0"
