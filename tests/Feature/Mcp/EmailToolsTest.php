@@ -29,6 +29,7 @@ use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
+use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -55,7 +56,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, PrepareAgentEmailAction::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, PrepareAgentEmailAction::class, SaveAgentEmailDraftAction::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
