@@ -1834,7 +1834,7 @@ it('falls back to the default account and warns when a draft\'s connected accoun
         ->toBe($this->account->id);
 });
 
-it('reopens a draft at the sharing level of the mailbox it was saved on', function (): void {
+it('sends a reopened draft at the sharing level of the mailbox it was saved on', function (): void {
     $this->user->currentWorkspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
     $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'user_id' => $this->user->id,
@@ -1857,10 +1857,16 @@ it('reopens a draft at the sharing level of the mailbox it was saved on', functi
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open', draftId: $draft->id)
         ->assertSet('accountId', $second->id)
-        ->assertSet('privacyTier', EmailPrivacyTier::FULL->value);
+        ->call('send');
+
+    $queued = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($queued->connected_account_id)->toBe($second->id)
+        ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($queued->privacy_tier_customized)->toBeFalse();
 });
 
-it('resumes a reply draft at the sharing level of the mailbox it was saved on', function (): void {
+it('sends a resumed reply draft at the sharing level of the mailbox it was saved on', function (): void {
     $this->user->currentWorkspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
     $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'user_id' => $this->user->id,
@@ -1892,7 +1898,13 @@ it('resumes a reply draft at the sharing level of the mailbox it was saved on', 
     Livewire::test(EmailComposer::class, ['dock' => 'inline'])
         ->call('resumeDraftFor', (string) $inbound->getKey())
         ->assertSet('accountId', $second->id)
-        ->assertSet('privacyTier', EmailPrivacyTier::FULL->value);
+        ->call('send');
+
+    $queued = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($queued->connected_account_id)->toBe($second->id)
+        ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($queued->privacy_tier_customized)->toBeFalse();
 });
 
 it('fills subject and body from a template and keeps the signature below it', function (): void {

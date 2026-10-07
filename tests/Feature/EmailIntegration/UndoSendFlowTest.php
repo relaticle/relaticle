@@ -33,7 +33,6 @@ it('cancels a single send within the 5s undo window', function (): void {
         'cc' => [],
         'bcc' => [],
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'priority' => EmailPriority::PRIORITY,
         'scheduled_for' => null,
         'batch_id' => null,

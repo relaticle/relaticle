@@ -55,7 +55,6 @@ it('persists a queued Email row for the outbox', function (): void {
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ];
 
@@ -88,7 +87,6 @@ it('forbids queuing mail when the mailbox cannot send', function (): void {
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]))->toThrow(HttpException::class);
 });
@@ -105,7 +103,6 @@ it('forbids queuing mail when the mailbox is not active', function (EmailAccount
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]))->toThrow(HttpException::class);
 })->with([
@@ -146,7 +143,6 @@ it('ignores an in_reply_to_email_id that belongs to another team', function (): 
         'bcc' => [],
         'in_reply_to_email_id' => $foreignEmail->getKey(),
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -170,7 +166,6 @@ it('ignores a link_to record that belongs to another team', function (): void {
         'cc' => [],
         'bcc' => [],
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ], People::class, $foreignPerson->getKey());
 
@@ -208,7 +203,6 @@ it('does not copy a provider thread id from a different sending mailbox', functi
         'bcc' => [],
         'in_reply_to_email_id' => $sharedEmail->getKey(),
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -266,7 +260,6 @@ it('syncs the email thread aggregate when an outbound reply is sent', function (
         'bcc' => [],
         'in_reply_to_email_id' => $original->getKey(),
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -309,7 +302,6 @@ it('links the queued email to a CRM record via emailables', function (): void {
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ];
 
@@ -348,7 +340,6 @@ it('updates record metrics after a manually linked queued send is delivered', fu
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ];
 
@@ -390,7 +381,6 @@ it('rejects sending through a connected account owned by another user', function
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]))->toThrow(ModelNotFoundException::class);
 
@@ -407,7 +397,6 @@ it('throws when the user has hit the max queued limit', function (): void {
         'subject' => 'Already queued',
         'direction' => EmailDirection::OUTBOUND,
         'status' => EmailStatus::QUEUED,
-        'privacy_tier' => EmailPrivacyTier::FULL,
     ]);
 
     expect(fn () => app(SendEmailAction::class)->execute($this->user, [
@@ -419,7 +408,6 @@ it('throws when the user has hit the max queued limit', function (): void {
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]))->toThrow(RuntimeException::class, 'queued');
 });
@@ -440,7 +428,6 @@ it('persists uploaded attachments and flags the email', function (): void {
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$path],
         'attachment_file_names' => [$path => 'quarterly-report.pdf'],
@@ -472,7 +459,6 @@ it('reads attachment bytes into the provider payload when sending', function ():
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$path],
         'attachment_file_names' => [$path => 'notes.txt'],
@@ -517,7 +503,6 @@ it('persists inline cid attachments and includes them in the provider payload', 
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::FORWARD,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$path],
         'attachment_file_names' => [$path => 'logo.png'],
@@ -572,7 +557,6 @@ it('embeds rich editor inline images from data-id paths when queuing send', func
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -606,7 +590,6 @@ it('does not attach a storage file referenced by a composer image url', function
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -631,7 +614,6 @@ it('does not attach another tenant image named in composer html', function (): v
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -655,7 +637,6 @@ it('does not attach a non-image file from the tenant compose directory', functio
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -678,7 +659,6 @@ it('does not follow path traversal in composer image data-id', function (): void
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 
@@ -709,7 +689,6 @@ it('rejects a Graph attachment that exceeds the inline JSON file cap', function 
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$path],
         'attachment_file_names' => [$path => 'huge.bin'],
@@ -744,7 +723,6 @@ it('rejects Graph attachments whose combined encoded size exceeds the JSON reque
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$first, $second],
         'attachment_file_names' => [
@@ -772,7 +750,6 @@ it('still queues a Gmail attachment that would exceed Graph inline limits', func
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
         'attachments' => [$path],
         'attachment_file_names' => [$path => 'report.bin'],
@@ -796,7 +773,6 @@ it('queues from the mailbox of the user it is given, not the signed-in one', fun
         'bcc' => [],
         'in_reply_to_email_id' => null,
         'creation_source' => EmailCreationSource::COMPOSE,
-        'privacy_tier' => EmailPrivacyTier::FULL,
         'batch_id' => null,
     ]);
 

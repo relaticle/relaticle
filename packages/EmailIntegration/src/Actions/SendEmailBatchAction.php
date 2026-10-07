@@ -9,7 +9,6 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailBatch;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
@@ -39,7 +38,6 @@ final readonly class SendEmailBatchAction
      *     attachments?: array<int, string>,
      *     attachment_file_names?: array<string, string>,
      *     attachment_attributes?: array<string, array{is_inline?: bool, content_id?: ?string}>,
-     *     privacy_tier?: EmailPrivacyTier,
      * }  $payload
      */
     public function execute(User $user, array $recipients, array $payload): EmailBatch
@@ -78,7 +76,6 @@ final readonly class SendEmailBatchAction
                         'bcc' => [],
                         'in_reply_to_email_id' => null,
                         'creation_source' => EmailCreationSource::MASS_SEND,
-                        ...(isset($payload['privacy_tier']) ? ['privacy_tier' => $payload['privacy_tier']] : []),
                         'batch_id' => $batch->getKey(),
                         'attachments' => $payload['attachments'] ?? [],
                         'attachment_file_names' => $payload['attachment_file_names'] ?? [],
