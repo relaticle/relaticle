@@ -402,3 +402,26 @@ it('does not open the settings page for another user\'s account', function (): v
     livewire(EmailAccountSettingsPage::class, ['account' => $otherAccount->id])
         ->assertNotFound();
 });
+
+it('words the confirmation for this mailbox and not for the workspace', function (): void {
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value])
+        ->mountAction('save')
+        ->assertMountedActionModalSee(__('email/privacy-settings.sharing_confirmation.mailbox_description', [
+            'tier' => EmailPrivacyTier::SUBJECT->getLabel(),
+        ]))
+        ->assertMountedActionModalDontSee(__('email/privacy-settings.sharing_confirmation.description', [
+            'tier' => EmailPrivacyTier::SUBJECT->getLabel(),
+        ]));
+});
+
+it('does not open the settings page for the owner mailbox in another workspace', function (): void {
+    $elsewhere = Workspace::factory()->create(['user_id' => $this->user->id]);
+    $otherWorkspaceAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $elsewhere->id,
+        'user_id' => $this->user->id,
+    ]));
+
+    livewire(EmailAccountSettingsPage::class, ['account' => $otherWorkspaceAccount->id])
+        ->assertNotFound();
+});
