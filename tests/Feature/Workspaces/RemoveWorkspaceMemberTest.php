@@ -2,14 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\RemoveWorkspaceMember;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Notifications\WorkspaceMemberRemovedNotification;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Laravel\Jetstream\Http\Livewire\TeamMemberManager;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(User::class);
 
@@ -132,4 +139,71 @@ test('admin can still leave the workspace themselves', function () {
         ->call('removeTeamMember');
 
     expect($workspace->fresh()->users()->where('users.id', $admin->id)->exists())->toBeFalse();
+});
+
+function syncingMailbox(User $member, Workspace $workspace, array $attributes = []): ConnectedAccount
+{
+    return ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $member->getKey(),
+        'status' => EmailAccountStatus::ACTIVE,
+        'sync_cursor' => 'cursor-1',
+        ...$attributes,
+    ]));
+}
+
+test('removing a member disconnects their mailbox and stops its sync', function () {
+    Bus::fake([IncrementalEmailSyncJob::class]);
+    Http::fake(['oauth2.googleapis.com/*' => Http::response()]);
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $mailbox = syncingMailbox($member, $workspace);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    $this->artisan('email:incremental-sync');
+
+    $mailbox = ConnectedAccount::withTrashed()->findOrFail($mailbox->getKey());
+
+    expect($mailbox->trashed())->toBeTrue()
+        ->and($mailbox->access_token)->toBeNull()
+        ->and($mailbox->refresh_token)->toBeNull();
+
+    Bus::assertNotDispatched(IncrementalEmailSyncJob::class);
+});
+
+test('removing a member leaves their mailbox in another workspace connected', function () {
+    Http::fake();
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $member = User::factory()->withPersonalWorkspace()->create();
+    $workspace->users()->attach($member, ['role' => 'member']);
+
+    $shared = ['email_address' => 'dana@northwind.test', 'provider_account_id' => 'google-123'];
+    syncingMailbox($member, $workspace, $shared);
+    $elsewhere = syncingMailbox($member, $member->currentWorkspace, $shared);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect($elsewhere->fresh()->trashed())->toBeFalse()
+        ->and($elsewhere->fresh()->access_token)->not->toBeNull();
+
+    Http::assertNothingSent();
+});
+
+test('removing a member leaves a teammate mailbox connected', function () {
+    Http::fake();
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $ownersMailbox = syncingMailbox($owner, $workspace);
+    syncingMailbox($member, $workspace);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect($ownersMailbox->fresh()->trashed())->toBeFalse();
 });
