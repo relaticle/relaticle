@@ -59,8 +59,8 @@ final readonly class VisibleEmailsQuery
         $query
             ->when(isset($filters['direction']), fn (Builder $q): Builder => $q->where('direction', $filters['direction'] ?? null))
             ->when(isset($filters['thread_id']), fn (Builder $q): Builder => $q->where('thread_id', $filters['thread_id'] ?? null))
-            ->when(isset($filters['sent_after']), fn (Builder $q): Builder => $q->where('sent_at', '>', Date::parse($filters['sent_after'] ?? '')))
-            ->when(isset($filters['sent_before']), fn (Builder $q): Builder => $q->where('sent_at', '<', Date::parse($filters['sent_before'] ?? '')));
+            ->when(isset($filters['sent_after']), fn (Builder $q): Builder => $q->where('sent_at', '>', Date::parse($filters['sent_after'] ?? '')->utc()->toDateTimeString()))
+            ->when(isset($filters['sent_before']), fn (Builder $q): Builder => $q->where('sent_at', '<', Date::parse($filters['sent_before'] ?? '')->utc()->toDateTimeString()));
 
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)

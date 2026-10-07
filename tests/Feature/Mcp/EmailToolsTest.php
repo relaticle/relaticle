@@ -325,6 +325,16 @@ it('filters by search, direction and sent date', function (): void {
         ->and(array_column(listedEmails($this->viewer, ['search' => 'acme.test']), 'id'))->toEqualCanonicalizing([$old->id, $recent->id]);
 });
 
+it('reads a sent date with an offset at the instant it names', function (): void {
+    $afterMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-07 00:30:00']);
+    $beforeMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 23:30:00']);
+
+    $instant = '2026-10-07T09:00:00+09:00';
+
+    expect(array_column(listedEmails($this->viewer, ['sent_after' => $instant]), 'id'))->toBe([$afterMidnight->id])
+        ->and(array_column(listedEmails($this->viewer, ['sent_before' => $instant]), 'id'))->toBe([$beforeMidnight->id]);
+});
+
 it('lists newest first and pages', function (): void {
     $older = ($this->emailFrom)($this->viewer, ['sent_at' => now()->subHours(2)]);
     $newer = ($this->emailFrom)($this->viewer, ['sent_at' => now()->subHour()]);
