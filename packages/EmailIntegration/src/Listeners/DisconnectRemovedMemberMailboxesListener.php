@@ -9,7 +9,6 @@ use App\Models\Workspace;
 use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Throwable;
 
 final readonly class DisconnectRemovedMemberMailboxesListener
 {
@@ -24,12 +23,6 @@ final readonly class DisconnectRemovedMemberMailboxesListener
         ConnectedAccount::query()
             ->ownedBy($event->user, $event->team)
             ->get()
-            ->each(function (ConnectedAccount $mailbox): void {
-                try {
-                    $this->disconnect->execute($mailbox);
-                } catch (Throwable $exception) {
-                    report($exception);
-                }
-            });
+            ->each(fn (ConnectedAccount $mailbox) => rescue(fn () => $this->disconnect->execute($mailbox)));
     }
 }

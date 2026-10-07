@@ -111,7 +111,7 @@ trait HasEmailReaderActions
                             ->hiddenLabel()
                             ->options(EmailPrivacyTier::class)
                             ->view('email-integration::forms.sharing-tier-cards')
-                            ->viewData(['tiers' => EmailPrivacyTier::cases(), 'ariaLabel' => __('filament/pages/record-emails.fields.privacy_tier.label')])
+                            ->viewData(['ariaLabel' => __('filament/pages/record-emails.fields.privacy_tier.label')])
                             ->required(),
                     ]),
 

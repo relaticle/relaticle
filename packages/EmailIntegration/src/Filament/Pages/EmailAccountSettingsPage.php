@@ -243,7 +243,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             ->label($this->labelWithInfo(__('filament/pages/email-account-settings.sharing.label'), __('filament/pages/email-account-settings.sharing.hint')))
             ->view('email-integration::forms.sharing-tier-cards')
             ->viewData([
-                'tiers' => EmailPrivacyTier::cases(),
                 'ariaLabel' => __('filament/pages/email-account-settings.sharing.label'),
                 'workspaceDefaultLabel' => __('filament/pages/email-account-settings.sharing.use_workspace_default'),
                 'workspaceDefaultDescription' => __('filament/pages/email-account-settings.sharing.workspace_default_description', [
@@ -570,16 +569,12 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 /** @var User $user */
                 $user = auth()->user();
 
-                $sharingPreferenceChanged = $this->accountSharingPreferenceChanged();
+                $chosenTier = $this->storedSharingTierFromForm($data['sharing_tier'] ?? null);
 
                 $updateSettings->execute($this->account(), $data);
 
-                if ($sharingPreferenceChanged) {
-                    resolve(SaveMailboxSharingTierAction::class)->execute(
-                        $user,
-                        $this->account(),
-                        $this->storedSharingTierFromForm($data['sharing_tier'] ?? null),
-                    );
+                if ($chosenTier !== $this->account()->sharing_tier) {
+                    resolve(SaveMailboxSharingTierAction::class)->execute($user, $this->account(), $chosenTier);
                 }
 
                 $this->account()->refresh();
@@ -594,14 +589,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     private function accountSharingTierChanged(): bool
     {
         return $this->resolvedAccountSharingTier() !== $this->privacy()->tierForMailbox($this->account());
-    }
-
-    private function accountSharingPreferenceChanged(): bool
-    {
-        $data = $this->form->getState();
-
-        return $this->storedSharingTierFromForm($data['sharing_tier'] ?? null)
-            !== $this->account()->sharing_tier;
     }
 
     private function storedSharingTierFromForm(mixed $tierValue): ?EmailPrivacyTier

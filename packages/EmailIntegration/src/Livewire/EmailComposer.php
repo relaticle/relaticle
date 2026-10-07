@@ -2307,7 +2307,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->where('user_id', $this->authUser()->getKey())
             ->where('workspace_id', $this->authUser()->current_workspace_id)
             ->connected()
-            ->with('workspace')
             ->orderByDesc('is_default')
             ->oldest()
             ->get());

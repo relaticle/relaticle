@@ -67,7 +67,7 @@ final readonly class PrivacyService
 
     public function tierForMailbox(ConnectedAccount $mailbox): EmailPrivacyTier
     {
-        return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->workspace);
+        return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->loadMissing('workspace')->workspace);
     }
 
     public function workspaceSharingTier(Workspace $workspace): EmailPrivacyTier
