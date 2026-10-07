@@ -85,17 +85,12 @@ trait RunsInviteStep
         } catch (Throwable $exception) {
             report($exception);
 
-            $this->sendNotification(
-                __('filament/pages/workspaces.setup_workspace.invite.not_sent.title'),
-                __('filament/pages/workspaces.setup_workspace.invite.not_sent.body'),
-                'warning',
-            );
+            Notification::make()
+                ->title(__('filament/pages/workspaces.setup_workspace.invite.not_sent.title'))
+                ->body(__('filament/pages/workspaces.setup_workspace.invite.not_sent.body'))
+                ->warning()
+                ->send();
         }
-    }
-
-    protected function sendNotification(string $title, ?string $message = null, string $type = 'success'): void
-    {
-        Notification::make()->title($title)->body($message)->{$type}()->send();
     }
 
     private function inviteForm(): Schema

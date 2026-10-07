@@ -6,6 +6,7 @@ namespace App\Livewire\App\Workspaces\Concerns;
 
 use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Support\EmailAddress;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
@@ -73,11 +74,11 @@ trait SendsWorkspaceInvitations
         $retryAfter = $this->inviteRetryAfterSeconds();
 
         if ($retryAfter !== null) {
-            $this->sendNotification(
-                __('workspaces.notifications.invite_rate_limited.title'),
-                __('workspaces.notifications.invite_rate_limited.body', ['seconds' => $retryAfter]),
-                'danger',
-            );
+            Notification::make()
+                ->title(__('workspaces.notifications.invite_rate_limited.title'))
+                ->body(__('workspaces.notifications.invite_rate_limited.body', ['seconds' => $retryAfter]))
+                ->danger()
+                ->send();
 
             return;
         }
@@ -98,16 +99,16 @@ trait SendsWorkspaceInvitations
         }
 
         if ($sent > 0) {
-            $this->sendNotification(__('workspaces.notifications.workspace_invitation_sent.success'));
+            Notification::make()->title(__('workspaces.notifications.workspace_invitation_sent.success'))->success()->send();
             $this->dispatch('workspaceInvitationSent');
         }
 
         if ($failures !== []) {
-            $this->sendNotification(
-                __('workspaces.notifications.some_invites_failed.title'),
-                implode("\n", $failures),
-                'warning',
-            );
+            Notification::make()
+                ->title(__('workspaces.notifications.some_invites_failed.title'))
+                ->body(implode("\n", $failures))
+                ->warning()
+                ->send();
         }
     }
 }
