@@ -1660,12 +1660,10 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $accounts = $this->activeAccounts();
-        $previous = $accounts->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->tierAccountId);
-        $next = $accounts->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $value);
+        $previous = $this->activeAccount($this->tierAccountId);
+        $next = $this->activeAccount($value);
 
-        $levelWasPickedByHand = $previous instanceof ConnectedAccount
-            && $this->privacyTier !== resolve(PrivacyService::class)->tierForMailbox($previous)->value;
+        $levelWasPickedByHand = $previous instanceof ConnectedAccount && ! $this->privacyTierFollows($previous);
 
         if ($next instanceof ConnectedAccount && ! $levelWasPickedByHand) {
             $this->useMailboxSharingTier($next);
@@ -1681,13 +1679,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function chosenPrivacyTier(): array
     {
-        $mailbox = $this->activeAccounts()->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->accountId);
-
-        if ($mailbox instanceof ConnectedAccount && $this->privacyTier === resolve(PrivacyService::class)->tierForMailbox($mailbox)->value) {
+        if ($this->privacyTierFollows($this->selectedAccount())) {
             return [];
         }
 
         return ['privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier)];
+    }
+
+    private function privacyTierFollows(?ConnectedAccount $mailbox): bool
+    {
+        return $mailbox instanceof ConnectedAccount
+            && $this->privacyTier === resolve(PrivacyService::class)->tierForMailbox($mailbox)->value;
     }
 
     private function useMailboxSharingTier(ConnectedAccount $account): void
@@ -2140,8 +2142,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->draftId = (string) $draft->getKey();
 
-        $draftAccount = $this->activeAccounts()
-            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === (string) $draft->connected_account_id);
+        $draftAccount = $this->activeAccount((string) $draft->connected_account_id);
 
         if ($draftAccount instanceof ConnectedAccount) {
             $this->accountId = (string) $draftAccount->getKey();
@@ -2325,12 +2326,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
     private function selectedAccount(): ?ConnectedAccount
     {
-        if ($this->accountId === null) {
+        return $this->activeAccount($this->accountId);
+    }
+
+    private function activeAccount(?string $accountId): ?ConnectedAccount
+    {
+        if ($accountId === null) {
             return null;
         }
 
         return $this->activeAccounts()
-            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->accountId);
+            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $accountId);
     }
 
     /**
