@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
@@ -93,6 +94,24 @@ final readonly class VisibleEmailsQuery
             ->with(['participants', 'shares', 'body', 'attachments'])
             ->whereKey($id)
             ->first();
+    }
+
+    /** @throws ValidationException */
+    public function replyTarget(User $viewer, ?string $id): ?Email
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $email = $this->find($viewer, $id);
+
+        if (! $email instanceof Email) {
+            throw ValidationException::withMessages([
+                'in_reply_to_email_id' => "Email with ID [{$id}] not found.",
+            ]);
+        }
+
+        return $email;
     }
 
     /** @return Builder<Email> */

@@ -71,7 +71,7 @@ final class SendEmailTool extends Tool
         $user = auth()->user();
 
         /** @var array{connected_account_id: string, to: list<string>, cc?: list<string>, bcc?: list<string>, subject: string, body: string, include_signature?: bool|int|string, in_reply_to_email_id?: string} $validated */
-        $validated = $request->validate($this->rules(), [
+        $validated = $request->validate(PrepareAgentEmail::RULES, [
             'to.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
             'cc.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
             'bcc.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
@@ -97,24 +97,6 @@ final class SendEmailTool extends Tool
     protected function openWorldHint(): bool
     {
         return true;
-    }
-
-    /** @return array<string, list<string>> */
-    private function rules(): array
-    {
-        return [
-            'connected_account_id' => ['required', 'string', 'max:64'],
-            'to' => ['required', 'array', 'list', 'min:1', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
-            'to.*' => ['required', 'string', 'email', 'max:255'],
-            'cc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
-            'cc.*' => ['required', 'string', 'email', 'max:255'],
-            'bcc' => ['sometimes', 'array', 'list', 'max:'.PrepareAgentEmail::MAX_RECIPIENTS],
-            'bcc.*' => ['required', 'string', 'email', 'max:255'],
-            'subject' => ['required', 'string', 'max:255'],
-            'body' => ['required', 'string', 'max:50000'],
-            'include_signature' => ['sometimes', 'boolean'],
-            'in_reply_to_email_id' => ['sometimes', 'string', 'max:64'],
-        ];
     }
 
     private function roleAllowsSending(): bool

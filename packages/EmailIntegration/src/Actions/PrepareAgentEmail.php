@@ -11,7 +11,6 @@ use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Support\AgentEmailBody;
 
@@ -20,6 +19,20 @@ final readonly class PrepareAgentEmail
     public const int MAX_RECIPIENTS = 20;
 
     public const string RECIPIENT_LIMIT_MESSAGE = 'An email can go to at most '.self::MAX_RECIPIENTS.' recipients in total across to, cc and bcc.';
+
+    public const array RULES = [
+        'connected_account_id' => ['required', 'string', 'max:64'],
+        'to' => ['required', 'array', 'list', 'min:1', 'max:'.self::MAX_RECIPIENTS],
+        'to.*' => ['required', 'string', 'email', 'max:255'],
+        'cc' => ['sometimes', 'array', 'list', 'max:'.self::MAX_RECIPIENTS],
+        'cc.*' => ['required', 'string', 'email', 'max:255'],
+        'bcc' => ['sometimes', 'array', 'list', 'max:'.self::MAX_RECIPIENTS],
+        'bcc.*' => ['required', 'string', 'email', 'max:255'],
+        'subject' => ['required', 'string', 'max:255'],
+        'body' => ['required', 'string', 'max:50000'],
+        'include_signature' => ['sometimes', 'boolean'],
+        'in_reply_to_email_id' => ['sometimes', 'string', 'max:64'],
+    ];
 
     public function __construct(
         private AgentEmailBody $body,
@@ -65,7 +78,7 @@ final readonly class PrepareAgentEmail
         $this->assertWithinRecipientLimit($data);
 
         $account = $this->sendableAccount($user, $workspace, $data['connected_account_id']);
-        $replyTo = $this->replyTarget($user, $data['in_reply_to_email_id'] ?? null);
+        $replyTo = $this->emails->replyTarget($user, $data['in_reply_to_email_id'] ?? null);
 
         return [
             'connected_account_id' => (string) $account->getKey(),
@@ -107,23 +120,6 @@ final readonly class PrepareAgentEmail
         }
 
         return $account;
-    }
-
-    private function replyTarget(User $user, ?string $replyToId): ?Email
-    {
-        if ($replyToId === null) {
-            return null;
-        }
-
-        $replyTo = $this->emails->find($user, $replyToId);
-
-        if (! $replyTo instanceof Email) {
-            throw ValidationException::withMessages([
-                'in_reply_to_email_id' => "Email with ID [{$replyToId}] not found.",
-            ]);
-        }
-
-        return $replyTo;
     }
 
     /**
