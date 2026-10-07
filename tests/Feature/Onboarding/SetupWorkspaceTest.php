@@ -825,8 +825,7 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->mountAction('skipMailbox')
-            ->callMountedAction()
+            ->callAction('skipMailbox')
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
@@ -849,7 +848,7 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->call('skipMailbox')
+            ->callAction('skipMailbox')
             ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
             ->call('backToMailbox')
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'));
@@ -861,7 +860,7 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->call('skipMailbox')
+            ->callAction('skipMailbox')
             ->call('backToMailbox')
             ->assertSuccessful()
             ->call('backToMailbox')
@@ -874,7 +873,7 @@ describe('connect email', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
 
-        livewire(SetupWorkspace::class)->call('skipMailbox');
+        livewire(SetupWorkspace::class)->callAction('skipMailbox');
 
         ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
             'user_id' => $user->getKey(),
@@ -892,7 +891,7 @@ describe('connect email', function (): void {
     it('offers no way back to connect when the feature is off', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
-        livewire(SetupWorkspace::class)->call('skipMailbox');
+        livewire(SetupWorkspace::class)->callAction('skipMailbox');
 
         Feature::define(EmailIntegration::class, false);
         Feature::flushCache();

@@ -57,12 +57,9 @@ trait RunsMailboxSteps
                 ->label(__('filament/pages/workspaces.setup_workspace.email.skip_confirm.submit'))
                 ->color('danger'))
             ->modalFooterActionsAlignment(Alignment::End)
-            ->action($this->skipMailbox(...));
-    }
-
-    public function skipMailbox(): void
-    {
-        resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+            ->action(function (): void {
+                resolve(MoveWorkspaceSetup::class)->execute($this->authUser(), $this->workspace, OnboardingStep::Email, OnboardingStep::UseCase);
+            });
     }
 
     public function backToMailbox(): void
