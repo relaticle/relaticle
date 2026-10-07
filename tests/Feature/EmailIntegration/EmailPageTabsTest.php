@@ -176,8 +176,6 @@ it('refreshes the outbox and failed badges when a failed email is retried', func
 });
 
 it('offers a direct gmail connect on drafts when no mailbox is connected', function (): void {
-    config()->set('services.gmail.client_id', 'gmail-client');
-
     $this->account->forceDelete();
 
     Livewire::test(DraftsTable::class)

@@ -499,8 +499,6 @@ it('shows in sync when the mailbox has no recorded error', function (): void {
 });
 
 it('renders Connect Gmail and hides Connect Microsoft without a Microsoft mailbox client', function (): void {
-    config()->set('services.gmail.client_id', 'gmail-client');
-
     config()->set('services.azure.client_id');
 
     livewire(EmailAccountsPage::class)

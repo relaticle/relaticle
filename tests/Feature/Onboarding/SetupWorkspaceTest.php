@@ -739,7 +739,6 @@ it('leaves a workspace that already has a use case as it is', function (): void 
 describe('connect email', function (): void {
     beforeEach(function (): void {
         Feature::define(EmailIntegration::class, true);
-        config()->set('services.gmail.client_id', 'gmail-client');
         config()->set('services.azure.client_id', 'azure-client');
     });
 
