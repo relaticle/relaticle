@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailShare;
 
@@ -62,6 +63,11 @@ final readonly class PrivacyService
         }
 
         return $tier;
+    }
+
+    public function tierForMailbox(ConnectedAccount $mailbox): EmailPrivacyTier
+    {
+        return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->workspace);
     }
 
     /**

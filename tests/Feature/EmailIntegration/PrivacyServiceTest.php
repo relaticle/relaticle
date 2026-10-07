@@ -260,6 +260,45 @@ it('effectiveTier returns FULL for a non-owner when email is FULL', function ():
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
+it('uses the level stored on the mailbox', function (): void {
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $mailbox = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'sharing_tier' => EmailPrivacyTier::SUBJECT,
+    ]));
+
+    expect($this->service->tierForMailbox($mailbox))->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('falls back to the workspace default for a mailbox with no level', function (): void {
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+
+    expect($this->service->tierForMailbox($this->account->fresh()))->toBe(EmailPrivacyTier::PRIVATE);
+});
+
+it('falls back to participants only when neither the mailbox nor the workspace has a level', function (): void {
+    $mailbox = $this->account->fresh();
+    $mailbox->workspace->default_email_sharing_tier = null;
+
+    expect($this->service->tierForMailbox($mailbox))->toBe(EmailPrivacyTier::METADATA_ONLY);
+});
+
+it('keeps the same person free to share differently in two workspaces', function (): void {
+    $other = Workspace::factory()->create(['user_id' => $this->owner->id]);
+    $here = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id,
+        'email_address' => 'dana@northwind.test', 'sharing_tier' => EmailPrivacyTier::FULL,
+    ]));
+    $there = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $other->id, 'user_id' => $this->owner->id,
+        'email_address' => 'dana@northwind.test', 'sharing_tier' => EmailPrivacyTier::PRIVATE,
+    ]));
+
+    expect($this->service->tierForMailbox($here))->toBe(EmailPrivacyTier::FULL)
+        ->and($this->service->tierForMailbox($there))->toBe(EmailPrivacyTier::PRIVATE);
+});
+
 it('defaultTierForUser returns user-level tier when the user has one set', function (): void {
     $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 

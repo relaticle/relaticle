@@ -159,6 +159,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public ?string $privacyTier = null;
 
     #[Locked]
+    public ?string $tierAccountId = null;
+
+    #[Locked]
     public ?string $pageTo = null;
 
     #[Locked]
@@ -264,8 +267,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             : ($payload['to'] ?? ($this->pageTo !== null && $this->pageTo !== '' ? [$this->pageTo] : []));
         $this->linkRecordType = $payload['linkRecordType'] ?? ($this->isMassSend ? null : $this->pageRecordType);
         $this->linkRecordId = $payload['linkRecordId'] ?? ($this->isMassSend ? null : $this->pageRecordId);
-        $this->privacyTier = resolve(PrivacyService::class)
-            ->defaultTierForUser($this->authUser())->value;
+        $this->useMailboxSharingTier($account);
 
         $signature = $this->defaultSignatureFor($this->accountId);
         $this->signatureId = $signature?->getKey();
@@ -312,7 +314,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+        $this->useMailboxSharingTier($account);
 
         $this->replyMode = in_array($mode, ['reply', 'reply_all', 'forward'], true) ? $mode : 'reply';
 
@@ -402,7 +404,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->resetComposerState();
 
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
+        $this->useMailboxSharingTier($account);
 
         $this->loadDraft((string) $draft->getKey());
 
@@ -1658,9 +1660,26 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
+        $accounts = $this->activeAccounts();
+        $previous = $accounts->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $this->tierAccountId);
+        $next = $accounts->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === $value);
+
+        $levelWasPickedByHand = $previous instanceof ConnectedAccount
+            && $this->privacyTier !== resolve(PrivacyService::class)->tierForMailbox($previous)->value;
+
+        if ($next instanceof ConnectedAccount && ! $levelWasPickedByHand) {
+            $this->useMailboxSharingTier($next);
+        }
+
         $signature = $this->defaultSignatureFor($value);
         $this->signatureId = $signature?->getKey();
         $this->updatedSignatureId($this->signatureId);
+    }
+
+    private function useMailboxSharingTier(ConnectedAccount $account): void
+    {
+        $this->privacyTier = resolve(PrivacyService::class)->tierForMailbox($account)->value;
+        $this->tierAccountId = (string) $account->getKey();
     }
 
     public function updatedSignatureId(?string $value): void
@@ -2221,6 +2240,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             'inReplyToEmailId',
             'linkRecordType',
             'linkRecordId',
+            'tierAccountId',
         ]);
         $this->resetErrorBag();
     }
@@ -2268,6 +2288,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             ->where('user_id', $this->authUser()->getKey())
             ->where('workspace_id', $this->authUser()->current_workspace_id)
             ->connected()
+            ->with('workspace')
             ->orderByDesc('is_default')
             ->oldest()
             ->get());

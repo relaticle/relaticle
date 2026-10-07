@@ -158,7 +158,7 @@ it('creates an EmailBatch and persists one Email row per recipient from the comp
 });
 
 it('stamps mass-send emails with the sender sharing default', function (EmailPrivacyTier $tier): void {
-    $this->user->update(['default_email_sharing_tier' => $tier]);
+    $this->account->forceFill(['sharing_tier' => $tier])->save();
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
 
     $person = People::create([
@@ -185,7 +185,7 @@ it('stamps mass-send emails with the sender sharing default', function (EmailPri
 ]);
 
 it('uses the sender sharing default when the batch payload omits a privacy tier', function (EmailPrivacyTier $tier): void {
-    $this->user->update(['default_email_sharing_tier' => $tier]);
+    $this->account->forceFill(['sharing_tier' => $tier])->save();
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
 
     $person = People::create([
@@ -212,7 +212,7 @@ it('uses the sender sharing default when the batch payload omits a privacy tier'
 ]);
 
 it('uses the privacy tier from the batch payload instead of the sender default', function (): void {
-    $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::PRIVATE])->save();
 
     $person = People::create([
         'workspace_id' => $this->workspace->id,
@@ -879,4 +879,31 @@ it('deletes a reopened mass send draft after a successful send', function (): vo
 
     expect(Email::query()->withTrashed()->whereKey($draft->id)->exists())->toBeFalse()
         ->and(EmailBatch::where('workspace_id', $this->workspace->id)->count())->toBe(1);
+});
+
+it('keeps a hand-picked level when the sender switches mailbox', function (): void {
+    $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'sharing_tier' => EmailPrivacyTier::FULL,
+    ]));
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('privacyTier', EmailPrivacyTier::PRIVATE->value)
+        ->set('accountId', (string) $second->getKey())
+        ->assertSet('privacyTier', EmailPrivacyTier::PRIVATE->value);
+});
+
+it('follows the new mailbox level when the sender switches mailbox without picking one', function (): void {
+    $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'sharing_tier' => EmailPrivacyTier::FULL,
+    ]));
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', (string) $second->getKey())
+        ->assertSet('privacyTier', EmailPrivacyTier::FULL->value);
 });

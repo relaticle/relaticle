@@ -47,16 +47,16 @@ final readonly class SendEmailBatchAction
     public function execute(User $user, array $recipients, array $payload): EmailBatch
     {
         $accountId = $payload['connected_account_id'];
-        $privacyTier = $payload['privacy_tier']
-            ?? $this->privacy->defaultTierForUser($user, $user->currentWorkspace);
 
         // Authorize the sender owns the chosen account in the current workspace; the
         // per-recipient People records are this workspace's own selection from the
         // PeopleResource table, already tenant-scoped by Filament.
-        ConnectedAccount::query()
+        $account = ConnectedAccount::query()
             ->ownedBy($user, $user->currentWorkspace)
             ->whereKey($accountId)
             ->firstOrFail();
+
+        $privacyTier = $payload['privacy_tier'] ?? $this->privacy->tierForMailbox($account);
 
         return DB::transaction(function () use ($user, $recipients, $payload, $accountId, $privacyTier): EmailBatch {
             $batch = EmailBatch::query()->create([

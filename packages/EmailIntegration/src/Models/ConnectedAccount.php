@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Relaticle\EmailIntegration\Data\MailboxHistoryImportSummary;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -58,6 +59,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string|null $last_error
  * @property string|null $history_import_batch_id
  * @property string|null $history_import_notified_batch_id
+ * @property EmailPrivacyTier|null $sharing_tier
  */
 #[Fillable([
     'workspace_id',
@@ -685,6 +687,7 @@ final class ConnectedAccount extends Model
         return [
             'provider' => EmailProvider::class,
             'status' => EmailAccountStatus::class,
+            'sharing_tier' => EmailPrivacyTier::class,
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'last_calendar_synced_at' => 'datetime',

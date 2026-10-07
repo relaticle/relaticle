@@ -89,7 +89,7 @@ final readonly class QueueAgentEmailAction
             'bcc' => $this->recipients($data['bcc'] ?? []),
             'in_reply_to_email_id' => $replyTo?->getKey(),
             'creation_source' => $source,
-            'privacy_tier' => $this->privacy->defaultTierForUser($user, $workspace),
+            'privacy_tier' => $this->privacy->tierForMailbox($account),
             'batch_id' => null,
             'priority' => EmailPriority::PRIORITY,
             'scheduled_for' => now()->addSeconds($holdSeconds),

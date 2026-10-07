@@ -1135,7 +1135,7 @@ it('shows a held email in the default view of its owner outbox', function (): vo
 });
 
 it('sends with the sender default sharing level', function (): void {
-    $this->viewer->forceFill(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
+    $this->viewerAccount->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     $data = emailToolData($this->viewer->fresh(), SendEmailTool::class, sendArguments($this->viewerAccount));
 
