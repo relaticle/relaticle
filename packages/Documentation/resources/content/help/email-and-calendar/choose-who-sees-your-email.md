@@ -39,7 +39,9 @@ Saving also updates the email that mailbox has already synced, except any
 email you changed individually. Choosing **Full access** asks you to type a
 confirmation first, because it shares the body of every email in that mailbox.
 
-Setting up a workspace asks for this level after each mailbox you connect.
+Setting up a workspace asks for a level after each mailbox you connect.
+Setup offers **Participants only** and **Subject line and participants**.
+The mailbox's settings offer all four levels afterwards.
 
 ## Change one email
 

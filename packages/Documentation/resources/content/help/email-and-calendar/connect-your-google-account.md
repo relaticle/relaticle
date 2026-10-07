@@ -2,7 +2,7 @@
 title: Connect your Google account
 description: Link a Google account so your email and calendar sync into Relaticle, then manage, reconnect, or disconnect it from workspace settings.
 order: 1
-updated: "2026-10-05"
+updated: "2026-10-07"
 related: [help/email-and-calendar/connect-your-microsoft-account, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/see-meetings-and-link-them-to-records]
 ---
 
@@ -44,8 +44,8 @@ it runs. The account shows **Syncing** with a percentage during the import
 and **In sync** once it has caught up.
 
 New email and events keep arriving after that. What your workspace sees of
-each email depends on your sharing level, which starts at the workspace
-default. [Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
+each email depends on the mailbox's sharing level, which starts at the
+workspace default. [Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
 before you connect a mailbox you consider sensitive.
 
 ## Manage a connected account
