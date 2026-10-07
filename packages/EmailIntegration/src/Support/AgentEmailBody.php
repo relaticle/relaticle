@@ -18,13 +18,13 @@ final readonly class AgentEmailBody
     {
         return $this->renderer->applySignatureBlock(
             $this->html($markdown),
-            $this->signature($account, $includeSignature),
+            $this->signatureForDraft($markdown, $account, $includeSignature),
         );
     }
 
     public function forSending(string $markdown, ConnectedAccount $account, bool $includeSignature): string
     {
-        $signature = $this->signature($account, $includeSignature);
+        $signature = $this->signatureForSending($account, $includeSignature);
 
         if (! $signature instanceof EmailSignature) {
             return $this->html($markdown);
@@ -35,7 +35,12 @@ final readonly class AgentEmailBody
         );
     }
 
-    private function signature(ConnectedAccount $account, bool $includeSignature): ?EmailSignature
+    public function signatureForDraft(string $markdown, ConnectedAccount $account, bool $includeSignature): ?EmailSignature
+    {
+        return $this->signatureForSending($account, $includeSignature && trim($markdown) !== '');
+    }
+
+    public function signatureForSending(ConnectedAccount $account, bool $includeSignature): ?EmailSignature
     {
         return $includeSignature
             ? EmailSignature::query()->defaultFor((string) $account->getKey())->first()

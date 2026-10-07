@@ -32,6 +32,7 @@ use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
+use Relaticle\Chat\Support\ProposalVerbs;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
@@ -144,6 +145,10 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $this->ensureTenantContext();
+
+        if (! in_array($code, $this->editableCodesOf($pendingAction), true)) {
+            return;
+        }
 
         $this->editingStepId = (string) $pendingAction->getKey();
         $this->editingFieldCode = $code;
@@ -546,6 +551,7 @@ final class ProposalCard extends BaseLivewireComponent
                 'editableCodes' => $this->editableCodesOf($step),
                 'isActive' => (string) $step->getKey() === $activeStepId,
                 'needsOwnApproval' => $step->needsOwnApproval(),
+                'decisionLabel' => ProposalVerbs::action($step->entity_type, $step->operation->value),
                 'isBatch' => ProposalPayload::from($step)->isBatch,
                 'recordCount' => $this->recordCountOf($step),
                 'remainingCount' => $this->remainingCountOf($step),
@@ -1672,8 +1678,9 @@ final class ProposalCard extends BaseLivewireComponent
         // Only Create proposals are inline-editable, so only they need the rebuild that
         // re-derives each owned row from action_data to attach an editable `code`. For
         // update/delete, action_data holds diffs/record ids rather than display values, so the
-        // stored display rows are authoritative; rebuilding would blank them out.
-        if ($pendingAction->operation !== PendingActionOperation::Create) {
+        // stored display rows are authoritative; rebuilding would blank them out. An email is
+        // never edited, so its stored rows are the ones the tool proposed.
+        if ($pendingAction->operation !== PendingActionOperation::Create || ProposalCoreFields::isIndivisible($pendingAction->entity_type)) {
             return $existingFields;
         }
 
@@ -1711,6 +1718,10 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         $entityType = $pendingAction->entity_type;
+
+        if (ProposalCoreFields::isIndivisible($entityType) || ! is_string(Relation::getMorphedModel($entityType))) {
+            return [];
+        }
 
         // Which codes are editable is a property of the entity, not of the record:
         // the describer lists the entity's core keys plus its active, non-deferred

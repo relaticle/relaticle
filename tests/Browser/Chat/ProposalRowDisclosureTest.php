@@ -357,3 +357,71 @@ it('heads a fully-skipped batch with Rejected, since it wrote nothing', function
     expect($header)->toContain('Rejected')
         ->and($header)->not->toContain('skipped');
 });
+
+it('words a decided email by what happened to it and links to no record', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided emails', $conversationId);
+
+    $steps = [];
+
+    foreach ([['emails', 'SendAssistantEmail', 'Q4 lanes'], ['email_drafts', 'SaveAssistantEmailDraft', 'Next steps']] as [$entityType, $action, $subject]) {
+        $pending = PendingAction::query()->create([
+            'workspace_id' => $workspace->getKey(),
+            'user_id' => $user->getKey(),
+            'conversation_id' => $conversationId,
+            'action_class' => "Relaticle\\EmailIntegration\\Actions\\{$action}",
+            'operation' => PendingActionOperation::Create,
+            'entity_type' => $entityType,
+            'action_data' => ['subject' => $subject],
+            'display_data' => [
+                'title' => $entityType === 'emails' ? 'Send Email' : 'Save Email Draft',
+                'summary' => "Email: {$subject}",
+                'fields' => [['label' => 'Subject', 'value' => $subject]],
+            ],
+            'status' => PendingActionStatus::Approved,
+            'expires_at' => now()->addMinutes(15),
+            'resolved_at' => now(),
+            'result_data' => ['id' => (string) Str::ulid(), 'type' => $entityType],
+        ]);
+
+        $steps[] = [
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'EmailTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'operation' => 'create',
+                'data' => ['subject' => $subject],
+                'display' => $pending->display_data,
+            ]),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => storedToolSteps($steps),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSee('Sent')
+        ->assertSee('Saved')
+        ->assertDontSee('Created')
+        ->assertMissing('[data-proposal-record-link]');
+});

@@ -144,7 +144,7 @@
                     @disabled($blockedBy !== [])
                     class="inline-flex h-6 shrink-0 items-center rounded-md bg-primary-600 px-2 text-xs font-medium text-white shadow-sm transition hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                    {{ __('Send') }}
+                    {{ $step['decisionLabel'] }}
                 </button>
             @else
                 <button

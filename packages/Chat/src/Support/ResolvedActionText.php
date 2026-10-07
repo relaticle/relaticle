@@ -40,11 +40,13 @@ final readonly class ResolvedActionText
         $excluded = $action['excluded'] ?? [];
         $failure = $action['failure'] ?? null;
         $marker = ($action['just_decided'] ?? false) ? 'JUST DECIDED, ' : '';
-        $head = '- '.$marker.PendingActionStatus::from($action['status'])->promptWord().": {$action['operation']} ";
-        $notWritten = 'NOT '.($action['operation'] === 'delete' ? 'deleted' : "{$action['operation']}d");
+        $verb = ProposalVerbs::verb($action['entity_type'], $action['operation']);
+        $noun = ProposalVerbs::noun($action['entity_type']);
+        $head = '- '.$marker.PendingActionStatus::from($action['status'])->promptWord().": {$verb} ";
+        $notWritten = ProposalVerbs::notDone($action['entity_type'], $action['operation']);
 
         if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
-            $lines = [$head.count($records)." {$action['entity_type']} records:"];
+            $lines = [$head.count($records)." {$noun} records:"];
 
             foreach ($records as $record) {
                 $lines[] = '    - '.self::recordText($record, $cite);
@@ -65,7 +67,7 @@ final readonly class ResolvedActionText
             return $lines;
         }
 
-        $line = $head."{$action['entity_type']} ".self::recordsText($action, $cite);
+        $line = $head."{$noun} ".self::recordsText($action, $cite);
 
         if ($skipped !== []) {
             $line .= "; skipped by the user, {$notWritten}: ".implode(', ', array_map(self::quoted(...), $skipped));

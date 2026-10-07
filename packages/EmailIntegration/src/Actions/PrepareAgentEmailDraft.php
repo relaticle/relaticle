@@ -64,12 +64,11 @@ final readonly class PrepareAgentEmailDraft
 
         $threadsOnReply = $replyTo instanceof Email && filled($replyTo->rfc_message_id);
         $markdown = (string) ($data['body'] ?? '');
-        $includeSignature = ($data['include_signature'] ?? true) && trim($markdown) !== '';
 
         return [
             'connected_account_id' => (string) $account->getKey(),
             'subject' => $data['subject'] ?? null,
-            'body_html' => $this->body->forDraft($markdown, $account, $includeSignature),
+            'body_html' => $this->body->forDraft($markdown, $account, $data['include_signature'] ?? true),
             'to' => $data['to'] ?? [],
             'cc' => $data['cc'] ?? [],
             'bcc' => $data['bcc'] ?? [],

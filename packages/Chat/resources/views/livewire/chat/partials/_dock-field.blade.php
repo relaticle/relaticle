@@ -131,6 +131,7 @@
                     <span @class([
                         'font-medium text-gray-900 dark:text-white' => array_key_exists('new', $row),
                         'text-gray-700 dark:text-gray-300' => ! array_key_exists('new', $row),
+                        'whitespace-pre-wrap' => str_contains((string) ($row['new'] ?? $row['value'] ?? ''), "\n"),
                     ])>{{ $row['new'] ?? $row['value'] ?? '' }}</span>
                 @endif
             @endif

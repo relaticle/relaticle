@@ -12,6 +12,9 @@ use Relaticle\Chat\Tools\Concerns\DescribesEmailProposals;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Support\AgentEmailBody;
 
 final class CreateEmailDraftTool extends BaseWriteCreateTool
 {
@@ -71,6 +74,11 @@ final class CreateEmailDraftTool extends BaseWriteCreateTool
             'include_signature' => $schema->boolean()->description('Add the mailbox default signature.')->default(true),
             'in_reply_to_email_id' => $schema->string()->description('ID of the email this draft replies to, so it threads.'),
         ];
+    }
+
+    protected function appendedSignature(ConnectedAccount $account, array $data): ?EmailSignature
+    {
+        return resolve(AgentEmailBody::class)->signatureForDraft((string) ($data['body'] ?? ''), $account, $data['include_signature'] === true);
     }
 
     protected function extractRecordData(array $record): array

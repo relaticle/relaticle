@@ -152,14 +152,12 @@ final readonly class PendingActionService
     }
 
     /**
-     * jsonb stores object keys by length, not by insertion, so a stored payload only
-     * equals the one that was written when both are compared with their keys sorted.
-     *
      * @param  array<array-key, mixed>  $data
      * @return array<array-key, mixed>
      */
     private function withSortedKeys(array $data): array
     {
+        // jsonb stores object keys by length, so a stored payload equals the written one only with keys sorted.
         ksort($data, SORT_STRING);
 
         return array_map(fn (mixed $value): mixed => is_array($value) ? $this->withSortedKeys($value) : $value, $data);
@@ -847,6 +845,11 @@ final readonly class PendingActionService
         }
 
         $resolver = resolve(RecordReferenceResolver::class);
+
+        if (! $resolver->hasRecordPage($action->entity_type)) {
+            return [];
+        }
+
         $payload = ProposalPayload::from($action);
 
         if (! $payload->isBatch) {

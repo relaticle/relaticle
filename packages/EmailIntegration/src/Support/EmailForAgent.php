@@ -79,6 +79,38 @@ final readonly class EmailForAgent
         ];
     }
 
+    public function textFromHtml(string $html): string
+    {
+        $document = HTMLDocument::createFromString($html, LIBXML_NOERROR, 'UTF-8');
+
+        foreach ($document->querySelectorAll('head, style, script, template, noscript') as $hidden) {
+            $hidden->remove();
+        }
+
+        foreach ($document->querySelectorAll('br') as $lineBreak) {
+            $lineBreak->replaceWith("\n");
+        }
+
+        foreach ($document->querySelectorAll('td, th') as $cell) {
+            $cell->append(' ');
+        }
+
+        foreach ($document->querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote') as $block) {
+            $block->append("\n");
+        }
+
+        $lines = Str::of((string) $document->body?->textContent)
+            ->replaceMatches('/[ \t\x{00A0}]+/u', ' ')
+            ->explode("\n")
+            ->map(fn (string $line): string => trim($line))
+            ->implode("\n");
+
+        return Str::of($lines)
+            ->replaceMatches('/\n{3,}/', "\n\n")
+            ->trim()
+            ->toString();
+    }
+
     /**
      * @return array{
      *     id: string,
@@ -136,37 +168,5 @@ final readonly class EmailForAgent
         }
 
         return $this->textFromHtml((string) $email->body->body_html);
-    }
-
-    private function textFromHtml(string $html): string
-    {
-        $document = HTMLDocument::createFromString($html, LIBXML_NOERROR, 'UTF-8');
-
-        foreach ($document->querySelectorAll('head, style, script, template, noscript') as $hidden) {
-            $hidden->remove();
-        }
-
-        foreach ($document->querySelectorAll('br') as $lineBreak) {
-            $lineBreak->replaceWith("\n");
-        }
-
-        foreach ($document->querySelectorAll('td, th') as $cell) {
-            $cell->append(' ');
-        }
-
-        foreach ($document->querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote') as $block) {
-            $block->append("\n");
-        }
-
-        $lines = Str::of((string) $document->body?->textContent)
-            ->replaceMatches('/[ \t\x{00A0}]+/u', ' ')
-            ->explode("\n")
-            ->map(fn (string $line): string => trim($line))
-            ->implode("\n");
-
-        return Str::of($lines)
-            ->replaceMatches('/\n{3,}/', "\n\n")
-            ->trim()
-            ->toString();
     }
 }
