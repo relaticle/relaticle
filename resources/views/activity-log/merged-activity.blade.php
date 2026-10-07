@@ -75,7 +75,10 @@
                             <dt class="truncate pt-[1px] text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                 {{ $row['label'] }}
                             </dt>
-                            <dd class="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300">
+                            <dd
+                                class="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300"
+                                @if ($row['full'] !== null) x-show="!full" @endif
+                            >
                                 <span
                                     class="line-clamp-2 text-gray-500 line-through decoration-gray-400/50 dark:text-gray-500"
                                     @if ($row['full'] === null) title="{{ $row['old'] }}" @endif
