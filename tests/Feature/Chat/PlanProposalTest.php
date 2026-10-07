@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
+use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
@@ -26,6 +27,7 @@ use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 
 mutates(ProposalPlanService::class, PlanReferenceValidator::class, PlanReferenceResolver::class, PlanReference::class);
 
@@ -120,7 +122,7 @@ it('approves the whole plan in order and resolves references to real ids', funct
 
     $result = resolve(ProposalPlanService::class)->approveAll($company, $this->user);
 
-    expect($result['approved'])->toBe(3)
+    expect($result['approved'])->toHaveCount(3)
         ->and($result['failed'])->toBeNull();
 
     $createdCompany = Company::query()->where('name', 'Acme Robotics')->firstOrFail();
@@ -195,10 +197,45 @@ it('reports the failing step and keeps the steps already committed', function ()
 
     $result = resolve(ProposalPlanService::class)->approveAll($company, $this->user);
 
-    expect($result['approved'])->toBe(1)
+    expect($result['approved'])->toHaveCount(1)
         ->and($result['failed']['step'] ?? null)->toBe(2)
         ->and(Company::query()->where('name', 'Acme Robotics')->exists())->toBeTrue()
         ->and(People::query()->count())->toBe(0);
+});
+
+it('numbers a failure on the rail of pending steps and leaves a send pending', function (): void {
+    ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+        'records' => [['name' => 'Acme Robotics']],
+    ]));
+
+    $company = ($this->proposalFor)('company');
+
+    $send = PendingAction::query()->create([
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'conversation_id' => $this->convId,
+        'turn_id' => $this->turnId,
+        'action_class' => SendAssistantEmail::class,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'emails',
+        'action_data' => ['subject' => 'Q4 lanes'],
+        'display_data' => ['title' => 'Send Email', 'summary' => 'Send email: Q4 lanes', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    ($this->tool)(CreatePersonTool::class)->handle(new Request([
+        'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $company->getKey())]],
+    ]));
+
+    $person = ($this->proposalFor)('people');
+    $person->update(['action_data' => [...$person->action_data, 'company_id' => PlanReference::to('01MISSINGMISSINGMISSINGMI')]]);
+
+    $result = resolve(ProposalPlanService::class)->approveAll($company, $this->user);
+
+    expect(array_map(fn (PendingAction $step): string => (string) $step->getKey(), $result['approved']))->toBe([(string) $company->getKey()])
+        ->and($result['failed']['step'] ?? null)->toBe(3)
+        ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 
 it('treats a lone proposal as a plan of one', function (): void {
@@ -215,7 +252,7 @@ it('treats a lone proposal as a plan of one', function (): void {
 
     $result = $plan->approveAll($company, $this->user);
 
-    expect($result['approved'])->toBe(1)
+    expect($result['approved'])->toHaveCount(1)
         ->and(Company::query()->where('name', 'Solo Corp')->exists())->toBeTrue();
 });
 

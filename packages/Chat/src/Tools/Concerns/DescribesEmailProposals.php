@@ -16,16 +16,13 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 trait DescribesEmailProposals
 {
-    private const int MAX_EMAILS_PER_CALL = 5;
+    abstract protected function maxEmailsPerCall(): int;
 
     public function schema(JsonSchema $schema): array
     {
         $properties = parent::schema($schema);
 
-        $properties['records']->description(
-            'The emails to propose. Pass ONE item for a single email, or up to '.self::MAX_EMAILS_PER_CALL
-            .' items to propose them all in ONE card (never loop one call per email).',
-        );
+        $properties['records']->description($this->recordsDescription());
 
         return $properties;
     }
@@ -34,13 +31,30 @@ trait DescribesEmailProposals
     {
         $records = $request['records'] ?? null;
 
-        if (is_array($records) && count($records) > self::MAX_EMAILS_PER_CALL) {
-            return (string) json_encode([
-                'error' => 'At most '.self::MAX_EMAILS_PER_CALL.' emails per proposal. Nothing was proposed.',
-            ], JSON_UNESCAPED_SLASHES);
+        if (is_array($records) && count($records) > $this->maxEmailsPerCall()) {
+            return (string) json_encode(['error' => $this->tooManyEmailsError()], JSON_UNESCAPED_SLASHES);
         }
 
         return parent::handle($request);
+    }
+
+    private function recordsDescription(): string
+    {
+        if ($this->maxEmailsPerCall() === 1) {
+            return 'The email to send. Pass exactly one email per call and make one call per email: each email gets its own approval.';
+        }
+
+        return 'The emails to propose. Pass ONE item for a single email, or up to '.$this->maxEmailsPerCall()
+            .' items to propose them all in ONE card (never loop one call per email).';
+    }
+
+    private function tooManyEmailsError(): string
+    {
+        if ($this->maxEmailsPerCall() === 1) {
+            return 'A send proposal takes exactly one email. Make one call per email: each gets its own approval. Nothing was proposed.';
+        }
+
+        return 'At most '.$this->maxEmailsPerCall().' emails per proposal. Nothing was proposed.';
     }
 
     /**

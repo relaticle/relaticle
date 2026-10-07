@@ -22,6 +22,7 @@ final class SendEmailTool extends BaseWriteCreateTool
         return 'Propose sending an email as the user from one of their mailboxes. Returns a proposal the user approves; nothing is sent until they do.'
             .' The email reaches people outside the workspace, so propose it only when the user asked for it.'
             .' After approval it waits a few seconds so the user can still undo it.'
+            .' One call proposes exactly one email: make one call per email, and each gets its own approval.'
             .' Write `body` as plain text or markdown. Prefer the create email draft tool when the user wants to review the email before it can go.';
     }
 
@@ -50,9 +51,9 @@ final class SendEmailTool extends BaseWriteCreateTool
         return WorkspaceCapability::EmailAgentSend;
     }
 
-    protected function batchVerb(): string
+    protected function maxEmailsPerCall(): int
     {
-        return 'Send';
+        return 1;
     }
 
     protected function entitySchema(JsonSchema $schema): array

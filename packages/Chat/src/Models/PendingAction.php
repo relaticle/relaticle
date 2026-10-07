@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 
 /**
  * @property string $id
@@ -82,6 +83,11 @@ final class PendingAction extends Model
     public function isPending(): bool
     {
         return $this->status === PendingActionStatus::Pending;
+    }
+
+    public function needsOwnApproval(): bool
+    {
+        return $this->action_class === SendAssistantEmail::class;
     }
 
     public function isExpired(): bool

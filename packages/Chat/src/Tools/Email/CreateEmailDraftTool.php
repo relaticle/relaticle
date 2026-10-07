@@ -49,6 +49,11 @@ final class CreateEmailDraftTool extends BaseWriteCreateTool
         return null;
     }
 
+    protected function maxEmailsPerCall(): int
+    {
+        return 5;
+    }
+
     protected function batchVerb(): string
     {
         return 'Save';

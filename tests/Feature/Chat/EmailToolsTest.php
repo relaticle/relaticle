@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
+use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
@@ -25,6 +32,7 @@ use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
@@ -527,12 +535,13 @@ function chatDraftRecord(ConnectedAccount $account, array $overrides = []): arra
  * @param  list<array<string, mixed>>  $records
  * @return array<string, mixed>
  */
-function proposeChatEmails(User $user, string $class, array $records, ?string $conversationId = null): array
+function proposeChatEmails(User $user, string $class, array $records, ?string $conversationId = null, ?string $turnId = null): array
 {
     auth()->setUser($user);
 
     $tool = resolve($class);
     $tool->setConversationId($conversationId);
+    $tool->setTurnId($turnId);
 
     return json_decode($tool->handle(new Request(['records' => $records])), true);
 }
@@ -1099,32 +1108,36 @@ it('skips a send the user cannot make and proposes nothing', function (string $c
     })->and(PendingAction::query()->count())->toBe(0);
 })->with(['a teammate mailbox', 'more than twenty recipients in total', 'no recipient', 'no body']);
 
-it('refuses a call with more than five emails whole', function (): void {
-    $records = array_fill(0, 6, chatSendRecord($this->viewerAccount));
+it('refuses a send call with more than one email whole', function (): void {
+    $records = [
+        chatSendRecord($this->viewerAccount, ['subject' => 'First']),
+        chatSendRecord($this->viewerAccount, ['subject' => 'Second']),
+    ];
 
     $result = proposeChatEmails($this->viewer, SendEmailTool::class, $records);
 
-    expect($result['error'])->toContain('At most 5 emails per proposal')
-        ->and(PendingAction::query()->count())->toBe(0);
+    expect($result['error'])->toContain('exactly one email')->toContain('one call per email')
+        ->and(PendingAction::query()->count())->toBe(0)
+        ->and(Email::query()->count())->toBe(0);
 });
 
-it('proposes two emails as one card and queues each when it is approved', function (): void {
-    $proposal = proposeChatEmails($this->viewer, SendEmailTool::class, [
-        chatSendRecord($this->viewerAccount, ['subject' => 'First']),
-        chatSendRecord($this->viewerAccount, ['subject' => 'Second']),
-    ]);
+it('tells the assistant to send one email per call and a draft call to take up to five', function (): void {
+    auth()->setUser($this->viewer);
 
-    $pending = pendingChatEmail($proposal);
+    $description = fn (string $class): string => (string) resolve($class)->schema(new JsonSchemaTypeFactory)['records']->toArray()['description'];
 
-    $first = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 0);
-    $second = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 1);
+    expect($description(SendEmailTool::class))->toContain('exactly one email')->toContain('own approval')
+        ->and($description(CreateEmailDraftTool::class))->toContain('up to 5');
+});
 
-    expect(PendingAction::query()->count())->toBe(1)
-        ->and($proposal['display']['title'])->toBe('Send Emails')
-        ->and($proposal['display']['summary'])->toBe('Send 2 emails')
-        ->and($first['finalized'])->toBeFalse()
-        ->and($second['finalized'])->toBeTrue()
-        ->and(Email::query()->where('status', EmailStatus::QUEUED)->pluck('subject')->all())->toEqualCanonicalizing(['First', 'Second']);
+it('proposes five drafts as one card', function (): void {
+    $records = array_map(fn (int $number): array => chatDraftRecord($this->viewerAccount, ['subject' => "Draft {$number}"]), range(1, 5));
+
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, $records);
+
+    expect($result['type'])->toBe('pending_action')
+        ->and($result['display']['summary'])->toBe('Save 5 email drafts')
+        ->and(PendingAction::query()->count())->toBe(1);
 });
 
 it('approves a send card from the dock without a link or an error', function (): void {
@@ -1140,6 +1153,206 @@ it('approves a send card from the dock without a link or an error', function ():
         ->assertDispatched('proposal:resolved', fn (string $event, array $params): bool => $params['decision'] === 'approved' && $params['record'] === null);
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
+});
+
+function proposeChatPlanTask(User $user, string $conversationId, string $turnId, string $title): PendingAction
+{
+    auth()->setUser($user);
+
+    $tool = resolve(CreateTaskTool::class);
+    $tool->setConversationId($conversationId);
+    $tool->setTurnId($turnId);
+    $tool->handle(new Request(['records' => [['title' => $title]]]));
+
+    return PendingAction::query()->where('entity_type', 'task')->where('conversation_id', $conversationId)->latest('id')->firstOrFail();
+}
+
+function openChatEmailDock(PendingAction $anchor): Testable
+{
+    return Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $anchor->getKey(), context: 'conversation');
+}
+
+describe('a send inside a plan', function (): void {
+    beforeEach(function (): void {
+        $this->actingAs($this->viewer);
+        Filament::setTenant($this->workspace);
+        Queue::fake();
+
+        $this->conversationId = chatEmailConversation($this->viewer);
+        $this->turnId = (string) Str::ulid();
+
+        $this->planTask = fn (string $title = 'Call Lena'): PendingAction => proposeChatPlanTask($this->viewer, $this->conversationId, $this->turnId, $title);
+
+        $this->planSend = fn (string $subject = 'Q4 lanes', array $overrides = []): PendingAction => pendingChatEmail(proposeChatEmails(
+            $this->viewer,
+            SendEmailTool::class,
+            [chatSendRecord($this->viewerAccount, ['subject' => $subject, ...$overrides])],
+            $this->conversationId,
+            $this->turnId,
+        ));
+    });
+
+    it('is left pending by approve all, which creates the task and queues no email', function (): void {
+        $task = ($this->planTask)();
+        $send = ($this->planSend)();
+
+        openChatEmailDock($task)
+            ->call('approveAll')
+            ->assertHasNoErrors()
+            ->assertNotDispatched('proposal:resolve-failed')
+            ->assertSet('pendingActionId', (string) $send->getKey())
+            ->assertSet('activeStepId', (string) $send->getKey());
+
+        expect(Task::query()->where('title', 'Call Lena')->exists())->toBeTrue()
+            ->and($task->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and(Email::query()->count())->toBe(0);
+
+        Queue::assertNotPushed(ProcessChatMessage::class);
+    });
+
+    it('announces only the steps approve all really approved', function (): void {
+        $send = ($this->planSend)();
+        $task = ($this->planTask)();
+
+        $announced = [];
+
+        openChatEmailDock($send)
+            ->call('approveAll')
+            ->assertDispatched('proposal:resolved', function (string $event, array $params) use (&$announced): bool {
+                $announced[] = $params['pendingActionId'];
+
+                return true;
+            });
+
+        expect($announced)->toBe([$task->getKey()])
+            ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('is queued once by its own approval, and the assistant resumes after it', function (): void {
+        AiCreditBalance::query()->updateOrCreate(
+            ['workspace_id' => $this->workspace->getKey()],
+            ['credits_remaining' => 50, 'credits_used' => 0, 'purchased_credits' => 0],
+        );
+
+        $task = ($this->planTask)();
+        $send = ($this->planSend)();
+
+        $dock = openChatEmailDock($task)->call('approveAll');
+
+        expect(Email::query()->count())->toBe(0);
+
+        $dock->call('approveStep', (string) $send->getKey())->assertHasNoErrors();
+
+        expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1)
+            ->and($send->fresh()->status)->toBe(PendingActionStatus::Approved);
+
+        Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume);
+    });
+
+    it('shows its cc address and its message in full on the plan card', function (): void {
+        $task = ($this->planTask)();
+        ($this->planSend)('Q4 lanes', ['cc' => ['ops@acme.test'], 'bcc' => ['audit@acme.test'], 'body' => "Lane 4 is confirmed.\n\nSecond paragraph of the message."]);
+
+        openChatEmailDock($task)
+            ->assertSee('ops@acme.test')
+            ->assertSee('audit@acme.test')
+            ->assertSee('Lane 4 is confirmed.')
+            ->assertSee('Second paragraph of the message.');
+    });
+
+    it('has its own Send button while a task step keeps the icon', function (): void {
+        $task = ($this->planTask)();
+        $send = ($this->planSend)();
+
+        $dock = openChatEmailDock($task);
+        $views = collect($dock->instance()->stepViews())->keyBy('entity_type');
+
+        expect($views['emails']['needsOwnApproval'])->toBeTrue()
+            ->and($views['task']['needsOwnApproval'])->toBeFalse()
+            ->and(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(1);
+
+        $dock->assertSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
+    });
+
+    it('counts only the steps approve all will approve, and says each email is sent on its own', function (): void {
+        ($this->planTask)('First task');
+        ($this->planTask)('Second task');
+        $send = ($this->planSend)();
+
+        openChatEmailDock($send)
+            ->assertSee('Approve all 2')
+            ->assertSee(__('Each email is sent with its own button'))
+            ->assertDontSee(__('Approved together, in order'));
+    });
+
+    it('offers no approve all for a plan made only of sends', function (): void {
+        $first = ($this->planSend)('First');
+        ($this->planSend)('Second');
+
+        $dock = openChatEmailDock($first)
+            ->assertSee('Discard all')
+            ->assertDontSee('Approve all');
+
+        expect(substr_count($dock->html(), 'data-proposal-send-step'))->toBe(2);
+    });
+
+    it('is not sent by the keyboard shortcut on a plan', function (): void {
+        $task = ($this->planTask)();
+        $send = ($this->planSend)();
+        ($this->planSend)('Second email');
+
+        openChatEmailDock($task)
+            ->dispatch('proposal:create-current', context: 'conversation')
+            ->assertNotDispatched('proposal:resolve-failed');
+
+        expect(Task::query()->where('title', 'Call Lena')->exists())->toBeTrue()
+            ->and(Email::query()->count())->toBe(0)
+            ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('is not sent by the keyboard shortcut on a plan made only of sends', function (): void {
+        $first = ($this->planSend)('First');
+        ($this->planSend)('Second');
+
+        openChatEmailDock($first)->dispatch('proposal:create-current', context: 'conversation');
+
+        expect(Email::query()->count())->toBe(0)
+            ->and(PendingAction::query()->pending()->count())->toBe(2);
+
+        Queue::assertNotPushed(ProcessChatMessage::class);
+    });
+
+    it('names its own step when a draft step fails after an earlier approval', function (): void {
+        $task = ($this->planTask)();
+        $draft = pendingChatEmail(proposeChatEmails(
+            $this->viewer,
+            CreateEmailDraftTool::class,
+            [chatDraftRecord($this->viewerAccount)],
+            $this->conversationId,
+            $this->turnId,
+        ));
+
+        ConnectedAccount::query()->whereKey($this->viewerAccount->id)->update(['status' => EmailAccountStatus::DISCONNECTED]);
+
+        $announced = [];
+
+        $dock = openChatEmailDock($task)
+            ->call('approveAll')
+            ->assertDispatched('proposal:resolved', function (string $event, array $params) use (&$announced): bool {
+                $announced[] = $params['pendingActionId'];
+
+                return true;
+            })
+            ->assertDispatched('proposal:resolve-failed', fn (string $event, array $params): bool => str_starts_with($params['message'], 'Step 2 could not be completed'));
+
+        expect($dock->errors()->get('resolve')[0])->toStartWith('Step 2 could not be completed')
+            ->and($announced)->toBe([$task->getKey()])
+            ->and(Task::query()->where('title', 'Call Lena')->exists())->toBeTrue()
+            ->and($draft->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and(Email::query()->count())->toBe(0);
+    });
 });
 
 it('leaves the send intact when an approval names fields to leave out', function (): void {

@@ -545,6 +545,7 @@ final class ProposalCard extends BaseLivewireComponent
                 'fields' => $this->recordFieldsOf($step),
                 'editableCodes' => $this->editableCodesOf($step),
                 'isActive' => (string) $step->getKey() === $activeStepId,
+                'needsOwnApproval' => $step->needsOwnApproval(),
                 'isBatch' => ProposalPayload::from($step)->isBatch,
                 'recordCount' => $this->recordCountOf($step),
                 'remainingCount' => $this->remainingCountOf($step),
@@ -894,8 +895,6 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
-        $steps = $this->planSteps();
-
         try {
             $result = $plan->approveAll($anchor, $this->authUser());
         } catch (QueryException $exception) {
@@ -912,7 +911,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        foreach (array_slice($steps, 0, $result['approved']) as $step) {
+        foreach ($result['approved'] as $step) {
             $this->announceResolution($step, 'approved');
         }
 
@@ -1762,10 +1761,14 @@ final class ProposalCard extends BaseLivewireComponent
         // every dock round trip, only to be discarded. stepViews() already carries
         // both per step. The counters below stay: they are cheap array reads and the
         // batch footer's behaviour is asserted through them.
+        $approveAllCount = count(array_filter($steps, static fn (array $step): bool => $step['needsOwnApproval'] === false));
+
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
             'steps' => $steps,
             'isPlan' => count($steps) > 1,
+            'approveAllCount' => $approveAllCount,
+            'hasOwnApprovalSteps' => $approveAllCount < count($steps),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
         ]);

@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Services;
 
 use App\Models\User;
 use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
@@ -139,27 +140,25 @@ final readonly class ProposalPlanService
     }
 
     /**
-     * Approve every remaining step, in order, each in its own transaction.
+     * Approve every remaining step that does not need its own approval, in order,
+     * each in its own transaction.
      *
      * Execution stops at the first failure and reports it: the steps before it are
      * committed and stay committed, because a plan is a sequence of real CRM writes
      * and undoing the earlier ones would be a second set of writes the user never
-     * approved.
+     * approved. A step that needs its own approval stays pending and is never a failure.
      *
-     * @return array{approved: int, failed: array{step: int, message: string}|null}
+     * @return array{approved: list<PendingAction>, failed: array{step: int, message: string}|null}
      */
     public function approveAll(PendingAction $action, User $user): array
     {
-        $approved = 0;
-        $steps = $this->steps($action);
+        $approved = [];
 
-        // Counted over the steps actually attempted, i.e. the still-pending ones, which
-        // is the same basis the card numbers its rail on. Counting over every proposal
-        // of the turn made "Step 3 could not be completed" appear on a card whose steps
-        // were labelled 1 and 2 once an earlier step had been approved on its own.
+        // Numbered over the still-pending steps, skipped ones included: the same basis
+        // the card numbers its rail on.
         $position = 0;
 
-        foreach ($steps as $step) {
+        foreach ($this->steps($action) as $step) {
             $step->refresh();
 
             if ($step->status !== PendingActionStatus::Pending) {
@@ -167,6 +166,10 @@ final readonly class ProposalPlanService
             }
 
             $position++;
+
+            if ($step->needsOwnApproval()) {
+                continue;
+            }
 
             try {
                 $this->approveStep($step, $user);
@@ -177,21 +180,24 @@ final readonly class ProposalPlanService
                 // renders.
                 report($exception);
 
-                return [
-                    'approved' => $approved,
-                    'failed' => ['step' => $position, 'message' => $this->databaseFailureMessage($exception)],
-                ];
-            } catch (RuntimeException $exception) {
-                return [
-                    'approved' => $approved,
-                    'failed' => ['step' => $position, 'message' => ApprovalFailureMessage::for($exception)],
-                ];
+                return $this->failure($approved, $position, $this->databaseFailureMessage($exception));
+            } catch (RuntimeException|ValidationException $exception) {
+                return $this->failure($approved, $position, ApprovalFailureMessage::for($exception));
             }
 
-            $approved++;
+            $approved[] = $step;
         }
 
         return ['approved' => $approved, 'failed' => null];
+    }
+
+    /**
+     * @param  list<PendingAction>  $approved
+     * @return array{approved: list<PendingAction>, failed: array{step: int, message: string}}
+     */
+    private function failure(array $approved, int $position, string $message): array
+    {
+        return ['approved' => $approved, 'failed' => ['step' => $position, 'message' => $message]];
     }
 
     /**

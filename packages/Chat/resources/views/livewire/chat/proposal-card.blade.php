@@ -7,13 +7,14 @@
     // singular: the card can never commit anything that is not rendered.
     $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
     $primaryLabel = $isPlan
-        ? __('Approve all :count', ['count' => $stepCount])
+        ? __('Approve all :count', ['count' => $approveAllCount])
         : match ($operation) {
             'update' => __('Save changes'),
             'delete' => __('Delete'),
             default => __('Create'),
         };
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
+    $showPrimary = ! $isPlan || $approveAllCount > 0;
     $discardLabel = $isPlan ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
@@ -59,7 +60,7 @@
                     {{-- Right-aligned meta, same slot the records_table header uses
                          for its truncation count. --}}
                     <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                        {{ __('Approved together, in order') }}
+                        {{ $hasOwnApprovalSteps ? __('Each email is sent with its own button') : __('Approved together, in order') }}
                     </span>
                 </div>
             @endif
@@ -137,6 +138,7 @@
                     {{ $discardLabel }}
                 </button>
 
+                @if ($showPrimary)
                 <button
                     type="button"
                     wire:click="{{ $primaryAction }}"
@@ -158,6 +160,7 @@
                         class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
                     ></kbd>
                 </button>
+                @endif
                 </div>
             </div>
         </div>
