@@ -63,10 +63,9 @@ final readonly class StoreEmailAction
 
         try {
             $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
-                $email = Email::query()->create([
+                $email = $connectedAccount->emails()->chaperone()->create([
                     'workspace_id' => $connectedAccount->workspace_id,
                     'user_id' => $connectedAccount->user_id,
-                    'connected_account_id' => $connectedAccount->getKey(),
                     'rfc_message_id' => $data->rfcMessageId,
                     'provider_message_id' => $data->providerMessageId,
                     'thread_id' => $data->threadId,

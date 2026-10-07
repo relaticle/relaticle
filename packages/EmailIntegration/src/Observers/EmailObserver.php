@@ -27,7 +27,9 @@ final readonly class EmailObserver
             return;
         }
 
-        $mailbox = ConnectedAccount::withTrashed()->find($email->connected_account_id);
+        $mailbox = $email->relationLoaded('connectedAccount')
+            ? $email->connectedAccount
+            : ConnectedAccount::withTrashed()->find($email->connected_account_id);
 
         if ($mailbox instanceof ConnectedAccount) {
             $email->privacy_tier = $this->privacyService->tierForMailbox($mailbox);

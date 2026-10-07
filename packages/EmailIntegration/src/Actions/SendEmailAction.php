@@ -125,10 +125,9 @@ final readonly class SendEmailAction
                 : null;
 
             /** @var Email $email */
-            $email = Email::query()->create([
+            $email = $account->emails()->chaperone()->create([
                 'workspace_id' => $account->workspace_id,
                 'user_id' => $account->user_id,
-                'connected_account_id' => $account->getKey(),
                 // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
                 // header) so a retry that re-enters after the provider already
                 // delivered can find the sent message and adopt it instead of
