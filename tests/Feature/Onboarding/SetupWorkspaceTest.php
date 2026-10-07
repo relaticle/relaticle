@@ -239,6 +239,14 @@ it('requires a use case', function (): void {
         ->assertHasFormErrors(['onboarding_use_case' => 'required']);
 });
 
+it('labels the use case button Continue because the invite step follows', function (): void {
+    workspaceInSetup(User::factory()->create());
+
+    livewire(SetupWorkspace::class)
+        ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'))
+        ->assertDontSee(__('filament/pages/workspaces.create_workspace.actions.get_started'));
+});
+
 it('stores the use case and moves on to the invite step', function (): void {
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);

@@ -29,7 +29,7 @@ it('can create a new workspace through the browser', function (): void {
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
         ->click('[for$="onboarding_use_case-other"]')
-        ->press('Get started')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
         ->press('Get started')
         ->assertPathIs('/app/second-workspace')
