@@ -17,6 +17,7 @@ use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 
 mutates(User::class);
 
@@ -183,13 +184,20 @@ test('removing a member leaves their mailbox in another workspace connected', fu
     $workspace->users()->attach($member, ['role' => 'member']);
 
     $shared = ['email_address' => 'dana@northwind.test', 'provider_account_id' => 'google-123'];
-    syncingMailbox($member, $workspace, $shared);
+    $removed = syncingMailbox($member, $workspace, $shared);
     $elsewhere = syncingMailbox($member, $member->currentWorkspace, $shared);
+    $kept = Email::factory()->create([
+        'workspace_id' => $member->current_workspace_id,
+        'user_id' => $member->getKey(),
+        'connected_account_id' => $elsewhere->getKey(),
+    ]);
 
     resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
 
-    expect($elsewhere->fresh()->trashed())->toBeFalse()
-        ->and($elsewhere->fresh()->access_token)->not->toBeNull();
+    expect(ConnectedAccount::withTrashed()->findOrFail($removed->getKey())->trashed())->toBeTrue()
+        ->and($elsewhere->fresh()->trashed())->toBeFalse()
+        ->and($elsewhere->fresh()->access_token)->not->toBeNull()
+        ->and(Email::query()->whereKey($kept->getKey())->exists())->toBeTrue();
 
     Http::assertNothingSent();
 });
