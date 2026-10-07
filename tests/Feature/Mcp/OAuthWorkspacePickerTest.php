@@ -198,7 +198,7 @@ it('names the registered host when the client omits the redirect uri', function 
 it('spells out what the connector will be able to do, including deletion', function (): void {
     $this->actingAs($this->user);
 
-    $response = $this->get(authorizeUrl($this->client));
+    $response = $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
 
     $response->assertOk();
     $response->assertSee('Read and search your records');
@@ -305,7 +305,7 @@ it('refuses to approve a connector for a billing-paused workspace', function ():
 it('persists the chosen workspace_id onto the auth code', function (): void {
     $this->actingAs($this->user);
 
-    $this->get(authorizeUrl($this->client));
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
 
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
@@ -919,6 +919,34 @@ it('swaps the list for one sentence and disables Authorize when the role grants 
         ->not->toMatch('/id="consentNone"\s+hidden/')
         ->toMatch('/<button type="submit"\s+disabled\s+class=/');
 });
+
+it('shows the sentence and refuses the approval when the request names nothing an owner could grant', function (string $scope): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => $scope]))->assertOk()->getContent();
+
+    expect($content)
+        ->toContain('Your role in this workspace allows nothing Test MCP Client asked for.')
+        ->toMatch('/id="permissionList"\s+hidden/')
+        ->not->toMatch('/id="consentNone"\s+hidden/')
+        ->not->toMatch('/data-abilities-any="/')
+        ->toMatch('/<button type="submit"\s+disabled\s+class=/');
+
+    $location = (string) $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->personalWorkspace->getKey(),
+    ])->assertRedirect()->headers->get('Location');
+
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+    expect($query['error'])->toBe('access_denied')
+        ->and(DB::table('oauth_auth_codes')->count())->toBe(0);
+})->with([
+    'an email scope without mcp:use' => 'email:read',
+    'no scope at all' => '',
+]);
 
 it('keeps the list and an enabled Authorize when the role grants what the client asked for', function (): void {
     $this->actingAs($this->user);

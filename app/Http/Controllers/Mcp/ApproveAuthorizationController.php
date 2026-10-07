@@ -57,11 +57,10 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
 
         try {
             $authRequest = $this->getAuthRequestFromSession($request);
-            $requested = $authRequest->getScopes();
-            $granted = $this->scopesFor($user, $workspace, $requested);
+            $granted = $this->scopesFor($user, $workspace, $authRequest->getScopes());
 
             $authRequest->setScopes($granted);
-            $authRequest->setAuthorizationApproved($requested === [] || $granted !== []);
+            $authRequest->setAuthorizationApproved($granted !== []);
 
             return $this->withErrorHandling(fn (): Response => $this->convertResponse(
                 $this->server->completeAuthorizationRequest($authRequest, $psrResponse),
