@@ -61,6 +61,9 @@ return [
             'title' => 'Account connected.',
             'body' => 'Emails and meetings will appear as the import runs.',
         ],
+        'cancelled' => [
+            'title' => 'Nothing was connected. You can connect a mailbox any time.',
+        ],
         'calendar_sync_queued' => [
             'title' => 'Calendar sync started.',
             'body' => 'Your meetings will update on this page as the sync finishes.',

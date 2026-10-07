@@ -80,6 +80,10 @@ final readonly class CallbackController
             return $this->redirectWithError($request, $user, 'That email provider is not supported.');
         }
 
+        if ($request->query('error') === 'access_denied') {
+            return $this->redirectAfterCancel($request, $user);
+        }
+
         // Both 'gmail' (registered in EmailIntegrationServiceProvider from services.gmail)
         // and 'azure' resolve to their own OAuth clients + email-account redirects.
         $driver = Socialite::driver($provider);
@@ -151,6 +155,27 @@ final readonly class CallbackController
     private function consumeBoundWorkspace(Request $request, User $user): ?Workspace
     {
         return MailboxOAuthWorkspace::forUser($user, $request->session()->pull(RedirectController::WORKSPACE_SESSION_KEY));
+    }
+
+    private function redirectAfterCancel(Request $request, User $user): RedirectResponse
+    {
+        Notification::make()
+            ->title(__('filament/pages/email-accounts.notifications.cancelled.title'))
+            ->warning()
+            ->send();
+
+        $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
+        $workspace = $this->consumeBoundWorkspace($request, $user) ?? $user->currentWorkspace;
+
+        if (is_string($returnUrl)) {
+            return redirect($returnUrl);
+        }
+
+        if ($workspace === null) {
+            return redirect('/');
+        }
+
+        return redirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug]));
     }
 
     private function redirectWithError(Request $request, User $user, string $message, ?Workspace $workspace = null): RedirectResponse
