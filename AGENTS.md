@@ -249,6 +249,8 @@ production: message ordering, approval races, duplicate proposals.
 - Every write tool takes batch input: `records[]` on create and update,
   `ids[]` on delete. One call → one `PendingAction`; a multi-record proposal is
   a `_batch` the dock resolves per item. Do not add scalar-only tools.
+- `CreateEmailDraftTool` is the one write that does not propose. A draft is private,
+  reaches nobody, and its user reviews it in the composer before it can leave.
 - A request needing several writes is ONE turn: the assistant chains the write
   tools and links them with `$ref:<pending_action_id>` where a record it just
   proposed would go. Proposals sharing a `turn_id` are one plan, presented as a

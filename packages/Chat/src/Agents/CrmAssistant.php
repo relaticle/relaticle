@@ -43,6 +43,7 @@ use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
@@ -999,6 +1000,7 @@ PROMPT;
             ListEmailsTool::class,
             GetEmailTool::class,
             ListEmailAccountsTool::class,
+            CreateEmailDraftTool::class,
         ];
     }
 

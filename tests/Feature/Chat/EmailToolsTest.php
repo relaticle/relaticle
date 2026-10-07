@@ -9,20 +9,25 @@ use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
+use Relaticle\EmailIntegration\Models\EmailSignature;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -473,10 +478,196 @@ it('lists only the mailboxes the signed-in user connected in this workspace, def
 });
 
 it('offers the email tools only when a mailbox can send', function (): void {
-    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class];
+    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class];
 
     expect(chatEmailToolClasses(EmailReach::Ready))->toContain(...$emailTools)
-        ->and(chatEmailToolClasses(EmailReach::NoMailbox))->not->toContain(...$emailTools)
-        ->and(chatEmailToolClasses(EmailReach::Off))->not->toContain(...$emailTools)
-        ->and(chatEmailToolClasses(null))->not->toContain(...$emailTools);
+        ->and(array_intersect($emailTools, chatEmailToolClasses(EmailReach::NoMailbox)))->toBe([])
+        ->and(array_intersect($emailTools, chatEmailToolClasses(EmailReach::Off)))->toBe([])
+        ->and(array_intersect($emailTools, chatEmailToolClasses(null)))->toBe([]);
+});
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function chatDraftArguments(ConnectedAccount $account, array $overrides = []): array
+{
+    return [
+        'connected_account_id' => $account->getKey(),
+        'to' => ['client@acme.test'],
+        'subject' => 'Next steps',
+        'body' => "Hi Dana,\n\nHere is the **plan**.",
+        ...$overrides,
+    ];
+}
+
+function chatDraftBodyHtml(string $draftId): string
+{
+    return Email::query()->with('body')->findOrFail($draftId)->body->body_html;
+}
+
+it('saves a private draft in the mailbox of the user straight away and proposes nothing', function (): void {
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['cc' => ['boss@acme.test']]));
+
+    $draft = Email::query()->with('participants')->findOrFail($result['id']);
+
+    expect($result)->toHaveKeys(['id', 'mailbox', 'url', 'note'])
+        ->and($result['mailbox'])->toBe($this->viewerAccount->email_address)
+        ->and($result['note'])->toBe('Saved to Drafts. Nothing was sent. Tell the user to review it and send it from Drafts.')
+        ->and($draft->status)->toBe(EmailStatus::DRAFT)
+        ->and($draft->creation_source)->toBe(EmailCreationSource::CHAT)
+        ->and($draft->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($draft->user_id)->toBe($this->viewer->id)
+        ->and($draft->workspace_id)->toBe($this->workspace->id)
+        ->and($draft->subject)->toBe('Next steps')
+        ->and($draft->participants->pluck('email_address', 'role.value')->sortKeys()->all())->toBe(['cc' => 'boss@acme.test', 'to' => 'client@acme.test'])
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('renders the draft body from markdown with raw html escaped and adds the mailbox default signature', function (): void {
+    $signature = EmailSignature::factory()->default()->create([
+        'connected_account_id' => $this->viewerAccount->id,
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'content_html' => '<p>Dana, Acme</p>',
+    ]);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, [
+        'body' => 'Hi <script>alert(1)</script> **Dana**',
+    ]));
+
+    expect(chatDraftBodyHtml($result['id']))
+        ->toContain('<strong>Dana</strong>')
+        ->toContain('&lt;script&gt;')
+        ->not->toContain('<script')
+        ->toContain('data-id="'.SignatureBlock::ID.'"')
+        ->toContain((string) $signature->getKey());
+});
+
+it('leaves the signature out of a draft when the user asks for none', function (): void {
+    EmailSignature::factory()->default()->create([
+        'connected_account_id' => $this->viewerAccount->id,
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+    ]);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['include_signature' => false]));
+
+    expect(chatDraftBodyHtml($result['id']))->not->toContain('data-id="'.SignatureBlock::ID.'"');
+});
+
+it('threads a reply draft onto a visible email and stamps it as a reply', function (): void {
+    $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<orig@acme.test>', 'thread_id' => 'thread-1']);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]));
+
+    $draft = Email::query()->findOrFail($result['id']);
+
+    expect($draft->creation_source)->toBe(EmailCreationSource::REPLY)
+        ->and($draft->in_reply_to)->toBe('<orig@acme.test>')
+        ->and($draft->thread_id)->toBe('thread-1');
+});
+
+it('stamps a reply draft as written by the assistant when the original has no message id to thread on', function (): void {
+    $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => null, 'thread_id' => 'thread-1']);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]));
+
+    $draft = Email::query()->findOrFail($result['id']);
+
+    expect($draft->creation_source)->toBe(EmailCreationSource::CHAT)
+        ->and($draft->in_reply_to)->toBeNull()
+        ->and($draft->thread_id)->toBeNull();
+});
+
+it('refuses a reply draft aimed at a private email of a teammate and saves nothing', function (): void {
+    $private = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::PRIVATE, 'rfc_message_id' => '<secret@acme.test>']);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $private->id]));
+
+    expect($result)->toBe(['error' => "Email with ID [{$private->id}] not found."])
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('refuses a draft in the mailbox of a teammate and saves nothing', function (): void {
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->coworkerAccount));
+
+    expect($result)->toBe(['error' => "Mailbox with ID [{$this->coworkerAccount->id}] not found."])
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('refuses a draft in a mailbox of the user that is disconnected and saves nothing', function (): void {
+    $disconnected = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->disconnected()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+    ]));
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($disconnected));
+
+    expect($result)->toBe(['error' => "Mailbox with ID [{$disconnected->id}] not found."])
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('answers an empty draft with the empty draft message', function (): void {
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, ['connected_account_id' => $this->viewerAccount->id]);
+
+    expect($result)->toBe(['error' => 'Cannot save an empty draft.'])
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('reports an invalid recipient address instead of saving', function (): void {
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['to' => ['not-an-address']]));
+
+    expect($result)->toHaveKey('error')
+        ->and($result['error'])->toContain('to.0')
+        ->and($result)->not->toHaveKey('id')
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('treats a null argument as not given when saving a draft', function (): void {
+    $nulls = array_fill_keys(['to', 'cc', 'bcc', 'subject', 'include_signature', 'in_reply_to_email_id'], null);
+
+    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, [
+        'connected_account_id' => $this->viewerAccount->id,
+        'body' => 'Just a note to self.',
+        ...$nulls,
+    ]);
+
+    expect($result)->not->toHaveKey('error')->toHaveKey('id');
+
+    $draft = Email::query()->with('participants')->findOrFail($result['id']);
+
+    expect($draft->subject)->toBeNull()
+        ->and($draft->participants)->toHaveCount(0)
+        ->and($draft->creation_source)->toBe(EmailCreationSource::CHAT);
+});
+
+it('links the saved draft to the Drafts tab of the Emails page of the current workspace', function (): void {
+    $url = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount))['url'];
+
+    expect(parse_url($url, PHP_URL_PATH))->toEndWith("/{$this->workspace->slug}/email")
+        ->and(parse_url($url, PHP_URL_QUERY))->toBe('tab=drafts');
+});
+
+it('reads a sent date filter without an offset in the timezone of the signed-in user', function (): void {
+    $this->viewer->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $beforeBoundary = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 23:30:00']);
+    $afterBoundary = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-07 00:30:00']);
+
+    $ids = fn (array $arguments): array => array_column(chatEmailTool($this->viewer, ListEmailsTool::class, $arguments)['items'], 'id');
+
+    expect($ids(['sent_after' => '2026-10-07T09:00:00']))->toBe([$afterBoundary->id])
+        ->and($ids(['sent_before' => '2026-10-07T09:00:00']))->toBe([$beforeBoundary->id]);
+});
+
+it('keeps the offset of a sent date filter that carries one', function (): void {
+    $this->viewer->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-07 00:30:00']);
+    $laterThanNineUtc = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-07 09:30:00']);
+
+    $ids = array_column(chatEmailTool($this->viewer, ListEmailsTool::class, ['sent_after' => '2026-10-07T09:00:00+00:00'])['items'], 'id');
+
+    expect($ids)->toBe([$laterThanNineUtc->id]);
 });

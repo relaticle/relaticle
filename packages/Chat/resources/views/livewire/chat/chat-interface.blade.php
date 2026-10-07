@@ -135,6 +135,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'list_emails' => __('Searching email…'),
             'get_email' => __('Reading an email…'),
             'list_email_accounts' => __('Checking your mailboxes…'),
+            'create_email_draft' => __('Saving a draft…'),
             'list_custom_fields' => __('Reading custom fields…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
