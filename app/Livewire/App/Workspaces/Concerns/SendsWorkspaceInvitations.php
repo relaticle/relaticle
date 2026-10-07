@@ -30,11 +30,17 @@ trait SendsWorkspaceInvitations
     {
         $parts = preg_split('/[\s,;]+/', trim($input)) ?: [];
 
-        return collect($parts)
-            ->filter(fn (string $email): bool => $email !== '')
-            ->unique(EmailAddress::canonicalize(...))
-            ->values()
-            ->all();
+        $typedByCanonical = [];
+
+        foreach ($parts as $email) {
+            if ($email === '') {
+                continue;
+            }
+
+            $typedByCanonical[EmailAddress::canonicalize($email)] ??= $email;
+        }
+
+        return array_values($typedByCanonical);
     }
 
     private function inviteRateLimitKey(): string
