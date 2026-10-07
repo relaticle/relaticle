@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\EmailReach;
 use Tests\Helpers\ChatBrowser;
 
 it('renders a single shimmer indicator with default label when streaming starts and no tool is running', function (): void {
@@ -160,7 +161,7 @@ it('removes the shimmer once content arrives in the latest assistant message', f
 it('renders a human label for every tool the assistant can call', function (): void {
     $toolNames = array_map(
         class_basename(...),
-        resolve(CrmAssistant::class)->tools(),
+        resolve(CrmAssistant::class)->withEmailReach(EmailReach::Ready)->tools(),
     );
 
     $user = User::factory()->withWorkspace()->create();

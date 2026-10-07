@@ -43,6 +43,9 @@ use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\Email\GetEmailTool;
+use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
+use Relaticle\Chat\Tools\Email\ListEmailsTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -334,7 +337,7 @@ When asked how you work or what rules you follow, answer in user terms: what you
 ## Rules
 1. Writes: when the user asks to create, update, or delete records, call the write tool. It returns a proposal the user must approve or reject; nothing happens until they do. Acknowledge it in ONE short sentence (e.g. "Review the proposal below."). NEVER repeat the proposed records or their field values in prose, no tables, no bullet lists, no per-record summaries: the proposal card under your reply already shows every field.
 2. Reads: when the user asks to find, list, show, or search records, call the read tool. When users ask to SEE records ("show me my companies", "all my records"), call the list tools. List tools render real record tables. Use GetCrmSummaryTool only for count and overview questions ("how many deals do I have"). Never use it instead of showing records.
-3. Blocks: results from the list tools, the get tools and ListActivityTool are rendered as a table or card block under your reply, in tool-call order, each with its own title. Nothing else renders a block. SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block, and neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool or GuideToPageTool, so present those results yourself as a short markdown list or sentence, still never printing a raw ID. A list with zero results renders no block either: say so in prose.
+3. Blocks: results from the list tools, the get tools and ListActivityTool are rendered as a table or card block under your reply, in tool-call order, each with its own title. Nothing else renders a block. SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block, and neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool, GuideToPageTool, ListEmailsTool, GetEmailTool or ListEmailAccountsTool, so present those results yourself as a short markdown list or sentence, still never printing a raw ID. A list with zero results renders no block either: say so in prose.
 4. Lookups: when you call a read tool only to find ids for another tool call (before an update, a delete, or a get), use SearchCrmTool, or pass `lookup: true` to the list or get tool. A lookup renders nothing. Only a call the user asked to see renders a block.
 5. Lead-in: write ONE short lead-in sentence for the entire turn, even when you call several read tools, and never write a heading or bold label naming a result set: every block prints its own title.
 6. No repetition: where a block renders, never repeat its records as a markdown table, a bullet list, or per-record prose. Answering a question ABOUT the data (a count, a total, which record is largest) is still your job; re-listing the data is not. Name only the records the answer turns on: the largest, the tie, the exception. Walking every row to show your work is re-listing.
@@ -945,6 +948,7 @@ PROMPT;
             GetCreditBalanceTool::class,
             SearchDocsTool::class,
             AggregateCrmTool::class,
+            ...$this->emailToolClasses(),
 
             // Write tools
             ChatCreateCompanyTool::class,
@@ -980,6 +984,22 @@ PROMPT;
             $classes,
             fn (string $class): bool => ! in_array($class, self::SETUP_MODE_EXCLUDED_TOOLS, true),
         ));
+    }
+
+    /**
+     * @return list<class-string<Tool>>
+     */
+    private function emailToolClasses(): array
+    {
+        if ($this->emailReach !== EmailReach::Ready) {
+            return [];
+        }
+
+        return [
+            ListEmailsTool::class,
+            GetEmailTool::class,
+            ListEmailAccountsTool::class,
+        ];
     }
 
     private function sanitizeLabel(string $label): string

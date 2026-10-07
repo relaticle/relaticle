@@ -100,7 +100,7 @@ it('scopes the block claim to the read tools that emit one', function (): void {
     expect($instructions)
         ->toContain('rendered as a table or card block')
         ->toContain('SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
-        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool or GuideToPageTool')
+        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool, GuideToPageTool, ListEmailsTool, GetEmailTool or ListEmailAccountsTool')
         ->toContain('A list with zero results renders no block either')
         ->toContain('ONE short lead-in sentence');
 });
