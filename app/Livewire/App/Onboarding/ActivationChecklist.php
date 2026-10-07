@@ -245,9 +245,6 @@ final class ActivationChecklist extends Component
         return $workspace instanceof Workspace && resolve(WorkspaceActivationFacts::class)->hasSampleData($workspace);
     }
 
-    /**
-     * A non-sample record required: removing samples must never leave the workspace empty.
-     */
     #[Computed]
     public function canRemoveSampleData(): bool
     {
