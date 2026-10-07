@@ -21,7 +21,7 @@ use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
-mutates(EmailVisibilityService::class, VisibleMeetingScope::class);
+mutates(EmailVisibilityService::class, PreferredEmailCopyService::class, VisibleMeetingScope::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create([

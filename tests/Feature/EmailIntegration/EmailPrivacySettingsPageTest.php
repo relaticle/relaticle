@@ -152,12 +152,12 @@ it('saves without confirmation when the workspace sharing tier is unchanged', fu
         ->assertNotified(__('filament/pages/email-privacy-settings.notifications.saved'));
 });
 
-it('shows each sharing tier with its explanation', function (): void {
+it('shows each workspace default tier with its explanation', function (EmailPrivacyTier $tier): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
-        ->assertSee(EmailPrivacyTier::SUBJECT->getDescription());
-});
+        ->assertSee($tier->getLabel())
+        ->assertSee($tier->getDescription());
+})->with(EmailPrivacyTier::workspaceDefaults());
 
 it('shows enforcement level explanations in the row picker', function (): void {
     WorkspaceEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
