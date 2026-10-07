@@ -66,9 +66,6 @@ final class WorkspaceActivationFacts
         return $this->facts($workspace)['sample'];
     }
 
-    /**
-     * A record that is not a seeded sample: the workspace's own, or one a mailbox sync created.
-     */
     public function hasNonSampleRecord(Workspace $workspace): bool
     {
         return $this->facts($workspace)['real'];

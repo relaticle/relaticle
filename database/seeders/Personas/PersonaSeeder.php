@@ -145,10 +145,8 @@ final readonly class PersonaSeeder
         }
     }
 
-    /**
-     * A persona with records goes through the use case step a signup uses, so it gets the
-     * stage preset and fixtures from the app. A persona without a use case is never in setup.
-     */
+    // A persona with records goes through the use case step a signup uses, so it gets the
+    // stage preset and fixtures from the app. A persona without a use case is never in setup.
     private function createWorkspace(User $user, Persona $persona): Workspace
     {
         $attributes = [
