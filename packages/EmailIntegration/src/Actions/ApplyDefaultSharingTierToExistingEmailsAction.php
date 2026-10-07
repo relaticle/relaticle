@@ -23,6 +23,7 @@ final readonly class ApplyDefaultSharingTierToExistingEmailsAction
                 ->whereNull('sharing_tier')
                 ->select('id'))
             ->where('privacy_tier_customized', false)
+            ->where('privacy_tier', '!=', $tier->value)
             ->update(['privacy_tier' => $tier->value]);
     }
 
@@ -31,6 +32,7 @@ final readonly class ApplyDefaultSharingTierToExistingEmailsAction
         return Email::query()
             ->where('connected_account_id', $mailbox->getKey())
             ->where('privacy_tier_customized', false)
+            ->where('privacy_tier', '!=', $tier->value)
             ->update(['privacy_tier' => $tier->value]);
     }
 }

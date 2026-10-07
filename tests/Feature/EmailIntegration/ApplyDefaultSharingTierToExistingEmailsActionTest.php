@@ -66,6 +66,15 @@ it('re-stamps only the mail of the mailbox whose level changed', function (): vo
         ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
+it('brings drifted mail back to the mailbox level when the same level is saved again', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace, ['sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $drifted = sharingEmail($mailbox, EmailPrivacyTier::FULL);
+
+    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
+
+    expect($drifted->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
 it('leaves the same person mail in another workspace alone', function (): void {
     $elsewhere = Workspace::factory()->create(['user_id' => $this->owner->id]);
     $mailbox = sharingMailbox($this->owner, $this->workspace);

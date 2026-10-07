@@ -1145,7 +1145,6 @@ describe('connect email', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
         $account = connectedMailboxFor($user, $workspace);
-        $account->forceFill(['sharing_tier' => $before])->save();
         $colleague = User::factory()->create();
 
         $ownMail = mailOf($user, $workspace, $account, $before);

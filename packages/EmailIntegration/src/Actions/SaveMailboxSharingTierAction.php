@@ -21,16 +21,10 @@ final readonly class SaveMailboxSharingTierAction
     {
         abort_unless($mailbox->user_id === $actor->getKey(), 403);
 
-        $previous = $this->privacy->tierForMailbox($mailbox);
-
-        DB::transaction(function () use ($mailbox, $tier, $previous): void {
+        DB::transaction(function () use ($mailbox, $tier): void {
             $mailbox->forceFill(['sharing_tier' => $tier])->save();
 
-            $effective = $this->privacy->tierForMailbox($mailbox);
-
-            if ($effective !== $previous) {
-                $this->applyRetroactive->executeForMailbox($mailbox, $effective);
-            }
+            $this->applyRetroactive->executeForMailbox($mailbox, $this->privacy->tierForMailbox($mailbox));
         });
     }
 }
