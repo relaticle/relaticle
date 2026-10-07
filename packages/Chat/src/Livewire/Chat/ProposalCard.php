@@ -834,7 +834,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        if ($pendingAction->operation === PendingActionOperation::Delete) {
+        if ($pendingAction->operation === PendingActionOperation::Delete || ProposalCoreFields::isIndivisible($pendingAction->entity_type)) {
             return [];
         }
 

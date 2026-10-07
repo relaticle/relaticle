@@ -19,8 +19,11 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\EditAction;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Relaticle\EmailIntegration\Enums\EmailPageTab;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 
 mutates(RecordRedirectController::class);
 
@@ -148,6 +151,29 @@ it('redirects a workspace invitation reference straight to the Members page', fu
         ->get('/r/workspace_invitations/'.(string) Str::ulid())
         ->assertRedirect($expectedUrl);
 });
+
+it('redirects an email reference to the tab that holds it', function (string $type, EmailPageTab $tab): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user)
+        ->get("/r/{$type}/".(string) Str::ulid())
+        ->assertRedirect(EmailInboxPage::getUrl(['tab' => $tab->value], panel: 'app', tenant: $user->currentWorkspace));
+})->with([
+    'a sent email' => ['emails', EmailPageTab::OUTBOX],
+    'a saved draft' => ['email_drafts', EmailPageTab::DRAFTS],
+]);
+
+it('404s for an email reference while the email integration is off', function (string $type): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user)->get("/r/{$type}/".(string) Str::ulid())->assertNotFound();
+})->with(['emails', 'email_drafts']);
 
 it('404s for a custom field belonging to another workspace', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();

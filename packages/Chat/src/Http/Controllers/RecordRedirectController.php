@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Relaticle\Chat\Support\DestinationResolver;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 
 /**
@@ -51,6 +52,9 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * `workspace_invitations` is the same shape as `custom_field`: no per-record route,
  * so every id resolves to the same destination (the Members page) against the
  * caller's own current workspace, with no record fetch at all.
+ *
+ * `emails` and `email_drafts` have no per-record view either: every id opens the Outbox or Drafts
+ * tab through `DestinationResolver`, which 404s while the email integration is off.
  */
 final readonly class RecordRedirectController
 {
@@ -58,10 +62,27 @@ final readonly class RecordRedirectController
 
     private const string WORKSPACE_INVITATION_TYPE = 'workspace_invitations';
 
-    public function __invoke(Request $request, RecordReferenceResolver $resolver, string $type, string $id): RedirectResponse|Response
+    private const array EMAIL_DESTINATIONS = [
+        'emails' => 'email_outbox',
+        'email_drafts' => 'email_drafts',
+    ];
+
+    public function __invoke(Request $request, RecordReferenceResolver $resolver, DestinationResolver $destinations, string $type, string $id): RedirectResponse|Response
     {
         if ($type === self::CUSTOM_FIELD_TYPE || $type === self::WORKSPACE_INVITATION_TYPE) {
             $url = $resolver->urlFor($type, $id);
+
+            abort_if($url === null, 404);
+
+            return redirect($url);
+        }
+
+        /** @var User $user */
+        $user = $request->user();
+
+        if (array_key_exists($type, self::EMAIL_DESTINATIONS)) {
+            $workspace = $user->currentWorkspace;
+            $url = $workspace === null ? null : $destinations->resolve(self::EMAIL_DESTINATIONS[$type], $workspace);
 
             abort_if($url === null, 404);
 
@@ -74,9 +95,6 @@ final readonly class RecordRedirectController
             : null;
 
         abort_if($modelClass === null, 404);
-
-        /** @var User $user */
-        $user = $request->user();
 
         $record = $modelClass::query()->withTrashed()->find($id);
 

@@ -110,3 +110,23 @@ it('resolves no email_accounts page while the email integration is off', functio
 
     expect(app(DestinationResolver::class)->resolve('email_accounts', $this->user->currentWorkspace))->toBeNull();
 });
+
+it('resolves the email tab destinations to the tab of the Emails page while the email integration is on', function (string $destination, string $tab): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $url = app(DestinationResolver::class)->resolve($destination, $this->user->currentWorkspace);
+
+    expect(parse_url($url, PHP_URL_PATH))->toEndWith("/{$this->user->currentWorkspace->slug}/email")
+        ->and(parse_url($url, PHP_URL_QUERY))->toBe("tab={$tab}");
+})->with([
+    'drafts' => ['email_drafts', 'drafts'],
+    'outbox' => ['email_outbox', 'outbox'],
+]);
+
+it('resolves no email tab page while the email integration is off', function (string $destination): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
+    expect(app(DestinationResolver::class)->resolve($destination, $this->user->currentWorkspace))->toBeNull();
+})->with(['email_drafts', 'email_outbox']);

@@ -2,22 +2,36 @@
 
 declare(strict_types=1);
 
+use App\Enums\WorkspaceRole;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
+use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
+use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -27,7 +41,7 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -490,7 +504,7 @@ it('offers the email tools only when a mailbox can send', function (): void {
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function chatDraftArguments(ConnectedAccount $account, array $overrides = []): array
+function chatDraftRecord(ConnectedAccount $account, array $overrides = []): array
 {
     return [
         'connected_account_id' => $account->getKey(),
@@ -501,30 +515,88 @@ function chatDraftArguments(ConnectedAccount $account, array $overrides = []): a
     ];
 }
 
+/**
+ * @param  class-string<Tool>  $class
+ * @param  list<array<string, mixed>>  $records
+ * @return array<string, mixed>
+ */
+function proposeChatEmails(User $user, string $class, array $records, ?string $conversationId = null): array
+{
+    auth()->setUser($user);
+
+    $tool = resolve($class);
+    $tool->setConversationId($conversationId);
+
+    return json_decode($tool->handle(new Request(['records' => $records])), true);
+}
+
+function chatEmailConversation(User $user): string
+{
+    $id = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $id,
+        'workspace_id' => $user->current_workspace_id,
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => (string) $user->getKey(),
+        'title' => 'Email',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $id;
+}
+
+function pendingChatEmail(array $proposal): PendingAction
+{
+    return PendingAction::query()->findOrFail($proposal['pending_action_id']);
+}
+
+function chatEmailMember(Workspace $workspace, WorkspaceRole $role): User
+{
+    $user = User::factory()->create();
+    $workspace->users()->attach($user, ['role' => $role->value]);
+    $user->switchWorkspace($workspace);
+
+    return $user->fresh();
+}
+
+function chatEmailMailbox(User $user, Workspace $workspace): ConnectedAccount
+{
+    return ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+    ]));
+}
+
 function chatDraftBodyHtml(string $draftId): string
 {
     return Email::query()->with('body')->findOrFail($draftId)->body->body_html;
 }
 
-it('saves a private draft in the mailbox of the user straight away and proposes nothing', function (): void {
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['cc' => ['boss@acme.test']]));
+it('proposes a draft on a card and saves no email until it is approved', function (): void {
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['cc' => ['boss@acme.test']])]);
 
-    $draft = Email::query()->with('participants')->findOrFail($result['id']);
+    $card = collect($result['display']['fields'])->pluck('value', 'label')->all();
 
-    expect($result)->toHaveKeys(['id', 'mailbox', 'url', 'note'])
-        ->and($result['mailbox'])->toBe($this->viewerAccount->email_address)
-        ->and($result['note'])->toBe('Saved to Drafts. Nothing was sent. Tell the user to review it and send it from Drafts.')
-        ->and($draft->status)->toBe(EmailStatus::DRAFT)
-        ->and($draft->creation_source)->toBe(EmailCreationSource::CHAT)
-        ->and($draft->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
-        ->and($draft->user_id)->toBe($this->viewer->id)
-        ->and($draft->workspace_id)->toBe($this->workspace->id)
-        ->and($draft->subject)->toBe('Next steps')
-        ->and($draft->participants->pluck('email_address', 'role.value')->sortKeys()->all())->toBe(['cc' => 'boss@acme.test', 'to' => 'client@acme.test'])
-        ->and(PendingAction::query()->count())->toBe(0);
+    expect($result['type'])->toBe('pending_action')
+        ->and($result['entity_type'])->toBe('email_drafts')
+        ->and($result['display']['title'])->toBe('Save Email Draft')
+        ->and($card)->toMatchArray([
+            'From' => $this->viewerAccount->email_address,
+            'To' => 'client@acme.test',
+            'CC' => 'boss@acme.test',
+            'Subject' => 'Next steps',
+            'Message' => "Hi Dana,\n\nHere is the **plan**.",
+            'Signature' => 'Default',
+        ])
+        ->and($card)->not->toHaveKey('BCC')
+        ->and($result)->not->toHaveKey('url')
+        ->and(PendingAction::query()->count())->toBe(1)
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
 });
 
-it('renders the draft body from markdown with raw html escaped and adds the mailbox default signature', function (): void {
+it('saves one private draft in the mailbox of the user when the card is approved', function (): void {
     $signature = EmailSignature::factory()->default()->create([
         'connected_account_id' => $this->viewerAccount->id,
         'workspace_id' => $this->workspace->id,
@@ -532,16 +604,25 @@ it('renders the draft body from markdown with raw html escaped and adds the mail
         'content_html' => '<p>Dana, Acme</p>',
     ]);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, [
-        'body' => 'Hi <script>alert(1)</script> **Dana**',
-    ]));
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['cc' => ['boss@acme.test']])]));
 
-    expect(chatDraftBodyHtml($result['id']))
-        ->toContain('<strong>Dana</strong>')
-        ->toContain('&lt;script&gt;')
-        ->not->toContain('<script')
-        ->toContain('data-id="'.SignatureBlock::ID.'"')
-        ->toContain((string) $signature->getKey());
+    resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+    $draft = Email::query()->with('participants')->sole();
+
+    expect($draft->status)->toBe(EmailStatus::DRAFT)
+        ->and($draft->creation_source)->toBe(EmailCreationSource::CHAT)
+        ->and($draft->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($draft->user_id)->toBe($this->viewer->id)
+        ->and($draft->workspace_id)->toBe($this->workspace->id)
+        ->and($draft->connected_account_id)->toBe($this->viewerAccount->id)
+        ->and($draft->subject)->toBe('Next steps')
+        ->and($draft->participants->pluck('email_address', 'role.value')->sortKeys()->all())->toBe(['cc' => 'boss@acme.test', 'to' => 'client@acme.test'])
+        ->and(chatDraftBodyHtml($draft->id))->toContain('<strong>plan</strong>')
+        ->and(chatDraftBodyHtml($draft->id))->toContain('data-id="'.SignatureBlock::ID.'"')
+        ->and(chatDraftBodyHtml($draft->id))->toContain((string) $signature->getKey())
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and($pending->fresh()->result_data['id'])->toBe($draft->id);
 });
 
 it('leaves the signature out of a draft when the user asks for none', function (): void {
@@ -551,17 +632,62 @@ it('leaves the signature out of a draft when the user asks for none', function (
         'user_id' => $this->viewer->id,
     ]);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['include_signature' => false]));
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['include_signature' => false])]);
 
-    expect(chatDraftBodyHtml($result['id']))->not->toContain('data-id="'.SignatureBlock::ID.'"');
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    expect(collect($proposal['display']['fields'])->pluck('value', 'label')['Signature'])->toBe('None')
+        ->and(chatDraftBodyHtml(Email::query()->sole()->id))->not->toContain('data-id="'.SignatureBlock::ID.'"');
+});
+
+it('renders the draft body from markdown with raw html escaped', function (): void {
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['body' => 'Hi <script>alert(1)</script> **Dana**'])]);
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    expect(chatDraftBodyHtml(Email::query()->sole()->id))
+        ->toContain('<strong>Dana</strong>')
+        ->toContain('&lt;script&gt;')
+        ->not->toContain('<script');
+});
+
+it('saves nothing when the draft card is rejected', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->reject($pending, $this->viewer);
+
+    expect($pending->fresh()->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+});
+
+it('proposes the same draft once when a provider error replays the turn', function (): void {
+    $conversationId = chatEmailConversation($this->viewer);
+    $record = chatDraftRecord($this->viewerAccount);
+
+    $first = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [$record], $conversationId);
+    $second = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [$record], $conversationId);
+
+    expect($second['pending_action_id'])->toBe($first['pending_action_id'])
+        ->and(PendingAction::query()->count())->toBe(1);
+});
+
+it('refuses a second approval of a draft card and saves nothing more', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending->fresh(), $this->viewer))->toThrow(RuntimeException::class, 'already been resolved')
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(1);
 });
 
 it('threads a reply draft onto a visible email and stamps it as a reply', function (): void {
     $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<orig@acme.test>', 'thread_id' => 'thread-1']);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]));
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['in_reply_to_email_id' => $original->id])]);
 
-    $draft = Email::query()->findOrFail($result['id']);
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
 
     expect($draft->creation_source)->toBe(EmailCreationSource::REPLY)
         ->and($draft->in_reply_to)->toBe('<orig@acme.test>')
@@ -571,82 +697,217 @@ it('threads a reply draft onto a visible email and stamps it as a reply', functi
 it('stamps a reply draft as written by the assistant when the original has no message id to thread on', function (): void {
     $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => null, 'thread_id' => 'thread-1']);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]));
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['in_reply_to_email_id' => $original->id])]);
 
-    $draft = Email::query()->findOrFail($result['id']);
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
 
     expect($draft->creation_source)->toBe(EmailCreationSource::CHAT)
         ->and($draft->in_reply_to)->toBeNull()
         ->and($draft->thread_id)->toBeNull();
 });
 
-it('refuses a reply draft aimed at a private email of a teammate and saves nothing', function (): void {
+it('skips a draft aimed at a private email of a teammate and proposes nothing', function (): void {
     $private = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::PRIVATE, 'rfc_message_id' => '<secret@acme.test>']);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['in_reply_to_email_id' => $private->id]));
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['in_reply_to_email_id' => $private->id])]);
 
-    expect($result)->toBe(['error' => "Email with ID [{$private->id}] not found."])
-        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+    expect($result['error'])->toContain("Email with ID [{$private->id}] not found.")
+        ->and(PendingAction::query()->count())->toBe(0);
 });
 
-it('refuses a draft in the mailbox of a teammate and saves nothing', function (): void {
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->coworkerAccount));
+it('skips a draft in a mailbox the user cannot draft in and proposes nothing', function (string $case): void {
+    $otherWorkspace = Workspace::factory()->create();
 
-    expect($result)->toBe(['error' => "Mailbox with ID [{$this->coworkerAccount->id}] not found."])
-        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+    $account = match ($case) {
+        'a teammate mailbox' => $this->coworkerAccount,
+        'a disconnected mailbox' => ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->disconnected()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->viewer->id,
+        ])),
+        'a mailbox of the user in another workspace' => chatEmailMailbox($this->viewer, $otherWorkspace),
+    };
+
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($account)]);
+
+    expect($result['error'])->toContain("Mailbox with ID [{$account->id}] not found.")
+        ->and(PendingAction::query()->count())->toBe(0);
+})->with(['a teammate mailbox', 'a disconnected mailbox', 'a mailbox of the user in another workspace']);
+
+it('skips a draft with no subject with the subject message', function (): void {
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['subject' => null])]);
+
+    expect($result['error'])->toContain('The subject is required.')
+        ->and(PendingAction::query()->count())->toBe(0);
 });
 
-it('refuses a draft in a mailbox of the user that is disconnected and saves nothing', function (): void {
-    $disconnected = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->disconnected()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->viewer->id,
-    ]));
+it('reports an invalid recipient address instead of proposing', function (): void {
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['to' => ['not-an-address']])]);
 
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($disconnected));
-
-    expect($result)->toBe(['error' => "Mailbox with ID [{$disconnected->id}] not found."])
-        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
+    expect($result['error'])->toContain('to.0')
+        ->and(PendingAction::query()->count())->toBe(0);
 });
 
-it('answers an empty draft with the empty draft message', function (): void {
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, ['connected_account_id' => $this->viewerAccount->id]);
-
-    expect($result)->toBe(['error' => 'Cannot save an empty draft.'])
-        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
-});
-
-it('reports an invalid recipient address instead of saving', function (): void {
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount, ['to' => ['not-an-address']]));
-
-    expect($result)->toHaveKey('error')
-        ->and($result['error'])->toContain('to.0')
-        ->and($result)->not->toHaveKey('id')
-        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(0);
-});
-
-it('treats a null argument as not given when saving a draft', function (): void {
-    $nulls = array_fill_keys(['to', 'cc', 'bcc', 'subject', 'include_signature', 'in_reply_to_email_id'], null);
-
-    $result = chatEmailTool($this->viewer, CreateEmailDraftTool::class, [
-        'connected_account_id' => $this->viewerAccount->id,
-        'body' => 'Just a note to self.',
-        ...$nulls,
+it('keeps the valid draft of a call and reports the skipped one', function (): void {
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [
+        chatDraftRecord($this->viewerAccount, ['subject' => 'Good one']),
+        chatDraftRecord($this->coworkerAccount, ['subject' => 'Bad one']),
     ]);
 
-    expect($result)->not->toHaveKey('error')->toHaveKey('id');
+    expect($result)->toHaveKey('skipped_records')
+        ->and($result['skipped_records'])->toHaveCount(1)
+        ->and($result['display']['fields'][0]['value'])->toBe('Good one');
+});
 
-    $draft = Email::query()->with('participants')->findOrFail($result['id']);
+it('refuses a call with more than five drafts whole', function (): void {
+    $records = array_fill(0, 6, chatDraftRecord($this->viewerAccount));
 
-    expect($draft->subject)->toBeNull()
+    $result = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, $records);
+
+    expect($result['error'])->toContain('At most 5 emails per proposal')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('proposes two drafts as one card and saves each when it is approved', function (): void {
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [
+        chatDraftRecord($this->viewerAccount, ['subject' => 'First']),
+        chatDraftRecord($this->viewerAccount, ['subject' => 'Second']),
+    ]);
+
+    $pending = pendingChatEmail($proposal);
+
+    $first = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 0);
+    $second = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 1);
+
+    expect(PendingAction::query()->count())->toBe(1)
+        ->and($proposal['display']['title'])->toBe('Create Email Drafts')
+        ->and($first['finalized'])->toBeFalse()
+        ->and($second['finalized'])->toBeTrue()
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->pluck('subject')->all())->toEqualCanonicalizing(['First', 'Second'])
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Approved);
+});
+
+it('lets a viewer propose and approve a draft', function (): void {
+    $viewer = chatEmailMember($this->workspace, WorkspaceRole::Viewer);
+    $account = chatEmailMailbox($viewer, $this->workspace);
+
+    $proposal = proposeChatEmails($viewer, CreateEmailDraftTool::class, [chatDraftRecord($account)]);
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $viewer);
+
+    expect($proposal['type'])->toBe('pending_action')
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->sole()->user_id)->toBe($viewer->id);
+});
+
+it('treats a null argument as not given when proposing a draft', function (): void {
+    $nulls = array_fill_keys(['to', 'cc', 'bcc', 'body', 'include_signature', 'in_reply_to_email_id'], null);
+
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [[
+        'connected_account_id' => $this->viewerAccount->id,
+        'subject' => 'Note to self',
+        ...$nulls,
+    ]]);
+
+    expect($proposal)->not->toHaveKey('error');
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $draft = Email::query()->with('participants')->sole();
+
+    expect($draft->subject)->toBe('Note to self')
         ->and($draft->participants)->toHaveCount(0)
         ->and($draft->creation_source)->toBe(EmailCreationSource::CHAT);
 });
 
-it('links the saved draft to the Drafts tab of the Emails page of the current workspace', function (): void {
-    $url = chatEmailTool($this->viewer, CreateEmailDraftTool::class, chatDraftArguments($this->viewerAccount))['url'];
+it('saves the complete draft when an approval names fields to leave out', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)]));
 
-    expect(parse_url($url, PHP_URL_PATH))->toEndWith("/{$this->workspace->slug}/email")
-        ->and(parse_url($url, PHP_URL_QUERY))->toBe('tab=drafts');
+    resolve(PendingActionService::class)->approve($pending, $this->viewer, ['to', 'body', 'subject', 'include_signature']);
+
+    $draft = Email::query()->with('participants')->sole();
+
+    expect($draft->subject)->toBe('Next steps')
+        ->and($draft->participants->pluck('email_address')->all())->toBe(['client@acme.test'])
+        ->and(chatDraftBodyHtml($draft->id))->toContain('<strong>plan</strong>')
+        ->and($pending->fresh()->result_data)->not->toHaveKey('excluded');
+});
+
+it('offers no field checkbox on a draft card', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)]));
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('toggleField', 'to')
+        ->call('toggleField', 'body')
+        ->assertSet('excludedFields', []);
+
+    $rows = collect($card->instance()->currentRecordFields());
+
+    expect($rows->pluck('label')->all())->toBe(['Subject', 'From', 'To', 'Message', 'Signature'])
+        ->and($rows->pluck('code')->filter()->all())->toBe(['subject']);
+});
+
+it('stores a body that quotes a reference literally', function (): void {
+    $body = 'Please quote $ref:INV-42 when you pay.';
+
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount, ['body' => $body, 'subject' => 'Re: $ref:INV-42'])]);
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $draft = Email::query()->sole();
+
+    expect($draft->subject)->toBe('Re: $ref:INV-42')
+        ->and(chatDraftBodyHtml($draft->id))->toContain('$ref:INV-42');
+});
+
+it('approves a draft card from the dock without a link or an error', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)]));
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertNotDispatched('proposal:resolve-failed')
+        ->assertDispatched('proposal:resolved', fn (string $event, array $params): bool => $params['pendingActionId'] === $pending->getKey()
+            && $params['decision'] === 'approved'
+            && $params['record'] === null);
+
+    expect($pending->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(1);
+});
+
+it('names the draft by its subject for the assistant after it is approved', function (): void {
+    $conversationId = chatEmailConversation($this->viewer);
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)], $conversationId);
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $resolved = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null);
+
+    expect($resolved[0]['entity_type'])->toBe('email_drafts')
+        ->and($resolved[0]['label'])->toBe('Next steps');
+});
+
+it('cites an approved draft with a link that opens the Drafts tab', function (): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $conversationId = chatEmailConversation($this->viewer);
+    $proposal = proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [chatDraftRecord($this->viewerAccount)], $conversationId);
+
+    resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer);
+
+    $url = resolve(PendingActionService::class)->resolvedForConversation($conversationId, null)[0]['records'][0]['url'];
+
+    $this->actingAs($this->viewer)
+        ->get($url)
+        ->assertRedirect(EmailInboxPage::getUrl(['tab' => EmailPageTab::DRAFTS->value], panel: 'app', tenant: $this->workspace));
 });
 
 it('reads a sent date filter without an offset in the timezone of the signed-in user', function (): void {
@@ -670,4 +931,29 @@ it('keeps the offset of a sent date filter that carries one', function (): void 
     $ids = array_column(chatEmailTool($this->viewer, ListEmailsTool::class, ['sent_after' => '2026-10-07T09:00:00+00:00'])['items'], 'id');
 
     expect($ids)->toBe([$laterThanNineUtc->id]);
+});
+
+it('reads a date-only sent filter as local midnight in the timezone of the signed-in user', function (): void {
+    $this->viewer->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+
+    $beforeMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 14:30:00']);
+    $afterMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 15:30:00']);
+
+    $ids = fn (array $arguments): array => array_column(chatEmailTool($this->viewer, ListEmailsTool::class, $arguments)['items'], 'id');
+
+    expect($ids(['sent_after' => '2026-10-07']))->toBe([$afterMidnight->id])
+        ->and($ids(['sent_before' => '2026-10-07']))->toBe([$beforeMidnight->id]);
+});
+
+it('reads a sent filter in the app timezone for a user with no timezone', function (): void {
+    config(['app.timezone' => 'Asia/Tokyo']);
+    $this->viewer->forceFill(['timezone' => null])->save();
+
+    $beforeMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 14:30:00']);
+    $afterMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 15:30:00']);
+
+    $ids = fn (array $arguments): array => array_column(chatEmailTool($this->viewer, ListEmailsTool::class, $arguments)['items'], 'id');
+
+    expect($ids(['sent_after' => '2026-10-07']))->toBe([$afterMidnight->id])
+        ->and($ids(['sent_before' => '2026-10-07']))->toBe([$beforeMidnight->id]);
 });

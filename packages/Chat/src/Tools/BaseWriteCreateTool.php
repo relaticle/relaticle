@@ -66,6 +66,18 @@ abstract class BaseWriteCreateTool implements Tool
         return null;
     }
 
+    protected function requiredCapability(): ?WorkspaceCapability
+    {
+        return WorkspaceCapability::RecordsCreate;
+    }
+
+    private function missingCapabilityError(User $user): ?string
+    {
+        $capability = $this->requiredCapability();
+
+        return $capability instanceof WorkspaceCapability ? $this->capabilityError($user, $capability) : null;
+    }
+
     public function schema(JsonSchema $schema): array
     {
         $user = auth()->user();
@@ -96,7 +108,7 @@ abstract class BaseWriteCreateTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $capabilityError = $this->capabilityError($user, WorkspaceCapability::RecordsCreate);
+        $capabilityError = $this->missingCapabilityError($user);
 
         if ($capabilityError !== null) {
             return $capabilityError;

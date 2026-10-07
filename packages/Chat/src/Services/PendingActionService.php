@@ -53,6 +53,7 @@ use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use RuntimeException;
 use Throwable;
 
@@ -91,6 +92,7 @@ final readonly class PendingActionService
         DeleteCustomField::class,
         CreateWorkspaceInvitation::class,
         RemoveSampleData::class,
+        SaveAssistantEmailDraft::class,
     ];
 
     /**
@@ -124,7 +126,7 @@ final readonly class PendingActionService
                 ->where('entity_type', $entityType)
                 ->pending()
                 ->get()
-                ->first(static fn (PendingAction $existing): bool => $existing->action_data === $actionData);
+                ->first(fn (PendingAction $existing): bool => $this->withSortedKeys($existing->action_data) === $this->withSortedKeys($actionData));
 
             if ($duplicate instanceof PendingAction) {
                 return $duplicate;
@@ -145,6 +147,20 @@ final readonly class PendingActionService
             'status' => PendingActionStatus::Pending,
             'expires_at' => now()->addMinutes($expiryMinutes),
         ]);
+    }
+
+    /**
+     * jsonb stores object keys by length, not by insertion, so a stored payload only
+     * equals the one that was written when both are compared with their keys sorted.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    private function withSortedKeys(array $data): array
+    {
+        ksort($data, SORT_STRING);
+
+        return array_map(fn (mixed $value): mixed => is_array($value) ? $this->withSortedKeys($value) : $value, $data);
     }
 
     private function expiryMinutesFor(?string $conversationId): int
@@ -989,7 +1005,7 @@ final readonly class PendingActionService
      */
     private function sanitizedExclusions(PendingAction $pendingAction, array $excludedFields): array
     {
-        if ($pendingAction->operation === PendingActionOperation::Delete) {
+        if ($pendingAction->operation === PendingActionOperation::Delete || ProposalCoreFields::isIndivisible($pendingAction->entity_type)) {
             return [];
         }
 

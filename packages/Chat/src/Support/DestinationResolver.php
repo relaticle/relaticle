@@ -18,7 +18,9 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Workspace;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 use Relaticle\ImportWizard\Filament\Pages\ImportNotes;
 use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
@@ -45,6 +47,8 @@ final readonly class DestinationResolver
         'access_tokens',
         'connect_assistant',
         'email_accounts',
+        'email_drafts',
+        'email_outbox',
         'billing',
     ];
 
@@ -96,6 +100,8 @@ final readonly class DestinationResolver
                 'access_tokens' => AccessTokens::getUrl(panel: 'app', tenant: $workspace),
                 'connect_assistant' => url()->getPublicUrl(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt'], absolute: false)),
                 'email_accounts' => Feature::active(EmailIntegration::class) ? EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace) : null,
+                'email_drafts' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::DRAFTS->value], panel: 'app', tenant: $workspace) : null,
+                'email_outbox' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::OUTBOX->value], panel: 'app', tenant: $workspace) : null,
                 'billing' => Feature::active(BillingFeature::class) ? Billing::getUrl(panel: 'app', tenant: $workspace) : null,
                 default => null,
             };

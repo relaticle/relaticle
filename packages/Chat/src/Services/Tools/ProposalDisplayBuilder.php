@@ -29,6 +29,8 @@ final readonly class ProposalDisplayBuilder
         'task' => ['title' => 'Create Task', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create task'],
         'note' => ['title' => 'Create Note', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create note'],
         'workspace_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
+        'emails' => ['title' => 'Send Email', 'nameKey' => 'subject', 'label' => 'Subject', 'summaryPrefix' => 'Send email'],
+        'email_drafts' => ['title' => 'Save Email Draft', 'nameKey' => 'subject', 'label' => 'Subject', 'summaryPrefix' => 'Save email draft'],
     ];
 
     public function __construct(
