@@ -825,10 +825,24 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->call('skipMailbox')
+            ->mountAction('skipMailbox')
+            ->callMountedAction()
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
         expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
+    });
+
+    it('stays on the connect step until the owner confirms the skip', function (): void {
+        $workspace = workspaceInSetup(User::factory()->create());
+
+        livewire(SetupWorkspace::class)
+            ->mountAction('skipMailbox')
+            ->assertMountedActionModalSee([
+                __('filament/pages/workspaces.setup_workspace.email.skip_confirm.heading'),
+                __('filament/pages/workspaces.setup_workspace.email.benefit_records'),
+            ]);
+
+        expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::Email);
     });
 
     it('lets the owner go back to connect from the use case while no mailbox is connected', function (): void {

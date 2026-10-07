@@ -41,24 +41,11 @@
         <span>{{ __($this->asksForSharing() ? 'filament/pages/workspaces.setup_workspace.email.privacy' : 'filament/pages/workspaces.setup_workspace.email.privacy_existing') }}</span>
     </p>
 
-    <ul class="mt-7 flex flex-col gap-2.5">
-        @foreach ([
-            'ri-user-add-line' => 'benefit_records',
-            'ri-mail-line' => 'benefit_timeline',
-            'ri-send-plane-line' => 'benefit_send',
-        ] as $icon => $key)
-            <li class="flex items-center gap-3 text-sm font-medium text-gray-700 dark:text-gray-300">
-                <span class="flex size-7 shrink-0 items-center justify-center rounded-lg bg-gray-50 text-gray-500 ring-1 ring-gray-950/5 dark:bg-white/5 dark:text-gray-400 dark:ring-white/10">
-                    <x-filament::icon :icon="$icon" class="size-4" />
-                </span>
-                <span>{{ __('filament/pages/workspaces.setup_workspace.email.'.$key) }}</span>
-            </li>
-        @endforeach
-    </ul>
+    <div class="mt-7">
+        @include('filament.pages.setup-workspace.benefits')
+    </div>
 
     <div class="mt-auto pt-6 text-center">
-        <button type="button" wire:click="skipMailbox" class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300">
-            {{ __('filament/pages/workspaces.setup_workspace.email.skip') }}
-        </button>
+        {{ $this->skipMailboxAction }}
     </div>
 </div>

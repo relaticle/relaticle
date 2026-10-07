@@ -14,6 +14,9 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
 use App\Services\WorkspaceActivationFacts;
+use Filament\Actions\Action;
+use Filament\Support\Enums\Alignment;
+use Filament\Support\Enums\Width;
 use Illuminate\Validation\Rule;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -37,6 +40,24 @@ trait RunsMailboxSteps
         }
 
         resolve(SaveOnboardingSharing::class)->execute($this->authUser(), $this->workspace, EmailPrivacyTier::from($this->sharingTier));
+    }
+
+    public function skipMailboxAction(): Action
+    {
+        return Action::make('skipMailbox')
+            ->label(__('filament/pages/workspaces.setup_workspace.email.skip'))
+            ->link()
+            ->color('gray')
+            ->modalWidth(Width::Large)
+            ->modalCloseButton(false)
+            ->modalHeading(__('filament/pages/workspaces.setup_workspace.email.skip_confirm.heading'))
+            ->modalDescription(__('filament/pages/workspaces.setup_workspace.email.skip_confirm.description'))
+            ->modalContent(view('filament.pages.setup-workspace.benefits', ['boxed' => true]))
+            ->modalSubmitAction(fn (Action $action): Action => $action
+                ->label(__('filament/pages/workspaces.setup_workspace.email.skip_confirm.submit'))
+                ->color('danger'))
+            ->modalFooterActionsAlignment(Alignment::End)
+            ->action($this->skipMailbox(...));
     }
 
     public function skipMailbox(): void
