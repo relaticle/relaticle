@@ -125,6 +125,16 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function newestConnectedFor(Builder $query, User $user, Workspace $workspace): Builder
+    {
+        return $query->ownedBy($user, $workspace)->connected()->latest();
+    }
+
+    /**
      * Scope to accounts that are connected and authorised (safe to sync/send through).
      *
      * @param  Builder<ConnectedAccount>  $query
@@ -283,18 +293,6 @@ final class ConnectedAccount extends Model
         }
 
         return self::query()->ownedBy($user, $workspace)->connected()->exists();
-    }
-
-    /**
-     * Whether the user holds a mailbox in another workspace, in any status: a sharing change
-     * rewrites the mail of every account that is not removed, so the status must not narrow this.
-     */
-    public static function hasMailboxOutside(User $user, Workspace $workspace): bool
-    {
-        return self::query()
-            ->where('user_id', $user->getKey())
-            ->whereNot('workspace_id', $workspace->getKey())
-            ->exists();
     }
 
     /**

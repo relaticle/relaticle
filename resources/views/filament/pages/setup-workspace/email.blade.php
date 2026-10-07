@@ -38,7 +38,7 @@
 
     <p class="mt-3.5 flex items-start gap-2 text-xs/5 text-gray-500 dark:text-gray-400">
         <x-filament::icon icon="ri-lock-line" class="mt-0.5 size-4 shrink-0" />
-        <span>{{ __($this->asksForSharing() ? 'filament/pages/workspaces.setup_workspace.email.privacy' : 'filament/pages/workspaces.setup_workspace.email.privacy_existing') }}</span>
+        <span>{{ __('filament/pages/workspaces.setup_workspace.email.privacy') }}</span>
     </p>
 
     <div class="mt-7">

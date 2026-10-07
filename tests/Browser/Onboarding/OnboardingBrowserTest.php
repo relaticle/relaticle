@@ -139,7 +139,7 @@ it('stores the sharing level an owner picks after a mailbox is connected', funct
 
     $page = walkToMailboxStep($user, 'Northwind Studio', 'northwind-studio');
 
-    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+    $mailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
         'user_id' => $user->getKey(),
         'workspace_id' => Workspace::query()->where('slug', 'northwind-studio')->value('id'),
         'email_address' => 'olivia@northwind.test',
@@ -156,7 +156,7 @@ it('stores the sharing level an owner picks after a mailbox is connected', funct
         ->waitForText('Help us customize your workspace')
         ->assertDontSee('Choose what your team sees');
 
-    expect($user->refresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
+    expect($mailbox->refresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('moves the preview panel with the setup step', function (): void {

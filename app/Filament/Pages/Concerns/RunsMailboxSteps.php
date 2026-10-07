@@ -13,7 +13,6 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\Workspace;
 use App\Onboarding\MailboxProviderHint;
-use App\Onboarding\SharingQuestion;
 use App\Services\WorkspaceActivationFacts;
 use Filament\Actions\Action;
 use Filament\Support\Enums\Alignment;
@@ -114,10 +113,8 @@ trait RunsMailboxSteps
     public function connectedMailbox(): ?ConnectedAccount
     {
         return once(fn (): ?ConnectedAccount => ConnectedAccount::query()
-            ->ownedBy($this->authUser(), $this->workspace)
-            ->connected()
-            ->latest()
-            ->first(['provider', 'email_address', 'status']));
+            ->newestConnectedFor($this->authUser(), $this->workspace)
+            ->first());
     }
 
     /**
@@ -160,10 +157,6 @@ trait RunsMailboxSteps
         }
 
         if ($workspace->onboarding_step === WorkspaceSetupStep::Sharing) {
-            if (! $this->asksForSharing()) {
-                $move->execute($this->authUser(), $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
-            }
-
             return;
         }
 
@@ -171,19 +164,16 @@ trait RunsMailboxSteps
             return;
         }
 
-        $next = $this->asksForSharing() ? WorkspaceSetupStep::Sharing : WorkspaceSetupStep::UseCase;
-
-        $move->execute($this->authUser(), $workspace, WorkspaceSetupStep::Email, $next);
-    }
-
-    private function asksForSharing(): bool
-    {
-        return SharingQuestion::appliesTo($this->authUser(), $this->workspace);
+        $move->execute($this->authUser(), $workspace, WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing);
     }
 
     private function preselectedSharingTier(): string
     {
-        $effective = resolve(PrivacyService::class)->effectiveSharingTierForUser($this->authUser());
+        $mailbox = $this->connectedMailbox();
+
+        $effective = $mailbox instanceof ConnectedAccount
+            ? resolve(PrivacyService::class)->tierForMailbox($mailbox)
+            : EmailPrivacyTier::METADATA_ONLY;
 
         return in_array($effective, SaveOnboardingSharing::OFFERED_TIERS, true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;
     }
