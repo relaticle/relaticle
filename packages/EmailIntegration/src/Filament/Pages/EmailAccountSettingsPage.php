@@ -243,6 +243,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             ->label($this->labelWithInfo(__('filament/pages/email-account-settings.sharing.label'), __('filament/pages/email-account-settings.sharing.hint')))
             ->view('email-integration::forms.sharing-tier-cards')
             ->viewData([
+                'tiers' => EmailPrivacyTier::cases(),
                 'ariaLabel' => __('filament/pages/email-account-settings.sharing.label'),
                 'workspaceDefaultLabel' => __('filament/pages/email-account-settings.sharing.use_workspace_default'),
                 'workspaceDefaultDescription' => __('filament/pages/email-account-settings.sharing.workspace_default_description', [

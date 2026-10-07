@@ -159,7 +159,7 @@ it('creates an EmailBatch and persists one Email row per recipient from the comp
 
 it('stamps mass-send emails with the sender sharing default', function (EmailPrivacyTier $tier): void {
     $this->account->forceFill(['sharing_tier' => $tier])->save();
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $person = People::create([
         'workspace_id' => $this->workspace->id,
@@ -186,7 +186,7 @@ it('stamps mass-send emails with the sender sharing default', function (EmailPri
 
 it('uses the sender sharing default when the batch payload omits a privacy tier', function (EmailPrivacyTier $tier): void {
     $this->account->forceFill(['sharing_tier' => $tier])->save();
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $person = People::create([
         'workspace_id' => $this->workspace->id,

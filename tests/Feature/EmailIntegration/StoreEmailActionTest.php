@@ -469,7 +469,7 @@ it('stamps the mailbox workspace privacy default when the owner has switched cur
 
     $otherTeam = Workspace::factory()->create([
         'user_id' => $this->user->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+        'default_email_sharing_tier' => EmailPrivacyTier::SUBJECT,
     ]);
     $this->user->workspaces()->attach($otherTeam, ['role' => 'admin']);
     $this->user->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();

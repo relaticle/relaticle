@@ -309,16 +309,16 @@ it('defaultTierForUser returns user-level tier when the user has one set', funct
 
 it('defaultTierForUser falls back to team default when user has no preference', function (): void {
     $this->owner->update(['default_email_sharing_tier' => null]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $tier = $this->service->defaultTierForUser($this->owner->fresh());
 
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
+    expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('defaultTierForUser prefers the user setting over the mailbox workspace default', function (): void {
     $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
 
     $tier = $this->service->defaultTierForUser($this->owner->fresh(), $this->workspace);
 
@@ -331,7 +331,7 @@ it('defaultTierForUser uses the mailbox workspace default instead of the owner c
 
     $otherTeam = Workspace::factory()->create([
         'user_id' => $this->owner->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+        'default_email_sharing_tier' => EmailPrivacyTier::SUBJECT,
     ]);
     $this->owner->workspaces()->attach($otherTeam, ['role' => 'admin']);
     $this->owner->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();
@@ -343,15 +343,15 @@ it('defaultTierForUser uses the mailbox workspace default instead of the owner c
 
 it('tierFromPreference resolves an empty selection to the workspace default', function (): void {
     $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
 
     $tier = $this->service->tierFromPreference('', $this->account->fresh());
 
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
+    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
 it('tierFromPreference resolves an explicit selection to that tier', function (): void {
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $tier = $this->service->tierFromPreference(EmailPrivacyTier::PRIVATE->value, $this->account->fresh());
 

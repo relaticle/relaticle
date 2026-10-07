@@ -199,8 +199,8 @@ it('saves account settings without confirmation when the sharing tier is unchang
 });
 
 it('clears a sharing override when selecting use workspace default even if the effective tier stays equal', function (): void {
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
-    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->set('data.default_email_sharing_tier', '')
@@ -216,7 +216,7 @@ it('persists an explicit sharing override equal to the workspace default without
         'default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY,
     ]);
     $this->user->workspaces()->attach($metadataTeam, ['role' => 'admin']);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $metadataAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $metadataTeam->getKey(),
@@ -231,12 +231,17 @@ it('persists an explicit sharing override equal to the workspace default without
     ]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->set('data.default_email_sharing_tier', EmailPrivacyTier::FULL->value)
+        ->set('data.default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
         ->callAction('save')
         ->assertNotified();
 
-    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::FULL)
+    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
         ->and($metadataWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+});
+
+it('offers full access to a mailbox owner', function (): void {
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->assertSeeHtml('value="'.EmailPrivacyTier::FULL->value.'"');
 });
 
 it('adds blocklist entries from the blocklist modal', function (): void {

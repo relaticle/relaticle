@@ -20,6 +20,8 @@ final readonly class UpdateWorkspaceEmailPrivacySettingsAction
             403,
         );
 
+        abort_unless($defaultTier->canBeWorkspaceDefault(), 422);
+
         $workspace->update([
             'default_email_sharing_tier' => $defaultTier->value,
         ]);

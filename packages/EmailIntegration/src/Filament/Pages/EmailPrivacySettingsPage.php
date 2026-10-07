@@ -279,6 +279,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                         ->label(__('filament/pages/email-privacy-settings.workspace_default.tier_label'))
                         ->view('email-integration::forms.sharing-tier-cards')
                         ->viewData([
+                            'tiers' => EmailPrivacyTier::workspaceDefaults(),
                             'ariaLabel' => __('filament/pages/email-privacy-settings.workspace_default.tier_label'),
                         ]),
                 ])
