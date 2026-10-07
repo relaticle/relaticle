@@ -70,15 +70,6 @@ final readonly class PrivacyService
         return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->workspace);
     }
 
-    public function tierFromPreference(mixed $tierValue, ConnectedAccount $mailbox): EmailPrivacyTier
-    {
-        return match (true) {
-            $tierValue instanceof EmailPrivacyTier => $tierValue,
-            filled($tierValue) => EmailPrivacyTier::from((string) $tierValue),
-            default => $this->workspaceSharingTier($mailbox->workspace),
-        };
-    }
-
     public function workspaceSharingTier(Workspace $workspace): EmailPrivacyTier
     {
         return $workspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;

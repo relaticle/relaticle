@@ -42,7 +42,7 @@ it('loads the account form and existing blocklist entries on mount', function ()
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->assertSet('data.sync_inbox', $this->account->fresh()->sync_inbox)
-        ->assertSet('data.default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->assertSet('data.sharing_tier', EmailPrivacyTier::SUBJECT->value)
         ->assertCount('blocklistEntries', 1);
 });
 
@@ -59,7 +59,7 @@ it('saves account settings and the sharing tier from the save action', function 
             'sync_sent' => true,
             'hourly_send_limit' => 25,
             'daily_send_limit' => 100,
-            'default_email_sharing_tier' => EmailPrivacyTier::FULL->value,
+            'sharing_tier' => EmailPrivacyTier::FULL->value,
         ])
         ->callAction('save', data: [
             'full_access_confirmation' => 'I understand',
@@ -83,7 +83,7 @@ it('saves the level on this mailbox and leaves the owner other mailbox alone', f
     ]));
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
-        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value])
+        ->fillForm(['sharing_tier' => EmailPrivacyTier::SUBJECT->value])
         ->callAction('save')
         ->assertHasNoFormErrors();
 
@@ -104,7 +104,7 @@ it('lets a plain member open the page and set the level of their own mailbox', f
     expect(EmailAccountSettingsPage::canAccess())->toBeTrue();
 
     livewire(EmailAccountSettingsPage::class, ['account' => $mailbox->getKey()])
-        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::FULL->value])
+        ->fillForm(['sharing_tier' => EmailPrivacyTier::FULL->value])
         ->callAction('save', data: ['full_access_confirmation' => 'I understand'])
         ->assertNotified();
 
@@ -128,7 +128,7 @@ it('re-stamps synced mail of this mailbox and keeps hand-set mail when the level
     ]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
-        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::FULL->value])
+        ->fillForm(['sharing_tier' => EmailPrivacyTier::FULL->value])
         ->callAction('save', data: ['full_access_confirmation' => 'I understand']);
 
     expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
@@ -147,7 +147,7 @@ it('returns this mailbox mail to the workspace default when the level is cleared
     ]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
-        ->set('data.default_email_sharing_tier', '')
+        ->set('data.sharing_tier', '')
         ->callAction('save')
         ->assertNotified();
 
@@ -157,14 +157,14 @@ it('returns this mailbox mail to the workspace default when the level is cleared
 
 it('selects use workspace default when the mailbox has no level of its own', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
-        ->assertSet('data.default_email_sharing_tier', '', strict: true)
+        ->assertSet('data.sharing_tier', '', strict: true)
         ->assertSee('Use workspace default');
 });
 
 it('requires confirmation when changing the account sharing tier to private', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
-            'default_email_sharing_tier' => EmailPrivacyTier::PRIVATE->value,
+            'sharing_tier' => EmailPrivacyTier::PRIVATE->value,
         ])
         ->mountAction('save')
         ->assertActionMounted('save');
@@ -173,7 +173,7 @@ it('requires confirmation when changing the account sharing tier to private', fu
 it('rejects an incorrect full access confirmation phrase on account settings', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
-            'default_email_sharing_tier' => EmailPrivacyTier::FULL->value,
+            'sharing_tier' => EmailPrivacyTier::FULL->value,
         ])
         ->callAction('save', data: [
             'full_access_confirmation' => 'not the phrase',
@@ -189,7 +189,7 @@ it('saves account settings without confirmation when the sharing tier is unchang
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
         ->fillForm([
             'sync_inbox' => false,
-            'default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value,
+            'sharing_tier' => EmailPrivacyTier::SUBJECT->value,
         ])
         ->callAction('save')
         ->assertNotified();
@@ -203,7 +203,7 @@ it('clears a sharing override when selecting use workspace default even if the e
     $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->set('data.default_email_sharing_tier', '')
+        ->set('data.sharing_tier', '')
         ->callAction('save')
         ->assertNotified();
 
@@ -231,7 +231,7 @@ it('persists an explicit sharing override equal to the workspace default without
     ]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->set('data.default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->set('data.sharing_tier', EmailPrivacyTier::SUBJECT->value)
         ->callAction('save')
         ->assertNotified();
 
@@ -410,7 +410,7 @@ it('does not open the settings page for another user\'s account', function (): v
 
 it('words the confirmation for this mailbox and not for the workspace', function (): void {
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
-        ->fillForm(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT->value])
+        ->fillForm(['sharing_tier' => EmailPrivacyTier::SUBJECT->value])
         ->mountAction('save')
         ->assertMountedActionModalSee(__('email/privacy-settings.sharing_confirmation.mailbox_description', [
             'tier' => EmailPrivacyTier::SUBJECT->getLabel(),

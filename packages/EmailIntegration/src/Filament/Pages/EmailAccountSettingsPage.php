@@ -92,7 +92,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
             'sync_sent' => $this->account()->sync_sent,
             'hourly_send_limit' => $this->account()->hourly_send_limit,
             'daily_send_limit' => $this->account()->daily_send_limit,
-            'default_email_sharing_tier' => $this->account()->sharing_tier->value ?? '',
+            'sharing_tier' => $this->account()->sharing_tier->value ?? '',
         ]);
 
         $this->signatures = $this->loadSignatures();
@@ -239,7 +239,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         $workspaceTier = $this->privacy()->workspaceSharingTier($this->account()->workspace);
 
-        return ViewField::make('default_email_sharing_tier')
+        return ViewField::make('sharing_tier')
             ->label($this->labelWithInfo(__('filament/pages/email-account-settings.sharing.label'), __('filament/pages/email-account-settings.sharing.hint')))
             ->view('email-integration::forms.sharing-tier-cards')
             ->viewData([
@@ -578,7 +578,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                     resolve(SaveMailboxSharingTierAction::class)->execute(
                         $user,
                         $this->account(),
-                        $this->storedSharingTierFromForm($data['default_email_sharing_tier'] ?? null),
+                        $this->storedSharingTierFromForm($data['sharing_tier'] ?? null),
                     );
                 }
 
@@ -600,7 +600,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         $data = $this->form->getState();
 
-        return $this->storedSharingTierFromForm($data['default_email_sharing_tier'] ?? null)
+        return $this->storedSharingTierFromForm($data['sharing_tier'] ?? null)
             !== $this->account()->sharing_tier;
     }
 
@@ -617,7 +617,8 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     {
         $data = $this->form->getState();
 
-        return $this->privacy()->tierFromPreference($data['default_email_sharing_tier'] ?? null, $this->account());
+        return $this->storedSharingTierFromForm($data['sharing_tier'] ?? null)
+            ?? $this->privacy()->workspaceSharingTier($this->account()->workspace);
     }
 
     private function privacy(): PrivacyService

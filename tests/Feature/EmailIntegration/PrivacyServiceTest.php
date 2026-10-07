@@ -299,23 +299,6 @@ it('keeps the same person free to share differently in two workspaces', function
         ->and($this->service->tierForMailbox($there))->toBe(EmailPrivacyTier::PRIVATE);
 });
 
-it('tierFromPreference resolves an empty selection to the workspace default', function (): void {
-    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
-
-    $tier = $this->service->tierFromPreference('', $this->account->fresh());
-
-    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
-});
-
-it('tierFromPreference resolves an explicit selection to that tier', function (): void {
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
-
-    $tier = $this->service->tierFromPreference(EmailPrivacyTier::PRIVATE->value, $this->account->fresh());
-
-    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
-});
-
 it('effectiveTier owner access is not blocked by protected recipient', function (): void {
     WorkspaceEmailBlocklist::factory()->protected()->email('protected@sensitive.com')->create([
         'workspace_id' => $this->workspace->id,

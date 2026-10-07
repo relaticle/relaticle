@@ -124,7 +124,7 @@ it('moves only mailboxes without their own level when the workspace default chan
         ->and($chosen->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
-it('updates team emails only for mailboxes that follow the workspace default', function (): void {
+it('updates workspace emails only for mailboxes that follow the workspace default', function (): void {
     $member = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
     $this->workspace->users()->attach($member, ['role' => 'member']);
     $overrideMember = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
