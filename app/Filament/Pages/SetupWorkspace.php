@@ -109,12 +109,7 @@ final class SetupWorkspace extends Page
 
     public function stepView(): string
     {
-        return match ($this->step()) {
-            OnboardingStep::Email => 'email',
-            OnboardingStep::Sharing => 'sharing',
-            OnboardingStep::Invite => 'invite',
-            default => 'use-case',
-        };
+        return $this->step()->view();
     }
 
     public function previewPanel(): string
