@@ -47,6 +47,7 @@ use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\SendEmailTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -1001,6 +1002,7 @@ PROMPT;
             GetEmailTool::class,
             ListEmailAccountsTool::class,
             CreateEmailDraftTool::class,
+            SendEmailTool::class,
         ];
     }
 

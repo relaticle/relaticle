@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
@@ -23,9 +24,14 @@ use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
+use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -40,8 +46,9 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -492,7 +499,7 @@ it('lists only the mailboxes the signed-in user connected in this workspace, def
 });
 
 it('offers the email tools only when a mailbox can send', function (): void {
-    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class];
+    $emailTools = [ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class];
 
     expect(chatEmailToolClasses(EmailReach::Ready))->toContain(...$emailTools)
         ->and(array_intersect($emailTools, chatEmailToolClasses(EmailReach::NoMailbox)))->toBe([])
@@ -781,7 +788,7 @@ it('proposes two drafts as one card and saves each when it is approved', functio
     $second = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 1);
 
     expect(PendingAction::query()->count())->toBe(1)
-        ->and($proposal['display']['title'])->toBe('Create Email Drafts')
+        ->and($proposal['display']['title'])->toBe('Save Email Drafts')
         ->and($first['finalized'])->toBeFalse()
         ->and($second['finalized'])->toBeTrue()
         ->and(Email::query()->where('status', EmailStatus::DRAFT)->pluck('subject')->all())->toEqualCanonicalizing(['First', 'Second'])
@@ -908,6 +915,243 @@ it('cites an approved draft with a link that opens the Drafts tab', function ():
     $this->actingAs($this->viewer)
         ->get($url)
         ->assertRedirect(EmailInboxPage::getUrl(['tab' => EmailPageTab::DRAFTS->value], panel: 'app', tenant: $this->workspace));
+});
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function chatSendRecord(ConnectedAccount $account, array $overrides = []): array
+{
+    return [
+        'connected_account_id' => $account->getKey(),
+        'to' => ['lena@acme.test'],
+        'subject' => 'Q4 lanes',
+        'body' => 'Confirmed.',
+        ...$overrides,
+    ];
+}
+
+it('proposes a send on a card that shows who gets it and what it says, and queues nothing', function (): void {
+    $result = proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount, ['cc' => ['ops@acme.test']])]);
+
+    $card = collect($result['display']['fields'])->pluck('value', 'label')->all();
+
+    expect($result['type'])->toBe('pending_action')
+        ->and($result['entity_type'])->toBe('emails')
+        ->and($result['display']['title'])->toBe('Send Email')
+        ->and($card)->toMatchArray([
+            'From' => $this->viewerAccount->email_address,
+            'To' => 'lena@acme.test',
+            'CC' => 'ops@acme.test',
+            'Subject' => 'Q4 lanes',
+            'Message' => 'Confirmed.',
+            'Signature' => 'Default',
+        ])
+        ->and($card)->not->toHaveKey('BCC')
+        ->and(PendingAction::query()->count())->toBe(1)
+        ->and(Email::query()->count())->toBe(0);
+});
+
+it('queues one email in the undo window and shows the undo toast when the card is approved', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+    $email = Email::query()->sole();
+    $undoWindow = config('email-integration.outbox.undo_send_window_seconds');
+
+    $toast = collect(session('filament.notifications'))->sole();
+
+    expect($email->status)->toBe(EmailStatus::QUEUED)
+        ->and($email->creation_source)->toBe(EmailCreationSource::CHAT)
+        ->and($email->user_id)->toBe($this->viewer->id)
+        ->and($email->scheduled_for->greaterThan(now()))->toBeTrue()
+        ->and($email->scheduled_for->lessThanOrEqualTo(now()->addSeconds($undoWindow)))->toBeTrue()
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and($toast['title'])->toBe(__('filament/concerns/email-compose.notifications.queued.title'))
+        ->and(collect($toast['actions'])->pluck('name')->all())->toBe(['undo'])
+        ->and($this->viewer->notifications()->count())->toBe(0);
+});
+
+it('does not count email sent through rela toward the ten held assistant emails', function (): void {
+    foreach (range(1, 10) as $number) {
+        $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount, ['subject' => "Chat send {$number}"])]));
+
+        resolve(PendingActionService::class)->approve($pending, $this->viewer);
+    }
+
+    $email = resolve(QueueAgentEmailAction::class)->execute(
+        $this->viewer,
+        ['connected_account_id' => $this->viewerAccount->id, 'to' => ['lena@acme.test'], 'subject' => 'From Claude', 'body' => 'Hi'],
+        EmailCreationSource::MCP,
+        'Claude',
+    );
+
+    expect($email->status)->toBe(EmailStatus::QUEUED)
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(11);
+});
+
+it('queues nothing when the send card is rejected', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->reject($pending, $this->viewer);
+
+    expect($pending->fresh()->status)->toBe(PendingActionStatus::Rejected)
+        ->and(Email::query()->count())->toBe(0);
+});
+
+it('proposes the same send once when a provider error replays the turn', function (): void {
+    $conversationId = chatEmailConversation($this->viewer);
+    $record = chatSendRecord($this->viewerAccount, ['cc' => ['ops@acme.test'], 'include_signature' => false]);
+
+    $first = proposeChatEmails($this->viewer, SendEmailTool::class, [$record], $conversationId);
+    $second = proposeChatEmails($this->viewer, SendEmailTool::class, [$record], $conversationId);
+
+    expect($second['pending_action_id'])->toBe($first['pending_action_id'])
+        ->and(PendingAction::query()->count())->toBe(1);
+});
+
+it('refuses a second approval of a send card and queues nothing more', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending->fresh(), $this->viewer))->toThrow(RuntimeException::class, 'already been resolved')
+        ->and(Email::query()->count())->toBe(1);
+});
+
+it('refuses a viewer who asks to send and proposes nothing', function (): void {
+    $viewer = chatEmailMember($this->workspace, WorkspaceRole::Viewer);
+    $account = chatEmailMailbox($viewer, $this->workspace);
+
+    $result = proposeChatEmails($viewer, SendEmailTool::class, [chatSendRecord($account)]);
+
+    expect($result['error'])->toContain('workspace role does not allow that')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('refuses to approve a send after the role lost the right to send', function (): void {
+    $member = chatEmailMember($this->workspace, WorkspaceRole::Member);
+    $account = chatEmailMailbox($member, $this->workspace);
+
+    $pending = pendingChatEmail(proposeChatEmails($member, SendEmailTool::class, [chatSendRecord($account)]));
+
+    $this->workspace->users()->updateExistingPivot($member->id, ['role' => WorkspaceRole::Viewer->value]);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $member->fresh()))->toThrow(HttpException::class)
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and(Email::query()->count())->toBe(0);
+});
+
+it('refuses to approve a send after its mailbox stopped being able to send', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    ConnectedAccount::query()->whereKey($this->viewerAccount->id)->update(['status' => EmailAccountStatus::DISCONNECTED]);
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->viewer))->toThrow(ValidationException::class, 'Pick one of your own mailboxes that can send')
+        ->and(Email::query()->count())->toBe(0);
+});
+
+it('refuses to approve a reply after its target became private', function (): void {
+    $original = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::FULL]);
+
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount, ['in_reply_to_email_id' => $original->id])]));
+
+    $original->forceFill(['privacy_tier' => EmailPrivacyTier::PRIVATE])->save();
+
+    expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->viewer))->toThrow(ValidationException::class, "Email with ID [{$original->id}] not found.")
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+});
+
+it('sends a reply onto the thread of the email it answers', function (): void {
+    $original = ($this->emailFrom)($this->viewer, ['rfc_message_id' => '<orig@acme.test>', 'thread_id' => 'thread-1']);
+
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount, ['in_reply_to_email_id' => $original->id])]));
+
+    resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+    $email = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($email->in_reply_to)->toBe('<orig@acme.test>')
+        ->and($email->thread_id)->toBe('thread-1');
+});
+
+it('skips a send the user cannot make and proposes nothing', function (string $case): void {
+    $addresses = fn (string $prefix, int $count): array => array_map(fn (int $number): string => "{$prefix}{$number}@acme.test", range(1, $count));
+
+    $record = match ($case) {
+        'a teammate mailbox' => chatSendRecord($this->coworkerAccount),
+        'more than twenty recipients in total' => chatSendRecord($this->viewerAccount, ['to' => $addresses('to', 11), 'cc' => $addresses('cc', 10)]),
+        'no recipient' => chatSendRecord($this->viewerAccount, ['to' => []]),
+        'no body' => chatSendRecord($this->viewerAccount, ['body' => null]),
+    };
+
+    $result = proposeChatEmails($this->viewer, SendEmailTool::class, [$record]);
+
+    expect($result['error'])->toContain(match ($case) {
+        'a teammate mailbox' => 'Pick one of your own mailboxes that can send',
+        'more than twenty recipients in total' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
+        'no recipient' => 'to field',
+        'no body' => 'body field',
+    })->and(PendingAction::query()->count())->toBe(0);
+})->with(['a teammate mailbox', 'more than twenty recipients in total', 'no recipient', 'no body']);
+
+it('refuses a call with more than five emails whole', function (): void {
+    $records = array_fill(0, 6, chatSendRecord($this->viewerAccount));
+
+    $result = proposeChatEmails($this->viewer, SendEmailTool::class, $records);
+
+    expect($result['error'])->toContain('At most 5 emails per proposal')
+        ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('proposes two emails as one card and queues each when it is approved', function (): void {
+    $proposal = proposeChatEmails($this->viewer, SendEmailTool::class, [
+        chatSendRecord($this->viewerAccount, ['subject' => 'First']),
+        chatSendRecord($this->viewerAccount, ['subject' => 'Second']),
+    ]);
+
+    $pending = pendingChatEmail($proposal);
+
+    $first = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 0);
+    $second = resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 1);
+
+    expect(PendingAction::query()->count())->toBe(1)
+        ->and($proposal['display']['title'])->toBe('Send Emails')
+        ->and($proposal['display']['summary'])->toBe('Send 2 emails')
+        ->and($first['finalized'])->toBeFalse()
+        ->and($second['finalized'])->toBeTrue()
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->pluck('subject')->all())->toEqualCanonicalizing(['First', 'Second']);
+});
+
+it('approves a send card from the dock without a link or an error', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('createCurrent')
+        ->assertNotDispatched('proposal:resolve-failed')
+        ->assertDispatched('proposal:resolved', fn (string $event, array $params): bool => $params['decision'] === 'approved' && $params['record'] === null);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
+});
+
+it('leaves the send intact when an approval names fields to leave out', function (): void {
+    $pending = pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount)]));
+
+    resolve(PendingActionService::class)->approve($pending, $this->viewer, ['to', 'body', 'subject']);
+
+    $email = Email::query()->with(['participants', 'body'])->sole();
+
+    expect($email->subject)->toBe('Q4 lanes')
+        ->and($email->participants->where('role', EmailParticipantRole::TO)->pluck('email_address')->all())->toBe(['lena@acme.test'])
+        ->and($email->body->body_html)->toContain('Confirmed.');
 });
 
 it('reads a sent date filter without an offset in the timezone of the signed-in user', function (): void {

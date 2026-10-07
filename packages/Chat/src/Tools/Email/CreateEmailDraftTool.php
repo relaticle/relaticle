@@ -49,6 +49,11 @@ final class CreateEmailDraftTool extends BaseWriteCreateTool
         return null;
     }
 
+    protected function batchVerb(): string
+    {
+        return 'Save';
+    }
+
     protected function entitySchema(JsonSchema $schema): array
     {
         return [

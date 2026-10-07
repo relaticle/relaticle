@@ -54,6 +54,7 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 use RuntimeException;
 use Throwable;
 
@@ -93,6 +94,7 @@ final readonly class PendingActionService
         CreateWorkspaceInvitation::class,
         RemoveSampleData::class,
         SaveAssistantEmailDraft::class,
+        SendAssistantEmail::class,
     ];
 
     /**

@@ -71,6 +71,11 @@ abstract class BaseWriteCreateTool implements Tool
         return WorkspaceCapability::RecordsCreate;
     }
 
+    protected function batchVerb(): string
+    {
+        return 'Create';
+    }
+
     private function missingCapabilityError(User $user): ?string
     {
         $capability = $this->requiredCapability();
@@ -211,8 +216,8 @@ abstract class BaseWriteCreateTool implements Tool
 
         $displayData = $isBatch
             ? [
-                'title' => __('Create :entities', ['entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
-                'summary' => sprintf('Create %d %s', count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
+                'title' => __(':verb :entities', ['verb' => $this->batchVerb(), 'entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
+                'summary' => sprintf('%s %d %s', $this->batchVerb(), count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
                 'items' => $items,
             ]
             : $items[0];
