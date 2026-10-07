@@ -32,8 +32,8 @@ touch with a person or company, and not what was said.
 
 The level applies to that mailbox only. Your other mailboxes keep their own
 levels. A mailbox with no level of its own follows the workspace default.
-The workspace default is never **Full access**, so each mailbox owner opts in
-to it.
+The workspace default is never **Full access**. You set that level on a
+mailbox, in that mailbox's settings.
 
 Saving also updates the email that mailbox has already synced, except any
 email you changed individually. Choosing **Full access** asks you to type a
