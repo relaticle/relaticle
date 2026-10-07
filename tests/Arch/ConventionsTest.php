@@ -73,7 +73,12 @@ it('keeps migrations forward-only (no down methods)', function (): void {
 it('queues only commands that exist from migrations', function (): void {
     $declared = [];
 
-    foreach (glob(dirname(__DIR__, 2).'/app/Console/Commands/*.php') ?: [] as $file) {
+    $commandFiles = [
+        ...(glob(dirname(__DIR__, 2).'/app/Console/Commands/*.php') ?: []),
+        ...(glob(dirname(__DIR__, 2).'/packages/*/src/Console/Commands/*.php') ?: []),
+    ];
+
+    foreach ($commandFiles as $file) {
         if (preg_match('/#\[Signature\(\s*\'([a-z0-9:_-]+)/i', (string) file_get_contents($file), $match) === 1) {
             $declared[] = $match[1];
         }
