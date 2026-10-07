@@ -10,6 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\SaveUserEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class SaveOnboardingSharing
 {
@@ -24,6 +25,10 @@ final readonly class SaveOnboardingSharing
     {
         abort_unless(in_array($tier, self::OFFERED_TIERS, true), 422);
 
+        if (! $this->asks($user, $workspace)) {
+            return $this->moveSetup->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase);
+        }
+
         return DB::transaction(function () use ($user, $workspace, $tier): bool {
             if (! $this->moveSetup->execute($user, $workspace, WorkspaceSetupStep::Sharing, WorkspaceSetupStep::UseCase)) {
                 return false;
@@ -33,5 +38,11 @@ final readonly class SaveOnboardingSharing
 
             return true;
         });
+    }
+
+    public function asks(User $user, Workspace $workspace): bool
+    {
+        return $user->default_email_sharing_tier === null
+            && ! ConnectedAccount::hasConnectedOutside($user, $workspace);
     }
 }
