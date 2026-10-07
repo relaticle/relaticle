@@ -29,7 +29,7 @@ final readonly class SaveOnboardingUseCase
     /**
      * @param  array<string, mixed>  $input
      */
-    public function execute(User $user, Workspace $workspace, array $input, ?OnboardingStep $then): void
+    public function execute(User $user, Workspace $workspace, array $input, ?OnboardingStep $then): bool
     {
         abort_unless($workspace->user_id === $user->getKey(), 403);
 
@@ -37,10 +37,12 @@ final readonly class SaveOnboardingUseCase
 
         $useCase = OnboardingUseCase::from((string) $input['onboarding_use_case']);
 
-        DB::transaction(function () use ($workspace, $input, $useCase, $then): void {
+        $saved = DB::transaction(function () use ($workspace, $input, $useCase, $then): bool {
             $locked = Workspace::query()->whereKey($workspace->getKey())->lockForUpdate()->sole();
 
-            abort_unless($locked->onboarding_step === OnboardingStep::UseCase && $locked->onboarding_use_case === null, 409);
+            if ($locked->onboarding_step !== OnboardingStep::UseCase || $locked->onboarding_use_case !== null) {
+                return false;
+            }
 
             $locked->update([
                 'onboarding_use_case' => $useCase,
@@ -58,9 +60,15 @@ final readonly class SaveOnboardingUseCase
             if ($preset !== null) {
                 $this->applyStagePreset->execute($locked, $preset);
             }
+
+            return true;
         });
 
         $workspace->refresh();
+
+        if (! $saved) {
+            return false;
+        }
 
         // The seeder swallows its own failures, but a SQL error aborts any open Postgres
         // transaction and turns its COMMIT into a ROLLBACK, so it runs after this one commits.
@@ -71,6 +79,8 @@ final readonly class SaveOnboardingUseCase
         $this->facts->forget($workspace);
 
         SyncSubscriberJob::dispatchFor((string) $workspace->user_id);
+
+        return true;
     }
 
     private function seedsSamples(User $user, Workspace $workspace): bool

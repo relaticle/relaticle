@@ -437,7 +437,7 @@ it('syncs the owner so the use case tag reaches the mailing list', function (): 
     Queue::assertPushed(SyncSubscriberJob::class, fn (SyncSubscriberJob $job): bool => invade($job)->userId === (string) $user->getKey());
 });
 
-it('rejects a second submit instead of seeding twice', function (): void {
+it('ignores a second submit instead of seeding twice', function (): void {
     Feature::define(OnboardSeed::class, true);
 
     $user = User::factory()->create();
@@ -446,8 +446,7 @@ it('rejects a second submit instead of seeding twice', function (): void {
 
     resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, $input, null);
 
-    expect(fn () => resolve(SaveOnboardingUseCase::class)->execute($user, $workspace->fresh(), $input, null))
-        ->toThrow(HttpException::class);
+    expect(resolve(SaveOnboardingUseCase::class)->execute($user, $workspace->fresh(), $input, null))->toBeFalse();
 
     expect(Company::query()->where('workspace_id', $workspace->getKey())->count())->toBe(4);
 });
@@ -692,14 +691,13 @@ it('refuses to move the setup for someone who does not own the workspace', funct
     expect($workspace->fresh()->onboarding_step)->toBe(OnboardingStep::UseCase);
 });
 
-it('aborts the use case step for a workspace that already has a use case', function (): void {
+it('leaves a workspace that already has a use case as it is', function (): void {
     $user = User::factory()->create();
     $workspace = workspaceInSetup($user);
 
     $workspace->update(['onboarding_use_case' => OnboardingUseCase::Sales]);
 
-    expect(fn () => resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, ['onboarding_use_case' => 'other'], null))
-        ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(409));
+    expect(resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, ['onboarding_use_case' => 'other'], null))->toBeFalse();
 
     expect($workspace->fresh())
         ->onboarding_use_case->toBe(OnboardingUseCase::Sales)
@@ -974,13 +972,13 @@ describe('connect email', function (): void {
         ['microsoft', 'google', 'gmail'],
     ]);
 
-    it('refuses to save the use case while the workspace is still on the connect step', function (): void {
+    it('returns the owner to setup when the use case is submitted from another step', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
             ->fillForm(['onboarding_use_case' => OnboardingUseCase::Other->value])
             ->call('saveUseCase')
-            ->assertStatus(409);
+            ->assertRedirect(SetupWorkspace::getUrl(['tenant' => $workspace]));
 
         expect($workspace->fresh())
             ->onboarding_use_case->toBeNull()
