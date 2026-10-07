@@ -13,6 +13,7 @@ use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalPayload;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * A plan is the set of proposals one assistant turn produced.
@@ -140,49 +141,31 @@ final readonly class ProposalPlanService
     }
 
     /**
-     * Approve every remaining step that does not need its own approval, in order,
-     * each in its own transaction.
-     *
-     * Execution stops at the first failure and reports it: the steps before it are
-     * committed and stay committed, because a plan is a sequence of real CRM writes
-     * and undoing the earlier ones would be a second set of writes the user never
-     * approved. A step that needs its own approval stays pending and is never a failure.
-     *
-     * @return array{approved: list<PendingAction>, failed: array{step: int, message: string}|null}
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}|null}
      */
     public function approveAll(PendingAction $action, User $user): array
     {
         $approved = [];
 
-        // Numbered over the still-pending steps, skipped ones included: the same basis
-        // the card numbers its rail on.
-        $position = 0;
-
         foreach ($this->steps($action) as $step) {
             $step->refresh();
 
-            if ($step->status !== PendingActionStatus::Pending) {
-                continue;
-            }
-
-            $position++;
-
-            if ($step->needsOwnApproval()) {
+            if ($step->status !== PendingActionStatus::Pending || $step->needsOwnApproval()) {
                 continue;
             }
 
             try {
                 $this->approveStep($step, $user);
             } catch (QueryException $exception) {
-                // Must precede the RuntimeException arm: QueryException extends
-                // PDOException extends RuntimeException, so without this the driver
-                // message (the SQL, its bindings and the connection) is what the card
-                // renders.
                 report($exception);
 
-                return $this->failure($approved, $position, $this->databaseFailureMessage($exception));
+                return $this->failure($approved, $step, $this->databaseFailureMessage($exception));
+            } catch (TransportExceptionInterface $exception) {
+                report($exception);
+
+                return $this->failure($approved, $step, ApprovalFailureMessage::forDelivery());
             } catch (RuntimeException|ValidationException $exception) {
-                return $this->failure($approved, $position, ApprovalFailureMessage::for($exception));
+                return $this->failure($approved, $step, ApprovalFailureMessage::for($exception));
             }
 
             $approved[] = $step;
@@ -193,11 +176,11 @@ final readonly class ProposalPlanService
 
     /**
      * @param  list<PendingAction>  $approved
-     * @return array{approved: list<PendingAction>, failed: array{step: int, message: string}}
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}}
      */
-    private function failure(array $approved, int $position, string $message): array
+    private function failure(array $approved, PendingAction $step, string $message): array
     {
-        return ['approved' => $approved, 'failed' => ['step' => $position, 'message' => $message]];
+        return ['approved' => $approved, 'failed' => ['step' => $step, 'message' => $message]];
     }
 
     /**
@@ -240,6 +223,8 @@ final readonly class ProposalPlanService
 
             return;
         }
+
+        throw_if($step->needsOwnApproval(), RuntimeException::class, __('Each email is approved on its own.'));
 
         foreach (array_keys($payload->batchRecords()) as $index) {
             $this->pendingActions->approveItem($step->refresh(), $user, $index);

@@ -878,6 +878,10 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
+        if ($this->loadStep($this->activeStepId())?->needsOwnApproval() === true) {
+            return;
+        }
+
         $this->createCurrent(resolve(PendingActionService::class));
     }
 
@@ -922,8 +926,8 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         if ($result['failed'] !== null) {
-            $this->reportResolveFailure($anchor, __('Step :step could not be completed: :message', [
-                'step' => $result['failed']['step'],
+            $this->reportResolveFailure($result['failed']['step'], __(':step could not be completed: :message', [
+                'step' => $this->stepSummary($result['failed']['step']),
                 'message' => $result['failed']['message'],
             ]));
 
@@ -1568,7 +1572,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         report($exception);
 
-        $message = __('The email could not be sent, so nothing was saved. Please try again in a moment.');
+        $message = ApprovalFailureMessage::forDelivery();
 
         $this->reportResolveFailure($pendingAction, $index === null
             ? $message
@@ -1675,11 +1679,8 @@ final class ProposalCard extends BaseLivewireComponent
 
         $existingFields = $this->currentDisplayFields($pendingAction);
 
-        // Only Create proposals are inline-editable, so only they need the rebuild that
-        // re-derives each owned row from action_data to attach an editable `code`. For
-        // update/delete, action_data holds diffs/record ids rather than display values, so the
-        // stored display rows are authoritative; rebuilding would blank them out. An email is
-        // never edited, so its stored rows are the ones the tool proposed.
+        // Only a Create proposal is rebuilt, to attach editable codes. Update and delete rows hold
+        // diffs, and an email is never edited, so their stored rows stand.
         if ($pendingAction->operation !== PendingActionOperation::Create || ProposalCoreFields::isIndivisible($pendingAction->entity_type)) {
             return $existingFields;
         }

@@ -24,6 +24,11 @@ final readonly class ApprovalFailureMessage
         return $exception->getMessage();
     }
 
+    public static function forDelivery(): string
+    {
+        return __('The email could not be sent, so nothing was saved. Please try again in a moment.');
+    }
+
     private static function forValidation(ValidationException $exception): string
     {
         $fields = array_keys($exception->errors());

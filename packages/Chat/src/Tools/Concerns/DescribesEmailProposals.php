@@ -192,7 +192,9 @@ trait DescribesEmailProposals
             return 'None';
         }
 
-        return trim(resolve(EmailForAgent::class)->textFromHtml($signature->content_html));
+        $text = trim(resolve(EmailForAgent::class)->textFromHtml($signature->content_html));
+
+        return $text === '' ? 'Default signature' : $text;
     }
 
     private function repliedToEmail(string $emailId): ?string

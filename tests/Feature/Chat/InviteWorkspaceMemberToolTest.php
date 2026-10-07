@@ -21,6 +21,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\DestinationResolver;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
 use Symfony\Component\Mailer\Exception\TransportException;
 
@@ -110,6 +111,51 @@ it('keeps the mail transport failure off the card when the invite email cannot b
         ->and($shown)->not->toContain('postmaster@relaticle');
 
     expect(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
+        ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+it('keeps the mail transport failure off the plan card when approve all reaches an invitation', function (): void {
+    $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+    Mail::shouldReceive('to')->andReturnSelf();
+    Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $this->workspace->getKey(),
+        'participant_type' => $this->user->getMorphClass(),
+        'participant_id' => (string) $this->user->getKey(),
+        'title' => 'Invite',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $turnId = (string) Str::ulid();
+
+    $invite = app(InviteWorkspaceMemberTool::class);
+    $invite->setConversationId($conversationId);
+    $invite->setTurnId($turnId);
+    $invite->handle(new Request(['records' => [['email' => 'undeliverable@example.com', 'role' => 'member']]]));
+
+    $task = app(CreateTaskTool::class);
+    $task->setConversationId($conversationId);
+    $task->setTurnId($turnId);
+    $task->handle(new Request(['records' => [['title' => 'Follow up']]]));
+
+    $pending = PendingAction::query()->where('entity_type', 'workspace_invitations')->sole();
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->call('approveAll')
+        ->assertDispatched('proposal:resolve-failed')
+        ->assertHasErrors('resolve');
+
+    $shown = $component->errors()->first('resolve');
+
+    expect($shown)->toContain('The email could not be sent, so nothing was saved. Please try again in a moment.')
+        ->and($shown)->not->toContain('smtp.internal.test')
+        ->and($shown)->not->toContain('postmaster@relaticle')
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 

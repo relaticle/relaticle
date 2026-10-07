@@ -198,12 +198,12 @@ it('reports the failing step and keeps the steps already committed', function ()
     $result = resolve(ProposalPlanService::class)->approveAll($company, $this->user);
 
     expect($result['approved'])->toHaveCount(1)
-        ->and($result['failed']['step'] ?? null)->toBe(2)
+        ->and($result['failed']['step']->getKey() ?? null)->toBe($person->getKey())
         ->and(Company::query()->where('name', 'Acme Robotics')->exists())->toBeTrue()
         ->and(People::query()->count())->toBe(0);
 });
 
-it('numbers a failure on the rail of pending steps and leaves a send pending', function (): void {
+it('names the failing step and leaves a send pending', function (): void {
     ($this->tool)(CreateCompanyTool::class)->handle(new Request([
         'records' => [['name' => 'Acme Robotics']],
     ]));
@@ -234,7 +234,7 @@ it('numbers a failure on the rail of pending steps and leaves a send pending', f
     $result = resolve(ProposalPlanService::class)->approveAll($company, $this->user);
 
     expect(array_map(fn (PendingAction $step): string => (string) $step->getKey(), $result['approved']))->toBe([(string) $company->getKey()])
-        ->and($result['failed']['step'] ?? null)->toBe(3)
+        ->and($result['failed']['step']->getKey() ?? null)->toBe($person->getKey())
         ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
 });
 

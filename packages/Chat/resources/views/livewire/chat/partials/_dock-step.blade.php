@@ -141,7 +141,7 @@
                     wire:click="approveStep(@js($step['id']))"
                     wire:loading.attr="disabled"
                     data-proposal-send-step="{{ $step['id'] }}"
-                    @disabled($blockedBy !== [])
+                    @disabled($blockedBy !== [] || $editingFieldCode !== null)
                     class="inline-flex h-6 shrink-0 items-center rounded-md bg-primary-600 px-2 text-xs font-medium text-white shadow-sm transition hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                     {{ $step['decisionLabel'] }}
@@ -151,7 +151,7 @@
                     type="button"
                     wire:click="approveStep(@js($step['id']))"
                     wire:loading.attr="disabled"
-                    @disabled($blockedBy !== [])
+                    @disabled($blockedBy !== [] || $editingFieldCode !== null)
                     @class([
                         'inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-gray-400 transition focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/step:opacity-100',
                         'hover:bg-primary-50 hover:text-primary-600 dark:hover:bg-primary-400/10 dark:hover:text-primary-400' => $blockedBy === [],

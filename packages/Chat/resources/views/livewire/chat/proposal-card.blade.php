@@ -11,6 +11,7 @@
         : \Relaticle\Chat\Support\ProposalVerbs::action($proposal?->entity_type ?? '', $operation ?? 'create');
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
     $showPrimary = ! $isPlan || $approveAllCount > 0;
+    $primaryIsSend = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);
     $discardLabel = $isPlan ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
@@ -137,8 +138,14 @@
                 @if ($showPrimary)
                 <button
                     type="button"
+                    wire:key="primary-{{ $primaryAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $primaryAction }}"
                     wire:loading.attr="disabled"
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $primaryBlocked ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($primaryBlocked)
                     @if ($primaryBlocked) title="{{ $primaryBlockedHint }}" @endif
                     @class([
@@ -150,11 +157,13 @@
                 >
                     <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
+                    @unless ($primaryIsSend)
                     <kbd
                         x-data
                         x-text="/Mac|iP/.test(navigator.platform) ? '⌘⏎' : 'Ctrl+⏎'"
                         class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
                     ></kbd>
+                    @endunless
                 </button>
                 @endif
                 </div>

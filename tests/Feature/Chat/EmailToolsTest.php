@@ -21,12 +21,14 @@ use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
+use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
@@ -1336,6 +1338,77 @@ describe('a send inside a plan', function (): void {
         Queue::assertNotPushed(ProcessChatMessage::class);
     });
 
+    it('refuses a stored batch send whole, so one Send never sends several emails', function (): void {
+        $record = chatSendRecord($this->viewerAccount);
+
+        $row = PendingAction::query()->create([
+            'workspace_id' => $this->workspace->getKey(),
+            'user_id' => $this->viewer->getKey(),
+            'conversation_id' => $this->conversationId,
+            'turn_id' => $this->turnId,
+            'action_class' => SendAssistantEmail::class,
+            'operation' => PendingActionOperation::Create,
+            'entity_type' => 'emails',
+            'action_data' => ['_batch' => true, 'records' => [$record, [...$record, 'subject' => 'Second']]],
+            'display_data' => ['title' => 'Send Emails', 'summary' => 'Send 2 emails', 'items' => [
+                ['summary' => 'Send email: Q4 lanes', 'fields' => []],
+                ['summary' => 'Send email: Second', 'fields' => []],
+            ]],
+            'status' => PendingActionStatus::Pending,
+            'expires_at' => now()->addMinutes(15),
+        ]);
+
+        $dock = openChatEmailDock($row)->call('approveStep', (string) $row->getKey());
+
+        expect($dock->errors()->get('resolve'))->toBe([__('Each email is approved on its own.')])
+            ->and(Email::query()->count())->toBe(0)
+            ->and($row->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
+
+    it('records a failed approve all on the step that failed, not on a send', function (): void {
+        $send = ($this->planSend)();
+        $task = ($this->planTask)();
+        $task->update(['action_data' => [...$task->action_data, 'people_ids' => [PlanReference::to('01MISSINGMISSINGMISSINGMI')]]]);
+
+        $dock = openChatEmailDock($send)->call('approveAll');
+
+        expect($task->fresh()->result_data['last_error'] ?? null)->not->toBeNull()
+            ->and($send->fresh()->result_data)->toBeNull()
+            ->and($dock->errors()->get('resolve')[0])->toContain('Call Lena')->toContain('could not be completed')->not->toContain('Step ');
+    });
+
+    it('is not sent by the keyboard shortcut when it is the only step left, but by its own footer button', function (): void {
+        $send = ($this->planSend)();
+
+        $dock = openChatEmailDock($send)->dispatch('proposal:create-current', context: 'conversation');
+
+        expect(Email::query()->count())->toBe(0)
+            ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+        $dock->assertDontSeeHtml('<kbd');
+
+        $dock->call('createCurrent');
+
+        expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
+    });
+
+    it('keeps the shortcut hint on a footer that is not for a send', function (): void {
+        openChatEmailDock(($this->planTask)())->assertSeeHtml('<kbd');
+    });
+
+    it('disables its Send button while a field of another step is being edited', function (): void {
+        $task = ($this->planTask)();
+        $send = ($this->planSend)();
+
+        $dock = openChatEmailDock($task);
+
+        expect($dock->html())->not->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+
+        $dock->call('editField', 'title', (string) $task->getKey());
+
+        expect($dock->html())->toMatch('/data-proposal-send-step="'.$send->getKey().'"\s+disabled/');
+    });
+
     it('names its own step when a draft step fails after an earlier approval', function (): void {
         $task = ($this->planTask)();
         $draft = pendingChatEmail(proposeChatEmails(
@@ -1357,9 +1430,10 @@ describe('a send inside a plan', function (): void {
 
                 return true;
             })
-            ->assertDispatched('proposal:resolve-failed', fn (string $event, array $params): bool => str_starts_with($params['message'], 'Step 2 could not be completed'));
+            ->assertDispatched('proposal:resolve-failed', fn (string $event, array $params): bool => $params['pendingActionId'] === $draft->getKey()
+                && str_starts_with($params['message'], 'Save email draft to client@acme.test: Next steps could not be completed'));
 
-        expect($dock->errors()->get('resolve')[0])->toStartWith('Step 2 could not be completed')
+        expect($dock->errors()->get('resolve')[0])->toStartWith('Save email draft to client@acme.test: Next steps could not be completed')
             ->and($announced)->toBe([$task->getKey()])
             ->and(Task::query()->where('title', 'Call Lena')->exists())->toBeTrue()
             ->and($draft->fresh()->status)->toBe(PendingActionStatus::Pending)
@@ -1467,6 +1541,14 @@ describe('an email card', function (): void {
         $pending = ($this->{$card})();
 
         expect(collect($pending->display_data['fields'])->pluck('value', 'label')['Signature'])->toBe("Dana Lopez\nHead of Ops, Acme");
+    })->with(['a send card' => 'sendCard', 'a draft card' => 'draftCard']);
+
+    it('shows a default signature with no text as a default signature', function (string $card): void {
+        ($this->signature)('<p><img src="https://acme.test/logo.png" alt=""></p>');
+
+        $pending = ($this->{$card})();
+
+        expect(collect($pending->display_data['fields'])->pluck('value', 'label')['Signature'])->toBe('Default signature');
     })->with(['a send card' => 'sendCard', 'a draft card' => 'draftCard']);
 
     it('shows no signature when the user asks for none or the mailbox has no default', function (string $card, bool $hasDefault, array $overrides): void {
