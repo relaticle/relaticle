@@ -36,6 +36,7 @@ API or MCP.
 | Promote someone to Admin | Yes | No | No | No |
 | Manage custom fields | Yes | Yes | No | No |
 | Manage workspace email settings | Yes | Yes | No | No |
+| Send email through an AI assistant | Yes | Yes | Yes | No |
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |

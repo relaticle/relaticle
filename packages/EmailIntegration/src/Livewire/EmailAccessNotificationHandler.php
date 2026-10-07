@@ -19,6 +19,7 @@ use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -161,25 +162,25 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $email = Email::query()
             ->whereKey($emailId)
             ->where('user_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
             ->first();
 
         if (! $email instanceof Email) {
+            Notification::make()
+                ->title(__('filament/concerns/email-compose.notifications.not_found.title'))
+                ->danger()
+                ->send();
+
             return;
         }
 
         try {
             resolve(CancelQueuedEmailAction::class)->execute($email);
             $this->dispatch('outbox:changed');
-            Notification::make()
-                ->title(__('filament/concerns/email-compose.notifications.cancelled.title'))
-                ->success()
-                ->send();
+            $this->notifyCancelled();
         } catch (RuntimeException) {
-            Notification::make()
-                ->title(__('filament/concerns/email-compose.notifications.too_late.title'))
-                ->danger()
-                ->send();
+            $email->refresh()->status === EmailStatus::CANCELLED
+                ? $this->notifyCancelled()
+                : $this->notifyTooLate();
         }
     }
 
@@ -200,6 +201,22 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $this->js(
             'window.dispatchEvent(new CustomEvent("close-modal", { bubbles: true, detail: '.Js::from(['id' => self::DATABASE_NOTIFICATIONS_MODAL_ID]).' }))',
         );
+    }
+
+    private function notifyCancelled(): void
+    {
+        Notification::make()
+            ->title(__('filament/concerns/email-compose.notifications.cancelled.title'))
+            ->success()
+            ->send();
+    }
+
+    private function notifyTooLate(): void
+    {
+        Notification::make()
+            ->title(__('filament/concerns/email-compose.notifications.too_late.title'))
+            ->danger()
+            ->send();
     }
 
     private function authUser(): User

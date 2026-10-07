@@ -1,4 +1,4 @@
-**Effective date:** October 5, 2026
+**Effective date:** October 6, 2026
 
 This Privacy Policy explains how Relaticle ("we", "us", "our") collects, uses, and protects your personal data when you use our services.
 
@@ -149,7 +149,7 @@ You can connect a Google (Gmail and Google Calendar) or Microsoft account to a w
 **What we access.** With your permission, Relaticle reads:
 
 - Email messages: sender, recipients, subject, body, timestamps, and thread information.
-- Attachment names, types, and sizes. The files themselves stay with your provider. Relaticle downloads one only when you open it and does not store it.
+- Attachment names, types, and sizes. A file stays with your provider, and Relaticle downloads it only when you open it, without storing it. Images embedded in a message and small files that arrive inside it are stored with that message.
 - Events on your primary calendar: title, description, location, times, organizer, and attendees with their responses.
 
 **How we use it.** We use this data only to provide features you can see in Relaticle:
@@ -158,19 +158,19 @@ You can connect a Google (Gmail and Google Calendar) or Microsoft account to a w
 - Create company and people records from email participants. By default, this happens only for addresses your workspace has emailed. Workspace admins can change or turn this off.
 - Send email you write in Relaticle from your own address. We send only when you click Send or schedule the message.
 - Accept or decline a meeting invitation when you choose to. This changes only your own response.
-- Summarize an email thread when you ask. The thread content goes to our AI provider to produce that summary.
+- Summarize an email thread when you ask. The thread content goes to our AI provider to produce that summary. The summary is saved with the thread in your workspace.
 
 We never change, label, or delete messages in your mailbox.
 
 **Who can see it.** Your sharing settings decide what teammates see: nothing, participants and timestamps, the subject line, or the full email. Workspace blocklists and protected contacts hide matching emails and meetings from everyone. We don't share it outside your workspace, except with the service providers listed in section 3.
 
-**What we don't do.** We don't sell this data. We don't use it for advertising. We don't use it to train AI models. Relaticle staff do not read it, except with your permission, for security, or where the law requires.
+**What we don't do.** We don't sell this data. We don't use it for advertising. We don't use it to train AI models, and the AI provider that writes a summary does not train its models on the thread. We don't build aggregated or anonymized data sets from it. Relaticle staff do not read it, except with your permission, for security, or where the law requires.
 
 **Disconnecting and deletion.** Disconnecting an account stops the sync and deletes the stored access tokens. For Google accounts, it also revokes Relaticle's access, unless another of your workspaces still uses that connection. Emails and meetings already synced stay in the workspace. They are removed when you delete your Relaticle account, after the 30-day grace period. To delete synced data sooner, email privacy@relaticle.com. You can also revoke access at any time from your Google or Microsoft account settings.
 
 **Security.** Access tokens are encrypted at rest. All data travels over encrypted connections.
 
-**Google API Services.** Relaticle's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements.
+**Google API Services.** Relaticle's use and transfer of information received from Google APIs to any other app will adhere to the [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements. This covers the data as received and anything derived from it, such as a thread summary.
 
 ## 11. Changes to This Policy
 

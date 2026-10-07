@@ -280,6 +280,7 @@ return [
         ],
         'email' => [
             'manage' => ['label' => 'Manage workspace email settings'],
+            'agent_send' => ['label' => 'Send email through an AI assistant'],
         ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],

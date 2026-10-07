@@ -100,7 +100,7 @@ describe('Legal pages', function () {
         $response->assertSee('Privacy Policy');
         $response->assertSee('Relaticle');
         $response->assertSee('privacy@relaticle.com');
-        $response->assertSee('October 5, 2026');
+        $response->assertSee('October 6, 2026');
         $response->assertSee('Data from a self-hosted installation stays on your servers unless you configure an external integration.');
         $response->assertSee('That integration may send authorized data to its provider.');
         $response->assertSee('Relaticle does not sell CRM data.');
@@ -151,6 +151,11 @@ describe('Legal pages', function () {
         $response->assertSee('The thread content goes to our AI provider to produce that summary.');
         $response->assertSee('Emails and meetings already synced stay in the workspace.');
         $response->assertSee('We never change, label, or delete messages in your mailbox.');
+        $response->assertSee('small files that arrive inside it are stored with that message.');
+        $response->assertSee('The summary is saved with the thread in your workspace.');
+        $response->assertSee('the AI provider that writes a summary does not train its models on the thread.');
+        $response->assertSee("We don't build aggregated or anonymized data sets from it.", false);
+        $response->assertSee('This covers the data as received and anything derived from it, such as a thread summary.');
     })->with([
         'HTML' => [[]],
         'Markdown' => [['Accept' => 'text/markdown']],

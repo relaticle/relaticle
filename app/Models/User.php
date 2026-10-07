@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Casts\AsCanonicalEmail;
 use App\Data\NotificationPreferences;
+use App\Enums\EmailGrant;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
 use App\Enums\WorkspaceCapability;
@@ -428,7 +429,12 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             return array_values(Jetstream::$permissions);
         }
 
-        return WorkspaceCapability::tokenPermissions($this->workspaceCapabilities($workspaceId));
+        $capabilities = $this->workspaceCapabilities($workspaceId);
+
+        return [
+            ...WorkspaceCapability::tokenPermissions($capabilities),
+            ...array_column(EmailGrant::grantableWith($capabilities), 'value'),
+        ];
     }
 
     public function hasWorkspaceCapability(?string $workspaceId, WorkspaceCapability $capability): bool

@@ -25,7 +25,7 @@ it('cancels a single send within the 5s undo window', function (): void {
     ]));
 
     $this->travelTo(now()->startOfSecond());
-    $email = resolve(SendEmailAction::class)->execute([
+    $email = resolve(SendEmailAction::class)->execute($user, [
         'connected_account_id' => $account->getKey(),
         'subject' => 'Hi',
         'body_html' => '<p>Hi</p>',

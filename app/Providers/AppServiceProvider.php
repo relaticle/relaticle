@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\CrmEntity;
+use App\Enums\EmailGrant;
 use App\Enums\Plan;
 use App\Events\WorkspaceCreated;
 use App\Filament\CustomFields\DateFieldType;
@@ -247,19 +248,31 @@ final class AppServiceProvider extends ServiceProvider
         Event::listen(AccessTokenCreated::class, CopyWorkspaceIdToAccessToken::class);
         Passport::useAuthorizationServerResponseType(new WorkspaceBearerTokenResponse);
 
-        // laravel/mcp appends `mcp:use` from a later booted callback, so setting the catalog here keeps it.
-        Passport::tokensCan([
-            'read' => 'Read your CRM records',
-            'create' => 'Create new CRM records',
-            'update' => 'Update existing CRM records',
-            'delete' => 'Delete CRM records',
-        ]);
+        $this->configureTokenScopes();
 
         // Connectors are long-lived but must not be immortal: a user who revokes one from
         // the Access Tokens page should not be outlived by a year-long bearer token.
         Passport::tokensExpireIn(now()->addDays(30));
         Passport::refreshTokensExpireIn(now()->addDays(90));
 
+        $this->configureConsentScreen();
+
+        $this->configurePolicies();
+        $this->configureModels();
+        $this->configureFilament();
+        $this->configureCommunityCounts();
+        $this->configureLivewire();
+        $this->configureMacros();
+        $this->configureRateLimiting();
+        $this->configureScribe();
+
+        $this->configureActivityLog();
+        $this->configureBlog();
+        $this->configureDevCommands();
+    }
+
+    private function configureConsentScreen(): void
+    {
         Passport::authorizationView(function (array $parameters) {
             $user = $parameters['user'] ?? null;
 
@@ -291,21 +304,26 @@ final class AppServiceProvider extends ServiceProvider
                 ? $currentWorkspaceId
                 : $workspaces->first(fn (Workspace $workspace): bool => ! in_array((string) $workspace->getKey(), $pausedWorkspaceIds, true))?->getKey();
 
+            $parameters['abilitiesByWorkspace'] = $user instanceof User
+                ? $workspaces->mapWithKeys(fn (Workspace $workspace): array => [
+                    (string) $workspace->getKey() => $user->grantableTokenPermissions((string) $workspace->getKey()),
+                ])->all()
+                : [];
+
             return response()->view('mcp.authorize', $parameters);
         });
+    }
 
-        $this->configurePolicies();
-        $this->configureModels();
-        $this->configureFilament();
-        $this->configureCommunityCounts();
-        $this->configureLivewire();
-        $this->configureMacros();
-        $this->configureRateLimiting();
-        $this->configureScribe();
-
-        $this->configureActivityLog();
-        $this->configureBlog();
-        $this->configureDevCommands();
+    private function configureTokenScopes(): void
+    {
+        // laravel/mcp appends `mcp:use` from a later booted callback, so setting the catalog here keeps it.
+        Passport::tokensCan([
+            'read' => 'Read your CRM records',
+            'create' => 'Create new CRM records',
+            'update' => 'Update existing CRM records',
+            'delete' => 'Delete CRM records',
+            ...EmailGrant::passportScopes(),
+        ]);
     }
 
     /**

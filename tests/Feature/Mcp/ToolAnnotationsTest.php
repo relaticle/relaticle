@@ -18,6 +18,11 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\CreateUploadUrlTool;
+use App\Mcp\Tools\Email\CreateEmailDraftTool;
+use App\Mcp\Tools\Email\GetEmailTool;
+use App\Mcp\Tools\Email\ListEmailAccountsTool;
+use App\Mcp\Tools\Email\ListEmailsTool;
+use App\Mcp\Tools\Email\SendEmailTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -71,6 +76,9 @@ $updateTaskAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'i
 /** @var array{readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false} $deleteAnnotations */
 $deleteAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => false];
 
+/** @var array{readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true} $sendAnnotations */
+$sendAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => true];
+
 /** @var array{readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false} $attachAnnotations */
 $attachAnnotations = ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false];
 
@@ -121,6 +129,11 @@ $toolContracts = [
     DeleteNoteTool::class => ['title' => 'Delete Note', 'name' => 'delete-note-tool', 'annotations' => $deleteAnnotations],
     AttachNoteToEntitiesTool::class => ['title' => 'Attach Note Relationships', 'name' => 'attach-note-to-entities-tool', 'annotations' => $attachAnnotations],
     DetachNoteFromEntitiesTool::class => ['title' => 'Detach Note Relationships', 'name' => 'detach-note-from-entities-tool', 'annotations' => $detachAnnotations],
+    ListEmailsTool::class => ['title' => 'List Emails', 'name' => 'list-emails-tool', 'annotations' => $readAnnotations],
+    GetEmailTool::class => ['title' => 'Get Email', 'name' => 'get-email-tool', 'annotations' => $readAnnotations],
+    ListEmailAccountsTool::class => ['title' => 'List Email Accounts', 'name' => 'list-email-accounts-tool', 'annotations' => $readAnnotations],
+    CreateEmailDraftTool::class => ['title' => 'Create Email Draft', 'name' => 'create-email-draft-tool', 'annotations' => $createAnnotations],
+    SendEmailTool::class => ['title' => 'Send Email', 'name' => 'send-email-tool', 'annotations' => $sendAnnotations],
 ];
 
 mutates(...array_merge(
@@ -144,7 +157,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(39);
+    expect($registeredTools)->toBeArray()->toHaveCount(44);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -163,7 +176,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(39);
+    expect($tools)->toBeArray()->toHaveCount(44);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();

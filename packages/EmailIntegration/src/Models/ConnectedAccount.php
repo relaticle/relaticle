@@ -57,6 +57,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property EmailAccountStatus $status
  * @property string|null $last_error
  * @property string|null $history_import_batch_id
+ * @property string|null $history_import_notified_batch_id
  */
 #[Fillable([
     'workspace_id',
@@ -84,6 +85,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
     'status',
     'last_error',
     'history_import_batch_id',
+    'history_import_notified_batch_id',
     'sync_inbox',
     'sync_sent',
     'daily_send_limit',

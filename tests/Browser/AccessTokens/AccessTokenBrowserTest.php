@@ -70,6 +70,9 @@ it('scrolls a table wider than its card so the row actions stay reachable', func
             scroller.scrollLeft = scroller.scrollWidth
 
             const action = card.querySelector('tbody tr td:last-child button')
+
+            action.scrollIntoView({ block: 'center' })
+
             const box = action.getBoundingClientRect()
             const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
 

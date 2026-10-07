@@ -704,6 +704,7 @@ it('notifies after retry when every failed import job eventually succeeds', func
         'sync_cursor' => 'history-done',
     ]));
     $batchId = attachHistoryImportBatch($account);
+    $account->update(['history_import_notified_batch_id' => $batchId]);
 
     resolve(MailboxHistoryImportService::class)->markAwaitingRetrySuccessNotice($batchId);
 

@@ -72,6 +72,7 @@ final readonly class SendEmailBatchAction
                 $person = $recipient['person'];
 
                 $this->sendEmail->execute(
+                    user: $user,
                     data: [
                         'connected_account_id' => $accountId,
                         'subject' => $this->renderService->renderPlainText($payload['subject'], $person),

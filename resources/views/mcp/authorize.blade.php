@@ -46,6 +46,31 @@
 <div class="min-h-screen flex items-center justify-center p-4 sm:p-6">
     <div class="w-full max-w-md">
         <div class="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+            @php
+                $requestedScopes = collect($scopes)->pluck('id');
+                $asksForRestScopes = $requestedScopes->intersect(['read', 'create', 'update', 'delete'])->isNotEmpty();
+                $connectsOverMcp = $requestedScopes->contains(\Laravel\Mcp\Server\Registrar::OAUTH_SCOPE);
+
+                $permissions = collect([
+                    ['abilities' => ['read'], 'label' => __('mcp.consent.permissions.read'), 'asked' => ! $asksForRestScopes || $requestedScopes->contains('read')],
+                    ['abilities' => ['create', 'update'], 'label' => __('mcp.consent.permissions.write'), 'asked' => ! $asksForRestScopes || $requestedScopes->intersect(['create', 'update'])->isNotEmpty()],
+                    ['abilities' => ['delete'], 'label' => __('mcp.consent.permissions.delete'), 'asked' => ! $asksForRestScopes || $requestedScopes->contains('delete')],
+                    ...collect(\App\Enums\EmailGrant::offered())->map(fn (\App\Enums\EmailGrant $grant): array => [
+                        'abilities' => [$grant->value],
+                        'label' => $grant->consentTitle(),
+                        'asked' => $connectsOverMcp,
+                    ]),
+                ])->where('asked', true);
+
+                $choosesWorkspace = $workspaces->count() > 1 || $pausedWorkspaceIds !== [];
+
+                if (! $choosesWorkspace) {
+                    $selectedWorkspaceId = $workspaces->first()?->getKey();
+                }
+
+                $selectedAbilities = $abilitiesByWorkspace[$selectedWorkspaceId] ?? [];
+            @endphp
+
             <!-- Header -->
             <div class="flex flex-col items-center gap-4 px-6 pt-8 pb-6 text-center">
                 <x-brand.logo-lockup size="md" class="text-gray-900 dark:text-white" />
@@ -56,126 +81,88 @@
                     </h1>
 
                     <p class="text-sm text-gray-500 dark:text-gray-400">
-                        {{ __('mcp.consent.intro', ['client' => $client->name]) }}
+                        @if($choosesWorkspace || $workspaces->isEmpty())
+                            {{ __('mcp.consent.intro.choose', ['client' => $client->name]) }}
+                        @else
+                            {{ __('mcp.consent.intro.one', ['client' => $client->name, 'workspace' => $workspaces->first()->name]) }}
+                        @endif
                     </p>
-
-                    @if($redirectHost)
-                        <p class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ __('mcp.consent.redirect', ['host' => $redirectHost]) }}
-                        </p>
-                    @endif
                 </div>
             </div>
 
-            <div class="space-y-6 border-t border-gray-200 px-6 py-6 dark:border-gray-800">
-                <!-- User Info -->
-                <div class="flex flex-col gap-0.5 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 dark:border-gray-800 dark:bg-gray-800/40">
-                    <span class="shrink-0 text-sm text-gray-500 dark:text-gray-400">{{ __('mcp.consent.signed_in_as') }}</span>
-                    <span class="text-sm font-medium break-all text-gray-900 dark:text-white">{{ $user->email }}</span>
-                </div>
-
-                <!-- Workspace Picker -->
+            <div class="space-y-5 border-t border-gray-200 px-6 py-5 dark:border-gray-800">
                 @if($workspaces->count() > 0)
-                    <div>
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.workspace.heading') }}</h2>
-                        <p class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                            {{ __('mcp.consent.workspace.description', ['client' => $client->name]) }}
-                        </p>
+                    @if($choosesWorkspace)
+                        <div>
+                            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.workspace.heading') }}</h2>
 
-                        <div class="mt-3 space-y-2" role="radiogroup" aria-label="{{ __('mcp.consent.workspace.aria_label') }}">
-                            @foreach($workspaces as $workspace)
-                                @php($isPaused = in_array($workspace->getKey(), $pausedWorkspaceIds, true))
-                                <label @class([
-                                    'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-4 py-3 transition-colors',
-                                    'cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 has-[:checked]:border-primary has-[:checked]:bg-primary-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 dark:hover:bg-gray-800/50 dark:has-[:checked]:border-primary-400 dark:has-[:checked]:bg-primary-950/50' => ! $isPaused,
-                                    'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60 dark:border-gray-800 dark:bg-gray-800/30' => $isPaused,
-                                ])>
-                                    <input
-                                        type="radio"
-                                        name="workspace_id"
-                                        value="{{ $workspace->getKey() }}"
-                                        form="authorizeForm"
-                                        required
-                                        @disabled($isPaused)
-                                        @checked($workspace->getKey() === $selectedWorkspaceId)
-                                        class="size-4 shrink-0 accent-primary"
-                                    >
-                                    <span class="min-w-0 flex-1 text-sm font-medium break-words text-gray-900 dark:text-white">{{ $workspace->name }}</span>
-                                    {{-- The card is narrower than the `sm` breakpoint, so these badges sit
-                                         inline on desktop and drop to their own line on a phone rather than
-                                         squeezing the workspace name into one word per line. --}}
-                                    @if($isPaused)
-                                        <span class="w-full pl-7 text-xs font-medium text-red-600 sm:w-auto sm:pl-0 sm:text-right dark:text-red-400">{{ __('mcp.consent.workspace.paused') }}</span>
-                                    @elseif($workspace->personal_workspace)
-                                        <span class="w-full pl-7 text-xs text-gray-500 sm:w-auto sm:pl-0 sm:text-right dark:text-gray-400">{{ __('mcp.consent.workspace.personal') }}</span>
-                                    @endif
-                                </label>
-                            @endforeach
-                        </div>
+                            <div class="mt-2 space-y-1.5" role="radiogroup" aria-label="{{ __('mcp.consent.workspace.aria_label') }}">
+                                @foreach($workspaces as $workspace)
+                                    @php($isPaused = in_array($workspace->getKey(), $pausedWorkspaceIds, true))
+                                    <label @class([
+                                        'flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-3 py-2 transition-colors',
+                                        'cursor-pointer border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50 has-[:checked]:border-primary has-[:checked]:bg-primary-50 dark:border-gray-800 dark:bg-gray-900 dark:hover:border-gray-700 dark:hover:bg-gray-800/50 dark:has-[:checked]:border-primary-400 dark:has-[:checked]:bg-primary-950/50' => ! $isPaused,
+                                        'cursor-not-allowed border-gray-200 bg-gray-50 opacity-60 dark:border-gray-800 dark:bg-gray-800/30' => $isPaused,
+                                    ])>
+                                        <input
+                                            type="radio"
+                                            name="workspace_id"
+                                            value="{{ $workspace->getKey() }}"
+                                            form="authorizeForm"
+                                            data-abilities="{{ implode(' ', $abilitiesByWorkspace[$workspace->getKey()] ?? []) }}"
+                                            required
+                                            @disabled($isPaused)
+                                            @checked($workspace->getKey() === $selectedWorkspaceId)
+                                            class="size-4 shrink-0 accent-primary"
+                                        >
+                                        <span class="min-w-0 flex-1 text-sm font-medium break-words text-gray-900 dark:text-white">{{ $workspace->name }}</span>
+                                        @if($isPaused)
+                                            <span class="w-full pl-7 text-xs font-medium text-red-600 sm:w-auto sm:pl-0 sm:text-right dark:text-red-400">{{ __('mcp.consent.workspace.paused') }}</span>
+                                        @elseif($workspace->personal_workspace)
+                                            <span class="w-full pl-7 text-xs text-gray-500 sm:w-auto sm:pl-0 sm:text-right dark:text-gray-400">{{ __('mcp.consent.workspace.personal') }}</span>
+                                        @endif
+                                    </label>
+                                @endforeach
+                            </div>
 
-                        @if($workspaces->count() === count($pausedWorkspaceIds))
-                            <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
-                                {{ __('mcp.consent.workspace.all_paused') }}
+                            <p class="mt-2 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                                {{ __('mcp.consent.workspace.description') }}
                             </p>
-                        @endif
-                    </div>
 
-                    <!-- Permissions -->
-                    <div>
-                        <h2 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.heading') }}</h2>
-                        <p class="mt-1 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                            {{ __('mcp.consent.permissions.description') }}
-                        </p>
-
-                        @php($requestedScopes = collect($scopes)->pluck('id'))
-                        @php($asksForRestScopes = $requestedScopes->intersect(['read', 'create', 'update', 'delete'])->isNotEmpty())
-
-                        <ul class="mt-3 space-y-3">
-                            @if(! $asksForRestScopes || $requestedScopes->contains('read'))
-                            <li class="flex items-start gap-3">
-                                <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                    <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"/>
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.read.title') }}</span>
-                                    <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.read.description') }}</span>
-                                </span>
-                            </li>
+                            @if($workspaces->count() === count($pausedWorkspaceIds))
+                                <p class="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300">
+                                    {{ __('mcp.consent.workspace.all_paused') }}
+                                </p>
                             @endif
-                            @if(! $asksForRestScopes || $requestedScopes->intersect(['create', 'update'])->isNotEmpty())
-                            <li class="flex items-start gap-3">
-                                <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-                                    <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.86 4.49a2.1 2.1 0 1 1 2.97 2.97L8.4 18.9l-3.9.98.98-3.9L16.86 4.49Z"/>
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.write.title') }}</span>
-                                    <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.write.description') }}</span>
-                                </span>
-                            </li>
-                            @endif
-                            @if(! $asksForRestScopes || $requestedScopes->contains('delete'))
-                            <li class="flex items-start gap-3">
-                                <span class="mt-px flex size-6 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400">
-                                    <svg class="size-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                                    </svg>
-                                </span>
-                                <span class="min-w-0">
-                                    <span class="block text-sm font-medium text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.delete.title') }}</span>
-                                    <span class="mt-0.5 block text-xs leading-relaxed text-gray-500 dark:text-gray-400">{{ __('mcp.consent.permissions.delete.description') }}</span>
-                                </span>
-                            </li>
-                            @endif
-                        </ul>
+                        </div>
+                    @else
+                        <input type="hidden" name="workspace_id" value="{{ $selectedWorkspaceId }}" form="authorizeForm">
+                    @endif
 
-                        <p class="mt-4 rounded-lg bg-gray-50 px-3 py-2 text-xs leading-relaxed text-gray-500 dark:bg-gray-800/40 dark:text-gray-400">
-                            {{ __('mcp.consent.permissions.excluded') }}
-                        </p>
-                    </div>
+                    @if($selectedWorkspaceId)
+                        <div>
+                            <h2 id="permissions-heading" class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('mcp.consent.permissions.heading', ['client' => $client->name]) }}</h2>
+
+                            <ul class="mt-2 space-y-1.5" aria-labelledby="permissions-heading" aria-live="polite">
+                                @foreach($permissions as $permission)
+                                    <li
+                                        data-abilities-any="{{ implode(' ', $permission['abilities']) }}"
+                                        @if(array_intersect($permission['abilities'], $selectedAbilities) === []) hidden @endif
+                                        class="flex items-start gap-2.5 text-sm text-gray-700 dark:text-gray-300"
+                                    >
+                                        <svg class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="m5 12.5 4.5 4.5L19 7.5"/>
+                                        </svg>
+                                        <span class="min-w-0">{{ $permission['label'] }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            <p class="mt-3 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                                {{ __('mcp.consent.permissions.excluded') }}
+                            </p>
+                        </div>
+                    @endif
                 @else
                     <div class="rounded-xl border border-red-200 bg-red-50 px-4 py-3 dark:border-red-900/50 dark:bg-red-950/40">
                         <p class="text-sm font-medium text-red-800 dark:text-red-200">{{ __('mcp.consent.workspace.none.heading') }}</p>
@@ -221,8 +208,12 @@
             </div>
         </div>
 
-        <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+        <p class="mt-4 text-center text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+            <span class="break-all">{{ __('mcp.consent.signed_in_as', ['email' => $user->email]) }}</span>
             {{ __('mcp.consent.revoke_hint') }}
+            @if($redirectHost)
+                {{ __('mcp.consent.redirect', ['host' => $redirectHost]) }}
+            @endif
         </p>
     </div>
 </div>
@@ -259,6 +250,36 @@
                 }, 5000);
             }, 200);
         });
+
+        const permissions = document.querySelectorAll('[data-abilities-any]');
+
+        const workspaceRadios = document.querySelectorAll('input[type="radio"][name="workspace_id"]');
+
+        function listPermissionsOfCheckedWorkspace() {
+            const checked = Array.from(workspaceRadios).find(function(radio) {
+                return radio.checked;
+            });
+
+            if (! checked) {
+                return;
+            }
+
+            const held = checked.dataset.abilities.split(' ');
+
+            permissions.forEach(function(permission) {
+                permission.hidden = ! permission.dataset.abilitiesAny.split(' ').some(function(ability) {
+                    return held.includes(ability);
+                });
+            });
+        }
+
+        workspaceRadios.forEach(function(radio) {
+            radio.addEventListener('change', listPermissionsOfCheckedWorkspace);
+        });
+
+        // A browser can restore another checked radio on reload or Back without firing change.
+        window.addEventListener('pageshow', listPermissionsOfCheckedWorkspace);
+        listPermissionsOfCheckedWorkspace();
 
         // Handle cancel button...
         const cancelForm = document.querySelector('form[method="POST"]:has(input[name="_method"][value="DELETE"])');

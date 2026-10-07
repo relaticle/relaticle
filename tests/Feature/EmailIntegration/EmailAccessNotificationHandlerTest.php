@@ -314,9 +314,43 @@ describe('undo queued send', function (): void {
 
         Livewire::test(EmailAccessNotificationHandler::class)
             ->dispatch('undo-queued-send', emailId: (string) $theirs->getKey())
-            ->assertNotNotified();
+            ->assertNotified(__('filament/concerns/email-compose.notifications.not_found.title'));
 
         expect($theirs->refresh()->status)->toBe(EmailStatus::QUEUED);
+    });
+
+    it('says the email is already cancelled when undo is pressed twice', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'scheduled_for' => now()->addSeconds(5),
+        ]);
+
+        Livewire::test(EmailAccessNotificationHandler::class)
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
+            ->assertNotNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
+
+        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+    });
+
+    it('notifies too late when the queued email has already been sent', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'status' => EmailStatus::SENT,
+            'sent_at' => now(),
+        ]);
+
+        Livewire::test(EmailAccessNotificationHandler::class)
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
+
+        expect($email->refresh()->status)->toBe(EmailStatus::SENT);
     });
 
     it('notifies too late when the queued email has already started sending', function (): void {

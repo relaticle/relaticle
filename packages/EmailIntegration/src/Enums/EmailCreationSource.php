@@ -15,6 +15,7 @@ enum EmailCreationSource: string implements HasLabel
     case REPLY = 'reply';
     case REPLY_ALL = 'reply_all';
     case MASS_SEND = 'mass_send';
+    case MCP = 'mcp';
 
     public function getLabel(): string
     {
@@ -26,6 +27,7 @@ enum EmailCreationSource: string implements HasLabel
             self::REPLY => 'Reply',
             self::REPLY_ALL => 'Reply All',
             self::MASS_SEND => 'Mass Send',
+            self::MCP => 'MCP',
         };
     }
 }

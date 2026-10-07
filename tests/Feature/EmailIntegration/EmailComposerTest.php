@@ -300,6 +300,23 @@ it('queues an email through SendEmailAction on send with the persisted body and 
         ->and($email->scheduled_for)->not->toBeNull();
 });
 
+it('tells the user when the outbox is full and keeps the composer open', function (): void {
+    config(['email-integration.outbox.max_queued_per_user' => 0]);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['lead@example.com'])
+        ->set('subject', 'Cannot queue')
+        ->set('bodyHtml', '<p>Hello there</p>')
+        ->call('send')
+        ->assertNotified(__('filament/emails/composer.notifications.outbox_full.title'))
+        ->assertSet('isOpen', true)
+        ->assertSet('subject', 'Cannot queue')
+        ->assertNotDispatched('composer:sent');
+
+    expect(Email::query()->where('subject', 'Cannot queue')->exists())->toBeFalse();
+});
+
 it('resolves merge tags from the primary To recipient when compose was not opened from a record', function (): void {
     $person = People::factory()->for($this->user->currentWorkspace)->create([
         'name' => 'Laravel Projects',
