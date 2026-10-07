@@ -2,7 +2,7 @@
 title: MCP Server
 description: Read the reference for Relaticle's MCP server, with OAuth and personal access token setup, custom field access and direct writes.
 order: 2
-updated: "2026-10-05"
+updated: "2026-10-07"
 ---
 
 MCP (Model Context Protocol) lets AI assistants like Claude work directly with your Relaticle CRM data. Instead of copy-pasting between tools, your AI assistant can list companies, create tasks, update people, and more -- all from a natural conversation.
@@ -57,7 +57,7 @@ Clients that support Dynamic Client Registration (RFC 7591), including Claude.ai
 
 At consent you pick **one workspace** for the connector. That choice is permanent for that connector: to point it at a different workspace, revoke it and connect again. Paused workspaces cannot be selected. Subscribe first, or the connector would have no data to read.
 
-The consent screen lists what the connector will be able to do, and the list follows your role in the workspace you pick. Where email is on, every role gets reading and drafting, and the Owner, Admin and Member roles get sending. The client cannot ask for more or less. Where email is on, Relaticle shows this screen every time a connector authorizes, so it always holds what its user saw.
+The consent screen lists what the connector will be able to do, and the list follows your role in the workspace you pick. Where email is on, every role gets reading and drafting, and the Owner, Admin and Member roles get sending. The client cannot ask for more or less. Relaticle shows this screen every time a connector authorizes, so the connector always holds what its user saw.
 
 Access tokens last 30 days and refresh tokens 90 days; supported clients refresh silently in the background.
 

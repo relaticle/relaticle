@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
-use App\Http\Middleware\RequireConsentForEmailGrants;
+use App\Http\Middleware\RequireConsent;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Listeners\Mcp\CopyWorkspaceIdToAccessToken;
 use App\Mcp\Servers\RelaticleServer;
@@ -25,7 +25,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(
     ApproveAuthorizationController::class,
-    RequireConsentForEmailGrants::class,
+    RequireConsent::class,
     AuthCode::class,
     CopyWorkspaceIdToAccessToken::class,
     SetApiWorkspaceContext::class,
@@ -658,41 +658,6 @@ it('refuses an MCP call when a Passport token carries no workspace binding', fun
         ->assertForbidden();
 });
 
-it('keeps the consented workspace when the client re-authorizes and Passport skips consent', function (): void {
-    Feature::define(EmailIntegration::class, false);
-
-    completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
-
-    // Passport short-circuits the consent screen (and so our workspace picker) when the
-    // user already holds an active token for the client, so the second grant never
-    // records a workspace of its own.
-    $verifier = Str::random(64);
-    $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
-
-    $this->actingAs($this->user);
-
-    $location = $this->get(authorizeUrl($this->client, [
-        'scope' => 'mcp:use',
-        'state' => 'again',
-        'code_challenge' => $challenge,
-    ]))->assertRedirect()->headers->get('Location');
-
-    parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
-
-    $this->postJson('/oauth/token', [
-        'grant_type' => 'authorization_code',
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'code_verifier' => $verifier,
-        'code' => $query['code'],
-    ])->assertOk();
-
-    $tokens = DB::table('oauth_access_tokens')->where('user_id', $this->user->getKey())->get();
-
-    expect($tokens)->toHaveCount(2);
-    expect($tokens->pluck('workspace_id')->unique()->all())->toBe([$this->otherWorkspace->getKey()]);
-});
-
 it('keeps a refreshed connector on its own workspace after the client is consented to another workspace', function (): void {
     $personalTokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
 
@@ -753,38 +718,29 @@ it('binds each code exchange to the workspace its own consent picked', function 
         ->and(whoAmI($otherTokens['access_token']))->toContain($this->otherWorkspace->getKey());
 });
 
-it('leaves no workspace from a rejected approval for a later authorization', function (): void {
-    Feature::define(EmailIntegration::class, false);
-
+it('binds a re-authorization to the workspace picked on its own consent screen', function (): void {
     completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
 
-    $otherClient = Client::query()->forceCreate([
-        'id' => (string) Str::uuid(),
-        'name' => 'Other MCP Client',
-        'redirect_uris' => ['https://example.com/callback'],
-        'grant_types' => ['authorization_code', 'refresh_token'],
-        'revoked' => false,
-        'owner_type' => $this->user->getMorphClass(),
-        'owner_id' => $this->user->getKey(),
-    ]);
+    $tokens = completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
 
+    expect(whoAmI($tokens['access_token']))
+        ->toContain($this->otherWorkspace->getKey())
+        ->not->toContain($this->personalWorkspace->getKey());
+});
+
+it('mints no auth code when the approval carries the wrong auth token', function (): void {
     $this->actingAs($this->user);
-    $this->get(authorizeUrl($otherClient, ['scope' => 'mcp:use']))->assertOk();
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertOk();
+
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
-        'client_id' => $otherClient->getKey(),
+        'client_id' => $this->client->getKey(),
         'auth_token' => 'not-the-session-token',
         'workspace_id' => $this->otherWorkspace->getKey(),
-    ]);
+    ])->assertForbidden();
 
-    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertRedirect();
-
-    $skippedConsentCode = DB::table('oauth_auth_codes')
-        ->where('client_id', $this->client->getKey())
-        ->latest('expires_at')
-        ->first();
-
-    expect($skippedConsentCode->workspace_id)->toBe($this->personalWorkspace->getKey());
+    expect(DB::table('oauth_auth_codes')->count())->toBe(0);
 });
 
 /**
@@ -966,22 +922,40 @@ it('shows consent when a client names an email scope while the email feature is 
         ->assertSee('name="workspace_id"', false);
 });
 
-it('still skips consent on a re-authorization while the email feature is off', function (): void {
+it('shows consent again on a re-authorization while the email feature is off', function (): void {
     Feature::define(EmailIntegration::class, false);
 
     completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
 
     $this->actingAs($this->user);
 
-    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertRedirect();
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
 });
 
-it('still skips consent for a REST client that already holds its scopes', function (): void {
+it('shows consent again for a REST client that already holds its scopes', function (): void {
     completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read');
 
     $this->actingAs($this->user);
 
-    $this->get(authorizeUrl($this->client, ['scope' => 'read']))->assertRedirect();
+    $this->get(authorizeUrl($this->client, ['scope' => 'read']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('trims the record scope a demoted member lost when the REST client re-authorizes', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->otherWorkspace, 'read delete');
+
+    $firstTokenId = Passport::token()->newQuery()->sole()->getKey();
+
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    $newestToken = Passport::token()->newQuery()->whereKeyNot($firstTokenId)->sole();
+
+    expect($newestToken->scopes)->toBe(['read']);
 });
 
 it('refuses an oauth token that lacks the mcp scope, whatever else it holds', function (): void {
