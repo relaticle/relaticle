@@ -155,3 +155,14 @@ it('includes team owner emails when the owner is not on the team_user pivot', fu
     expect($updated)->toBe(1)
         ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
+
+it('applies a new workspace default to the mail of a disconnected mailbox', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace);
+    $email = sharingEmail($mailbox, EmailPrivacyTier::SUBJECT);
+    $mailbox->delete();
+
+    resolve(SaveWorkspaceEmailSharingDefaultAction::class)->execute($this->workspace, $this->owner, EmailPrivacyTier::PRIVATE);
+    $mailbox->restore();
+
+    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
+});

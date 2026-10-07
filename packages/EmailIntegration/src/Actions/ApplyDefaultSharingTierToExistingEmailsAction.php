@@ -9,15 +9,18 @@ use App\Models\Workspace;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
 final readonly class ApplyDefaultSharingTierToExistingEmailsAction
 {
     public function executeForWorkspace(Workspace $workspace, EmailPrivacyTier $tier): int
     {
+        // A disconnected mailbox keeps its row and mail, and reconnecting restores both.
         return Email::query()
+            ->withoutGlobalScope(ActiveAccountScope::class)
             ->where('workspace_id', $workspace->getKey())
-            ->whereIn('connected_account_id', ConnectedAccount::query()
+            ->whereIn('connected_account_id', ConnectedAccount::withTrashed()
                 ->where('workspace_id', $workspace->getKey())
                 ->whereNull('sharing_tier')
                 ->select('id'))
