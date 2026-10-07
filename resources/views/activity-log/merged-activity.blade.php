@@ -3,7 +3,7 @@
 
     /** @var \Relaticle\ActivityLog\Timeline\TimelineEntry $entry */
     /** @var \Relaticle\ActivityLog\Support\ActivityLogSummary $summary */
-    /** @var list<array{label: string, old: string, new: string}> $rows */
+    /** @var list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}> $rows */
     /** @var string|null $importFile */
     /** @var string|null $viaSource */
 
@@ -68,25 +68,46 @@
             <div x-show="open" x-cloak x-collapse class="mt-2">
                 <dl class="divide-y divide-gray-100 rounded-md border border-gray-200 bg-gray-50/50 text-[12px] dark:divide-white/5 dark:border-white/10 dark:bg-white/[0.02]">
                     @foreach ($rows as $row)
-                        <div class="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-start gap-x-3 px-3 py-2">
+                        <div
+                            class="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] items-start gap-x-3 px-3 py-2"
+                            @if ($row['full'] !== null) x-data="{ full: false }" @endif
+                        >
                             <dt class="truncate pt-[1px] text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                 {{ $row['label'] }}
                             </dt>
                             <dd class="flex flex-wrap items-center gap-2 text-gray-700 dark:text-gray-300">
                                 <span
                                     class="line-clamp-2 text-gray-500 line-through decoration-gray-400/50 dark:text-gray-500"
-                                    title="{{ $row['old'] }}"
+                                    @if ($row['full'] === null) title="{{ $row['old'] }}" @endif
                                 >
                                     {{ $row['old'] }}
                                 </span>
                                 <x-filament::icon icon="heroicon-m-arrow-right" class="h-3 w-3 shrink-0 text-gray-400" />
                                 <span
                                     class="line-clamp-2 font-medium text-gray-900 dark:text-gray-100"
-                                    title="{{ $row['new'] }}"
+                                    @if ($row['full'] === null) title="{{ $row['new'] }}" @endif
                                 >
                                     {{ $row['new'] }}
                                 </span>
                             </dd>
+
+                            @if ($row['full'] !== null)
+                                <div class="col-span-full mt-1 grid cursor-auto gap-2" @click.stop @keydown.enter.stop @keydown.space.stop>
+                                    <button
+                                        type="button"
+                                        class="justify-self-start text-[12px] font-medium text-primary-600 hover:underline dark:text-primary-400"
+                                        :aria-expanded="full.toString()"
+                                        @click="full = !full"
+                                        x-text="full ? @js(__('workspaces.activity.full_change.hide')) : @js(__('workspaces.activity.full_change.show'))"
+                                    >
+                                        {{ __('workspaces.activity.full_change.show') }}
+                                    </button>
+
+                                    <div x-show="full" x-cloak x-collapse>
+                                        @include('activity-log.full-change', ['full' => $row['full']])
+                                    </div>
+                                </div>
+                            @endif
                         </div>
                     @endforeach
                 </dl>

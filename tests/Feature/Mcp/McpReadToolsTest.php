@@ -461,3 +461,36 @@ it('names every known channel and null in its description', function (): void {
 
     expect($description)->toContain('null');
 });
+
+it('returns an excerpt of a long rich text change, not the whole body', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $body = '<p>'.str_repeat('a renewal note that keeps going. ', 200).'</p><p>closing words</p>';
+
+    Activity::withoutGlobalScopes()->where('subject_id', $company->getKey())->delete();
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => '<p>Draft</p>', 'label' => '<p>Draft</p>'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.changes.0.field', 'Description')
+            ->where('items.0.changes.0.old', 'Draft')
+            ->where('items.0.changes.0.new', fn (string $new): bool => str_ends_with($new, '(shortened)') && mb_strlen($new) < 600)
+            ->etc());
+});

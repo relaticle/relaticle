@@ -21,4 +21,12 @@ final readonly class PlainText
 
         return Str::squish(str_replace("\u{00A0}", ' ', $text));
     }
+
+    public static function linesFromHtml(string $html): string
+    {
+        return collect(preg_split(self::BLOCK_BOUNDARY, $html) ?: [])
+            ->map(self::fromHtml(...))
+            ->filter(fn (string $line): bool => $line !== '')
+            ->implode("\n");
+    }
 }

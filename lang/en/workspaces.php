@@ -226,7 +226,14 @@ return [
         ],
         'changes_modal' => [
             'trigger' => 'View all changes',
+            'trigger_full' => 'View full change',
             'close' => 'Close',
+        ],
+        'full_change' => [
+            'show' => 'Show full text',
+            'hide' => 'Hide full text',
+            'before' => 'Before',
+            'after' => 'After',
         ],
         'no_results' => [
             'heading' => 'Nothing matches these filters',
