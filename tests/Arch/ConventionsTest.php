@@ -278,6 +278,84 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
     );
 });
 
+it('names an action for what it does, with no Action suffix', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $predatesTheRule = [
+        'ApplyDefaultSharingTierToExistingEmailsAction',
+        'ApproveEmailAccessRequestAction',
+        'AutoCreateCompanyAction',
+        'AutoCreatePersonAction',
+        'CancelEmailAccessRequestAction',
+        'CancelQueuedEmailAction',
+        'CompleteMailboxHistoryImportAction',
+        'ConnectAccountAction',
+        'CreateEmailTemplateAction',
+        'CreateSignatureAction',
+        'DeleteDraftAttachmentAction',
+        'DeleteEmailDraftAction',
+        'DeleteEmailTemplatesAction',
+        'DeleteSignatureAction',
+        'DeleteWorkspaceEmailVisibilityEntryAction',
+        'DenyEmailAccessRequestAction',
+        'DisconnectConnectedAccountAction',
+        'LinkEmailAction',
+        'LinkMeetingAction',
+        'LinkMeetingToRecordAction',
+        'MarkEmailAsReadAction',
+        'MarkEmailsSendFailedAction',
+        'QueueAgentEmailAction',
+        'ReconcileCalendarMeetingsAction',
+        'RequestEmailAccessAction',
+        'RescheduleQueuedEmailAction',
+        'RespondToMeetingAction',
+        'RetryFailedEmailAction',
+        'RetryMailboxHistoryImportFailuresAction',
+        'SaveEmailDraftAction',
+        'SaveUserEmailSharingDefaultAction',
+        'SaveWorkspaceEmailSharingDefaultAction',
+        'SendEmailAction',
+        'SendEmailBatchAction',
+        'SetDefaultConnectedAccountAction',
+        'StartMailboxHistoryImportAction',
+        'StopCalendarPushChannelAction',
+        'StoreEmailAction',
+        'StoreMeetingAction',
+        'SyncEmailBatchCountersAction',
+        'SyncEmailThreadAction',
+        'UnlinkMeetingFromRecordAction',
+        'UpdateConnectedAccountBlocklistAction',
+        'UpdateConnectedAccountSettingsAction',
+        'UpdateEmailSharingAction',
+        'UpdateSignatureAction',
+        'UpdateUserEmailPrivacySettingsAction',
+        'UpdateWorkspaceContactCreationSettingsAction',
+        'UpdateWorkspaceEmailPrivacySettingsAction',
+        'UpdateWorkspaceEmailVisibilityAction',
+        'UpdateWorkspaceEmailVisibilityEntryAction',
+        'UpdateWorkspaceEmailVisibilityEntrySubdomainsAction',
+        'UpdateWorkspaceProtectedRecipientsAction',
+    ];
+
+    $suffixed = array_values(array_filter(
+        array_map(
+            static fn (string $file): string => basename($file, '.php'),
+            phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+        ),
+        static fn (string $name): bool => str_ends_with($name, 'Action'),
+    ));
+
+    expect(array_values(array_diff($suffixed, $predatesTheRule)))->toBe(
+        [],
+        'An action is named for what it does, with no Action suffix (.ai/guidelines/relaticle/architecture.md).',
+    );
+
+    expect(array_values(array_diff($predatesTheRule, $suffixed)))->toBe(
+        [],
+        'These actions no longer carry the suffix. Remove them from $predatesTheRule.',
+    );
+});
+
 it('keeps reusable query predicates on their model as scopes', function (): void {
     $root = dirname(__DIR__, 2);
 

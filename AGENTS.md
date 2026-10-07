@@ -56,9 +56,15 @@ Actions are the single source of truth for business logic and side effects
 (notifications, syncs, etc.).
 
 A step or a rule that two actions share is an action too, and they inject it.
-`PrepareAgentEmailAction` checks the capability, the mailbox and the recipient limit, and
+`PrepareAgentEmail` checks the capability, the mailbox and the recipient limit, and
 `QueueAgentEmailAction` composes it. A reusable read that returns records is a query class,
 never an action.
+
+An action is named for what it does, verb first, with no `Action` suffix: `CreateOpportunity`,
+`PrepareAgentEmail`. The `Actions` namespace already says what it is.
+`tests/Arch/ConventionsTest.php` fails a class in an `Actions` folder whose name ends in
+`Action`. The 53 EmailIntegration actions that predate the rule are listed in that test, and
+the list only shrinks.
 
 The canonical shape is `final readonly`, with a single `execute()` method and
 authorization plus tenant-ownership checks inside the action itself.
