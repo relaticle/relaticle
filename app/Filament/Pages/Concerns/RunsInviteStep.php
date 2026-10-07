@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Concerns;
 
+use App\Actions\Jetstream\InviteWorkspaceMember;
 use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Enums\OnboardingStep;
 use App\Enums\WorkspaceRole;
 use App\Livewire\App\Workspaces\Concerns\SendsWorkspaceInvitations;
-use App\Rules\RegistrableEmail;
 use App\Support\EmailAddress;
 use App\Support\Workspaces\RoleOptions;
 use Closure;
@@ -163,7 +163,7 @@ trait RunsInviteStep
     {
         return Validator::make(
             ['email' => EmailAddress::canonicalize($email)],
-            ['email' => ['max:255', ...RegistrableEmail::rules(checkDns: false)]],
+            ['email' => InviteWorkspaceMember::emailRules()],
         )->passes();
     }
 }
