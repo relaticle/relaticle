@@ -799,3 +799,32 @@ test('a single change too long to read inline opens whole in the slide-over', fu
         ->toContain("going.\nclosing words")
         ->not->toContain('<p>');
 });
+
+test('a long plain text change keeps its line breaks in the slide-over', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Plain Note Co']);
+    $body = str_repeat("a renewal line that keeps going\n", 10)."\nclosing words";
+
+    $activity = Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->owner->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'summary',
+            'label' => 'Summary',
+            'type' => 'textarea',
+            'old' => ['value' => 'Draft', 'label' => 'Draft'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    $component = livewire(ActivityLog::class)
+        ->assertOk()
+        ->mountAction(TestAction::make('viewChanges')->table($activity));
+
+    expect(slideOverChanges($component))->toContain("keeps going\nclosing words");
+});

@@ -25,6 +25,7 @@ final readonly class PlainText
     public static function linesFromHtml(string $html): string
     {
         return collect(preg_split(self::BLOCK_BOUNDARY, $html) ?: [])
+            ->flatMap(fn (string $block): array => explode("\n", $block))
             ->map(self::fromHtml(...))
             ->filter(fn (string $line): bool => $line !== '')
             ->implode("\n");
