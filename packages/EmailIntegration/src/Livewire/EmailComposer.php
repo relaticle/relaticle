@@ -2126,8 +2126,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->draftId = (string) $draft->getKey();
 
-        if ($this->isOwnedAccountId((string) $draft->connected_account_id)) {
-            $this->accountId = (string) $draft->connected_account_id;
+        $draftAccount = $this->activeAccounts()
+            ->first(fn (ConnectedAccount $account): bool => (string) $account->getKey() === (string) $draft->connected_account_id);
+
+        if ($draftAccount instanceof ConnectedAccount) {
+            $this->accountId = (string) $draftAccount->getKey();
+            $this->useMailboxSharingTier($draftAccount);
         } else {
             // The account this draft was composed from was disconnected since
             // it was saved. `open()` already selected a default active account
