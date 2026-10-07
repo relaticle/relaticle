@@ -7,6 +7,7 @@ namespace App\Mcp\Tools\Concerns;
 use App\Enums\EmailGrant;
 use App\Enums\WorkspaceCapability;
 use App\Models\PersonalAccessToken;
+use App\Models\User;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Registrar;
 use Laravel\Passport\AccessToken as PassportAccessToken;
@@ -86,7 +87,7 @@ trait ChecksTokenAbility
 
         if ($token instanceof PassportAccessToken) {
             return $token->can(Registrar::OAUTH_SCOPE)
-                ? [...WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), ...$emailAbilities]
+                ? $this->abilitiesTheRoleGrants($emailAbilities)
                 : [];
         }
 
@@ -119,5 +120,23 @@ trait ChecksTokenAbility
     private function currentToken(): ?object
     {
         return auth()->user()?->currentAccessToken();
+    }
+
+    /**
+     * @param  list<string>  $emailAbilities
+     * @return list<string>
+     */
+    private function abilitiesTheRoleGrants(array $emailAbilities): array
+    {
+        $user = auth()->user();
+
+        if (! $user instanceof User) {
+            return [];
+        }
+
+        return array_values(array_intersect(
+            [...WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), ...$emailAbilities],
+            $user->grantableTokenPermissions($user->currentWorkspace?->getKey()),
+        ));
     }
 }

@@ -835,6 +835,22 @@ it('reports the record abilities and the email abilities of the role to the conn
     expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'create', 'update', 'delete', 'email:read', 'email:draft', 'email:send']);
 });
 
+it('reports a viewer\'s connector the read and email abilities its role grants', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $tokens = completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'email:read', 'email:draft']);
+});
+
+it('stops reporting write and send abilities to a connector once its user is demoted to viewer', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
+
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'email:read', 'email:draft']);
+});
+
 it('reports only the record abilities to a connector while the email feature is off', function (): void {
     Feature::define(EmailIntegration::class, false);
 
