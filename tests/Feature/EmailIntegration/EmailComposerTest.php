@@ -1841,6 +1841,7 @@ it('reopens a draft at the sharing level of the mailbox it was saved on', functi
         'workspace_id' => $this->user->current_workspace_id,
         'status' => 'active',
         'sharing_tier' => EmailPrivacyTier::FULL,
+        'created_at' => now()->addMinute(),
     ]));
 
     Livewire::test(EmailComposer::class)
@@ -1866,6 +1867,7 @@ it('resumes a reply draft at the sharing level of the mailbox it was saved on', 
         'workspace_id' => $this->user->current_workspace_id,
         'status' => 'active',
         'sharing_tier' => EmailPrivacyTier::FULL,
+        'created_at' => now()->addMinute(),
     ]));
     $inbound = Email::factory()->create([
         'workspace_id' => $this->user->current_workspace_id,
