@@ -70,32 +70,6 @@ final readonly class PrivacyService
         return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->workspace);
     }
 
-    /**
-     * Resolve the default tier to stamp on a newly created email.
-     * User preference wins over workspace default.
-     *
-     * Pass the mailbox's workspace for background sync. `$user->current_workspace_id` is
-     * only the owner's currently selected workspace, so using it for imports would
-     * stamp another workspace's default onto this mailbox.
-     */
-    public function defaultTierForUser(User $user, ?Workspace $workspace = null): EmailPrivacyTier
-    {
-        if ($user->default_email_sharing_tier) {
-            return $user->default_email_sharing_tier;
-        }
-
-        // Resolve the workspace explicitly (instead of $user->currentWorkspace, whose accessor
-        // larastan types as never-null and which can auto-switch workspaces as a side
-        // effect) so the null case, a user without a current workspace, is handled.
-        $workspace ??= $user->current_workspace_id !== null ? Workspace::query()->find($user->current_workspace_id) : null;
-
-        if ($workspace === null) {
-            return EmailPrivacyTier::METADATA_ONLY;
-        }
-
-        return $workspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
-    }
-
     public function tierFromPreference(mixed $tierValue, ConnectedAccount $mailbox): EmailPrivacyTier
     {
         return match (true) {
@@ -103,11 +77,6 @@ final readonly class PrivacyService
             filled($tierValue) => EmailPrivacyTier::from((string) $tierValue),
             default => $this->workspaceSharingTier($mailbox->workspace),
         };
-    }
-
-    public function effectiveSharingTierForUser(User $user): EmailPrivacyTier
-    {
-        return $this->defaultTierForUser($user, $user->currentWorkspace);
     }
 
     public function workspaceSharingTier(Workspace $workspace): EmailPrivacyTier

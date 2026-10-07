@@ -1182,7 +1182,7 @@ describe('connect email', function (): void {
 
         livewire(SetupWorkspace::class);
 
-        $account->update(['status' => EmailAccountStatus::DISCONNECTED]);
+        $account->delete();
 
         livewire(SetupWorkspace::class)
             ->assertSuccessful()

@@ -114,3 +114,16 @@ and update that SENT row. Creating a new synced row duplicates the send.
 `EmailAttachment::DISK` under `email-attachments/{current_team_id}/` with an
 `image/` MIME type, plus `data:image/` URIs. Do not treat `/storage/...` URLs
 as arbitrary disk paths.
+
+## The sharing level lives on the mailbox
+
+`connected_accounts.sharing_tier` holds the level, and null follows the workspace
+default. Resolve it with `PrivacyService::tierForMailbox()` from the mailbox the
+email is sent or synced through, never from the user or `currentWorkspace`: the
+same person shares differently in each workspace. Write it only through
+`SaveMailboxSharingTierAction`, which re-stamps that one mailbox's mail. A
+workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault()`).
+`tests/Feature/EmailIntegration/PrivacyServiceTest.php` fails when a second
+workspace's mailbox changes the level, and
+`ApplyDefaultSharingTierToExistingEmailsActionTest.php` fails when a save
+reaches another mailbox's mail.
