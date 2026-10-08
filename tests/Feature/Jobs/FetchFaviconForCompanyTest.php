@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\Http\HostResolver;
 use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Filament\Facades\Filament;
@@ -332,6 +333,48 @@ test('an unreachable company site is not reported as an error', function (): voi
 
     (new FetchFaviconForCompany($company->fresh()))->handle();
 
+    Exceptions::assertNothingReported();
+});
+
+test('a favicon whose host does not resolve is skipped without being reported', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://icons.dead-host.example/favicon.png');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+    Http::fake();
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    Http::assertNothingSent();
+    Exceptions::assertNothingReported();
+    expect($company->fresh()->getMedia('logo'))->toBeEmpty();
+});
+
+test('a favicon host that stops resolving before the download is not reported', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    $favicon = Mockery::mock(AshAllenDesign\FaviconFetcher\Favicon::class);
+    $favicon->shouldReceive('getFaviconUrl')->andReturn('https://icons.flaky-host.example/favicon.png');
+
+    Favicon::shouldReceive('driver->fetch')->andReturn($favicon);
+    Http::fake();
+
+    $lookups = 0;
+    app()->instance(HostResolver::class, new HostResolver(function () use (&$lookups): array {
+        $lookups++;
+
+        return $lookups === 1 ? ['93.184.216.34'] : [];
+    }));
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    Http::assertNothingSent();
     Exceptions::assertNothingReported();
 });
 

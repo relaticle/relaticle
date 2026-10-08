@@ -9,6 +9,7 @@ use App\Support\Http\SsrfGuard;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Request as HttpClientRequest;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 
 mutates(SsrfGuard::class);
@@ -192,6 +193,29 @@ test('guard refuses a host that resolves to a private address at send time', fun
         ->toThrow(SsrfGuardException::class);
 
     Http::assertNothingSent();
+});
+
+test('refuses a host that does not resolve without reporting it', function (): void {
+    resolveHostsTo([]);
+    Http::fake();
+
+    expect(SsrfGuard::isAllowed('https://dead-host.example.com/icon.png'))->toBeFalse()
+        ->and(fn () => SsrfGuard::guard(Http::timeout(5))->get('https://dead-host.example.com/icon.png'))
+        ->toThrow(SsrfGuardException::class, 'Could not resolve host: dead-host.example.com');
+
+    Http::assertNothingSent();
+    Exceptions::assertNothingReported();
+});
+
+test('reports a host that resolves to a non-public address', function (): void {
+    resolveHostsTo(['169.254.169.254']);
+    Http::fake();
+
+    expect(SsrfGuard::isAllowed('https://metadata.example.com/icon.png'))->toBeFalse()
+        ->and(fn () => SsrfGuard::guard(Http::timeout(5))->get('https://metadata.example.com/icon.png'))
+        ->toThrow(SsrfGuardException::class);
+
+    Exceptions::assertReportedCount(2);
 });
 
 test('guard aborts a download larger than the upload limit', function (): void {
