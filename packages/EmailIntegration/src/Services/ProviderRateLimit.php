@@ -11,9 +11,9 @@ use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 /**
- * Per-mailbox cooldown for Gmail/Graph user-rate limits. One 429 on a connected
- * account must park every other fetch for that mailbox until Retry-After, or
- * workers keep calling the API and Google slides the lock forward.
+ * Per-mailbox cooldown for Gmail/Graph user-rate limits and outages. One 429 on a
+ * connected account must park every other fetch for that mailbox until Retry-After,
+ * or workers keep calling the API and Google slides the lock forward.
  */
 final readonly class ProviderRateLimit
 {
@@ -52,6 +52,21 @@ final readonly class ProviderRateLimit
 
             if ($seconds !== null) {
                 return $seconds;
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return null;
+    }
+
+    public static function outageSeconds(Throwable $exception): ?int
+    {
+        $current = $exception;
+
+        while ($current instanceof Throwable) {
+            if ((self::httpStatus($current) ?? 0) >= 500) {
+                return self::clamp(self::headerSeconds($current) ?? self::FALLBACK_SECONDS);
             }
 
             $current = $current->getPrevious();
