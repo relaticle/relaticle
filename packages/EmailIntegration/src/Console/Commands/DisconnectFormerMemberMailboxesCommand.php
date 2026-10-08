@@ -8,14 +8,14 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder;
-use Relaticle\EmailIntegration\Actions\DisconnectFormerMemberMailboxAction;
+use Relaticle\EmailIntegration\Actions\DisconnectFormerMemberMailbox;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 #[Description('Disconnect mailboxes whose owner no longer belongs to the workspace')]
 #[Signature('email:disconnect-former-member-mailboxes {--force : Disconnect the mailboxes instead of reporting them}')]
 final class DisconnectFormerMemberMailboxesCommand extends Command
 {
-    public function handle(DisconnectFormerMemberMailboxAction $disconnect): int
+    public function handle(DisconnectFormerMemberMailbox $disconnect): int
     {
         $write = (bool) $this->option('force');
         $found = 0;

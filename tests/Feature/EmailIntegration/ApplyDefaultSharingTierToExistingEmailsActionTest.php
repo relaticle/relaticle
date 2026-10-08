@@ -7,7 +7,7 @@ use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Arr;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\SaveWorkspaceEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -16,7 +16,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(
     ApplyDefaultSharingTierToExistingEmailsAction::class,
-    SaveMailboxSharingTierAction::class,
+    SaveMailboxSharingTier::class,
 );
 
 beforeEach(function (): void {
@@ -59,7 +59,7 @@ it('re-stamps only the mail of the mailbox whose level changed', function (): vo
     $mine = sharingEmail($mailbox, EmailPrivacyTier::METADATA_ONLY);
     $other = sharingEmail($sibling, EmailPrivacyTier::METADATA_ONLY);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
 
     expect($mine->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT)
         ->and($other->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
@@ -70,7 +70,7 @@ it('brings drifted mail back to the mailbox level when the same level is saved a
     $mailbox = sharingMailbox($this->owner, $this->workspace, ['sharing_tier' => EmailPrivacyTier::SUBJECT]);
     $drifted = sharingEmail($mailbox, EmailPrivacyTier::FULL);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
 
     expect($drifted->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
@@ -80,7 +80,7 @@ it('leaves the same person mail in another workspace alone', function (): void {
     $mailbox = sharingMailbox($this->owner, $this->workspace);
     $far = sharingEmail(sharingMailbox($this->owner, $elsewhere), EmailPrivacyTier::FULL);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
 
     expect($far->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
@@ -89,7 +89,7 @@ it('keeps an email the owner set by hand', function (): void {
     $mailbox = sharingMailbox($this->owner, $this->workspace);
     $custom = sharingEmail($mailbox, EmailPrivacyTier::FULL, ['privacy_tier_customized' => true]);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
 
     expect($custom->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
@@ -99,7 +99,7 @@ it('returns a mailbox to the workspace default when its level is cleared', funct
     $mailbox = sharingMailbox($this->owner, $this->workspace, ['sharing_tier' => EmailPrivacyTier::PRIVATE]);
     $email = sharingEmail($mailbox, EmailPrivacyTier::PRIVATE);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, null);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, null);
 
     expect($mailbox->fresh()->sharing_tier)->toBeNull()
         ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
@@ -108,7 +108,7 @@ it('returns a mailbox to the workspace default when its level is cleared', funct
 it('refuses to set the level of a mailbox someone else owns', function (): void {
     $mailbox = sharingMailbox(User::factory()->create(), $this->workspace);
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->owner, $mailbox, EmailPrivacyTier::FULL);
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::FULL);
 })->throws(HttpException::class);
 
 it('moves only mailboxes without their own level when the workspace default changes', function (): void {

@@ -10,7 +10,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use RuntimeException;
 use Throwable;
 
-final readonly class DisconnectFormerMemberMailboxAction
+final readonly class DisconnectFormerMemberMailbox
 {
     public function __construct(
         private CancelQueuedEmailAction $cancelQueued,

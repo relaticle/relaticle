@@ -31,7 +31,7 @@ use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -1204,7 +1204,7 @@ it('keeps a sent email on its mailbox level when the owner lowers it later', fun
 
     $data = emailToolData($this->viewer->fresh(), SendEmailTool::class, sendArguments($this->viewerAccount));
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->viewer, $this->viewerAccount->fresh(), EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->viewer, $this->viewerAccount->fresh(), EmailPrivacyTier::PRIVATE);
 
     $sent = Email::query()->findOrFail($data['id']);
 

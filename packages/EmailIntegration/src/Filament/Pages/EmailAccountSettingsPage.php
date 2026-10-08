@@ -36,7 +36,7 @@ use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\CreateSignatureAction;
 use Relaticle\EmailIntegration\Actions\DeleteSignatureAction;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountBlocklistAction;
 use Relaticle\EmailIntegration\Actions\UpdateConnectedAccountSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateSignatureAction;
@@ -574,7 +574,7 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
                 $updateSettings->execute($this->account(), $data);
 
                 if ($chosenTier !== $this->account()->sharing_tier) {
-                    resolve(SaveMailboxSharingTierAction::class)->execute($user, $this->account(), $chosenTier);
+                    resolve(SaveMailboxSharingTier::class)->execute($user, $this->account(), $chosenTier);
                 }
 
                 $this->account()->refresh();

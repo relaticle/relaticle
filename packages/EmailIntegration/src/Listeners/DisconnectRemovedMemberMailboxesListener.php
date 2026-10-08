@@ -7,12 +7,12 @@ namespace Relaticle\EmailIntegration\Listeners;
 use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Jetstream\Events\TeamMemberRemoved;
-use Relaticle\EmailIntegration\Actions\DisconnectFormerMemberMailboxAction;
+use Relaticle\EmailIntegration\Actions\DisconnectFormerMemberMailbox;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 final readonly class DisconnectRemovedMemberMailboxesListener
 {
-    public function __construct(private DisconnectFormerMemberMailboxAction $disconnect) {}
+    public function __construct(private DisconnectFormerMemberMailbox $disconnect) {}
 
     public function handle(TeamMemberRemoved $event): void
     {
