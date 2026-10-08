@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
@@ -64,7 +65,7 @@ final class RemoveSampleDataTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: RemoveSampleData::class,
             operation: PendingActionOperation::Delete,
-            entityType: 'sample_data',
+            entityType: ProposalEntity::SampleData,
             actionData: ['name' => __('All sample records')],
             displayData: [
                 'title' => __('Remove sample data'),

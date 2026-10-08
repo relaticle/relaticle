@@ -42,10 +42,10 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
-use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalLabel;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
@@ -106,7 +106,7 @@ final readonly class PendingActionService
         ?string $conversationId,
         string $actionClass,
         PendingActionOperation $operation,
-        string $entityType,
+        ProposalEntity $entityType,
         array $actionData,
         array $displayData,
         ?string $messageId = null,
@@ -143,7 +143,7 @@ final readonly class PendingActionService
     /**
      * @param  array<string, mixed>  $actionData
      */
-    private function identicalProposal(string $conversationId, ?string $turnId, string $actionClass, PendingActionOperation $operation, string $entityType, array $actionData): ?PendingAction
+    private function identicalProposal(string $conversationId, ?string $turnId, string $actionClass, PendingActionOperation $operation, ProposalEntity $entityType, array $actionData): ?PendingAction
     {
         $sameWrite = fn (): Builder => PendingAction::query()
             ->where('conversation_id', $conversationId)
@@ -651,7 +651,7 @@ final readonly class PendingActionService
 
         return array_values(array_map(fn (PendingAction $action): array => [
             'operation' => $action->operation->value,
-            'entity_type' => $action->entity_type,
+            'entity_type' => $action->entity_type->value,
             'status' => $action->status->value,
             'label' => $this->resolveActionLabel($action),
             'record_id' => $this->resolveResultRecordId($action),
@@ -805,7 +805,7 @@ final readonly class PendingActionService
 
         return array_values(array_map(fn (PendingAction $action): array => [
             'operation' => $action->operation->value,
-            'entity_type' => $action->entity_type,
+            'entity_type' => $action->entity_type->value,
             'label' => $this->resolveActionLabel($action),
         ], $actions->all()));
     }
@@ -861,7 +861,7 @@ final readonly class PendingActionService
 
         $resolver = resolve(RecordReferenceResolver::class);
 
-        if (! $resolver->hasRecordPage($action->entity_type)) {
+        if ($action->entity_type->isIndivisible()) {
             return [];
         }
 
@@ -873,7 +873,7 @@ final readonly class PendingActionService
             return $id === null ? [] : [[
                 'id' => $id,
                 'label' => $this->resolveActionLabel($action),
-                'url' => $resolver->referenceUrl($action->entity_type, $id),
+                'url' => $resolver->referenceUrl($action->entity_type->value, $id),
             ]];
         }
 
@@ -893,7 +893,7 @@ final readonly class PendingActionService
             $records[] = [
                 'id' => (string) $id,
                 'label' => $item === null ? null : ProposalLabel::of($action->entity_type, $item['data'], $item['display']),
-                'url' => $resolver->referenceUrl($action->entity_type, (string) $id),
+                'url' => $resolver->referenceUrl($action->entity_type->value, (string) $id),
             ];
         }
 
@@ -1025,7 +1025,7 @@ final readonly class PendingActionService
      */
     private function sanitizedExclusions(PendingAction $pendingAction, array $excludedFields): array
     {
-        if ($pendingAction->operation === PendingActionOperation::Delete || ProposalCoreFields::isIndivisible($pendingAction->entity_type)) {
+        if ($pendingAction->operation === PendingActionOperation::Delete || $pendingAction->entity_type->isIndivisible()) {
             return [];
         }
 
@@ -1034,7 +1034,7 @@ final readonly class PendingActionService
             fn (mixed $code): bool => is_string($code)
                 && $code !== ''
                 && ! str_starts_with($code, '_')
-                && $code !== ProposalCoreFields::titleKey($pendingAction->entity_type),
+                && $code !== $pendingAction->entity_type->titleKey(),
         )));
     }
 
@@ -1047,10 +1047,10 @@ final readonly class PendingActionService
      * @param  list<string>  $excludedFields
      * @return array<array-key, mixed>
      */
-    private function withoutExcludedFields(array $record, array $excludedFields, string $entityType): array
+    private function withoutExcludedFields(array $record, array $excludedFields, ProposalEntity $entityType): array
     {
         foreach ($excludedFields as $code) {
-            if (ProposalCoreFields::isCore($entityType, $code)) {
+            if ($entityType->isCore($code)) {
                 unset($record[$code]);
 
                 continue;

@@ -19,11 +19,11 @@ use Laravel\Ai\Tools\Request;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\DestinationResolver;
-use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
@@ -115,7 +115,7 @@ it('creates one pending action for a batch of two invitations, carrying both ema
     $pending = pendingActionForWorkspace($this->user);
 
     expect($pending->action_class)->toBe(CreateWorkspaceInvitation::class)
-        ->and($pending->entity_type)->toBe('workspace_invitations')
+        ->and($pending->entity_type)->toBe(ProposalEntity::WorkspaceInvitation)
         ->and($pending->action_data['_batch'])->toBeTrue()
         ->and(collect($pending->action_data['records'])->pluck('email')->all())
         ->toBe(['alex@example.com', 'jamie@example.com']);
@@ -452,7 +452,7 @@ it('does not render a name row on the invitation card', function (): void {
 
     expect($labels)->not->toContain('Name')
         ->and($labels)->toContain('Email')
-        ->and(ProposalCoreFields::titleKey('workspace_invitations'))->toBe('email');
+        ->and(ProposalEntity::WorkspaceInvitation->titleKey())->toBe('email');
 });
 
 it('labels a resolved invitation by its email so the assistant can name it', function (): void {

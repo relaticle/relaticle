@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Models;
 
-use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -18,7 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
-use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\Chat\Enums\ProposalEntity;
 
 /**
  * @property string $id
@@ -29,7 +28,7 @@ use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
  * @property string|null $message_id
  * @property string $action_class
  * @property PendingActionOperation $operation
- * @property string $entity_type
+ * @property ProposalEntity $entity_type
  * @property array<string, mixed> $action_data
  * @property array<string, mixed> $display_data
  * @property PendingActionStatus $status
@@ -61,17 +60,12 @@ final class PendingAction extends Model
     use HasUlids;
     use HasWorkspace;
 
-    /** @var list<class-string> */
-    private const array LEAVES_THE_WORKSPACE = [
-        SendAssistantEmail::class,
-        CreateWorkspaceInvitation::class,
-    ];
-
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
             'operation' => PendingActionOperation::class,
+            'entity_type' => ProposalEntity::class,
             'status' => PendingActionStatus::class,
             'action_data' => 'array',
             'display_data' => 'array',
@@ -94,12 +88,12 @@ final class PendingAction extends Model
 
     public function needsOwnApproval(): bool
     {
-        return in_array($this->action_class, self::LEAVES_THE_WORKSPACE, true);
+        return $this->entity_type->needsOwnApproval();
     }
 
     public function isEmailSend(): bool
     {
-        return $this->action_class === SendAssistantEmail::class;
+        return $this->entity_type === ProposalEntity::Email;
     }
 
     public function isExpired(): bool

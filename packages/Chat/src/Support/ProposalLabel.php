@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Relaticle\Chat\Enums\ProposalEntity;
+
 final readonly class ProposalLabel
 {
     /** @var list<string> */
@@ -13,9 +15,9 @@ final readonly class ProposalLabel
      * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $display
      */
-    public static function of(string $entityType, array $data, array $display): ?string
+    public static function of(ProposalEntity $entity, array $data, array $display): ?string
     {
-        $titleKey = ProposalCoreFields::titleKey($entityType);
+        $titleKey = $entity->titleKey();
 
         return self::filled($data[$titleKey] ?? null)
             ?? self::titleRow($display, $titleKey)

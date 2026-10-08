@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 
 /**
  * @phpstan-type ResolvedAction array{operation: string, entity_type: string, status: string, label: string|null, record_id?: string|null, record_ids?: list<string>, records?: list<array{id: string, label: string|null, url: string}>, skipped?: list<string>, excluded?: list<array{record: string|null, fields: list<string>}>, failure?: string|null, just_decided?: bool}
@@ -40,10 +42,12 @@ final readonly class ResolvedActionText
         $excluded = $action['excluded'] ?? [];
         $failure = $action['failure'] ?? null;
         $marker = ($action['just_decided'] ?? false) ? 'JUST DECIDED, ' : '';
-        $verb = ProposalVerbs::verb($action['entity_type'], $action['operation']);
-        $noun = ProposalVerbs::noun($action['entity_type']);
+        $entity = ProposalEntity::from($action['entity_type']);
+        $operation = PendingActionOperation::from($action['operation']);
+        $verb = $entity->verb($operation);
+        $noun = $entity->noun();
         $head = '- '.$marker.PendingActionStatus::from($action['status'])->promptWord().": {$verb} ";
-        $notWritten = ProposalVerbs::notDone($action['entity_type'], $action['operation']);
+        $notWritten = $entity->notDone($operation);
 
         if (count($records) > 1 || ($records !== [] && $skipped !== [])) {
             $lines = [$head.count($records)." {$noun} records:"];

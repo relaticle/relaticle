@@ -11,12 +11,12 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Support\PendingActionEnvelope;
-use Relaticle\Chat\Support\ProposalVerbs;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
@@ -39,6 +39,11 @@ abstract class BaseWriteCreateTool implements Tool
     abstract protected function actionClass(): string;
 
     abstract protected function entityType(): string;
+
+    protected function proposalEntity(): ProposalEntity
+    {
+        return ProposalEntity::from($this->entityType());
+    }
 
     abstract public function description(): string;
 
@@ -75,12 +80,12 @@ abstract class BaseWriteCreateTool implements Tool
 
     private function batchVerb(): string
     {
-        return Str::ucfirst(ProposalVerbs::verb($this->entityType(), PendingActionOperation::Create->value));
+        return Str::ucfirst($this->proposalEntity()->verb(PendingActionOperation::Create));
     }
 
     private function batchNoun(): string
     {
-        return Str::headline(ProposalVerbs::noun($this->entityType()));
+        return Str::headline($this->proposalEntity()->noun());
     }
 
     private function missingCapabilityError(User $user): ?string
@@ -234,7 +239,7 @@ abstract class BaseWriteCreateTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Create,
-            entityType: $this->entityType(),
+            entityType: $this->proposalEntity(),
             actionData: $actionData,
             displayData: $displayData,
             turnId: $this->resolveTurnId(),

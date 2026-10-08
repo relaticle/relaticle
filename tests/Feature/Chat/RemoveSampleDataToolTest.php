@@ -19,6 +19,7 @@ use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
@@ -72,7 +73,7 @@ it('proposes one removal listing the sample count of every entity', function ():
         ->and($result['meta'])->toBe(['agent_should_stop' => true])
         ->and($pending->action_class)->toBe(RemoveSampleData::class)
         ->and($pending->operation)->toBe(PendingActionOperation::Delete)
-        ->and($pending->entity_type)->toBe('sample_data')
+        ->and($pending->entity_type)->toBe(ProposalEntity::SampleData)
         ->and($pending->display_data['summary'])->toBe('Delete 6 sample records')
         ->and(collect($pending->display_data['fields'])->pluck('value', 'label')->all())->toBe([
             'Companies' => '2',

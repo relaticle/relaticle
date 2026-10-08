@@ -100,8 +100,8 @@ final class CreateTaskTool extends BaseWriteCreateTool
         $fields[] = ['label' => 'Assignees', 'value' => $assigneeNames !== '' ? $assigneeNames : __('(none)')];
 
         return [
-            'title' => 'Create Task',
-            'summary' => "Create task \"{$title}\"",
+            'title' => $this->proposalEntity()->createTitle(),
+            'summary' => $this->proposalEntity()->createSummary($title),
             'fields' => $fields,
         ];
     }

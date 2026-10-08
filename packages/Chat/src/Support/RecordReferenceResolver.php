@@ -80,11 +80,6 @@ final readonly class RecordReferenceResolver
         ];
     }
 
-    public function hasRecordPage(string $entityType): bool
-    {
-        return ! ProposalCoreFields::isIndivisible($entityType);
-    }
-
     /**
      * The URL a chat tool payload cites for a record: the short
      * `/r/{type}/{id}` redirect, rendered as a styled chip later. Every caller

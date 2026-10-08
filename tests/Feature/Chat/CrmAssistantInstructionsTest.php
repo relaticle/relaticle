@@ -610,7 +610,7 @@ it('marks the proposals the resumed turn just decided', function (): void {
             'just_decided' => true,
         ],
         [
-            'operation' => 'create', 'entity_type' => 'companies', 'status' => 'approved',
+            'operation' => 'create', 'entity_type' => 'company', 'status' => 'approved',
             'label' => 'Older Co', 'record_id' => '01EARLIER', 'record_ids' => [],
             'records' => [], 'skipped' => [], 'excluded' => [], 'failure' => null,
             'just_decided' => false,
@@ -621,7 +621,7 @@ it('marks the proposals the resumed turn just decided', function (): void {
 
     expect($block)
         ->toContain('JUST DECIDED, APPROVED (written): invite teammate')
-        ->not->toContain('JUST DECIDED, APPROVED (written): create companies')
+        ->not->toContain('JUST DECIDED, APPROVED (written): create company')
         ->not->toContain('already decided by the user earlier in this conversation')
         ->toContain('Never call it already done, already sent');
 });

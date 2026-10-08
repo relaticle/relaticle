@@ -89,8 +89,8 @@ final class CreateNoteTool extends BaseWriteCreateTool
         }
 
         return [
-            'title' => 'Create Note',
-            'summary' => "Create note \"{$title}\"",
+            'title' => $this->proposalEntity()->createTitle(),
+            'summary' => $this->proposalEntity()->createSummary($title),
             'fields' => $fields,
         ];
     }

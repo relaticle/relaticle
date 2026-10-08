@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
@@ -462,7 +463,7 @@ it('gives the user a full day to decide a proposal', function (): void {
         conversationId: $this->convId,
         actionClass: CreateTask::class,
         operation: PendingActionOperation::Create,
-        entityType: 'task',
+        entityType: ProposalEntity::Task,
         actionData: ['title' => 'Decide tomorrow'],
         displayData: ['summary' => 'Create task "Decide tomorrow"'],
     );

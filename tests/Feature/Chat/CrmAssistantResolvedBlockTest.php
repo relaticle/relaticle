@@ -8,14 +8,14 @@ it('renders a resolved_actions block when set', function (): void {
     $instructions = (new CrmAssistant)
         ->withResolvedActions([
             ['operation' => 'create', 'entity_type' => 'task', 'status' => 'approved', 'label' => 'Review Q3', 'record_id' => '01ABC'],
-            ['operation' => 'create', 'entity_type' => 'person', 'status' => 'rejected', 'label' => 'Sarah', 'record_id' => null],
+            ['operation' => 'create', 'entity_type' => 'people', 'status' => 'rejected', 'label' => 'Sarah', 'record_id' => null],
         ])
         ->instructions();
 
     expect($instructions)->toContain('<resolved_actions>')
         ->and($instructions)->toContain('APPROVED (written): create task "Review Q3" (id: 01ABC)')
-        ->and($instructions)->toContain('REJECTED (nothing was written): create person "Sarah"')
-        ->and($instructions)->not->toContain('REJECTED (nothing was written): create person "Sarah" (id:')
+        ->and($instructions)->toContain('REJECTED (nothing was written): create people "Sarah"')
+        ->and($instructions)->not->toContain('REJECTED (nothing was written): create people "Sarah" (id:')
         ->and($instructions)->toContain('REJECTED and EXPIRED (nothing was written) mean nothing changed.')
         ->and($instructions)->toContain('NEVER describe a decided proposal as pending')
         ->and($instructions)->toContain('when the user explicitly asks for the action again (including after rejecting it), call the tool to create a FRESH proposal');
@@ -26,7 +26,7 @@ it('tells the model about unchecked fields and failed approval attempts', functi
         ->withResolvedActions([
             [
                 'operation' => 'create',
-                'entity_type' => 'person',
+                'entity_type' => 'people',
                 'status' => 'approved',
                 'label' => 'James',
                 'record_id' => '01DEF',

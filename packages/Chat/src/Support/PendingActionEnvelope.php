@@ -23,7 +23,7 @@ final readonly class PendingActionEnvelope
             'pending_action_id' => $pending->id,
             'turn_id' => $pending->turn_id,
             'action' => $action,
-            'entity_type' => $pending->entity_type,
+            'entity_type' => $pending->entity_type->value,
             'operation' => $pending->operation->value,
             'data' => $data,
             ...$beforeDisplay,

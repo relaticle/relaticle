@@ -15,8 +15,8 @@
     $inPlan = $inPlan ?? false;
     $operationLabels = ['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')];
     $outcomeLabels = ['rejected' => __('Rejected'), 'expired' => __('Expired'), 'superseded' => __('Replaced')];
-    $approvedLabels = collect(['create', 'update', 'delete'])->mapWithKeys(fn (string $operation): array => [$operation => \Relaticle\Chat\Support\ProposalVerbs::done('', $operation)])->all();
-    $entityReceipts = \Relaticle\Chat\Support\ProposalVerbs::receiptsByEntity();
+    $approvedLabels = collect(\Relaticle\Chat\Enums\PendingActionOperation::cases())->mapWithKeys(fn (\Relaticle\Chat\Enums\PendingActionOperation $operation): array => [$operation->value => $operation->done()])->all();
+    $entityReceipts = \Relaticle\Chat\Enums\ProposalEntity::receipts();
     $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from($operationLabels).")[action.operation] ?? action.operation)";
 @endphp
 {{-- COMPACT progress view while the batch is still docked. Gated on there being

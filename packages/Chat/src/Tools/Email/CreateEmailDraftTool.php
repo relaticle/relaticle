@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Tools\Email;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 use Relaticle\Chat\Tools\Concerns\DescribesEmailProposals;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
@@ -34,7 +35,7 @@ final class CreateEmailDraftTool extends BaseWriteCreateTool
 
     protected function entityType(): string
     {
-        return 'email_drafts';
+        return ProposalEntity::EmailDraft->value;
     }
 
     protected function nameAttribute(): string
@@ -94,7 +95,7 @@ final class CreateEmailDraftTool extends BaseWriteCreateTool
     protected function buildRecordDisplay(array $record): array
     {
         return [
-            'title' => 'Save Email Draft',
+            'title' => $this->proposalEntity()->createTitle(),
             'summary' => $this->emailSummary('Save email draft', $record),
             'fields' => $this->emailRows($record),
         ];

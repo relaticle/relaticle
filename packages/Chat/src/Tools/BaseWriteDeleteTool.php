@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
@@ -34,6 +35,11 @@ abstract class BaseWriteDeleteTool implements Tool
     abstract protected function entityLabel(): string;
 
     abstract protected function entityType(): string;
+
+    protected function proposalEntity(): ProposalEntity
+    {
+        return ProposalEntity::from($this->entityType());
+    }
 
     abstract public function description(): string;
 
@@ -101,7 +107,7 @@ abstract class BaseWriteDeleteTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Delete,
-            entityType: $this->entityType(),
+            entityType: $this->proposalEntity(),
             actionData: $this->actionData($deletable),
             displayData: $this->displayData($deletable),
             turnId: $this->resolveTurnId(),

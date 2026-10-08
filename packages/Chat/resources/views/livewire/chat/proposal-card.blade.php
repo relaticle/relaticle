@@ -8,7 +8,7 @@
     $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
     $primaryLabel = $isPlan
         ? trans_choice('Approve :count step|Approve all :count', $approveAllCount, ['count' => $approveAllCount])
-        : \Relaticle\Chat\Support\ProposalVerbs::action($proposal?->entity_type ?? '', $operation ?? 'create');
+        : ($proposal?->entity_type->action($proposal->operation) ?? \Relaticle\Chat\Enums\PendingActionOperation::Create->action());
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
     $showPrimary = ! $isPlan || $approveAllCount > 0;
     $primaryIsSend = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);

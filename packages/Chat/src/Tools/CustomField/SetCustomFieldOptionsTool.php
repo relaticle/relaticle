@@ -14,6 +14,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\ProposalPayload;
@@ -156,7 +157,7 @@ final class SetCustomFieldOptionsTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: SetCustomFieldOptions::class,
             operation: PendingActionOperation::Update,
-            entityType: 'custom_field',
+            entityType: ProposalEntity::CustomField,
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
