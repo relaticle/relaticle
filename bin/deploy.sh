@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Deploys the in-place Forge site. The deploy script in Forge is this one line:
+# Deploys the in-place Forge site. The deploy script in Forge is these two lines:
 #
+#   export PATH="$HOME/.local/bin:$PATH" COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 #   cd $FORGE_SITE_PATH && PHP=$FORGE_PHP PHP_FPM=$FORGE_PHP_FPM COMPOSER="$FORGE_COMPOSER" BRANCH=$FORGE_SITE_BRANCH bash bin/deploy.sh
 #
 # Every merge to main and every release triggers a deploy, so two often arrive
@@ -21,7 +22,7 @@ set -euo pipefail
 PHP="${PHP:-php}"
 PHP_FPM="${PHP_FPM:-}"
 COMPOSER="${COMPOSER:-composer}"
-PNPM="${PNPM:-corepack pnpm}"
+PNPM="${PNPM:-pnpm}"
 BRANCH="${BRANCH:-main}"
 
 DEPLOYED_COMMIT_FILE="storage/framework/deployed-commit"
@@ -72,6 +73,7 @@ release() {
 
     generate_api_docs
     build_assets
+    $PHP artisan app:generate-sitemap
 
     deployed_state "$commit" > "$DEPLOYED_COMMIT_FILE"
 
@@ -95,7 +97,7 @@ reload_fpm() {
 
 generate_api_docs() {
     # Scribe cannot read cached routes, so it is pointed at a cache file that does not exist.
-    APP_ROUTES_CACHE=storage/framework/routes-uncached.php $PHP artisan scribe:generate --no-interaction
+    APP_ROUTES_CACHE=storage/framework/routes-uncached.php $PHP artisan scribe:generate --force
 }
 
 build_assets() {
