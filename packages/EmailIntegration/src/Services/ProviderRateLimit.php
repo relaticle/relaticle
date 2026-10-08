@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
+use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
@@ -65,7 +67,7 @@ final readonly class ProviderRateLimit
         $current = $exception;
 
         while ($current instanceof Throwable) {
-            if ((self::httpStatus($current) ?? 0) >= 500) {
+            if (self::isUnreachable($current) || (self::httpStatus($current) ?? 0) >= 500) {
                 return self::clamp(self::headerSeconds($current) ?? self::FALLBACK_SECONDS);
             }
 
@@ -73,6 +75,11 @@ final readonly class ProviderRateLimit
         }
 
         return null;
+    }
+
+    private static function isUnreachable(Throwable $exception): bool
+    {
+        return $exception instanceof ConnectionException || $exception instanceof NetworkExceptionInterface;
     }
 
     private static function secondsFor(Throwable $exception): ?int

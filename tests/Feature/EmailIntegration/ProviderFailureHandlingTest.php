@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use Google\Service\Exception as GoogleServiceException;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Psr7\Request as PsrRequest;
 use GuzzleHttp\Psr7\Response as PsrResponse;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Artisan;
@@ -97,6 +100,24 @@ it('parks the job and keeps the mailbox active when the provider answers 502', f
 
     Exceptions::assertNothingReported();
 })->with('provider-calling jobs');
+
+it('parks the job and keeps the mailbox active when the provider cannot be reached', function (Closure $job, Throwable $failure): void {
+    config()->set('app.url', 'https://app.relaticle.com');
+    $account = mailboxWithCursors();
+    providerThrows($failure);
+
+    workMailboxJob($job($account));
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeBetween(55, 60)
+        ->and(DB::table('jobs')->count())->toBe(1)
+        ->and(DB::table('failed_jobs')->count())->toBe(0);
+
+    Exceptions::assertNothingReported();
+})->with('provider-calling jobs')->with([
+    'graph' => [new ConnectionException('cURL error 28: Resolving timed out after 10001 milliseconds for https://graph.microsoft.com/v1.0/me/mailFolders/inbox')],
+    'google' => [new ConnectException('cURL error 28: Resolving timed out after 10001 milliseconds', new PsrRequest('GET', 'https://gmail.googleapis.com/gmail/v1/users/me/history'))],
+]);
 
 it('gives a rejected token one more attempt, then asks for a reconnect without reporting', function (Closure $job): void {
     $account = mailboxWithCursors();
