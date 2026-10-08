@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 
 #[Title('Get CRM Summary')]
-#[Description('Get workspace record counts, opportunity pipeline totals by stage, and user-timezone-aware task due status.')]
+#[Description('Get workspace record counts, opportunity pipeline totals by stage with won and lost value, and user-timezone-aware task due status.')]
 final class GetCrmSummaryTool extends Tool
 {
     use ChecksTokenAbility;

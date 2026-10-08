@@ -6,6 +6,7 @@ namespace App\Support\CustomFields;
 
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -62,7 +63,7 @@ final readonly class CustomFieldOptionMap
     {
         $type = CustomFieldType::tryFrom($field->type);
 
-        return $type !== null && self::picksFromOptions($type) && $field->lookup_type === null;
+        return $type !== null && self::picksFromOptions($type) && ! $field->relationshipDefinition() instanceof CustomFieldRelationship;
     }
 
     public static function choiceRule(): string

@@ -14,7 +14,7 @@ use Relaticle\CustomFields\Models\CustomField;
 
 final class RichContentEntry extends AbstractInfolistEntry
 {
-    public function make(CustomField $customField): TextEntry
+    public function make(CustomField $customField, ?Model $record = null): TextEntry
     {
         return TextEntry::make($customField->getFieldName())
             ->html()

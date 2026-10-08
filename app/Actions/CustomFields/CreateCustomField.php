@@ -29,6 +29,7 @@ final readonly class CreateCustomField
         'date',
         'date-time',
         'select',
+        'status',
         'multi-select',
         'tags-input',
         'toggle',
@@ -40,6 +41,7 @@ final readonly class CreateCustomField
     /** @var list<string> Types that require user-managed options. */
     public const array CHOICE_TYPES = [
         'select',
+        'status',
         'multi-select',
         'radio',
         'checkbox-list',

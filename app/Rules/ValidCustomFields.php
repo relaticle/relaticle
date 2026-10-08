@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
-use App\Enums\CustomFieldType;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -61,10 +61,7 @@ final readonly class ValidCustomFields implements ValidationRule
                 }
 
                 $this->addChoiceFieldOptionRules($customField, $rules);
-
-                if ($customField->type === CustomFieldType::RECORD->value) {
-                    $rules["custom_fields.{$customField->code}"][] = new OwnedLookupRecords($this->tenantId, (string) $customField->lookup_type, $customField->name);
-                }
+                $this->addLinkTargetRules($customField, $rules);
             }
         }
 
@@ -102,11 +99,30 @@ final readonly class ValidCustomFields implements ValidationRule
     }
 
     /**
+     * A link field's payload holds record ids, and nothing under the package checks that
+     * they belong to this workspace: its reachability query runs on the target model,
+     * which carries no team scope here.
+     *
+     * @param  array<string, array<int, mixed>>  $rules
+     */
+    private function addLinkTargetRules(BaseCustomField $customField, array &$rules): void
+    {
+        if (! $customField->relationshipDefinition() instanceof CustomFieldRelationship) {
+            return;
+        }
+
+        $ruleKey = "custom_fields.{$customField->code}";
+
+        $rules[$ruleKey] = array_merge($rules[$ruleKey] ?? [], [new OwnedLinkTargets($customField, $this->tenantId)]);
+    }
+
+    /**
      * Add Rule::in validation for choice fields to ensure submitted option IDs actually exist.
      *
      * For single-choice fields (select, radio): validates the scalar value.
      * For multi-choice fields (multi_select, checkbox_list): validates each array element.
-     * Skips fields that accept arbitrary values (e.g., tags) or use a lookup_type.
+     * Skips fields that accept arbitrary values (e.g., tags) and record fields, whose
+     * payload holds target record ids rather than option ids.
      *
      * @param  array<string, array<int, mixed>>  $rules
      */
@@ -126,7 +142,7 @@ final readonly class ValidCustomFields implements ValidationRule
             return;
         }
 
-        if ($customField->lookup_type !== null) {
+        if ($customField->relationshipDefinition() instanceof CustomFieldRelationship) {
             return;
         }
 

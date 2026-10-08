@@ -10,6 +10,7 @@ use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\Media\UploadClaims;
 use Illuminate\Database\Eloquent\Model;
 use Relaticle\CustomFields\Models\CustomField;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 
 final readonly class CustomFieldValueObserver
 {
@@ -49,11 +50,19 @@ final readonly class CustomFieldValueObserver
 
     public function created(CustomFieldValue $value): void
     {
-        $this->log($value, null);
+        if ($this->readsLinks($value)) {
+            return;
+        }
+
+        $this->log($value, old: null);
     }
 
     public function updated(CustomFieldValue $value): void
     {
+        if ($this->readsLinks($value)) {
+            return;
+        }
+
         $column = CustomFieldValue::getValueColumn($value->customField->type);
 
         if (! $value->wasChanged($column)) {
@@ -61,6 +70,17 @@ final readonly class CustomFieldValueObserver
         }
 
         $this->log($value, $value->getOriginal($column));
+    }
+
+    /**
+     * A field that links records keeps its history in the edge ledger, and
+     * LogLinkChangeListener writes the timeline entry for both records from the one
+     * event. Any value row left on such a field is pre-migration residue: logging it
+     * here would double the entry, or announce an id as the value.
+     */
+    private function readsLinks(CustomFieldValue $value): bool
+    {
+        return $value->customField->relationshipDefinition() instanceof CustomFieldRelationship;
     }
 
     private function log(CustomFieldValue $value, mixed $old): void

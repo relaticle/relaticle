@@ -26,7 +26,9 @@ use App\Listeners\SeedWorkspaceCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
+use App\Models\CustomFieldLink;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldSection;
 use App\Models\CustomFieldValue;
 use App\Models\Export;
@@ -54,11 +56,13 @@ use App\Support\CustomFields\RestoreConflictMessage;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\Impersonator;
+use App\Support\LinkActorResolver;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
 use App\Support\Migrations\TenantMigration;
 use App\Support\Passport\ClientRepository;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use App\Support\RecordLinkFields;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Exports\ExportColumn;
@@ -111,6 +115,7 @@ use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
 use Relaticle\ActivityLog\Facades\Timeline;
 use Relaticle\Chat\Support\ChatTelemetry;
+use Relaticle\CustomFields\Contracts\LinkActorResolverInterface;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\ImportWizard\Models\Import;
@@ -157,19 +162,7 @@ final class AppServiceProvider extends ServiceProvider
         // verification is unconditional. See routes/web.php.
         Cashier::ignoreRoutes();
 
-        // One batch_uuid per request/job, lazily generated and forgotten between
-        // them. It is the key the activity timeline groups a single save's rows on.
-        $this->app->scoped(RequestActivityBatch::class);
-        $this->app->scoped(CurrentImport::class);
-        $this->app->scoped(CurrentWorkspace::class);
-
-        // Caches creation-source facts per workspace for the lifetime of a
-        // request/job, scoped so a queue worker resets it between jobs.
-        $this->app->scoped(WorkspaceActivationFacts::class);
-
-        $this->app->scoped(RecordNameResolver::class);
-        $this->app->scoped(MediaLookup::class);
-        $this->app->scoped(WorkspaceCustomFields::class);
+        $this->registerPerRequestCaches();
 
         // spatie/laravel-onboard binds OnboardingSteps as a SINGLETON, which
         // makes every workspace share one OnboardingStep instance. Its complete()
@@ -654,6 +647,16 @@ final class AppServiceProvider extends ServiceProvider
         CustomFields::useSectionModel(CustomFieldSection::class);
         CustomFields::useOptionModel(CustomFieldOption::class);
         CustomFields::useValueModel(CustomFieldValue::class);
+        CustomFields::useRelationshipModel(CustomFieldRelationship::class);
+        CustomFields::useLinkModel(CustomFieldLink::class);
+
+        // Both bindings resolve one instance: a caller that names the actor for its own
+        // write reaches for the class, and the package's writer for the interface.
+        $this->app->singleton(LinkActorResolver::class);
+        $this->app->singleton(
+            LinkActorResolverInterface::class,
+            fn (Application $app): LinkActorResolver => $app->make(LinkActorResolver::class),
+        );
 
         // Replaces the package's definitions so custom-field dates read the same as the
         // native columns beside them: `date-time` swaps the table column, which otherwise
@@ -850,5 +853,30 @@ final class AppServiceProvider extends ServiceProvider
             'schedule:work',
         );
         DevCommands::except('reverb', 'queue');
+    }
+
+    /**
+     * State that lives for one request or job and is forgotten between them, so a queue
+     * worker never carries another job's workspace, batch or field lookups.
+     */
+    private function registerPerRequestCaches(): void
+    {
+        // One batch_uuid per request/job, lazily generated and forgotten between
+        // them. It is the key the activity timeline groups a single save's rows on.
+        $this->app->scoped(RequestActivityBatch::class);
+        $this->app->scoped(CurrentImport::class);
+        $this->app->scoped(CurrentWorkspace::class);
+
+        // Caches creation-source facts per workspace for the lifetime of a
+        // request/job, scoped so a queue worker resets it between jobs.
+        $this->app->scoped(WorkspaceActivationFacts::class);
+
+        $this->app->scoped(RecordNameResolver::class);
+        $this->app->scoped(MediaLookup::class);
+        $this->app->scoped(WorkspaceCustomFields::class);
+
+        // Which custom fields of an entity read the link ledger. Same shape: one lookup
+        // per request rather than one per serialised record.
+        $this->app->scoped(RecordLinkFields::class);
     }
 }

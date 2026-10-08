@@ -122,7 +122,7 @@ it('marks custom field labels with the same outline icon set as the native detai
     $iconPath = fn (string $icon): string => Str::match('/ d="([^"]+)"/', svg($icon)->contents());
 
     livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
-        ->assertSeeHtml($iconPath('heroicon-o-chevron-up-down'))
+        ->assertSeeHtml($iconPath('heroicon-o-flag'))
         ->assertDontSeeHtml($iconPath('mdi-form-select'))
         ->assertDontSeeHtml($iconPath('mdi-calendar'));
 });

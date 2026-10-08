@@ -32,6 +32,7 @@ use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\ChatDocument;
+use Tests\Helpers\RecordFieldFixture;
 
 mutates(CustomFieldsDisplayFormatter::class);
 mutates(DisplayFieldSelector::class);
@@ -552,12 +553,13 @@ it('names record custom fields in a list table with one lookup per page, not per
         'code' => 'linked_company',
         'name' => 'Linked Company',
         'type' => 'record',
-        'lookup_type' => 'company',
         'sort_order' => 60,
         'validation_rules' => [],
         'active' => true,
         'system_defined' => false,
     ]);
+
+    RecordFieldFixture::pointAt($field, 'company');
     $field->settings = CustomFieldSettingsData::from(['visible_in_list' => true, 'list_toggleable_hidden' => false, 'visible_in_view' => true]);
     $field->save();
 

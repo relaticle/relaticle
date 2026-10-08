@@ -16,11 +16,14 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\Workspace;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Infolists\Components\Entry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
@@ -235,8 +238,13 @@ trait HasRecordPageLayout
     {
         $customFields = CustomFields::infolist()->withoutSections()->forSchema($schema);
 
-        $customFieldIcons = $customFields->getFields()
-            ->mapWithKeys(fn (CustomField $field): array => [$field->getFieldName() => CustomFieldType::tryFrom($field->type)?->icon()]);
+        $workspace = Filament::getTenant();
+
+        $customFieldIcons = $workspace instanceof Workspace
+            ? resolve(WorkspaceCustomFields::class)
+                ->forEntity($workspace, $this->getRecord()->getMorphClass())
+                ->mapWithKeys(fn (CustomField $field): array => [$field->getFieldName() => CustomFieldType::tryFrom($field->type)?->icon()])
+            : collect();
 
         $entries = collect($this->nativeDetailEntries())
             ->concat($customFields->values()->map(fn (Entry $entry): Entry => $entry

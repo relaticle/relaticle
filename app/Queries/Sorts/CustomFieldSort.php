@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Queries\Sorts;
 
+use App\Enums\CrmEntity;
 use App\Models\CustomField;
+use App\Models\CustomFieldRelationship;
 use App\Models\CustomFieldValue;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Relaticle\CustomFields\QueryBuilders\RecordLinkQuery;
 use Spatie\QueryBuilder\Sorts\Sort;
 
 /**
@@ -22,6 +25,22 @@ final readonly class CustomFieldSort implements Sort
      */
     public function __invoke(Builder $query, bool $descending, string $property): void
     {
+        $definition = $this->field->relationshipDefinition();
+
+        if ($definition instanceof CustomFieldRelationship) {
+            // A link field has no value row to order by: the sort reads the name of the
+            // first record it points at, and unlinked rows sort last either way.
+            resolve(RecordLinkQuery::class)->orderByLinkedAttribute(
+                $query,
+                $definition,
+                $definition->readDirectionFor($this->field),
+                CrmEntity::tryFrom($definition->targetEntityTypeFor($this->field))?->titleColumn() ?? 'name',
+                $descending ? 'desc' : 'asc',
+            );
+
+            return;
+        }
+
         $model = $query->getModel();
 
         $column = $this->field->getValueColumn();

@@ -4,22 +4,29 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
-use App\Support\CustomFields\RecordNameResolver;
+use App\Support\CustomFields\RecordNameResolver as CustomFieldRecordNames;
 use App\Support\PlainText;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Support\RecordNameResolver;
+use Relaticle\CustomFields\Data\RecordLinkPayload;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Models\CustomFieldLink;
 use Relaticle\CustomFields\Models\CustomFieldOption;
+use Relaticle\CustomFields\Models\CustomFieldRelationship;
 use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Services\Relationships\LinkReader;
 
 final readonly class CustomFieldsDisplayFormatter
 {
@@ -56,25 +63,15 @@ final readonly class CustomFieldsDisplayFormatter
             }
 
             $newValue = $this->storedForm($field, $proposedValue);
-            $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+            $definition = $field->relationshipDefinition();
 
-            $row = [
-                'label' => $field->name,
-                'code' => (string) $code,
-                'new' => $this->renderValue($field, $newValue, $timezone),
-                'type' => $this->displayType($field, $dataType),
-            ];
+            if ($definition instanceof CustomFieldRelationship) {
+                $rows[] = $this->linkRow($user, $field, $definition, (string) $code, $newValue, $oldModel);
 
-            if ($field->type === CustomFieldType::RECORD->value) {
-                $row['values'] = $this->recordNames($field, $newValue);
-            } elseif ($dataType === FieldDataType::MULTI_CHOICE && is_array($newValue)) {
-                $row['values'] = $this->optionNames($field, $newValue);
+                continue;
             }
 
-            if ($dataType === FieldDataType::SINGLE_CHOICE) {
-                $name = $this->renderSingleChoice($field, $newValue);
-                $row['values'] = $name === null || $name === '' ? [] : [$name];
-            }
+            $row = $this->valueRow($field, (string) $code, $newValue, $timezone);
 
             if ($oldModel instanceof Model) {
                 $oldValue = $this->lookupCurrentValue($field, $oldModel);
@@ -118,41 +115,29 @@ final readonly class CustomFieldsDisplayFormatter
         $rows = [];
 
         foreach ($fields as $field) {
+            $definition = $field->relationshipDefinition();
+
+            if ($definition instanceof CustomFieldRelationship) {
+                $linkRow = $this->storedLinkRow($model, $field, $definition);
+
+                if ($linkRow !== null) {
+                    $rows[] = $linkRow;
+                }
+
+                continue;
+            }
+
             $stored = $byFieldId->get($field->getKey());
 
             if (! $stored instanceof CustomFieldValue) {
                 continue;
             }
 
-            $raw = $this->plainValue($stored->{CustomFieldValue::getValueColumn($field->type)});
-            $rendered = $this->renderValue($field, $raw, $timezone);
+            $row = $this->storedValueRow($field, $stored, $valueLimit, $timezone);
 
-            if ($rendered === null) {
-                continue;
+            if ($row !== null) {
+                $rows[] = $row;
             }
-
-            $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
-            $type = $this->displayType($field, $dataType);
-            $value = $this->condense($rendered, $type === 'text' ? $valueLimit : null);
-
-            if ($value === '') {
-                continue;
-            }
-
-            $row = [
-                'label' => $field->name,
-                'code' => $field->code,
-                'value' => $value,
-                'type' => $type,
-            ];
-
-            $values = $this->storedValues($field, $raw, $dataType);
-
-            if ($values !== null) {
-                $row['values'] = $values;
-            }
-
-            $rows[] = $row;
         }
 
         return $rows;
@@ -173,7 +158,7 @@ final readonly class CustomFieldsDisplayFormatter
         }
 
         if ($field->type === CustomFieldType::RECORD->value) {
-            return $this->recordNames($field, $value);
+            return $this->storedRecordNames($field, $value);
         }
 
         if ($dataType === FieldDataType::MULTI_CHOICE) {
@@ -217,6 +202,124 @@ final readonly class CustomFieldsDisplayFormatter
         return $limit === null ? $oneLine : Str::limit($oneLine, $limit);
     }
 
+    /**
+     * A link field's proposal row: the records it will point at, as chips, beside the
+     * ones it points at now. A record proposed earlier in this turn resolves to its
+     * proposed name, so the card never shows an approval the user was not told about.
+     *
+     * @return array{label: string, code: string, new: string|null, type: string, values: list<string>, old?: string|null, _oldValue?: mixed, _newValue?: mixed}
+     */
+    private function linkRow(User $user, CustomField $field, CustomFieldRelationship $definition, string $code, mixed $newValue, ?Model $oldModel): array
+    {
+        $newIds = RecordLinkPayload::fromValue($newValue)->ids;
+        $names = $this->recordNames($user, $definition, $field, $newIds);
+
+        $row = [
+            'label' => $field->name,
+            'code' => $code,
+            'new' => $names === [] ? null : implode(', ', $names),
+            'type' => 'badges',
+            'values' => $names,
+        ];
+
+        if (! $oldModel instanceof Model) {
+            return $row;
+        }
+
+        // The current edges, not a value row: a link field has none. This is the same
+        // read the record page makes, so both sides of the diff agree.
+        $oldIds = $this->currentLinkIds($oldModel, $field);
+        $oldNames = $this->recordNames($user, $definition, $field, $oldIds);
+
+        $row['old'] = $oldNames === [] ? null : implode(', ', $oldNames);
+        $row['_oldValue'] = $oldIds;
+        $row['_newValue'] = $newIds;
+
+        return $row;
+    }
+
+    /**
+     * @param  array<int, int|string>  $ids
+     * @return list<string>
+     */
+    private function recordNames(User $user, CustomFieldRelationship $definition, CustomField $field, array $ids): array
+    {
+        $entityType = $definition->targetEntityTypeFor($field);
+        $modelClass = Relation::getMorphedModel($entityType);
+
+        if ($modelClass === null || ! is_subclass_of($modelClass, Model::class)) {
+            return [];
+        }
+
+        return resolve(RecordNameResolver::class)->labels(
+            $ids,
+            $modelClass,
+            $user->currentWorkspace,
+            CrmEntity::tryFrom($entityType)?->titleColumn() ?? 'name',
+        );
+    }
+
+    /**
+     * @return array<int, int|string>
+     */
+    private function currentLinkIds(Model $model, CustomField $field): array
+    {
+        if (! method_exists($model, 'getCustomFieldValue')) {
+            return [];
+        }
+
+        $ids = $model->getCustomFieldValue($field);
+
+        return is_array($ids) ? array_values($ids) : [];
+    }
+
+    /**
+     * The names a record's links already carry, read from the relations the caller
+     * loaded for the whole page. A display block is a summary, so an unloaded relation
+     * skips the field rather than paying a query per row for it.
+     *
+     * @return list<string>
+     */
+    private function loadedLinkNames(Model $model, CustomField $field, CustomFieldRelationship $definition): array
+    {
+        if (! $model->relationLoaded('outgoingLinks') || ! $model->relationLoaded('incomingLinks')) {
+            return [];
+        }
+
+        $names = [];
+
+        foreach (resolve(LinkReader::class)->orderedLinksFor($model, $definition, $definition->readDirectionFor($field)) as $link) {
+            $relation = $this->farEndRelation($link, $model);
+
+            if (! $link->relationLoaded($relation)) {
+                return [];
+            }
+
+            $far = $link->getRelation($relation);
+
+            if (! $far instanceof Model) {
+                continue;
+            }
+
+            $column = CrmEntity::tryFrom($far->getMorphClass())?->titleColumn() ?? 'name';
+            $name = $far->getAttribute($column);
+
+            if (is_string($name) && $name !== '') {
+                $names[] = $name;
+            }
+        }
+
+        return $names;
+    }
+
+    private function farEndRelation(CustomFieldLink $link, Model $model): string
+    {
+        $isFromEnd = $link->from_entity_type === $model->getMorphClass()
+            && (string) $link->from_entity_id === (string) $model->getKey();
+
+        return $isFromEnd ? 'toEntity' : 'fromEntity';
+    }
+
     private function renderValue(CustomField $field, mixed $value, string $timezone): ?string
     {
         if (in_array($value, [null, '', []], true)) {
@@ -253,15 +356,15 @@ final readonly class CustomFieldsDisplayFormatter
 
     private function renderRecords(CustomField $field, mixed $value): string
     {
-        return implode(', ', $this->recordNames($field, $value));
+        return implode(', ', $this->storedRecordNames($field, $value));
     }
 
     /** @return list<string> */
-    private function recordNames(CustomField $field, mixed $value): array
+    private function storedRecordNames(CustomField $field, mixed $value): array
     {
         return array_map(
             fn (array $record): string => $record['name'] ?? $record['id'],
-            resolve(RecordNameResolver::class)->resolve((string) $field->lookup_type, $value),
+            resolve(CustomFieldRecordNames::class)->resolve((string) $field->targetEntityType(), $value),
         );
     }
 
@@ -354,5 +457,98 @@ final readonly class CustomFieldsDisplayFormatter
         $column = CustomFieldValue::getValueColumn($field->type);
 
         return $this->plainValue($row->{$column});
+    }
+
+    /**
+     * The proposed value of one non-link field, rendered once for the card heading and,
+     * where the field is option-backed, again as the list of labels the card draws.
+     *
+     * @return array{label: string, code: string, new: string|null, type: string, values?: list<string>}
+     */
+    private function valueRow(CustomField $field, string $code, mixed $newValue, string $timezone): array
+    {
+        $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+
+        $row = [
+            'label' => $field->name,
+            'code' => $code,
+            'new' => $this->renderValue($field, $newValue, $timezone),
+            'type' => $this->displayType($field, $dataType),
+        ];
+
+        if ($field->type === CustomFieldType::RECORD->value) {
+            $row['values'] = $this->storedRecordNames($field, $newValue);
+        } elseif ($dataType === FieldDataType::MULTI_CHOICE && is_array($newValue)) {
+            $row['values'] = $this->optionNames($field, $newValue);
+        }
+
+        if ($dataType === FieldDataType::SINGLE_CHOICE) {
+            $name = $this->renderSingleChoice($field, $newValue);
+            $row['values'] = $name === null || $name === '' ? [] : [$name];
+        }
+
+        return $row;
+    }
+
+    /**
+     * The records a link field holds, as the badges row a record card draws. Null when
+     * the record links nothing: a display block is a summary, not a form.
+     *
+     * @return array{label: string, code: string, value: string, type: string, values: list<string>}|null
+     */
+    private function storedLinkRow(Model $model, CustomField $field, CustomFieldRelationship $definition): ?array
+    {
+        $names = $this->loadedLinkNames($model, $field, $definition);
+
+        if ($names === []) {
+            return null;
+        }
+
+        return [
+            'label' => $field->name,
+            'code' => $field->code,
+            'value' => implode(', ', $names),
+            'type' => 'badges',
+            'values' => $names,
+        ];
+    }
+
+    /**
+     * One stored value, condensed to the width a card gives it. Null when the field
+     * renders to nothing, which a summary leaves out rather than showing as blank.
+     *
+     * @return array{label: string, code: string, value: string, type: string, values?: list<string>}|null
+     */
+    private function storedValueRow(CustomField $field, CustomFieldValue $stored, int $valueLimit, string $timezone): ?array
+    {
+        $raw = $this->plainValue($stored->{CustomFieldValue::getValueColumn($field->type)});
+        $rendered = $this->renderValue($field, $raw, $timezone);
+
+        if ($rendered === null) {
+            return null;
+        }
+
+        $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
+        $type = $this->displayType($field, $dataType);
+        $value = $this->condense($rendered, $type === 'text' ? $valueLimit : null);
+
+        if ($value === '') {
+            return null;
+        }
+
+        $row = [
+            'label' => $field->name,
+            'code' => $field->code,
+            'value' => $value,
+            'type' => $type,
+        ];
+
+        $values = $this->storedValues($field, $raw, $dataType);
+
+        if ($values !== null) {
+            $row['values'] = $values;
+        }
+
+        return $row;
     }
 }

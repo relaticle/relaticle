@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services;
 
-use App\Enums\CustomFields\TaskField;
 use App\Filament\Resources\TaskResource;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\OptionsInCategory;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\JoinClause;
@@ -47,14 +47,14 @@ final readonly class MyTasksService
             ->where('t.workspace_id', $workspace->getKey())
             ->where('tu.user_id', $user->getKey())
             ->whereNull('t.deleted_at')
-            ->when($meta->doneOptionId !== null, function (Builder $query) use ($meta): void {
+            ->when($meta->terminalOptionIds !== [], function (Builder $query) use ($meta): void {
                 $query->whereNotExists(function (Builder $sub) use ($meta): void {
                     $sub->select(DB::raw(1))
                         ->from('custom_field_values as st')
                         ->whereColumn('st.entity_id', 't.id')
                         ->where('st.entity_type', 'task')
                         ->where('st.custom_field_id', $meta->statusFieldId)
-                        ->where('st.string_value', $meta->doneOptionId);
+                        ->whereIn('st.string_value', $meta->terminalOptionIds);
                 });
             });
 
@@ -99,23 +99,24 @@ final readonly class MyTasksService
     }
 
     /**
-     * Whether the tenant still has a `Done` status option to complete a task into.
+     * Whether the tenant still has a completed status option to complete a task into.
      *
      * Reuses the same memoized lookup as the list query, so the dashboard can hide
-     * a completion control that would fail on every click.
+     * a completion control that would fail on every click: a field with no completed
+     * option carries no terminal ids either.
      */
-    public function hasDoneOption(Workspace $workspace): bool
+    public function hasCompletedStatusOption(Workspace $workspace): bool
     {
-        return $this->resolveFieldMetadata($workspace)->doneOptionId !== null;
+        return $this->resolveFieldMetadata($workspace)->terminalOptionIds !== [];
     }
 
     /**
      * Resolves the per-tenant custom-field IDs the main query needs.
      *
-     * One round-trip pulls both the `due_date` and `status` field IDs plus the
-     * `Done` option ID (joined to `custom_field_options`). Memoized on the
+     * One round-trip pulls both the `due_date` and `status` field IDs, and a second
+     * reads the status options that close a task. Memoized on the
      * application container so concurrent dashboard renders within the same
-     * request reuse the result instead of refiring three lookups each time.
+     * request reuse the result instead of refiring the lookups each time.
      */
     private function resolveFieldMetadata(Workspace $workspace): MyTasksFieldMetadata
     {
@@ -129,24 +130,21 @@ final readonly class MyTasksService
         }
 
         $row = DB::table('custom_fields as cf')
-            ->leftJoin('custom_field_options as opt', function (JoinClause $join): void {
-                $join->on('opt.custom_field_id', '=', 'cf.id')
-                    ->where('opt.name', '=', TaskField::DONE_STATUS);
-            })
             ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')
             ->whereIn('cf.code', ['due_date', 'status'])
             ->selectRaw(implode(', ', [
                 "MAX(CASE WHEN cf.code = 'due_date' THEN cf.id END) AS due_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
-                "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
             ]))
             ->first();
 
+        $statusFieldId = $row?->status_field_id !== null ? (string) $row->status_field_id : null;
+
         $meta = new MyTasksFieldMetadata(
             dueFieldId: $row?->due_field_id !== null ? (string) $row->due_field_id : null,
-            statusFieldId: $row?->status_field_id !== null ? (string) $row->status_field_id : null,
-            doneOptionId: $row?->done_option_id !== null ? (string) $row->done_option_id : null,
+            statusFieldId: $statusFieldId,
+            terminalOptionIds: OptionsInCategory::terminalIds($workspace->getKey(), 'status', $statusFieldId),
         );
 
         app()->instance($cacheKey, $meta);
@@ -173,9 +171,10 @@ final readonly class MyTasksService
  */
 final readonly class MyTasksFieldMetadata
 {
+    /** @param list<string> $terminalOptionIds */
     public function __construct(
         public ?string $dueFieldId,
         public ?string $statusFieldId,
-        public ?string $doneOptionId,
+        public array $terminalOptionIds,
     ) {}
 }

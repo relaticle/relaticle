@@ -260,9 +260,11 @@ final class ProposalCard extends BaseLivewireComponent
             ->only([$code])
             ->values()
             // The package spans each field across its own 12-column grid; this schema has one column.
-            ->map(fn (Field $field): Field => $field->hiddenLabel()->columnSpan(['default' => 'full', 'lg' => 'full']))
+            ->map(fn (Component $field): Component => $field instanceof Field
+                ? $field->hiddenLabel()->columnSpan(['default' => 'full', 'lg' => 'full'])
+                : $field)
             // Filament's date panel cannot leave the card's scroller; the browser's picker can.
-            ->map(fn (Field $field): Field => $field instanceof DateTimePicker ? $field->native() : $field)
+            ->map(fn (Component $field): Component => $field instanceof DateTimePicker ? $field->native() : $field)
             ->all();
     }
 

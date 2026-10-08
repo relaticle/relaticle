@@ -29,11 +29,13 @@ enum CustomFieldType: string
     case DATE = 'date';
     case DATE_TIME = 'date-time';
     case SELECT = 'select';
+    case STATUS = 'status';
     case MULTI_SELECT = 'multi-select';
     // Retired through config('custom-fields.field_type_configuration')->disabled(), not
     // deleted: stored rows still need a type name and a format when a schema lists them.
     case FILE_UPLOAD = 'file-upload';
     case RECORD = 'record';
+    case RELATIONSHIP = 'relationship';
 
     /** The value shape an agent must send when writing this field. */
     public function inputFormat(): string
@@ -47,14 +49,14 @@ enum CustomFieldType: string
             self::LINK => 'array of URL strings',
             self::DOMAIN => 'array of domain strings; a URL is reduced to its host',
             self::CHECKBOX, self::TOGGLE => 'boolean',
-            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => 'option label or option ID',
+            self::SELECT, self::STATUS, self::RADIO, self::TOGGLE_BUTTONS => 'option label or option ID',
             self::MULTI_SELECT, self::CHECKBOX_LIST => 'array of option labels or IDs',
             self::TAGS_INPUT => 'array of arbitrary string values',
             self::RICH_EDITOR => 'markdown, or HTML when the value starts with <; stored and returned as HTML',
             self::COLOR_PICKER => 'hex color string',
             self::DATE => 'ISO 8601 date',
             self::DATE_TIME => 'ISO 8601 datetime string; an offset is converted to UTC',
-            self::RECORD => 'array of record IDs of the lookup entity; records must belong to this workspace',
+            self::RECORD, self::RELATIONSHIP => 'array of record IDs of the related entity; records must belong to this workspace',
             self::FILE_UPLOAD => 'read-only; the file-upload field type is no longer supported and cannot be written',
         };
     }
@@ -85,6 +87,8 @@ enum CustomFieldType: string
             self::MULTI_SELECT => 'heroicon-o-queue-list',
             self::FILE_UPLOAD => 'heroicon-o-paper-clip',
             self::RECORD => 'heroicon-o-link',
+            self::RELATIONSHIP => 'heroicon-o-arrows-right-left',
+            self::STATUS => 'heroicon-o-flag',
         };
     }
 
@@ -99,14 +103,14 @@ enum CustomFieldType: string
             self::LINK => ['https://example.com'],
             self::DOMAIN => ['example.com'],
             self::CHECKBOX, self::TOGGLE => true,
-            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => 'In progress',
+            self::SELECT, self::STATUS, self::RADIO, self::TOGGLE_BUTTONS => 'In progress',
             self::MULTI_SELECT, self::CHECKBOX_LIST => ['Enterprise', 'EU'],
             self::TAGS_INPUT => ['priority', 'customer'],
             self::RICH_EDITOR => "## Notes\n- first call done",
             self::COLOR_PICKER => '#0A80EA',
             self::DATE => '2026-09-10',
             self::DATE_TIME => '2025-01-15T10:30:00Z',
-            self::RECORD => ['01J...'],
+            self::RECORD, self::RELATIONSHIP => ['01J...'],
             self::FILE_UPLOAD => null,
         };
     }
@@ -132,7 +136,8 @@ enum CustomFieldType: string
             self::NUMBER, self::CURRENCY, self::DATE, self::DATE_TIME => ['$gte' => $this->example()],
             self::CHECKBOX, self::TOGGLE => ['$eq' => $this->example()],
             self::EMAIL, self::PHONE, self::LINK, self::DOMAIN, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => ['$has_any' => $this->example()],
-            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => ['$in' => [$this->example()]],
+            self::SELECT, self::STATUS, self::RADIO, self::TOGGLE_BUTTONS => ['$in' => [$this->example()]],
+            self::RECORD, self::RELATIONSHIP => ['$in' => $this->example()],
             default => [],
         };
     }
@@ -147,7 +152,7 @@ enum CustomFieldType: string
     public function isChoice(): bool
     {
         return match ($this) {
-            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS,
+            self::SELECT, self::STATUS, self::RADIO, self::TOGGLE_BUTTONS,
             self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => true,
             default => false,
         };

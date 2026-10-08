@@ -14,6 +14,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\PhoneSearch;
 use Illuminate\Testing\Fluent\AssertableJson;
+use Relaticle\CustomFields\Enums\RelationshipCardinality;
+use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\RecordFieldFixture;
 use Tests\Helpers\WorkspaceCustomField;
 
 mutates(SearchTool::class, FetchTool::class, PhoneSearch::class);
@@ -115,6 +118,23 @@ it('searches custom fields and treats wildcard characters literally', function (
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
             ->has('results', 1)
             ->where('results.0.title', 'Literal Match')
+            ->etc());
+});
+
+it('leaves a link field out of the search, so a linked record never matches by id', function (): void {
+    TenantContextService::setTenantId($this->workspace->getKey());
+
+    $field = RecordFieldFixture::record($this->workspace, 'people', 'company', 'vendor', RelationshipCardinality::ManyToMany);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Searchable Vendor']);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Linked Person']);
+
+    $person->update(['custom_fields' => [$field->code => [$company->getKey()]]]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => (string) $company->getKey()])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', 0)
             ->etc());
 });
 

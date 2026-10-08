@@ -36,6 +36,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
+use App\Support\LinkActorResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,10 @@ final readonly class PendingActionService
         SaveAssistantEmailDraft::class,
         SendAssistantEmail::class,
     ];
+
+    public function __construct(
+        private LinkActorResolver $linkActor,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $actionData
@@ -234,8 +239,7 @@ final readonly class PendingActionService
         // timeout. Scope it to the action's workspace, and restore the prior value afterward so
         // the override never outlives this call (TenantContextService resolves its context
         // before the Filament tenant).
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
+        [$previousTenantId, $previousActor] = $this->enterResolutionContext($pendingAction, $user);
 
         try {
             $resolved = DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
@@ -279,12 +283,27 @@ final readonly class PendingActionService
                 return $pendingAction->refresh();
             });
         } finally {
-            TenantContextService::setTenantId($previousTenantId);
+            $this->leaveResolutionContext($previousTenantId, $previousActor);
         }
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
         return $resolved;
+    }
+
+    /**
+     * Who a link written by this approval is credited to. Nothing is signed in when the
+     * resolution runs from a queue or a command, and the proposal's own user is the
+     * answer there; the relation is never read, because a plan approval hydrates every
+     * step and strict lazy loading arms on the second row.
+     */
+    private function actorFor(PendingAction $pendingAction, User $user): User
+    {
+        if ((string) $user->getKey() === (string) $pendingAction->user_id) {
+            return $user;
+        }
+
+        return User::query()->find($pendingAction->user_id) ?? $user;
     }
 
     public function reject(PendingAction $pendingAction, User $user): PendingAction
@@ -361,8 +380,7 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
+        [$previousTenantId, $previousActor] = $this->enterResolutionContext($pendingAction, $user);
 
         try {
             [$finalized, $record, $itemStatus] = DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
@@ -407,7 +425,7 @@ final readonly class PendingActionService
                 return [$finalized, $model, 'approved'];
             });
         } finally {
-            TenantContextService::setTenantId($previousTenantId);
+            $this->leaveResolutionContext($previousTenantId, $previousActor);
         }
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
@@ -1148,5 +1166,28 @@ final readonly class PendingActionService
                 ->findOrFail($ids)
                 ->all(),
         );
+    }
+
+    /**
+     * The action executes the underlying CRM write, which may persist custom-field
+     * values, and there may be no resolvable custom-fields tenant when it runs: the
+     * Livewire dock sets the Filament tenant but not necessarily the custom-fields one.
+     * Without it the TenantScope no-ops and saveCustomFields() iterates EVERY tenant,
+     * writing value rows across all of them and, at scale, exceeding the request timeout.
+     *
+     * @return array{0: int|string|null, 1: Model|null}
+     */
+    private function enterResolutionContext(PendingAction $pendingAction, User $user): array
+    {
+        $previousTenantId = TenantContextService::getCurrentTenantId();
+        TenantContextService::setTenantId($pendingAction->workspace_id);
+
+        return [$previousTenantId, $this->linkActor->override($this->actorFor($pendingAction, $user))];
+    }
+
+    private function leaveResolutionContext(int|string|null $previousTenantId, ?Model $previousActor): void
+    {
+        TenantContextService::setTenantId($previousTenantId);
+        $this->linkActor->override($previousActor);
     }
 }
