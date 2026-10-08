@@ -843,7 +843,7 @@ it('makes the send tool the exception to batching and to one approval for a turn
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('SendEmailTool is the exception to batching: it takes one email per call, so call it once per email')
         ->toContain('Never call the same write tool twice in one turn for the same entity type, except SendEmailTool')
-        ->toContain('approves once, except that each email to send is approved on its own');
+        ->toContain('approves once, except that each email to send and each invitation proposal is approved on its own');
 });
 
 it('limits the citations exception to the two import links after the fence of an attached csv preview', function (): void {

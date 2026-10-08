@@ -224,7 +224,9 @@ final readonly class ProposalPlanService
             return;
         }
 
-        throw_if($step->needsOwnApproval(), RuntimeException::class, __('Each email is approved on its own.'));
+        // A batch row shows only its active record in full, so one click must
+        // never send a message nobody opened.
+        throw_if($step->isEmailSend(), RuntimeException::class, __('Each email is approved on its own.'));
 
         foreach (array_keys($payload->batchRecords()) as $index) {
             $this->pendingActions->approveItem($step->refresh(), $user, $index);

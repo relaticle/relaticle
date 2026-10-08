@@ -17,12 +17,12 @@ final readonly class ProposalVerbs
     private const array ENTITIES = [
         'emails' => ['action' => 'Send', 'done' => 'Sent', 'count' => ':count sent', 'verb' => 'send', 'notDone' => 'NOT sent', 'noun' => 'email'],
         'email_drafts' => ['action' => 'Save draft', 'done' => 'Saved', 'count' => ':count saved', 'verb' => 'save', 'notDone' => 'NOT saved', 'noun' => 'email draft'],
-        'workspace_invitations' => ['action' => 'Send invitation', 'done' => 'Invited', 'count' => ':count invited', 'verb' => 'invite', 'notDone' => 'NOT invited', 'noun' => 'teammate'],
+        'workspace_invitations' => ['action' => 'Send invitation|Send :count invitations', 'done' => 'Invited', 'count' => ':count invited', 'verb' => 'invite', 'notDone' => 'NOT invited', 'noun' => 'teammate'],
     ];
 
-    public static function action(string $entityType, string $operation): string
+    public static function action(string $entityType, string $operation, int $count = 1): string
     {
-        return __(self::entry($entityType, $operation)['action']);
+        return trans_choice(self::entry($entityType, $operation)['action'], $count, ['count' => $count]);
     }
 
     public static function done(string $entityType, string $operation): string

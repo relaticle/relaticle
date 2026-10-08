@@ -551,13 +551,14 @@ final class ProposalCard extends BaseLivewireComponent
                 'editableCodes' => $this->editableCodesOf($step),
                 'isActive' => (string) $step->getKey() === $activeStepId,
                 'needsOwnApproval' => $step->needsOwnApproval(),
-                'decisionLabel' => ProposalVerbs::action($step->entity_type, $step->operation->value),
+                'decisionLabel' => ProposalVerbs::action($step->entity_type, $step->operation->value, $this->remainingCountOf($step)),
                 'isBatch' => ProposalPayload::from($step)->isBatch,
                 'recordCount' => $this->recordCountOf($step),
                 'remainingCount' => $this->remainingCountOf($step),
                 'items' => $this->batchItemViews($step),
                 'blockedBy' => $this->sortedPositions($blockedBy),
                 'activeItemLabel' => $this->activeItemLabelOf($step),
+                'activeItemSummary' => $this->activeItemSummaryOf($step),
                 'activeItemPosition' => $this->activeItemPositionOf($step),
                 'excludableCodes' => $this->excludableCodesOf($step),
             ];
@@ -701,6 +702,19 @@ final class ProposalCard extends BaseLivewireComponent
         if (is_string($title) && $title !== '') {
             return $title;
         }
+
+        return is_string($summary) ? $summary : '';
+    }
+
+    private function activeItemSummaryOf(PendingAction $step): string
+    {
+        $payload = ProposalPayload::from($step);
+
+        if (! $payload->isBatch) {
+            return '';
+        }
+
+        $summary = $payload->displayAt($this->cursorFor($step))['summary'] ?? null;
 
         return is_string($summary) ? $summary : '';
     }

@@ -19,6 +19,7 @@
     $stepTitle = ($step['title'] ?? '') !== '' ? $step['title'] : $operationLabel;
     $valueHeader = $step['operation'] === 'delete' ? __('Value') : __('New value');
     $identityLabel = $step['isBatch'] ? $step['activeItemLabel'] : $step['recordLabel'];
+    $standaloneSummary = $step['isBatch'] && $step['activeItemSummary'] !== '' ? $step['activeItemSummary'] : $step['summary'];
 
     // Attribute checkboxes: standalone cards only. A plan's fields render under
     // the shared Approve-all footer, where per-field exclusion state has no
@@ -77,7 +78,7 @@
             </div>
         @else
             <div class="px-4 pb-2.5 pt-1.5">
-                <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $step['summary'] }}</p>
+                <p class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">{{ $standaloneSummary }}</p>
             </div>
         @endif
     @else
@@ -119,8 +120,9 @@
         </div>
 
         {{-- Remaining-record count, for a step proposing several records of one
-             type. The rows below carry the records themselves. --}}
-        @if ($step['isBatch'] && $step['remainingCount'] > 1)
+             type. The rows below carry the records themselves. A step with its
+             own button already counts them there. --}}
+        @if ($step['isBatch'] && $step['remainingCount'] > 1 && ! $step['needsOwnApproval'])
             <span class="select-none px-0.5 text-xs font-medium tabular-nums text-gray-400 dark:text-gray-500" aria-live="polite">
                 {{ trans_choice(':count record|:count records', $step['remainingCount'], ['count' => $step['remainingCount']]) }}
             </span>

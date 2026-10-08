@@ -1281,14 +1281,14 @@ describe('a send inside a plan', function (): void {
         $dock->assertSeeHtml('data-proposal-send-step="'.$send->getKey().'"');
     });
 
-    it('counts only the steps approve all will approve, and says each email is sent on its own', function (): void {
+    it('counts only the steps approve all will approve, and says each send has its own button', function (): void {
         ($this->planTask)('First task');
         ($this->planTask)('Second task');
         $send = ($this->planSend)();
 
         openChatEmailDock($send)
             ->assertSee('Approve all 2')
-            ->assertSee(__('Each email is sent with its own button'))
+            ->assertSee(__('Each send has its own button'))
             ->assertDontSee(__('Approved together, in order'));
     });
 

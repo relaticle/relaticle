@@ -57,7 +57,7 @@
                     {{-- Right-aligned meta, same slot the records_table header uses
                          for its truncation count. --}}
                     <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                        {{ $hasOwnApprovalSteps ? __('Each email is sent with its own button') : __('Approved together, in order') }}
+                        {{ $hasOwnApprovalSteps ? __('Each send has its own button') : __('Approved together, in order') }}
                     </span>
                 </div>
             @endif

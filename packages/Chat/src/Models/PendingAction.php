@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Models;
 
+use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\User;
 use Carbon\CarbonImmutable;
@@ -60,6 +61,12 @@ final class PendingAction extends Model
     use HasUlids;
     use HasWorkspace;
 
+    /** @var list<class-string> */
+    private const array LEAVES_THE_WORKSPACE = [
+        SendAssistantEmail::class,
+        CreateWorkspaceInvitation::class,
+    ];
+
     /** @return array<string, string> */
     protected function casts(): array
     {
@@ -86,6 +93,11 @@ final class PendingAction extends Model
     }
 
     public function needsOwnApproval(): bool
+    {
+        return in_array($this->action_class, self::LEAVES_THE_WORKSPACE, true);
+    }
+
+    public function isEmailSend(): bool
     {
         return $this->action_class === SendAssistantEmail::class;
     }

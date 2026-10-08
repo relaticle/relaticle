@@ -2,7 +2,7 @@
 title: Approve what the assistant changes
 description: Every create, update, or delete the AI proposes waits for your review. Nothing is saved until you approve it.
 order: 2
-updated: "2026-10-07"
+updated: "2026-10-08"
 related: [help/ai-assistant/ask-questions-about-your-data, help/getting-started/use-custom-fields, help/email-and-calendar/use-your-email-with-an-ai-assistant]
 ---
 
@@ -48,6 +48,11 @@ An email is approved one at a time. Its card shows every recipient and the
 whole message, and its button reads **Send** or **Save draft**. In a plan,
 **Approve all** never sends an email. Each one waits for its own **Send**.
 See [Use your email with an AI assistant](/help/email-and-calendar/use-your-email-with-an-ai-assistant).
+
+## Invitations
+
+Inviting someone to your workspace emails them, so an invitation keeps its own
+button too: **Send invitation**. In a plan, **Approve all** never sends it.
 
 ## Proposals don't wait forever
 
