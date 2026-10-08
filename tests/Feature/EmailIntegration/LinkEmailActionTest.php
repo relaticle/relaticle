@@ -13,7 +13,10 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
@@ -1464,4 +1467,69 @@ it('does not move last_email_at backwards when an older email is linked after a 
     app(LinkEmailAction::class)->execute($older);
 
     expect($company->fresh()->last_email_at->toDateTimeString())->toBe($newerSentAt->toDateTimeString());
+});
+
+it('advances the email counters of linked companies in id order whatever the participant order', function (): void {
+    $domainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    $domainByCompanyId = [];
+
+    foreach (['acme.com', 'globex.com'] as $domain) {
+        $company = Company::create([
+            'workspace_id' => $this->workspace->id,
+            'name' => $domain,
+            'creator_id' => $this->user->id,
+        ]);
+        $company->saveCustomFieldValue($domainsField, "https://{$domain}", $this->workspace);
+
+        $domainByCompanyId[$company->getKey()] = $domain;
+    }
+
+    krsort($domainByCompanyId);
+
+    $email = makeLinkEmail();
+
+    foreach ($domainByCompanyId as $domain) {
+        EmailParticipant::factory()->to()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => "contact@{$domain}",
+        ]);
+    }
+
+    $advancedCompanyIds = [];
+
+    DB::listen(function (QueryExecuted $query) use (&$advancedCompanyIds): void {
+        if (str_starts_with($query->sql, 'update companies set email_count')) {
+            $advancedCompanyIds[] = Arr::last($query->bindings);
+        }
+    });
+
+    app(LinkEmailAction::class)->execute($email);
+
+    ksort($domainByCompanyId);
+
+    expect($advancedCompanyIds)->toBe(array_keys($domainByCompanyId));
+});
+
+it('counts an email toward a company and an opportunity linked before the first pass', function (): void {
+    $company = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Linked By Hand',
+        'creator_id' => $this->user->id,
+    ]);
+    $opportunity = Opportunity::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+    $email->companies()->attach($company->getKey(), ['link_source' => 'manual']);
+    $email->opportunities()->attach($opportunity->getKey(), ['link_source' => 'manual']);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($company->fresh()->email_count)->toBe(1)
+        ->and($opportunity->fresh()->email_count)->toBe(1);
 });

@@ -33,8 +33,8 @@ jobs:
       # deploy itself went through, so a single unretried request reports failure for
       # a deploy that shipped. 502 is already in curl's transient set, as is a
       # timeout, so --max-time turns a stalled attempt into a retry rather than a
-      # hang. --max-time resets per retry. Forge queues duplicate triggers and the
-      # deploy script is idempotent, so retrying is cheaper than a false red release.
+      # hang. --max-time resets per retry. bin/deploy.sh runs one deploy at a time and
+      # skips a commit that is already live, so retrying is cheaper than a false red release.
       - name: Trigger Forge Deploy
         run: |
           curl --fail --silent --show-error --location --retry 5 --max-time 60 \

@@ -8,11 +8,13 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use Filament\Facades\Filament;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileUnacceptableForCollection;
@@ -318,4 +320,29 @@ test('keeps the logo of a previous domain when the fetch for the new domain thro
 
     expect($logos)->toHaveCount(1)
         ->and($logos->first()->getCustomProperty('domain'))->toBe('https://old-domain.com');
+});
+
+test('an unreachable company site is not reported as an error', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['dead-host.example']],
+    ]);
+
+    Favicon::shouldReceive('driver->fetch')
+        ->andThrow(new ConnectionException('Could not resolve host for https://dead-host.example'));
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    Exceptions::assertNothingReported();
+});
+
+test('an unexpected failure while fetching a favicon is reported', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    Favicon::shouldReceive('driver->fetch')->andThrow(new TypeError('broken driver'));
+
+    (new FetchFaviconForCompany($company->fresh()))->handle();
+
+    Exceptions::assertReported(TypeError::class);
 });

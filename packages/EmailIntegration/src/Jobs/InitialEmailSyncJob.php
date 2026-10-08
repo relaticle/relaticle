@@ -20,6 +20,7 @@ use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
+use Relaticle\EmailIntegration\Jobs\Middleware\HandlesProviderFailures;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotification;
@@ -50,11 +51,11 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return list<Skip>
+     * @return list<Skip|HandlesProviderFailures>
      */
     public function middleware(): array
     {
-        return [Skip::when($this->connectedAccount->trashed())];
+        return [Skip::when($this->connectedAccount->trashed()), new HandlesProviderFailures];
     }
 
     /**
