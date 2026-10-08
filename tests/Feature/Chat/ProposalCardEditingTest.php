@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CustomFieldType;
+use App\Enums\WorkspaceRole;
 use App\Features\OnboardSeed;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -20,6 +21,7 @@ use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
 use Tests\Helpers\ProposalCardFixture;
 
 mutates(ProposalCard::class);
@@ -419,4 +421,33 @@ it('shrinks the pagination count as records are skipped and hides it for the las
         ->call('skipItem', (string) $action->getKey(), 1)
         ->assertSee('Create')
         ->assertDontSee('1/1');
+});
+
+it('opens no edit form on an invitation card', function (): void {
+    (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Admin->value]],
+    ]));
+
+    $action = PendingAction::query()->where('entity_type', 'workspace_invitations')->sole();
+
+    $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation');
+
+    expect($card->instance()->editableCodes())->toBe([]);
+
+    $card->call('editField', 'email')
+        ->assertSet('editingFieldCode', null)
+        ->assertSet('editingStepId', null);
+
+    expect($action->fresh()->action_data['email'])->toBe('alex@example.com');
+});
+
+it('refuses to open a field the card does not offer for editing', function (): void {
+    $action = ProposalCardFixture::task($this->user, ['title' => 'Edit me']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call('editField', 'not_a_field')
+        ->assertSet('editingFieldCode', null)
+        ->assertSet('editingStepId', null);
 });

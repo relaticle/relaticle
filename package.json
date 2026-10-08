@@ -20,9 +20,9 @@
         "laravel-vite-plugin": "^3.2.0",
         "playwright": "^1.63.0",
         "postcss": "^8.5.29",
-        "postcss-nesting": "^14.0.2",
+        "postcss-nesting": "^14.0.3",
         "tailwindcss": "^4.3.3",
-        "vite": "^8.3.2"
+        "vite": "^8.3.3"
     },
     "dependencies": {
         "@alpinejs/collapse": "^3.17.4",
@@ -40,7 +40,7 @@
         "alpinejs": "^3.17.4",
         "dompurify": "^3.4.16",
         "laravel-echo": "^2.5.0",
-        "marked": "^18.0.14",
+        "marked": "^18.1.0",
         "motion": "^14.0.0",
         "pusher-js": "^8.6.0",
         "shiki": "^4.5.0"

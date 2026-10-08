@@ -8,7 +8,7 @@ use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -18,7 +18,7 @@ final readonly class SaveOnboardingSharing
 
     public function __construct(
         private MoveWorkspaceSetup $moveSetup,
-        private SaveMailboxSharingTierAction $saveSharingTier,
+        private SaveMailboxSharingTier $saveSharingTier,
     ) {}
 
     public function execute(User $user, Workspace $workspace, EmailPrivacyTier $tier): bool

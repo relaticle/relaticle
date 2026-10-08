@@ -197,9 +197,7 @@ final class AppServiceProvider extends ServiceProvider
             ),
         );
 
-        // Passport self-binds this singleton, and every OAuth endpoint resolves the
-        // client it was handed through it.
-        $this->app->singleton(BaseClientRepository::class, ClientRepository::class);
+        $this->registerPassport();
 
         // The shared MarkdownRenderer always loads HeadingPermalinkExtension, which
         // stamps a docs-site anchor onto every heading regardless of add_anchors_to_headings.
@@ -212,6 +210,17 @@ final class AppServiceProvider extends ServiceProvider
                 renderAnchors: false,
                 extensions: [TableExtension::class],
             ));
+    }
+
+    private function registerPassport(): void
+    {
+        // Passport self-binds this singleton, and every OAuth endpoint resolves the
+        // client it was handed through it.
+        $this->app->singleton(BaseClientRepository::class, ClientRepository::class);
+
+        // A device-approved token would skip ApproveAuthorizationController, which derives
+        // the email scopes from the user's role. Passport reads this when it boots.
+        Passport::$deviceCodeGrantEnabled = false;
     }
 
     /**

@@ -115,6 +115,15 @@ it('shows a proposed date-time on the calendar day of the viewer', function (): 
     expect($card['new'])->toBe('Oct 1, 2026');
 });
 
+it('proposes an update with the envelope every write tool shares', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
+
+    $envelope = json_decode(runUpdateToolForCustomFieldsTest(UpdateCompanyTool::class, $company, ['domains' => ['acme.io']]), true);
+
+    expect(array_keys($envelope))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta'])
+        ->and($envelope['meta'])->toBe(['agent_should_stop' => true]);
+});
+
 it('updates company domains via custom_fields and persists as json_value', function (): void {
     $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 

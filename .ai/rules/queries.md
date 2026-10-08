@@ -9,7 +9,7 @@ paths:
 
 # Queries: the read path
 
-A reusable read is a query class. An action is a write. One filter language answers a list
+A reusable read is a query class, never an action. One filter language answers a list
 question the same way on the REST API, MCP and chat. It lives in `app/Queries`. The design
 records are `docs/superpowers/specs/2026-10-02-crm-filter-language-design.md` for the filter
 language and `docs/superpowers/specs/2026-10-06-queries-read-layer-design.md` for the read path.

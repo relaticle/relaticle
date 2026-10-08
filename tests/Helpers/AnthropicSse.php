@@ -72,6 +72,19 @@ final class AnthropicSse
             ."data: {\"type\":\"message_stop\"}\n\n";
     }
 
+    /**
+     * @param  array<string, mixed>  $input
+     */
+    public static function toolUseStepWithInput(string $tool, array $input): string
+    {
+        return self::MESSAGE_START
+            .'data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_step_1","name":'.json_encode($tool, JSON_THROW_ON_ERROR).",\"input\":{}}}\n\n"
+            .'data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":'.json_encode(json_encode($input, JSON_THROW_ON_ERROR), JSON_THROW_ON_ERROR)."}}\n\n"
+            ."data: {\"type\":\"content_block_stop\",\"index\":0}\n\n"
+            ."data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"tool_use\"},\"usage\":{\"output_tokens\":3}}\n\n"
+            ."data: {\"type\":\"message_stop\"}\n\n";
+    }
+
     public static function fake(string $body): void
     {
         Http::fake([

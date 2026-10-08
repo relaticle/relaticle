@@ -64,17 +64,19 @@ final readonly class ImportFileLoader
                 ->getRows()
                 ->reject(fn (array $row): bool => array_all($row, blank(...)))
                 ->take($this->maxRows())
-                ->map(function (array $row) use ($headers, &$rowCount): array {
-                    return [
-                        'row_number' => ++$rowCount + 1,
-                        'raw_data' => json_encode(
-                            array_combine($headers, $this->normalizeRow($headers, $row)),
-                            JSON_UNESCAPED_UNICODE
-                        ) ?: '{}',
-                        'validation' => null,
-                        'corrections' => null,
-                    ];
+                ->values()
+                ->tapEach(function () use (&$rowCount): void {
+                    $rowCount++;
                 })
+                ->map(fn (array $row, int $index): array => [
+                    'row_number' => $index + 2,
+                    'raw_data' => json_encode(
+                        array_combine($headers, $this->normalizeRow($headers, $row)),
+                        JSON_UNESCAPED_UNICODE
+                    ) ?: '{}',
+                    'validation' => null,
+                    'corrections' => null,
+                ])
                 ->chunk($this->chunkSize())
                 ->each(fn (LazyCollection $chunk) => $store->query()->insert($chunk->all()));
 

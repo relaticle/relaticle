@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Mcp;
 
 use App\Enums\EmailGrant;
+use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
@@ -21,7 +22,8 @@ use Symfony\Component\HttpFoundation\Response;
  * MCP-aware approve handler. Validates that the user has selected exactly one
  * workspace they belong to, stashes the workspace_id in the session so the AuthCode
  * model's creating hook can persist it, then completes the request. Email scopes come
- * from the user's role in that workspace, never from what the client asked for.
+ * from the user's role in that workspace, never from what the client asked for, and a
+ * record scope the role lacks is dropped.
  */
 final class ApproveAuthorizationController extends BaseApproveAuthorizationController
 {
@@ -55,8 +57,10 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
 
         try {
             $authRequest = $this->getAuthRequestFromSession($request);
-            $authRequest->setScopes($this->scopesFor($user, $workspace, $authRequest->getScopes()));
-            $authRequest->setAuthorizationApproved(true);
+            $granted = $this->scopesFor($user, $workspace, $authRequest->getScopes());
+
+            $authRequest->setScopes($granted);
+            $authRequest->setAuthorizationApproved($granted !== []);
 
             return $this->withErrorHandling(fn (): Response => $this->convertResponse(
                 $this->server->completeAuthorizationRequest($authRequest, $psrResponse),
@@ -72,9 +76,13 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
      */
     private function scopesFor(User $user, Workspace $workspace, array $requested): array
     {
+        $grantable = $user->grantableTokenPermissions($workspace->getKey());
+        $withheld = array_diff(WorkspaceCapability::tokenPermissions(WorkspaceCapability::forOwner()), $grantable);
+
         $requested = array_values(array_filter(
             $requested,
-            fn (ScopeEntityInterface $scope): bool => EmailGrant::tryFrom($scope->getIdentifier()) === null,
+            fn (ScopeEntityInterface $scope): bool => EmailGrant::tryFrom($scope->getIdentifier()) === null
+                && ! in_array($scope->getIdentifier(), $withheld, true),
         ));
 
         $identifiers = array_map(fn (ScopeEntityInterface $scope): string => $scope->getIdentifier(), $requested);
@@ -87,7 +95,7 @@ final class ApproveAuthorizationController extends BaseApproveAuthorizationContr
             ...$requested,
             ...array_map(
                 fn (EmailGrant $grant): Scope => new Scope($grant->value),
-                EmailGrant::fromValues($user->grantableTokenPermissions($workspace->getKey())),
+                EmailGrant::fromValues($grantable),
             ),
         ];
     }

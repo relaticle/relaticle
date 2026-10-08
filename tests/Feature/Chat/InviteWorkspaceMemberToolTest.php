@@ -6,21 +6,26 @@ use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\Workspace\Members;
 use App\Mail\WorkspaceInvitationMail;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\DestinationResolver;
-use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ResolvedActionText;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
 use Symfony\Component\Mailer\Exception\TransportException;
 
@@ -41,6 +46,60 @@ function pendingActionForWorkspace(User $user): PendingAction
         ->firstOrFail();
 }
 
+function seedInvitationConversation(User $user): string
+{
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => (string) $user->getKey(),
+        'title' => 'Invites',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $conversationId;
+}
+
+/**
+ * @param  list<string>  $emails
+ */
+function proposeInvitationsInConversation(User $user, array $emails, ?string $conversationId = null, ?string $turnId = null): PendingAction
+{
+    $conversationId ??= seedInvitationConversation($user);
+
+    $tool = app(InviteWorkspaceMemberTool::class);
+    $tool->setConversationId($conversationId);
+    $tool->setTurnId($turnId);
+    $tool->handle(new Request([
+        'records' => array_map(
+            static fn (string $email): array => ['email' => $email, 'role' => WorkspaceRole::Member->value],
+            $emails,
+        ),
+    ]));
+
+    return PendingAction::query()
+        ->where('conversation_id', $conversationId)
+        ->where('entity_type', 'workspace_invitations')
+        ->orderByDesc('id')
+        ->firstOrFail();
+}
+
+function openInvitationDock(PendingAction $anchor): Testable
+{
+    return Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $anchor->getKey(), context: 'conversation');
+}
+
+function resolvedInvitationText(PendingAction $pending): string
+{
+    return collect(resolve(PendingActionService::class)->resolvedForConversation((string) $pending->conversation_id, null))
+        ->flatMap(fn (array $action): array => ResolvedActionText::lines($action, cite: false))
+        ->implode("\n");
+}
+
 it('creates one pending action for a batch of two invitations, carrying both emails', function (): void {
     $tool = app(InviteWorkspaceMemberTool::class);
 
@@ -56,7 +115,7 @@ it('creates one pending action for a batch of two invitations, carrying both ema
     $pending = pendingActionForWorkspace($this->user);
 
     expect($pending->action_class)->toBe(CreateWorkspaceInvitation::class)
-        ->and($pending->entity_type)->toBe('workspace_invitations')
+        ->and($pending->entity_type)->toBe(ProposalEntity::WorkspaceInvitation)
         ->and($pending->action_data['_batch'])->toBeTrue()
         ->and(collect($pending->action_data['records'])->pluck('email')->all())
         ->toBe(['alex@example.com', 'jamie@example.com']);
@@ -111,6 +170,158 @@ it('keeps the mail transport failure off the card when the invite email cannot b
 
     expect(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
         ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
+});
+
+describe('an invitation proposal', function (): void {
+    beforeEach(function (): void {
+        Queue::fake();
+
+        $this->conversationId = seedInvitationConversation($this->user);
+        $this->turnId = (string) Str::ulid();
+
+        $this->planTask = function (string $title = 'Call Lena'): PendingAction {
+            $tool = app(CreateTaskTool::class);
+            $tool->setConversationId($this->conversationId);
+            $tool->setTurnId($this->turnId);
+            $tool->handle(new Request(['records' => [['title' => $title]]]));
+
+            return PendingAction::query()
+                ->where('conversation_id', $this->conversationId)
+                ->where('entity_type', 'task')
+                ->orderByDesc('id')
+                ->firstOrFail();
+        };
+
+        $this->planInvite = fn (array $emails = ['alex@example.com']): PendingAction => proposeInvitationsInConversation($this->user, $emails, $this->conversationId, $this->turnId);
+    });
+
+    it('is left pending by approve all, which creates the task and sends no invitation', function (): void {
+        Mail::fake();
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)();
+
+        openInvitationDock($task)
+            ->call('approveAll')
+            ->assertHasNoErrors()
+            ->assertNotDispatched('proposal:resolve-failed');
+
+        expect(Task::query()->where('title', 'Call Lena')->exists())->toBeTrue()
+            ->and($task->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and(WorkspaceInvitation::query()->count())->toBe(0);
+
+        Mail::assertNothingQueued();
+    });
+
+    it('sends every invitation of its step with one click of its own button', function (): void {
+        Mail::fake();
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($task)
+            ->call('approveStep', (string) $invite->getKey())
+            ->assertHasNoErrors();
+
+        expect(WorkspaceInvitation::query()->orderBy('email')->pluck('email')->all())->toBe(['alex@example.com', 'jamie@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($task->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 2);
+    });
+
+    it('labels its own button with the invitations still to send', function (): void {
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com', 'sam@example.com']);
+
+        openInvitationDock($task)
+            ->assertSeeHtml('data-proposal-send-step="'.$invite->getKey().'"')
+            ->assertSee('Send 3 invitations')
+            ->assertDontSee('3 records')
+            ->call('skipItem', (string) $invite->getKey(), 0)
+            ->assertSee('Send 2 invitations');
+    });
+
+    it('heads a paginated card with the one invitation its button sends', function (): void {
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        openInvitationDock($invite)
+            ->assertSee('Invite alex@example.com as Member')
+            ->assertDontSee('Invite 2 teammates')
+            ->call('nextItem')
+            ->assertSee('Invite jamie@example.com as Member')
+            ->assertDontSee('Invite alex@example.com as Member');
+    });
+
+    it('counts only the steps approve all will approve, and says each send has its own button', function (): void {
+        ($this->planTask)('First task');
+        ($this->planTask)('Second task');
+        $invite = ($this->planInvite)();
+
+        openInvitationDock($invite)
+            ->assertSee('Approve all 2')
+            ->assertSee('Send invitation')
+            ->assertSee(__('Each send has its own button'))
+            ->assertDontSee(__('Approved together, in order'));
+    });
+
+    it('is not sent by the keyboard shortcut when it is the only step left, but by its own footer button', function (): void {
+        Mail::fake();
+        $invite = ($this->planInvite)();
+
+        $dock = openInvitationDock($invite)->dispatch('proposal:create-current', context: 'conversation');
+
+        expect($invite->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+        Mail::assertNothingQueued();
+
+        $dock->assertDontSeeHtml('<kbd')->call('createCurrent');
+
+        expect($invite->fresh()->status)->toBe(PendingActionStatus::Approved);
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 1);
+    });
+
+    it('keeps the invitation already sent when a later one in its step fails', function (): void {
+        Mail::fake();
+        $task = ($this->planTask)();
+        $invite = ($this->planInvite)(['alex@example.com', 'jamie@example.com']);
+
+        $member = User::factory()->create(['email' => 'jamie@example.com']);
+        $this->workspace->users()->attach($member->getKey(), ['role' => WorkspaceRole::Member->value]);
+
+        openInvitationDock($task)
+            ->call('approveStep', (string) $invite->getKey())
+            ->assertDispatched('proposal:resolve-failed')
+            ->assertHasErrors('resolve');
+
+        expect(WorkspaceInvitation::query()->pluck('email')->all())->toBe(['alex@example.com'])
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Pending)
+            ->and($invite->fresh()->result_data['items'][0]['status'] ?? null)->toBe('approved');
+
+        Mail::assertQueued(WorkspaceInvitationMail::class, 1);
+    });
+
+    it('keeps the mail transport failure off the plan card when its own button cannot send it', function (): void {
+        $transportMessage = 'Connection could not be established with host "smtp.internal.test:587": authentication failed for user "postmaster@relaticle"';
+
+        Mail::shouldReceive('to')->andReturnSelf();
+        Mail::shouldReceive('queue')->andThrow(new TransportException($transportMessage));
+
+        ($this->planTask)('Follow up');
+        $invite = ($this->planInvite)(['undeliverable@example.com']);
+
+        $component = openInvitationDock($invite)
+            ->call('approveStep', (string) $invite->getKey())
+            ->assertDispatched('proposal:resolve-failed')
+            ->assertHasErrors('resolve');
+
+        $shown = $component->errors()->first('resolve');
+
+        expect($shown)->toContain('The email could not be sent, so nothing was saved. Please try again in a moment.')
+            ->and($shown)->not->toContain('smtp.internal.test')
+            ->and($shown)->not->toContain('postmaster@relaticle')
+            ->and($invite->fresh()->status)->toBe(PendingActionStatus::Pending);
+    });
 });
 
 it('approving an email that already belongs to a workspace member surfaces the validation error and writes no row', function (): void {
@@ -241,7 +452,7 @@ it('does not render a name row on the invitation card', function (): void {
 
     expect($labels)->not->toContain('Name')
         ->and($labels)->toContain('Email')
-        ->and(ProposalCoreFields::titleKey('workspace_invitations'))->toBe('email');
+        ->and(ProposalEntity::WorkspaceInvitation->titleKey())->toBe('email');
 });
 
 it('labels a resolved invitation by its email so the assistant can name it', function (): void {
@@ -283,8 +494,44 @@ it('names the entity in plain words on a batch card', function (): void {
 
     $display = pendingActionForWorkspace($this->user)->display_data;
 
-    expect($display['summary'] ?? '')->not->toContain('workspace_invitations')
-        ->and($display['summary'] ?? '')->toContain('workspace invitations');
+    expect($display['title'] ?? '')->toBe('Invite Teammates')
+        ->and($display['summary'] ?? '')->toBe('Invite 2 teammates');
+});
+
+it('labels its decision with the invitation it sends', function (): void {
+    $pending = proposeInvitationsInConversation($this->user, ['alex@example.com']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->assertSeeHtmlInOrder(['wire:click="createCurrent"', '<span>Send invitation</span>'])
+        ->assertDontSeeHtml('<span>Create</span>');
+});
+
+it('tells the assistant in plain words who was invited and who was not', function (): void {
+    Mail::fake();
+    $service = resolve(PendingActionService::class);
+
+    $invited = proposeInvitationsInConversation($this->user, ['invited@example.com']);
+    $declined = proposeInvitationsInConversation($this->user, ['declined@example.com']);
+
+    $service->approve($invited, $this->user);
+    $service->reject($declined, $this->user);
+
+    expect(resolvedInvitationText($invited))->toContain('APPROVED (written): invite teammate "invited@example.com"')
+        ->not->toContain('create workspace_invitations')
+        ->and(resolvedInvitationText($declined))->toContain('REJECTED (nothing was written): invite teammate "declined@example.com"');
+});
+
+it('says NOT invited for an invitation the user skipped', function (): void {
+    Mail::fake();
+    $service = resolve(PendingActionService::class);
+
+    $pending = proposeInvitationsInConversation($this->user, ['first@example.com', 'second@example.com']);
+
+    $service->approveItem($pending, $this->user, 0);
+    $service->rejectItem($pending->fresh(), $this->user, 1);
+
+    expect(resolvedInvitationText($pending))->toContain('skipped by the user, NOT invited: "second@example.com"');
 });
 
 it('keeps the mail transport failure off the card on the batch path too', function (): void {

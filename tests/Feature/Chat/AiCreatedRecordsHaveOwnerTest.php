@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
@@ -69,7 +70,7 @@ it('AI-created company through pending-action approval gets owner set', function
         conversationId: $conversationId,
         actionClass: CreateCompany::class,
         operation: PendingActionOperation::Create,
-        entityType: 'company',
+        entityType: ProposalEntity::Company,
         actionData: [
             'name' => 'Approved Co',
             'account_owner_id' => $this->user->getKey(),

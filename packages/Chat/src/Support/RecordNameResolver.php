@@ -107,7 +107,7 @@ final readonly class RecordNameResolver
             return '';
         }
 
-        $titleKey = ProposalCoreFields::titleKey($action->entity_type);
+        $titleKey = $action->entity_type->titleKey();
         // A batched proposal keeps its records under `records`, so the title lives on
         // the referenced record, not on action_data. recordAtOrEmpty() answers both
         // shapes: a single-record proposal is its own record at index 0.

@@ -21,6 +21,7 @@ use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
@@ -29,7 +30,6 @@ use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
-use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
@@ -145,6 +145,10 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
+        if (! in_array($code, $this->editableCodesOf($pendingAction), true)) {
+            return;
+        }
+
         $this->editingStepId = (string) $pendingAction->getKey();
         $this->editingFieldCode = $code;
         $this->form->fill($this->formStateFor($pendingAction, $code));
@@ -226,8 +230,8 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        $entityType = $pendingAction->entity_type;
-        $titleKey = ProposalCoreFields::titleKey($entityType);
+        $entity = $pendingAction->entity_type;
+        $titleKey = $entity->titleKey();
 
         if ($code === $titleKey) {
             return [
@@ -238,7 +242,7 @@ final class ProposalCard extends BaseLivewireComponent
             ];
         }
 
-        if ($entityType === 'company' && $code === 'account_owner_id') {
+        if ($entity === ProposalEntity::Company && $code === 'account_owner_id') {
             return [
                 Select::make('account_owner_id')
                     ->label(__('Account Owner'))
@@ -269,7 +273,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $record = $this->currentRecord($pendingAction);
 
-        if (ProposalCoreFields::isCore($pendingAction->entity_type, $code)) {
+        if ($pendingAction->entity_type->isCore($code)) {
             return [$code => $record[$code] ?? null];
         }
 
@@ -293,7 +297,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $pendingAction = $this->loadStep($this->editingStepId ?? $this->activeStepId());
 
-        $entityType = $pendingAction instanceof PendingAction ? $pendingAction->entity_type : '';
+        $entityType = $pendingAction instanceof PendingAction ? $pendingAction->entity_type->value : '';
 
         $modelClass = Relation::getMorphedModel($entityType);
 
@@ -538,19 +542,22 @@ final class ProposalCard extends BaseLivewireComponent
                 'id' => (string) $step->getKey(),
                 'position' => $position + 1,
                 'operation' => $step->operation->value,
-                'entity_type' => $step->entity_type,
+                'entity_type' => $step->entity_type->value,
                 'summary' => $this->stepSummary($step),
                 'title' => is_string($step->display_data['title'] ?? null) ? $step->display_data['title'] : '',
                 'recordLabel' => $this->stepRecordLabel($step),
                 'fields' => $this->recordFieldsOf($step),
                 'editableCodes' => $this->editableCodesOf($step),
                 'isActive' => (string) $step->getKey() === $activeStepId,
+                'needsOwnApproval' => $step->needsOwnApproval(),
+                'decisionLabel' => $step->entity_type->action($step->operation, $this->remainingCountOf($step)),
                 'isBatch' => ProposalPayload::from($step)->isBatch,
                 'recordCount' => $this->recordCountOf($step),
                 'remainingCount' => $this->remainingCountOf($step),
                 'items' => $this->batchItemViews($step),
                 'blockedBy' => $this->sortedPositions($blockedBy),
                 'activeItemLabel' => $this->activeItemLabelOf($step),
+                'activeItemSummary' => $this->activeItemSummaryOf($step),
                 'activeItemPosition' => $this->activeItemPositionOf($step),
                 'excludableCodes' => $this->excludableCodesOf($step),
             ];
@@ -620,7 +627,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         if ($step->operation === PendingActionOperation::Create) {
             $record = $this->currentRecord($step);
-            $title = $record[ProposalCoreFields::titleKey($step->entity_type)] ?? null;
+            $title = $record[$step->entity_type->titleKey()] ?? null;
 
             if (is_string($title) && $title !== '') {
                 return $title;
@@ -694,6 +701,19 @@ final class ProposalCard extends BaseLivewireComponent
         if (is_string($title) && $title !== '') {
             return $title;
         }
+
+        return is_string($summary) ? $summary : '';
+    }
+
+    private function activeItemSummaryOf(PendingAction $step): string
+    {
+        $payload = ProposalPayload::from($step);
+
+        if (! $payload->isBatch) {
+            return '';
+        }
+
+        $summary = $payload->displayAt($this->cursorFor($step))['summary'] ?? null;
 
         return is_string($summary) ? $summary : '';
     }
@@ -834,11 +854,11 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        if ($pendingAction->operation === PendingActionOperation::Delete) {
+        if ($pendingAction->operation === PendingActionOperation::Delete || $pendingAction->entity_type->isIndivisible()) {
             return [];
         }
 
-        $titleKey = ProposalCoreFields::titleKey($pendingAction->entity_type);
+        $titleKey = $pendingAction->entity_type->titleKey();
         $codes = [];
 
         foreach ($this->recordFieldsOf($pendingAction) as $row) {
@@ -871,6 +891,10 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
+        if ($this->loadStep($this->activeStepId())?->needsOwnApproval() === true) {
+            return;
+        }
+
         $this->createCurrent(resolve(PendingActionService::class));
     }
 
@@ -894,8 +918,6 @@ final class ProposalCard extends BaseLivewireComponent
 
         $this->ensureTenantContext();
 
-        $steps = $this->planSteps();
-
         try {
             $result = $plan->approveAll($anchor, $this->authUser());
         } catch (QueryException $exception) {
@@ -912,13 +934,13 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         }
 
-        foreach (array_slice($steps, 0, $result['approved']) as $step) {
+        foreach ($result['approved'] as $step) {
             $this->announceResolution($step, 'approved');
         }
 
         if ($result['failed'] !== null) {
-            $this->reportResolveFailure($anchor, __('Step :step could not be completed: :message', [
-                'step' => $result['failed']['step'],
+            $this->reportResolveFailure($result['failed']['step'], __(':step could not be completed: :message', [
+                'step' => $this->stepSummary($result['failed']['step']),
                 'message' => $result['failed']['message'],
             ]));
 
@@ -1174,7 +1196,7 @@ final class ProposalCard extends BaseLivewireComponent
 
         // A deleted record has no page to link to, so only Create items carry a ref.
         $record = ($pendingAction->operation === PendingActionOperation::Create && $result['record'] instanceof Model)
-            ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $result['record']->getKey())
+            ? resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type->value, (string) $result['record']->getKey())
             : null;
 
         $this->dispatch(
@@ -1563,7 +1585,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         report($exception);
 
-        $message = __('The email could not be sent, so nothing was saved. Please try again in a moment.');
+        $message = ApprovalFailureMessage::forDelivery();
 
         $this->reportResolveFailure($pendingAction, $index === null
             ? $message
@@ -1632,7 +1654,7 @@ final class ProposalCard extends BaseLivewireComponent
             return null;
         }
 
-        return resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type, (string) $recordId);
+        return resolve(RecordReferenceResolver::class)->resolve($pendingAction->entity_type->value, (string) $recordId);
     }
 
     /**
@@ -1670,11 +1692,9 @@ final class ProposalCard extends BaseLivewireComponent
 
         $existingFields = $this->currentDisplayFields($pendingAction);
 
-        // Only Create proposals are inline-editable, so only they need the rebuild that
-        // re-derives each owned row from action_data to attach an editable `code`. For
-        // update/delete, action_data holds diffs/record ids rather than display values, so the
-        // stored display rows are authoritative; rebuilding would blank them out.
-        if ($pendingAction->operation !== PendingActionOperation::Create) {
+        // Only a Create proposal is rebuilt, to attach editable codes. Update and delete rows hold
+        // diffs, and an email is never edited, so their stored rows stand.
+        if ($pendingAction->operation !== PendingActionOperation::Create || $pendingAction->entity_type->isIndivisible()) {
             return $existingFields;
         }
 
@@ -1711,7 +1731,12 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        $entityType = $pendingAction->entity_type;
+        $entity = $pendingAction->entity_type;
+        $entityType = $entity->value;
+
+        if ($entity->isIndivisible() || ! is_string(Relation::getMorphedModel($entityType))) {
+            return [];
+        }
 
         // Which codes are editable is a property of the entity, not of the record:
         // the describer lists the entity's core keys plus its active, non-deferred
@@ -1726,7 +1751,7 @@ final class ProposalCard extends BaseLivewireComponent
         $this->ensureTenantContext();
 
         $schema = resolve(ProposalFieldSchemaDescriber::class)
-            ->describe($this->authUser(), $entityType, $this->currentRecord($pendingAction));
+            ->describe($this->authUser(), $entity, $this->currentRecord($pendingAction));
 
         return $this->editableCodesCache[$entityType] = array_map(
             static fn (array $field): string => (string) $field['code'],
@@ -1762,10 +1787,14 @@ final class ProposalCard extends BaseLivewireComponent
         // every dock round trip, only to be discarded. stepViews() already carries
         // both per step. The counters below stay: they are cheap array reads and the
         // batch footer's behaviour is asserted through them.
+        $approveAllCount = count(array_filter($steps, static fn (array $step): bool => $step['needsOwnApproval'] === false));
+
         return view('chat::livewire.chat.proposal-card', [
             'proposal' => $proposal,
             'steps' => $steps,
             'isPlan' => count($steps) > 1,
+            'approveAllCount' => $approveAllCount,
+            'hasOwnApprovalSteps' => $approveAllCount < count($steps),
             'recordCount' => $proposal instanceof PendingAction ? $this->recordCountOf($proposal) : 0,
             'remainingCount' => $proposal instanceof PendingAction ? $this->remainingCountOf($proposal) : 0,
         ]);

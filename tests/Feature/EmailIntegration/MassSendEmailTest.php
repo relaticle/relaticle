@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -237,7 +237,7 @@ it('keeps a mass send on its mailbox level when the owner lowers it later', func
         ],
     );
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
 
     $sent = Email::query()->where('creation_source', EmailCreationSource::MASS_SEND)->sole();
 
@@ -258,7 +258,7 @@ it('keeps a composer mass send on its mailbox level when the owner lowers it lat
         ->set('bodyHtml', '<p>Hi</p>')
         ->call('send');
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
 
     $sent = Email::query()->where('creation_source', EmailCreationSource::MASS_SEND)->sole();
 

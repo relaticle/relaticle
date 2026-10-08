@@ -15,7 +15,8 @@
     $inPlan = $inPlan ?? false;
     $operationLabels = ['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')];
     $outcomeLabels = ['rejected' => __('Rejected'), 'expired' => __('Expired'), 'superseded' => __('Replaced')];
-    $approvedLabels = ['create' => __('Created'), 'update' => __('Updated'), 'delete' => __('Deleted')];
+    $approvedLabels = collect(\Relaticle\Chat\Enums\PendingActionOperation::cases())->mapWithKeys(fn (\Relaticle\Chat\Enums\PendingActionOperation $operation): array => [$operation->value => $operation->done()])->all();
+    $entityReceipts = \Relaticle\Chat\Enums\ProposalEntity::receipts();
     $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from($operationLabels).")[action.operation] ?? action.operation)";
 @endphp
 {{-- COMPACT progress view while the batch is still docked. Gated on there being
@@ -176,7 +177,7 @@
                 </span>
             </template>
 
-            {{-- An approved row names the effect (Created, Updated, Deleted),
+            {{-- An approved row names the effect (Created, Updated, Deleted, Sent, Saved),
                  the same verbs a batch receipt uses, so the outcome is the one
                  place the operation is stated. A dot carries the colour, so
                  the tile stays the row's only tinted surface. The other outcomes come from a
@@ -195,7 +196,7 @@
                     ></span>
                     <span
                         x-text="action.status === 'approved'
-                            ? ((@js($approvedLabels))[action.operation] ?? @js(__('Approved')))
+                            ? ((@js($entityReceipts))[action.entity_type]?.done ?? (@js($approvedLabels))[action.operation] ?? @js(__('Approved')))
                             : ((@js($outcomeLabels))[action.status] ?? action.status)"
                     ></span>
                 </span>

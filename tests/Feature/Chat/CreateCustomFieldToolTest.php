@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
@@ -74,13 +75,14 @@ it('creates a pending proposal for a select field with options', function (): vo
     expect($decoded['type'])->toBe('pending_action')
         ->and($decoded['operation'])->toBe('create')
         ->and($decoded['entity_type'])->toBe('custom_field')
-        ->and($decoded['meta']['agent_should_stop'])->toBeTrue();
+        ->and($decoded['meta']['agent_should_stop'])->toBeTrue()
+        ->and(array_keys($decoded))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'meta']);
 
     $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
 
     expect($pending->action_class)->toBe(CreateCustomField::class)
         ->and($pending->operation)->toBe(PendingActionOperation::Create)
-        ->and($pending->entity_type)->toBe('custom_field')
+        ->and($pending->entity_type)->toBe(ProposalEntity::CustomField)
         ->and($pending->action_data['name'])->toBe('Priority')
         ->and($pending->action_data['type'])->toBe('select')
         ->and($pending->action_data['entity_type'])->toBe('company')

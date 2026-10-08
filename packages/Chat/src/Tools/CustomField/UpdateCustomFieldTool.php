@@ -15,7 +15,9 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
@@ -186,7 +188,7 @@ final class UpdateCustomFieldTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: UpdateCustomField::class,
             operation: PendingActionOperation::Update,
-            entityType: 'custom_field',
+            entityType: ProposalEntity::CustomField,
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
@@ -200,16 +202,9 @@ final class UpdateCustomFieldTool implements Tool
 
         $publicRecords = array_map(ProposalPayload::withoutMarkers(...), $actionRecords);
 
-        return (string) json_encode([
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => 'UpdateCustomField',
-            'entity_type' => 'custom_field',
-            'operation' => 'update',
-            'data' => $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ], JSON_UNESCAPED_SLASHES);
+        return (string) json_encode(
+            PendingActionEnvelope::for($pending, 'UpdateCustomField', $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0]),
+            JSON_UNESCAPED_SLASHES,
+        );
     }
 }

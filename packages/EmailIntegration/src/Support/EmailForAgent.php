@@ -9,6 +9,7 @@ use Dom\HTMLDocument;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -54,6 +55,60 @@ final readonly class EmailForAgent
                     ->all()
                 : [],
         ];
+    }
+
+    /**
+     * @return array{
+     *     id: string,
+     *     email: string,
+     *     name: ?string,
+     *     provider: string,
+     *     is_default: bool,
+     *     can_send: bool
+     * }
+     */
+    public function mailbox(ConnectedAccount $account): array
+    {
+        return [
+            'id' => (string) $account->getKey(),
+            'email' => $account->email_address,
+            'name' => $account->display_name,
+            'provider' => $account->provider->value,
+            'is_default' => (bool) $account->is_default,
+            'can_send' => $account->isSendable(),
+        ];
+    }
+
+    public function textFromHtml(string $html): string
+    {
+        $document = HTMLDocument::createFromString($html, LIBXML_NOERROR, 'UTF-8');
+
+        foreach ($document->querySelectorAll('head, style, script, template, noscript') as $hidden) {
+            $hidden->remove();
+        }
+
+        foreach ($document->querySelectorAll('br') as $lineBreak) {
+            $lineBreak->replaceWith("\n");
+        }
+
+        foreach ($document->querySelectorAll('td, th') as $cell) {
+            $cell->append(' ');
+        }
+
+        foreach ($document->querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote') as $block) {
+            $block->append("\n");
+        }
+
+        $lines = Str::of((string) $document->body?->textContent)
+            ->replaceMatches('/[ \t\x{00A0}]+/u', ' ')
+            ->explode("\n")
+            ->map(fn (string $line): string => trim($line))
+            ->implode("\n");
+
+        return Str::of($lines)
+            ->replaceMatches('/\n{3,}/', "\n\n")
+            ->trim()
+            ->toString();
     }
 
     /**
@@ -113,37 +168,5 @@ final readonly class EmailForAgent
         }
 
         return $this->textFromHtml((string) $email->body->body_html);
-    }
-
-    private function textFromHtml(string $html): string
-    {
-        $document = HTMLDocument::createFromString($html, LIBXML_NOERROR, 'UTF-8');
-
-        foreach ($document->querySelectorAll('head, style, script, template, noscript') as $hidden) {
-            $hidden->remove();
-        }
-
-        foreach ($document->querySelectorAll('br') as $lineBreak) {
-            $lineBreak->replaceWith("\n");
-        }
-
-        foreach ($document->querySelectorAll('td, th') as $cell) {
-            $cell->append(' ');
-        }
-
-        foreach ($document->querySelectorAll('p, div, li, tr, h1, h2, h3, h4, h5, h6, blockquote') as $block) {
-            $block->append("\n");
-        }
-
-        $lines = Str::of((string) $document->body?->textContent)
-            ->replaceMatches('/[ \t\x{00A0}]+/u', ' ')
-            ->explode("\n")
-            ->map(fn (string $line): string => trim($line))
-            ->implode("\n");
-
-        return Str::of($lines)
-            ->replaceMatches('/\n{3,}/', "\n\n")
-            ->trim()
-            ->toString();
     }
 }

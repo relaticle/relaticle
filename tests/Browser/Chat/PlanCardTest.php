@@ -2,8 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\ChatBrowser;
 
 /**
@@ -85,4 +92,146 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
 
     $page->assertSee('Cancelled with the step it depended on')
         ->assertDontSee('0 of 0 resolved');
+});
+
+it('does not let the second click of a double-click send the email that replaces the approve button', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'task then send', $conversationId);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+
+    $turnId = (string) Str::ulid();
+
+    $propose = fn (string $actionClass, string $entityType, array $data, array $display): PendingAction => PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'turn_id' => $turnId,
+        'action_class' => $actionClass,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => $entityType,
+        'action_data' => $data,
+        'display_data' => $display,
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $propose(CreateTask::class, 'task', ['title' => 'Call Lena'], [
+        'title' => 'Create Task',
+        'summary' => 'Create task "Call Lena"',
+        'fields' => [['label' => 'Title', 'value' => 'Call Lena']],
+    ]);
+
+    $send = $propose(SendAssistantEmail::class, 'emails', [
+        'connected_account_id' => (string) $account->getKey(),
+        'to' => ['lena@acme.test'],
+        'subject' => 'Q4 lanes',
+        'body' => 'Confirmed.',
+        'include_signature' => false,
+    ], [
+        'title' => 'Send Email',
+        'summary' => 'Send email to lena@acme.test: Q4 lanes',
+        'fields' => [['label' => 'Subject', 'value' => 'Q4 lanes']],
+    ]);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->resize(1440, 900)
+        ->assertSee('Q4 lanes');
+
+    $spot = $page->script(<<<'JS'
+        (() => {
+            const box = document.querySelector('[wire\\:click="approveAll"]').getBoundingClientRect();
+
+            return { x: box.right - 8, y: box.top + box.height / 2 };
+        })();
+    JS);
+
+    $page->click('[wire\:click="approveAll"]')
+        ->assertVisible('[wire\:click="createCurrent"]');
+
+    $clicked = $page->script(<<<JS
+        (() => {
+            const button = document.elementFromPoint({$spot['x']}, {$spot['y']}).closest('button');
+            const wasDisabled = button.disabled;
+            const discard = document.querySelector('[wire\\\\:click="discardCurrent"]');
+            const discardWasDisabled = discard.disabled;
+            button.click();
+            discard.click();
+
+            return { wasDisabled, discardWasDisabled, action: button.getAttribute('wire:click') };
+        })();
+    JS);
+
+    $page->wait(0.4);
+
+    expect($clicked)->toBe(['wasDisabled' => true, 'discardWasDisabled' => true, 'action' => 'createCurrent'])
+        ->and(Email::query()->count())->toBe(0)
+        ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+    $page->wait(1);
+
+    $armed = $page->script(<<<'JS'
+        document.querySelector('[wire\\:click="createCurrent"]').disabled === false;
+    JS);
+
+    expect($armed)->toBeTrue();
+});
+
+it('renders a streamed proposal the user already decided as a decided card and docks nothing', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'retried turn', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.messages = [];
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-decided',
+                    turn_id: 'turn-1',
+                    status: 'approved',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Call Lena"', fields: [] },
+                    meta: { agent_should_stop: false },
+                }),
+            });
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-open',
+                    turn_id: 'turn-1',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Email Lena"', fields: [] },
+                    meta: { agent_should_stop: true },
+                }),
+            });
+
+            const actions = data.messages.flatMap((m) => m.pending_actions || []);
+
+            return {
+                statuses: actions.map((a) => a.status),
+                docked: data.visiblePendingActions().map((a) => a.pending_action_id),
+            };
+        })();
+    JS);
+
+    expect($result)->toBe(['statuses' => ['approved', 'pending'], 'docked' => ['pa-open']]);
 });

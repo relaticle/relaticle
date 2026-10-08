@@ -16,7 +16,9 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsValidationFailures;
 use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
@@ -133,7 +135,7 @@ final class DeleteCustomFieldTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: DeleteCustomField::class,
             operation: PendingActionOperation::Delete,
-            entityType: 'custom_field',
+            entityType: ProposalEntity::CustomField,
             actionData: $isBatch
                 ? [
                     '_batch' => true,
@@ -156,20 +158,10 @@ final class DeleteCustomFieldTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        return (string) json_encode([
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => 'DeleteCustomField',
-            'entity_type' => 'custom_field',
-            'operation' => 'delete',
-            'data' => ['records' => array_map(fn (CustomField $field): array => [
-                'entity_type' => $field->entity_type,
-                'code' => $field->code,
-            ], $fields)],
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ], JSON_UNESCAPED_SLASHES);
+        return (string) json_encode(PendingActionEnvelope::for($pending, 'DeleteCustomField', ['records' => array_map(fn (CustomField $field): array => [
+            'entity_type' => $field->entity_type,
+            'code' => $field->code,
+        ], $fields)]), JSON_UNESCAPED_SLASHES);
     }
 
     /**

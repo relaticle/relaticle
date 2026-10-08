@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 
 /**
  * @property string $id
@@ -27,7 +28,7 @@ use Relaticle\Chat\Enums\PendingActionStatus;
  * @property string|null $message_id
  * @property string $action_class
  * @property PendingActionOperation $operation
- * @property string $entity_type
+ * @property ProposalEntity $entity_type
  * @property array<string, mixed> $action_data
  * @property array<string, mixed> $display_data
  * @property PendingActionStatus $status
@@ -64,6 +65,7 @@ final class PendingAction extends Model
     {
         return [
             'operation' => PendingActionOperation::class,
+            'entity_type' => ProposalEntity::class,
             'status' => PendingActionStatus::class,
             'action_data' => 'array',
             'display_data' => 'array',
@@ -82,6 +84,16 @@ final class PendingAction extends Model
     public function isPending(): bool
     {
         return $this->status === PendingActionStatus::Pending;
+    }
+
+    public function needsOwnApproval(): bool
+    {
+        return $this->entity_type->needsOwnApproval();
+    }
+
+    public function isEmailSend(): bool
+    {
+        return $this->entity_type === ProposalEntity::Email;
     }
 
     public function isExpired(): bool

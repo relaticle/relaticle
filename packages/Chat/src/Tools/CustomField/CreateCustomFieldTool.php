@@ -14,7 +14,9 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
 use Relaticle\Chat\Tools\Concerns\RequiresWorkspaceCapability;
@@ -172,7 +174,7 @@ final class CreateCustomFieldTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: CreateCustomField::class,
             operation: PendingActionOperation::Create,
-            entityType: 'custom_field',
+            entityType: ProposalEntity::CustomField,
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
@@ -184,17 +186,10 @@ final class CreateCustomFieldTool implements Tool
             turnId: $this->resolveTurnId(),
         );
 
-        return (string) json_encode($this->withSkippedRecords([
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => 'CreateCustomField',
-            'entity_type' => 'custom_field',
-            'operation' => 'create',
-            'data' => $pending->action_data,
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ], $skipped), JSON_UNESCAPED_SLASHES);
+        return (string) json_encode(
+            $this->withSkippedRecords(PendingActionEnvelope::for($pending, 'CreateCustomField', $pending->action_data), $skipped),
+            JSON_UNESCAPED_SLASHES,
+        );
     }
 
     /**

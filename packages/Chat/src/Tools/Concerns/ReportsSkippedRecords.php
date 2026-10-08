@@ -14,7 +14,7 @@ trait ReportsSkippedRecords
     {
         $label = null;
 
-        foreach (['name', 'title', 'email'] as $key) {
+        foreach (['name', 'title', 'subject', 'email'] as $key) {
             if (is_string($record[$key] ?? null) && trim($record[$key]) !== '') {
                 $label = trim($record[$key]);
 

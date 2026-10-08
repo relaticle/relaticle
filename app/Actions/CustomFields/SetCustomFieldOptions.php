@@ -12,7 +12,6 @@ use App\Models\User;
 use App\Support\CustomFieldOptionPlan;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -145,10 +144,8 @@ final readonly class SetCustomFieldOptions
 
         CustomFieldValue::query()
             ->holdingOption($field, $fromId)
-            ->with(['entity' => function (Relation $entity): void {
-                if ($entity instanceof MorphTo) {
-                    $entity->withTrashed();
-                }
+            ->with(['entity' => function (MorphTo $entity): void {
+                $entity->withTrashed();
             }])
             ->eachById(function (CustomFieldValue $value) use ($field, $column, $fromId, $toId): void {
                 $value->setRelation('customField', $field);

@@ -121,7 +121,7 @@ as arbitrary disk paths.
 default. Resolve it with `PrivacyService::tierForMailbox()` from the mailbox the
 email is sent or synced through, never from the user or `currentWorkspace`: the
 same person shares differently in each workspace. Write it only through
-`SaveMailboxSharingTierAction`, which re-stamps that one mailbox's mail. A
+`SaveMailboxSharingTier`, which re-stamps that one mailbox's mail. A
 workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault()`).
 `tests/Feature/EmailIntegration/PrivacyServiceTest.php` fails when a second
 workspace's mailbox changes the level, and
@@ -139,7 +139,7 @@ email takes a level from anywhere but the mailbox it is sent from.
 
 Removing a member, or leaving, disconnects that person's mailboxes in the
 workspace and cancels the mail they had queued there. Both go through
-`DisconnectFormerMemberMailboxAction`. `DisconnectRemovedMemberMailboxesListener`
+`DisconnectFormerMemberMailbox`. `DisconnectRemovedMemberMailboxesListener`
 runs it on `TeamMemberRemoved`, and it is registered outside the feature flag,
 because a stored token must not survive with the feature off.
 `email:disconnect-former-member-mailboxes` runs it for anyone removed earlier,

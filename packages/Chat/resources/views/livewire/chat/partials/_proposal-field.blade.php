@@ -61,9 +61,12 @@
 
         <template x-if="!['badges', 'boolean', 'link'].includes(field.type)">
             <span
-                :class="Object.prototype.hasOwnProperty.call(field, 'new')
-                    ? 'font-medium text-gray-900 dark:text-white'
-                    : 'text-gray-700 dark:text-gray-300'"
+                :class="[
+                    Object.prototype.hasOwnProperty.call(field, 'new')
+                        ? 'font-medium text-gray-900 dark:text-white'
+                        : 'text-gray-700 dark:text-gray-300',
+                    String(field.new ?? field.value ?? '').includes('\n') ? 'whitespace-pre-wrap' : '',
+                ]"
                 x-text="field.new ?? field.value"
             ></span>
         </template>

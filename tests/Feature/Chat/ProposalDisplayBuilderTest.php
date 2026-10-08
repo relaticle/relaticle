@@ -6,6 +6,7 @@ use App\Features\OnboardSeed;
 use App\Models\CustomField;
 use App\Models\User;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 
 mutates(ProposalDisplayBuilder::class);
@@ -32,7 +33,7 @@ it('builds company display with title, name row, and custom link rows', function
 
     /** @var ProposalDisplayBuilder $builder */
     $builder = resolve(ProposalDisplayBuilder::class);
-    $display = $builder->build($this->user, 'company', $record, []);
+    $display = $builder->build($this->user, ProposalEntity::Company, $record, []);
 
     expect($display['title'])->toBe('Create Company')
         ->and($display['summary'])->toBe('Create company "Acme Corp"')
@@ -62,7 +63,7 @@ it('carries forward read-only core rows not owned by the builder', function (): 
 
     /** @var ProposalDisplayBuilder $builder */
     $builder = resolve(ProposalDisplayBuilder::class);
-    $display = $builder->build($this->user, 'people', $record, $existingFields);
+    $display = $builder->build($this->user, ProposalEntity::People, $record, $existingFields);
 
     $labels = collect($display['fields'])->pluck('label')->all();
 
@@ -82,7 +83,7 @@ it('does not duplicate custom rows when existingFields already has a type-bearin
 
     /** @var ProposalDisplayBuilder $builder */
     $builder = resolve(ProposalDisplayBuilder::class);
-    $display = $builder->build($this->user, 'company', $record, $existingFields);
+    $display = $builder->build($this->user, ProposalEntity::Company, $record, $existingFields);
 
     $linkedinRows = collect($display['fields'])->filter(fn (array $r): bool => ($r['label'] ?? '') === 'LinkedIn')->values()->all();
 
@@ -114,7 +115,7 @@ it('does not duplicate a custom row when the stored display row carries no type 
 
     /** @var ProposalDisplayBuilder $builder */
     $builder = resolve(ProposalDisplayBuilder::class);
-    $display = $builder->build($this->user, 'company', $record, $existingFields);
+    $display = $builder->build($this->user, ProposalEntity::Company, $record, $existingFields);
 
     $linkedinRows = collect($display['fields'])->filter(fn (array $r): bool => ($r['label'] ?? '') === 'LinkedIn')->values()->all();
 

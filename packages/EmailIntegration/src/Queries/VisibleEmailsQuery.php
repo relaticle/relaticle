@@ -12,6 +12,9 @@ use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -40,6 +43,20 @@ final readonly class VisibleEmailsQuery
         return array_keys(self::RECORDS);
     }
 
+    /** @return array<string, list<mixed>> */
+    public static function filterRules(): array
+    {
+        return [
+            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
+            'record_type' => ['required_with:record_id', 'string', Rule::in(self::recordTypes())],
+            'record_id' => ['required_with:record_type', 'string', 'max:64'],
+            'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
+            'thread_id' => ['sometimes', 'string', 'max:255'],
+            'sent_after' => ['sometimes', 'date'],
+            'sent_before' => ['sometimes', 'date'],
+        ];
+    }
+
     /**
      * @param  array{search?: string, record_type?: string, record_id?: string, direction?: string, thread_id?: string, sent_after?: string, sent_before?: string}  $filters
      * @return Paginator<int, Email>
@@ -59,8 +76,8 @@ final readonly class VisibleEmailsQuery
         $query
             ->when(isset($filters['direction']), fn (Builder $q): Builder => $q->where('direction', $filters['direction'] ?? null))
             ->when(isset($filters['thread_id']), fn (Builder $q): Builder => $q->where('thread_id', $filters['thread_id'] ?? null))
-            ->when(isset($filters['sent_after']), fn (Builder $q): Builder => $q->where('sent_at', '>', Date::parse($filters['sent_after'] ?? '')))
-            ->when(isset($filters['sent_before']), fn (Builder $q): Builder => $q->where('sent_at', '<', Date::parse($filters['sent_before'] ?? '')));
+            ->when(isset($filters['sent_after']), fn (Builder $q): Builder => $q->where('sent_at', '>', Date::parse($filters['sent_after'] ?? '')->utc()->toDateTimeString()))
+            ->when(isset($filters['sent_before']), fn (Builder $q): Builder => $q->where('sent_at', '<', Date::parse($filters['sent_before'] ?? '')->utc()->toDateTimeString()));
 
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)
@@ -77,6 +94,24 @@ final readonly class VisibleEmailsQuery
             ->with(['participants', 'shares', 'body', 'attachments'])
             ->whereKey($id)
             ->first();
+    }
+
+    /** @throws ValidationException */
+    public function replyTarget(User $viewer, ?string $id): ?Email
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $email = $this->find($viewer, $id);
+
+        if (! $email instanceof Email) {
+            throw ValidationException::withMessages([
+                'in_reply_to_email_id' => "Email with ID [{$id}] not found.",
+            ]);
+        }
+
+        return $email;
     }
 
     /** @return Builder<Email> */

@@ -10,7 +10,7 @@ use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
-final readonly class SaveMailboxSharingTierAction
+final readonly class SaveMailboxSharingTier
 {
     public function __construct(
         private ApplyDefaultSharingTierToExistingEmailsAction $applyRetroactive,

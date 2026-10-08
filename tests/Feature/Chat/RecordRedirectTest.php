@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\EditAction;
 use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
 use Relaticle\CustomFields\Services\TenantContextService;
 
@@ -148,6 +149,15 @@ it('redirects a workspace invitation reference straight to the Members page', fu
         ->get('/r/workspace_invitations/'.(string) Str::ulid())
         ->assertRedirect($expectedUrl);
 });
+
+it('404s for an email reference, which has no record page to open', function (string $type): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $this->actingAs($user)->get("/r/{$type}/".(string) Str::ulid())->assertNotFound();
+})->with(['emails', 'email_drafts']);
 
 it('404s for a custom field belonging to another workspace', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();

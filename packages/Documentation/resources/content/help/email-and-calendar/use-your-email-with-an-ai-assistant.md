@@ -1,19 +1,46 @@
 ---
 title: Use your email with an AI assistant
-description: Let Claude, ChatGPT, or another connected assistant read email you can see, save drafts, and send for you with a five minute window to cancel.
+description: Let Rela, Claude, or ChatGPT read email you can see, save drafts, and send for you. You approve or can cancel every send.
 order: 9
 updated: "2026-10-07"
-related: [help/email-and-calendar/choose-who-sees-your-email, help/ai-assistant/connect-claude-or-chatgpt, help/workspace/manage-members-and-roles]
+related: [help/email-and-calendar/choose-who-sees-your-email, help/ai-assistant/connect-claude-or-chatgpt, help/ai-assistant/approve-what-the-assistant-changes, help/workspace/manage-members-and-roles]
 ---
 
-A connected assistant such as Claude or ChatGPT can work with your synced
-email. It gets what your role in the workspace allows, and it never sees
-more than you see in Relaticle.
+Rela, the built-in AI assistant, can work with your synced email. So can a
+connected assistant such as Claude or ChatGPT. Each gets what your role in
+the workspace allows, and none sees more than you see in Relaticle.
+
+## Ask Rela about your email
+
+Rela needs no setup beyond a connected mailbox. Ask it in the chat:
+"what did Lena say about the Q4 rates?", "draft a reply that confirms
+Thursday", or "email Lena the new price list".
+
+- **Reading.** Rela reads email at the sharing level it has for you. The
+  table under [What the assistant can read](#what-the-assistant-can-read)
+  applies to Rela too.
+- **Drafts.** Rela proposes a draft on a card. Click **Save draft** and it
+  goes into your **Drafts**, where you review it before you send.
+- **Sending.** Rela proposes the email on a card that shows the mailbox, every
+  recipient, the subject, the message, and your signature. Nothing leaves
+  until you click **Send**.
+
+After you click **Send**, an **Undo** button stays on screen for five
+seconds. Then the email goes out from your own mailbox.
+
+Every email gets its own card and its own **Send** click. When Rela proposes
+an email together with other changes, **Approve all** saves the other
+changes and leaves each email waiting for you.
+
+The Owner, Admin, and Member roles can send through Rela. A Viewer can read
+and save drafts.
+
+## Connect Claude or ChatGPT
 
 A connector you added before email access existed has none until you connect
 it again.
 
-## Give a connector email access
+### Give a connector email access
 
 1. If the assistant is already connected, open **Access Tokens** from your
    avatar menu, find it under **AI Connectors**, and click **Revoke**.
@@ -34,7 +61,7 @@ The list follows your role in the workspace you picked.
 A connector gets everything on the list. To give an assistant less, use an
 access token.
 
-## Turn it on for an access token
+### Turn it on for an access token
 
 Open **Access Tokens** from your avatar menu. Tick **Read email**,
 **Draft email**, or **Send email** when you create a token. For a token you
@@ -71,8 +98,9 @@ email. The email carries no images and no attachments. Your mailbox's default
 signature is added unless the assistant leaves it out. A draft goes into your
 **Drafts**, and you review it before you send.
 
-An email the assistant sends waits five minutes before it leaves. It sends
-from a mailbox you connected yourself, never a teammate's.
+An email a connected assistant sends waits five minutes before it leaves. It
+sends from a mailbox you connected yourself, never a teammate's. Rela has no
+five minute hold, because you approve each email on its card first.
 
 1. You get a notification, such as "Claude queued an email". It names the
    subject and the recipients.

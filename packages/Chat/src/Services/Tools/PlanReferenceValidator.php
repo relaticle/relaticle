@@ -86,12 +86,12 @@ final readonly class PlanReferenceValidator
             }
         }
 
-        $referencedModel = Relation::getMorphedModel($referenced->entity_type);
+        $referencedModel = Relation::getMorphedModel($referenced->entity_type->value);
 
         if ($referencedModel !== $expectedModel) {
             $expected = class_basename($expectedModel);
 
-            return "Step reference `{$value}` points at a {$referenced->entity_type} proposal, but a {$expected} is required here.";
+            return "Step reference `{$value}` points at a {$referenced->entity_type->value} proposal, but a {$expected} is required here.";
         }
 
         return null;

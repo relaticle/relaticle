@@ -367,7 +367,7 @@ final class ChatInterface extends BaseLivewireComponent
             'pending_action_id' => (string) $action->getKey(),
             'turn_id' => $action->turn_id,
             'operation' => $action->operation->value,
-            'entity_type' => $action->entity_type,
+            'entity_type' => $action->entity_type->value,
             'data' => $action->action_data,
             'display' => $action->display_data,
             'status' => 'pending',

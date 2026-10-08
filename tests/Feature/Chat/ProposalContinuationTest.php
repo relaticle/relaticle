@@ -31,6 +31,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Support\TurnPresence;
 use Tests\Helpers\AnthropicSse;
 
 mutates(TurnContinuationService::class);
@@ -97,6 +98,39 @@ it('resumes the assistant when an approval leaves nothing pending', function ():
             && $job->conversationId === $this->convId
             && $job->message === "The user decided the proposals above:\n- APPROVED (written): create company \"Continuation Co\"",
     );
+});
+
+it('does not resume a turn that is retrying, which reports the decided card itself', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    $proposal = continuationProposal($this->user, $this->convId, $turnId, 'Retrying Co');
+    TurnPresence::begin($this->convId, turnId: $turnId, message: 'Create it');
+    TurnPresence::markRetried($this->convId, $turnId);
+
+    Livewire::test(ProposalCard::class)
+        ->dispatch('proposal:set-active', id: (string) $proposal->getKey(), context: 'conversation')
+        ->call('createCurrent', resolve(PendingActionService::class));
+
+    Queue::assertNotPushed(ProcessChatMessage::class);
+
+    TurnPresence::clear($this->convId, $turnId);
+
+    expect(resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId))->toBeTrue();
+});
+
+it('still resumes behind a turn that is streaming and has not retried', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    $proposal = continuationProposal($this->user, $this->convId, $turnId, 'Streaming Co');
+    TurnPresence::begin($this->convId, turnId: $turnId, message: 'Create it');
+
+    Livewire::test(ProposalCard::class)
+        ->dispatch('proposal:set-active', id: (string) $proposal->getKey(), context: 'conversation')
+        ->call('createCurrent', resolve(PendingActionService::class));
+
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume);
 });
 
 it('resumes after a rejection too, so a discarded card is not a dead end', function (): void {

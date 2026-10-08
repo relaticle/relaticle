@@ -29,6 +29,21 @@ production: message ordering, approval races, duplicate proposals.
   single card and approved once (`ProposalPlanService`). A new foreign key on a
   write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
   it will accept neither reference validation nor ownership checks.
+- A write that leaves the workspace is approved on its own: an email send and a
+  workspace invitation. `ProposalEntity::needsOwnApproval()` owns that list.
+  `ProposalPlanService::approveAll()` skips such a step: it stays pending, shown in
+  full, with its own button, and the keyboard shortcut never approves it.
+  `SendEmailTool` takes one email per call, and `PendingAction::isEmailSend()` makes
+  `approveStep()` refuse a batch of them. An invitation step may hold several
+  addresses, and its button sends them all. `tests/Feature/Chat/EmailToolsTest.php`
+  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when "Approve all"
+  or its shortcut sends either.
+- `Relaticle\Chat\Enums\ProposalEntity` owns every fact that follows from what a proposal
+  writes: its title key, its core fields, its verbs, and whether it is approved on its own.
+  `PendingAction::entity_type` is cast to it. A new kind of proposal is a new case, and every
+  `match` in the enum lists each case with no `default`, so PHPStan fails a case that a
+  fact forgot. Strings remain only where another vocabulary starts: the custom-fields
+  bridge, `RecordReferenceResolver`, and payloads sent to the browser or the model.
 - Resolve a reference only at approval time (`PlanReferenceResolver`), never at
   proposal time, and never let a `$ref` fall out of a card's display: a plan card
   that hides the link being approved is the failure this design exists to

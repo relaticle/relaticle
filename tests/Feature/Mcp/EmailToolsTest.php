@@ -27,8 +27,11 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
+use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
-use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
+use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -54,7 +57,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -322,6 +325,16 @@ it('filters by search, direction and sent date', function (): void {
         ->and(array_column(listedEmails($this->viewer, ['search' => 'Invoice', 'sent_after' => now()->subDays(3)->toIso8601String()]), 'id'))->toBe([$recent->id])
         ->and(array_column(listedEmails($this->viewer, ['search' => 'Invoice', 'sent_before' => now()->subDays(3)->toIso8601String()]), 'id'))->toBe([$old->id])
         ->and(array_column(listedEmails($this->viewer, ['search' => 'acme.test']), 'id'))->toEqualCanonicalizing([$old->id, $recent->id]);
+});
+
+it('reads a sent date with an offset at the instant it names', function (): void {
+    $afterMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-07 00:30:00']);
+    $beforeMidnight = ($this->emailFrom)($this->viewer, ['sent_at' => '2026-10-06 23:30:00']);
+
+    $instant = '2026-10-07T09:00:00+09:00';
+
+    expect(array_column(listedEmails($this->viewer, ['sent_after' => $instant]), 'id'))->toBe([$afterMidnight->id])
+        ->and(array_column(listedEmails($this->viewer, ['sent_before' => $instant]), 'id'))->toBe([$beforeMidnight->id]);
 });
 
 it('lists newest first and pages', function (): void {
@@ -741,6 +754,17 @@ it('escapes raw html in a draft body', function (): void {
         ->toContain('<strong>safe</strong>');
 });
 
+it('keeps merge tags literal in a draft body', function (): void {
+    $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
+        'body' => 'Dated {today} and {{ today }} and {first_name}',
+    ]));
+
+    $html = Email::query()->with('body')->findOrFail($data['id'])->body->body_html;
+
+    expect(html_entity_decode(strip_tags($html)))->toBe('Dated {today} and {{ today }} and {first_name}')
+        ->and($html)->not->toContain(now()->toFormattedDateString());
+});
+
 it('drops an unsafe link and keeps a single line break in a draft body', function (): void {
     $data = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, [
         'body' => "Thanks,\nDana [click](javascript:alert(1)) [site](https://acme.test)",
@@ -1135,6 +1159,38 @@ it('shows a held email in the default view of its owner outbox', function (): vo
         ->assertCanNotSeeTableRecords([$held]);
 });
 
+it('schedules email sent through rela like composer mail in the owner outbox', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $inUndoWindow = Email::factory()->outbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'connected_account_id' => $this->viewerAccount->getKey(),
+        'status' => EmailStatus::QUEUED,
+        'creation_source' => EmailCreationSource::CHAT,
+        'scheduled_for' => now()->addSeconds(3),
+    ]);
+
+    $scheduled = Email::factory()->outbound()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'connected_account_id' => $this->viewerAccount->getKey(),
+        'status' => EmailStatus::QUEUED,
+        'creation_source' => EmailCreationSource::CHAT,
+        'scheduled_for' => now()->addHour(),
+    ]);
+
+    $this->actingAs($this->viewer);
+    Filament::setTenant($this->workspace);
+
+    livewire(OutboxTable::class)
+        ->assertCanSeeTableRecords([$inUndoWindow])
+        ->assertCanNotSeeTableRecords([$scheduled])
+        ->filterTable('status_tab', 'scheduled')
+        ->assertCanSeeTableRecords([$scheduled])
+        ->assertCanNotSeeTableRecords([$inUndoWindow]);
+});
+
 it('sends with the sender default sharing level', function (): void {
     $this->viewerAccount->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
@@ -1148,7 +1204,7 @@ it('keeps a sent email on its mailbox level when the owner lowers it later', fun
 
     $data = emailToolData($this->viewer->fresh(), SendEmailTool::class, sendArguments($this->viewerAccount));
 
-    resolve(SaveMailboxSharingTierAction::class)->execute($this->viewer, $this->viewerAccount->fresh(), EmailPrivacyTier::PRIVATE);
+    resolve(SaveMailboxSharingTier::class)->execute($this->viewer, $this->viewerAccount->fresh(), EmailPrivacyTier::PRIVATE);
 
     $sent = Email::query()->findOrFail($data['id']);
 
@@ -1197,6 +1253,42 @@ it('escapes raw html in a sent body', function (): void {
         ->not->toContain('<script')
         ->not->toContain('<img')
         ->toContain('<strong>safe</strong>');
+});
+
+it('keeps merge tags literal in a sent body', function (): void {
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, [
+        'body' => 'Dated {today} and {{ today }} and {first_name}',
+    ]));
+
+    $html = Email::query()->with('body')->findOrFail($data['id'])->body->body_html;
+
+    expect(html_entity_decode(strip_tags($html)))->toBe('Dated {today} and {{ today }} and {first_name}')
+        ->and($html)->not->toContain(now()->toFormattedDateString());
+});
+
+it('fills a merge tag in the mailbox signature while the body keeps its own literal', function (): void {
+    EmailSignature::factory()->default()->create([
+        'connected_account_id' => $this->viewerAccount->id,
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->viewer->id,
+        'content_html' => '<p>Dana, {today}</p>',
+    ]);
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['body' => 'Dated {today}']));
+
+    expect(Email::query()->with('body')->findOrFail($data['id'])->body->body_html)
+        ->toContain('Dated {today}')
+        ->toContain('<p>Dana, '.now()->toFormattedDateString().'</p>');
+});
+
+it('keeps a link whose address holds braces working in a sent body', function (): void {
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, [
+        'body' => 'Read [the docs](https://acme.test/a/{id}) now',
+    ]));
+
+    expect(Email::query()->with('body')->findOrFail($data['id'])->body->body_html)
+        ->toContain('<a href="https://acme.test/a/%7Bid%7D">the docs</a>')
+        ->not->toContain(now()->toFormattedDateString());
 });
 
 it('tells the user an email is held, with a way to cancel it', function (): void {
@@ -1554,7 +1646,7 @@ it('holds for at least a minute whatever the config says', function (int $config
     'negative' => -5,
 ]);
 
-it('cancels the email when the notice cannot be stored', function (): void {
+it('leaves no email behind when the notice cannot be stored', function (): void {
     config(['app.debug' => false]);
     DatabaseNotification::creating(fn (): never => throw new RuntimeException('notifications down'));
 
@@ -1562,8 +1654,10 @@ it('cancels the email when the notice cannot be stored', function (): void {
         ->tool(SendEmailTool::class, sendArguments($this->viewerAccount))
         ->assertHasErrors(['An internal server error occurred.']);
 
-    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0)
-        ->and(Email::query()->where('status', EmailStatus::CANCELLED)->count())->toBe(1);
+    expect(Email::query()->count())->toBe(0)
+        ->and(EmailBody::query()->count())->toBe(0)
+        ->and(EmailParticipant::query()->count())->toBe(0)
+        ->and(DatabaseNotification::query()->count())->toBe(0);
 });
 
 it('stops an assistant from holding more than ten emails at once', function (): void {
@@ -1602,6 +1696,23 @@ it('does not count the user own queued mail toward the assistant cap', function 
     expect($data['status'])->toBe('queued');
 });
 
+it('does not count email sent through rela toward the ten held assistant emails', function (): void {
+    foreach (range(1, 10) as $number) {
+        Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->viewer->id,
+            'connected_account_id' => $this->viewerAccount->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'creation_source' => EmailCreationSource::CHAT,
+            'scheduled_for' => now()->addSeconds(5),
+        ]);
+    }
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount));
+
+    expect($data['status'])->toBe('queued');
+});
+
 it('refuses more than twenty recipients across to, cc and bcc', function (): void {
     $addresses = fn (string $prefix, int $count): array => array_map(fn (int $number): string => "{$prefix}{$number}@acme.test", range(1, $count));
 
@@ -1615,6 +1726,16 @@ it('refuses more than twenty recipients across to, cc and bcc', function (): voi
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
+
+it('names the total limit when one list alone holds more than twenty recipients', function (string $field): void {
+    $addresses = array_map(fn (int $number): string => "person{$number}@acme.test", range(1, 21));
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailTool::class, sendArguments($this->viewerAccount, [$field => $addresses]))
+        ->assertHasErrors(['An email can go to at most 20 recipients in total across to, cc and bcc.']);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+})->with(['to', 'cc', 'bcc']);
 
 it('accepts twenty recipients across to, cc and bcc', function (): void {
     $addresses = fn (string $prefix, int $count): array => array_map(fn (int $number): string => "{$prefix}{$number}@acme.test", range(1, $count));

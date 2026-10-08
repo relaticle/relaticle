@@ -40,7 +40,6 @@ const inline = (node) => {
     // The chip and heading glyphs are drawn, not written.
     if (tag === 'svg') return '';
     if (tag === 'br') return '\n';
-    if (tag === 'img') return `![${node.getAttribute('alt') ?? ''}](${node.getAttribute('src') ?? ''})`;
     if (tag === 'code') return `\`${collapse(node.textContent ?? '').trim()}\``;
 
     const children = () => Array.from(node.childNodes).map(inline).join('');

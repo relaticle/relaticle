@@ -16,16 +16,35 @@ final readonly class AgentEmailBody
 
     public function forDraft(string $markdown, ConnectedAccount $account, bool $includeSignature): string
     {
-        $signature = $includeSignature
-            ? EmailSignature::query()->defaultFor((string) $account->getKey())->first()
-            : null;
-
-        return $this->renderer->applySignatureBlock($this->html($markdown), $signature);
+        return $this->renderer->applySignatureBlock(
+            $this->html($markdown),
+            $this->signatureForDraft($markdown, $account, $includeSignature),
+        );
     }
 
     public function forSending(string $markdown, ConnectedAccount $account, bool $includeSignature): string
     {
-        return $this->renderer->renderForSending($this->forDraft($markdown, $account, $includeSignature));
+        $signature = $this->signatureForSending($account, $includeSignature);
+
+        if (! $signature instanceof EmailSignature) {
+            return $this->html($markdown);
+        }
+
+        return $this->html($markdown).$this->renderer->renderForSending(
+            $this->renderer->applySignatureBlock('', $signature),
+        );
+    }
+
+    public function signatureForDraft(string $markdown, ConnectedAccount $account, bool $includeSignature): ?EmailSignature
+    {
+        return $this->signatureForSending($account, $includeSignature && trim($markdown) !== '');
+    }
+
+    public function signatureForSending(ConnectedAccount $account, bool $includeSignature): ?EmailSignature
+    {
+        return $includeSignature
+            ? EmailSignature::query()->defaultFor((string) $account->getKey())->first()
+            : null;
     }
 
     private function html(string $markdown): string

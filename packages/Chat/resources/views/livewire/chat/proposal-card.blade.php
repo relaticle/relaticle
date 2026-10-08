@@ -7,13 +7,11 @@
     // singular: the card can never commit anything that is not rendered.
     $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
     $primaryLabel = $isPlan
-        ? __('Approve all :count', ['count' => $stepCount])
-        : match ($operation) {
-            'update' => __('Save changes'),
-            'delete' => __('Delete'),
-            default => __('Create'),
-        };
+        ? trans_choice('Approve :count step|Approve all :count', $approveAllCount, ['count' => $approveAllCount])
+        : ($proposal?->entity_type->action($proposal->operation) ?? \Relaticle\Chat\Enums\PendingActionOperation::Create->action());
     $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
+    $showPrimary = ! $isPlan || $approveAllCount > 0;
+    $primaryIsSend = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);
     $discardLabel = $isPlan ? __('Discard all') : __('Discard');
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
@@ -59,7 +57,7 @@
                     {{-- Right-aligned meta, same slot the records_table header uses
                          for its truncation count. --}}
                     <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                        {{ __('Approved together, in order') }}
+                        {{ $hasOwnApprovalSteps ? __('Each send has its own button') : __('Approved together, in order') }}
                     </span>
                 </div>
             @endif
@@ -125,8 +123,14 @@
                 <div class="ms-auto flex items-center gap-2">
                 <button
                     type="button"
+                    wire:key="discard-{{ $discardAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $discardAction }}"
                     wire:loading.attr="disabled"
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $editingFieldCode !== null ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
@@ -137,10 +141,17 @@
                     {{ $discardLabel }}
                 </button>
 
+                @if ($showPrimary)
                 <button
                     type="button"
+                    wire:key="primary-{{ $primaryAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $primaryAction }}"
                     wire:loading.attr="disabled"
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $primaryBlocked ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($primaryBlocked)
                     @if ($primaryBlocked) title="{{ $primaryBlockedHint }}" @endif
                     @class([
@@ -152,12 +163,15 @@
                 >
                     <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
+                    @unless ($primaryIsSend)
                     <kbd
                         x-data
                         x-text="/Mac|iP/.test(navigator.platform) ? '⌘⏎' : 'Ctrl+⏎'"
                         class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
                     ></kbd>
+                    @endunless
                 </button>
+                @endif
                 </div>
             </div>
         </div>

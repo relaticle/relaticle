@@ -7,7 +7,7 @@ namespace Relaticle\Chat\Services\Tools;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\User;
-use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -26,11 +26,11 @@ final readonly class ProposalFieldSchemaDescriber
      * @param  array<string, mixed>  $record  clean action_data record (single, or one batch item)
      * @return list<array{code: string, label: string, kind: string, value: mixed, options?: list<array{id: string, label: string}>, required: bool}>
      */
-    public function describe(User $user, string $entityType, array $record): array
+    public function describe(User $user, ProposalEntity $entity, array $record): array
     {
         return array_merge(
-            $this->coreFields($user, $entityType, $record),
-            $this->customFields($user, $entityType, $record),
+            $this->coreFields($user, $entity, $record),
+            $this->customFields($user, $entity, $record),
         );
     }
 
@@ -38,9 +38,9 @@ final readonly class ProposalFieldSchemaDescriber
      * @param  array<string, mixed>  $record
      * @return list<array{code: string, label: string, kind: string, value: mixed, options?: list<array{id: string, label: string}>, required: bool}>
      */
-    private function coreFields(User $user, string $entityType, array $record): array
+    private function coreFields(User $user, ProposalEntity $entity, array $record): array
     {
-        $nameKey = ProposalCoreFields::titleKey($entityType);
+        $nameKey = $entity->titleKey();
         $nameLabel = $nameKey === 'title' ? 'Title' : 'Name';
 
         $fields = [
@@ -53,7 +53,7 @@ final readonly class ProposalFieldSchemaDescriber
             ],
         ];
 
-        if ($entityType === 'company') {
+        if ($entity === ProposalEntity::Company) {
             $owner = $record['account_owner_id'] ?? null;
 
             $fields[] = [
@@ -76,13 +76,13 @@ final readonly class ProposalFieldSchemaDescriber
      * @param  array<string, mixed>  $record
      * @return list<array{code: string, label: string, kind: string, value: mixed, options?: list<array{id: string, label: string}>, required: bool}>
      */
-    private function customFields(User $user, string $entityType, array $record): array
+    private function customFields(User $user, ProposalEntity $entity, array $record): array
     {
         $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
 
         $fields = CustomField::query()
             ->where('tenant_id', $user->currentWorkspace->getKey())
-            ->where('entity_type', $entityType)
+            ->where('entity_type', $entity->value)
             ->active()
             ->orderBy('code')
             ->with(['options:id,custom_field_id,name'])
