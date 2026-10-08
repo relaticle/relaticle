@@ -9,6 +9,7 @@ use App\Actions\Jetstream\ResendWorkspaceInvitation;
 use App\Actions\Jetstream\RevokeWorkspaceInvitation;
 use App\Actions\Jetstream\UpdateWorkspaceMemberRole;
 use App\Enums\WorkspaceRole;
+use App\Features\EmailIntegration;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Models\Workspace;
@@ -35,6 +36,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use stdClass;
@@ -432,6 +434,9 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             ->label(__('workspaces.actions.remove_workspace_member'))
             ->icon('heroicon-m-user-minus')
             ->color('danger')
+            ->modalDescription(fn (array $record): string => Feature::active(EmailIntegration::class)
+                ? __('workspaces.modals.remove_workspace_member.mailbox_notice', ['name' => $record['name']])
+                : __('filament-actions::modal.confirmation'))
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
@@ -460,7 +465,9 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             ->label(__('workspaces.actions.leave_workspace'))
             ->icon('heroicon-m-arrow-right-start-on-rectangle')
             ->color('danger')
-            ->modalDescription(__('workspaces.modals.leave_workspace.notice'))
+            ->modalDescription(fn (): string => Feature::active(EmailIntegration::class)
+                ? __('workspaces.modals.leave_workspace.mailbox_notice')
+                : __('workspaces.modals.leave_workspace.notice'))
             ->requiresConfirmation()
             // Hidden on the owner row: RemoveWorkspaceMember always rejects the owner,
             // so showing it could only ever produce an error.

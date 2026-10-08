@@ -2,7 +2,7 @@
 title: Choose who sees your email
 description: Pick how much of each mailbox your workspace can see, from nothing to the full message, and change the level for one email at a time.
 order: 5
-updated: "2026-10-07"
+updated: "2026-10-08"
 related: [help/email-and-calendar/set-workspace-email-privacy, help/email-and-calendar/request-access-to-an-email, help/email-and-calendar/connect-your-google-account]
 ---
 
@@ -61,8 +61,9 @@ choose the **Teammate**, and set their **Access level**.
 ## When a member leaves a workspace
 
 A member removed from a workspace has their mailboxes there disconnected. Their
-email in that workspace is hidden from everyone. The same mailbox in another
-workspace is not affected.
+email in that workspace is hidden from everyone, and email they had scheduled
+to send from it is cancelled. The same happens when a member leaves. The same
+mailbox in another workspace is not affected.
 
 ## Keep some senders out of a mailbox
 
