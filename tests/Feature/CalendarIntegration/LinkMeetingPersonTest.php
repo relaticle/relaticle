@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -555,4 +556,40 @@ it('does not auto-create a person for a workspace-blocked attendee', function ()
 
     expect(People::query()->where('workspace_id', $team->id)->count())->toBe(0);
     expect(Company::query()->where('workspace_id', $team->id)->count())->toBe(0);
+});
+
+it('advances the meeting count of an opportunity whose point of contact attended', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+    Filament::setTenant($workspace);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+    ]));
+
+    $emailsField = CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+
+    $person = People::factory()->create(['workspace_id' => $workspace->id]);
+    $person->saveCustomFieldValue($emailsField, ['buyer@acme.com'], $workspace);
+    $opportunity = Opportunity::factory()->create(['workspace_id' => $workspace->id, 'contact_id' => $person->getKey()]);
+
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $workspace->id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+    MeetingAttendee::factory()->create([
+        'meeting_id' => $meeting->getKey(),
+        'email_address' => 'buyer@acme.com',
+        'is_self' => false,
+    ]);
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    expect($opportunity->fresh()->meeting_count)->toBe(1);
 });

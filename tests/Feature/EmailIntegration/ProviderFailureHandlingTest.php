@@ -45,7 +45,7 @@ function providerThrows(Throwable $exception): void
     app()->instance(MailServiceFactoryInterface::class, $mailFactory);
 
     $calendar = Mockery::mock(CalendarServiceInterface::class);
-    $calendar->shouldReceive('fetchDelta', 'initialSync')->andThrow($exception);
+    $calendar->shouldReceive('fetchDelta', 'initialSync', 'ensurePushChannel')->andThrow($exception);
     $calendarFactory = Mockery::mock(CalendarServiceFactoryInterface::class);
     $calendarFactory->shouldReceive('make')->andReturn($calendar);
     app()->instance(CalendarServiceFactoryInterface::class, $calendarFactory);
@@ -66,6 +66,14 @@ dataset('delta sync jobs', [
     'calendar' => [fn (ConnectedAccount $account): IncrementalCalendarSyncJob => new IncrementalCalendarSyncJob($account)],
 ]);
 
+dataset('provider-calling jobs', [
+    'incremental email' => [fn (ConnectedAccount $account): IncrementalEmailSyncJob => new IncrementalEmailSyncJob($account)],
+    'initial email' => [fn (ConnectedAccount $account): InitialEmailSyncJob => new InitialEmailSyncJob($account)],
+    'incremental calendar' => [fn (ConnectedAccount $account): IncrementalCalendarSyncJob => new IncrementalCalendarSyncJob($account)],
+    'initial calendar' => [fn (ConnectedAccount $account): InitialCalendarSyncJob => new InitialCalendarSyncJob($account)],
+    'calendar push channel' => [fn (ConnectedAccount $account): EnsureCalendarPushChannelJob => new EnsureCalendarPushChannelJob($account)],
+]);
+
 function workMailboxJob(?object $job = null): void
 {
     if ($job !== null) {
@@ -76,6 +84,7 @@ function workMailboxJob(?object $job = null): void
 }
 
 it('parks the job and keeps the mailbox active when the provider answers 502', function (Closure $job): void {
+    config()->set('app.url', 'https://app.relaticle.com');
     $account = mailboxWithCursors();
     providerThrows(graphBadGateway());
 
@@ -87,7 +96,7 @@ it('parks the job and keeps the mailbox active when the provider answers 502', f
         ->and(DB::table('failed_jobs')->count())->toBe(0);
 
     Exceptions::assertNothingReported();
-})->with('delta sync jobs');
+})->with('provider-calling jobs');
 
 it('gives a rejected token one more attempt, then asks for a reconnect without reporting', function (Closure $job): void {
     $account = mailboxWithCursors();

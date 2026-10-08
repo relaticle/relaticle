@@ -1515,3 +1515,21 @@ it('advances the email counters of linked companies in id order whatever the par
 
     expect($advancedCompanyIds)->toBe(array_keys($domainByCompanyId));
 });
+
+it('counts an email toward a company and an opportunity linked before the first pass', function (): void {
+    $company = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Linked By Hand',
+        'creator_id' => $this->user->id,
+    ]);
+    $opportunity = Opportunity::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+    $email->companies()->attach($company->getKey(), ['link_source' => 'manual']);
+    $email->opportunities()->attach($opportunity->getKey(), ['link_source' => 'manual']);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($company->fresh()->email_count)->toBe(1)
+        ->and($opportunity->fresh()->email_count)->toBe(1);
+});
