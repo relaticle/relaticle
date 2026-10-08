@@ -2,7 +2,7 @@
 # Deploys the in-place Forge site. The deploy script in Forge is these two lines:
 #
 #   export PATH="$HOME/.local/bin:$PATH" COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-#   cd $FORGE_SITE_PATH && PHP=$FORGE_PHP PHP_FPM=$FORGE_PHP_FPM COMPOSER="$FORGE_COMPOSER" BRANCH=$FORGE_SITE_BRANCH bash bin/deploy.sh
+#   cd $FORGE_SITE_PATH && PHP=$FORGE_PHP PHP_FPM=$FORGE_PHP_FPM COMPOSER_BIN="$FORGE_COMPOSER" BRANCH=$FORGE_SITE_BRANCH bash bin/deploy.sh
 #
 # `bash bin/deploy.sh force` redeploys the live commit.
 
@@ -10,7 +10,8 @@ set -euo pipefail
 
 PHP="${PHP:-php}"
 PHP_FPM="${PHP_FPM:-}"
-COMPOSER="${COMPOSER:-composer}"
+# Composer reads an exported COMPOSER as the path to composer.json.
+COMPOSER_BIN="${COMPOSER_BIN:-composer}"
 PNPM="${PNPM:-pnpm}"
 BRANCH="${BRANCH:-main}"
 
@@ -50,7 +51,7 @@ release() {
     local commit
     commit="$(git rev-parse HEAD)"
 
-    $COMPOSER install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+    $COMPOSER_BIN install --no-dev --no-interaction --prefer-dist --optimize-autoloader
 
     $PHP artisan migrate --force
 

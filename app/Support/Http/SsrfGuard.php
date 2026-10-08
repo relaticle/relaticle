@@ -46,7 +46,7 @@ final readonly class SsrfGuard
 
             return true;
         } catch (SsrfGuardException $exception) {
-            report($exception);
+            report_unless($exception->hostUnresolved, $exception);
 
             return false;
         }
@@ -79,7 +79,7 @@ final readonly class SsrfGuard
             try {
                 $pin = self::pin($host, $port);
             } catch (SsrfGuardException $exception) {
-                report($exception);
+                report_unless($exception->hostUnresolved, $exception);
 
                 throw $exception;
             }
@@ -128,7 +128,7 @@ final readonly class SsrfGuard
     {
         $addresses = self::resolveAddresses($host);
 
-        throw_if($addresses === [], SsrfGuardException::class, "Could not resolve host: {$host}");
+        throw_if($addresses === [], SsrfGuardException::unresolvedHost($host));
 
         foreach ($addresses as $address) {
             throw_unless(self::isPublicAddress($address), SsrfGuardException::class, "Refusing to fetch from non-public address: {$address}");
