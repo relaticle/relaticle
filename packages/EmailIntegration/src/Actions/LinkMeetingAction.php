@@ -118,8 +118,7 @@ final readonly class LinkMeetingAction
             ->where('workspace_id', $meeting->workspace_id)
             ->where('contact_id', $person->getKey())
             ->get()
-            ->filter(fn (Opportunity $opportunity): bool => $this->autoAttach($meeting->opportunities(), $opportunity->getKey()))
-            ->values();
+            ->filter(fn (Opportunity $opportunity): bool => $this->autoAttach($meeting->opportunities(), $opportunity->getKey()));
     }
 
     private function shouldCreatePerson(Workspace $workspace): bool

@@ -96,9 +96,9 @@ final readonly class RecordCommunicationMetrics
         $email->loadMissing(['people', 'companies', 'opportunities']);
 
         return [
-            ...$email->people->reject(fn (People $person): bool => isset($countedPeople[$person->getKey()]))->values(),
-            ...$email->companies->reject(fn (Company $company): bool => isset($countedCompanies[$company->getKey()]))->values(),
-            ...$email->opportunities->reject(fn (Opportunity $opportunity): bool => isset($countedOpportunities[$opportunity->getKey()]))->values(),
+            ...$email->people->except(array_keys($countedPeople)),
+            ...$email->companies->except(array_keys($countedCompanies)),
+            ...$email->opportunities->except(array_keys($countedOpportunities)),
         ];
     }
 
