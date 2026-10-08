@@ -4,18 +4,7 @@
 #   export PATH="$HOME/.local/bin:$PATH" COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 #   cd $FORGE_SITE_PATH && PHP=$FORGE_PHP PHP_FPM=$FORGE_PHP_FPM COMPOSER="$FORGE_COMPOSER" BRANCH=$FORGE_SITE_BRANCH bash bin/deploy.sh
 #
-# Every merge to main and every release triggers a deploy, so two often arrive
-# within a minute. A lock runs them one at a time, and a commit that is already
-# live is skipped unless .env changed since. `bash bin/deploy.sh force` redeploys
-# the live commit.
-#
-# PHP-FPM keeps the previous code in opcache until it reloads, so the reload is
-# the moment the site switches. Dependencies, migrations and the config, route
-# and view caches are in place before it. Nothing slow runs between the checkout
-# and the reload, because until then old classes meet new views.
-#
-# The fetch phase re-executes this file after the checkout moves, so a change to
-# the release phase applies to the deploy that ships it.
+# `bash bin/deploy.sh force` redeploys the live commit.
 
 set -euo pipefail
 
@@ -42,6 +31,7 @@ fetch() {
     local target
     target="$(git rev-parse FETCH_HEAD)"
 
+    # A merge and its release each trigger a deploy, so the second usually finds its commit live.
     if [[ -f "$DEPLOYED_COMMIT_FILE" && "$(cat "$DEPLOYED_COMMIT_FILE")" == "$(deployed_state "$target")" ]]; then
         echo "✓ ${target:0:9} is already live"
         exit 0
@@ -52,6 +42,7 @@ fetch() {
     # scribe:generate rewrites a tracked view on every deploy, which a pull refuses to overwrite.
     git reset --quiet --hard "$target"
 
+    # Re-executed so the release phase comes from the commit being deployed.
     exec bash bin/deploy.sh release
 }
 
@@ -66,6 +57,8 @@ release() {
     # config:cache stores the release, so web requests and queue workers report under this commit.
     SENTRY_RELEASE="$commit" $PHP artisan optimize
 
+    # PHP-FPM serves the previous code from opcache until this reload. Nothing slow may run
+    # between the checkout and here, because until then old classes meet new views.
     reload_fpm
 
     $PHP artisan horizon:terminate
