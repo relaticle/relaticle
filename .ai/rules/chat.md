@@ -24,10 +24,13 @@ still-pending single-record CREATE of the expected entity type, and
 Rejecting a step cascade-cancels its dependents (`result_data.cancelled_by`), and
 `approveAll` commits per step and stops at the first failure, a plan is a sequence
 of real CRM writes, not a transaction.
-A step whose `PendingAction::needsOwnApproval()` is true (an email send) is never part
-of that one click: `approveAll` skips it, the footer counts only what it will approve,
-and the step keeps its own Send button with every row shown. A collapsed email row
-behind a bulk button once sent CC, BCC and bodies nobody had opened.
+A step whose `PendingAction::needsOwnApproval()` is true (an email send or a workspace
+invitation) is never part of that one click: `approveAll` skips it, the footer counts
+only what it will approve, and the step keeps its own Send button with every row shown.
+A collapsed email row behind a bulk button once sent CC, BCC and bodies nobody had opened.
+An invitation step may batch, because each row already shows its address and role: its
+button sends every address still listed. An email send never batches
+(`PendingAction::isEmailSend()`).
 The dock re-docks on the WHOLE pending set (`syncActiveProposal` keys on a signature
 of all pending ids): keying on the first id alone leaves the card rendering the plan
 as it looked when only step one had streamed in.
