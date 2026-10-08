@@ -127,3 +127,23 @@ workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault
 workspace's mailbox changes the level, and
 `ApplyDefaultSharingTierToExistingEmailsActionTest.php` fails when a save
 reaches another mailbox's mail.
+
+A sender passes no level. `SendEmailAction` and `StoreEmailAction` create the
+email through `$account->emails()->chaperone()`, and `EmailObserver` stamps the
+level from that mailbox. An explicit `privacy_tier` on create means the owner
+chose it for that one email, and a later level change skips it.
+`tests/Feature/EmailIntegration/EmailComposerTest.php` fails when a composed
+email takes a level from anywhere but the mailbox it is sent from.
+
+## A mailbox never outlives the membership
+
+Removing a member, or leaving, disconnects that person's mailboxes in the
+workspace and cancels the mail they had queued there. Both go through
+`DisconnectFormerMemberMailboxAction`. `DisconnectRemovedMemberMailboxesListener`
+runs it on `TeamMemberRemoved`, and it is registered outside the feature flag,
+because a stored token must not survive with the feature off.
+`email:disconnect-former-member-mailboxes` runs it for anyone removed earlier,
+and a migration queues that command. A new path that ends a membership fires
+`TeamMemberRemoved` or calls the action itself.
+`tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php` fails when a removal
+leaves a token, a syncing mailbox or a queued email behind.
