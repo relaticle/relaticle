@@ -1127,17 +1127,17 @@ describe('connect email', function (): void {
         [EmailPrivacyTier::PRIVATE, EmailPrivacyTier::METADATA_ONLY],
     ]);
 
-    it('stores the chosen level as the owner\'s own and moves on', function (): void {
+    it('stores the chosen level on the mailbox and moves on', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
             ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
             ->call('saveSharing')
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
-        expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
+        expect($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
             ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
@@ -1163,14 +1163,14 @@ describe('connect email', function (): void {
         'participants only' => [EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT],
     ]);
 
-    it('stores participants only as the owner\'s own level when the default choice is submitted', function (): void {
+    it('stores participants only on the mailbox when the default choice is submitted', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)->call('saveSharing');
 
-        expect($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+        expect($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
             ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
@@ -1181,7 +1181,7 @@ describe('connect email', function (): void {
 
         livewire(SetupWorkspace::class);
 
-        $account->update(['status' => EmailAccountStatus::DISCONNECTED]);
+        $account->delete();
 
         livewire(SetupWorkspace::class)
             ->assertSuccessful()
@@ -1196,21 +1196,21 @@ describe('connect email', function (): void {
     it('refuses a level the step does not offer', function (string $tier): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
             ->set('sharingTier', $tier)
             ->call('saveSharing')
             ->assertHasErrors('sharingTier');
 
-        expect($user->fresh()->default_email_sharing_tier)->toBeNull()
+        expect($mailbox->fresh()->sharing_tier)->toBeNull()
             ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     })->with([EmailPrivacyTier::FULL->value, EmailPrivacyTier::PRIVATE->value, 'nonsense']);
 
-    it('leaves the owner\'s level alone when a stale tab saves after the setup moved on', function (): void {
+    it('leaves the mailbox level alone when a stale tab saves after the setup moved on', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         $setup = livewire(SetupWorkspace::class);
 
@@ -1220,20 +1220,8 @@ describe('connect email', function (): void {
             ->call('saveSharing')
             ->assertSuccessful();
 
-        expect($user->fresh()->default_email_sharing_tier)->toBeNull()
+        expect($mailbox->fresh()->sharing_tier)->toBeNull()
             ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
-    });
-
-    it('skips sharing for an owner who already chose a level, and leaves it alone', function (): void {
-        $user = User::factory()->create(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
-        $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
     });
 
     it('moves on to the use case when the feature is switched off on the sharing step', function (): void {
@@ -1286,19 +1274,25 @@ describe('connect email', function (): void {
         'several people' => [3, '3 people found'],
     ]);
 
-    it('skips sharing for an owner with a mailbox in another workspace, and leaves that mail alone', function (): void {
+    it('asks about sharing for an owner with a mailbox in another workspace, and leaves that mail alone', function (): void {
         $user = User::factory()->withPersonalWorkspace()->create();
         $other = $user->currentWorkspace;
-        $email = mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
+        $otherMailbox = connectedMailboxFor($user, $other);
+        $otherMailbox->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+        $email = mailOf($user, $other, $otherMailbox, EmailPrivacyTier::FULL);
 
         $workspace = workspaceInSetup($user, 'Second Corp');
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
+            ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+            ->call('saveSharing')
+            ->assertHasNoErrors();
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
+            ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
+            ->and($otherMailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::FULL)
             ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
     });
 
@@ -1310,7 +1304,7 @@ describe('connect email', function (): void {
         $removed->delete();
 
         $workspace = workspaceInSetup($user, 'Second Corp');
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
             ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'))
@@ -1318,136 +1312,96 @@ describe('connect email', function (): void {
             ->assertHasNoErrors();
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+            ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
             ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
     });
 
-    it('skips sharing while another workspace holds a mailbox of the owner in any status', function (EmailAccountStatus $status): void {
+    it('asks about sharing whatever status the owner other mailbox is in', function (EmailAccountStatus $status): void {
         $user = User::factory()->withPersonalWorkspace()->create();
-        $other = $user->currentWorkspace;
-        $email = mailOf($user, $other, connectedMailboxFor($user, $other, ['status' => $status]), EmailPrivacyTier::FULL);
+        connectedMailboxFor($user, $user->currentWorkspace, ['status' => $status]);
 
         $workspace = workspaceInSetup($user, 'Second Corp');
         connectedMailboxFor($user, $workspace);
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.sharing.heading'));
 
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
-            ->and(Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->value('privacy_tier'))->toBe(EmailPrivacyTier::FULL);
-    })->with([EmailAccountStatus::DISCONNECTED, EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
+        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
+    })->with([EmailAccountStatus::ACTIVE, EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
 
-    it('moves on from sharing when the owner has stored a level elsewhere since', function (EmailPrivacyTier $stored): void {
+    it('preselects the level the mailbox already has when setup offers it', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-
-        $user->update(['default_email_sharing_tier' => $stored]);
+        connectedMailboxFor($user, $workspace)->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBe($stored);
-    })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
-
-    it('moves on from sharing when the owner has connected a mailbox elsewhere since', function (): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        $other = $user->currentWorkspace;
-        $workspace = workspaceInSetup($user, 'Second Corp');
-        connectedMailboxFor($user, $workspace);
-
-        livewire(SetupWorkspace::class);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
-
-        mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+            ->assertSet('sharingTier', EmailPrivacyTier::SUBJECT->value);
     });
 
-    it('saves nothing when a stale tab continues after the owner stored a level elsewhere', function (EmailPrivacyTier $stored): void {
+    it('preselects participants only when the mailbox level is one setup does not offer', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        $account = connectedMailboxFor($user, $workspace);
-        $email = mailOf($user, $workspace, $account, EmailPrivacyTier::METADATA_ONLY);
+        connectedMailboxFor($user, $workspace)->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+
+        livewire(SetupWorkspace::class)
+            ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value);
+    });
+
+    it('moves on without saving when the mailbox was disconnected before the level was saved', function (): void {
+        $user = User::factory()->create();
+        $workspace = workspaceInSetup($user);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         $setup = livewire(SetupWorkspace::class);
+        $mailbox->delete();
 
-        $user->update(['default_email_sharing_tier' => $stored]);
-
-        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)->call('saveSharing');
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBe($stored)
-            ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
-    })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
-
-    it('saves nothing when a stale tab continues after the owner connected a mailbox elsewhere', function (): void {
-        $user = User::factory()->withPersonalWorkspace()->create();
-        $other = $user->currentWorkspace;
-        $workspace = workspaceInSetup($user, 'Second Corp');
-        connectedMailboxFor($user, $workspace);
-
-        $setup = livewire(SetupWorkspace::class);
-
-        $otherEmail = mailOf($user, $other, connectedMailboxFor($user, $other), EmailPrivacyTier::FULL);
-
-        $setup->set('sharingTier', EmailPrivacyTier::METADATA_ONLY->value)->call('saveSharing');
+        $setup->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+            ->call('saveSharing')
+            ->assertHasNoErrors();
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull()
-            ->and($otherEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+            ->and(ConnectedAccount::withTrashed()->find($mailbox->getKey())->sharing_tier)->toBeNull();
     });
 
     it('keeps the setup on sharing when saving the level fails', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
 
         $setup = livewire(SetupWorkspace::class)->set('sharingTier', EmailPrivacyTier::SUBJECT->value);
 
-        Event::listen('eloquent.updating: '.User::class, fn (): never => throw new RuntimeException('lock timeout'));
+        Event::listen('eloquent.updating: '.ConnectedAccount::class, fn (): never => throw new RuntimeException('lock timeout'));
 
         expect(fn () => $setup->call('saveSharing'))->toThrow(RuntimeException::class);
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+            ->and($mailbox->fresh()->sharing_tier)->toBeNull();
     });
 
     it('refuses to save a level the sharing step does not offer when the action runs directly', function (EmailPrivacyTier $tier): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
         livewire(SetupWorkspace::class);
 
         expect(fn () => resolve(SaveOnboardingSharing::class)->execute($user, $workspace, $tier))
             ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(422));
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing)
-            ->and($user->fresh()->default_email_sharing_tier)->toBeNull();
+            ->and($mailbox->fresh()->sharing_tier)->toBeNull();
     })->with([EmailPrivacyTier::FULL, EmailPrivacyTier::PRIVATE]);
 
     it('refuses to save a sharing level for someone who does not own the workspace', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
-        connectedMailboxFor($user, $workspace);
+        $mailbox = connectedMailboxFor($user, $workspace);
         livewire(SetupWorkspace::class);
         $member = User::factory()->create();
 
         expect(fn () => resolve(SaveOnboardingSharing::class)->execute($member, $workspace, EmailPrivacyTier::SUBJECT))
             ->toThrow(fn (HttpException $exception) => expect($exception->getStatusCode())->toBe(403));
 
-        expect($member->fresh()->default_email_sharing_tier)->toBeNull()
+        expect($mailbox->fresh()->sharing_tier)->toBeNull()
             ->and($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Sharing);
     });
 
@@ -1478,30 +1432,13 @@ describe('connect email', function (): void {
         expect($setup->instance()->getPreview())->not->toHaveKey('mailboxProgress');
     })->with([EmailAccountStatus::ERROR, EmailAccountStatus::REAUTH_REQUIRED]);
 
-    it('promises a sharing choice on the connect step to an owner who will be asked', function (): void {
-        workspaceInSetup(User::factory()->create());
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'));
-    });
-
-    it('promises no sharing choice on the connect step to an owner who has a stored level', function (): void {
-        workspaceInSetup(User::factory()->create(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]));
-
-        livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
-    });
-
-    it('promises no sharing choice on the connect step to an owner with a mailbox elsewhere', function (): void {
+    it('always promises a sharing choice on the connect step', function (): void {
         $user = User::factory()->withPersonalWorkspace()->create();
         connectedMailboxFor($user, $user->currentWorkspace);
         workspaceInSetup($user, 'Second Corp');
 
         livewire(SetupWorkspace::class)
-            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy_existing'))
-            ->assertDontSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
+            ->assertSee(__('filament/pages/workspaces.setup_workspace.email.privacy'));
     });
 });
 

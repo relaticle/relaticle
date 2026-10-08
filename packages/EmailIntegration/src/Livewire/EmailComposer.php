@@ -46,7 +46,6 @@ use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
@@ -60,7 +59,6 @@ use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
-use Relaticle\EmailIntegration\Services\PrivacyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
@@ -155,8 +153,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public mixed $bodyHtml = null;
 
     public ?string $signatureId = null;
-
-    public ?string $privacyTier = null;
 
     #[Locked]
     public ?string $pageTo = null;
@@ -264,8 +260,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             : ($payload['to'] ?? ($this->pageTo !== null && $this->pageTo !== '' ? [$this->pageTo] : []));
         $this->linkRecordType = $payload['linkRecordType'] ?? ($this->isMassSend ? null : $this->pageRecordType);
         $this->linkRecordId = $payload['linkRecordId'] ?? ($this->isMassSend ? null : $this->pageRecordId);
-        $this->privacyTier = resolve(PrivacyService::class)
-            ->defaultTierForUser($this->authUser())->value;
 
         $signature = $this->defaultSignatureFor($this->accountId);
         $this->signatureId = $signature?->getKey();
@@ -312,7 +306,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
 
         $this->replyMode = in_array($mode, ['reply', 'reply_all', 'forward'], true) ? $mode : 'reply';
 
@@ -402,7 +395,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->resetComposerState();
 
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
 
         $this->loadDraft((string) $draft->getKey());
 
@@ -542,7 +534,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                     'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
                     'in_reply_to_email_id' => $this->inReplyToEmailId,
                     'creation_source' => $this->creationSource(),
-                    'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
                     'batch_id' => null,
                     // Interactive sends from the composer keep the undo-send window.
                     'priority' => EmailPriority::PRIORITY,
@@ -643,7 +634,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'connected_account_id' => (string) $this->accountId,
                 'subject' => (string) $this->subject,
                 'body_html' => $bodyHtml,
-                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
                 'attachment_attributes' => $attachmentAttributes,

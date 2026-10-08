@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 
@@ -20,7 +21,7 @@ final readonly class PreferredEmailCopyService
      * Keep one copy the viewer may see of each RFC Message-ID.
      *
      * Two connected mailboxes can store the same message. The record mailbox
-     * should show it once. Prefer the viewer's own copy when they have one.
+     * should show it once. Prefer the viewer's own copy, then the most open one.
      *
      * @param  Builder<Email>  $query
      * @return Builder<Email>
@@ -40,6 +41,7 @@ final readonly class PreferredEmailCopyService
             ->selectRaw('distinct on (coalesce(emails.rfc_message_id, emails.id)) emails.id')
             ->orderByRaw('coalesce(emails.rfc_message_id, emails.id)')
             ->orderByRaw('case when emails.user_id = ? then 0 else 1 end', [$viewer->getKey()])
+            ->orderByRaw('array_position(?::text[], emails.privacy_tier::text) desc nulls last', [EmailPrivacyTier::opennessRanking()])
             ->latest('emails.sent_at')
             ->orderByDesc('emails.id');
 

@@ -260,74 +260,43 @@ it('effectiveTier returns FULL for a non-owner when email is FULL', function ():
     expect($tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-it('defaultTierForUser returns user-level tier when the user has one set', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
+it('uses the level stored on the mailbox', function (): void {
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
+    $mailbox = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'sharing_tier' => EmailPrivacyTier::SUBJECT,
+    ]));
 
-    $tier = $this->service->defaultTierForUser($this->owner);
-
-    expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
+    expect($this->service->tierForMailbox($mailbox))->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-it('defaultTierForUser falls back to team default when user has no preference', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => null]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
-
-    $tier = $this->service->defaultTierForUser($this->owner->fresh());
-
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
-});
-
-it('defaultTierForUser prefers the user setting over the mailbox workspace default', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
-
-    $tier = $this->service->defaultTierForUser($this->owner->fresh(), $this->workspace);
-
-    expect($tier)->toBe(EmailPrivacyTier::SUBJECT);
-});
-
-it('defaultTierForUser uses the mailbox workspace default instead of the owner current team', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => null]);
+it('falls back to the workspace default for a mailbox with no level', function (): void {
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
 
-    $otherTeam = Workspace::factory()->create([
-        'user_id' => $this->owner->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
-    ]);
-    $this->owner->workspaces()->attach($otherTeam, ['role' => 'admin']);
-    $this->owner->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();
-
-    $tier = $this->service->defaultTierForUser($this->owner->fresh(), $this->workspace);
-
-    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
+    expect($this->service->tierForMailbox($this->account->fresh()))->toBe(EmailPrivacyTier::PRIVATE);
 });
 
-it('tierFromPreference resolves an empty selection to the workspace default', function (): void {
-    $this->owner->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+it('falls back to participants only when neither the mailbox nor the workspace has a level', function (): void {
+    $mailbox = $this->account->fresh();
+    $mailbox->workspace->default_email_sharing_tier = null;
 
-    $tier = $this->service->tierFromPreference('', $this->owner->fresh());
-
-    expect($tier)->toBe(EmailPrivacyTier::FULL);
+    expect($this->service->tierForMailbox($mailbox))->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
 
-it('tierFromPreference resolves an explicit selection to that tier', function (): void {
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+it('keeps the same person free to share differently in two workspaces', function (): void {
+    $other = Workspace::factory()->create(['user_id' => $this->owner->id]);
+    $here = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id,
+        'email_address' => 'dana@northwind.test', 'sharing_tier' => EmailPrivacyTier::FULL,
+    ]));
+    $there = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $other->id, 'user_id' => $this->owner->id,
+        'email_address' => 'dana@northwind.test', 'sharing_tier' => EmailPrivacyTier::PRIVATE,
+    ]));
 
-    $tier = $this->service->tierFromPreference(EmailPrivacyTier::PRIVATE->value, $this->owner->fresh());
-
-    expect($tier)->toBe(EmailPrivacyTier::PRIVATE);
-});
-
-it('defaultTierForUser returns metadata-only when the user has no current team', function (): void {
-    $orphan = User::factory()->create([
-        'current_workspace_id' => null,
-        'default_email_sharing_tier' => null,
-    ]);
-
-    $tier = $this->service->defaultTierForUser($orphan);
-
-    expect($tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
+    expect($this->service->tierForMailbox($here))->toBe(EmailPrivacyTier::FULL)
+        ->and($this->service->tierForMailbox($there))->toBe(EmailPrivacyTier::PRIVATE);
 });
 
 it('effectiveTier owner access is not blocked by protected recipient', function (): void {

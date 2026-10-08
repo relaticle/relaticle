@@ -114,3 +114,36 @@ and update that SENT row. Creating a new synced row duplicates the send.
 `EmailAttachment::DISK` under `email-attachments/{current_team_id}/` with an
 `image/` MIME type, plus `data:image/` URIs. Do not treat `/storage/...` URLs
 as arbitrary disk paths.
+
+## The sharing level lives on the mailbox
+
+`connected_accounts.sharing_tier` holds the level, and null follows the workspace
+default. Resolve it with `PrivacyService::tierForMailbox()` from the mailbox the
+email is sent or synced through, never from the user or `currentWorkspace`: the
+same person shares differently in each workspace. Write it only through
+`SaveMailboxSharingTierAction`, which re-stamps that one mailbox's mail. A
+workspace default is never Full access (`EmailPrivacyTier::canBeWorkspaceDefault()`).
+`tests/Feature/EmailIntegration/PrivacyServiceTest.php` fails when a second
+workspace's mailbox changes the level, and
+`ApplyDefaultSharingTierToExistingEmailsActionTest.php` fails when a save
+reaches another mailbox's mail.
+
+A sender passes no level. `SendEmailAction` and `StoreEmailAction` create the
+email through `$account->emails()->chaperone()`, and `EmailObserver` stamps the
+level from that mailbox. An explicit `privacy_tier` on create means the owner
+chose it for that one email, and a later level change skips it.
+`tests/Feature/EmailIntegration/EmailComposerTest.php` fails when a composed
+email takes a level from anywhere but the mailbox it is sent from.
+
+## A mailbox never outlives the membership
+
+Removing a member, or leaving, disconnects that person's mailboxes in the
+workspace and cancels the mail they had queued there. Both go through
+`DisconnectFormerMemberMailboxAction`. `DisconnectRemovedMemberMailboxesListener`
+runs it on `TeamMemberRemoved`, and it is registered outside the feature flag,
+because a stored token must not survive with the feature off.
+`email:disconnect-former-member-mailboxes` runs it for anyone removed earlier,
+and a migration queues that command. A new path that ends a membership fires
+`TeamMemberRemoved` or calls the action itself.
+`tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php` fails when a removal
+leaves a token, a syncing mailbox or a queued email behind.

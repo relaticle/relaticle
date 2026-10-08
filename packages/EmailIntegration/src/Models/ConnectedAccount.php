@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Relaticle\EmailIntegration\Data\MailboxHistoryImportSummary;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -58,6 +59,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string|null $last_error
  * @property string|null $history_import_batch_id
  * @property string|null $history_import_notified_batch_id
+ * @property EmailPrivacyTier|null $sharing_tier
  */
 #[Fillable([
     'workspace_id',
@@ -120,6 +122,16 @@ final class ConnectedAccount extends Model
         return $query
             ->where('user_id', $user->getKey())
             ->where('workspace_id', $workspace->getKey());
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function newestConnectedFor(Builder $query, User $user, Workspace $workspace): Builder
+    {
+        return $query->ownedBy($user, $workspace)->connected()->latest();
     }
 
     /**
@@ -281,18 +293,6 @@ final class ConnectedAccount extends Model
         }
 
         return self::query()->ownedBy($user, $workspace)->connected()->exists();
-    }
-
-    /**
-     * Whether the user holds a mailbox in another workspace, in any status: a sharing change
-     * rewrites the mail of every account that is not removed, so the status must not narrow this.
-     */
-    public static function hasMailboxOutside(User $user, Workspace $workspace): bool
-    {
-        return self::query()
-            ->where('user_id', $user->getKey())
-            ->whereNot('workspace_id', $workspace->getKey())
-            ->exists();
     }
 
     /**
@@ -685,6 +685,7 @@ final class ConnectedAccount extends Model
         return [
             'provider' => EmailProvider::class,
             'status' => EmailAccountStatus::class,
+            'sharing_tier' => EmailPrivacyTier::class,
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'last_calendar_synced_at' => 'datetime',

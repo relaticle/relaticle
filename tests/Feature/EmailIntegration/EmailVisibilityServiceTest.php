@@ -6,8 +6,11 @@ use App\Enums\CustomFields\PeopleField;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
+use Carbon\CarbonImmutable;
 use Relaticle\EmailIntegration\Enums\ConnectionStrength;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -15,8 +18,10 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleMeetingScope;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
+use Relaticle\EmailIntegration\Services\PrivacyService;
 
-mutates(EmailVisibilityService::class, VisibleMeetingScope::class);
+mutates(EmailVisibilityService::class, PreferredEmailCopyService::class, VisibleMeetingScope::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create([
@@ -303,4 +308,75 @@ it('counts one preferred copy for every viewer of the same rfc message', functio
 
     expect($ownerMetrics->emailCount)->toBe(1)
         ->and($coworkerMetrics->emailCount)->toBe(1);
+});
+
+function copyOfMessage(User $owner, Workspace $workspace, EmailPrivacyTier $tier, CarbonImmutable $sentAt): Email
+{
+    $mailbox = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $owner->id,
+    ]));
+
+    return Email::factory()->inbound()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $mailbox->getKey(),
+        'rfc_message_id' => '<shared-thread@example.com>',
+        'sent_at' => $sentAt,
+        'is_internal' => false,
+        'privacy_tier' => $tier,
+    ]);
+}
+
+it('shows a teammate the most open copy of a message two members synced', function (): void {
+    $alice = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach([$alice->id => ['role' => 'member'], $viewer->id => ['role' => 'member']]);
+    $person = People::factory()->for($this->workspace)->create();
+
+    $open = copyOfMessage($this->user, $this->workspace, EmailPrivacyTier::FULL, now()->subHour());
+    $closed = copyOfMessage($alice, $this->workspace, EmailPrivacyTier::METADATA_ONLY, now());
+    $person->emails()->attach([$open->getKey(), $closed->getKey()]);
+
+    $emails = $person->emails();
+    resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($emails->getQuery(), $viewer);
+    $picked = $emails->get();
+
+    expect($picked)->toHaveCount(1)
+        ->and($picked->first()->getKey())->toBe($open->getKey())
+        ->and(resolve(PrivacyService::class)->effectiveTier($picked->first(), $viewer))->toBe(EmailPrivacyTier::FULL);
+});
+
+it('still shows a member their own copy first', function (): void {
+    $alice = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($alice, ['role' => 'member']);
+    $person = People::factory()->for($this->workspace)->create();
+
+    $open = copyOfMessage($this->user, $this->workspace, EmailPrivacyTier::FULL, now()->subHour());
+    $own = copyOfMessage($alice, $this->workspace, EmailPrivacyTier::METADATA_ONLY, now());
+    $person->emails()->attach([$open->getKey(), $own->getKey()]);
+
+    $emails = $person->emails();
+    resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($emails->getQuery(), $alice);
+    $picked = $emails->get();
+
+    expect($picked->first()->getKey())->toBe($own->getKey());
+});
+
+it('never shows a teammate a private copy while another copy is shared', function (): void {
+    $alice = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $viewer = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach([$alice->id => ['role' => 'member'], $viewer->id => ['role' => 'member']]);
+    $person = People::factory()->for($this->workspace)->create();
+
+    $private = copyOfMessage($this->user, $this->workspace, EmailPrivacyTier::PRIVATE, now());
+    $subject = copyOfMessage($alice, $this->workspace, EmailPrivacyTier::SUBJECT, now()->subHour());
+    $person->emails()->attach([$private->getKey(), $subject->getKey()]);
+
+    $emails = $person->emails();
+    resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($emails->getQuery(), $viewer);
+    $picked = $emails->get();
+
+    expect($picked)->toHaveCount(1)
+        ->and($picked->first()->getKey())->toBe($subject->getKey());
 });

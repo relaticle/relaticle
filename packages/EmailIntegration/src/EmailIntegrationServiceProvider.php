@@ -15,17 +15,20 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
+use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
+use Relaticle\EmailIntegration\Listeners\DisconnectRemovedMemberMailboxesListener;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
@@ -34,7 +37,6 @@ use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
-use Relaticle\EmailIntegration\Livewire\UserEmailPrivacySettings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -88,15 +90,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             'meeting' => Meeting::class,
         ]);
 
-        // Workspace rules outlive their creator; a personal template leaves with them,
-        // even while the feature is off.
-        User::deleting(function (User $user): void {
-            EmailTemplate::query()
-                ->withoutGlobalScopes()
-                ->where('created_by', $user->getKey())
-                ->where('is_shared', false)
-                ->forceDelete();
-        });
+        $this->registerCleanupThatIgnoresTheFeatureFlag();
 
         if (! self::enabled()) {
             return;
@@ -145,7 +139,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
-        Livewire::component('email-integration.user-email-privacy-settings', UserEmailPrivacySettings::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the
@@ -183,5 +176,23 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
     public static function enabled(): bool
     {
         return Feature::for(null)->active(EmailIntegration::class);
+    }
+
+    private function registerCleanupThatIgnoresTheFeatureFlag(): void
+    {
+        // Workspace rules outlive their creator; a personal template leaves with them.
+        User::deleting(function (User $user): void {
+            EmailTemplate::query()
+                ->withoutGlobalScopes()
+                ->where('created_by', $user->getKey())
+                ->where('is_shared', false)
+                ->forceDelete();
+        });
+
+        Event::listen(TeamMemberRemoved::class, DisconnectRemovedMemberMailboxesListener::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([DisconnectFormerMemberMailboxesCommand::class]);
+        }
     }
 }

@@ -19,7 +19,6 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -49,7 +48,6 @@ final readonly class SendEmailAction
      *     bcc?: array<array{email: string, name: ?string}>,
      *     in_reply_to_email_id?: ?string,
      *     creation_source: EmailCreationSource,
-     *     privacy_tier: EmailPrivacyTier,
      *     batch_id?: ?string,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
@@ -124,10 +122,9 @@ final readonly class SendEmailAction
                 : null;
 
             /** @var Email $email */
-            $email = Email::query()->create([
+            $email = $account->emails()->chaperone()->create([
                 'workspace_id' => $account->workspace_id,
                 'user_id' => $account->user_id,
-                'connected_account_id' => $account->getKey(),
                 // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
                 // header) so a retry that re-enters after the provider already
                 // delivered can find the sent message and adopt it instead of
@@ -150,7 +147,6 @@ final readonly class SendEmailAction
                 'folder' => EmailFolder::Sent,
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
-                'privacy_tier' => $data['privacy_tier'],
                 'has_attachments' => $hasDownloadableAttachments,
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],

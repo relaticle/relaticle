@@ -2,7 +2,7 @@
 title: Connect your Microsoft account
 description: Link an Outlook or Microsoft 365 mailbox so its email and calendar sync into Relaticle, and see what access Relaticle asks Microsoft for.
 order: 2
-updated: "2026-10-05"
+updated: "2026-10-07"
 related: [help/email-and-calendar/connect-your-google-account, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/see-meetings-and-link-them-to-records]
 ---
 
@@ -57,7 +57,7 @@ The account belongs to the workspace you connected it in. Relaticle imports
 your mailbox and calendar in the background, and the account shows
 **Syncing** with a percentage until it reads **In sync**.
 
-What your workspace sees of each email depends on your sharing level.
+What your workspace sees of each email depends on the mailbox's sharing level.
 [Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
 before you connect a mailbox you consider sensitive.
 

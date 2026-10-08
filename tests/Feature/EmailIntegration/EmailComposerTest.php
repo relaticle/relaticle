@@ -1834,6 +1834,79 @@ it('falls back to the default account and warns when a draft\'s connected accoun
         ->toBe($this->account->id);
 });
 
+it('sends a reopened draft at the sharing level of the mailbox it was saved on', function (): void {
+    $this->user->currentWorkspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+    $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'workspace_id' => $this->user->current_workspace_id,
+        'status' => 'active',
+        'sharing_tier' => EmailPrivacyTier::FULL,
+        'created_at' => now()->addMinute(),
+    ]));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', $second->id)
+        ->set('to', ['x@example.com'])
+        ->set('subject', 'Second mailbox draft')
+        ->set('bodyHtml', '<p>b</p>')
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $draft->id)
+        ->assertSet('accountId', $second->id)
+        ->call('send');
+
+    $queued = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($queued->connected_account_id)->toBe($second->id)
+        ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($queued->privacy_tier_customized)->toBeFalse();
+});
+
+it('sends a resumed reply draft at the sharing level of the mailbox it was saved on', function (): void {
+    $this->user->currentWorkspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
+    $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'user_id' => $this->user->id,
+        'workspace_id' => $this->user->current_workspace_id,
+        'status' => 'active',
+        'sharing_tier' => EmailPrivacyTier::FULL,
+        'created_at' => now()->addMinute(),
+    ]));
+    $inbound = Email::factory()->create([
+        'workspace_id' => $this->user->current_workspace_id,
+        'user_id' => $this->user->id,
+        'connected_account_id' => $this->account->id,
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'rfc_message_id' => '<original@example.com>',
+    ]);
+    EmailParticipant::factory()->create([
+        'email_id' => $inbound->id,
+        'email_address' => 'sender@contact.com',
+        'role' => EmailParticipantRole::FROM,
+    ]);
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', (string) $inbound->getKey(), 'reply')
+        ->set('accountId', $second->id)
+        ->set('bodyHtml', '<p>On my way</p>')
+        ->call('close');
+
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('resumeDraftFor', (string) $inbound->getKey())
+        ->assertSet('accountId', $second->id)
+        ->call('send');
+
+    $queued = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($queued->connected_account_id)->toBe($second->id)
+        ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($queued->privacy_tier_customized)->toBeFalse();
+});
+
 it('fills subject and body from a template and keeps the signature below it', function (): void {
     $signature = EmailSignature::factory()->create([
         'connected_account_id' => $this->account->id,

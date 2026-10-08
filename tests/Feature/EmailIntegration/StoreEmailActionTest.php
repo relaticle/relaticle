@@ -464,12 +464,12 @@ it('marks email as internal when all participants are team members', function ()
 });
 
 it('stamps the mailbox workspace privacy default when the owner has switched current team', function (): void {
-    $this->user->update(['default_email_sharing_tier' => null]);
+    $this->account->forceFill(['sharing_tier' => null])->save();
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
 
     $otherTeam = Workspace::factory()->create([
         'user_id' => $this->user->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+        'default_email_sharing_tier' => EmailPrivacyTier::SUBJECT,
     ]);
     $this->user->workspaces()->attach($otherTeam, ['role' => 'admin']);
     $this->user->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();

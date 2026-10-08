@@ -2,7 +2,7 @@
 title: Request access to an email from a teammate
 description: Ask a teammate to share the subject or the full body of a restricted email, and approve or deny the requests teammates send you.
 order: 7
-updated: "2026-10-06"
+updated: "2026-10-07"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/set-workspace-email-privacy]
 ---
 
@@ -35,8 +35,8 @@ emails. Open the email, and the pending request sits above it with
 **Approve** and **Deny**.
 
 Approving shares that one email with that one teammate at the level they
-asked for. Your default sharing level and your other email stay as they
-are.
+asked for. The sharing level of your mailbox and your other email stay as
+they are.
 
 To take access back later, open the email, click **Sharing**, and remove
 the teammate under **Share with specific teammates**.

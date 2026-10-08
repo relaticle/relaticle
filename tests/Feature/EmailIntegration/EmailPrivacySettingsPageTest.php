@@ -5,8 +5,10 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
+use Relaticle\EmailIntegration\Actions\SaveWorkspaceEmailSharingDefaultAction;
 use Relaticle\EmailIntegration\Actions\UpdateWorkspaceContactCreationSettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateWorkspaceEmailPrivacySettingsAction;
 use Relaticle\EmailIntegration\Actions\UpdateWorkspaceEmailVisibilityAction;
@@ -51,12 +53,10 @@ it('opens the tab named in the url and falls back to visibility for an unknown t
 it('updates the team default_email_sharing_tier on save', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
-        ->callAction('save', data: [
-            'full_access_confirmation' => 'I understand',
-        ]);
+        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->callAction('save');
 
-    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('retroactively updates non-customized emails when the workspace sharing default changes', function (): void {
@@ -83,12 +83,10 @@ it('retroactively updates non-customized emails when the workspace sharing defau
 
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
-        ->callAction('save', data: [
-            'full_access_confirmation' => 'I understand',
-        ]);
+        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->callAction('save');
 
-    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+    expect($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT)
         ->and($customized->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
@@ -102,17 +100,47 @@ it('requires confirmation when changing the workspace sharing tier to private', 
         ->assertActionMounted('save');
 });
 
-it('rejects an incorrect full access confirmation phrase on the workspace sharing tab', function (): void {
+it('refuses full access posted to the workspace sharing tab', function (): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
         ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
         ->callAction('save', data: [
-            'full_access_confirmation' => 'not the phrase',
+            'full_access_confirmation' => 'I understand',
         ])
-        ->assertHasActionErrors(['full_access_confirmation']);
+        ->assertStatus(422);
 
     expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
 });
+
+it('renders and saves a lower level when the stored workspace default is full access', function (): void {
+    DB::table('workspaces')->where('id', $this->workspace->id)->update(['default_email_sharing_tier' => 'full']);
+
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
+        ->assertSuccessful()
+        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->callAction('save');
+
+    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('offers no full access card as the workspace default', function (): void {
+    livewire(EmailPrivacySettingsPage::class)
+        ->call('setTab', 'sharing')
+        ->assertSee(EmailPrivacyTier::SUBJECT->getLabel())
+        ->assertDontSeeHtml('value="'.EmailPrivacyTier::FULL->value.'"');
+});
+
+it('refuses full access as the workspace default when the action runs directly', function (): void {
+    resolve(SaveWorkspaceEmailSharingDefaultAction::class)
+        ->execute($this->workspace, $this->user, EmailPrivacyTier::FULL);
+})->throws(HttpException::class);
+
+it('still accepts every lower level as the workspace default', function (EmailPrivacyTier $tier): void {
+    resolve(SaveWorkspaceEmailSharingDefaultAction::class)->execute($this->workspace, $this->user, $tier);
+
+    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe($tier);
+})->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::SUBJECT]);
 
 it('saves without confirmation when the workspace sharing tier is unchanged', function (): void {
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY]);
@@ -124,13 +152,12 @@ it('saves without confirmation when the workspace sharing tier is unchanged', fu
         ->assertNotified(__('filament/pages/email-privacy-settings.notifications.saved'));
 });
 
-it('shows each sharing tier with its explanation', function (): void {
+it('shows each workspace default tier with its explanation', function (EmailPrivacyTier $tier): void {
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->assertSee(EmailPrivacyTier::METADATA_ONLY->getDescription())
-        ->assertSee(EmailPrivacyTier::SUBJECT->getDescription())
-        ->assertSee(EmailPrivacyTier::FULL->getDescription());
-});
+        ->assertSee($tier->getLabel())
+        ->assertSee($tier->getDescription());
+})->with(EmailPrivacyTier::workspaceDefaults());
 
 it('shows enforcement level explanations in the row picker', function (): void {
     WorkspaceEmailBlocklist::factory()->protected()->email('legal@acme.com')->create([
@@ -339,10 +366,10 @@ it('forbids a non-admin member from changing team privacy settings', function ()
     expect(fn () => resolve(UpdateWorkspaceEmailPrivacySettingsAction::class)->execute(
         $this->workspace,
         $member,
-        EmailPrivacyTier::FULL,
+        EmailPrivacyTier::SUBJECT,
     ))->toThrow(HttpException::class);
 
-    expect($this->workspace->fresh()->default_email_sharing_tier)->not->toBe(EmailPrivacyTier::FULL);
+    expect($this->workspace->fresh()->default_email_sharing_tier)->not->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('allows an admin member to change team privacy settings', function (): void {
@@ -353,12 +380,10 @@ it('allows an admin member to change team privacy settings', function (): void {
 
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'sharing')
-        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
-        ->callAction('save', data: [
-            'full_access_confirmation' => 'I understand',
-        ]);
+        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->callAction('save');
 
-    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
 it('grants the team owner access to the workspace privacy page', function (): void {
@@ -482,7 +507,7 @@ it('does not persist settings when save is called on the visibility tab', functi
 
     livewire(EmailPrivacySettingsPage::class)
         ->call('setTab', 'visibility')
-        ->set('default_email_sharing_tier', EmailPrivacyTier::FULL->value)
+        ->set('default_email_sharing_tier', EmailPrivacyTier::SUBJECT->value)
         ->callAction('save');
 
     expect($this->workspace->fresh()->default_email_sharing_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);

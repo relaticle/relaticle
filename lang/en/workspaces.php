@@ -136,6 +136,10 @@ return [
         ],
         'leave_workspace' => [
             'notice' => 'Are you sure you would like to leave this workspace?',
+            'mailbox_notice' => 'You lose access to this workspace. Any mailbox you connected here is disconnected, and its email is hidden from your team.',
+        ],
+        'remove_workspace_member' => [
+            'mailbox_notice' => ':name loses access to this workspace. Any mailbox they connected here is disconnected, and its email is hidden from everyone.',
         ],
         'delete_workspace' => [
             'notice' => 'This will schedule the workspace for deletion. You will have 30 days to cancel before all data is permanently removed.',

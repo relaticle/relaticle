@@ -28,6 +28,7 @@ use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -1135,11 +1136,24 @@ it('shows a held email in the default view of its owner outbox', function (): vo
 });
 
 it('sends with the sender default sharing level', function (): void {
-    $this->viewer->forceFill(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
+    $this->viewerAccount->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
 
     $data = emailToolData($this->viewer->fresh(), SendEmailTool::class, sendArguments($this->viewerAccount));
 
     expect(Email::query()->findOrFail($data['id'])->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('keeps a sent email on its mailbox level when the owner lowers it later', function (): void {
+    $this->viewerAccount->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+
+    $data = emailToolData($this->viewer->fresh(), SendEmailTool::class, sendArguments($this->viewerAccount));
+
+    resolve(SaveMailboxSharingTierAction::class)->execute($this->viewer, $this->viewerAccount->fresh(), EmailPrivacyTier::PRIVATE);
+
+    $sent = Email::query()->findOrFail($data['id']);
+
+    expect($sent->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($sent->privacy_tier_customized)->toBeFalse();
 });
 
 it('expands the default signature into the sent body', function (): void {

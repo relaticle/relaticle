@@ -46,7 +46,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
 
     /**
      * Workspace email settings use the email.manage capability, which the owner
-     * and admins have. Other roles use the per-user My Email Privacy page.
+     * and admins have.
      *
      * @param  array<string, mixed>  $parameters
      */
@@ -279,6 +279,7 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
                         ->label(__('filament/pages/email-privacy-settings.workspace_default.tier_label'))
                         ->view('email-integration::forms.sharing-tier-cards')
                         ->viewData([
+                            'tiers' => EmailPrivacyTier::workspaceDefaults(),
                             'ariaLabel' => __('filament/pages/email-privacy-settings.workspace_default.tier_label'),
                         ]),
                 ])

@@ -21,7 +21,6 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
-use Relaticle\EmailIntegration\Filament\Pages\UserEmailPrivacyPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
@@ -519,14 +518,12 @@ it('keeps email settings out of the sidebar and shows only accounts and template
     expect(EmailAccountsPage::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailTemplateResource::shouldRegisterNavigation())->toBeFalse()
         ->and(EmailSignaturesPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(EmailAccessRequestsPage::shouldRegisterNavigation())->toBeFalse()
-        ->and(UserEmailPrivacyPage::shouldRegisterNavigation())->toBeFalse();
+        ->and(EmailAccessRequestsPage::shouldRegisterNavigation())->toBeFalse();
 
     $this->get(EmailAccountsPage::getUrl(tenant: $this->workspace))
         ->assertSuccessful()
         ->assertSee(__('filament/pages/email-accounts.navigation_label'), false)
         ->assertSee(__('filament/resources/email-template.navigation_label'), false)
         ->assertDontSee(__('filament/pages/email-access-requests.navigation_label'), false)
-        ->assertDontSee(__('filament/pages/email-privacy-settings.navigation_label'), false)
-        ->assertDontSee(__('filament/pages/user-email-privacy.navigation_label'), false);
+        ->assertDontSee(__('filament/pages/email-privacy-settings.navigation_label'), false);
 });

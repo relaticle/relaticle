@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailShare;
 
@@ -64,46 +65,9 @@ final readonly class PrivacyService
         return $tier;
     }
 
-    /**
-     * Resolve the default tier to stamp on a newly created email.
-     * User preference wins over workspace default.
-     *
-     * Pass the mailbox's workspace for background sync. `$user->current_workspace_id` is
-     * only the owner's currently selected workspace, so using it for imports would
-     * stamp another workspace's default onto this mailbox.
-     */
-    public function defaultTierForUser(User $user, ?Workspace $workspace = null): EmailPrivacyTier
+    public function tierForMailbox(ConnectedAccount $mailbox): EmailPrivacyTier
     {
-        if ($user->default_email_sharing_tier) {
-            return $user->default_email_sharing_tier;
-        }
-
-        // Resolve the workspace explicitly (instead of $user->currentWorkspace, whose accessor
-        // larastan types as never-null and which can auto-switch workspaces as a side
-        // effect) so the null case, a user without a current workspace, is handled.
-        $workspace ??= $user->current_workspace_id !== null ? Workspace::query()->find($user->current_workspace_id) : null;
-
-        if ($workspace === null) {
-            return EmailPrivacyTier::METADATA_ONLY;
-        }
-
-        return $workspace->default_email_sharing_tier ?? EmailPrivacyTier::METADATA_ONLY;
-    }
-
-    public function tierFromPreference(mixed $tierValue, User $user): EmailPrivacyTier
-    {
-        return match (true) {
-            $tierValue instanceof EmailPrivacyTier => $tierValue,
-            filled($tierValue) => EmailPrivacyTier::from((string) $tierValue),
-            default => $user->currentWorkspace instanceof Workspace
-                ? $this->workspaceSharingTier($user->currentWorkspace)
-                : EmailPrivacyTier::METADATA_ONLY,
-        };
-    }
-
-    public function effectiveSharingTierForUser(User $user): EmailPrivacyTier
-    {
-        return $this->defaultTierForUser($user, $user->currentWorkspace);
+        return $mailbox->sharing_tier ?? $this->workspaceSharingTier($mailbox->loadMissing('workspace')->workspace);
     }
 
     public function workspaceSharingTier(Workspace $workspace): EmailPrivacyTier

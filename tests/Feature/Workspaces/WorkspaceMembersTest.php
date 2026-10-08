@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Jetstream\UpdateWorkspaceMemberRole;
 use App\Enums\WorkspaceRole;
+use App\Features\EmailIntegration;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Models\User;
@@ -15,6 +16,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 
 mutates(WorkspaceMembers::class);
 
@@ -473,3 +475,35 @@ test('the change role modal offers a way to compare roles rendered from the capa
         ->toContain(__('workspaces.roles.owner.label'))
         ->toContain(__('workspaces.capabilities.fields.manage.label'));
 });
+
+test('removing a member warns that their mailboxes disconnect when email is on', function (bool $emailIsOn): void {
+    Feature::define(EmailIntegration::class, $emailIsOn);
+    $member = User::factory()->create(['name' => 'Dana Whitfield']);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+
+    $warning = __('workspaces.modals.remove_workspace_member.mailbox_notice', ['name' => 'Dana Whitfield']);
+
+    $modal = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction(TestAction::make('removeWorkspaceMember')->table($member->id));
+
+    $emailIsOn
+        ? $modal->assertMountedActionModalSee($warning)
+        : $modal->assertMountedActionModalDontSee($warning)->assertMountedActionModalSee(__('filament-actions::modal.confirmation'));
+})->with(['email on' => true, 'email off' => false]);
+
+test('leaving a workspace warns that your mailboxes disconnect when email is on', function (bool $emailIsOn): void {
+    Feature::define(EmailIntegration::class, $emailIsOn);
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $member->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+    $this->actingAs($member);
+
+    $warning = __('workspaces.modals.leave_workspace.mailbox_notice');
+
+    $modal = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction(TestAction::make('leaveWorkspace')->table($member->id));
+
+    $emailIsOn
+        ? $modal->assertMountedActionModalSee($warning)
+        : $modal->assertMountedActionModalDontSee($warning)->assertMountedActionModalSee(__('workspaces.modals.leave_workspace.notice'));
+})->with(['email on' => true, 'email off' => false]);

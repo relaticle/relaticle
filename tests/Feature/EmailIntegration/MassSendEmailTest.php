@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTierAction;
 use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -158,8 +159,8 @@ it('creates an EmailBatch and persists one Email row per recipient from the comp
 });
 
 it('stamps mass-send emails with the sender sharing default', function (EmailPrivacyTier $tier): void {
-    $this->user->update(['default_email_sharing_tier' => $tier]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+    $this->account->forceFill(['sharing_tier' => $tier])->save();
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $person = People::create([
         'workspace_id' => $this->workspace->id,
@@ -173,7 +174,6 @@ it('stamps mass-send emails with the sender sharing default', function (EmailPri
             'massSend' => true,
             'recipients' => massRecipientPayload($person, 'person@example.com'),
         ])
-        ->assertSet('privacyTier', $tier->value)
         ->set('subject', 'Hello')
         ->set('bodyHtml', '<p>Hi</p>')
         ->call('send');
@@ -184,9 +184,9 @@ it('stamps mass-send emails with the sender sharing default', function (EmailPri
     'metadata-only' => EmailPrivacyTier::METADATA_ONLY,
 ]);
 
-it('uses the sender sharing default when the batch payload omits a privacy tier', function (EmailPrivacyTier $tier): void {
-    $this->user->update(['default_email_sharing_tier' => $tier]);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+it('stamps a batch queued through the action with the sender sharing default', function (EmailPrivacyTier $tier): void {
+    $this->account->forceFill(['sharing_tier' => $tier])->save();
+    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     $person = People::create([
         'workspace_id' => $this->workspace->id,
@@ -211,15 +211,21 @@ it('uses the sender sharing default when the batch payload omits a privacy tier'
     'metadata-only' => EmailPrivacyTier::METADATA_ONLY,
 ]);
 
-it('uses the privacy tier from the batch payload instead of the sender default', function (): void {
-    $this->user->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
-
+function massSendPerson(): People
+{
     $person = People::create([
-        'workspace_id' => $this->workspace->id,
+        'workspace_id' => test()->workspace->id,
         'name' => 'Person',
-        'creator_id' => $this->user->id,
+        'creator_id' => test()->user->id,
     ]);
     setPersonEmail($person, 'person@example.com');
+
+    return $person;
+}
+
+it('keeps a mass send on its mailbox level when the owner lowers it later', function (): void {
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+    $person = massSendPerson();
 
     resolve(SendEmailBatchAction::class)->execute(
         user: $this->user,
@@ -228,11 +234,36 @@ it('uses the privacy tier from the batch payload instead of the sender default',
             'connected_account_id' => $this->account->id,
             'subject' => 'Hello',
             'body_html' => '<p>Hi</p>',
-            'privacy_tier' => EmailPrivacyTier::FULL,
         ],
     );
 
-    expect(Email::query()->where('creation_source', EmailCreationSource::MASS_SEND)->sole()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    resolve(SaveMailboxSharingTierAction::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
+
+    $sent = Email::query()->where('creation_source', EmailCreationSource::MASS_SEND)->sole();
+
+    expect($sent->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($sent->privacy_tier_customized)->toBeFalse();
+});
+
+it('keeps a composer mass send on its mailbox level when the owner lowers it later', function (): void {
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::FULL])->save();
+    $person = massSendPerson();
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => massRecipientPayload($person, 'person@example.com'),
+        ])
+        ->set('subject', 'Hello')
+        ->set('bodyHtml', '<p>Hi</p>')
+        ->call('send');
+
+    resolve(SaveMailboxSharingTierAction::class)->execute($this->user, $this->account->fresh(), EmailPrivacyTier::PRIVATE);
+
+    $sent = Email::query()->where('creation_source', EmailCreationSource::MASS_SEND)->sole();
+
+    expect($sent->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($sent->privacy_tier_customized)->toBeFalse();
 });
 
 it('warns when some selected people have no email but still opens the composer', function (): void {
@@ -879,4 +910,26 @@ it('deletes a reopened mass send draft after a successful send', function (): vo
 
     expect(Email::query()->withTrashed()->whereKey($draft->id)->exists())->toBeFalse()
         ->and(EmailBatch::where('workspace_id', $this->workspace->id)->count())->toBe(1);
+});
+
+it('queues an email at the level of the mailbox the sender switched to', function (): void {
+    $second = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->user->id,
+        'sharing_tier' => EmailPrivacyTier::FULL,
+    ]));
+
+    livewire(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('accountId', (string) $second->getKey())
+        ->set('to', ['person@example.com'])
+        ->set('subject', 'Hello')
+        ->set('bodyHtml', '<p>Hi</p>')
+        ->call('send');
+
+    $queued = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    expect($queued->connected_account_id)->toBe($second->getKey())
+        ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
+        ->and($queued->privacy_tier_customized)->toBeFalse();
 });

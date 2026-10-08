@@ -51,9 +51,16 @@ final readonly class SharingTierChangeConfirmation
 
     public static function modalDescription(EmailPrivacyTier $newTier): string
     {
+        return __('email/privacy-settings.sharing_confirmation.description', [
+            'tier' => $newTier->getLabel(),
+        ]);
+    }
+
+    public static function mailboxModalDescription(EmailPrivacyTier $newTier): string
+    {
         return match ($newTier) {
-            EmailPrivacyTier::FULL => __('email/privacy-settings.sharing_confirmation.full_access_description'),
-            default => __('email/privacy-settings.sharing_confirmation.description', [
+            EmailPrivacyTier::FULL => __('email/privacy-settings.sharing_confirmation.mailbox_full_access_description'),
+            default => __('email/privacy-settings.sharing_confirmation.mailbox_description', [
                 'tier' => $newTier->getLabel(),
             ]),
         };

@@ -597,6 +597,47 @@ describe('subject privacy enforcement', function (): void {
             ->assertDontSeeHtml("email-list-row-{$private->getKey()}");
     });
 
+    it('lists a message two members synced once, as its most open copy', function (): void {
+        $this->actingAs($this->viewer);
+
+        $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $this->workspace->users()->attach($teammate, ['role' => 'member']);
+        $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $teammate->id,
+        ]));
+
+        $open = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'rfc_message_id' => '<renewal-thread@example.com>',
+            'subject' => 'Renewal terms',
+            'sent_at' => CarbonImmutable::parse('2026-10-01 09:00:00'),
+            'privacy_tier' => EmailPrivacyTier::FULL,
+        ]);
+        $closed = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $teammate->id,
+            'connected_account_id' => $teammateAccount->getKey(),
+            'rfc_message_id' => '<renewal-thread@example.com>',
+            'subject' => 'Renewal terms',
+            'sent_at' => CarbonImmutable::parse('2026-10-02 09:00:00'),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach([$open->getKey(), $closed->getKey()]);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSeeHtml("email-list-row-{$open->getKey()}")
+            ->assertDontSeeHtml("email-list-row-{$closed->getKey()}")
+            ->assertSee('Renewal terms')
+            ->assertDontSee('(subject hidden)');
+    });
+
     it('returns no emails when a client calls the table records method directly', function (): void {
         $this->actingAs($this->viewer);
 
