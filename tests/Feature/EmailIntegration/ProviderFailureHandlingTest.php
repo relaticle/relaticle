@@ -143,14 +143,22 @@ it('retries a parked mailbox job for a day instead of three attempts', function 
     EnsureCalendarPushChannelJob::class,
 ]);
 
-it('waits as long as the provider asks when an outage names a retry time', function (): void {
-    $response = new Response(new PsrResponse(503, ['Retry-After' => '120'], ''));
+it('parks the mailbox for as long as the provider asks when an outage names a retry time', function (): void {
+    $account = mailboxWithCursors();
+    providerThrows(new RequestException(new Response(new PsrResponse(503, ['Retry-After' => '120'], ''))));
 
-    expect(ProviderRateLimit::outageSeconds(new RequestException($response)))->toBe(120);
+    workMailboxJob(new IncrementalEmailSyncJob($account));
+
+    expect(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeBetween(115, 120);
 });
 
-it('does not treat a client error as an outage', function (): void {
-    $response = new Response(new PsrResponse(404, [], ''));
+it('reports a client error and leaves the mailbox unparked', function (): void {
+    $account = mailboxWithCursors();
+    providerThrows(new RequestException(new Response(new PsrResponse(404, [], ''))));
 
-    expect(ProviderRateLimit::outageSeconds(new RequestException($response)))->toBeNull();
+    workMailboxJob(new IncrementalEmailSyncJob($account));
+
+    expect(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeNull();
+
+    Exceptions::assertReported(RequestException::class);
 });
