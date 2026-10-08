@@ -425,3 +425,63 @@ it('words a decided email by what happened to it and links to no record', functi
         ->assertDontSee('Created')
         ->assertMissing('[data-proposal-record-link]');
 });
+
+it('words a decided invitation as invited', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided teammate', $conversationId);
+
+    $pending = PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Workspace\\CreateWorkspaceInvitation',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'workspace_invitations',
+        'action_data' => ['email' => 'alex@example.com', 'role' => 'member'],
+        'display_data' => [
+            'title' => 'Invite Teammate',
+            'summary' => 'Invite alex@example.com as Member',
+            'fields' => [['label' => 'Email', 'value' => 'alex@example.com'], ['label' => 'Role', 'value' => 'Member']],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['id' => (string) Str::ulid(), 'type' => 'workspace_invitations'],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => storedToolSteps([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'InviteWorkspaceMemberTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateWorkspaceInvitation',
+                'entity_type' => 'workspace_invitations',
+                'operation' => 'create',
+                'data' => ['email' => 'alex@example.com', 'role' => 'member'],
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSee('Invited')
+        ->assertDontSee('Created');
+});

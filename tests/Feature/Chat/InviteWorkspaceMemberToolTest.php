@@ -21,6 +21,7 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\DestinationResolver;
 use Relaticle\Chat\Support\ProposalCoreFields;
+use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Workspace\InviteWorkspaceMemberTool;
 use Symfony\Component\Mailer\Exception\TransportException;
@@ -40,6 +41,42 @@ function pendingActionForWorkspace(User $user): PendingAction
         ->where('workspace_id', $user->currentWorkspace->getKey())
         ->latest()
         ->firstOrFail();
+}
+
+/**
+ * @param  list<string>  $emails
+ */
+function proposeInvitationsInConversation(User $user, array $emails): PendingAction
+{
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'participant_type' => $user->getMorphClass(),
+        'participant_id' => (string) $user->getKey(),
+        'title' => 'Invites',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $tool = app(InviteWorkspaceMemberTool::class);
+    $tool->setConversationId($conversationId);
+    $tool->handle(new Request([
+        'records' => array_map(
+            static fn (string $email): array => ['email' => $email, 'role' => WorkspaceRole::Member->value],
+            $emails,
+        ),
+    ]));
+
+    return PendingAction::query()->where('conversation_id', $conversationId)->sole();
+}
+
+function resolvedInvitationText(PendingAction $pending): string
+{
+    return collect(resolve(PendingActionService::class)->resolvedForConversation((string) $pending->conversation_id, null))
+        ->flatMap(fn (array $action): array => ResolvedActionText::lines($action, cite: false))
+        ->implode("\n");
 }
 
 it('creates one pending action for a batch of two invitations, carrying both emails', function (): void {
@@ -329,8 +366,44 @@ it('names the entity in plain words on a batch card', function (): void {
 
     $display = pendingActionForWorkspace($this->user)->display_data;
 
-    expect($display['summary'] ?? '')->not->toContain('workspace_invitations')
-        ->and($display['summary'] ?? '')->toContain('workspace invitations');
+    expect($display['title'] ?? '')->toBe('Invite Teammates')
+        ->and($display['summary'] ?? '')->toBe('Invite 2 teammates');
+});
+
+it('labels its decision with the invitation it sends', function (): void {
+    $pending = proposeInvitationsInConversation($this->user, ['alex@example.com']);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')
+        ->assertSeeHtmlInOrder(['wire:click="createCurrent"', '<span>Send invitation</span>'])
+        ->assertDontSeeHtml('<span>Create</span>');
+});
+
+it('tells the assistant in plain words who was invited and who was not', function (): void {
+    Mail::fake();
+    $service = resolve(PendingActionService::class);
+
+    $invited = proposeInvitationsInConversation($this->user, ['invited@example.com']);
+    $declined = proposeInvitationsInConversation($this->user, ['declined@example.com']);
+
+    $service->approve($invited, $this->user);
+    $service->reject($declined, $this->user);
+
+    expect(resolvedInvitationText($invited))->toContain('APPROVED (written): invite teammate "invited@example.com"')
+        ->not->toContain('create workspace_invitations')
+        ->and(resolvedInvitationText($declined))->toContain('REJECTED (nothing was written): invite teammate "declined@example.com"');
+});
+
+it('says NOT invited for an invitation the user skipped', function (): void {
+    Mail::fake();
+    $service = resolve(PendingActionService::class);
+
+    $pending = proposeInvitationsInConversation($this->user, ['first@example.com', 'second@example.com']);
+
+    $service->approveItem($pending, $this->user, 0);
+    $service->rejectItem($pending->fresh(), $this->user, 1);
+
+    expect(resolvedInvitationText($pending))->toContain('skipped by the user, NOT invited: "second@example.com"');
 });
 
 it('keeps the mail transport failure off the card on the batch path too', function (): void {

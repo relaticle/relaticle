@@ -17,6 +17,7 @@ final readonly class ProposalVerbs
     private const array ENTITIES = [
         'emails' => ['action' => 'Send', 'done' => 'Sent', 'count' => ':count sent', 'verb' => 'send', 'notDone' => 'NOT sent', 'noun' => 'email'],
         'email_drafts' => ['action' => 'Save draft', 'done' => 'Saved', 'count' => ':count saved', 'verb' => 'save', 'notDone' => 'NOT saved', 'noun' => 'email draft'],
+        'workspace_invitations' => ['action' => 'Send invitation', 'done' => 'Invited', 'count' => ':count invited', 'verb' => 'invite', 'notDone' => 'NOT invited', 'noun' => 'teammate'],
     ];
 
     public static function action(string $entityType, string $operation): string

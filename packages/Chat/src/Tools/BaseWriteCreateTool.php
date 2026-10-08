@@ -16,6 +16,7 @@ use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
 use Relaticle\Chat\Support\PendingActionEnvelope;
+use Relaticle\Chat\Support\ProposalVerbs;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
@@ -72,9 +73,14 @@ abstract class BaseWriteCreateTool implements Tool
         return WorkspaceCapability::RecordsCreate;
     }
 
-    protected function batchVerb(): string
+    private function batchVerb(): string
     {
-        return 'Create';
+        return Str::ucfirst(ProposalVerbs::verb($this->entityType(), PendingActionOperation::Create->value));
+    }
+
+    private function batchNoun(): string
+    {
+        return Str::headline(ProposalVerbs::noun($this->entityType()));
     }
 
     private function missingCapabilityError(User $user): ?string
@@ -217,8 +223,8 @@ abstract class BaseWriteCreateTool implements Tool
 
         $displayData = $isBatch
             ? [
-                'title' => __(':verb :entities', ['verb' => $this->batchVerb(), 'entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
-                'summary' => sprintf('%s %d %s', $this->batchVerb(), count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
+                'title' => __(':verb :entities', ['verb' => $this->batchVerb(), 'entities' => Str::plural($this->batchNoun(), count($items))]),
+                'summary' => sprintf('%s %d %s', $this->batchVerb(), count($items), Str::plural(Str::lower($this->batchNoun()), count($items))),
                 'items' => $items,
             ]
             : $items[0];

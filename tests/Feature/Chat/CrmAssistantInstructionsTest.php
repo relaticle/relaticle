@@ -620,7 +620,7 @@ it('marks the proposals the resumed turn just decided', function (): void {
     $block = $agent->instructions();
 
     expect($block)
-        ->toContain('JUST DECIDED, APPROVED (written): create workspace_invitations')
+        ->toContain('JUST DECIDED, APPROVED (written): invite teammate')
         ->not->toContain('JUST DECIDED, APPROVED (written): create companies')
         ->not->toContain('already decided by the user earlier in this conversation')
         ->toContain('Never call it already done, already sent');
