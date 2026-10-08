@@ -62,41 +62,56 @@ final readonly class RecordCommunicationMetrics
     }
 
     /**
+     * @param  list<People|Company|Opportunity>  $records
+     */
+    public function incrementEmailMetricsInLockOrder(array $records, Email $email): void
+    {
+        foreach ($this->inLockOrder($records) as $record) {
+            $this->incrementEmailMetrics($record, $email);
+        }
+    }
+
+    /**
+     * @param  list<People|Company|Opportunity>  $records
+     */
+    public function incrementMeetingMetricsInLockOrder(array $records, Meeting $meeting): void
+    {
+        foreach ($this->inLockOrder($records) as $record) {
+            $this->incrementMeetingMetrics($record, $meeting);
+        }
+    }
+
+    /**
      * @param  array<string, true>  $countedCompanies
      * @param  array<string, true>  $countedPeople
      * @param  array<string, true>  $countedOpportunities
+     * @return list<People|Company|Opportunity>
      */
-    public function incrementEmailMetricsForPrelinkedRecords(
+    public function prelinkedRecords(
         Email $email,
         array $countedCompanies,
         array $countedPeople,
         array $countedOpportunities,
-    ): void {
+    ): array {
         $email->loadMissing(['people', 'companies', 'opportunities']);
 
-        foreach ($email->people as $person) {
-            if (isset($countedPeople[$person->getKey()])) {
-                continue;
-            }
+        return [
+            ...$email->people->reject(fn (People $person): bool => isset($countedPeople[$person->getKey()]))->values(),
+            ...$email->companies->reject(fn (Company $company): bool => isset($countedCompanies[$company->getKey()]))->values(),
+            ...$email->opportunities->reject(fn (Opportunity $opportunity): bool => isset($countedOpportunities[$opportunity->getKey()]))->values(),
+        ];
+    }
 
-            $this->incrementEmailMetrics($person, $email);
-        }
+    /**
+     * @param  list<People|Company|Opportunity>  $records
+     * @return list<People|Company|Opportunity>
+     */
+    private function inLockOrder(array $records): array
+    {
+        // Two transactions that name the same records in a different order deadlock on the row locks.
+        usort($records, fn (Model $a, Model $b): int => [$a->getTable(), $a->getKey()] <=> [$b->getTable(), $b->getKey()]);
 
-        foreach ($email->companies as $company) {
-            if (isset($countedCompanies[$company->getKey()])) {
-                continue;
-            }
-
-            $this->incrementEmailMetrics($company, $email);
-        }
-
-        foreach ($email->opportunities as $opportunity) {
-            if (isset($countedOpportunities[$opportunity->getKey()])) {
-                continue;
-            }
-
-            $this->incrementEmailMetrics($opportunity, $email);
-        }
+        return $records;
     }
 
     private function advanceMeetingMetrics(string $table, string $id, CarbonInterface $startsAt): void

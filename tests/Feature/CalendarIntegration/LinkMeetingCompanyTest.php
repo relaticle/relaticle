@@ -6,9 +6,14 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
+use Relaticle\EmailIntegration\Jobs\RelinkRecordHistoryJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
@@ -96,4 +101,60 @@ it('does not downgrade an existing manual company link to auto', function (): vo
     // The auto-link pass must not flip the prior manual pivot to 'auto'.
     expect($meeting->companies()->count())->toBe(1);
     expect($meeting->companies()->first()?->pivot->link_source)->toBe('manual');
+});
+
+it('advances the meeting counters of linked companies in id order whatever the attendee order', function (): void {
+    Bus::fake([RelinkRecordHistoryJob::class]);
+
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+    Filament::setTenant($workspace);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $user->id,
+    ]));
+
+    $domainsField = CustomField::query()
+        ->where('tenant_id', $workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    $companyIds = [];
+
+    foreach (['globex.com', 'acme.com'] as $domain) {
+        $company = Company::factory()->create(['workspace_id' => $workspace->id, 'name' => $domain]);
+        $company->saveCustomFieldValue($domainsField, "https://{$domain}", $workspace);
+
+        $companyIds[] = $company->getKey();
+    }
+
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $workspace->id,
+        'connected_account_id' => $account->getKey(),
+    ]);
+
+    foreach (['acme.com', 'globex.com'] as $domain) {
+        MeetingAttendee::factory()->create([
+            'meeting_id' => $meeting->getKey(),
+            'email_address' => "person@{$domain}",
+            'is_self' => false,
+        ]);
+    }
+
+    $advancedCompanyIds = [];
+
+    DB::listen(function (QueryExecuted $query) use (&$advancedCompanyIds): void {
+        if (str_contains($query->sql, 'update "companies" set "meeting_count"')) {
+            $advancedCompanyIds[] = Arr::last($query->bindings);
+        }
+    });
+
+    (app(LinkMeetingAction::class))->execute($meeting->fresh());
+
+    sort($companyIds);
+
+    expect($advancedCompanyIds)->toBe($companyIds);
 });

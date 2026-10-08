@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Workspace;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -38,6 +39,7 @@ final readonly class LinkMeetingAction
         $workspace = $meeting->workspace;
         $account = $meeting->connectedAccount;
         $skippedDomains = $this->domainMatcher->skippedHosts($workspaceId);
+        $counted = [];
 
         foreach ($attendees as $attendee) {
             $isAutomatedSender = $this->automatedSender->matches($attendee->email_address);
@@ -70,7 +72,7 @@ final readonly class LinkMeetingAction
                 if ($company instanceof Company) {
                     $attendee->update(['company_id' => $company->getKey()]);
                     if ($this->autoAttach($meeting->companies(), $company->getKey()) && $countsTowardIntelligence) {
-                        $this->metrics->incrementMeetingMetrics($company, $meeting);
+                        $counted[] = $company;
                     }
                 }
             }
@@ -88,7 +90,7 @@ final readonly class LinkMeetingAction
             if ($person instanceof People) {
                 $attendee->update(['contact_id' => $person->getKey()]);
                 if ($this->autoAttach($meeting->people(), $person->getKey()) && $countsTowardIntelligence) {
-                    $this->metrics->incrementMeetingMetrics($person, $meeting);
+                    $counted[] = $person;
                 }
 
                 $personCompany = $person->company;
@@ -96,20 +98,28 @@ final readonly class LinkMeetingAction
                 if ($personCompany instanceof Company
                     && $this->autoAttach($meeting->companies(), $personCompany->getKey())
                     && $countsTowardIntelligence) {
-                    $this->metrics->incrementMeetingMetrics($personCompany, $meeting);
+                    $counted[] = $personCompany;
                 }
 
-                $opportunities = Opportunity::query()->where('workspace_id', $workspaceId)
-                    ->where('contact_id', $person->getKey())
-                    ->get();
-
-                foreach ($opportunities as $opportunity) {
-                    if ($this->autoAttach($meeting->opportunities(), $opportunity->getKey()) && $countsTowardIntelligence) {
-                        $this->metrics->incrementMeetingMetrics($opportunity, $meeting);
-                    }
-                }
+                $attached = $this->attachOpportunitiesOf($person, $meeting);
+                $counted = $countsTowardIntelligence ? [...$counted, ...$attached] : $counted;
             }
         }
+
+        $this->metrics->incrementMeetingMetricsInLockOrder($counted, $meeting);
+    }
+
+    /**
+     * @return Collection<int, Opportunity>
+     */
+    private function attachOpportunitiesOf(People $person, Meeting $meeting): Collection
+    {
+        return Opportunity::query()
+            ->where('workspace_id', $meeting->workspace_id)
+            ->where('contact_id', $person->getKey())
+            ->get()
+            ->filter(fn (Opportunity $opportunity): bool => $this->autoAttach($meeting->opportunities(), $opportunity->getKey()))
+            ->values();
     }
 
     private function shouldCreatePerson(Workspace $workspace): bool
