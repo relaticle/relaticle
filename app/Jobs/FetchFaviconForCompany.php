@@ -7,6 +7,7 @@ namespace App\Jobs;
 use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Support\Http\SsrfGuard;
+use AshAllenDesign\FaviconFetcher\Exceptions\ConnectionException;
 use AshAllenDesign\FaviconFetcher\Facades\Favicon;
 use finfo;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -91,7 +92,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 
             $this->company->clearMediaCollectionExcept(Company::LOGO_MEDIA_COLLECTION, $logo);
         } catch (Throwable $exception) {
-            report($exception);
+            report_unless($exception instanceof ConnectionException, $exception);
         }
     }
 
