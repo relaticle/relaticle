@@ -46,6 +46,33 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
 
+## Workspace scope (fails closed)
+
+Company, People, Opportunity, Task and Note carry `App\Models\Scopes\WorkspaceScope`. With no
+workspace bound in `App\Support\CurrentWorkspace` the scope returns no rows. It never reads
+every workspace. `tests/Feature/Models/Scopes/WorkspaceScopeTest.php` fails when that changes.
+
+| The code runs | The workspace comes from |
+|---|---|
+| in a web or panel request | `BindCurrentWorkspaceListener`: the signed-in user's workspace, then the Filament tenant |
+| in an API or MCP request | `SetApiWorkspaceContext`, from the token |
+| in a job dispatched while a workspace is bound | Laravel `Context`, which carries the id into the job |
+| in a job, command or webhook that starts unbound | `CurrentWorkspace::within($workspace, fn () => ...)`, which also sets the custom-fields tenant |
+| in the system admin panel | the `workspaces.across` middleware, which reads across workspaces |
+
+- A reader that already filters by an explicit workspace id removes the scope and keeps its own
+  filter: `->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $id)`. The filter
+  is the tenant guard, so it never depends on what happens to be bound. `TenantFkValidator` and
+  `ListsEntity` are the working examples
+- Reading across workspaces lives in memory only and never enters `Context`, so a job
+  dispatched from the system admin panel starts unbound. A bound workspace always wins over it
+- Filament builds its own queries for relationship selects, relationship filters and column
+  eager loads. Removing the scope in `getEloquentQuery()` does not reach them, which is why the
+  system admin panel uses the middleware and no per-resource override
+- Livewire matches persistent middleware by class. `AppServiceProvider` registers
+  `ReadAcrossWorkspaces`, because the alias alone skips every update request.
+  `tests/Feature/SystemAdmin/SystemAdminPanelProviderTest.php` fails without it
+
 ## Actions (business operations)
 
 An action is one business operation: a class that takes input, does something, and gives
@@ -529,7 +556,7 @@ is the exception that admits the code could not.
 - Tenant context for the custom-fields package is set in `SetApiWorkspaceContext` middleware via `TenantContextService::setTenantId()`. Actions don't need `withTenant()` wrappers
 - In Filament, the package's own `SetTenantContextMiddleware` handles tenant context. No action-level code is needed there either
 - `CustomFieldValidationService` intentionally uses explicit `where('tenant_id', ...)` with `withoutGlobalScopes()`. This is defensive and correct; don't change it to rely on ambient state
-- Every write path that is NOT a Filament panel request or behind `SetApiWorkspaceContext` (chat action approval, queued jobs, webhooks, commands) must set `TenantContextService::setTenantId()` before saving custom fields. Otherwise `saveCustomFields` iterates every tenant (gateway timeouts + cross-tenant writes). Wrap manual calls in try/finally restoring the previous tenant id (mirror `SetApiWorkspaceContext`)
+- Every write path that is NOT a Filament panel request or behind `SetApiWorkspaceContext` (chat action approval, queued jobs, webhooks, commands) runs inside `CurrentWorkspace::within($workspace, fn () => ...)` before saving custom fields. It binds the CRM workspace and the custom-fields tenant together and restores both, also when the callback throws. Without the tenant, `saveCustomFields` iterates every tenant (gateway timeouts + cross-tenant writes). Never hand-roll the `TenantContextService::setTenantId()` try/finally in new code
 - Writing null/empty for a custom field is how a value is cleared. Never skip or filter out "empty" values on save; only keys absent from the payload are left untouched. Verify any persistence change in both directions (set a value AND clear it), through both the panel form and the chat/API path
 - Retire a field type through `config('custom-fields.field_type_configuration')->disabled()` and keep its `CustomFieldType` case. Stored rows still need a type name and a write format when a schema lists them, and `CustomFieldType::from()` throws without the case. `FILE_UPLOAD` is the precedent
 - Sections, validation rules, conditional visibility and field width are package features Relaticle does not use. `config/custom-fields.php` disables all four, so the settings form never shows them. They are never a parity gap: do not add them to a chat tool, an MCP tool or the API

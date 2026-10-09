@@ -150,8 +150,9 @@ rejected by the custom-fields package's own unique rules running inside
 `CustomFieldsRequestValidator` at proposal time. Never re-implement them as
 bespoke lookups in a tool; they drift, and any escape hatch they offer is a
 lie the real rule blocks later. Two load-bearing pieces:
-- `ProcessChatMessage::bindAuth()` binds `TenantContextService` for the whole
-  job (restored in `releaseAuth()`). Without it the unique rules silently
+- `ProcessChatMessage::handle()` runs the whole job inside
+  `CurrentWorkspace::within()`, which binds the CRM workspace and the
+  custom-fields tenant and restores both. Without it the unique rules silently
   no-op in the queued job. That is the exact bug that let chat create
   duplicate emails while the panel form rejected them. Any new chat entry point that
   validates or writes custom fields needs the same binding.
