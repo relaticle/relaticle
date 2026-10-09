@@ -90,10 +90,12 @@ runners are free, and longer when several runs queue for them.
 After each change, while iterating:
 
 1. `vendor/bin/pint --dirty --format agent`: fix code style
-2. `php artisan test --compact <paths>`: the test files you touched, plus the tests
-   that exercise the classes you changed (`grep -rl 'ClassName' tests`). For more than
-   one file, add `--parallel --processes=4` and pass the directory the files share.
-   The Running the suite section of `testing.md` has the form
+2. `composer test:affected`: the tests the branch's changes reach, picked from the TIA
+   baseline and run on four processes. `-- --plan` lists them and runs nothing. When it
+   refuses, or names a file it cannot place, run `php artisan test --compact <paths>`
+   over the test files you touched and the tests that exercise the classes you changed
+   (`grep -rl 'ClassName' tests`). The Running the suite section of `testing.md` has
+   both forms
 
 Once, before pushing:
 
