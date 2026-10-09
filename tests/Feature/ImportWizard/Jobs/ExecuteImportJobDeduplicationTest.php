@@ -877,3 +877,36 @@ it('creates a record with a unique value only a deleted record holds', function 
         ->created_rows->toBe(1)
         ->failed_rows->toBe(0);
 });
+
+it('frees a unique value for a later chunk once an earlier chunk replaced it', function (): void {
+    $field = ImportExecutionFixture::customField($this, 'registration', 'text', 'company');
+    $field->update(['settings' => new CustomFieldSettingsData(unique_per_entity_type: true)]);
+    [$first, $second] = Company::factory()->count(2)->create(['workspace_id' => $this->workspace->id])->all();
+
+    $update = fn (int $number, Company $company, string $registration): array => ImportExecutionFixture::row($number, ['ID' => (string) $company->id, 'Registration' => $registration], [
+        'match_action' => RowMatchAction::Update->value,
+        'matched_id' => (string) $company->id,
+    ]);
+    $skipped = fn (int $from, int $to): array => array_map(
+        fn (int $number): array => ImportExecutionFixture::row($number, ['ID' => '', 'Registration' => ''], ['match_action' => RowMatchAction::Skip->value]),
+        range($from, $to),
+    );
+
+    ImportExecutionFixture::readyStore($this, ['ID', 'Registration'], [
+        $update(2, $first, 'DE811907980'),
+        ...$skipped(3, 501),
+        $update(502, $first, 'DE129273398'),
+        ...$skipped(503, 1001),
+        $update(1002, $second, 'DE811907980'),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Registration', target: 'custom_fields_registration'),
+    ], ImportEntityType::Company);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->updated_rows->toBe(3)
+        ->failed_rows->toBe(0)
+        ->and(ImportExecutionFixture::customFieldValue($this, (string) $second->id, (string) $field->id)->getAttribute($field->getValueColumn()))->toBe('DE811907980');
+});
