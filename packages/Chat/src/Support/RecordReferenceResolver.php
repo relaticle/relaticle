@@ -203,9 +203,8 @@ final readonly class RecordReferenceResolver
 
     private function resolveLabel(string $entityType, string $recordId): ?string
     {
-        // This method exists purely to render a label, which makes it the cheapest
-        // possible cross-tenant disclosure if a foreign id ever reaches it. The explicit
-        // workspace_id predicate is the guard, independent of any ambient workspace.
+        // A label is the cheapest cross-tenant disclosure a foreign id can buy, so the explicit
+        // workspace_id predicate is the guard, whatever workspace is bound.
         $authUser = auth()->user();
 
         if (! $authUser instanceof User) {
