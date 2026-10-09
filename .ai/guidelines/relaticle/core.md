@@ -91,7 +91,9 @@ After each change, while iterating:
 
 1. `vendor/bin/pint --dirty --format agent`: fix code style
 2. `php artisan test --compact <paths>`: the test files you touched, plus the tests
-   that exercise the classes you changed (`grep -rl 'ClassName' tests`)
+   that exercise the classes you changed (`grep -rl 'ClassName' tests`). For more than
+   one file, add `--parallel --processes=4` and pass the directory the files share.
+   The Running the suite section of `testing.md` has the form
 
 Once, before pushing:
 

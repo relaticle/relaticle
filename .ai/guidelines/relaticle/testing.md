@@ -54,6 +54,14 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
 - The normal local run is scoped: `php artisan test --compact <paths>` over the test
   files you touched and the tests that exercise the classes you changed. The Quality
   Checks section of `core.md` lists the whole loop.
+- A run over more than one file goes parallel on four processes:
+  `php artisan test --compact tests/Feature/Api/V1 --parallel --processes=4`. Those 15
+  files take 73s in one process and 28s in four. A parallel run accepts one path. For
+  several files, pass the directory they share and name them:
+  `--filter='(NotesApiTest|TasksApiTest)::'`. Keep the directory, because the same filter
+  over the whole suite loads every test file and gains nothing. One file stays in one
+  process: each worker migrates its own database first. Four processes beat one per core
+  (33s) while other workspaces share the machine.
 - The merge gate is the `Tests` workflow on GitHub, which runs the complete suite on
   every push to a pull request. After a push, watch it as a background task. Do not run
   the complete suite locally to confirm a push.
