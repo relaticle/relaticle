@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -15,7 +16,6 @@ use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
-use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 /**
@@ -43,12 +43,9 @@ final readonly class ProposalEditor
         // Before the pin below, not after: this method validates core fields
         // against the actor's workspace while writing custom fields under the
         // proposal's, so a cross-tenant caller would split one record in two.
-        ProposalOwnership::assert($pendingAction, $user);
+        $workspace = ProposalOwnership::assert($pendingAction, $user);
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
-
-        try {
+        return resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $input, $index): PendingAction {
             return DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
                 /** @var PendingAction $locked */
                 $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
@@ -77,9 +74,7 @@ final readonly class ProposalEditor
 
                 return $locked->refresh();
             });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
     }
 
     /**

@@ -36,6 +36,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentSource;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +53,6 @@ use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 use RuntimeException;
@@ -221,24 +221,12 @@ final readonly class PendingActionService
      */
     public function approve(PendingAction $pendingAction, User $user, array $excludedFields = []): PendingAction
     {
-        ProposalOwnership::assert($pendingAction, $user);
+        $workspace = ProposalOwnership::assert($pendingAction, $user);
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        // The action executes the underlying CRM write, which may persist custom-field
-        // values. When approve() runs there may be no resolvable custom-fields tenant
-        // context (the Livewire dock sets the Filament tenant but not necessarily the
-        // custom-fields one). Without it the custom-fields TenantScope no-ops and
-        // saveCustomFields() iterates EVERY tenant's field definitions, writing value rows
-        // across all tenants (cross-tenant leak) and, at scale, exceeding the request
-        // timeout. Scope it to the action's workspace, and restore the prior value afterward so
-        // the override never outlives this call (TenantContextService resolves its context
-        // before the Filament tenant).
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
-
-        try {
-            $resolved = DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
+        $resolved = resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $excludedFields): PendingAction {
+            return DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
                 /** @var PendingAction $pendingAction */
                 $pendingAction = PendingAction::query()
                     ->lockForUpdate()
@@ -278,9 +266,7 @@ final readonly class PendingActionService
 
                 return $pendingAction->refresh();
             });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
@@ -357,15 +343,12 @@ final readonly class PendingActionService
      */
     public function approveItem(PendingAction $pendingAction, User $user, int $index, array $excludedFields = []): array
     {
-        ProposalOwnership::assert($pendingAction, $user);
+        $workspace = ProposalOwnership::assert($pendingAction, $user);
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
-
-        try {
-            [$finalized, $record, $itemStatus] = DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
+        [$finalized, $record, $itemStatus] = resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $index, $excludedFields): array {
+            return DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
                 /** @var PendingAction $locked */
                 $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
@@ -406,9 +389,7 @@ final readonly class PendingActionService
 
                 return [$finalized, $model, 'approved'];
             });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
 

@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -62,6 +63,11 @@ final readonly class LinkEmailAction
     }
 
     private function claimAndLink(Email $email, bool $reapply): void
+    {
+        resolve(CurrentWorkspace::class)->within($email->workspace_id, fn () => $this->claimAndLinkInTransaction($email, $reapply));
+    }
+
+    private function claimAndLinkInTransaction(Email $email, bool $reapply): void
     {
         DB::transaction(function () use ($email, $reapply): void {
             /** @var Email|null $locked */

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\CurrentSource;
+use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CanonicalValue;
 use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
@@ -126,7 +127,12 @@ final class ExecuteImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        if (CurrentSource::during(CreationSource::IMPORT, $this->runImport(...))) {
+        $handedOff = resolve(CurrentWorkspace::class)->within(
+            $this->workspaceId,
+            fn (): bool => CurrentSource::during(CreationSource::IMPORT, $this->runImport(...)),
+        );
+
+        if ($handedOff) {
             $this->handOff();
         }
     }

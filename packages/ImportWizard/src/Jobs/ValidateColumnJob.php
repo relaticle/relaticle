@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Jobs;
 
+use App\Support\CurrentWorkspace;
 use Illuminate\Bus\Batchable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Database\Connection;
@@ -67,9 +68,11 @@ final class ValidateColumnJob implements ShouldQueue
         $jsonPath = '$.'.$this->column->source;
 
         try {
-            $this->column->isEntityLinkMapping()
-                ? $this->validateEntityLink($import, $reader, $jsonPath)
-                : $this->validateField($import, $reader, $jsonPath);
+            resolve(CurrentWorkspace::class)->within($import->workspace_id, function () use ($import, $reader, $jsonPath): void {
+                $this->column->isEntityLinkMapping()
+                    ? $this->validateEntityLink($import, $reader, $jsonPath)
+                    : $this->validateField($import, $reader, $jsonPath);
+            });
         } catch (ImportStoreException $e) {
             throw_unless($e->isNotFound(), $e);
         } finally {

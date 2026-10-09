@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Jobs;
 
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -12,7 +13,6 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\UniqueFor;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -42,10 +42,7 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
         }
 
         $workspace = $account->workspace()->first();
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($account->workspace_id);
-
-        try {
+        resolve(CurrentWorkspace::class)->within($account->workspace_id, function () use ($linkEmail, $linkMeeting, $account, $workspace): void {
             Email::query()
                 ->withoutGlobalScope(ActiveAccountScope::class)
                 ->where('connected_account_id', $account->getKey())
@@ -72,9 +69,7 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
 
                     $linkMeeting->execute($meeting);
                 });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
     }
 
     public function uniqueId(): string

@@ -27,6 +27,8 @@ final class WorkspaceScope implements Scope
         $workspace = resolve(CurrentWorkspace::class)->get();
 
         if (! $workspace instanceof Workspace) {
+            $builder->whereRaw('1 = 0');
+
             return;
         }
 

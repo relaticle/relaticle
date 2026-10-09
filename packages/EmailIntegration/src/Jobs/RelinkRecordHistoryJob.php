@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Jobs;
 use App\Features\EmailIntegration;
 use App\Models\Company;
 use App\Models\People;
+use App\Support\CurrentWorkspace;
 use App\Support\EmailAddress;
 use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
@@ -19,7 +20,6 @@ use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -52,10 +52,7 @@ final class RelinkRecordHistoryJob implements ShouldBeUniqueUntilProcessing, Sho
             return;
         }
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($workspaceId);
-
-        try {
+        resolve(CurrentWorkspace::class)->within($workspaceId, function () use ($visibility, $domainMatcher, $linkEmail, $linkMeeting, $workspaceId): void {
             $unlinkedParticipants = $this->unlinkedParticipantsMatcher($visibility, $domainMatcher, $workspaceId);
 
             if (! $unlinkedParticipants instanceof Closure) {
@@ -75,9 +72,7 @@ final class RelinkRecordHistoryJob implements ShouldBeUniqueUntilProcessing, Sho
                 ->with(['connectedAccount', 'workspace'])
                 ->lazyById(100)
                 ->each(fn (Meeting $meeting) => $linkMeeting->execute($meeting));
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
     }
 
     public static function shouldRelink(string $workspaceId): bool
