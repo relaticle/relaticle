@@ -519,8 +519,8 @@ it('marks received mail with a bulk header as bulk mail', function (array $heade
 
     expect($email->isBulkMail)->toBe($isBulkMail);
 
-    Http::assertSent(fn (Request $request): bool => ! str_contains((string) $request->url(), '/me/messages/MSG1')
-        || str_contains(urldecode((string) $request->url()), 'internetMessageHeaders'));
+    Http::assertSent(fn (Request $request): bool => str_contains((string) $request->url(), '/me/messages/MSG1')
+        && str_contains(urldecode((string) $request->url()), 'internetMessageHeaders'));
 })->with([
     'list-unsubscribe' => [[['name' => 'List-Unsubscribe', 'value' => '<https://example.com/u>']], true],
     'precedence bulk' => [[['name' => 'Precedence', 'value' => ' Bulk ']], true],

@@ -74,6 +74,17 @@ it('keeps the recent pass when the history cap is wider than the window', functi
     Bus::assertDispatched(fn (InitialEmailSyncJob $job): bool => $job->pass === MailboxImportPass::Recent);
 });
 
+it('keeps the import running after new mail starts syncing, until the history is listed', function (): void {
+    Bus::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+    $account->refresh()->update(['sync_cursor' => 'live-cursor']);
+
+    expect($account->fresh()?->isEmailHistoryImportRunning())->toBeTrue();
+});
+
 it('also queues initial calendar sync when the account has calendar', function (): void {
     Bus::fake();
 
