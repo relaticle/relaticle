@@ -170,20 +170,14 @@ final class MicrosoftGraphMailService implements MailServiceInterface
      */
     private function hasBulkMailHeaders(array $message): bool
     {
-        foreach ($message['internetMessageHeaders'] ?? [] as $header) {
-            $name = Str::lower((string) ($header['name'] ?? ''));
-            $value = Str::lower(trim((string) ($header['value'] ?? '')));
-
-            if ($name === 'list-unsubscribe') {
-                return true;
-            }
-
-            if ($name === 'precedence' && in_array($value, self::BULK_PRECEDENCE, true)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(
+            $message['internetMessageHeaders'] ?? [],
+            fn (array $header): bool => match (Str::lower((string) ($header['name'] ?? ''))) {
+                'list-unsubscribe' => true,
+                'precedence' => in_array(Str::lower(trim((string) ($header['value'] ?? ''))), self::BULK_PRECEDENCE, true),
+                default => false,
+            },
+        );
     }
 
     /**

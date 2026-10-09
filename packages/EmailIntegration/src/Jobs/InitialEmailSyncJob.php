@@ -115,21 +115,21 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $allIds = array_values($page->messageIds->all());
         $newIds = $this->unstoredIds($account, $allIds);
         $historyBatchId = $this->resolveHistoryImportBatchId($account);
-        $pass = $this->pass;
 
         if ($historyBatchId !== null && $page->cursor !== null) {
             self::startSyncingNewMail($account, $page->cursor);
         }
 
-        $nextPageToken = $page->nextPageToken;
-        $pageCursor = $page->cursor;
-
         if ($newIds === [] || $historyBatchId !== null) {
             $mailboxHistoryImport->addStoreJobs($account, $newIds);
-            self::continueOrFinish($account, $pass, $historyCursor, $nextPageToken, $pageCursor, $historyBatchId);
+            self::continueOrFinish($account, $this->pass, $historyCursor, $page->nextPageToken, $page->cursor, $historyBatchId);
 
             return;
         }
+
+        $pass = $this->pass;
+        $nextPageToken = $page->nextPageToken;
+        $pageCursor = $page->cursor;
 
         InitialSyncPageStoreBatch::dispatchEmails(
             account: $account,
