@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
-use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,8 +40,8 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        $workspace = $account->workspace()->first();
-        resolve(CurrentWorkspace::class)->within($account->workspace_id, function () use ($linkEmail, $linkMeeting, $account, $workspace): void {
+        $workspace = $account->workspace()->firstOrFail();
+        resolve(CurrentWorkspace::class)->within($workspace, function () use ($linkEmail, $linkMeeting, $account, $workspace): void {
             Email::query()
                 ->withoutGlobalScope(ActiveAccountScope::class)
                 ->where('connected_account_id', $account->getKey())
@@ -50,9 +49,7 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
                 ->each(function (Email $email) use ($linkEmail, $account, $workspace): void {
                     $email->setRelation('connectedAccount', $account);
 
-                    if ($workspace instanceof Workspace) {
-                        $email->setRelation('workspace', $workspace);
-                    }
+                    $email->setRelation('workspace', $workspace);
 
                     $linkEmail->reapply($email);
                 });
@@ -63,9 +60,7 @@ final class RelinkMailboxHistoryJob implements ShouldBeUnique, ShouldQueue
                 ->each(function (Meeting $meeting) use ($linkMeeting, $account, $workspace): void {
                     $meeting->setRelation('connectedAccount', $account);
 
-                    if ($workspace instanceof Workspace) {
-                        $meeting->setRelation('workspace', $workspace);
-                    }
+                    $meeting->setRelation('workspace', $workspace);
 
                     $linkMeeting->execute($meeting);
                 });

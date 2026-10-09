@@ -68,17 +68,13 @@ final class CurrentWorkspace
             $previousWorkspace?->getKey() === $workspace => $previousWorkspace,
             default => Workspace::query()->findOrFail($workspace),
         };
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-
         $this->set($workspace);
-        // Unbound, the custom-fields TenantScope no-ops and spans every tenant.
-        TenantContextService::setTenantId($workspace->getKey());
 
         try {
-            return $callback();
+            // Unbound, the custom-fields TenantScope no-ops and spans every tenant.
+            return TenantContextService::withTenant($workspace->getKey(), $callback);
         } finally {
             $previousWorkspace instanceof Workspace ? $this->set($previousWorkspace) : $this->forget();
-            TenantContextService::setTenantId($previousTenantId);
         }
     }
 }
