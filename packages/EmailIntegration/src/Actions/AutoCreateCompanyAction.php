@@ -35,7 +35,9 @@ final readonly class AutoCreateCompanyAction
     {
         $host = $this->domainMatcher->host($domain);
 
-        return CurrentSource::during(CreationSource::MAILBOX, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
+        $source = CurrentSource::bound() ?? CreationSource::MAILBOX;
+
+        return CurrentSource::during($source, fn (): Company => $this->advisoryLock->transactional("auto-create-company:{$workspaceId}:{$host}", function () use ($host, $workspaceId): Company {
             // Only create when the domain is not already in another company. The
             // caller's unlocked match can be stale by the time we get the lock, so
             // re-check here under mutual exclusion before creating.
@@ -65,14 +67,19 @@ final readonly class AutoCreateCompanyAction
         TenantContextService::setTenantId($workspaceId);
 
         try {
-            return Company::query()->create([
+            $company = Company::query()->create([
                 'name' => $this->domainToCompanyName($domain),
                 'workspace_id' => $workspaceId,
-                'custom_fields' => [
-                    CompanyField::DOMAINS->value => [$domain],
-                    CompanyField::ICP->value => false,
-                ],
             ]);
+
+            $company->saveCustomFields([
+                CompanyField::DOMAINS->value => [$domain],
+                CompanyField::ICP->value => false,
+            ]);
+
+            $company->touch();
+
+            return $company;
         } finally {
             TenantContextService::setTenantId($previousTenantId);
         }

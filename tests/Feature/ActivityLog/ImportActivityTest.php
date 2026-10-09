@@ -183,7 +183,7 @@ it('logs an import update on a record that already holds several custom field va
         ->and(Activity::query()->where('event', 'custom_field_changes')->count())->toBe(1);
 });
 
-it('logs nothing extra when a later row of the same import lands on a record it just created', function (): void {
+it('logs the company link once when a later row of the same import lands on a record it just created', function (): void {
     $cf = ImportExecutionFixture::customField($this, 'lead_source', 'text');
     Activity::query()->withoutGlobalScopes()->delete();
 
@@ -198,7 +198,14 @@ it('logs nothing extra when a later row of the same import lands on a record it 
 
     ImportExecutionFixture::run($this);
 
-    expect(Activity::query()->where('event', 'custom_field_changes')->count())->toBe(0);
+    $changes = Activity::query()->where('event', 'custom_field_changes')->get();
+    $codes = $changes->flatMap(
+        fn (Activity $activity): array => collect($activity->properties['custom_field_changes'] ?? [])->pluck('code')->all(),
+    )->sort()->values()->all();
+
+    expect($codes)->toBe(['company', 'domains', 'icp'])
+        ->and($changes)->toHaveCount(3)
+        ->and($changes->every(fn (Activity $activity): bool => ($activity->properties['source'] ?? null) === CreationSource::IMPORT->value))->toBeTrue();
 });
 
 function runThreePersonImport(object $context): void
