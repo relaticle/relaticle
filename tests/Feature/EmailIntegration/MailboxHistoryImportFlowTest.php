@@ -959,6 +959,27 @@ it('lists the history again when the owner retries an import whose listing faile
         && $job->pass === MailboxImportPass::Full);
 });
 
+it('never moves the import percent backwards when the full history adds messages', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1'), new StoreEmailJob($account, 'recent-2')]);
+    $batch->recordSuccessfulJob('recent-job');
+
+    expect($import->progressPercent($account->fresh()))->toBe(50);
+
+    $batch->add([new StoreEmailJob($account, 'old-1'), new StoreEmailJob($account, 'old-2')]);
+
+    expect($import->progressPercent($account->fresh()))->toBe(50);
+});
+
 it('waits for pagination before notifying even when a page finishes storing early', function (): void {
     Queue::fake();
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());

@@ -397,7 +397,7 @@ final readonly class MailboxHistoryImportService
                 return $account->sync_cursor !== null && ! $this->isHistoryListingPending($batch->id) ? 100 : 0;
             }
 
-            return $this->batchProgressPercent($batch, $account);
+            return $this->rememberProgressHighWater($batch->id, $this->batchProgressPercent($batch, $account));
         }
 
         if ($account->sync_cursor !== null) {
