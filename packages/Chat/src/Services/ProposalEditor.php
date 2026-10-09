@@ -45,36 +45,34 @@ final readonly class ProposalEditor
         // proposal's, so a cross-tenant caller would split one record in two.
         $workspace = ProposalOwnership::assert($pendingAction, $user);
 
-        return resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $input, $index): PendingAction {
-            return DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
-                /** @var PendingAction $locked */
-                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+        return resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
-                $this->assertEditable($locked);
+            $this->assertEditable($locked);
 
-                $record = $this->resolveRecord($locked, $index);
-                $entity = $locked->entity_type;
+            $record = $this->resolveRecord($locked, $index);
+            $entity = $locked->entity_type;
 
-                [$editedCore, $editedCustomFields] = $this->splitInput($entity, $input);
+            [$editedCore, $editedCustomFields] = $this->splitInput($entity, $input);
 
-                $this->validateCore($user, $entity, $editedCore);
+            $this->validateCore($user, $entity, $editedCore);
 
-                $cleanFields = $this->validateCustomFields($user, $entity, $editedCustomFields);
+            $cleanFields = $this->validateCustomFields($user, $entity, $editedCustomFields);
 
-                $rebuiltRecord = $this->rebuildRecord($user, $entity, $record, $editedCore, $editedCustomFields, $cleanFields);
+            $rebuiltRecord = $this->rebuildRecord($user, $entity, $record, $editedCore, $editedCustomFields, $cleanFields);
 
-                $rebuiltDisplay = $this->displayBuilder->build(
-                    $user,
-                    $entity,
-                    $rebuiltRecord,
-                    $this->currentDisplayFields($locked, $index),
-                );
+            $rebuiltDisplay = $this->displayBuilder->build(
+                $user,
+                $entity,
+                $rebuiltRecord,
+                $this->currentDisplayFields($locked, $index),
+            );
 
-                $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
+            $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
 
-                return $locked->refresh();
-            });
-        });
+            return $locked->refresh();
+        }));
     }
 
     /**

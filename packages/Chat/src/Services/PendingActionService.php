@@ -225,48 +225,46 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        $resolved = resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $excludedFields): PendingAction {
-            return DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
-                /** @var PendingAction $pendingAction */
-                $pendingAction = PendingAction::query()
-                    ->lockForUpdate()
-                    ->findOrFail($pendingAction->getKey());
+        $resolved = resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $excludedFields): PendingAction {
+            /** @var PendingAction $pendingAction */
+            $pendingAction = PendingAction::query()
+                ->lockForUpdate()
+                ->findOrFail($pendingAction->getKey());
 
-                $this->validateResolvable($pendingAction);
+            $this->validateResolvable($pendingAction);
 
-                // Batches resolve one record at a time through approveItem()/rejectItem(),
-                // which is what the dock's per-record Create steps through, one record and
-                // one transaction at a time. Refuse a whole-batch approve so no caller can
-                // bypass that and commit every record in one atomic write with no per-item
-                // outcome.
-                throw_if(
-                    ProposalPayload::from($pendingAction)->isBatch,
-                    RuntimeException::class,
-                    'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
-                );
+            // Batches resolve one record at a time through approveItem()/rejectItem(),
+            // which is what the dock's per-record Create steps through, one record and
+            // one transaction at a time. Refuse a whole-batch approve so no caller can
+            // bypass that and commit every record in one atomic write with no per-item
+            // outcome.
+            throw_if(
+                ProposalPayload::from($pendingAction)->isBatch,
+                RuntimeException::class,
+                'Batch proposals resolve per item via approveItem()/rejectItem(), not approve().',
+            );
 
-                $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
+            $result = CurrentSource::during(CreationSource::CHAT, fn (): mixed => $this->executeAction($pendingAction, $user, $excludedFields));
 
-                $resultData = $result instanceof Model
-                    ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
-                    : ['success' => true];
+            $resultData = $result instanceof Model
+                ? ['id' => $result->getKey(), 'type' => $result->getMorphClass()]
+                : ['success' => true];
 
-                // The audit truth: an excluded field was NOT written, and both the
-                // transcript and the model's <resolved_actions> block must be able to
-                // say so, or the assistant reports a value it never set.
-                if ($excludedFields !== []) {
-                    $resultData['excluded'] = $excludedFields;
-                }
+            // The audit truth: an excluded field was NOT written, and both the
+            // transcript and the model's <resolved_actions> block must be able to
+            // say so, or the assistant reports a value it never set.
+            if ($excludedFields !== []) {
+                $resultData['excluded'] = $excludedFields;
+            }
 
-                $pendingAction->update([
-                    'status' => PendingActionStatus::Approved,
-                    'resolved_at' => now(),
-                    'result_data' => $resultData,
-                ]);
+            $pendingAction->update([
+                'status' => PendingActionStatus::Approved,
+                'resolved_at' => now(),
+                'result_data' => $resultData,
+            ]);
 
-                return $pendingAction->refresh();
-            });
-        });
+            return $pendingAction->refresh();
+        }));
 
         $this->broadcastResolution($resolved, PendingActionStatus::Approved->value, null, true);
 
@@ -347,49 +345,47 @@ final readonly class PendingActionService
 
         $excludedFields = $this->sanitizedExclusions($pendingAction, $excludedFields);
 
-        [$finalized, $record, $itemStatus] = resolve(CurrentWorkspace::class)->within($workspace, function () use ($pendingAction, $user, $index, $excludedFields): array {
-            return DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
-                /** @var PendingAction $locked */
-                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+        [$finalized, $record, $itemStatus] = resolve(CurrentWorkspace::class)->within($workspace, fn (): array => DB::transaction(function () use ($pendingAction, $user, $index, $excludedFields): array {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
-                $this->validateResolvable($locked);
-                $records = ProposalPayload::from($locked)->batchRecords();
-                $this->assertItemIndex($records, $index);
+            $this->validateResolvable($locked);
+            $records = ProposalPayload::from($locked)->batchRecords();
+            $this->assertItemIndex($records, $index);
 
-                $resultData = is_array($locked->result_data) ? $locked->result_data : [];
-                $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
-                $progress = ProposalProgress::of($items, count($records));
+            $resultData = is_array($locked->result_data) ? $locked->result_data : [];
+            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
+            $progress = ProposalProgress::of($items, count($records));
 
-                // Idempotent: an already-resolved item is a no-op (no re-execute). Report
-                // the item's REAL stored status, not an assumed 'approved': it may have
-                // been rejected by an earlier call.
-                if ($progress->isResolved($index)) {
-                    return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
-                }
+            // Idempotent: an already-resolved item is a no-op (no re-execute). Report
+            // the item's REAL stored status, not an assumed 'approved': it may have
+            // been rejected by an earlier call.
+            if ($progress->isResolved($index)) {
+                return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
+            }
 
-                $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
+            $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
 
-                // A failure remembered from an earlier attempt is history the
-                // moment an item commits; leaving it would report a stale error
-                // on a batch that finalizes Approved.
-                unset($resultData['last_error']);
+            // A failure remembered from an earlier attempt is history the
+            // moment an item commits; leaving it would report a stale error
+            // on a batch that finalizes Approved.
+            unset($resultData['last_error']);
 
-                $items[$index] = ['status' => 'approved', 'id' => $model->getKey()];
+            $items[$index] = ['status' => 'approved', 'id' => $model->getKey()];
 
-                if ($excludedFields !== []) {
-                    $items[$index]['excluded'] = $excludedFields;
-                }
-                $resultData['items'] = $items;
-                $resultData['type'] ??= $model->getMorphClass();
-                $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
-                $ids[] = $model->getKey();
-                $resultData['ids'] = array_values($ids);
+            if ($excludedFields !== []) {
+                $items[$index]['excluded'] = $excludedFields;
+            }
+            $resultData['items'] = $items;
+            $resultData['type'] ??= $model->getMorphClass();
+            $ids = is_array($resultData['ids'] ?? null) ? $resultData['ids'] : [];
+            $ids[] = $model->getKey();
+            $resultData['ids'] = array_values($ids);
 
-                $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
+            $finalized = $this->finalizeBatchIfComplete($locked, $items, $records, $resultData);
 
-                return [$finalized, $model, 'approved'];
-            });
-        });
+            return [$finalized, $model, 'approved'];
+        }));
 
         $this->broadcastResolution($pendingAction, $itemStatus, $index, $finalized);
 

@@ -8,11 +8,13 @@ use App\Enums\CustomFieldType;
 use App\Enums\MediaCollection;
 use App\Enums\UploadSource;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\HasMedia;
@@ -37,7 +39,7 @@ final class BackfillRichEditorAttachmentsCommand extends Command
             ->withoutGlobalScopes()
             ->whereHas('customField', fn (Builder $query): Builder => $query->withoutGlobalScopes()->where('type', CustomFieldType::RICH_EDITOR->value))
             ->where('text_value', 'like', '%<img%')
-            ->with(['entity', 'customField' => fn (Relation $query): Relation => $query->withoutGlobalScopes()])
+            ->with(['entity' => fn (MorphTo $entity): MorphTo => $entity->withoutGlobalScope(WorkspaceScope::class), 'customField' => fn (Relation $query): Relation => $query->withoutGlobalScopes()])
             ->lazyById();
 
         foreach ($values as $value) {

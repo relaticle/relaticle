@@ -53,7 +53,6 @@ return [
                 'Relaticle\Chat\Services\CreditService::deduct' => 63,
                 'Relaticle\Chat\Services\CreditService::recordResolution' => 68,
                 'Relaticle\Chat\Services\MyTasksService::forUser' => 74,
-                'Relaticle\Chat\Services\PendingActionService::approve' => 67,
                 'Relaticle\Chat\Services\TipTapDocumentParser::walkDocument' => 67,
                 'Relaticle\Chat\Services\Tools\PlanReferenceValidator::error' => 66,
                 'Relaticle\Chat\Tools\Activity\ListActivityTool::handle' => 74,
