@@ -18,6 +18,14 @@ enum EmailProvider: string implements HasColor, HasIcon, HasLabel
         return filled(config("services.{$this->value}.client_id"));
     }
 
+    public function returnsCursorAfterListing(): bool
+    {
+        return match ($this) {
+            self::GMAIL => false,
+            self::AZURE => true,
+        };
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

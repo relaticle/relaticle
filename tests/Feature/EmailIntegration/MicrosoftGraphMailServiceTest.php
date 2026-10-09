@@ -507,6 +507,47 @@ it('maps a localized Graph sent items folder as sent', function (): void {
         ->and($email->direction)->toBe(EmailDirection::OUTBOUND);
 });
 
+it('marks received mail with a bulk header as bulk mail', function (array $headers, bool $isBulkMail): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'internetMessageHeaders' => $headers,
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1');
+
+    expect($email->isBulkMail)->toBe($isBulkMail);
+
+    Http::assertSent(fn (Request $request): bool => str_contains((string) $request->url(), '/me/messages/MSG1')
+        && str_contains(urldecode((string) $request->url()), 'internetMessageHeaders'));
+})->with([
+    'list-unsubscribe' => [[['name' => 'List-Unsubscribe', 'value' => '<https://example.com/u>']], true],
+    'precedence bulk' => [[['name' => 'Precedence', 'value' => ' Bulk ']], true],
+    'precedence junk' => [[['name' => 'precedence', 'value' => 'junk']], true],
+    'precedence list' => [[['name' => 'Precedence', 'value' => 'list']], false],
+    'a mailing list id alone' => [[['name' => 'List-Id', 'value' => '<sales.example.com>']], false],
+    'an auto reply' => [[['name' => 'Auto-Submitted', 'value' => 'auto-replied']], false],
+    'no headers' => [[], false],
+]);
+
+it('never marks mail the mailbox sent as bulk mail', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes([
+            'sentitems' => ['id' => 'sent-folder-id', 'displayName' => 'Sent Items'],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/SENT1*' => Http::response(graphMessagePayload([
+            'id' => 'SENT1',
+            'parentFolderId' => 'sent-folder-id',
+            'internetMessageHeaders' => [['name' => 'List-Unsubscribe', 'value' => '<https://example.com/u>']],
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('SENT1');
+
+    expect($email->isBulkMail)->toBeFalse();
+});
+
 it('does not treat a custom folder named Drafts as the well-known drafts folder', function (): void {
     Http::fake([
         ...graphWellKnownFolderFakes(),

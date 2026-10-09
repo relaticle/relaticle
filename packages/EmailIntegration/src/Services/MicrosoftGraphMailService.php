@@ -26,6 +26,8 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     /** Well-known folders whose mail never syncs. Their subfolders are skipped with them. */
     private const array EXCLUDED_FOLDERS = ['junkemail', 'deleteditems', 'outbox', 'conversationhistory', 'clutter', 'syncissues'];
 
+    private const array BULK_PRECEDENCE = ['bulk', 'junk'];
+
     private const int CURSOR_VERSION = 2;
 
     public const string PENDING_MESSAGE_ID_PREFIX = 'ms-pending-';
@@ -120,7 +122,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     public function fetchMessage(string $providerMessageId): FetchedEmailData
     {
         $message = $this->getMessageJson($providerMessageId, [
-            '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
+            '$select' => 'id,internetMessageId,internetMessageHeaders,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
             // Pull attachment metadata (not bytes) alongside the message so has-attachment
             // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
             // contentId lives on fileAttachment; Graph answers 400 when it is selected on the base type.
@@ -159,6 +161,22 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             participants: $participants,
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
             reconciliationMessageId: $this->reconciliationMessageId($message),
+            isBulkMail: ! $isOutbound && $this->hasBulkMailHeaders($message),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     */
+    private function hasBulkMailHeaders(array $message): bool
+    {
+        return array_any(
+            $message['internetMessageHeaders'] ?? [],
+            fn (array $header): bool => match (Str::lower((string) ($header['name'] ?? ''))) {
+                'list-unsubscribe' => true,
+                'precedence' => in_array(Str::lower(trim((string) ($header['value'] ?? ''))), self::BULK_PRECEDENCE, true),
+                default => false,
+            },
         );
     }
 

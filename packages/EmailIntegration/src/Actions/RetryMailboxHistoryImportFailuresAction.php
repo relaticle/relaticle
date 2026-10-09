@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
+use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
@@ -45,9 +46,9 @@ final readonly class RetryMailboxHistoryImportFailuresAction
             }
 
             $retryableUuids = $this->retryableFailedJobUuids($batch, $batchId);
-            $needsCalendar = $this->needsCalendarRecovery($account, $batchId);
+            $needsListing = $this->needsListingRecovery($account, $batchId);
 
-            if ($retryableUuids === [] && ! $needsCalendar) {
+            if ($retryableUuids === [] && ! $needsListing) {
                 return $this->recoveryAlreadyQueued($batch, $batchId);
             }
 
@@ -71,7 +72,7 @@ final readonly class RetryMailboxHistoryImportFailuresAction
                     $queued = true;
                 }
 
-                if ($needsCalendar && $this->queueCalendarRecovery($account, $batchId)) {
+                if ($needsListing && $this->queueListingRecovery($account, $batchId)) {
                     $queued = true;
                 }
             } catch (Throwable) {
@@ -140,7 +141,39 @@ final readonly class RetryMailboxHistoryImportFailuresAction
             return true;
         }
 
+        if ($this->mailboxHistoryImport->isHistoryListingPending($batchId)) {
+            return true;
+        }
+
         return $batch->pendingJobs > count($batch->failedJobIds);
+    }
+
+    private function needsListingRecovery(ConnectedAccount $account, string $batchId): bool
+    {
+        return $this->needsCalendarRecovery($account, $batchId)
+            || $this->mailboxHistoryImport->hasHistoryListingFailed($batchId);
+    }
+
+    private function queueListingRecovery(ConnectedAccount $account, string $batchId): bool
+    {
+        $queued = $this->needsCalendarRecovery($account, $batchId)
+            && $this->queueCalendarRecovery($account, $batchId);
+
+        if (! $this->mailboxHistoryImport->hasHistoryListingFailed($batchId)) {
+            return $queued;
+        }
+
+        $this->queueHistoryListing($account, $batchId);
+
+        return true;
+    }
+
+    private function queueHistoryListing(ConnectedAccount $account, string $batchId): void
+    {
+        $this->mailboxHistoryImport->markEmailListingStarted($account);
+        $this->mailboxHistoryImport->markHistoryListingPending($batchId);
+
+        dispatch(new InitialEmailSyncJob($account, historyImportBatchId: $batchId));
     }
 
     private function queueCalendarRecovery(ConnectedAccount $account, string $batchId): bool
