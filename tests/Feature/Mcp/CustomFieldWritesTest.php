@@ -62,7 +62,7 @@ function statusOptionId(CustomField $field, string $label): string
 function workspaceScopedCompanyLookups(): Collection
 {
     return collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'workspace_id'),
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'where "workspace_id"'),
     );
 }
 

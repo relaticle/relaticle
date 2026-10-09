@@ -14,7 +14,9 @@ use App\Models\CustomField;
 use App\Models\Export;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
@@ -27,6 +29,8 @@ mutates(CompanyExporter::class);
 beforeEach(function () {
     Event::fake()->except([
         WorkspaceCreated::class,
+        Authenticated::class,
+        TenantSet::class,
         'eloquent.creating: App\\Models\\Workspace',
     ]);
 

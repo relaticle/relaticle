@@ -7,6 +7,7 @@ use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -44,7 +45,7 @@ it('keeps each workspace to itself across sequential requests in one process', f
     $this->getJson("/api/v1/companies/{$otherCompany->id}")->assertOk();
     $this->getJson("/api/v1/companies/{$ownCompany->id}")->assertNotFound();
 
-    expect(Company::query()->whereKey([$ownCompany->id, $otherCompany->id])->count())->toBe(2);
+    expect(resolve(CurrentWorkspace::class)->get())->toBeNull();
 });
 
 it('leaves user queries unscoped once an api request ends', function (): void {

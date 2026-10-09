@@ -6,6 +6,8 @@ use App\Enums\CustomFields\PeopleField;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Google\Service\Exception as GoogleServiceException;
 use Illuminate\Contracts\Queue\Job as QueueJob;
 use Illuminate\Support\Facades\Cache;
@@ -360,6 +362,7 @@ it('completes the batch when a later step fails after the provider already accep
         }
     });
 
+    resolve(CurrentWorkspace::class)->set(Workspace::query()->findOrFail($email->workspace_id));
     $job = new SendEmailJob($email->getKey());
     $sendingService = app(EmailSendingService::class);
     $linkEmailAction = app(LinkEmailAction::class);
@@ -512,6 +515,7 @@ it('retries linking after a post-send crash without double-counting the batch or
         throw new RuntimeException('link failed');
     });
 
+    resolve(CurrentWorkspace::class)->set(Workspace::query()->findOrFail($email->workspace_id));
     $job = new SendEmailJob($email->getKey());
     $sendingService = app(EmailSendingService::class);
     $linkEmailAction = app(LinkEmailAction::class);

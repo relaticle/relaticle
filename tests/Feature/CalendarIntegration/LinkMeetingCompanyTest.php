@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Arr;
@@ -26,6 +27,7 @@ it('auto-links a meeting to a company by attendee email domain', function (): vo
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->getKey(),
         'email_address' => 'person@acme.com',
@@ -46,6 +48,7 @@ it('skips company creation for public domains', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->getKey(),
         'email_address' => 'user@gmail.com',
@@ -87,6 +90,7 @@ it('does not downgrade an existing manual company link to auto', function (): vo
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->getKey(),
         'email_address' => 'person@acme.com',
@@ -135,6 +139,7 @@ it('advances the meeting counters of linked companies in id order whatever the a
         'workspace_id' => $workspace->id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
 
     foreach (['acme.com', 'globex.com'] as $domain) {
         MeetingAttendee::factory()->create([

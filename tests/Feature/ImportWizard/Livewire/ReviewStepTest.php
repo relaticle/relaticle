@@ -6,7 +6,9 @@ use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Bus\PendingBatch;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Bus;
@@ -35,7 +37,7 @@ mutates(ReviewStep::class, ValidateColumnJob::class);
 beforeEach(function (): void {
     // Override the global Event::fake() from Pest.php to allow WorkspaceCreated through,
     // so CreateWorkspaceCustomFields listener runs and creates email/phone custom fields.
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -663,7 +665,7 @@ describe('on a remote store disk', function (): void {
 
     it('does not turn a failed snapshot into a retry notification', function (): void {
         $component = mountReviewStep($this);
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
         DB::listen(function (QueryExecuted $query): void {
             if (str_contains($query->sql, 'UPDATE import_rows')) {
                 Cache::lock(importStoreLockName($this->import->id))->forceRelease();
