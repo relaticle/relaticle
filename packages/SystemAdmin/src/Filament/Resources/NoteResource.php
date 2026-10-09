@@ -6,6 +6,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Models\Note;
+use App\Models\Scopes\WorkspaceScope;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -18,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\CreateNote;
 use Relaticle\SystemAdmin\Filament\Resources\NoteResource\Pages\EditNote;
@@ -144,5 +146,13 @@ final class NoteResource extends Resource
             'view' => ViewNote::route('/{record}'),
             'edit' => EditNote::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * @return Builder<Note>
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 }

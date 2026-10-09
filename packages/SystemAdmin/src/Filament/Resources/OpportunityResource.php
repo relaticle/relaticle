@@ -6,6 +6,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Models\Opportunity;
+use App\Models\Scopes\WorkspaceScope;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -18,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\CreateOpportunity;
 use Relaticle\SystemAdmin\Filament\Resources\OpportunityResource\Pages\EditOpportunity;
@@ -165,5 +167,13 @@ final class OpportunityResource extends Resource
             'view' => ViewOpportunity::route('/{record}'),
             'edit' => EditOpportunity::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * @return Builder<Opportunity>
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 }

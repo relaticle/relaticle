@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\CreationSource;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -18,6 +19,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\CreateTask;
 use Relaticle\SystemAdmin\Filament\Resources\TaskResource\Pages\EditTask;
@@ -144,5 +146,13 @@ final class TaskResource extends Resource
             'view' => ViewTask::route('/{record}'),
             'edit' => EditTask::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * @return Builder<Task>
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 }
