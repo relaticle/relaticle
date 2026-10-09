@@ -849,7 +849,7 @@ it('stops listing history for an import that was restarted', function (): void {
     Queue::assertNotPushed(InitialEmailSyncJob::class);
 });
 
-it('stops waiting for the history listing once it fails', function (): void {
+it('keeps a live mailbox syncing and reports the unfinished history when the listing fails', function (): void {
     Queue::fake();
 
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
@@ -859,11 +859,104 @@ it('stops waiting for the history listing once it fails', function (): void {
     $import = resolve(MailboxHistoryImportService::class);
     $import->markHistoryListingPending($batchId);
 
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1')]);
+
     new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
         ->failed(new RuntimeException('Graph is down'));
 
     expect($import->isHistoryListingPending($batchId))->toBeFalse()
-        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR);
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($account->user->notifications()->count())->toBe(0);
+
+    $batch->recordSuccessfulJob('recent-job');
+
+    $notification = $account->user->notifications()->sole();
+
+    expect($notification->data['status'])->toBe('warning')
+        ->and($notification->data['body'])->toContain(__('filament/notifications/mailbox-import-complete.email_history_did_not_finish'))
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeFalse();
+});
+
+it('reports the unfinished history when the listing fails after every listed message is stored', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1')]);
+    $batch->recordSuccessfulJob('recent-job');
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    expect($account->user->notifications()->sole()->data['status'])->toBe('warning');
+});
+
+it('parks a live mailbox for reconnection and keeps the error when the listing fails on a rejected token', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('invalid_grant: Bad Request'));
+
+    expect($account->fresh())
+        ->status->toBe(EmailAccountStatus::REAUTH_REQUIRED)
+        ->last_error->toBe('invalid_grant: Bad Request')
+        ->and($account->user->notifications()->sole()->data['status'])->toBe('warning');
+});
+
+it('fails a mailbox that was not syncing yet when the listing fails', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => null,
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    expect($account->fresh())
+        ->status->toBe(EmailAccountStatus::ERROR)
+        ->last_error->toBe('Graph is down')
+        ->and($account->user->notifications()->count())->toBe(0);
+});
+
+it('lists the history again when the owner retries an import whose listing failed', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $owner = mailboxOwnerInWorkspace($account);
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    $queued = resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($owner, $account->fresh(), $batchId);
+
+    expect($queued)->toBeTrue()
+        ->and($import->isHistoryListingPending($batchId))->toBeTrue()
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeTrue();
+
+    Queue::assertPushed(fn (InitialEmailSyncJob $job): bool => $job->historyImportBatchId === $batchId
+        && $job->pageToken === null
+        && $job->pass === MailboxImportPass::Full);
 });
 
 it('waits for pagination before notifying even when a page finishes storing early', function (): void {

@@ -67,7 +67,7 @@ return [
                 'Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool::handle' => 102,
                 'Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool::handle' => 138,
                 'Relaticle\Chat\Tools\SearchCrmTool::handle' => 64,
-                'Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction::execute' => 75,
+                'Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction::execute' => 73,
                 'Relaticle\EmailIntegration\Actions\ConnectAccountAction::execute' => 115,
                 'Relaticle\EmailIntegration\Actions\LinkEmailAction::link' => 109,
                 'Relaticle\EmailIntegration\Actions\LinkMeetingAction::execute' => 77,

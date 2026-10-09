@@ -58,14 +58,11 @@ final readonly class CompleteMailboxHistoryImportAction
             $failedEmailCount = count($batch->failedJobIds);
             $failedCalendarCount = $this->mailboxHistoryImport->calendarFailureCount($batchId);
             $calendarDidNotFinish = $account->hasCalendar() && $account->calendar_sync_cursor === null;
-            $hasEmailFailures = $failedEmailCount > 0;
+            $emailHistoryDidNotFinish = $this->mailboxHistoryImport->hasHistoryListingFailed($batchId);
+            $hasEmailFailures = $failedEmailCount > 0 || $emailHistoryDidNotFinish;
             $hasCalendarIssues = $failedCalendarCount > 0 || $calendarDidNotFinish;
 
-            $updates = ['initial_sync_imported' => $account->emails()->count()];
-
-            if ($account->hasCalendar()) {
-                $updates['initial_calendar_sync_imported'] = $account->meetings()->count();
-            }
+            $updates = $this->importedCounts($account);
 
             if (! $hasEmailFailures && ! $hasCalendarIssues) {
                 $updates['last_error'] = null;
@@ -88,6 +85,7 @@ final readonly class CompleteMailboxHistoryImportAction
                     failedEmailCount: $failedEmailCount,
                     failedCalendarCount: $failedCalendarCount,
                     calendarDidNotFinish: $calendarDidNotFinish,
+                    emailHistoryDidNotFinish: $emailHistoryDidNotFinish,
                 );
 
                 return;
@@ -105,6 +103,20 @@ final readonly class CompleteMailboxHistoryImportAction
                 $this->notifyImportComplete($user, $account, $batchId, afterRetry: true);
             }
         });
+    }
+
+    /**
+     * @return array<string, int|null>
+     */
+    private function importedCounts(ConnectedAccount $account): array
+    {
+        $counts = ['initial_sync_imported' => $account->emails()->count()];
+
+        if ($account->hasCalendar()) {
+            $counts['initial_calendar_sync_imported'] = $account->meetings()->count();
+        }
+
+        return $counts;
     }
 
     private function importBatchHasSettled(Batch $batch, string $batchId): bool
@@ -128,6 +140,7 @@ final readonly class CompleteMailboxHistoryImportAction
         int $failedEmailCount = 0,
         int $failedCalendarCount = 0,
         bool $calendarDidNotFinish = false,
+        bool $emailHistoryDidNotFinish = false,
     ): void {
         if (! $afterRetry) {
             $account->update(['history_import_notified_batch_id' => $batchId]);
@@ -144,6 +157,7 @@ final readonly class CompleteMailboxHistoryImportAction
             $account->hasCalendar() ? $account->initial_calendar_sync_imported : 0,
             $account->hasCalendar(),
         );
+        $notification->emailHistoryDidNotFinish = $emailHistoryDidNotFinish;
         $user->notifyNow($notification, ['database']);
 
         dispatch(new SendQueuedNotifications(collect([$user]), $notification, ['mail'])->afterCommit());

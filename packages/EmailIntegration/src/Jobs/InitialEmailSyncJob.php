@@ -188,17 +188,32 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
 
     public function failed(Throwable $exception): void
     {
+        $account = $this->connectedAccount;
+        $batchId = $this->historyImportBatchId;
         $mailboxHistoryImport = resolve(MailboxHistoryImportService::class);
-        $mailboxHistoryImport->markEmailListingFinished($this->connectedAccount);
+        $mailboxHistoryImport->markEmailListingFinished($account);
 
-        if ($this->historyImportBatchId !== null) {
-            $mailboxHistoryImport->markHistoryListingFinished($this->historyImportBatchId);
+        if ($batchId !== null) {
+            $mailboxHistoryImport->markHistoryListingFailed($batchId);
         }
 
-        $this->connectedAccount->update([
-            'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
-            'last_error' => $exception->getMessage(),
-        ]);
+        if (! $this->keepsSyncingNewMailAfter($exception)) {
+            $account->update([
+                'status' => $this->isAuthError($exception) ? EmailAccountStatus::REAUTH_REQUIRED : EmailAccountStatus::ERROR,
+                'last_error' => $exception->getMessage(),
+            ]);
+        }
+
+        if ($batchId !== null) {
+            resolve(CompleteMailboxHistoryImportAction::class)->execute((string) $account->getKey(), $batchId);
+        }
+    }
+
+    private function keepsSyncingNewMailAfter(Throwable $exception): bool
+    {
+        return $this->historyImportBatchId !== null
+            && $this->connectedAccount->sync_cursor !== null
+            && ! $this->isAuthError($exception);
     }
 
     public function uniqueId(): string

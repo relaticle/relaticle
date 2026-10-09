@@ -25,6 +25,8 @@ final readonly class MailboxHistoryImportService
 
     private const string HISTORY_LISTING_PENDING_PREFIX = 'email-integration:history-import-listing-pending:';
 
+    private const string HISTORY_LISTING_FAILED_PREFIX = 'email-integration:history-import-listing-failed:';
+
     private const string CALENDAR_IMPORT_PENDING_PREFIX = 'email-integration:history-import-calendar-pending:';
 
     private const string CALENDAR_DISCOVERED_PREFIX = 'email-integration:history-import-calendar-discovered:';
@@ -104,6 +106,18 @@ final readonly class MailboxHistoryImportService
     public function markHistoryListingPending(string $batchId): void
     {
         Cache::put(self::HISTORY_LISTING_PENDING_PREFIX.$batchId, true, now()->addMonth());
+        Cache::forget(self::HISTORY_LISTING_FAILED_PREFIX.$batchId);
+    }
+
+    public function markHistoryListingFailed(string $batchId): void
+    {
+        Cache::put(self::HISTORY_LISTING_FAILED_PREFIX.$batchId, true, now()->addMonth());
+        Cache::forget(self::HISTORY_LISTING_PENDING_PREFIX.$batchId);
+    }
+
+    public function hasHistoryListingFailed(string $batchId): bool
+    {
+        return Cache::has(self::HISTORY_LISTING_FAILED_PREFIX.$batchId);
     }
 
     public function markHistoryListingFinished(string $batchId): void

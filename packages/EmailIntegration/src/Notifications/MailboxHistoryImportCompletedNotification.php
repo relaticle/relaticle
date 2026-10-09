@@ -24,6 +24,9 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
 
     public readonly bool $includesCalendar;
 
+    // Never a constructor argument: a notification queued before this existed unserializes without it and needs this default.
+    public bool $emailHistoryDidNotFinish = false;
+
     public function __construct(
         public readonly ConnectedAccount $account,
         public readonly ?string $batchId = null,
@@ -110,7 +113,7 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
     public function hasIssues(): bool
     {
         return ! $this->afterFailedImportRetry
-            && ($this->failedEmailCount > 0 || $this->failedCalendarCount > 0 || $this->calendarDidNotFinish);
+            && ($this->failedEmailCount > 0 || $this->failedCalendarCount > 0 || $this->calendarDidNotFinish || $this->emailHistoryDidNotFinish);
     }
 
     private function kind(): string
@@ -189,6 +192,10 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
     private function failureSummary(): string
     {
         $parts = [];
+
+        if ($this->emailHistoryDidNotFinish) {
+            $parts[] = __('filament/notifications/mailbox-import-complete.email_history_did_not_finish');
+        }
 
         if ($this->failedEmailCount > 0) {
             $parts[] = trans_choice('filament/notifications/mailbox-import-complete.failed_messages', $this->failedEmailCount, [
