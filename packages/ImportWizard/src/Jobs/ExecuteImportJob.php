@@ -26,6 +26,7 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Middleware\FailOnException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -33,9 +34,12 @@ use Illuminate\Support\Str;
 use LogicException;
 use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Enums\FieldDataType;
+use Relaticle\CustomFields\Exceptions\UniqueCustomFieldValueTaken;
 use Relaticle\CustomFields\Filament\Integration\Support\Imports\ImportDataStorage;
 use Relaticle\CustomFields\Models\CustomFieldOption;
 use Relaticle\CustomFields\Models\CustomFieldValue;
+use Relaticle\CustomFields\Rules\UniqueCustomFieldValue;
+use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\CustomFields\Support\SafeValueConverter;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\EntityLink;
@@ -102,6 +106,9 @@ final class ExecuteImportJob implements ShouldQueue
 
     /** @var array<string, true> */
     private array $recordsCreatedHere = [];
+
+    /** @var array<string, string> "{customFieldId}|{spelling}" => key of the record whose staged value holds it */
+    private array $claimedUniqueValues = [];
 
     /**
      * Zone the CSV's naive datetimes are interpreted in: the importer's own, so an
@@ -445,14 +452,6 @@ final class ExecuteImportJob implements ShouldQueue
                 $record->forceFill($prepared);
                 $record->save();
 
-                if ($isCreate) {
-                    $this->recordsCreatedHere[$this->recordKey($record)] = true;
-                }
-
-                if ($isCreate && $matchField instanceof MatchableField && $matchSourceColumn !== null) {
-                    $this->registerInMatchableValueCache($row, $matchField, $matchSourceColumn, (string) $record->getKey(), $customFieldDefs);
-                }
-
                 $this->storeEntityLinkRelationships($record, $pendingRelationships, $context);
 
                 $storedCustomFieldData = ImportDataStorage::pull($record);
@@ -466,6 +465,14 @@ final class ExecuteImportJob implements ShouldQueue
                 }
 
                 $importer->afterSave($record, $context);
+
+                if ($isCreate) {
+                    $this->recordsCreatedHere[$this->recordKey($record)] = true;
+                }
+
+                if ($isCreate && $matchField instanceof MatchableField && $matchSourceColumn !== null) {
+                    $this->registerInMatchableValueCache($row, $matchField, $matchSourceColumn, (string) $record->getKey(), $customFieldDefs);
+                }
 
                 // Counted last. A rollback undoes the record but not a PHP counter, so
                 // incrementing before the custom-field pass could report a row as created
@@ -517,27 +524,14 @@ final class ExecuteImportJob implements ShouldQueue
             ? collect()
             : $record->loadMissing('customFieldValues')->getRelation('customFieldValues')->keyBy('custom_field_id');
 
-        foreach ($customFieldData as $code => $value) {
+        $safeValues = $this->safeCustomFieldValues($record, $customFieldData, $customFieldDefs, $customFieldFormatMap, $existingValues, $isCreate);
+
+        // Before the first value is staged: a row that fails here must leave nothing for the flush.
+        $this->claimUniqueValues($record, $safeValues, $customFieldDefs, $isCreate);
+
+        foreach ($safeValues as $code => $safeValue) {
             $cf = $customFieldDefs->get($code);
-
-            if ($cf === null) {
-                continue;
-            }
-
-            $value = $this->convertCustomFieldValue($value, $cf, $customFieldFormatMap[$code] ?? null);
-
             $valueColumn = CustomFieldValue::getValueColumn($cf->type);
-            $safeValue = SafeValueConverter::toDbSafe($value, $cf->type, $cf);
-
-            // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
-            // rejects a blank string for a date/timestamp column.
-            if (is_string($safeValue) && blank($safeValue) && $cf->typeData->dataType->isDateOrDateTime()) {
-                $safeValue = null;
-            }
-
-            if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
-                $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $existingValues->get($cf->getKey()));
-            }
 
             if ($cf->promotesValuesToOptions() && is_array($safeValue)) {
                 $this->accumulateTagOptions($cf, $safeValue);
@@ -569,6 +563,110 @@ final class ExecuteImportJob implements ShouldQueue
                 $this->stageCustomFieldChange($record, $cf, $existingValues->get($cf->getKey()), $valueColumn, $row[$valueColumn]);
             }
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $customFieldData
+     * @param  Collection<string, CustomField>  $customFieldDefs
+     * @param  array<string, ColumnData>  $customFieldFormatMap
+     * @param  Collection<int|string, CustomFieldValue>  $existingValues
+     * @return array<string, mixed>
+     */
+    private function safeCustomFieldValues(
+        Model $record,
+        array $customFieldData,
+        Collection $customFieldDefs,
+        array $customFieldFormatMap,
+        Collection $existingValues,
+        bool $isCreate,
+    ): array {
+        $safeValues = [];
+
+        foreach ($customFieldData as $code => $value) {
+            $cf = $customFieldDefs->get($code);
+
+            if ($cf === null) {
+                continue;
+            }
+
+            $value = $this->convertCustomFieldValue($value, $cf, $customFieldFormatMap[$code] ?? null);
+            $safeValue = SafeValueConverter::toDbSafe($value, $cf->type, $cf);
+
+            // SafeValueConverter passes string-backed types through untouched, and PostgreSQL
+            // rejects a blank string for a date/timestamp column.
+            if (is_string($safeValue) && blank($safeValue) && $cf->typeData->dataType->isDateOrDateTime()) {
+                $safeValue = null;
+            }
+
+            if (! $isCreate && $cf->typeData->dataType === FieldDataType::MULTI_CHOICE && is_array($safeValue)) {
+                $safeValue = $this->mergeWithExistingMultiChoiceValues($record, $cf, $safeValue, $existingValues->get($cf->getKey()));
+            }
+
+            $safeValues[$code] = $safeValue;
+        }
+
+        return $safeValues;
+    }
+
+    /**
+     * @param  array<string, mixed>  $safeValues
+     * @param  Collection<string, CustomField>  $customFieldDefs
+     */
+    private function claimUniqueValues(Model $record, array $safeValues, Collection $customFieldDefs, bool $isCreate): void
+    {
+        $claims = [];
+
+        foreach ($safeValues as $code => $safeValue) {
+            $cf = $customFieldDefs->get($code);
+
+            if (! $cf->settings->unique_per_entity_type) {
+                continue;
+            }
+
+            $rule = new UniqueCustomFieldValue($cf, $record->getKey(), exceptHeldValues: ! $isCreate);
+
+            foreach (Arr::wrap($safeValue) as $candidate) {
+                if (! is_scalar($candidate) || blank($candidate)) {
+                    continue;
+                }
+
+                $keys = array_map(
+                    fn (string $spelling): string => $cf->getKey().'|'.$spelling,
+                    CanonicalValue::spellings($cf, (string) $candidate),
+                );
+
+                throw_if(
+                    $this->claimedByAnotherRecord($record, $keys) || $this->heldByAnotherRecord($rule, $candidate),
+                    UniqueCustomFieldValueTaken::class,
+                    $record,
+                    $cf,
+                    (string) $candidate,
+                );
+
+                $claims = [...$claims, ...$keys];
+            }
+        }
+
+        foreach ($claims as $key) {
+            $this->claimedUniqueValues[$key] = $this->recordKey($record);
+        }
+    }
+
+    /** @param  list<string>  $keys */
+    private function claimedByAnotherRecord(Model $record, array $keys): bool
+    {
+        return array_any(
+            $keys,
+            fn (string $key): bool => ($this->claimedUniqueValues[$key] ?? $this->recordKey($record)) !== $this->recordKey($record),
+        );
+    }
+
+    private function heldByAnotherRecord(UniqueCustomFieldValue $rule, mixed $candidate): bool
+    {
+        return TenantContextService::withTenant(
+            $this->workspaceId,
+            fn (): bool => validator(['value' => $candidate], ['value' => [$rule]])->fails(),
+        );
     }
 
     private function recordKey(Model $record): string
@@ -659,6 +757,7 @@ final class ExecuteImportJob implements ShouldQueue
         }
 
         $this->pendingCustomFieldValues = [];
+        $this->claimedUniqueValues = [];
 
         event(new CustomFieldValuesImported(array_values(array_map(
             static fn (array $row): array => [
