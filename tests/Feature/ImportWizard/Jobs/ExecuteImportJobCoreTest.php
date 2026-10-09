@@ -12,7 +12,9 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Filesystem\FilesystemAdapter;
@@ -39,7 +41,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -1076,7 +1078,7 @@ describe('on a remote store disk', function (): void {
         ], [
             ColumnData::toField(source: 'Name', target: 'name'),
         ]);
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
         $failures = 0;
         DB::listen(function (QueryExecuted $query) use (&$failures): void {
             if ($failures === 0 && str_starts_with($query->sql, 'insert into "failed_import_rows"')) {
@@ -1140,7 +1142,7 @@ describe('on a remote store disk', function (): void {
                 return false;
             }
         });
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
         DB::listen(function (QueryExecuted $query): void {
             if (str_starts_with($query->sql, 'update "import_rows" set "processed"')) {
                 throw new RuntimeException('Database went away');

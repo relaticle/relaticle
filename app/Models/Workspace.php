@@ -16,6 +16,7 @@ use App\Events\WorkspaceDeleted;
 use App\Events\WorkspaceUpdated;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
+use App\Models\Scopes\WorkspaceScope as CrmWorkspaceScope;
 use App\Services\AvatarService;
 use App\Support\Media\UploadAllowlist;
 use App\Support\ReservedSlugAwareGenerateSlugAction;
@@ -516,7 +517,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     public function people(): HasMany
     {
-        return $this->hasMany(People::class);
+        return $this->hasMany(People::class)->withoutGlobalScope(CrmWorkspaceScope::class);
     }
 
     /**
@@ -524,7 +525,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     public function companies(): HasMany
     {
-        return $this->hasMany(Company::class);
+        return $this->hasMany(Company::class)->withoutGlobalScope(CrmWorkspaceScope::class);
     }
 
     /**
@@ -532,7 +533,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     public function tasks(): HasMany
     {
-        return $this->hasMany(Task::class);
+        return $this->hasMany(Task::class)->withoutGlobalScope(CrmWorkspaceScope::class);
     }
 
     /**
@@ -540,7 +541,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     public function opportunities(): HasMany
     {
-        return $this->hasMany(Opportunity::class);
+        return $this->hasMany(Opportunity::class)->withoutGlobalScope(CrmWorkspaceScope::class);
     }
 
     /**
@@ -548,7 +549,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
      */
     public function notes(): HasMany
     {
-        return $this->hasMany(Note::class);
+        return $this->hasMany(Note::class)->withoutGlobalScope(CrmWorkspaceScope::class);
     }
 
     /**

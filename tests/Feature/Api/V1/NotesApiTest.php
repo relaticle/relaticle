@@ -11,10 +11,12 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Concerns\ListsEntity;
 use App\Queries\Notes\NotesQuery;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -41,7 +43,7 @@ it('requires authentication', function (): void {
 it('can list notes', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Note::query()->where('workspace_id', $this->workspace->id)->count();
+    $seeded = Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->count();
     Note::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/notes')
@@ -412,7 +414,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $note = Note::query()->where('title', 'Test Note')->first();
+        $note = Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Test Note')->first();
         expect($note->workspace_id)->toBe($this->workspace->id);
     });
 
@@ -427,7 +429,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $note = Note::query()->where('title', 'Test Note')->first();
+        $note = Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Test Note')->first();
         expect($note->creator_id)->toBe($this->user->id);
     });
 
@@ -528,7 +530,9 @@ it('can create a note with relationship ids', function (): void {
     ])
         ->assertCreated();
 
-    $note = Note::query()->where('title', 'Linked note')->first();
+    $note = Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Linked note')->first();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
+
     expect($note->companies)->toHaveCount(1)
         ->and($note->people)->toHaveCount(1)
         ->and($note->opportunities)->toHaveCount(1);

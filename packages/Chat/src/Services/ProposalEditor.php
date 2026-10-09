@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -15,7 +16,6 @@ use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
-use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 /**
@@ -43,43 +43,36 @@ final readonly class ProposalEditor
         // Before the pin below, not after: this method validates core fields
         // against the actor's workspace while writing custom fields under the
         // proposal's, so a cross-tenant caller would split one record in two.
-        ProposalOwnership::assert($pendingAction, $user);
+        $workspace = ProposalOwnership::assert($pendingAction, $user);
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
+        return resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
-        try {
-            return DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
-                /** @var PendingAction $locked */
-                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+            $this->assertEditable($locked);
 
-                $this->assertEditable($locked);
+            $record = $this->resolveRecord($locked, $index);
+            $entity = $locked->entity_type;
 
-                $record = $this->resolveRecord($locked, $index);
-                $entity = $locked->entity_type;
+            [$editedCore, $editedCustomFields] = $this->splitInput($entity, $input);
 
-                [$editedCore, $editedCustomFields] = $this->splitInput($entity, $input);
+            $this->validateCore($user, $entity, $editedCore);
 
-                $this->validateCore($user, $entity, $editedCore);
+            $cleanFields = $this->validateCustomFields($user, $entity, $editedCustomFields);
 
-                $cleanFields = $this->validateCustomFields($user, $entity, $editedCustomFields);
+            $rebuiltRecord = $this->rebuildRecord($user, $entity, $record, $editedCore, $editedCustomFields, $cleanFields);
 
-                $rebuiltRecord = $this->rebuildRecord($user, $entity, $record, $editedCore, $editedCustomFields, $cleanFields);
+            $rebuiltDisplay = $this->displayBuilder->build(
+                $user,
+                $entity,
+                $rebuiltRecord,
+                $this->currentDisplayFields($locked, $index),
+            );
 
-                $rebuiltDisplay = $this->displayBuilder->build(
-                    $user,
-                    $entity,
-                    $rebuiltRecord,
-                    $this->currentDisplayFields($locked, $index),
-                );
+            $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
 
-                $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
-
-                return $locked->refresh();
-            });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+            return $locked->refresh();
+        }));
     }
 
     /**

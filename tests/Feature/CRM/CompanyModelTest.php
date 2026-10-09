@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -52,8 +53,8 @@ test('company has many people', function () {
         'company_id' => $company->getKey(),
     ]);
 
-    expect($company->people->first())->toBeInstanceOf(People::class)
-        ->and($company->people->first()->getKey())->toBe($people->getKey());
+    expect($company->people()->withoutGlobalScope(WorkspaceScope::class)->first())->toBeInstanceOf(People::class)
+        ->and($company->people()->withoutGlobalScope(WorkspaceScope::class)->first()->getKey())->toBe($people->getKey());
 });
 
 test('company has many opportunities', function () {
@@ -62,8 +63,8 @@ test('company has many opportunities', function () {
         'company_id' => $company->getKey(),
     ]);
 
-    expect($company->opportunities->first())->toBeInstanceOf(Opportunity::class)
-        ->and($company->opportunities->first()->getKey())->toBe($opportunity->getKey());
+    expect($company->opportunities()->withoutGlobalScope(WorkspaceScope::class)->first())->toBeInstanceOf(Opportunity::class)
+        ->and($company->opportunities()->withoutGlobalScope(WorkspaceScope::class)->first()->getKey())->toBe($opportunity->getKey());
 });
 
 test('company morph to many tasks', function () {
@@ -72,8 +73,8 @@ test('company morph to many tasks', function () {
 
     $company->tasks()->attach($task);
 
-    expect($company->tasks->first())->toBeInstanceOf(Task::class)
-        ->and($company->tasks->first()->getKey())->toBe($task->getKey());
+    expect($company->tasks()->withoutGlobalScope(WorkspaceScope::class)->first())->toBeInstanceOf(Task::class)
+        ->and($company->tasks()->withoutGlobalScope(WorkspaceScope::class)->first()->getKey())->toBe($task->getKey());
 });
 
 test('company morph to many notes', function () {
@@ -82,8 +83,8 @@ test('company morph to many notes', function () {
 
     $company->notes()->attach($note);
 
-    expect($company->notes->first())->toBeInstanceOf(Note::class)
-        ->and($company->notes->first()->getKey())->toBe($note->getKey());
+    expect($company->notes()->withoutGlobalScope(WorkspaceScope::class)->first())->toBeInstanceOf(Note::class)
+        ->and($company->notes()->withoutGlobalScope(WorkspaceScope::class)->first()->getKey())->toBe($note->getKey());
 });
 
 test('company logo is null until one is uploaded', function () {

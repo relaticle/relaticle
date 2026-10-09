@@ -12,6 +12,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Companies\CompaniesQuery;
@@ -46,7 +47,7 @@ it('requires authentication', function (): void {
 it('can list companies', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Company::query()->where('workspace_id', $this->workspace->id)->count();
+    $seeded = Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->count();
     Company::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/companies')
@@ -737,7 +738,7 @@ describe('custom fields', function (): void {
 
         $domains = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
 
-        expect(collect(Company::query()->with('customFieldValues.customField')->findOrFail($id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
+        expect(collect(Company::query()->withoutGlobalScope(WorkspaceScope::class)->with('customFieldValues.customField')->findOrFail($id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
     });
 
     it('creates the domains field as a domain type with no variant setting', function (): void {
@@ -767,7 +768,7 @@ describe('custom fields', function (): void {
 
         $domains = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
 
-        expect(collect(Company::query()->with('customFieldValues.customField')->findOrFail($own->id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
+        expect(collect(Company::query()->withoutGlobalScope(WorkspaceScope::class)->with('customFieldValues.customField')->findOrFail($own->id)->getCustomFieldValue($domains))->all())->toBe(['acme.com']);
     });
 
     it('rejects a domain another company holds in a different spelling', function (): void {
@@ -1049,7 +1050,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $company = Company::query()->where('name', 'Test Corp')->first();
+        $company = Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Corp')->first();
         expect($company->workspace_id)->toBe($this->workspace->id);
     });
 
@@ -1064,7 +1065,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $company = Company::query()->where('name', 'Test Corp')->first();
+        $company = Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Corp')->first();
         expect($company->creator_id)->toBe($this->user->id);
     });
 

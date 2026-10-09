@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
@@ -21,6 +23,7 @@ it('creates a manual link row', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create();
 
     (app(LinkMeetingToRecordAction::class))->execute(mailboxOwnerInWorkspace($account), $meeting, $person);
@@ -35,6 +38,7 @@ it('refuses to link a record from another team', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $foreignWorkspace = Workspace::factory()->create();
     $foreignPerson = People::factory()->for($foreignWorkspace)->create();
     $owner = mailboxOwnerInWorkspace($account);
@@ -43,7 +47,7 @@ it('refuses to link a record from another team', function (): void {
     expect(fn () => app(LinkMeetingToRecordAction::class)->execute($owner->fresh(), $meeting, $foreignPerson))
         ->toThrow(InvalidArgumentException::class);
 
-    expect($meeting->people()->count())->toBe(0);
+    expect($meeting->people()->withoutGlobalScope(WorkspaceScope::class)->count())->toBe(0);
 });
 
 it('is idempotent', function (): void {
@@ -52,6 +56,7 @@ it('is idempotent', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create();
 
     (app(LinkMeetingToRecordAction::class))->execute(mailboxOwnerInWorkspace($account), $meeting, $person);
@@ -69,6 +74,7 @@ it('increments meeting metrics on a new manual link', function (): void {
         'connected_account_id' => $account->getKey(),
         'organizer_email' => 'guest@clientcorp.com',
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create([
         'meeting_count' => 0,
         'last_meeting_at' => null,
@@ -93,6 +99,7 @@ it('does not double-count metrics when the same manual link is applied twice', f
         'connected_account_id' => $account->getKey(),
         'organizer_email' => 'guest@clientcorp.com',
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create(['meeting_count' => 0]);
 
     $action = app(LinkMeetingToRecordAction::class);
@@ -111,6 +118,7 @@ it('does not double-count metrics when automatic linking runs after a manual lin
         'connected_account_id' => $account->getKey(),
         'organizer_email' => 'guest@clientcorp.com',
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create(['meeting_count' => 0]);
 
     app(LinkMeetingToRecordAction::class)->execute(mailboxOwnerInWorkspace($account), $meeting, $person);
@@ -125,6 +133,7 @@ it('refuses a viewer who cannot update the record', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create();
 
     expect(fn () => app(LinkMeetingToRecordAction::class)->execute(mailboxOwnerInWorkspace($account, 'viewer'), $meeting, $person))
@@ -140,6 +149,7 @@ it('refuses a teammate who cannot see the meeting', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->getKey(),
         'email_address' => $account->email_address,

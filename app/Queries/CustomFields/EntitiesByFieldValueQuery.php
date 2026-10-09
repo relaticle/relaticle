@@ -6,6 +6,7 @@ namespace App\Queries\CustomFields;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -55,6 +56,7 @@ final readonly class EntitiesByFieldValueQuery
         }
 
         return $modelClass::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $field->tenant_id)
             ->whereIn($model->getKeyName(), $entityIds)
             ->oldest()

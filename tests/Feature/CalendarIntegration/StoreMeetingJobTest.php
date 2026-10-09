@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\People;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
@@ -76,6 +77,8 @@ it('stores calendar values longer than 255 characters', function (): void {
         app(StoreMeetingAction::class),
         app(NormalizedMeetingPayloadFactory::class),
     );
+
+    resolve(CurrentWorkspace::class)->set($account->workspace);
 
     $meeting = Meeting::query()->where('provider_event_id', $long)->sole();
 

@@ -244,6 +244,7 @@ final class SystemAdminPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 RequireSecondFactor::class,
+                'workspaces.across',
             ], isPersistent: true)
             ->routes(function () use ($panel): void {
                 Route::prefix('passkeys')

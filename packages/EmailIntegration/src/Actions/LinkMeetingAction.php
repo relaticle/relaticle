@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -32,6 +33,11 @@ final readonly class LinkMeetingAction
     ) {}
 
     public function execute(Meeting $meeting): void
+    {
+        resolve(CurrentWorkspace::class)->within($meeting->workspace_id, fn () => $this->link($meeting));
+    }
+
+    private function link(Meeting $meeting): void
     {
         $countsTowardIntelligence = $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting);
         $attendees = $meeting->attendees()->where('is_self', false)->get();

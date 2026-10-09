@@ -43,6 +43,33 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
 
+## Workspace scope (fails closed)
+
+Company, People, Opportunity, Task and Note carry `App\Models\Scopes\WorkspaceScope`. With no
+workspace bound in `App\Support\CurrentWorkspace` the scope returns no rows. It never reads
+every workspace. `tests/Feature/Models/Scopes/WorkspaceScopeTest.php` fails when that changes.
+
+| The code runs | The workspace comes from |
+|---|---|
+| in a web or panel request | `BindCurrentWorkspaceListener`: the signed-in user's workspace, then the Filament tenant |
+| in an API or MCP request | `SetApiWorkspaceContext`, from the token |
+| in a job dispatched while a workspace is bound | Laravel `Context`, which carries the id into the job |
+| in a job, command or webhook that starts unbound | `CurrentWorkspace::within($workspace, fn () => ...)`, which also sets the custom-fields tenant |
+| in the system admin panel | the `workspaces.across` middleware, which reads across workspaces |
+
+- A reader that already filters by an explicit workspace id removes the scope and keeps its own
+  filter: `->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $id)`. The filter
+  is the tenant guard, so it never depends on what happens to be bound. `TenantFkValidator` and
+  `ListsEntity` are the working examples
+- Reading across workspaces lives in memory only and never enters `Context`, so a job
+  dispatched from the system admin panel starts unbound. A bound workspace always wins over it
+- Filament builds its own queries for relationship selects, relationship filters and column
+  eager loads. Removing the scope in `getEloquentQuery()` does not reach them, which is why the
+  system admin panel uses the middleware and no per-resource override
+- Livewire matches persistent middleware by class. `AppServiceProvider` registers
+  `ReadAcrossWorkspaces`, because the alias alone skips every update request.
+  `tests/Feature/SystemAdmin/SystemAdminPanelProviderTest.php` fails without it
+
 ## Actions (business operations)
 
 An action is one business operation: a class that takes input, does something, and gives

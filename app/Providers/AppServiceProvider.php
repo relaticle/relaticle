@@ -13,6 +13,7 @@ use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
+use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
 use App\Listeners\CreateSetupConversationListener;
@@ -510,6 +511,9 @@ final class AppServiceProvider extends ServiceProvider
         // and the dotted entry carries the mapping the resolver reads.
         Livewire::component('filament.livewire.notifications', FilamentNotifications::class);
         Livewire::component(Notifications::class, FilamentNotifications::class);
+
+        // Livewire matches persistent middleware by class, so the panel's alias alone skips update requests.
+        Livewire::addPersistentMiddleware(ReadAcrossWorkspaces::class);
     }
 
     private function rateLimitTokenId(?object $token): ?string

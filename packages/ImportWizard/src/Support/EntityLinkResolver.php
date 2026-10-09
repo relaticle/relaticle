@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
 use Illuminate\Database\Eloquent\Builder;
@@ -144,6 +145,7 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $this->workspaceId)
             ->whereIn($field, $uniqueValues)
             ->pluck('id', $field)
@@ -206,6 +208,7 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->select((new $modelClass)->getQualifiedKeyName())
             ->where('workspace_id', $this->workspaceId);
     }

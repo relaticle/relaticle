@@ -10,6 +10,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -38,6 +39,7 @@ final readonly class RemoveSampleData
 
             foreach (self::MODELS as $model) {
                 $records = $model::query()
+                    ->withoutGlobalScope(WorkspaceScope::class)
                     ->where('workspace_id', $workspace->getKey())
                     ->where('creation_source', CreationSource::SAMPLE)
                     ->get();

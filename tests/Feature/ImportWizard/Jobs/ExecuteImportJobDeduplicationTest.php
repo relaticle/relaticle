@@ -9,7 +9,9 @@ use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +33,7 @@ use Tests\Helpers\WorkspaceCustomField;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class, CanonicalValue::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);

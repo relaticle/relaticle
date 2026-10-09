@@ -16,6 +16,7 @@ use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -202,10 +203,8 @@ final readonly class RecordReferenceResolver
 
     private function resolveLabel(string $entityType, string $recordId): ?string
     {
-        // The CRM models carry no global workspace scope (only SoftDeletingScope), so an
-        // unscoped whereKey() turns any id into a real name regardless of who owns it.
-        // This method exists purely to render a label, which makes it the cheapest
-        // possible cross-tenant disclosure if a foreign id ever reaches it.
+        // A label is the cheapest cross-tenant disclosure a foreign id can buy, so the explicit
+        // workspace_id predicate is the guard, whatever workspace is bound.
         $authUser = auth()->user();
 
         if (! $authUser instanceof User) {
@@ -227,11 +226,11 @@ final readonly class RecordReferenceResolver
                     ->where('tenant_id', $workspaceId)
                     ->whereKey($recordId)
                     ->value('name'),
-                'company' => Company::query()->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
-                'people' => People::query()->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
-                'opportunity' => Opportunity::query()->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
-                'task' => Task::query()->where('workspace_id', $workspaceId)->whereKey($recordId)->value('title'),
-                'note' => Note::query()->where('workspace_id', $workspaceId)->whereKey($recordId)->value('title'),
+                'company' => Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
+                'people' => People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
+                'opportunity' => Opportunity::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->whereKey($recordId)->value('name'),
+                'task' => Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->whereKey($recordId)->value('title'),
+                'note' => Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->whereKey($recordId)->value('title'),
                 default => null,
             };
         } catch (Throwable) {

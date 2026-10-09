@@ -172,7 +172,8 @@ the REST guide. Update those by hand.
   Make it public in the change that adds the first caller, with a test for that caller. The
   builder is authorized and workspace-bound already. Refine it with `where` and `whereHas`
   only, and put any `or` inside a `where(fn ...)` group. A top-level `orWhere` escapes the
-  workspace bound wherever `CurrentWorkspace` is not set, such as a queued job. Never call
+  workspace bound, because the list query removes the ambient `WorkspaceScope` and bounds
+  itself with one `whereBelongsTo`. Never call
   `withTrashed()` or `withoutGlobalScopes()` on it. Never rebuild the allowlists in the caller:
   `tests/Arch/ArchTest.php` fails a Spatie query built outside a query layer ("builds a list
   query only in a query layer").

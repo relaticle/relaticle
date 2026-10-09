@@ -10,6 +10,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentColor;
@@ -47,6 +48,7 @@ beforeEach(function () {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
+    resolve(CurrentWorkspace::class)->readAcrossWorkspaces();
 
     $this->workspaceOwner = User::factory()->withWorkspace()->create();
     $this->workspace = $this->workspaceOwner->currentWorkspace;
@@ -85,6 +87,44 @@ it('lets administrators edit ordinary customer records', function (string $model
     expect($record->refresh()->getAttribute($field))->toBe('Updated Customer Record')
         ->and($record->workspace_id)->toBe($this->workspace->getKey());
 })->with('customer record edit pages');
+
+it('lets administrators save a customer record that is linked to a company and a person', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
+    $company = Company::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $person = People::factory()->for($this->workspace)->create(['company_id' => $company->getKey(), 'creator_id' => $this->workspaceOwner->getKey()]);
+    $opportunity = Opportunity::factory()->for($this->workspace)->create([
+        'company_id' => $company->getKey(),
+        'contact_id' => $person->getKey(),
+        'creator_id' => $this->workspaceOwner->getKey(),
+    ]);
+
+    livewire(EditOpportunity::class, ['record' => $opportunity->getKey()])
+        ->assertSchemaStateSet(['company_id' => $company->getKey(), 'contact_id' => $person->getKey()])
+        ->fillForm(['name' => 'Renewal'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    livewire(EditPeople::class, ['record' => $person->getKey()])
+        ->fillForm(['name' => 'Renamed Person'])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    expect($opportunity->refresh()->name)->toBe('Renewal')
+        ->and($person->refresh()->name)->toBe('Renamed Person');
+});
+
+it('names the linked company and person on the opportunities and people lists', function (): void {
+    $company = Company::factory()->for($this->workspace)->create(['name' => 'Northwind Traders', 'creator_id' => $this->workspaceOwner->getKey()]);
+    $person = People::factory()->for($this->workspace)->create(['name' => 'Dana Whitfield', 'company_id' => $company->getKey(), 'creator_id' => $this->workspaceOwner->getKey()]);
+    Opportunity::factory()->for($this->workspace)->create(['company_id' => $company->getKey(), 'contact_id' => $person->getKey(), 'creator_id' => $this->workspaceOwner->getKey()]);
+
+    livewire(ListOpportunities::class)
+        ->assertSee('Northwind Traders')
+        ->assertSee('Dana Whitfield');
+
+    livewire(ListPeople::class)
+        ->assertSee('Northwind Traders');
+});
 
 it('lets super administrators move customer records between workspaces', function (string $modelClass, string $pageClass): void {
     $record = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);

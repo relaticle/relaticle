@@ -6,7 +6,9 @@ use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Cache;
@@ -30,7 +32,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ValidateColumnJob::class, ColumnValidator::class, EntityLinkValidator::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -582,7 +584,7 @@ describe('on a remote store disk', function (): void {
 
         [$job] = (new ValidateColumnJob($this->import->id, $column))->withFakeBatch();
 
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
 
         DB::listen(function (QueryExecuted $query) use ($job): void {
             if (str_contains($query->sql, 'DISTINCT')) {
@@ -610,7 +612,7 @@ describe('on a remote store disk', function (): void {
         $corrected = false;
         $modifiedAt = 0;
 
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
 
         DB::listen(function (QueryExecuted $query) use (&$corrected, &$modifiedAt, $remoteFile): void {
             if ($corrected || ! str_contains($query->sql, 'DISTINCT')) {
@@ -662,7 +664,7 @@ it('writes nothing when its batch is cancelled while it validates', function ():
 
     [$job] = (new ValidateColumnJob($this->import->id, $column))->withFakeBatch();
 
-    Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
 
     DB::listen(function (QueryExecuted $query) use ($job): void {
         if (str_contains($query->sql, 'DISTINCT')) {
