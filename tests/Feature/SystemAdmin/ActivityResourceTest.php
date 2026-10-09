@@ -7,6 +7,7 @@ use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
@@ -36,6 +37,7 @@ beforeEach(function (): void {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
+    resolve(CurrentWorkspace::class)->readAcrossWorkspaces();
 
     $this->ownerA = User::factory()->withWorkspace()->create();
     $this->workspaceA = $this->ownerA->currentWorkspace;

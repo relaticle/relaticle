@@ -24,14 +24,19 @@ final class WorkspaceScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        $workspace = resolve(CurrentWorkspace::class)->get();
+        $currentWorkspace = resolve(CurrentWorkspace::class);
+        $workspace = $currentWorkspace->get();
 
-        if (! $workspace instanceof Workspace) {
-            $builder->whereRaw('1 = 0');
+        if ($workspace instanceof Workspace) {
+            $builder->whereBelongsTo($workspace);
 
             return;
         }
 
-        $builder->whereBelongsTo($workspace);
+        if ($currentWorkspace->readsAcrossWorkspaces()) {
+            return;
+        }
+
+        $builder->whereRaw('1 = 0');
     }
 }

@@ -98,3 +98,35 @@ it('reads its own workspace records through the workspace relations with nothing
     expect(resolve(CurrentWorkspace::class)->get())->toBeNull()
         ->and($user->currentWorkspace->companies()->count())->toBe(1);
 });
+
+it('reads every workspace once reading across workspaces is switched on, and one workspace when one is bound', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $otherUser = User::factory()->withWorkspace()->create();
+    Company::withoutEvents(function () use ($user, $otherUser): void {
+        Company::factory()->create(['workspace_id' => $user->currentWorkspace->id, 'account_owner_id' => $user->id]);
+        Company::factory()->create(['workspace_id' => $otherUser->currentWorkspace->id, 'account_owner_id' => $otherUser->id]);
+    });
+    $currentWorkspace = resolve(CurrentWorkspace::class);
+    $currentWorkspace->forget();
+
+    $currentWorkspace->readAcrossWorkspaces();
+
+    expect(Company::query()->count())->toBe(2)
+        ->and($currentWorkspace->within($user->currentWorkspace, fn (): int => Company::query()->count()))->toBe(1);
+});
+
+it('does not carry reading across workspaces into a job', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    Company::withoutEvents(fn (): Company => Company::factory()->create([
+        'workspace_id' => $user->currentWorkspace->id,
+        'account_owner_id' => $user->id,
+    ]));
+    resolve(CurrentWorkspace::class)->forget();
+    resolve(CurrentWorkspace::class)->readAcrossWorkspaces();
+
+    $dehydrated = Context::dehydrate();
+    app()->forgetScopedInstances();
+    Context::hydrate($dehydrated);
+
+    expect(Company::query()->count())->toBe(0);
+});

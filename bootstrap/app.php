@@ -7,6 +7,7 @@ use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\NoReferrer;
+use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
@@ -184,6 +185,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'auth.context' => EnsureAuthenticationContext::class,
             'signed' => ValidateSignature::class,
             'no-referrer' => NoReferrer::class,
+            'workspaces.across' => ReadAcrossWorkspaces::class,
             // Fortify and Passkeys both reference this alias by name in their own
             // route definitions; overriding it here (rather than swapping every
             // route's middleware array) is the only way to reach both packages'

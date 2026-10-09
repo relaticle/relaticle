@@ -6,7 +6,6 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
-use App\Models\Scopes\WorkspaceScope as CrmWorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use Closure;
@@ -21,7 +20,6 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Str;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
@@ -171,7 +169,7 @@ final class ActivityResource extends Resource
     {
         return $table
             ->defaultSort('created_at', 'desc')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['workspace', 'causer', 'subject' => fn (MorphTo $subject): MorphTo => $subject->withoutGlobalScope(CrmWorkspaceScope::class)]))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['workspace', 'causer', 'subject']))
             ->columns([
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -300,9 +298,7 @@ final class ActivityResource extends Resource
      */
     public static function subjectName(Activity $record): ?string
     {
-        $subject = $record->relationLoaded('subject')
-            ? $record->subject
-            : $record->subject()->withoutGlobalScope(CrmWorkspaceScope::class)->getResults();
+        $subject = $record->subject;
 
         if ($subject === null) {
             return null;

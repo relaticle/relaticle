@@ -6,7 +6,6 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Models\People;
-use App\Models\Scopes\WorkspaceScope;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -19,7 +18,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\CreatePeople;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\EditPeople;
@@ -159,13 +157,5 @@ final class PeopleResource extends Resource
             'view' => ViewPeople::route('/{record}'),
             'edit' => EditPeople::route('/{record}/edit'),
         ];
-    }
-
-    /**
-     * @return Builder<People>
-     */
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 }

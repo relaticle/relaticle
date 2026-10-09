@@ -6,7 +6,6 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Models\Company;
-use App\Models\Scopes\WorkspaceScope;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -19,7 +18,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\CreateCompany;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\EditCompany;
@@ -160,13 +158,5 @@ final class CompanyResource extends Resource
             'view' => ViewCompany::route('/{record}'),
             'edit' => EditCompany::route('/{record}/edit'),
         ];
-    }
-
-    /**
-     * @return Builder<Company>
-     */
-    public static function getEloquentQuery(): Builder
-    {
-        return parent::getEloquentQuery()->withoutGlobalScope(WorkspaceScope::class);
     }
 }

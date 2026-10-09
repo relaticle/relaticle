@@ -15,6 +15,8 @@ final class CurrentWorkspace
 
     private ?Workspace $workspace = null;
 
+    private bool $readsAcrossWorkspaces = false;
+
     public function set(Workspace $workspace): void
     {
         $this->workspace = $workspace;
@@ -40,6 +42,16 @@ final class CurrentWorkspace
         }
 
         return $this->workspace = Workspace::query()->find($workspaceId);
+    }
+
+    public function readAcrossWorkspaces(): void
+    {
+        $this->readsAcrossWorkspaces = true;
+    }
+
+    public function readsAcrossWorkspaces(): bool
+    {
+        return $this->readsAcrossWorkspaces;
     }
 
     /**
