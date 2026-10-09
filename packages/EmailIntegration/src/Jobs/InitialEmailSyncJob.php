@@ -15,7 +15,6 @@ use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Queue\Middleware\Skip;
-use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\MailboxImportPass;
@@ -96,7 +95,7 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $service = $mailFactory->make($account);
 
         try {
-            $page = $service->initialBackfill($this->daysBack(), $this->pageToken);
+            $page = $service->initialBackfill($this->pass->daysBack(), $this->pageToken);
         } catch (Throwable $exception) {
             $mailboxHistoryImport->markEmailListingFinished($account);
 
@@ -208,21 +207,6 @@ final class InitialEmailSyncJob implements ShouldBeUnique, ShouldQueue
         $batchId = $this->historyImportBatchId ?? 'none';
 
         return 'initial-sync-'.$this->connectedAccount->getKey().'-'.hash('xxh3', $page.':'.$batchId.':'.$this->pass->value);
-    }
-
-    private function daysBack(): ?int
-    {
-        if ($this->pass === MailboxImportPass::Recent) {
-            return MailboxImportPass::RECENT_DAYS;
-        }
-
-        $days = Config::get('email-integration.sync.initial_days');
-
-        if (! is_numeric($days) || (int) $days <= 0) {
-            return null;
-        }
-
-        return (int) $days;
     }
 
     private static function continueOrFinish(

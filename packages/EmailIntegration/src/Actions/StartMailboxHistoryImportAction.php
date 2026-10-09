@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\MailboxImportPass;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
@@ -81,13 +80,13 @@ final readonly class StartMailboxHistoryImportAction
 
     private function firstPass(ConnectedAccount $account): MailboxImportPass
     {
-        $cappedDays = Config::get('email-integration.sync.initial_days');
-
         if (! $account->provider->returnsCursorAfterListing()) {
             return MailboxImportPass::Full;
         }
 
-        if (is_int($cappedDays) && $cappedDays > 0 && $cappedDays <= MailboxImportPass::RECENT_DAYS) {
+        $historyCapDays = MailboxImportPass::Full->daysBack();
+
+        if ($historyCapDays !== null && $historyCapDays <= MailboxImportPass::RECENT_DAYS) {
             return MailboxImportPass::Full;
         }
 
