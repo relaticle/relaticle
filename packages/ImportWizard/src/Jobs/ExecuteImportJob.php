@@ -60,6 +60,7 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportRow;
 use Relaticle\ImportWizard\Store\ImportStore;
+use Relaticle\ImportWizard\Support\EntityLinkResolver;
 use Relaticle\ImportWizard\Support\EntityLinkStorage\EntityLinkStorageInterface;
 use Spatie\Activitylog\Support\CauserResolver;
 
@@ -109,6 +110,9 @@ final class ExecuteImportJob implements ShouldQueue
 
     /** @var array<string, string> "{customFieldId}|{spelling}" => key of the record whose staged value holds it */
     private array $claimedUniqueValues = [];
+
+    /** @var array<string, list<string>> "{customFieldId}|{spelling}" => ids of the records storing it when the chunk began */
+    private array $storedUniqueValues = [];
 
     /**
      * Zone the CSV's naive datetimes are interpreted in: the importer's own, so an
@@ -226,9 +230,7 @@ final class ExecuteImportJob implements ShouldQueue
         $customFieldFormatMap = $this->buildCustomFieldFormatMap($fieldMappings);
 
         $matchField = $this->resolveMatchField($importer, $fieldMappings);
-        $matchSourceColumn = $matchField instanceof MatchableField
-            ? $this->findMatchSourceColumn($matchField, $fieldMappings)
-            : null;
+        $matchSourceColumn = $this->findMatchSourceColumn($matchField, $fieldMappings);
 
         $context = [
             'workspace_id' => $this->workspaceId,
@@ -246,6 +248,7 @@ final class ExecuteImportJob implements ShouldQueue
                     ->orderBy('row_number')
                     ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $store, $import, $startedAt): bool {
                         $existingRecords = $this->preloadExistingRecords($rows, $importer, withCustomFieldValues: $customFieldFormatMap !== []);
+                        $this->loadStoredUniqueValues($rows, $fieldMappings, $customFieldDefs);
 
                         foreach ($rows as $row) {
                             $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, $results, $existingRecords);
@@ -527,7 +530,7 @@ final class ExecuteImportJob implements ShouldQueue
         $safeValues = $this->safeCustomFieldValues($record, $customFieldData, $customFieldDefs, $customFieldFormatMap, $existingValues, $isCreate);
 
         // Before the first value is staged: a row that fails here must leave nothing for the flush.
-        $this->claimUniqueValues($record, $safeValues, $customFieldDefs, $isCreate);
+        $this->claimUniqueValues($record, $safeValues, $customFieldDefs, $existingValues);
 
         foreach ($safeValues as $code => $safeValue) {
             $cf = $customFieldDefs->get($code);
@@ -611,8 +614,9 @@ final class ExecuteImportJob implements ShouldQueue
     /**
      * @param  array<string, mixed>  $safeValues
      * @param  Collection<string, CustomField>  $customFieldDefs
+     * @param  Collection<int|string, CustomFieldValue>  $existingValues
      */
-    private function claimUniqueValues(Model $record, array $safeValues, Collection $customFieldDefs, bool $isCreate): void
+    private function claimUniqueValues(Model $record, array $safeValues, Collection $customFieldDefs, Collection $existingValues): void
     {
         $claims = [];
 
@@ -623,20 +627,17 @@ final class ExecuteImportJob implements ShouldQueue
                 continue;
             }
 
-            $rule = new UniqueCustomFieldValue($cf, $record->getKey(), exceptHeldValues: ! $isCreate);
+            $held = $this->uniqueValueKeys($cf, $existingValues->get($cf->getKey())?->getAttribute($cf->getValueColumn()));
 
             foreach (Arr::wrap($safeValue) as $candidate) {
-                if (! is_scalar($candidate) || blank($candidate)) {
+                $keys = $this->uniqueValueKeys($cf, $candidate);
+
+                if (array_intersect($keys, $held) !== []) {
                     continue;
                 }
 
-                $keys = array_map(
-                    fn (string $spelling): string => $cf->getKey().'|'.$spelling,
-                    CanonicalValue::spellings($cf, (string) $candidate),
-                );
-
                 throw_if(
-                    $this->claimedByAnotherRecord($record, $keys) || $this->heldByAnotherRecord($rule, $candidate),
+                    $this->claimedByAnotherRecord($record, $keys) || $this->storedOnAnotherRecord($record, $cf, $keys, $candidate),
                     UniqueCustomFieldValueTaken::class,
                     $record,
                     $cf,
@@ -652,6 +653,17 @@ final class ExecuteImportJob implements ShouldQueue
         }
     }
 
+    /** @return list<string> */
+    private function uniqueValueKeys(CustomField $cf, mixed $value): array
+    {
+        return array_values(collect(Arr::wrap($value instanceof Collection ? $value->all() : $value))
+            ->filter(fn (mixed $item): bool => is_scalar($item) && filled($item))
+            ->flatMap(fn (mixed $item): array => CanonicalValue::spellings($cf, (string) $item))
+            ->map(fn (string $spelling): string => $cf->getKey().'|'.mb_strtolower($spelling))
+            ->unique()
+            ->all());
+    }
+
     /** @param  list<string>  $keys */
     private function claimedByAnotherRecord(Model $record, array $keys): bool
     {
@@ -661,12 +673,68 @@ final class ExecuteImportJob implements ShouldQueue
         );
     }
 
-    private function heldByAnotherRecord(UniqueCustomFieldValue $rule, mixed $candidate): bool
+    /** @param  list<string>  $keys */
+    private function storedOnAnotherRecord(Model $record, CustomField $cf, array $keys, mixed $candidate): bool
     {
-        return TenantContextService::withTenant(
-            $this->workspaceId,
-            fn (): bool => validator(['value' => $candidate], ['value' => [$rule]])->fails(),
+        $this->rememberStoredUniqueValues($cf, $keys);
+
+        $storedElsewhere = array_any(
+            $keys,
+            fn (string $key): bool => array_diff($this->storedUniqueValues[$key], [(string) $record->getKey()]) !== [],
         );
+
+        return $storedElsewhere && TenantContextService::withTenant(
+            $this->workspaceId,
+            fn (): bool => validator(
+                ['value' => $candidate],
+                ['value' => [new UniqueCustomFieldValue($cf, $record->getKey())]],
+            )->fails(),
+        );
+    }
+
+    /**
+     * @param  Collection<int, ImportRow>  $rows
+     * @param  Collection<int, ColumnData>  $fieldMappings
+     * @param  Collection<string, CustomField>  $customFieldDefs
+     */
+    private function loadStoredUniqueValues(Collection $rows, Collection $fieldMappings, Collection $customFieldDefs): void
+    {
+        $this->storedUniqueValues = [];
+
+        foreach ($fieldMappings as $mapping) {
+            $cf = $customFieldDefs->get(Str::after($mapping->target, self::CUSTOM_FIELD_PREFIX));
+
+            if (! str_starts_with($mapping->target, self::CUSTOM_FIELD_PREFIX) || ! $cf?->settings->unique_per_entity_type) {
+                continue;
+            }
+
+            $cells = $rows
+                ->map(fn (ImportRow $row): mixed => $row->getFinalValue($mapping->source))
+                ->filter(fn (mixed $cell): bool => is_scalar($cell) && filled($cell))
+                ->flatMap(fn (mixed $cell): array => [(string) $cell, ...explode(',', (string) $cell)])
+                ->flatMap(fn (string $value): array => [trim($value), CanonicalValue::of($cf, trim($value))]);
+
+            $this->rememberStoredUniqueValues($cf, $this->uniqueValueKeys($cf, $cells));
+        }
+    }
+
+    /** @param  list<string>  $keys */
+    private function rememberStoredUniqueValues(CustomField $cf, array $keys): void
+    {
+        $unknown = array_values(array_filter($keys, fn (string $key): bool => ! isset($this->storedUniqueValues[$key])));
+
+        if ($unknown === []) {
+            return;
+        }
+
+        $recordsByValue = new EntityLinkResolver($this->workspaceId)->recordsStoring(
+            $cf,
+            array_map(fn (string $key): string => Str::after($key, '|'), $unknown),
+        );
+
+        foreach ($unknown as $key) {
+            $this->storedUniqueValues[$key] = $recordsByValue[Str::after($key, '|')] ?? [];
+        }
     }
 
     private function recordKey(Model $record): string
@@ -1137,10 +1205,10 @@ final class ExecuteImportJob implements ShouldQueue
      *
      * @param  Collection<int, ColumnData>  $fieldMappings
      */
-    private function findMatchSourceColumn(MatchableField $matchField, Collection $fieldMappings): ?string
+    private function findMatchSourceColumn(?MatchableField $matchField, Collection $fieldMappings): ?string
     {
         $mapping = $fieldMappings->first(
-            fn (ColumnData $col): bool => $col->target === $matchField->field
+            fn (ColumnData $col): bool => $col->target === $matchField?->field
         );
 
         return $mapping?->source;

@@ -10,9 +10,11 @@ use App\Models\People;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\MatchBehavior;
@@ -760,4 +762,114 @@ it('fails every create row that repeats a unique value a stored record already h
         ->created_rows->toBe(0)
         ->skipped_rows->toBe(0)
         ->failed_rows->toBe(2);
+});
+
+it('fails a row whose unique single-value field is already stored on another record', function (): void {
+    $field = ImportExecutionFixture::customField($this, 'vat_number', 'text', 'company');
+    $field->update(['settings' => new CustomFieldSettingsData(unique_per_entity_type: true)]);
+    $holder = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => 'company',
+        'entity_id' => $holder->id,
+        'tenant_id' => $this->workspace->id,
+        $field->getValueColumn() => 'DE811907980',
+    ]);
+
+    ImportExecutionFixture::readyStore($this, ['Name', 'VAT'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Northline Copy', 'VAT' => 'DE811907980'], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(3, ['Name' => 'Southline', 'VAT' => 'DE129273398'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'VAT', target: 'custom_fields_vat_number'),
+    ], ImportEntityType::Company);
+
+    ImportExecutionFixture::run($this);
+
+    $import = $this->import->fresh();
+
+    expect($import)
+        ->created_rows->toBe(1)
+        ->failed_rows->toBe(1)
+        ->and($import->failedRows()->sole()->validation_error)->toContain('DE811907980')
+        ->and(Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'Northline Copy')->exists())->toBeFalse();
+});
+
+it('looks up stored unique values once per chunk rather than once per row', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name', 'Domain'], collect(range(1, 6))->map(
+        fn (int $number): array => ImportExecutionFixture::row($number + 1, ['Name' => "Company {$number}", 'Domain' => "company{$number}.example"], ['match_action' => RowMatchAction::Create->value]),
+    )->all(), [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    $lookups = 0;
+    DB::listen(function (QueryExecuted $query) use (&$lookups): void {
+        $lookups += (int) preg_match('/from "?custom_field_values.*custom_field_id/is', $query->sql);
+    });
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh()->created_rows)->toBe(6)
+        ->and($lookups)->toBe(1);
+});
+
+it('lets a record keep a unique value it already shares with another record', function (): void {
+    $field = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
+    [$target, $other] = Company::factory()->count(2)->create(['workspace_id' => $this->workspace->id])->all();
+
+    foreach ([$target, $other] as $company) {
+        CustomFieldValue::factory()->withJsonValue(['northline.example'])->create([
+            'custom_field_id' => $field->id,
+            'entity_type' => 'company',
+            'entity_id' => $company->id,
+            'tenant_id' => $this->workspace->id,
+        ]);
+    }
+
+    ImportExecutionFixture::readyStore($this, ['ID', 'Name', 'Domain'], [
+        ImportExecutionFixture::row(2, ['ID' => (string) $target->id, 'Name' => 'Northline', 'Domain' => 'northline.example'], [
+            'match_action' => RowMatchAction::Update->value,
+            'matched_id' => (string) $target->id,
+        ]),
+    ], [
+        ColumnData::toField(source: 'ID', target: 'id'),
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->updated_rows->toBe(1)
+        ->failed_rows->toBe(0)
+        ->and($target->fresh()->name)->toBe('Northline');
+});
+
+it('creates a record with a unique value only a deleted record holds', function (): void {
+    $field = WorkspaceCustomField::byCode($this->workspace->id, 'company', 'domains');
+    $deleted = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    CustomFieldValue::factory()->withJsonValue(['northline.example'])->create([
+        'custom_field_id' => $field->id,
+        'entity_type' => 'company',
+        'entity_id' => $deleted->id,
+        'tenant_id' => $this->workspace->id,
+    ]);
+
+    $deleted->delete();
+
+    ImportExecutionFixture::readyStore($this, ['Name', 'Domain'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Northline', 'Domain' => 'northline.example'], ['match_action' => RowMatchAction::Create->value]),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+        ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),
+    ], ImportEntityType::Company);
+
+    ImportExecutionFixture::run($this);
+
+    expect($this->import->fresh())
+        ->created_rows->toBe(1)
+        ->failed_rows->toBe(0);
 });

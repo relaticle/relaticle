@@ -104,7 +104,7 @@ return [
                 'Relaticle\ImportWizard\Enums\DateFormat::getParseFormats' => 73,
                 'Relaticle\ImportWizard\Filament\Pages\ImportHistory::table' => 103,
                 'Relaticle\ImportWizard\Jobs\ExecuteImportJob::processRow' => 115,
-                'Relaticle\ImportWizard\Jobs\ExecuteImportJob::runFromStore' => 110,
+                'Relaticle\ImportWizard\Jobs\ExecuteImportJob::runFromStore' => 109,
             ],
         ],
     ],
