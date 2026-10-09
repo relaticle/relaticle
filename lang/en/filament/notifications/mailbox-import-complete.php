@@ -14,7 +14,7 @@ return [
     'failed_messages' => "{1}:count message couldn't be imported|[2,*]:count messages couldn't be imported",
     'failed_calendar_events' => "{1}:count calendar event couldn't be imported|[2,*]:count calendar events couldn't be imported",
     'calendar_did_not_finish' => 'Calendar import did not finish.',
-    'email_history_did_not_finish' => 'Older mail could not be imported.',
+    'email_history_did_not_finish' => "Older mail couldn't be imported.",
     'retry_success' => [
         'title' => 'Import retry complete',
         'body' => 'Previously missing messages from :email are imported. :imported are in Relaticle now.',
