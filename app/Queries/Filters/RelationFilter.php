@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Queries\Filters;
 
 use App\Enums\CrmEntity;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\Concerns\AppliesFilterNodes;
 use App\Queries\EntityFilters;
@@ -99,7 +100,7 @@ final readonly class RelationFilter implements Filter
         $workspace = $this->user->currentWorkspace;
 
         if ($this->definition->related instanceof CrmEntity) {
-            return $related->whereBelongsTo($workspace);
+            return $related->withoutGlobalScope(WorkspaceScope::class)->whereBelongsTo($workspace);
         }
 
         return $related->scopes(['memberOf' => [$workspace]]);

@@ -71,7 +71,7 @@ final readonly class UploadClaims
             return;
         }
 
-        $entity = $value->entity;
+        $entity = $value->ownRecord();
 
         if (! $entity instanceof HasMedia) {
             return;

@@ -6,6 +6,7 @@ namespace App\Queries\Concerns;
 
 use App\Data\ListQuery;
 use App\Enums\CrmEntity;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
@@ -44,7 +45,7 @@ trait ListsEntity
 
         $builder = QueryBuilder::for($model, $list->toRequest());
         $builder->scopes('withCustomFieldValues');
-        $builder->whereBelongsTo($user->currentWorkspace);
+        $builder->withoutGlobalScope(WorkspaceScope::class)->whereBelongsTo($user->currentWorkspace);
 
         return $builder
             ->allowedFilters(...new EntityFilters($user, $list->viewerZone)->for($entity))

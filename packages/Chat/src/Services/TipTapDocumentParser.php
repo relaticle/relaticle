@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
@@ -227,6 +228,7 @@ final class TipTapDocumentParser
             }
 
             $found = $modelClass::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
                 ->whereBelongsTo($workspace)
                 ->whereIn('id', array_unique($ids))
                 ->pluck('id')
