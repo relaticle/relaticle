@@ -7,6 +7,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 
 mutates(WorkspaceScope::class, CurrentWorkspace::class);
 
@@ -129,4 +130,19 @@ it('does not carry reading across workspaces into a job', function (): void {
     Context::hydrate($dehydrated);
 
     expect(Company::query()->count())->toBe(0);
+});
+
+it('binds a workspace by id without querying it again when it is already bound', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $currentWorkspace = resolve(CurrentWorkspace::class);
+    $workspaceId = $user->currentWorkspace->getKey();
+
+    $queries = $currentWorkspace->within($workspaceId, function () use ($currentWorkspace, $workspaceId): int {
+        DB::enableQueryLog();
+        $currentWorkspace->within($workspaceId, fn (): null => null);
+
+        return count(DB::getQueryLog());
+    });
+
+    expect($queries)->toBe(0);
 });

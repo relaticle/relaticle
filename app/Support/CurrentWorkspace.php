@@ -62,8 +62,12 @@ final class CurrentWorkspace
      */
     public function within(Workspace|string $workspace, Closure $callback): mixed
     {
-        $workspace = $workspace instanceof Workspace ? $workspace : Workspace::query()->findOrFail($workspace);
         $previousWorkspace = $this->get();
+        $workspace = match (true) {
+            $workspace instanceof Workspace => $workspace,
+            $previousWorkspace?->getKey() === $workspace => $previousWorkspace,
+            default => Workspace::query()->findOrFail($workspace),
+        };
         $previousTenantId = TenantContextService::getCurrentTenantId();
 
         $this->set($workspace);
