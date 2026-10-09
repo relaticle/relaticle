@@ -87,7 +87,7 @@ return [
                 'Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob::handle' => 100,
                 'Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob::handle' => 137,
                 'Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob::handle' => 64,
-                'Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob::handle' => 72,
+                'Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob::handle' => 67,
                 'Relaticle\EmailIntegration\Jobs\InitialSyncPageStoreBatch::dispatchEmails' => 75,
                 'Relaticle\EmailIntegration\Jobs\StoreEmailJob::handle' => 68,
                 'Relaticle\EmailIntegration\Livewire\DraftsTable::table' => 96,

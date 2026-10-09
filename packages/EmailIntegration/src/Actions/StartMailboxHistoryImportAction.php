@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\MailboxImportPass;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
@@ -43,6 +45,7 @@ final readonly class StartMailboxHistoryImportAction
             ]);
 
             $this->mailboxHistoryImport->markEmailListingStarted($account);
+            $this->mailboxHistoryImport->markHistoryListingPending($batch->id);
 
             if ($hadSyncCursor) {
                 $account->update([
@@ -54,7 +57,7 @@ final readonly class StartMailboxHistoryImportAction
             $account = $account->fresh() ?? $account;
 
             dispatch(new RelinkMailboxHistoryJob($account))->afterCommit();
-            dispatch(new InitialEmailSyncJob($account, historyImportBatchId: $batch->id))->afterCommit();
+            dispatch(new InitialEmailSyncJob($account, historyImportBatchId: $batch->id)->forPass($this->firstPass($account)))->afterCommit();
 
             if (! $account->hasCalendar()) {
                 return;
@@ -74,5 +77,20 @@ final readonly class StartMailboxHistoryImportAction
         } finally {
             $lock->release();
         }
+    }
+
+    private function firstPass(ConnectedAccount $account): MailboxImportPass
+    {
+        $cappedDays = Config::get('email-integration.sync.initial_days');
+
+        if (! $account->provider->returnsCursorAfterListing()) {
+            return MailboxImportPass::Full;
+        }
+
+        if (is_int($cappedDays) && $cappedDays > 0 && $cappedDays <= MailboxImportPass::RECENT_DAYS) {
+            return MailboxImportPass::Full;
+        }
+
+        return MailboxImportPass::Recent;
     }
 }

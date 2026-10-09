@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Exceptions\CalendarSyncTokenExpired;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
@@ -289,6 +290,51 @@ it('notifies with persisted email counts when the import succeeds', function ():
             'failures' => '',
         ]),
     );
+});
+
+it('syncs new Microsoft mail after the recent pass and sends one summary after the full history', function (): void {
+    config()->set('queue.default', 'database');
+    $user = mailboxImportNotificationUser();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    $account = mailboxImportNotificationAccount($user, ['provider' => EmailProvider::AZURE]);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->once()->with(90, null)->andReturn(new MailBackfillPage(
+        messageIds: collect(['recent-1', 'recent-2']), nextPageToken: null, cursor: 'recent-cursor',
+    ));
+    $service->shouldReceive('initialBackfill')->once()->with(null, null)->andReturn(new MailBackfillPage(
+        messageIds: collect(['recent-1', 'recent-2', 'old-1']), nextPageToken: null, cursor: 'full-cursor',
+    ));
+
+    foreach (['recent-1', 'recent-2', 'old-1'] as $messageId) {
+        $service->shouldReceive('fetchMessage')->once()->with($messageId)->andReturn(mailboxImportFetchedEmail($messageId));
+    }
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+    app()->instance(MailServiceFactoryInterface::class, $factory);
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+
+    $sawLiveMailboxBeforeTheSummary = false;
+
+    while (DB::table('jobs')->whereIn('queue', ['emails-import', 'emails-sync'])->exists()) {
+        workMailboxImportQueueOnce();
+        $account->refresh();
+
+        if ($account->sync_cursor === 'recent-cursor'
+            && $account->isEmailHistoryImportRunning()
+            && $user->notifications()->count() === 0) {
+            $sawLiveMailboxBeforeTheSummary = true;
+        }
+    }
+
+    expect($sawLiveMailboxBeforeTheSummary)->toBeTrue()
+        ->and($account->fresh()->sync_cursor)->toBe('full-cursor')
+        ->and($account->emails()->pluck('provider_message_id')->sort()->values()->all())->toBe(['old-1', 'recent-1', 'recent-2'])
+        ->and($account->fresh()->isEmailHistoryImportRunning())->toBeFalse()
+        ->and($user->notifications()->sole()->data['status'])->toBe('success');
 });
 
 it('notifies with issues when some store jobs permanently fail', function (): void {
@@ -844,6 +890,7 @@ it('does not send the import summary after the calendar progress marker expires'
     $batchId = (string) $account->history_import_batch_id;
 
     $account->update(['sync_cursor' => 'history-done']);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingFinished($batchId);
     DB::table('job_batches')->where('id', $batchId)->update([
         'total_jobs' => 1,
         'pending_jobs' => 0,

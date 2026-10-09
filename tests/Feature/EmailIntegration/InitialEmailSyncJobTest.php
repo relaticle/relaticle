@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\MailboxImportPass;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -73,6 +74,12 @@ it('does not cap the first import when EMAIL_SYNC_INITIAL_DAYS is unset', functi
     handleInitialEmailSync(new InitialEmailSyncJob($account), $factory);
 
     expect($account->fresh()?->sync_cursor)->toBe('history-1');
+});
+
+it('treats a page queued before passes existed as a full pass', function (): void {
+    $job = new ReflectionClass(InitialEmailSyncJob::class)->newInstanceWithoutConstructor();
+
+    expect($job->pass)->toBe(MailboxImportPass::Full);
 });
 
 it('passes the optional day cap through to the mail service', function (): void {

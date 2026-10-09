@@ -23,6 +23,8 @@ final readonly class MailboxHistoryImportService
 
     private const string EMAIL_LISTING_PENDING_PREFIX = 'email-integration:history-import-email-listing:';
 
+    private const string HISTORY_LISTING_PENDING_PREFIX = 'email-integration:history-import-listing-pending:';
+
     private const string CALENDAR_IMPORT_PENDING_PREFIX = 'email-integration:history-import-calendar-pending:';
 
     private const string CALENDAR_DISCOVERED_PREFIX = 'email-integration:history-import-calendar-discovered:';
@@ -97,6 +99,21 @@ final readonly class MailboxHistoryImportService
     public function isEmailListingInProgress(ConnectedAccount $account): bool
     {
         return Cache::has(self::EMAIL_LISTING_PENDING_PREFIX.$account->getKey());
+    }
+
+    public function markHistoryListingPending(string $batchId): void
+    {
+        Cache::put(self::HISTORY_LISTING_PENDING_PREFIX.$batchId, true, now()->addMonth());
+    }
+
+    public function markHistoryListingFinished(string $batchId): void
+    {
+        Cache::forget(self::HISTORY_LISTING_PENDING_PREFIX.$batchId);
+    }
+
+    public function isHistoryListingPending(string $batchId): bool
+    {
+        return Cache::has(self::HISTORY_LISTING_PENDING_PREFIX.$batchId);
     }
 
     public function markCalendarImportPending(string $batchId): void
@@ -215,7 +232,7 @@ final readonly class MailboxHistoryImportService
         }
 
         if ($account->sync_cursor !== null) {
-            return false;
+            return $this->isHistoryListingPending($batch->id);
         }
 
         return $account->status === EmailAccountStatus::ACTIVE
@@ -248,6 +265,10 @@ final readonly class MailboxHistoryImportService
 
     public function batchIsComplete(Batch $batch): bool
     {
+        if ($this->isHistoryListingPending($batch->id)) {
+            return false;
+        }
+
         if ($batch->finished()) {
             return true;
         }
@@ -343,7 +364,7 @@ final readonly class MailboxHistoryImportService
         $percent = (int) round(($this->batchSuccessfulJobCount($batch) / $batch->totalJobs) * 100);
         $percent = max(0, min(100, $percent));
 
-        if ($this->isEmailListingInProgress($account)) {
+        if ($this->isEmailListingInProgress($account) || $this->isHistoryListingPending($batch->id)) {
             return min(99, $percent);
         }
 
@@ -359,7 +380,7 @@ final readonly class MailboxHistoryImportService
 
         if ($batch instanceof Batch) {
             if ($batch->totalJobs === 0) {
-                return $account->sync_cursor !== null ? 100 : 0;
+                return $account->sync_cursor !== null && ! $this->isHistoryListingPending($batch->id) ? 100 : 0;
             }
 
             return $this->batchProgressPercent($batch, $account);

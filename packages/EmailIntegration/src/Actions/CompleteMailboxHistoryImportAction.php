@@ -109,6 +109,10 @@ final readonly class CompleteMailboxHistoryImportAction
 
     private function importBatchHasSettled(Batch $batch, string $batchId): bool
     {
+        if ($this->mailboxHistoryImport->isHistoryListingPending($batchId)) {
+            return false;
+        }
+
         if ($this->mailboxHistoryImport->hasAwaitingRetrySuccessNotice($batchId) && $batch->pendingJobs > 0) {
             return false;
         }
