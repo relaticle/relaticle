@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Data\ListQuery;
+use App\Enums\CrmEntity;
 use App\Models\Company;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
@@ -145,4 +147,18 @@ it('binds a workspace by id without querying it again when it is already bound',
     });
 
     expect($queries)->toBe(0);
+});
+
+it('lists the acting user\'s companies whatever workspace is bound', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $otherUser = User::factory()->withWorkspace()->create();
+    $company = Company::withoutEvents(fn (): Company => Company::factory()->create([
+        'workspace_id' => $user->currentWorkspace->id,
+        'account_owner_id' => $user->id,
+    ]));
+    resolve(CurrentWorkspace::class)->set($otherUser->currentWorkspace);
+
+    $page = resolve(CrmEntity::Company->query())->paginate($user, new ListQuery);
+
+    expect(collect($page->items())->pluck('id')->all())->toBe([$company->id]);
 });
