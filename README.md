@@ -19,7 +19,7 @@
   <a href="https://relaticle.com/docs">Documentation</a> ·
   <a href="https://relaticle.com/docs/mcp">MCP Server</a> ·
   <a href="https://github.com/orgs/Relaticle/projects/1/views/1">Roadmap</a> ·
-  <a href="https://github.com/Relaticle/relaticle/discussions">Discussions</a>
+  <a href="https://relaticle.com/discord">Discord</a>
 </p>
 
 <p align="center">
@@ -86,9 +86,8 @@ Visit our [documentation](https://relaticle.com/docs) for guides on business usa
 # Community & Support
 
 - [Report Issues](https://github.com/Relaticle/relaticle/issues)
-- [Request Features](https://github.com/Relaticle/relaticle/discussions/categories/ideas)
-- [Ask Questions](https://github.com/Relaticle/relaticle/discussions/categories/q-a)
-- [Discord](https://discord.gg/relaticle)
+- [Request Features](https://relaticle.com/discord)
+- [Ask Questions](https://relaticle.com/discord)
 - [Star us on GitHub](https://github.com/Relaticle/relaticle) to support the project
 
 # License
