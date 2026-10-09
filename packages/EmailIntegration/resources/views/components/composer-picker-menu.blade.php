@@ -7,7 +7,7 @@
     'emptyLabel' => null,
     /** 'wire' binds the expression to wire:click, 'alpine' to x-on:click. */
     'handler' => 'wire',
-    /** Builds the click expression for an option id (null = the "none" row). */
+    /** Builds the click expression for an option id. */
     'click',
     /** Optional trailing row that creates a new option; bound to wire:click. */
     'createLabel' => null,
@@ -30,31 +30,22 @@
         </button>
     </x-slot>
 
-    <x-filament::dropdown.list>
-        @if (filled($noneLabel))
-            <x-filament::dropdown.list.item
-                :attributes="new \Illuminate\View\ComponentAttributeBag($bind(null))"
-                :color="filled($selected) ? 'gray' : 'primary'"
-            >
-                {{ $noneLabel }}
-            </x-filament::dropdown.list.item>
-        @endif
+    @if ($options !== [] || filled($emptyLabel) || filled($noneLabel))
+        <x-filament::dropdown.list>
+            @foreach ($options as $id => $name)
+                <x-filament::dropdown.list.item
+                    :attributes="new \Illuminate\View\ComponentAttributeBag($bind((string) $id))"
+                    :color="$selected === (string) $id ? 'primary' : 'gray'"
+                >
+                    {{ $name }}
+                </x-filament::dropdown.list.item>
+            @endforeach
 
-        @foreach ($options as $id => $name)
-            <x-filament::dropdown.list.item
-                :attributes="new \Illuminate\View\ComponentAttributeBag($bind((string) $id))"
-                :color="$selected === (string) $id ? 'primary' : 'gray'"
-            >
-                {{ $name }}
-            </x-filament::dropdown.list.item>
-        @endforeach
-
-        @if ($options === [] && filled($emptyLabel))
-            <x-filament::dropdown.list.item tag="div" color="gray">
-                {{ $emptyLabel }}
-            </x-filament::dropdown.list.item>
-        @endif
-    </x-filament::dropdown.list>
+            @if ($options === [] && filled($emptyLabel ?? $noneLabel))
+                <p class="composer-picker-note">{{ $emptyLabel ?? $noneLabel }}</p>
+            @endif
+        </x-filament::dropdown.list>
+    @endif
 
     @if (filled($createLabel))
         <x-filament::dropdown.list>
