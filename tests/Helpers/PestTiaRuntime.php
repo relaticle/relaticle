@@ -74,7 +74,7 @@ final class PestTiaRuntime
             );
         }
 
-        pest()->tia()->directory($storageDirectory)->locally();
+        pest()->tia()->directory($storageDirectory)->locally()->trustDefaultBranch();
     }
 
     public static function storageDirectory(string $projectRoot, bool $usesSharedState): string
