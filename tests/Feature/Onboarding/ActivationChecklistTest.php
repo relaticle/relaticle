@@ -20,6 +20,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -571,6 +572,21 @@ it('removes sample data and keeps the records a mailbox sync created', function 
 
     expect(People::query()->whereKey($synced->getKey())->exists())->toBeTrue()
         ->and(People::query()->where('workspace_id', $this->workspace->getKey())->where('creation_source', CreationSource::SAMPLE)->exists())->toBeFalse();
+});
+
+it('removes the sample data of the workspace it is given when no workspace is bound', function (): void {
+    seedSampleRecords($this->workspace, $this->owner);
+    People::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'creator_id' => $this->owner->getKey(),
+        'creation_source' => CreationSource::WEB,
+    ]);
+    resolve(CurrentWorkspace::class)->forget();
+
+    $removed = resolve(RemoveSampleData::class)->execute($this->owner, $this->workspace);
+
+    expect($removed)->toBeGreaterThan(0)
+        ->and($this->workspace->people()->where('creation_source', CreationSource::SAMPLE)->exists())->toBeFalse();
 });
 
 it('removes every system record and keeps the workspace\'s own', function (): void {

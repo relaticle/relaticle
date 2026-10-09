@@ -9,6 +9,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\PersonalAccessToken;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -44,14 +45,15 @@ final class CrmOverviewPrompt extends Prompt
 
         $overview = Cache::remember($cacheKey, self::CACHE_TTL, function () use ($workspaceId): string {
             $counts = [
-                'companies' => Company::query()->where('workspace_id', $workspaceId)->count(),
-                'people' => People::query()->where('workspace_id', $workspaceId)->count(),
-                'opportunities' => Opportunity::query()->where('workspace_id', $workspaceId)->count(),
-                'tasks' => Task::query()->where('workspace_id', $workspaceId)->count(),
-                'notes' => Note::query()->where('workspace_id', $workspaceId)->count(),
+                'companies' => Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count(),
+                'people' => People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count(),
+                'opportunities' => Opportunity::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count(),
+                'tasks' => Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count(),
+                'notes' => Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count(),
             ];
 
             $recentCompanies = Company::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
                 ->where('workspace_id', $workspaceId)
                 ->latest()
                 ->take(5)
@@ -59,6 +61,7 @@ final class CrmOverviewPrompt extends Prompt
                 ->implode(', ');
 
             $recentPeople = People::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
                 ->where('workspace_id', $workspaceId)
                 ->latest()
                 ->take(5)
