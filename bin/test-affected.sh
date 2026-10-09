@@ -23,6 +23,18 @@ LISTING="$(vendor/bin/pest --tia --baselined --filtered --refetch --list-tests 2
     exit 1
 }
 
+# The cached config and routes load once per process, so coverage ties them to a few
+# tests. JavaScript and CSS reach only the Browser suite, which CI runs.
+UNPLACED="$({
+    git diff --name-only "$(git merge-base HEAD origin/main)"
+    git ls-files --others --exclude-standard
+} | grep -E '^(config|routes|bootstrap)/|^(resources|packages/[^/]+/resources)/(js|css)/' || true)"
+
+if [[ -n "$UNPLACED" ]]; then
+    echo "! Coverage cannot place these files. Pick their tests by hand:"
+    printf '%s\n' "$UNPLACED" | sed 's/^/  /'
+fi
+
 CLASSES="$(printf '%s\n' "$LISTING" | sed -nE 's/^ - P\\(Tests\\[^:]+)::.*/\1/p' | sort -u)"
 
 if [[ -z "$CLASSES" ]]; then
@@ -34,16 +46,19 @@ COUNT="$(printf '%s\n' "$CLASSES" | wc -l | tr -d ' ')"
 FILES="$(printf '%s\n' "$CLASSES" | sed -E 's/^Tests/tests/; s#\\#/#g; s/$/.php/')"
 
 echo "→ ${COUNT} affected test files"
-printf '%s\n' "$FILES"
 
 if [[ "${1:-}" == "--plan" ]]; then
+    printf '%s\n' "$FILES"
     exit 0
 fi
 
 if (( COUNT > MAX_FILES )); then
-    echo "✗ ${COUNT} files is past the limit of ${MAX_FILES}. Run the files you touched and let CI run the rest." >&2
+    echo "✗ Past the limit of ${MAX_FILES}: the change reaches most of the suite, or no baseline matches this checkout." >&2
+    echo "  Run the test files you touched and let CI run the rest. --plan lists all ${COUNT}." >&2
     exit 1
 fi
+
+printf '%s\n' "$FILES"
 
 if (( COUNT == 1 )); then
     exec vendor/bin/pest --compact --no-tia "$FILES"

@@ -12,6 +12,20 @@ final class PestTiaRuntime
 
     private const string SHARED_ENVIRONMENT_KEY = 'RELATICLE_PEST_TIA_SHARED';
 
+    /**
+     * Coverage records no edge for a file a test reads from disk.
+     *
+     * @var array<string, string>
+     */
+    private const array FILES_ARCH_TESTS_READ = [
+        '.ai/**' => 'tests/Arch',
+        '.github/**' => 'tests/Arch',
+        '*.md' => 'tests/Arch',
+        'composer.json' => 'tests/Arch',
+        'phpstan*.neon' => 'tests/Arch',
+        'phpunit*.xml' => 'tests/Arch',
+    ];
+
     /** @var list<string> */
     private const array COMPLETE_RUN_FLAGS = [
         '--parallel',
@@ -74,7 +88,11 @@ final class PestTiaRuntime
             );
         }
 
-        pest()->tia()->directory($storageDirectory)->locally()->trustDefaultBranch();
+        pest()->tia()
+            ->directory($storageDirectory)
+            ->locally()
+            ->trustDefaultBranch()
+            ->watch(self::FILES_ARCH_TESTS_READ);
     }
 
     public static function storageDirectory(string $projectRoot, bool $usesSharedState): string
