@@ -764,8 +764,8 @@ it('fails every create row that repeats a unique value a stored record already h
         ->failed_rows->toBe(2);
 });
 
-it('fails a row whose unique single-value field is already stored on another record', function (): void {
-    $field = ImportExecutionFixture::customField($this, 'vat_number', 'text', 'company');
+it('fails a row whose unique single-value field is already stored on another record', function (string $type, string $taken, string $free): void {
+    $field = ImportExecutionFixture::customField($this, 'registration', $type, 'company');
     $field->update(['settings' => new CustomFieldSettingsData(unique_per_entity_type: true)]);
     $holder = Company::factory()->create(['workspace_id' => $this->workspace->id]);
 
@@ -774,15 +774,16 @@ it('fails a row whose unique single-value field is already stored on another rec
         'entity_type' => 'company',
         'entity_id' => $holder->id,
         'tenant_id' => $this->workspace->id,
-        $field->getValueColumn() => 'DE811907980',
+        $field->getValueColumn() => $taken,
     ]);
 
-    ImportExecutionFixture::readyStore($this, ['Name', 'VAT'], [
-        ImportExecutionFixture::row(2, ['Name' => 'Northline Copy', 'VAT' => 'DE811907980'], ['match_action' => RowMatchAction::Create->value]),
-        ImportExecutionFixture::row(3, ['Name' => 'Southline', 'VAT' => 'DE129273398'], ['match_action' => RowMatchAction::Create->value]),
+    ImportExecutionFixture::readyStore($this, ['Name', 'Registration'], [
+        ImportExecutionFixture::row(2, ['Name' => 'Northline Copy', 'Registration' => $taken], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(3, ['Name' => 'Southline', 'Registration' => $free], ['match_action' => RowMatchAction::Create->value]),
+        ImportExecutionFixture::row(4, ['Name' => 'Southline Copy', 'Registration' => $free], ['match_action' => RowMatchAction::Create->value]),
     ], [
         ColumnData::toField(source: 'Name', target: 'name'),
-        ColumnData::toField(source: 'VAT', target: 'custom_fields_vat_number'),
+        ColumnData::toField(source: 'Registration', target: 'custom_fields_registration'),
     ], ImportEntityType::Company);
 
     ImportExecutionFixture::run($this);
@@ -791,14 +792,17 @@ it('fails a row whose unique single-value field is already stored on another rec
 
     expect($import)
         ->created_rows->toBe(1)
-        ->failed_rows->toBe(1)
-        ->and($import->failedRows()->sole()->validation_error)->toContain('DE811907980')
-        ->and(Company::query()->where('workspace_id', $this->workspace->id)->where('name', 'Northline Copy')->exists())->toBeFalse();
-});
+        ->failed_rows->toBe(2)
+        ->and($import->failedRows()->pluck('validation_error')->implode(' '))->toContain($taken, $free)
+        ->and(Company::query()->where('workspace_id', $this->workspace->id)->whereIn('name', ['Northline Copy', 'Southline Copy'])->exists())->toBeFalse();
+})->with([
+    'text' => ['text', 'DE811907980', 'DE129273398'],
+    'number' => ['number', '4471', '9920'],
+]);
 
 it('looks up stored unique values once per chunk rather than once per row', function (): void {
     ImportExecutionFixture::readyStore($this, ['Name', 'Domain'], collect(range(1, 6))->map(
-        fn (int $number): array => ImportExecutionFixture::row($number + 1, ['Name' => "Company {$number}", 'Domain' => "company{$number}.example"], ['match_action' => RowMatchAction::Create->value]),
+        fn (int $number): array => ImportExecutionFixture::row($number + 1, ['Name' => "Company {$number}", 'Domain' => "https://www.Company{$number}.example/pricing, company{$number}.test"], ['match_action' => RowMatchAction::Create->value]),
     )->all(), [
         ColumnData::toField(source: 'Name', target: 'name'),
         ColumnData::toField(source: 'Domain', target: 'custom_fields_domains'),

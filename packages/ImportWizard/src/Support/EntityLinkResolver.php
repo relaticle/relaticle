@@ -299,12 +299,12 @@ final class EntityLinkResolver
      * @param  list<string>  $values
      * @return array<string, list<string>>
      */
-    public function recordsStoring(CustomField $customField, array $values): array
+    public function recordIdsByValue(CustomField $customField, array $values): array
     {
         $valueColumn = $customField->getValueColumn();
         $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
         $model = new CustomFieldValue;
-        $recordsByValue = [];
+        $recordIdsByValue = [];
 
         foreach (array_chunk(array_map(mb_strtolower(...), $values), 5000) as $chunk) {
             $placeholders = implode(',', array_fill(0, count($chunk), '?'));
@@ -324,11 +324,11 @@ final class EntityLinkResolver
             );
 
             foreach ($rows as $row) {
-                $recordsByValue[mb_strtolower((string) $row->matched_value)][] = (string) $row->entity_id;
+                $recordIdsByValue[mb_strtolower((string) $row->matched_value)][] = (string) $row->entity_id;
             }
         }
 
-        return $recordsByValue;
+        return $recordIdsByValue;
     }
 
     /** @param  array<mixed>  $values */

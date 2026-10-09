@@ -108,10 +108,10 @@ final class ExecuteImportJob implements ShouldQueue
     /** @var array<string, true> */
     private array $recordsCreatedHere = [];
 
-    /** @var array<string, string> "{customFieldId}|{spelling}" => key of the record whose staged value holds it */
+    /** @var array<string, array<string, string>> custom field id => spelling => id of the record whose staged value holds it */
     private array $claimedUniqueValues = [];
 
-    /** @var array<string, list<string>> "{customFieldId}|{spelling}" => ids of the records storing it when the chunk began */
+    /** @var array<string, array<string, list<string>>> custom field id => lowercased spelling => ids of the records storing it when the chunk began */
     private array $storedUniqueValues = [];
 
     /**
@@ -248,7 +248,7 @@ final class ExecuteImportJob implements ShouldQueue
                     ->orderBy('row_number')
                     ->chunkById(500, function (Collection $rows) use ($importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, &$results, &$handedOff, $store, $import, $startedAt): bool {
                         $existingRecords = $this->preloadExistingRecords($rows, $importer, withCustomFieldValues: $customFieldFormatMap !== []);
-                        $this->loadStoredUniqueValues($rows, $fieldMappings, $customFieldDefs);
+                        $this->loadStoredUniqueValues($rows, $customFieldFormatMap, $customFieldDefs);
 
                         foreach ($rows as $row) {
                             $this->processRow($row, $importer, $fieldMappings, $allowedKeys, $customFieldDefs, $customFieldFormatMap, $matchField, $matchSourceColumn, $context, $results, $existingRecords);
@@ -618,6 +618,7 @@ final class ExecuteImportJob implements ShouldQueue
      */
     private function claimUniqueValues(Model $record, array $safeValues, Collection $customFieldDefs, Collection $existingValues): void
     {
+        $recordId = (string) $record->getKey();
         $claims = [];
 
         foreach ($safeValues as $code => $safeValue) {
@@ -627,114 +628,113 @@ final class ExecuteImportJob implements ShouldQueue
                 continue;
             }
 
-            $held = $this->uniqueValueKeys($cf, $existingValues->get($cf->getKey())?->getAttribute($cf->getValueColumn()));
+            $held = $this->uniqueValueSpellings($cf, $existingValues->get($cf->getKey())?->getAttribute($cf->getValueColumn()));
 
             foreach (Arr::wrap($safeValue) as $candidate) {
-                $keys = $this->uniqueValueKeys($cf, $candidate);
+                $spellings = $this->uniqueValueSpellings($cf, $candidate);
 
-                if (array_intersect($keys, $held) !== []) {
+                if (array_intersect($spellings, $held) !== []) {
                     continue;
                 }
 
                 throw_if(
-                    $this->claimedByAnotherRecord($record, $keys) || $this->storedOnAnotherRecord($record, $cf, $keys, $candidate),
+                    $this->claimedByAnotherRecord($recordId, $cf, $spellings) || $this->storedOnAnotherRecord($recordId, $cf, $spellings, $candidate),
                     UniqueCustomFieldValueTaken::class,
                     $record,
                     $cf,
                     (string) $candidate,
                 );
 
-                $claims = [...$claims, ...$keys];
+                $claims[$cf->getKey()] = [...$claims[$cf->getKey()] ?? [], ...$spellings];
             }
         }
 
-        foreach ($claims as $key) {
-            $this->claimedUniqueValues[$key] = $this->recordKey($record);
+        foreach ($claims as $customFieldId => $spellings) {
+            $this->claimedUniqueValues[$customFieldId] = array_replace(
+                $this->claimedUniqueValues[$customFieldId] ?? [],
+                array_fill_keys($spellings, $recordId),
+            );
         }
     }
 
     /** @return list<string> */
-    private function uniqueValueKeys(CustomField $cf, mixed $value): array
+    private function uniqueValueSpellings(CustomField $cf, mixed $value): array
     {
-        return array_values(collect(Arr::wrap($value instanceof Collection ? $value->all() : $value))
+        return array_values(Collection::wrap($value)
             ->filter(fn (mixed $item): bool => is_scalar($item) && filled($item))
             ->flatMap(fn (mixed $item): array => CanonicalValue::spellings($cf, (string) $item))
-            ->map(fn (string $spelling): string => $cf->getKey().'|'.mb_strtolower($spelling))
             ->unique()
             ->all());
     }
 
-    /** @param  list<string>  $keys */
-    private function claimedByAnotherRecord(Model $record, array $keys): bool
+    /** @param  list<string>  $spellings */
+    private function claimedByAnotherRecord(string $recordId, CustomField $cf, array $spellings): bool
     {
-        return array_any(
-            $keys,
-            fn (string $key): bool => ($this->claimedUniqueValues[$key] ?? $this->recordKey($record)) !== $this->recordKey($record),
-        );
+        $claimed = $this->claimedUniqueValues[$cf->getKey()] ?? [];
+
+        return array_any($spellings, fn (string $spelling): bool => isset($claimed[$spelling]) && $claimed[$spelling] !== $recordId);
     }
 
-    /** @param  list<string>  $keys */
-    private function storedOnAnotherRecord(Model $record, CustomField $cf, array $keys, mixed $candidate): bool
+    /** @param  list<string>  $spellings */
+    private function storedOnAnotherRecord(string $recordId, CustomField $cf, array $spellings, mixed $candidate): bool
     {
-        $this->rememberStoredUniqueValues($cf, $keys);
+        $lowercased = array_map(mb_strtolower(...), $spellings);
+        $this->rememberStoredUniqueValues($cf, $lowercased);
 
         $storedElsewhere = array_any(
-            $keys,
-            fn (string $key): bool => array_diff($this->storedUniqueValues[$key], [(string) $record->getKey()]) !== [],
+            $lowercased,
+            fn (string $spelling): bool => array_diff($this->storedUniqueValues[$cf->getKey()][$spelling], [$recordId]) !== [],
         );
 
         return $storedElsewhere && TenantContextService::withTenant(
             $this->workspaceId,
             fn (): bool => validator(
                 ['value' => $candidate],
-                ['value' => [new UniqueCustomFieldValue($cf, $record->getKey())]],
+                ['value' => [new UniqueCustomFieldValue($cf, $recordId)]],
             )->fails(),
         );
     }
 
     /**
      * @param  Collection<int, ImportRow>  $rows
-     * @param  Collection<int, ColumnData>  $fieldMappings
+     * @param  array<string, ColumnData>  $customFieldFormatMap
      * @param  Collection<string, CustomField>  $customFieldDefs
      */
-    private function loadStoredUniqueValues(Collection $rows, Collection $fieldMappings, Collection $customFieldDefs): void
+    private function loadStoredUniqueValues(Collection $rows, array $customFieldFormatMap, Collection $customFieldDefs): void
     {
         $this->storedUniqueValues = [];
 
-        foreach ($fieldMappings as $mapping) {
-            $cf = $customFieldDefs->get(Str::after($mapping->target, self::CUSTOM_FIELD_PREFIX));
+        foreach ($customFieldFormatMap as $code => $mapping) {
+            $cf = $customFieldDefs->get($code);
 
-            if (! str_starts_with($mapping->target, self::CUSTOM_FIELD_PREFIX) || ! $cf?->settings->unique_per_entity_type) {
+            if (! $cf?->settings->unique_per_entity_type) {
                 continue;
             }
 
-            $cells = $rows
+            // A cell's canonical form has spellings the raw cell does not, and a row is checked by them.
+            $values = $rows
                 ->map(fn (ImportRow $row): mixed => $row->getFinalValue($mapping->source))
                 ->filter(fn (mixed $cell): bool => is_scalar($cell) && filled($cell))
                 ->flatMap(fn (mixed $cell): array => [(string) $cell, ...explode(',', (string) $cell)])
-                ->flatMap(fn (string $value): array => [trim($value), CanonicalValue::of($cf, trim($value))]);
+                ->flatMap(fn (string $value): array => [$value, CanonicalValue::of($cf, trim($value))]);
 
-            $this->rememberStoredUniqueValues($cf, $this->uniqueValueKeys($cf, $cells));
+            $this->rememberStoredUniqueValues($cf, array_map(mb_strtolower(...), $this->uniqueValueSpellings($cf, $values)));
         }
     }
 
-    /** @param  list<string>  $keys */
-    private function rememberStoredUniqueValues(CustomField $cf, array $keys): void
+    /** @param  list<string>  $lowercasedSpellings */
+    private function rememberStoredUniqueValues(CustomField $cf, array $lowercasedSpellings): void
     {
-        $unknown = array_values(array_filter($keys, fn (string $key): bool => ! isset($this->storedUniqueValues[$key])));
+        $known = $this->storedUniqueValues[$cf->getKey()] ?? [];
+        $unknown = array_values(array_diff($lowercasedSpellings, array_map(strval(...), array_keys($known))));
 
         if ($unknown === []) {
             return;
         }
 
-        $recordsByValue = new EntityLinkResolver($this->workspaceId)->recordsStoring(
-            $cf,
-            array_map(fn (string $key): string => Str::after($key, '|'), $unknown),
-        );
+        $recordIdsByValue = new EntityLinkResolver($this->workspaceId)->recordIdsByValue($cf, $unknown);
 
-        foreach ($unknown as $key) {
-            $this->storedUniqueValues[$key] = $recordsByValue[Str::after($key, '|')] ?? [];
-        }
+        $this->storedUniqueValues[$cf->getKey()] = array_replace($known, array_fill_keys($unknown, []), $recordIdsByValue);
     }
 
     private function recordKey(Model $record): string
