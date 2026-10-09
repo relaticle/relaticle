@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a8ba32cb438b3f23852ed675d9397733",
+    "content-hash": "4f5ec00407c670db459c5e1646a9c205",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -22278,16 +22278,16 @@
         },
         {
             "name": "pestphp/pest",
-            "version": "v5.3.0",
+            "version": "dev-tia-warmup-worktrees",
             "source": {
                 "type": "git",
-                "url": "https://github.com/pestphp/pest.git",
-                "reference": "14a3efd918e11bb8f2b432d6ac8dd016431979fd"
+                "url": "https://github.com/ManukMinasyan/pest.git",
+                "reference": "4c64e0864bab56d351ab0b8b1c5e3f296e9e3428"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pestphp/pest/zipball/14a3efd918e11bb8f2b432d6ac8dd016431979fd",
-                "reference": "14a3efd918e11bb8f2b432d6ac8dd016431979fd",
+                "url": "https://api.github.com/repos/ManukMinasyan/pest/zipball/4c64e0864bab56d351ab0b8b1c5e3f296e9e3428",
+                "reference": "4c64e0864bab56d351ab0b8b1c5e3f296e9e3428",
                 "shasum": ""
             },
             "require": {
@@ -22353,15 +22353,74 @@
                 }
             },
             "autoload": {
+                "psr-4": {
+                    "Pest\\": "src/"
+                },
                 "files": [
                     "src/Functions.php",
                     "src/Pest.php"
-                ],
-                "psr-4": {
-                    "Pest\\": "src/"
-                }
+                ]
             },
-            "notification-url": "https://packagist.org/downloads/",
+            "autoload-dev": {
+                "psr-4": {
+                    "Tests\\Fixtures\\Covers\\": "tests/Fixtures/Covers",
+                    "Tests\\Fixtures\\Inheritance\\": "tests/Fixtures/Inheritance",
+                    "Tests\\Fixtures\\Arch\\": "tests/Fixtures/Arch",
+                    "Tests\\Fixtures\\Tia\\": "tests/Fixtures/Tia",
+                    "Tests\\": "tests/PHPUnit/"
+                },
+                "classmap": [
+                    "tests/Fixtures/Arch/ToBeCasedCorrectly/IncorrectCasing/incorrectCasing.php"
+                ],
+                "files": [
+                    "tests/Autoload.php"
+                ]
+            },
+            "scripts": {
+                "lint": [
+                    "rector",
+                    "pint --parallel"
+                ],
+                "test:lint": [
+                    "rector --dry-run",
+                    "pint --parallel --test"
+                ],
+                "test:profanity": [
+                    "XDEBUG_MODE=off php bin/pest --profanity --compact"
+                ],
+                "test:type:check": [
+                    "phpstan analyse --ansi --memory-limit=-1 --debug"
+                ],
+                "test:type:coverage": [
+                    "XDEBUG_MODE=off php -d memory_limit=-1 bin/pest --type-coverage --min=100"
+                ],
+                "test:unit": [
+                    "XDEBUG_MODE=off php bin/pest --exclude-group=integration --compact"
+                ],
+                "test:inline": [
+                    "XDEBUG_MODE=off php bin/pest --configuration=phpunit.inline.xml"
+                ],
+                "test:parallel": [
+                    "XDEBUG_MODE=off php bin/pest --exclude-group=integration --parallel --processes=3"
+                ],
+                "test:integration": [
+                    "XDEBUG_MODE=off php bin/pest --group=integration -v"
+                ],
+                "test:tia": [
+                    "php bin/pest --group=tia -v"
+                ],
+                "update:snapshots": [
+                    "XDEBUG_MODE=off REBUILD_SNAPSHOTS=true php bin/pest --update-snapshots --exclude-group=tia"
+                ],
+                "test": [
+                    "@test:lint",
+                    "@test:type:check",
+                    "@test:type:coverage",
+                    "@test:unit",
+                    "@test:parallel",
+                    "@test:integration"
+                ]
+            },
             "license": [
                 "MIT"
             ],
@@ -22381,20 +22440,19 @@
                 "unit"
             ],
             "support": {
-                "issues": "https://github.com/pestphp/pest/issues",
-                "source": "https://github.com/pestphp/pest/tree/v5.3.0"
+                "source": "https://github.com/ManukMinasyan/pest/tree/tia-warmup-worktrees"
             },
             "funding": [
                 {
-                    "url": "https://www.paypal.com/paypalme/enunomaduro",
-                    "type": "custom"
+                    "type": "github",
+                    "url": "https://github.com/nunomaduro"
                 },
                 {
-                    "url": "https://github.com/nunomaduro",
-                    "type": "github"
+                    "type": "custom",
+                    "url": "https://www.paypal.com/paypalme/enunomaduro"
                 }
             ],
-            "time": "2026-10-01T16:58:48+00:00"
+            "time": "2026-10-08T12:28:47+00:00"
         },
         {
             "name": "pestphp/pest-plugin",
@@ -25240,9 +25298,17 @@
             "time": "2026-10-05T20:07:08+00:00"
         }
     ],
-    "aliases": [],
+    "aliases": [
+        {
+            "package": "pestphp/pest",
+            "version": "dev-tia-warmup-worktrees",
+            "alias": "5.3.0",
+            "alias_normalized": "5.3.0.0"
+        }
+    ],
     "minimum-stability": "beta",
     "stability-flags": {
+        "pestphp/pest": 20,
         "spatie/guidelines-skills": 20
     },
     "prefer-stable": true,

@@ -1,14 +1,21 @@
 name: TIA Baseline
 
 # Pest looks for this workflow filename and for an artifact named
-# pest-tia-baseline. It runs nightly rather than on push: one recording holds a
+# pest-tia-baseline. It runs nightly rather than on every push: one recording holds a
 # runner for 23 minutes, and on a busy day the test jobs already queue for runners.
-# Nothing consumes the artifact yet: Pest cannot fetch it from a git worktree
-# (pestphp/pest#1820).
+# `composer test:affected` reads the artifact. A baseline is void once one of the
+# files Pest fingerprints changes, so a push to main that touches one records again.
 
 on:
   schedule:
     - cron: '0 3 * * *'
+  push:
+    branches: [main]
+    paths:
+      - composer.lock
+      - phpunit.xml
+      - pnpm-lock.yaml
+      - vite.config.js
   workflow_dispatch:
 
 # A manual run replaces a nightly one still in flight.

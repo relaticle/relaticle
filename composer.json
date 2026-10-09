@@ -92,7 +92,7 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
-        "pestphp/pest": "^5.0",
+        "pestphp/pest": "dev-tia-warmup-worktrees as 5.3.0",
         "pestphp/pest-plugin-browser": "^5.0",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-rector": "^5.0",
@@ -181,6 +181,10 @@
             "Composer\\Config::disableProcessTimeout",
             "pest --compact --parallel --configuration phpunit.ci.xml --shard=${SHARD} --ci --no-tia"
         ],
+        "test:affected": [
+            "Composer\\Config::disableProcessTimeout",
+            "bash bin/test-affected.sh"
+        ],
         "test:update-shards": [
             "Composer\\Config::disableProcessTimeout",
             "pest --parallel --update-shards --no-tia"
@@ -219,5 +223,12 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "name": "pest",
+            "type": "vcs",
+            "url": "https://github.com/ManukMinasyan/pest"
+        }
+    ]
 }
