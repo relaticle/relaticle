@@ -327,3 +327,8 @@
 .fi-meetings-date:hover .fi-fo-date-time-picker-display-text-input {
     @apply text-gray-900 dark:text-white;
 }
+
+/* Empty picker copy is a caption. The same row style as a real choice reads as a signature or template named "No …". */
+.composer-picker-note {
+    @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
+}
