@@ -43,6 +43,7 @@ Relaticle is a self-hosted CRM your AI agents can work in. Connect Claude, ChatG
 - **Multi-Workspace Isolation** - Workspace-scoped data with role-based permissions
 - **Modern Tech Stack** - Laravel 13, Filament 5, PHP 8.5, with an automated test suite on every change
 - **Privacy-First** - Self-hosted, AGPL-3.0, your data stays on your server
+- **Agent Plugin Ready** - [`plugins/relaticle-crm-operator`](plugins/relaticle-crm-operator) packages Relaticle's MCP workflow guidance as an installable plugin with a focused CRM Skill and eval cases.
 
 # Requirements
 
