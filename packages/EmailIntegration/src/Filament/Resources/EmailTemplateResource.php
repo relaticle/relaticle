@@ -9,9 +9,6 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\RichEditor;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -24,8 +21,8 @@ use Override;
 use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
 final class EmailTemplateResource extends Resource
 {
@@ -46,32 +43,7 @@ final class EmailTemplateResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->schema([
-            TextInput::make('name')
-                ->required()
-                ->maxLength(100),
-
-            TextInput::make('subject')
-                ->required()
-                ->maxLength(255),
-
-            RichEditor::make('body_html')
-                ->label(__('filament/resources/email-template.fields.body_html.label'))
-                ->required()
-                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                ->activePanel('mergeTags')
-                ->toolbarButtons([
-                    'bold', 'italic', 'underline', 'strike',
-                    'link', 'bulletList', 'orderedList',
-                    'blockquote', 'h2', 'h3', 'undo', 'redo',
-                ])
-                ->columnSpanFull(),
-
-            Toggle::make('is_shared')
-                ->label(__('filament/resources/email-template.fields.is_shared.label'))
-                ->helperText(__('filament/resources/email-template.fields.is_shared.helper_text'))
-                ->disabled(fn (?EmailTemplate $record): bool => $record instanceof EmailTemplate && $record->created_by === null),
-        ]);
+        return EmailTemplateForm::configure($schema);
     }
 
     public static function table(Table $table): Table
