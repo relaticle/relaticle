@@ -83,7 +83,7 @@ final class TaskResource extends Resource
     public static function table(Table $table): Table
     {
         /** @var Collection<string, CustomField> $customFields */
-        $customFields = CustomField::query()->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
+        $customFields = CustomField::query()->with('options')->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
         /** @var ValueResolvers $valueResolver */
         $valueResolver = resolve(ValueResolvers::class);
 

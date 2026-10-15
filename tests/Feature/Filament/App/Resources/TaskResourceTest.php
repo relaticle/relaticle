@@ -7,6 +7,7 @@ use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Mail\TaskAssignedMail;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
@@ -430,3 +431,15 @@ it('gives the task description the borderless document canvas', function (): voi
     expect($editor->getExtraAttributes())->toHaveKey('data-slash-menu')
         ->and($editor->getExtraAttributes()['class'])->toContain('fi-fo-rich-editor-seamless');
 });
+
+it('groups tasks by a select custom field and titles each group with its option label', function (string $code): void {
+    $field = CustomField::query()->where('code', $code)->firstOrFail();
+    $option = $field->options()->firstOrFail();
+    $task = Task::factory()->for($this->workspace, 'workspace')->create();
+    $task->saveCustomFieldValue($field, $option->getKey());
+
+    livewire(ManageTasks::class)
+        ->set('tableGrouping', "{$code}_group")
+        ->assertOk()
+        ->assertSee($option->name);
+})->with(['status', 'priority']);
