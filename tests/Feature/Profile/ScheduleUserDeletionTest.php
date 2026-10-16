@@ -57,18 +57,17 @@ test('user retains workspace memberships during grace period', function () {
     expect($user->refresh()->workspaces)->toHaveCount(1);
 });
 
-test('user cannot schedule deletion when owning workspace with other members', function () {
+test('user cannot schedule deletion when owning workspace with other members', function (string $ownedWorkspace) {
     Notification::fake();
 
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->currentWorkspace;
-    $workspace->users()->attach(User::factory()->create(), ['role' => 'member']);
+    $user = User::factory()->{$ownedWorkspace}()->create();
+    $user->ownedWorkspaces()->firstOrFail()->users()->attach(User::factory()->create(), ['role' => 'member']);
 
     expect(fn () => resolve(ScheduleUserDeletion::class)->schedule($user))
         ->toThrow(ValidationException::class);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
-});
+})->with(['personal workspace' => 'withPersonalWorkspace', 'team workspace' => 'withWorkspace']);
 
 test('the deletion blocker names an action the app supports', function (): void {
     Notification::fake();
