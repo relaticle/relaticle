@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\OpportunityResource\RelationManagers;
 
+use App\Filament\Actions\DuplicateAction;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
@@ -45,6 +46,7 @@ final class NotesRelationManager extends RelationManager
             ])
             ->recordActions([
                 ActionGroup::make([
+                    DuplicateAction::make(),
                     EditAction::make(),
                     DetachAction::make(),
                     DeleteAction::make(),

@@ -2,18 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Filament\Actions\DuplicateAction;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\OpportunityResource\RelationManagers\MeetingsRelationManager;
+use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
-mutates(OpportunityResource::class);
+mutates(OpportunityResource::class, DuplicateAction::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -241,4 +245,84 @@ it('does not shift a date-only custom field into the user timezone', function ()
         ->assertOk()
         ->assertSee('Aug 19, 2026')
         ->assertDontSee('Aug 18, 2026');
+});
+
+function opportunityWithCustomFields(Workspace $workspace, User $user): Opportunity
+{
+    $stageOptionId = DB::table('custom_field_options')
+        ->join('custom_fields', 'custom_fields.id', '=', 'custom_field_options.custom_field_id')
+        ->where('custom_fields.tenant_id', $workspace->getKey())
+        ->where('custom_fields.entity_type', 'opportunity')
+        ->where('custom_fields.code', 'stage')
+        ->value('custom_field_options.id');
+
+    $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create(['name' => 'Renewal']);
+    $opportunity->saveCustomFields(['amount' => 5000, 'close_date' => '2026-08-19', 'stage' => $stageOptionId]);
+
+    return $opportunity->refresh();
+}
+
+it('asks before duplicating an opportunity without changes', function (): void {
+    $record = opportunityWithCustomFields($this->workspace, $this->user);
+
+    livewire(ListOpportunities::class)
+        ->mountAction(TestAction::make('duplicate')->table($record))
+        ->callMountedAction()
+        ->assertActionMounted([TestAction::make('duplicate')->table($record), TestAction::make('confirmUnchanged')]);
+
+    expect(Opportunity::query()->where('name', 'Renewal')->count())->toBe(1);
+});
+
+it('duplicates an unchanged opportunity with its custom fields once confirmed', function (): void {
+    $record = opportunityWithCustomFields($this->workspace, $this->user);
+
+    livewire(ListOpportunities::class)
+        ->mountAction(TestAction::make('duplicate')->table($record))
+        ->callMountedAction()
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertActionNotMounted();
+
+    $copy = Opportunity::query()->where('name', 'Renewal')->whereKeyNot($record->getKey())->sole();
+
+    $valuesByCode = fn (Opportunity $opportunity): array => $opportunity->customFieldValues()
+        ->with('customField')
+        ->get()
+        ->mapWithKeys(fn (CustomFieldValue $value): array => [$value->customField->code => (string) $value->getValue()])
+        ->sortKeys()
+        ->all();
+
+    expect($valuesByCode($copy))->toHaveCount(3)->toBe($valuesByCode($record));
+});
+
+it('duplicates an opportunity under an edited name', function (): void {
+    $record = opportunityWithCustomFields($this->workspace, $this->user);
+
+    livewire(ListOpportunities::class)
+        ->callAction(TestAction::make('duplicate')->table($record), data: ['name' => 'Renewal 2027'])
+        ->assertHasNoActionErrors()
+        ->assertActionNotMounted();
+
+    $copy = Opportunity::query()->where('name', 'Renewal 2027')->sole();
+
+    expect($copy->customFieldValues()->count())->toBe(3);
+});
+
+it('records the duplicating member as the creator of the copy', function (): void {
+    $originalCreator = User::factory()->create();
+    $this->workspace->users()->attach($originalCreator, ['role' => 'member']);
+    $record = Opportunity::factory()->recycle($this->workspace)->create([
+        'name' => 'Renewal',
+        'creator_id' => $originalCreator->id,
+        'creation_source' => CreationSource::IMPORT,
+    ]);
+
+    livewire(ListOpportunities::class)
+        ->callAction(TestAction::make('duplicate')->table($record), data: ['name' => 'Renewal 2027'])
+        ->assertHasNoActionErrors();
+
+    $copy = Opportunity::query()->where('name', 'Renewal 2027')->sole();
+
+    expect($copy->creator_id)->toBe($this->user->id)
+        ->and($copy->creation_source)->toBe(CreationSource::WEB);
 });

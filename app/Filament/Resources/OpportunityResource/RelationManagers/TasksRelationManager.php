@@ -7,6 +7,7 @@ namespace App\Filament\Resources\OpportunityResource\RelationManagers;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\AttachAction;
@@ -45,6 +46,7 @@ final class TasksRelationManager extends RelationManager
             ])
             ->recordActions([
                 ActionGroup::make([
+                    TaskResource::duplicateAction(),
                     EditAction::make(),
                     DetachAction::make(),
                     DeleteAction::make(),
