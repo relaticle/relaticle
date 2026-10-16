@@ -28,7 +28,7 @@
                 {{ $this->composeEmailAction }}
             </div>
 
-            <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-y border-gray-200 dark:divide-white/5 dark:border-white/10">
+            <div class="flex min-h-[20rem] flex-col divide-y divide-gray-100 border-t border-gray-200 dark:divide-white/5 dark:border-white/10">
                 @forelse ($this->emails as $email)
                     <x-email-integration::list-row-wide :email="$email" wire:key="email-list-row-{{ $email->id }}" />
                 @empty

@@ -45,7 +45,7 @@
             class="fi-email-reader-backdrop absolute inset-0 bg-gray-950/50"
         ></div>
 
-        <div class="fi-email-reader-panel relative flex h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
+        <div class="fi-email-reader-panel relative flex h-[85vh] w-full max-w-5xl flex-col overflow-clip rounded-xl bg-white shadow-2xl ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10">
             <div class="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-gray-200 px-4 dark:border-gray-700">
                 <span class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200">
                     <x-heroicon-m-envelope class="h-4 w-4 text-gray-400" />
