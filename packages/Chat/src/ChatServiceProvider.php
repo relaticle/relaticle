@@ -216,7 +216,7 @@ final class ChatServiceProvider extends ServiceProvider
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             $this->inAppPanel(fn (): string => $this->recordChipIconScript()
-                .Blade::render("@vite(['resources/js/echo.js', 'packages/Chat/resources/js/chat.js'])")),
+                .Blade::render("@vite(['packages/Chat/resources/js/chat.js'])")),
         );
 
         // A session that merely expired keeps its drafts: the composer restores them after sign-in.

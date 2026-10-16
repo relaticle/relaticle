@@ -86,6 +86,11 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     // reasoning phase) otherwise trips it mid-turn and shows a false "took too long"
     // for a reply that is still generating server-side and does persist.
     streamTimeoutMs: 125000,
+    // The websocket is the fast path, never the only one: a turn with no stream
+    // event for this long asks the server whether it is still running.
+    turnPollMs: 3000,
+    turnPollId: null,
+    lastStreamActivityAt: 0,
     currentToolStatus: null,
 
     // Single source of truth for the assistant-bubble shape. Every streamed
@@ -332,31 +337,92 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
 
     startStreamTimeout(timeoutMs = null) {
         this.clearStreamTimeout();
+        this.lastStreamActivityAt = Date.now();
         this.streamTimeoutId = setTimeout(async () => {
             if (!this.isStreaming) return;
-            // A lost stream_end stranded this turn: reconcile from the DB so the
-            // final text AND any proposal card self-heal instead of showing a
-            // truncated bubble with a missing approve/reject CTA until reload.
-            const assistantMsg = this.lastAssistantBubble();
-            await this.reconcileLatestAssistant(assistantMsg);
-            // Same torn-down-instance hazard as handleStreamEnd (see the `destroyed`
-            // comment above): this continuation reaches restoreInputFocus() below,
-            // which would steal focus into whatever NEW instance is now live under
-            // this same context if a wire:navigate landed during the await above.
-            if (this.destroyed) return;
-            if (assistantMsg?.role === 'assistant') {
-                if (!assistantMsg.content) {
-                    assistantMsg.streamError = this.streamTexts.timeout;
-                    assistantMsg.retryable = true;
-                    assistantMsg.retryOnAuto = false;
-                }
-                assistantMsg.rendered = true;
-                assistantMsg.prerendered = false;
+            // Silence alone never ends a turn the server still runs: a retried job
+            // can outlast this deadline. The marker's TTL bounds a worker that died.
+            if ((await this.turnStillRunning()) === true) {
+                if (this.destroyed || !this.isStreaming) return;
+                this.startStreamTimeout();
+                this.watchTurn();
+                return;
             }
-            this.currentToolStatus = null;
-            this.isStreaming = false;
-            this.restoreInputFocus();
+            this.settleFromServer({ timedOut: true });
         }, timeoutMs ?? this.streamTimeoutMs);
+    },
+
+    // Started once the server has registered the turn (TurnPresence): asking
+    // earlier reads "not running" for a turn that has not begun.
+    watchTurn() {
+        this.stopWatchingTurn();
+        const id = this.turnPollId = setTimeout(async () => {
+            if (this.destroyed || !this.isStreaming) return;
+            const silent = Date.now() - this.lastStreamActivityAt >= this.turnPollMs;
+            const ended = silent && (await this.turnStillRunning()) === false;
+            if (this.turnPollId !== id) return;
+            if (ended) return this.settleFromServer();
+            this.watchTurn();
+        }, this.turnPollMs);
+    },
+
+    stopWatchingTurn() {
+        clearTimeout(this.turnPollId);
+        this.turnPollId = null;
+    },
+
+    // null when the server could not answer: unknown is never read as ended.
+    async turnStillRunning() {
+        try {
+            const res = await fetch(`${this.conversationsUrl}/${this.conversationId}/turn`, {
+                headers: { Accept: 'application/json' },
+            });
+
+            return res.ok ? (await res.json()).in_flight === true : null;
+        } catch {
+            return null;
+        }
+    },
+
+    // Ends a turn from persisted state when no stream_end did: the poll saw the
+    // turn finish, or the inactivity watchdog ran out. The reply, its proposal
+    // cards and its tables come from the database. Next steps still need the
+    // broadcast: the suggester saves them after the turn has ended.
+    async settleFromServer({ timedOut = false } = {}) {
+        const authoritative = await this.fetchLatestAssistant();
+        // Same torn-down-instance hazard as handleStreamEnd (see the `destroyed`
+        // comment above), and a stream_end may have finished the turn meanwhile.
+        if (this.destroyed || !this.isStreaming) return;
+        this.stopWatchingTurn();
+
+        let bubble = this.messages.findLast((m) => m.role === 'assistant' && !m.rendered) ?? null;
+        // A resumed turn mints its bubble on stream_start, which never arrived.
+        if (!bubble && authoritative && !this.isShownOutside(null, authoritative)) {
+            bubble = this.mintAssistantStub();
+        }
+        if (bubble) {
+            if (authoritative) this.applyPersisted(bubble, authoritative);
+            if (!bubble.content && bubble.pending_actions.length === 0) {
+                bubble.streamError = timedOut ? this.streamTexts.timeout : this.streamTexts.streamError;
+                bubble.retryable = true;
+                bubble.retryOnAuto = false;
+            }
+            bubble.rendered = true;
+            bubble.prerendered = false;
+            if (!bubble.streamError) this.clearStreamErrors();
+        }
+        this.finishTurn({ failed: !!bubble?.streamError });
+    },
+
+    finishTurn({ failed = false } = {}) {
+        this.currentToolStatus = null;
+        this.isStreaming = false;
+        this.clearStreamTimeout();
+        this.scrollToBottom();
+        this.restoreInputFocus();
+        if (failed) return;
+        this.flushQueuedSend();
+        this.maybeSyncTitle();
     },
 
     clearStreamTimeout() {
@@ -463,56 +529,77 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         } catch { /* not pending action JSON */ }
     },
 
-    // Reconcile a bubble against persisted state: pull the authoritative text
-    // (missed deltas), merge any still-pending proposal cards the client never
-    // received, and attach the read-tool display blocks. Targets the bubble
-    // whose stream just ended when known; falls back to the last assistant
-    // bubble (watchdog path).
-    async reconcileLatestAssistant(target = null) {
-        const assistantMsg = target ?? this.lastAssistantBubble();
-        if (assistantMsg?.role !== 'assistant') return;
+    async fetchLatestAssistant() {
         try {
             // Pass our own id: on the first turn of a new chat the conversation
             // was created by send.js's fetch, so the server component's
             // $conversationId is still null and it would hand back nothing.
-            const authoritative = await this.$wire.latestAssistantMessage(this.conversationId);
-            if (!authoritative) return;
-            // Capture the persisted id even when the text already matches,
-            // feedback (thumbs) and supersede anchoring need it.
-            if (authoritative.id && !assistantMsg.id) {
-                assistantMsg.id = authoritative.id;
-            }
-            const isUnstartedStub = assistantMsg.invocationId == null && !assistantMsg.content && !assistantMsg.rendered;
-            if (authoritative.content && authoritative.content !== assistantMsg.content && !isUnstartedStub) {
-                assistantMsg.content = authoritative.content;
-                assistantMsg.id = authoritative.id;
-                assistantMsg.rendered = false;
-                assistantMsg.prerendered = false;
-            }
-            if (!Array.isArray(assistantMsg.pending_actions)) assistantMsg.pending_actions = [];
-            // Span ALL bubbles: a card already rendered in an earlier bubble must
-            // not be merged again into this one (it would show twice).
-            const have = new Set(this.messages.flatMap((m) =>
-                (m.pending_actions || []).map((a) => a.pending_action_id)));
-            for (const card of (authoritative.pending_actions || [])) {
-                if (!have.has(card.pending_action_id)) assistantMsg.pending_actions.push(card);
-            }
-            // Replaced, not merged: the server derives the full set from this
-            // message's own persisted tool results, so it is already complete
-            // and a second reconcile of the same turn must not double it.
-            if (Array.isArray(authoritative.display_blocks)) {
-                assistantMsg.display_blocks = authoritative.display_blocks;
-            }
-            // Picks up a `.next_steps` broadcast the client never received. The
-            // suggester usually finishes AFTER this reconcile, in which case the
-            // row carries none yet and the broadcast is what fills the strip, so
-            // an empty list here must not wipe one already on screen.
-            if (Array.isArray(authoritative.next_steps) && authoritative.next_steps.length > 0) {
-                assistantMsg.next_steps = authoritative.next_steps;
-                this.nextSteps = authoritative.next_steps;
-            }
-        } catch (e) {
+            return await this.$wire.latestAssistantMessage(this.conversationId);
+        } catch {
             // Non-fatal: keep the streamed content if reconciliation fails.
+            return null;
+        }
+    },
+
+    // Reconcile a bubble against persisted state: pull the authoritative text
+    // (missed deltas), merge any still-pending proposal cards the client never
+    // received, and attach the read-tool display blocks. Targets the bubble
+    // whose stream just ended when known; falls back to the last assistant
+    // bubble.
+    async reconcileLatestAssistant(target = null) {
+        const assistantMsg = target ?? this.lastAssistantBubble();
+        if (assistantMsg?.role !== 'assistant') return;
+        const authoritative = await this.fetchLatestAssistant();
+        if (authoritative) this.applyPersisted(assistantMsg, authoritative);
+    },
+
+    // Matched by id, or by text for a bubble whose persisted id never arrived.
+    isShownOutside(bubble, authoritative) {
+        return this.messages.some((m) => m !== bubble && m.role === 'assistant'
+            && (m.id ? m.id === authoritative.id : m.content === authoritative.content));
+    },
+
+    // Runs once the turn is over. The latest row is this bubble's own only when no
+    // other bubble shows it: a turn stopped before the model answered persists
+    // nothing, so the latest row is then the previous turn's.
+    applyPersisted(assistantMsg, authoritative) {
+        const ownsLatest = !this.isShownOutside(assistantMsg, authoritative);
+
+        if (!Array.isArray(assistantMsg.pending_actions)) assistantMsg.pending_actions = [];
+        // Span ALL bubbles: a card already rendered in an earlier bubble must
+        // not be merged again into this one (it would show twice).
+        const have = new Set(this.messages.flatMap((m) =>
+            (m.pending_actions || []).map((a) => a.pending_action_id)));
+        for (const card of (authoritative.pending_actions || [])) {
+            if (!have.has(card.pending_action_id)) assistantMsg.pending_actions.push(card);
+        }
+
+        if (!ownsLatest) return;
+
+        // Capture the persisted id even when the text already matches,
+        // feedback (thumbs) and supersede anchoring need it.
+        if (authoritative.id && !assistantMsg.id) {
+            assistantMsg.id = authoritative.id;
+        }
+        if (authoritative.content && authoritative.content !== assistantMsg.content) {
+            assistantMsg.content = authoritative.content;
+            assistantMsg.id = authoritative.id;
+            assistantMsg.rendered = false;
+            assistantMsg.prerendered = false;
+        }
+        // Replaced, not merged: the server derives the full set from this
+        // message's own persisted tool results, so it is already complete
+        // and a second reconcile of the same turn must not double it.
+        if (Array.isArray(authoritative.display_blocks)) {
+            assistantMsg.display_blocks = authoritative.display_blocks;
+        }
+        // Picks up a `.next_steps` broadcast the client never received. The
+        // suggester usually finishes AFTER this reconcile, in which case the
+        // row carries none yet and the broadcast is what fills the strip, so
+        // an empty list here must not wipe one already on screen.
+        if (Array.isArray(authoritative.next_steps) && authoritative.next_steps.length > 0) {
+            assistantMsg.next_steps = authoritative.next_steps;
+            this.nextSteps = authoritative.next_steps;
         }
     },
 
@@ -543,21 +630,20 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
             assistantMsg.rendered = true;
             assistantMsg.prerendered = false;
         }
-        // A completed turn means the conversation recovered, failure banners on
-        // earlier bubbles describe a state that no longer exists (and reload
-        // would drop them anyway, since failed turns are never persisted).
+        this.clearStreamErrors();
+        this.finishTurn();
+    },
+
+    // A completed turn means the conversation recovered, failure banners on
+    // earlier bubbles describe a state that no longer exists (and reload
+    // would drop them anyway, since failed turns are never persisted).
+    clearStreamErrors() {
         this.messages.forEach((m) => {
             if (m.role === 'assistant' && m.streamError) {
                 m.streamError = null;
                 m.retryable = false;
             }
         });
-        this.isStreaming = false;
-        this.clearStreamTimeout();
-        this.scrollToBottom();
-        this.restoreInputFocus();
-        this.flushQueuedSend();
-        this.maybeSyncTitle();
     },
 
     // Pull fallback for the `.conversation.title` push. On a brand-new chat the

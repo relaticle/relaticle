@@ -209,24 +209,21 @@ it('enforces only the safe directives when the policy is off', function (): void
         ->assertHeaderMissing('Content-Security-Policy-Report-Only');
 });
 
-it('derives the reverb websocket origin from the REVERB variables the browser bundle is built with', function (): void {
-    $_SERVER['REVERB_HOST'] = 'ws.example.com';
-    $_SERVER['REVERB_PORT'] = '8443';
-    $_SERVER['REVERB_SCHEME'] = 'https';
-    $_SERVER['BROADCAST_REVERB_HOST'] = '127.0.0.1';
-    $_SERVER['BROADCAST_REVERB_PORT'] = '8080';
-
-    try {
-        $appConfig = require config_path('app.php');
-    } finally {
-        unset($_SERVER['REVERB_HOST'], $_SERVER['REVERB_PORT'], $_SERVER['REVERB_SCHEME'], $_SERVER['BROADCAST_REVERB_HOST'], $_SERVER['BROADCAST_REVERB_PORT']);
-    }
-
-    config()->set('app.csp', [...$appConfig['csp'], 'mode' => 'enforce']);
+it('allows the websocket origin the panel hands to Echo', function (): void {
+    config()->set('app.csp.mode', 'enforce');
+    config()->set('filament.broadcasting.echo', ['wsHost' => 'ws.example.com', 'wsPort' => 8443, 'forceTLS' => true]);
 
     expect($this->get('/app/login')->headers->get('Content-Security-Policy'))
-        ->toContain("connect-src 'self' https://cdn.usefathom.com wss://ws.example.com:8443")
-        ->not->toContain('127.0.0.1');
+        ->toContain("connect-src 'self' https://cdn.usefathom.com wss://ws.example.com:8443");
+});
+
+it('allows no websocket origin when broadcasting is off', function (): void {
+    config()->set('app.csp.mode', 'enforce');
+    config()->set('filament.broadcasting', []);
+
+    expect($this->get('/app/login')->headers->get('Content-Security-Policy'))
+        ->not->toContain('ws://')
+        ->not->toContain('wss://');
 });
 
 it('fails closed to the full policy for an empty or unknown mode', function (string $mode): void {

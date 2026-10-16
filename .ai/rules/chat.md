@@ -353,3 +353,24 @@ duplicated the user message on retry and hid the note.
 Credits settle on the model the job requested (`$this->resolved['model']`), never `meta->model`: v1
 overwrites it with the provider's own id, and a dated snapshot misses the multiplier lookup and bills
 1.0x. `ProcessChatMessageSettlementTest` pins it.
+
+## The websocket is the fast path, never the only one
+A turn must end on screen with no websocket at all. Self-hosted installs ran for months with no
+Reverb container, and the chat sat on "Thinking..." over a reply that was already saved (#955).
+Once the server has registered a turn (`TurnPresence`), `watchTurn()` in `stream.js` asks
+`GET /chat/conversations/{id}/turn` every `turnPollMs` of stream silence, and `settleFromServer()`
+ends the turn from the database when the marker is gone. The 125 second watchdog asks the same route
+first and keeps waiting while the turn is in flight, so a slow or retried job never shows a false
+timeout. `TurnPresence`'s TTL ends a turn whose worker died. Every way a turn starts calls `watchTurn()`
+after the server confirmed it: the send response, a reload mid-turn, and `chat:resuming`. Asking
+earlier reads "not running" for a turn that has not begun.
+`applyPersisted()` adopts the latest assistant row only when no other bubble shows it. A turn that
+ends before the model answers (stopped, paused, could not start) persists nothing, so the latest row
+is then the previous turn's reply. A job that fails persists its own failure note
+(`ProcessChatMessage::persistFailedTurn()`), and the poll shows that note as the reply, with no
+Retry button. Next steps arrive by broadcast only, so without a websocket they show after a reload.
+The marker lives in the cache, so web and workers must share one store. The Docker image defaults
+`CACHE_STORE` to redis for that reason. `tests/Browser/Chat/StreamWithoutWebsocketTest.php` is the gate.
+The Echo client is Filament's own: `config/filament.php` `broadcasting.echo` is rendered per request,
+so nothing about the websocket address is baked into the built bundle. Never read `import.meta.env`
+for it: the published image is built once and runs on every host.

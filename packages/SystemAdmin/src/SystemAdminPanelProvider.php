@@ -227,6 +227,8 @@ final class SystemAdminPanelProvider extends PanelProvider
                 InkPlugin::make(),
             ])
             ->databaseNotifications()
+            // Reverb admits the app panel's origin only, and nothing here streams.
+            ->broadcasting(false)
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

@@ -407,6 +407,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null) {
         const isFirstMessage = !this.conversationId;
 
+        this.stopWatchingTurn();
         this.anchorTo(userMsg);
 
         if (isFirstMessage) {
@@ -497,6 +498,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
 
                 userMsg.sendState = 'sent';
                 this.clearDraft(draftConversationId);
+                this.watchTurn();
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     // A deliberate cancel, not a delivery failure: the request
@@ -575,6 +577,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             }
             userMsg.sendState = 'sent';
             this.clearDraft(draftConversationId);
+            this.watchTurn();
         } catch (error) {
             if (error?.name === 'AbortError') {
                 userMsg.sendState = 'sent';

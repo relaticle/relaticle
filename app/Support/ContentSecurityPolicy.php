@@ -178,16 +178,15 @@ final readonly class ContentSecurityPolicy
      */
     private static function reverbOrigins(): array
     {
-        $host = config('app.csp.reverb.host');
+        $echo = config('filament.broadcasting.echo');
 
-        if (! is_string($host) || $host === '') {
+        if (! is_array($echo)) {
             return [];
         }
 
-        $secure = config('app.csp.reverb.scheme') === 'https';
-        $port = config()->integer('app.csp.reverb.port');
+        $scheme = $echo['forceTLS'] ? 'wss' : 'ws';
 
-        return [($secure ? 'wss' : 'ws')."://{$host}:{$port}"];
+        return ["{$scheme}://{$echo['wsHost']}:{$echo['wsPort']}"];
     }
 
     /**

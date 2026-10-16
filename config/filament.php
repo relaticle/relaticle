@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+$appUrl = parse_url((string) config('app.url'));
+$reverbHost = env('REVERB_HOST');
+$reverbIsSecure = $reverbHost ? env('REVERB_SCHEME', 'https') === 'https' : ($appUrl['scheme'] ?? 'http') === 'https';
+$reverbPort = (int) ($reverbHost ? env('REVERB_PORT', 443) : $appUrl['port'] ?? ($reverbIsSecure ? 443 : 80));
+
 return [
 
     /*
@@ -9,26 +14,26 @@ return [
     | Broadcasting
     |--------------------------------------------------------------------------
     |
-    | By uncommenting the Laravel Echo configuration, you may connect Filament
-    | to any Pusher-compatible websockets server.
+    | Filament renders this into every panel page and builds Echo from it, so
+    | the browser reads the websocket address at runtime and one built bundle
+    | serves any host. The chat streams over the same Echo instance.
     |
-    | This will allow your users to receive real-time notifications.
+    | With no REVERB_HOST, the socket is served from the APP_URL origin under
+    | /reverb, where the web server proxies it to Reverb.
     |
     */
 
-    'broadcasting' => env('VITE_PUSHER_APP_KEY') ? [
+    'broadcasting' => config('broadcasting.default') === 'reverb' ? [
 
         'echo' => [
-            'broadcaster' => 'pusher',
-            'key' => env('VITE_PUSHER_APP_KEY'),
-            'cluster' => env('VITE_PUSHER_APP_CLUSTER'),
-            'wsHost' => env('VITE_PUSHER_HOST'),
-            'wsPort' => env('VITE_PUSHER_PORT'),
-            'wssPort' => env('VITE_PUSHER_PORT'),
-            'authEndpoint' => '/broadcasting/auth',
-            'disableStats' => true,
-            'encrypted' => true,
-            'forceTLS' => true,
+            'broadcaster' => 'reverb',
+            'key' => config('broadcasting.connections.reverb.key'),
+            'wsHost' => $reverbHost ?: ($appUrl['host'] ?? 'localhost'),
+            'wsPort' => $reverbPort,
+            'wssPort' => $reverbPort,
+            'wsPath' => $reverbHost ? '' : '/reverb',
+            'forceTLS' => $reverbIsSecure,
+            'enabledTransports' => ['ws', 'wss'],
         ],
 
     ] : [],

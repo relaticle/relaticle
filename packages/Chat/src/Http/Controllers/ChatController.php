@@ -48,6 +48,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TurnPresence;
+use stdClass;
 
 final readonly class ChatController
 {
@@ -449,6 +450,16 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
+    }
+
+    public function turn(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless(new ConversationsQuery()->find($user, $conversationId) instanceof stdClass, 404);
+
+        return response()->json(['in_flight' => TurnPresence::current($conversationId) !== null]);
     }
 
     /**

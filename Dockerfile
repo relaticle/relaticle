@@ -75,6 +75,26 @@ COPY --chown=www-data:www-data --from=composer /app/vendor ./vendor
 # Copy built frontend assets
 COPY --chown=www-data:www-data --from=frontend /app/public/build ./public/build
 
+# Serve Reverb's websocket from the app's own origin, so the browser needs no second
+# host, port or certificate. The upstream is resolved per request: the app boots
+# without a reverb service, and the chat then settles each turn over HTTP.
+COPY --chown=www-data:www-data <<'NGINX' /etc/nginx/server-opts.d/reverb.conf
+location /reverb/app/ {
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $reverb http://reverb:8080;
+    rewrite ^/reverb(/.*)$ $1 break;
+    proxy_pass $reverb;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header Scheme $scheme;
+    proxy_set_header SERVER_PORT $server_port;
+    proxy_set_header REMOTE_ADDR $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "Upgrade";
+}
+NGINX
+
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize --no-dev
 
@@ -97,6 +117,8 @@ ENV AUTORUN_LARAVEL_ROUTE_CACHE=true
 ENV AUTORUN_LARAVEL_VIEW_CACHE=true
 ENV AUTORUN_LARAVEL_EVENT_CACHE=true
 ENV AUTORUN_LARAVEL_OPTIMIZE=false
+# Web and workers must share one cache: the turn marker, the cancel flag and locks live there.
+ENV CACHE_STORE=redis
 ENV PHP_OPCACHE_ENABLE=1
 ENV SSL_MODE=off
 

@@ -391,11 +391,15 @@ it('attaches display blocks to the streamed bubble at stream-end reconcile', fun
         (() => {
             {$resolveInterface}
 
-            data.mintAssistantStub({ content: 'Here are your companies.', invocationId: 'inv-reconcile' });
+            data.mintAssistantStub({ content: 'Here they are again.', invocationId: 'inv-reconcile' });
 
             return true;
         })();
     JS);
+
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here they are again.', [
+        displayBlockTableFixture(),
+    ], 0);
 
     // The real finalize path: handleStreamEnd() reconciles from the DB and
     // marks the bubble rendered, which is what actually puts the block on

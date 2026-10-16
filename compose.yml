@@ -44,6 +44,19 @@ services:
       SESSION_DRIVER: redis
       SESSION_SECURE_COOKIE: ${SESSION_SECURE_COOKIE:-}
       QUEUE_CONNECTION: redis
+      BROADCAST_CONNECTION: reverb
+      BROADCAST_REVERB_HOST: reverb
+      BROADCAST_REVERB_PORT: 8080
+      BROADCAST_REVERB_SCHEME: http
+      REVERB_APP_SECRET:
+      # Unset variables stay unset, so each provider keeps its own default.
+      ANTHROPIC_API_KEY:
+      OPENAI_API_KEY:
+      OLLAMA_BASE_URL:
+      OLLAMA_MODEL:
+      SELF_HOSTED_AI_URL:
+      SELF_HOSTED_AI_KEY:
+      SELF_HOSTED_AI_MODELS:
       MAIL_MAILER: ${MAIL_MAILER:-log}
       MAIL_HOST: ${MAIL_HOST:-}
       MAIL_PORT: ${MAIL_PORT:-587}
@@ -56,6 +69,8 @@ services:
       AUTORUN_ENABLED: "true"
       AUTORUN_LARAVEL_MIGRATION: "true"
       AUTORUN_LARAVEL_MIGRATION_ISOLATION: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - storage:/var/www/html/storage/app
     depends_on:
@@ -98,9 +113,25 @@ services:
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
       REDIS_PORT: 6379
+      CACHE_STORE: redis
       QUEUE_CONNECTION: redis
+      BROADCAST_CONNECTION: reverb
+      BROADCAST_REVERB_HOST: reverb
+      BROADCAST_REVERB_PORT: 8080
+      BROADCAST_REVERB_SCHEME: http
+      REVERB_APP_SECRET:
+      # Unset variables stay unset, so each provider keeps its own default.
+      ANTHROPIC_API_KEY:
+      OPENAI_API_KEY:
+      OLLAMA_BASE_URL:
+      OLLAMA_MODEL:
+      SELF_HOSTED_AI_URL:
+      SELF_HOSTED_AI_KEY:
+      SELF_HOSTED_AI_MODELS:
       # Disable automations for worker container
       AUTORUN_ENABLED: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - storage:/var/www/html/storage/app
     depends_on:
@@ -140,7 +171,13 @@ services:
       REDIS_HOST: redis
       REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
       REDIS_PORT: 6379
+      CACHE_STORE: redis
       QUEUE_CONNECTION: redis
+      BROADCAST_CONNECTION: reverb
+      BROADCAST_REVERB_HOST: reverb
+      BROADCAST_REVERB_PORT: 8080
+      BROADCAST_REVERB_SCHEME: http
+      REVERB_APP_SECRET:
       # Disable automations for scheduler container
       AUTORUN_ENABLED: "false"
     volumes:
@@ -150,6 +187,41 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "healthcheck-schedule"]
+      start_period: 10s
+
+  reverb:
+    image: ghcr.io/relaticle/relaticle:latest
+    restart: unless-stopped
+    command: ["php", "/var/www/html/artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    stop_signal: SIGTERM
+    environment:
+      APP_NAME: ${APP_NAME:-Relaticle}
+      APP_ENV: ${APP_ENV:-production}
+      APP_KEY: ${APP_KEY:?APP_KEY is required}
+      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_URL: ${APP_URL:-http://localhost}
+      LOG_CHANNEL: ${LOG_CHANNEL:-stderr}
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${DB_DATABASE:-relaticle}
+      DB_USERNAME: ${DB_USERNAME:-relaticle}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      REDIS_HOST: redis
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-null}
+      REDIS_PORT: 6379
+      CACHE_STORE: redis
+      BROADCAST_CONNECTION: reverb
+      REVERB_APP_SECRET:
+      # The websocket handshake carries the panel's origin, which differs from APP_URL on its own domain.
+      REVERB_ALLOWED_ORIGIN_EXTRA: ${APP_PANEL_DOMAIN:-}
+      # Disable automations for the websocket container
+      AUTORUN_ENABLED: "false"
+    depends_on:
+      app:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "healthcheck-reverb"]
       start_period: 10s
 
   postgres:

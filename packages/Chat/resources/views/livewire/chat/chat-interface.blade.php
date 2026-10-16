@@ -271,6 +271,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             this.isStreaming = true;
             this.currentToolStatus = null;
             this.startStreamTimeout();
+            this.watchTurn();
         }
 
         // Land at the latest message when reopening an existing conversation.
@@ -463,6 +464,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
                 this.isStreaming = true;
                 this.currentToolStatus = null;
                 this.startStreamTimeout();
+                this.watchTurn();
             }),
         ];
 
@@ -486,6 +488,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
         this.teardownAnchorObserver();
         this.teardownMessageSearch();
         this.clearStreamTimeout();
+        this.stopWatchingTurn();
         clearTimeout(this._copiedTimer);
         clearTimeout(this._scrollAnimationTimer);
         this.clearRateLimit();

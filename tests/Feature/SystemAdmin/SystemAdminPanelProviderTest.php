@@ -93,3 +93,8 @@ it('keeps showing every workspace when the staff companies table updates', funct
         ->assertOk()
         ->assertSee('Northwind Traders');
 });
+
+it('gives the websocket client to the app panel only', function (): void {
+    expect(Filament::getPanel('app')->hasBroadcasting())->toBeTrue()
+        ->and(Filament::getPanel('sysadmin')->hasBroadcasting())->toBeFalse();
+});
