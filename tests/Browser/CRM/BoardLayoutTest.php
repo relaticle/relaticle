@@ -45,11 +45,13 @@ it('scrolls a long column inside the board without scrolling the page', function
     $overflow = <<<'JS'
         (() => {
             const layout = document.querySelector('.fi-layout');
-            const column = document.querySelector('.flowforge-column-content');
+            const tray = document.querySelector('.ff-tray');
+            const scroller = [tray, ...tray.querySelectorAll('*')]
+                .find((element) => ['auto', 'scroll'].includes(getComputedStyle(element).overflowY));
 
             return {
                 pageScrolls: layout.scrollHeight > layout.clientHeight,
-                columnScrolls: column.scrollHeight > column.clientHeight,
+                columnScrolls: scroller !== undefined && scroller.scrollHeight > scroller.clientHeight,
             };
         })();
     JS;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\TaskResource\Pages;
 
+use App\Actions\Task\UpdateTask;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
@@ -14,6 +15,7 @@ use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\Workspace;
 use Exception;
 use Filament\Actions\Action;
@@ -22,19 +24,21 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
-use League\CommonMark\Exception\InvalidArgumentException;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\Flowforge\Board;
-use Relaticle\Flowforge\BoardResourcePage;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Components\CardFlex;
-use Throwable;
+use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
+use Relaticle\Flowforge\Grouping;
+use Relaticle\Flowforge\Lane;
+use Relaticle\Flowforge\Modern\BoardResourcePage;
 
 final class TasksBoard extends BoardResourcePage
 {
@@ -120,18 +124,7 @@ final class TasksBoard extends BoardResourcePage
                         ])->align('center'),
                     ]);
             })
-            ->columnActions([
-                CreateTaskAction::make()
-                    ->authorize(fn (): bool => Gate::allows('create', Task::class))
-                    ->label(__('filament/pages/boards.tasks.actions.add'))
-                    ->icon('heroicon-o-plus')
-                    ->iconButton()
-                    ->modalWidth(Width::TwoExtraLarge)
-                    ->slideOver(false)
-                    ->model(Task::class)
-                    ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
-                    ->using($this->createCard(...)),
-            ])
+            ->createCardAction($this->cardCreation())
             ->cardAction('edit')
             ->cardActions([
                 Action::make('edit')
@@ -157,6 +150,7 @@ final class TasksBoard extends BoardResourcePage
                         $record->delete();
                     }),
             ])
+            ->groupings([$this->assigneeGrouping()])
             ->filters([
                 RecordSelectFilter::make('assignees')
                     ->label(__('filament/pages/boards.tasks.filters.assignee'))
@@ -169,52 +163,19 @@ final class TasksBoard extends BoardResourcePage
             ->headerToolbar();
     }
 
-    /**
-     * Move card to new position using DecimalPosition service.
-     *
-     * Overrides the default Flowforge implementation to properly handle
-     * custom field columns which are stored in a polymorphic table.
-     *
-     * @throws Throwable
-     */
-    public function moveCard(
-        string $cardId,
-        string $targetColumnId,
-        ?string $afterCardId = null,
-        ?string $beforeCardId = null
-    ): void {
-        $board = $this->getBoard();
-        $query = $board->getQuery();
+    protected function authorizeCardMove(Model $card, string $targetColumnId, ?string $toLaneId = null): void
+    {
+        if (Gate::denies('update', $card)) {
+            throw CardMoveRejectedException::because(__('filament/pages/boards.move_denied'));
+        }
+    }
 
-        throw_unless($query instanceof Builder, InvalidArgumentException::class, 'Board query not available');
+    protected function persistCardMove(Model $card, mixed $columnValue, string $position): void
+    {
+        $card->update([$this->getBoard()->getPositionIdentifierAttribute() => $position]);
 
-        /** @var Task|null $card */
-        $card = (clone $query)->with(['assignees'])->find($cardId);
-        throw_unless($card, InvalidArgumentException::class, "Card not found: {$cardId}");
-
-        abort_unless(Gate::allows('update', $card), 403);
-        abort_unless($this->ownsColumn($targetColumnId), 422);
-
-        // Calculate new position using DecimalPosition (via the v3 helper)
-        $newPosition = $this->calculatePositionBetweenCards($afterCardId, $beforeCardId, $targetColumnId);
-
-        // Use transaction for data consistency
-        DB::transaction(function () use ($card, $board, $targetColumnId, $newPosition): void {
-            $columnIdentifier = $board->getColumnIdentifierAttribute();
-            $columnValue = $this->resolveStatusValue($card, $columnIdentifier, $targetColumnId);
-            $positionIdentifier = $board->getPositionIdentifierAttribute();
-
-            $card->update([$positionIdentifier => $newPosition]);
-
-            $card->saveCustomFieldValue(self::statusCustomField(), $columnValue);
-        });
-
-        // Emit success event after successful transaction
-        $this->dispatch('kanban-card-moved', [
-            'cardId' => $cardId,
-            'columnId' => $targetColumnId,
-            'position' => $newPosition,
-        ]);
+        /** @var Task $card */
+        $card->saveCustomFieldValue(self::statusCustomField(), $columnValue);
     }
 
     /**
@@ -258,6 +219,59 @@ final class TasksBoard extends BoardResourcePage
             $date->isTomorrow() => 'Due Tomorrow',
             default => $date->format('M j, Y'),
         };
+    }
+
+    private function cardCreation(): CreateTaskAction
+    {
+        return CreateTaskAction::make()
+            ->authorize(fn (): bool => Gate::allows('create', Task::class))
+            ->label(__('filament/pages/boards.tasks.actions.add'))
+            ->icon('heroicon-o-plus')
+            ->iconButton()
+            ->modalWidth(Width::TwoExtraLarge)
+            ->slideOver(false)
+            ->model(Task::class)
+            ->schema(fn (Schema $schema): Schema => TaskForm::get($schema, ['status']))
+            ->using($this->createCard(...));
+    }
+
+    private function assigneeGrouping(): Grouping
+    {
+        return Grouping::make('assignee')
+            ->label(__('filament/pages/boards.tasks.groupings.assignee'))
+            ->lanes(fn (Builder $boardQuery): array => User::query()
+                ->memberOf($this->currentUser()->currentWorkspace)
+                ->whereIn('users.id', DB::table('task_user')->whereIn('task_id', (clone $boardQuery)->select('tasks.id'))->select('user_id'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn (User $user): Lane => Lane::make($user->getKey())
+                    ->label($user->name)
+                    ->avatar($user->profile_photo_url)
+                    ->query(fn (Builder $query): Builder => $query->whereHas('assignees', fn (Builder $assignees): Builder => $assignees->whereKey($user->getKey()))))
+                ->all())
+            ->emptyLane(
+                __('filament/pages/boards.tasks.groupings.unassigned'),
+                fn (Builder $query): Builder => $query->whereDoesntHave('assignees'),
+            )
+            ->moveUsing($this->moveToAssigneeLane(...));
+    }
+
+    private function moveToAssigneeLane(Task $record, Lane $from, Lane $to): void
+    {
+        $assigneeIds = $record->assignees()->pluck('users.id')
+            ->push($to->getName())
+            ->reject(fn (string $id): bool => in_array($id, [$from->getName(), Grouping::EMPTY_LANE], true))
+            ->unique()
+            ->values()
+            ->all();
+
+        resolve(UpdateTask::class)->execute($this->currentUser(), $record, ['assignee_ids' => $assigneeIds]);
+    }
+
+    private function currentUser(): User
+    {
+        /** @var User */
+        return Auth::guard('web')->user();
     }
 
     /**

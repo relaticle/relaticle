@@ -1,0 +1,829 @@
+@layer properties, theme, base, components, utilities;
+
+@layer components.flowforge {
+    :is(
+        .ff-board,
+        .ff-column,
+        .ff-column-header,
+        .ff-count,
+        .ff-summary,
+        .ff-tray,
+        .ff-card,
+        .ff-card-actions,
+        .ff-add-row,
+        .ff-lanes,
+        .ff-lane-header,
+        .ff-cell,
+        .ff-limit-hint,
+        .ff-card-tag,
+        .ff-card-meta,
+        .ff-card-avatar,
+        .ff-header
+    ) {
+        --_text: var(--ff-text, var(--gray-950));
+        --_text-muted: var(--ff-text-muted, var(--gray-500));
+        --_accent: var(--ff-accent, var(--primary-500));
+        --_danger: var(--ff-danger, var(--danger-500));
+        --_warning: var(--ff-warning, var(--warning-600));
+        --_ease: var(--ff-ease, cubic-bezier(0.16, 1, 0.3, 1));
+        --_duration: var(--ff-duration, 200ms);
+    }
+
+    :where(.dark) :is(
+        .ff-board,
+        .ff-column,
+        .ff-column-header,
+        .ff-count,
+        .ff-summary,
+        .ff-tray,
+        .ff-card,
+        .ff-card-actions,
+        .ff-add-row,
+        .ff-lanes,
+        .ff-lane-header,
+        .ff-cell,
+        .ff-limit-hint,
+        .ff-card-tag,
+        .ff-card-meta,
+        .ff-card-avatar,
+        .ff-header
+    ) {
+        --_text: var(--ff-text, #fff);
+        --_text-muted: var(--ff-text-muted, var(--gray-400));
+        --_warning: var(--ff-warning, var(--warning-400));
+    }
+
+    .ff-columns,
+    .ff-lanes-grid,
+    .ff-lanes-heads {
+        --_gap: var(--ff-gap, 1.25rem);
+    }
+
+    .ff-column,
+    .ff-lanes-grid,
+    .ff-lanes-heads {
+        --_column-width: var(--ff-column-width, 300px);
+    }
+
+    .ff-lanes-heads {
+        --_surface: var(--ff-surface, var(--gray-50));
+    }
+
+    :where(.dark) .ff-lanes-heads {
+        --_surface: var(--ff-surface, var(--gray-950));
+    }
+
+    .ff-filters-panel {
+        --_surface-raised: var(--ff-surface-raised, #fff);
+        --_border: var(--ff-border, color-mix(in oklab, var(--gray-950) 5%, transparent));
+    }
+
+    :where(.dark) .ff-filters-panel {
+        --_surface-raised: var(--ff-surface-raised, var(--gray-900));
+        --_border: var(--ff-border, color-mix(in oklab, #fff 10%, transparent));
+    }
+
+    .ff-tray,
+    .ff-cell {
+        --_accent-tint: var(--ff-accent-tint, var(--primary-50));
+        --_tray-bg: var(--ff-tray-bg, var(--ff-surface-sunken, var(--gray-100)));
+        --_tray-radius: var(--ff-tray-radius, calc(var(--ff-radius, 0.75rem) + 0.25rem));
+    }
+
+    :where(.dark) .ff-tray,
+    :where(.dark) .ff-cell {
+        --_accent-tint: var(--ff-accent-tint, color-mix(in oklab, var(--primary-500) 10%, transparent));
+        --_tray-bg: var(--ff-tray-bg, var(--ff-surface-sunken, color-mix(in oklab, #fff 5%, transparent)));
+    }
+
+    .ff-card {
+        --_card-bg: var(--ff-card-bg, var(--ff-surface-raised, #fff));
+        --_card-ring: var(--ff-card-ring, var(--ff-border, color-mix(in oklab, var(--gray-950) 5%, transparent)));
+        --_card-radius: var(--ff-card-radius, var(--ff-radius, 0.75rem));
+        --_card-shadow: var(--ff-card-shadow, 0 1px 2px 0 rgb(0 0 0 / 0.05));
+        --_card-shadow-hover: var(--ff-card-shadow, 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1));
+        --_card-padding: var(--ff-card-padding, 0.75rem);
+        --_drag-tilt: var(--ff-drag-tilt, 2.5deg);
+        --_drag-shadow: var(--ff-drag-shadow, 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1));
+        --_placeholder-border: var(--ff-placeholder-border, var(--_accent));
+    }
+
+    :where(.dark) .ff-card {
+        --_card-bg: var(--ff-card-bg, var(--ff-surface-raised, var(--gray-900)));
+        --_card-ring: var(--ff-card-ring, var(--ff-border, color-mix(in oklab, #fff 10%, transparent)));
+    }
+
+    .ff-board {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+    .ff-board-body {
+        flex: 1 1 0%;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .ff-columns {
+        display: flex;
+        flex-direction: row;
+        column-gap: var(--_gap);
+        height: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .ff-page {
+        position: relative;
+        height: calc(100vh - 11rem);
+    }
+
+    .ff-grouping {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .ff-board > .ff-grouping {
+        padding-bottom: 0.75rem;
+    }
+
+    .ff-grouping-label {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: var(--_text-muted);
+    }
+
+    .ff-grouping-select {
+        width: 12rem;
+    }
+
+    .ff-column {
+        display: flex;
+        flex-direction: column;
+        flex-shrink: 0;
+        width: var(--_column-width);
+        min-width: var(--_column-width);
+        max-height: 100%;
+    }
+
+    .ff-column[data-collapsed]:not([data-drop]) {
+        width: 3rem;
+        min-width: 3rem;
+    }
+
+    .ff-column-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        padding: 0 0.25rem 0.5rem;
+    }
+
+    .ff-column[data-collapsed]:not([data-drop]) .ff-column-header {
+        flex-direction: column;
+        justify-content: normal;
+    }
+
+    .ff-column-heading {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .ff-column[data-collapsed]:not([data-drop]) .ff-column-heading {
+        display: contents;
+    }
+
+    .ff-column-dot {
+        flex-shrink: 0;
+        width: 0.5rem;
+        height: 0.5rem;
+        background-color: var(--color-500);
+        border-radius: 9999px;
+    }
+
+    .ff-column-icon {
+        flex-shrink: 0;
+        color: var(--_text-muted);
+    }
+
+    .ff-column-title {
+        margin: 0;
+        overflow: hidden;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-weight: 500;
+        color: var(--_text);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ff-column[data-collapsed]:not([data-drop]) .ff-column-title {
+        max-height: 16rem;
+        writing-mode: vertical-rl;
+    }
+
+    .ff-count {
+        flex-shrink: 0;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--_text-muted);
+    }
+
+    .ff-column[data-full] .ff-count {
+        color: var(--_warning);
+    }
+
+    .ff-summary {
+        overflow: hidden;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: var(--_text-muted);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ff-column-actions {
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 0.25rem;
+    }
+
+    .ff-tray,
+    .ff-cell {
+        background-color: var(--_tray-bg);
+        border-radius: var(--_tray-radius);
+        transition:
+            background-color var(--_duration) var(--_ease),
+            box-shadow var(--_duration) var(--_ease);
+    }
+
+    .ff-tray {
+        display: flex;
+        flex: 1 1 0%;
+        flex-direction: column;
+        min-height: 0;
+    }
+
+    .ff-column[data-drop="active"] .ff-tray,
+    .ff-cell[data-drop="active"] {
+        background-color: var(--_accent-tint);
+        box-shadow: inset 0 0 0 1px var(--_accent);
+    }
+
+    .ff-column[data-drop="blocked"] .ff-tray,
+    .ff-cell[data-drop="blocked"] {
+        box-shadow: inset 0 0 0 1px var(--_danger);
+    }
+
+    .ff-limit-hint {
+        margin: 0;
+        padding: 0.5rem 0.75rem 0;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        font-weight: 500;
+        color: var(--_danger);
+    }
+
+    .ff-cards {
+        display: flex;
+        flex: 1 1 0%;
+        flex-direction: column;
+        min-height: 4rem;
+        max-height: calc(100vh - 13rem);
+        padding: 0.5rem;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: contain;
+    }
+
+    .ff-column[data-collapsed]:not([data-drop]) .ff-cards {
+        padding: 0;
+    }
+
+    .ff-cards-more {
+        padding: 0.75rem 0;
+        text-align: center;
+    }
+
+    .ff-cards-loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        color: var(--_accent);
+    }
+
+    .ff-add-slot {
+        order: 9999;
+    }
+
+    .ff-add-row {
+        display: flex;
+        align-items: center;
+        gap: 0.375rem;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        text-align: start;
+        color: var(--_text-muted);
+        border-radius: 0.5rem;
+        transition: color var(--_duration) var(--_ease);
+    }
+
+    .ff-add-row:not(:disabled):hover {
+        color: var(--_text);
+    }
+
+    .ff-add-row:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+
+    .ff-add-row-icon {
+        flex-shrink: 0;
+    }
+
+    .ff-card {
+        position: relative;
+        margin-bottom: 0.5rem;
+        background-color: var(--_card-bg);
+        border-radius: var(--_card-radius);
+        box-shadow:
+            0 0 0 1px var(--_card-ring),
+            var(--_card-shadow);
+        transition: box-shadow var(--_duration) var(--_ease);
+    }
+
+    .ff-card[x-sortable-handle] {
+        cursor: grab;
+    }
+
+    .ff-card[x-sortable-handle]:active {
+        cursor: grabbing;
+    }
+
+    .ff-clickable {
+        cursor: pointer;
+    }
+
+    .ff-card:hover {
+        box-shadow:
+            0 0 0 1px var(--_card-ring),
+            var(--_card-shadow-hover);
+    }
+
+    .ff-card[data-pending] {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .ff-card-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: var(--_card-padding);
+    }
+
+    .ff-card-title {
+        margin: 0;
+        padding-inline-end: 1.5rem;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-weight: 500;
+        color: var(--_text);
+    }
+
+    .ff-card-link {
+        display: block;
+    }
+
+    .ff-card-actions {
+        position: absolute;
+        top: 0.5rem;
+        inset-inline-end: 0.5rem;
+    }
+
+    @media (hover: hover) {
+        .ff-card-actions {
+            opacity: 0;
+            transition: opacity var(--_duration) var(--_ease);
+        }
+
+        .ff-card:hover .ff-card-actions,
+        .ff-card-actions:focus-within,
+        .ff-card-actions:has([aria-expanded="true"]) {
+            opacity: 1;
+        }
+    }
+
+    .ff-card[data-dragging] {
+        background-color: transparent;
+        box-shadow: none;
+        cursor: grabbing;
+    }
+
+    .ff-card[data-dragging] > .ff-card-body {
+        background-color: var(--_card-bg);
+        border-radius: var(--_card-radius);
+        box-shadow:
+            0 0 0 1px var(--_card-ring),
+            var(--_drag-shadow);
+        rotate: var(--_drag-tilt);
+        scale: 1.02;
+    }
+
+    .ff-card[data-placeholder] {
+        background-color: transparent;
+        box-shadow: none;
+        outline: 1.5px dashed var(--_placeholder-border);
+        outline-offset: -1.5px;
+    }
+
+    .ff-card[data-placeholder] > * {
+        visibility: hidden;
+    }
+
+    .ff-dragging {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .ff-card-flex {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .ff-card-flex--nowrap {
+        flex-wrap: nowrap;
+    }
+
+    .ff-card-flex--gap-xs {
+        gap: 0.25rem;
+    }
+
+    .ff-card-flex--gap-sm {
+        gap: 0.5rem;
+    }
+
+    .ff-card-flex--gap-md {
+        gap: 0.75rem;
+    }
+
+    .ff-card-flex--gap-lg {
+        gap: 1rem;
+    }
+
+    .ff-card-flex--justify-start {
+        justify-content: flex-start;
+    }
+
+    .ff-card-flex--justify-center {
+        justify-content: center;
+    }
+
+    .ff-card-flex--justify-end {
+        justify-content: flex-end;
+    }
+
+    .ff-card-flex--justify-between {
+        justify-content: space-between;
+    }
+
+    .ff-card-flex--justify-around {
+        justify-content: space-around;
+    }
+
+    .ff-card-flex--justify-evenly {
+        justify-content: space-evenly;
+    }
+
+    .ff-card-flex--align-start {
+        align-items: flex-start;
+    }
+
+    .ff-card-flex--align-center {
+        align-items: center;
+    }
+
+    .ff-card-flex--align-end {
+        align-items: flex-end;
+    }
+
+    .ff-card-flex--align-baseline {
+        align-items: baseline;
+    }
+
+    .ff-card-flex--align-stretch {
+        align-items: stretch;
+    }
+
+    .ff-card-flex-item--fixed {
+        flex-shrink: 0;
+    }
+
+    .ff-card-flex-item--grow {
+        flex-grow: 1;
+    }
+
+    .ff-card-tags {
+        display: inline-flex;
+        flex-wrap: wrap;
+        align-items: center;
+        column-gap: 0.75rem;
+        row-gap: 0.25rem;
+    }
+
+    .ff-card-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.375rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        color: var(--_text-muted);
+    }
+
+    .ff-card-tag-dot {
+        flex-shrink: 0;
+        width: 0.375rem;
+        height: 0.375rem;
+        background-color: var(--color-500);
+        border-radius: 9999px;
+    }
+
+    .ff-card-meta {
+        font-size: 0.75rem;
+        line-height: 1rem;
+        color: var(--_text-muted);
+    }
+
+    /* Filament styles these in the components layer, which outranks this sublayer, so only important wins. */
+    .ff-card-meta .fi-badge {
+        padding: 0 !important;
+        font-weight: 400 !important;
+        color: inherit !important;
+        background: none !important;
+        box-shadow: none !important;
+    }
+
+    .ff-card-meta .fi-in-text-item {
+        font-size: inherit !important;
+        color: inherit !important;
+    }
+
+    .ff-card-avatars {
+        display: flex;
+        align-items: center;
+    }
+
+    .ff-card-avatars > * + * {
+        margin-inline-start: -0.375rem;
+    }
+
+    .ff-card-avatar {
+        flex-shrink: 0;
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 9999px;
+        box-shadow: 0 0 0 2px var(--_card-bg);
+    }
+
+    img.ff-card-avatar {
+        object-fit: cover;
+    }
+
+    span.ff-card-avatar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 500;
+        color: var(--gray-700);
+        background-color: var(--gray-200);
+    }
+
+    :where(.dark) span.ff-card-avatar {
+        color: var(--gray-200);
+        background-color: var(--gray-700);
+    }
+
+    .ff-card-avatars-more {
+        padding-inline-start: 0.625rem;
+        font-size: 0.75rem;
+        line-height: 1rem;
+        color: var(--_text-muted);
+    }
+
+    .ff-lanes {
+        height: 100%;
+        max-height: calc(100vh - 13rem);
+        overflow: auto;
+    }
+
+    .ff-lanes-grid {
+        display: grid;
+        grid-template-columns: repeat(var(--_columns), var(--_column-width));
+        column-gap: var(--_gap);
+        row-gap: 0.5rem;
+        padding-bottom: 1rem;
+    }
+
+    .ff-lanes-heads {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: grid;
+        grid-column: 1 / -1;
+        grid-template-columns: repeat(var(--_columns), var(--_column-width));
+        column-gap: var(--_gap);
+        padding-top: 0.25rem;
+        background-color: var(--_surface);
+    }
+
+    .ff-lane-header {
+        display: flex;
+        grid-column: 1 / -1;
+        align-items: center;
+        gap: 0.5rem;
+        padding-top: 1rem;
+    }
+
+    .ff-lane-avatar {
+        width: 1.5rem;
+        height: 1.5rem;
+        object-fit: cover;
+        border-radius: 9999px;
+    }
+
+    .ff-lane-icon {
+        color: var(--_text-muted);
+    }
+
+    .ff-lane-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        background-color: var(--color-500);
+        border-radius: 9999px;
+    }
+
+    .ff-lane-title {
+        margin: 0;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-weight: 500;
+        color: var(--_text);
+    }
+
+    .ff-lane-count {
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        font-variant-numeric: tabular-nums;
+        color: var(--_text-muted);
+    }
+
+    .ff-cell {
+        display: flex;
+        flex-direction: column;
+        min-height: 6rem;
+        padding: 0.5rem;
+    }
+
+    .ff-cell-cards {
+        flex: 1 1 0%;
+        min-height: 4rem;
+    }
+
+    .ff-lanes-more {
+        grid-column: 1 / -1;
+    }
+
+    .ff-header {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .ff-header-breadcrumbs {
+        margin-bottom: 0.5rem;
+    }
+
+    .ff-header-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .ff-header-title {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .ff-header-subheading {
+        max-width: 42rem;
+        margin: 0.25rem 0 0;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        color: var(--_text-muted);
+    }
+
+    .ff-header-tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.75rem 1.5rem;
+    }
+
+    .ff-header-indicators {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 0.25rem;
+    }
+
+    /* Filament styles the table container in the components layer, which outranks this sublayer, so only important wins. */
+    .ff-filters {
+        margin-bottom: 1rem;
+        overflow: visible !important;
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+
+    .ff-filters-main {
+        flex: 1 1 0%;
+    }
+
+    .ff-filters-toolbar {
+        display: flex;
+        align-items: center;
+        column-gap: 1rem;
+        margin-bottom: 1rem;
+        padding-inline: 0 !important;
+    }
+
+    .ff-filters-panel {
+        background-color: var(--_surface-raised);
+        border-radius: 0.75rem;
+        box-shadow:
+            0 0 0 1px var(--_border),
+            0 1px 2px 0 rgb(0 0 0 / 0.05);
+    }
+
+    .ff-filters-panel--above {
+        margin-bottom: 1rem;
+        border-bottom-width: 0 !important;
+    }
+
+    .ff-filters-panel--below {
+        margin-top: 1rem;
+    }
+
+    .ff-filters-panel--before,
+    .ff-filters-panel--after {
+        background-color: var(--_surface-raised) !important;
+        border-radius: 0.75rem !important;
+        box-shadow:
+            0 0 0 1px var(--_border),
+            0 1px 2px 0 rgb(0 0 0 / 0.05) !important;
+    }
+
+    .ff-filters-panel--before {
+        margin-inline-end: 1rem;
+    }
+
+    .ff-filters-panel--after {
+        margin-inline-start: 1rem;
+    }
+
+    .ff-filters-indicators {
+        margin-top: 0.75rem;
+        padding-inline: 0 !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .ff-tray,
+        .ff-cell,
+        .ff-card,
+        .ff-add-row,
+        .ff-card-actions {
+            transition: none;
+        }
+
+        .ff-card[data-dragging] > .ff-card-body {
+            rotate: none;
+            scale: none;
+        }
+    }
+}

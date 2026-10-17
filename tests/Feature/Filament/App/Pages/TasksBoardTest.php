@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Board;
+use Relaticle\Flowforge\Grouping;
+use Relaticle\Flowforge\Lane;
 
 mutates(TasksBoard::class, CreateTaskAction::class);
 
@@ -143,6 +145,84 @@ it('moves a card between columns via moveCard', function (): void {
     expect($updatedValue)->toBe($inProgress->getKey());
 });
 
+it('moves a card between two cards of another column', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+    $inProgress = $this->statusField->options->firstWhere('name', 'In progress');
+
+    [$above, $below, $task] = Task::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
+    $above->saveCustomFieldValue($this->statusField, $inProgress->getKey());
+    $below->saveCustomFieldValue($this->statusField, $inProgress->getKey());
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+    $above->forceFill(['order_column' => 1000])->saveQuietly();
+    $below->forceFill(['order_column' => 2000])->saveQuietly();
+
+    livewire(TasksBoard::class)
+        ->call('moveCard', (string) $task->id, (string) $inProgress->getKey(), (string) $above->id, (string) $below->id)
+        ->assertDispatched('kanban-card-moved');
+
+    $task->refresh();
+    $storedValue = $task->customFieldValues()
+        ->where('custom_field_id', $this->statusField->getKey())
+        ->value($this->statusField->getValueColumn());
+
+    expect($storedValue)->toBe($inProgress->getKey())
+        ->and((float) $task->order_column)->toBeGreaterThan(1000.0)->toBeLessThan(2000.0);
+});
+
+it('moves a card to another assignee lane and keeps its other assignees', function (): void {
+    $this->withoutDefer();
+
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+    [$leaving, $joining, $staying] = User::factory()->count(3)->create()->all();
+    $this->workspace->users()->attach([$leaving->id, $joining->id, $staying->id], ['role' => 'member']);
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+    $task->assignees()->attach([$leaving->id, $staying->id]);
+    Task::factory()->recycle([$this->user, $this->workspace])->create()->assignees()->attach($joining);
+
+    livewire(TasksBoard::class, ['groupBy' => 'assignee'])
+        ->call('moveCard', (string) $task->id, (string) $todo->getKey(), null, null, (string) $leaving->id, (string) $joining->id)
+        ->assertDispatched('kanban-card-moved');
+
+    expect($task->assignees()->pluck('users.id')->sort()->values()->all())
+        ->toBe(collect([$joining->id, $staying->id])->sort()->values()->all())
+        ->and($joining->notifications()->count())->toBe(1)
+        ->and($staying->notifications()->count())->toBe(0);
+});
+
+it('moves a card into the unassigned lane', function (): void {
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+    $assignee = User::factory()->create();
+    $this->workspace->users()->attach($assignee, ['role' => 'member']);
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->saveCustomFieldValue($this->statusField, $todo->getKey());
+    $task->assignees()->attach($assignee);
+
+    livewire(TasksBoard::class, ['groupBy' => 'assignee'])
+        ->call('moveCard', (string) $task->id, (string) $todo->getKey(), null, null, (string) $assignee->id, Grouping::EMPTY_LANE)
+        ->assertDispatched('kanban-card-moved');
+
+    expect($task->assignees()->exists())->toBeFalse();
+});
+
+it('offers an assignee lane only for workspace members', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $formerMember = User::factory()->create();
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->assignees()->attach([$member->id, $formerMember->id]);
+
+    $board = livewire(TasksBoard::class, ['groupBy' => 'assignee'])->instance()->getBoard();
+    $laneNames = collect($board->getActiveGrouping()->getLanes($board->getQuery()))
+        ->map(fn (Lane $lane): string => $lane->getName());
+
+    expect($laneNames)->toContain($member->id)
+        ->not->toContain($formerMember->id);
+});
+
 it('rejects a move to a status option the board does not own', function (string $targetKind): void {
     $todo = $this->statusField->options->firstWhere('name', 'To do');
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
@@ -164,7 +244,7 @@ it('rejects a move to a status option the board does not own', function (string 
 
     livewire(TasksBoard::class)
         ->call('moveCard', (string) $task->id, $targetId)
-        ->assertStatus(422)
+        ->assertNotified(__('flowforge::flowforge.unknown_column'))
         ->assertNotDispatched('kanban-card-moved');
 
     $storedValue = $task->fresh()->customFieldValues()
@@ -190,10 +270,11 @@ it('rejects a card created in a status option the board does not own', function 
     $targetId = $targetKind === 'foreign' ? (string) $foreignOptionId : 'not-an-option';
 
     livewire(TasksBoard::class)
+        ->assertActionDisabled(TestAction::make('create')->arguments(['column' => $targetId]))
         ->call('mountAction', 'create', ['column' => $targetId])
         ->set('mountedActions.0.data.title', 'Rejected task')
         ->call('callMountedAction')
-        ->assertStatus(422);
+        ->assertOk();
 
     expect(Task::query()->where('title', 'Rejected task')->exists())->toBeFalse();
 })->with(['foreign workspace option' => 'foreign', 'garbage id' => 'garbage']);

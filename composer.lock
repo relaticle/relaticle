@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "52a10a16e222e550088181f87477dcae",
+    "content-hash": "b51d9906c054f24a43752ab2f18f0e37",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10631,16 +10631,16 @@
         },
         {
             "name": "relaticle/flowforge",
-            "version": "v4.1.4",
+            "version": "v4.2.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/flowforge.git",
-                "reference": "16fedab8325df82f046a479d735179bccde89efa"
+                "reference": "97ccb40559609cd3c04d19a68682a5cf41915b65"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/16fedab8325df82f046a479d735179bccde89efa",
-                "reference": "16fedab8325df82f046a479d735179bccde89efa",
+                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/97ccb40559609cd3c04d19a68682a5cf41915b65",
+                "reference": "97ccb40559609cd3c04d19a68682a5cf41915b65",
                 "shasum": ""
             },
             "require": {
@@ -10661,6 +10661,7 @@
                 "orchestra/testbench": "^10.11|^11.2",
                 "pestphp/pest": "^4.7|^5.1",
                 "pestphp/pest-plugin-arch": "^4.0|^5.0",
+                "pestphp/pest-plugin-browser": "^4.3|^5.1",
                 "pestphp/pest-plugin-laravel": "^4.1|^5.0",
                 "phpstan/extension-installer": "^1.4",
                 "phpstan/phpstan-deprecation-rules": "^2.0",
@@ -10715,7 +10716,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-06T14:41:01+00:00"
+            "time": "2026-10-17T22:02:09+00:00"
         },
         {
             "name": "relaticle/ink",
