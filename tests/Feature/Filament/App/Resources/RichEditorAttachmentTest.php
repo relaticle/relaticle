@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Actions\Upload\CopyRichContentAttachments;
 use App\Enums\MediaCollection;
+use App\Filament\Actions\DuplicateAction;
 use App\Filament\CustomFields\RichContentEntry;
 use App\Filament\CustomFields\RichEditorComponent;
 use App\Filament\CustomFields\RichEditorFieldType;
@@ -29,7 +31,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
-mutates(RichContentAttachments::class, RichContentEntry::class, RichEditorFieldType::class, RichEditorComponent::class, AppPanelProvider::class);
+mutates(RichContentAttachments::class, RichContentEntry::class, RichEditorFieldType::class, RichEditorComponent::class, AppPanelProvider::class, DuplicateAction::class, CopyRichContentAttachments::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -371,4 +373,72 @@ it('saves a pasted image when temporary uploads live on a disk with no local pat
     $id = $editor->saveUploadedFileAttachment(livewireTemporaryUpload(onePixelPng(), 'shot.png'));
 
     expect(Media::query()->where('uuid', $id)->firstOrFail()->name)->toBe('shot.png');
+});
+
+function noteWithBodyImage(string $title): Note
+{
+    $id = noteBodyEditor()->saveUploadedFileAttachment(livewireTemporaryUpload(onePixelPng(), 'shot.png'));
+
+    livewire(ManageNotes::class)
+        ->callAction('create', ['title' => $title, 'custom_fields' => ['body' => "<p><img data-id=\"{$id}\" src=\"stale\"></p>"]])
+        ->assertHasNoActionErrors();
+
+    return Note::query()->where('title', $title)->firstOrFail();
+}
+
+it('gives a duplicated note its own copy of a body image', function (): void {
+    $note = noteWithBodyImage('Kickoff');
+    $original = Media::query()->whereMorphedTo('model', $note)->sole();
+
+    livewire(ManageNotes::class)
+        ->mountAction(TestAction::make('duplicate')->table($note))
+        ->setActionData(['title' => 'Kickoff copy'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $copy = Note::query()->where('title', 'Kickoff copy')->sole();
+    $copied = Media::query()->whereMorphedTo('model', $copy)->sole();
+
+    expect($copied->uuid)->not->toBe($original->uuid)
+        ->and($copied->collection_name)->toBe(MediaCollection::Attachments->value)
+        ->and(Storage::disk($copied->disk)->exists($copied->getPathRelativeToRoot()))->toBeTrue()
+        ->and(storedNoteBody($copy, $this->body))->toContain($copied->uuid)->not->toContain($original->uuid)
+        ->and($original->refresh()->model_id)->toBe($note->getKey());
+});
+
+it('copies a body image only once an unchanged duplicate is confirmed', function (): void {
+    $note = noteWithBodyImage('Kickoff');
+
+    $page = livewire(ManageNotes::class)
+        ->mountAction(TestAction::make('duplicate')->table($note))
+        ->callMountedAction()
+        ->assertActionMounted([TestAction::make('duplicate')->table($note), TestAction::make('confirmUnchanged')]);
+
+    expect(Media::query()->count())->toBe(1);
+
+    $page->callMountedAction()->assertHasNoActionErrors();
+
+    expect(Media::query()->count())->toBe(2);
+});
+
+it('removes the copied body image when the duplicate is rolled back', function (): void {
+    $note = noteWithBodyImage('Kickoff');
+    $foreign = $this->workspace->addMediaFromString(pdfBytes())->usingFileName('brief.pdf')
+        ->withAttributes(['workspace_id' => $this->workspace->getKey()])
+        ->toMediaCollection(MediaCollection::PendingUploads->value);
+    $foreignLink = '<p><a href="'.route('media.show', ['media' => $foreign->uuid]).'">Brief</a></p>';
+    $owner = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $owner->saveCustomFieldValue($this->body, $foreignLink);
+    $files = Storage::disk('local')->allFiles();
+
+    livewire(ManageNotes::class)
+        ->mountAction(TestAction::make('duplicate')->table($note))
+        ->setActionData(['title' => 'Kickoff copy', 'custom_fields' => ['body' => storedNoteBody($note, $this->body).$foreignLink]])
+        ->callMountedAction()
+        ->assertHasErrors(['custom_fields.body']);
+
+    expect(Note::query()->where('title', 'Kickoff copy')->exists())->toBeFalse()
+        ->and(Media::query()->count())->toBe(2)
+        ->and($foreign->refresh()->model_id)->toBe($owner->getKey())
+        ->and(Storage::disk('local')->allFiles())->toBe($files);
 });

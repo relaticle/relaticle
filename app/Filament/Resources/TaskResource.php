@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Actions\Task\NotifyTaskAssignees;
 use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\DuplicateAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
@@ -115,6 +117,7 @@ final class TaskResource extends Resource
             ]))
             ->recordActions([
                 ActionGroup::make([
+                    self::duplicateAction(),
                     EditAction::make()
                         ->using(function (Task $record, array $data): Task {
                             /** @var User $user */
@@ -134,6 +137,17 @@ final class TaskResource extends Resource
                     RestoreBulkAction::make(),
                 ]),
             ]);
+    }
+
+    public static function duplicateAction(): DuplicateAction
+    {
+        return DuplicateAction::make()
+            ->after(function (DuplicateAction $action, Task $record): void {
+                $submittedAssignees = $action->getRawData()['assignees'] ?? [];
+                $assigneeIds = array_values(array_filter(is_array($submittedAssignees) ? $submittedAssignees : [], is_string(...)));
+
+                resolve(NotifyTaskAssignees::class)->execute($record, $assigneeIds);
+            });
     }
 
     /**

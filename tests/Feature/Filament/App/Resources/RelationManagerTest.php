@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\CrmEntity;
+use App\Filament\Actions\DuplicateAction;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager as CompanyNotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
@@ -21,6 +23,8 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+
+mutates(DuplicateAction::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -180,3 +184,63 @@ it('searches the company tabs by name, title and assignee', function (string $re
         'pricing',
     ],
 ]);
+
+it('duplicates a record from the :dataset relation manager and links the copy to the owner', function (string $relationManager, string $pageClass, string $ownerModel, string $recordModel, string $otherModel): void {
+    $owner = $ownerModel::factory()->recycle([$this->user, $this->workspace])->create();
+    $other = $otherModel::factory()->recycle([$this->user, $this->workspace])->create();
+    $ownerRelation = CrmEntity::tryFromModel($owner)->relationName();
+    $otherRelation = CrmEntity::tryFromModel($other)->relationName();
+
+    $record = $recordModel::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Follow up']);
+    $record->{$ownerRelation}()->attach($owner);
+    $record->{$otherRelation}()->attach($other);
+
+    livewire($relationManager, ['ownerRecord' => $owner, 'pageClass' => $pageClass])
+        ->callAction(TestAction::make('duplicate')->table($record), data: ['title' => 'Follow up again'])
+        ->assertHasNoActionErrors();
+
+    $copy = $recordModel::query()->where('title', 'Follow up again')->sole();
+
+    expect($copy->{$ownerRelation}->modelKeys())->toBe([$owner->getKey()])
+        ->and($copy->{$otherRelation}->modelKeys())->toBe([$other->getKey()]);
+})->with([
+    'company tasks' => [CompanyTasksRelationManager::class, ViewCompany::class, Company::class, Task::class, People::class],
+    'company notes' => [CompanyNotesRelationManager::class, ViewCompany::class, Company::class, Note::class, People::class],
+    'person tasks' => [PeopleTasksRelationManager::class, ViewPeople::class, People::class, Task::class, Company::class],
+    'person notes' => [PeopleNotesRelationManager::class, ViewPeople::class, People::class, Note::class, Company::class],
+    'opportunity tasks' => [OpportunityTasksRelationManager::class, ViewOpportunity::class, Opportunity::class, Task::class, Company::class],
+    'opportunity notes' => [OpportunityNotesRelationManager::class, ViewOpportunity::class, Opportunity::class, Note::class, Company::class],
+]);
+
+it('notifies the assignees of a task duplicated from a record tab', function (): void {
+    $this->withoutDefer();
+    $assignee = User::factory()->create();
+    $this->workspace->users()->attach($assignee, ['role' => 'member']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Follow up']);
+    $record->companies()->attach($company);
+    $record->assignees()->attach($assignee);
+
+    livewire(CompanyTasksRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->callAction(TestAction::make('duplicate')->table($record), data: ['title' => 'Follow up again'])
+        ->assertHasNoActionErrors();
+
+    expect(data_get($assignee->notifications()->sole()->data, 'title'))->toBe('New Task Assignment: Follow up again');
+});
+
+it('asks before duplicating an unchanged task from a record tab', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Follow up']);
+    $record->companies()->attach($company);
+
+    livewire(CompanyTasksRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->mountAction(TestAction::make('duplicate')->table($record))
+        ->callMountedAction()
+        ->assertActionMounted([TestAction::make('duplicate')->table($record), TestAction::make('confirmUnchanged')])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertActionNotMounted();
+
+    expect(Task::query()->where('title', 'Follow up')->count())->toBe(2);
+});
