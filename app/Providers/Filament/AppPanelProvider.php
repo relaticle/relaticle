@@ -38,7 +38,6 @@ use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SuperviseImpersonation;
-use App\Listeners\SwitchWorkspace;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
@@ -57,7 +56,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Enums\DatabaseNotificationsPosition;
 use Filament\Enums\GlobalSearchPosition;
-use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -92,7 +90,6 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -131,14 +128,6 @@ final class AppPanelProvider extends PanelProvider
      */
     public function boot(): void
     {
-        /**
-         * Listen and switch workspace if tenant was changed
-         */
-        Event::listen(
-            TenantSet::class,
-            SwitchWorkspace::class,
-        );
-
         Action::configureUsing(fn (Action $action): Action => $action
             ->size(Size::Small)
             ->iconPosition('before')

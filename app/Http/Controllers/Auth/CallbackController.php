@@ -34,12 +34,12 @@ final readonly class CallbackController
         CreatesNewSocialUsers $creator
     ): RedirectResponse {
         if (! $request->has('code')) {
-            return $this->handleError('Authorization was cancelled or failed. Please try again.');
+            return $this->handleError(__('auth.confirm.cancelled'));
         }
 
         try {
             $socialUser = $this->retrieveSocialUser($provider->value);
-            $account = $this->resolveUser($provider->value, $socialUser, $creator);
+            $account = $this->resolveUser($provider, $socialUser, $creator);
 
             if (! $account instanceof UserSocialAccount) {
                 return $this->handleError(__('auth.link.account_exists'));
@@ -48,7 +48,7 @@ final readonly class CallbackController
             $user = $account->user;
 
             if (! $user instanceof User) {
-                return $this->handleError('Authentication state mismatch. Please try again.');
+                return $this->handleError(__('auth.confirm.state_mismatch'));
             }
 
             if ($user->wasRecentlyCreated) {
@@ -57,7 +57,7 @@ final readonly class CallbackController
 
             return $this->beginAndRedirect($user, $provider, $account);
         } catch (InvalidStateException) {
-            return $this->handleError('Authentication state mismatch. Please try again.');
+            return $this->handleError(__('auth.confirm.state_mismatch'));
         } catch (ValidationException $e) {
             return $this->handleError($e->validator->errors()->first());
         } catch (Throwable $e) {
@@ -75,14 +75,14 @@ final readonly class CallbackController
      * to authenticate normally before an explicit link flow can run.
      */
     private function resolveUser(
-        string $provider,
+        SocialiteProvider $provider,
         SocialiteUser $socialUser,
         CreatesNewSocialUsers $creator
     ): ?UserSocialAccount {
         return DB::transaction(function () use ($provider, $socialUser, $creator): ?UserSocialAccount {
             $existingAccount = UserSocialAccount::query()
                 ->with('user')
-                ->where('provider_name', $provider)
+                ->where('provider_name', $provider->value)
                 ->where('provider_id', $socialUser->getId())
                 ->first();
 
@@ -97,25 +97,26 @@ final readonly class CallbackController
                 : null;
 
             if ($matchedUser instanceof User) {
-                AuthenticationSession::suggestLink($provider, (string) $socialUser->getId(), $canonicalEmail);
+                AuthenticationSession::suggestLink($provider->value, (string) $socialUser->getId(), $canonicalEmail);
 
                 return null;
             }
 
-            $user = $this->createUser($socialUser, $creator, $provider);
+            if (! $provider->vouchesForEmailOf($socialUser)) {
+                throw ValidationException::withMessages(['email' => __('auth.provider.unverified_email')]);
+            }
 
-            return $this->linkSocialAccount($user, $provider, $socialUser->getId());
+            $user = $this->createUser($socialUser, $creator);
+
+            return $this->linkSocialAccount($user, $provider->value, $socialUser->getId());
         });
     }
 
-    private function createUser(
-        SocialiteUser $socialUser,
-        CreatesNewSocialUsers $creator,
-        string $provider
-    ): User {
+    private function createUser(SocialiteUser $socialUser, CreatesNewSocialUsers $creator): User
+    {
         return $creator->create([
             'name' => $this->extractName($socialUser),
-            'email' => $this->extractEmail($socialUser, $provider),
+            'email' => EmailAddress::canonicalize((string) $socialUser->getEmail()),
             'terms' => 'on',
         ]);
     }
@@ -158,17 +159,10 @@ final readonly class CallbackController
             ?? 'Unknown User';
     }
 
-    private function extractEmail(SocialiteUser $socialUser, string $provider): string
-    {
-        return EmailAddress::canonicalize(
-            $socialUser->getEmail() ?? sprintf('%s_%s@noemail.app', $provider, $socialUser->getId()),
-        );
-    }
-
     private function handleError(string $message): RedirectResponse
     {
         Notification::make()
-            ->title('Authentication Failed')
+            ->title(__('auth.provider.failed_title'))
             ->body($message)
             ->danger()
             ->persistent()

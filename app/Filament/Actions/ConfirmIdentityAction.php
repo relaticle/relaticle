@@ -524,7 +524,7 @@ final class ConfirmIdentityAction extends Action
         $user = $this->confirmingUser();
 
         if (! $user->hasPassword() && ! $user->hasPasskey()) {
-            $this->providerAccount = $user->socialAccounts()->first();
+            $this->providerAccount = $user->availableSocialAccount();
         }
 
         return $this->providerAccount;

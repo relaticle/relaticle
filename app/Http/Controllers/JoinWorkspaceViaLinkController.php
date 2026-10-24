@@ -21,7 +21,7 @@ final readonly class JoinWorkspaceViaLinkController
     {
         $workspace = $this->resolveWorkspace($token);
 
-        if ($workspace instanceof View) {
+        if (! $workspace instanceof Workspace) {
             return $workspace;
         }
 
@@ -52,7 +52,7 @@ final readonly class JoinWorkspaceViaLinkController
     {
         $workspace = $this->resolveWorkspace($token);
 
-        if ($workspace instanceof View) {
+        if (! $workspace instanceof Workspace) {
             return $workspace;
         }
 
@@ -85,11 +85,15 @@ final readonly class JoinWorkspaceViaLinkController
         return $this->redirectToWorkspace($workspace, __('workspaces.accept.joined', ['workspace' => $workspace->name]));
     }
 
-    private function resolveWorkspace(string $token): Workspace|View
+    private function resolveWorkspace(string $token): Workspace|View|Response
     {
         $workspace = Workspace::query()
             ->where('invite_link_token', $token)
-            ->firstOrFail();
+            ->first();
+
+        if (! $workspace instanceof Workspace) {
+            return response()->view('workspaces.invite-link-expired', status: 404);
+        }
 
         if ($workspace->isInviteLinkTokenExpired()) {
             return view('workspaces.invite-link-expired');

@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Laravel\Passkeys\Events\PasskeyVerified;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -99,6 +100,74 @@ test('password login waits for enrolled MFA before authenticating', function ():
 
     $this->assertGuest('web');
     expect(session('auth.pending.user_id'))->toBe($user->id);
+});
+
+test('password login returns an MFA user to the deep link they opened before signing in', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $deepLink = url()->getAppUrl("{$user->currentWorkspace->slug}/companies");
+
+    $this->get($deepLink)->assertRedirect();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertRedirect($deepLink);
+});
+
+test('password login returns an MFA user to the invitation they opened before signing in', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $invitation = WorkspaceInvitation::factory()->create(['email' => $user->email]);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+    $acceptUrl = route('workspace-invitations.token.accept', ['token' => $rawToken]);
+
+    $this->get($acceptUrl)->assertRedirect();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertRedirect($acceptUrl);
+});
+
+test('a throttled MFA code returns to the challenge with the wait instead of a bare error page', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('two-factor.login.store'), ['code' => '000000']);
+    }
+
+    $this->post(route('two-factor.login.store'), ['code' => '000000'])
+        ->assertRedirect(route('two-factor.login'));
+
+    expect(session('errors')->first('code'))->toStartWith(Str::before(__('auth.throttle'), ':seconds'));
+});
+
+test('a throttled identity confirmation code returns to its form with the wait', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    IdentityConfirmation::markMfaPending($user, null);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('identity.confirm.mfa.store'), ['code' => '000000']);
+    }
+
+    $this->post(route('identity.confirm.mfa.store'), ['code' => '000000'])
+        ->assertRedirect(route('identity.confirm.mfa'));
+
+    expect(session('errors')->first('code'))->toStartWith(Str::before(__('auth.throttle'), ':seconds'));
 });
 
 test('the Fortify password route completes login without MFA', function (): void {
@@ -876,7 +945,7 @@ test('social hint renders after discovering a social-only account', function ():
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
-        ->assertSee(__('auth.login.social_hint'));
+        ->assertSee(__('auth.login.social_hint', ['provider' => 'Google']));
 });
 
 test('password fallback link renders only for passkey users with a password', function (): void {
@@ -1137,7 +1206,27 @@ test('signup rejects a duplicate email at submission', function (): void {
     $component
         ->fillForm(['password' => 'Password123!'])
         ->call('authenticate')
-        ->assertHasFormErrors(['email']);
+        ->assertHasFormErrors(['email' => __('auth.login.account_exists')])
+        ->assertSet('authMethod', 'password');
+
+    expect(User::where('email', $email)->count())->toBe(1);
+});
+
+test('signup moves to sign-in when the account appears under a different letter case', function (): void {
+    $email = 'dup-case-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => strtoupper($email)])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    User::factory()->create(['email' => $email]);
+
+    $component
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.account_exists')])
+        ->assertSet('authMethod', 'password');
 
     expect(User::where('email', $email)->count())->toBe(1);
 });

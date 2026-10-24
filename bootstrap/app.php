@@ -22,13 +22,16 @@ use App\Http\Middleware\ValidateSignature;
 use App\Models\Notification;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -56,6 +59,7 @@ use Spatie\Health\Commands\ScheduleCheckHeartbeatCommand;
 use Spatie\MarkdownResponse\Actions\DetectsMarkdownRequest;
 use Spatie\MarkdownResponse\Enums\DetectionMethod;
 use Spatie\MarkdownResponse\Support\Config;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -115,6 +119,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Global rather than the web group: Filament panel routes do not run the web group.
         $middleware->append(SecurityHeaders::class);
+
+        $middleware->authenticateSessions();
 
         $middleware->web(
             append: [
@@ -249,6 +255,40 @@ return Application::configure(basePath: dirname(__DIR__))
             $lines[] = '';
 
             return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);
+        });
+
+        // An expired or wrong-account verification link returns to the prompt, where Resend gets a working one.
+        $exceptions->render(function (HttpException $e, Request $request): ?RedirectResponse {
+            if ($e->getStatusCode() !== 403 || ! $request->routeIs('filament.app.auth.email-verification.verify')) {
+                return null;
+            }
+
+            FilamentNotification::make()->title(__('auth.verify_email.link_unusable'))->warning()->persistent()->send();
+
+            return to_route('filament.app.auth.email-verification.prompt');
+        });
+
+        // Sign-in steps are retried, so a throttled one returns to its form with the wait instead of a bare 429 page.
+        $exceptions->render(function (ThrottleRequestsException $e, Request $request) use ($rendersJson): ?RedirectResponse {
+            if ($rendersJson($request)) {
+                return null;
+            }
+
+            $wait = __('auth.throttle', ['seconds' => $e->getHeaders()['Retry-After'] ?? 60]);
+
+            if ($request->routeIs('auth.socialite.redirect', 'auth.socialite.callback')) {
+                FilamentNotification::make()->title(__('auth.provider.failed_title'))->body($wait)->danger()->persistent()->send();
+
+                return to_route('login');
+            }
+
+            $form = match (true) {
+                $request->routeIs('two-factor.login.store') => route('two-factor.login'),
+                $request->routeIs('identity.confirm.mfa.store') => route('identity.confirm.mfa'),
+                default => null,
+            };
+
+            return $form === null ? null : redirect()->to($form)->withErrors(['code' => $wait]);
         });
 
         // Stale tabs and deploy boundaries produce checksum failures that

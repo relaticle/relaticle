@@ -24,6 +24,46 @@ it('flags the session for signup analytics tracking on signup', function (): voi
     expect(session()->get('fathom.track_signup'))->toBeTrue();
 });
 
+it('names a user who signs up with a plus address without the tag', function (): void {
+    $email = 'jane.doe+trial-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate');
+
+    expect(User::query()->where('email', $email)->sole()->name)->toBe('Jane Doe');
+});
+
+it('names a user whose address starts with a plus tag after the whole local part', function (): void {
+    $email = '+trial'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::query()->where('email', $email)->sole()->name)->toStartWith('+Trial');
+});
+
+it('throttles repeated signup submissions on one discovery', function (): void {
+    $component = livewire(Login::class)
+        ->fillForm(['email' => 'throttle-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertNotified(__('filament-panels::auth/pages/login.notifications.throttled.title', ['seconds' => 60, 'minutes' => 1]));
+});
+
 it('renders the signup event once and clears the flag', function (): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);

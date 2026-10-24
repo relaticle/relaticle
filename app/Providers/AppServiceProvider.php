@@ -8,8 +8,6 @@ use App\Console\Commands\MakeFilamentUserCommand;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
 use App\Enums\Plan;
-use App\Events\InactiveRecipientsRejected;
-use App\Events\WorkspaceCreated;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
@@ -17,16 +15,6 @@ use App\Filament\CustomFields\RichEditorFieldType;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
-use App\Listeners\Billing\SyncPlanOnStripeSubscriptionChange;
-use App\Listeners\CreateSetupConversationListener;
-use App\Listeners\Email\DropBouncedRecipientsListener;
-use App\Listeners\Email\NewSubscriberListener;
-use App\Listeners\Email\ParkInactiveRecipientsListener;
-use App\Listeners\Email\RecordLoginTimestampListener;
-use App\Listeners\Email\WorkspaceCreatedTagListener;
-use App\Listeners\Email\WorkspaceMemberAddedListener;
-use App\Listeners\Mcp\CopyWorkspaceIdToAccessToken;
-use App\Listeners\SeedWorkspaceCreditBalanceListener;
 use App\Livewire\FilamentNotifications;
 use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
@@ -84,8 +72,6 @@ use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
-use Illuminate\Auth\Events\Login;
-use Illuminate\Auth\Events\Verified;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
@@ -96,7 +82,6 @@ use Illuminate\Foundation\DevCommands;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
-use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Notifications\Channels\DatabaseChannel;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades;
@@ -112,11 +97,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
-use Laravel\Cashier\Events\WebhookHandled;
-use Laravel\Jetstream\Events\TeamMemberAdded;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
-use Laravel\Passport\Events\AccessTokenCreated;
 use Laravel\Passport\Passport;
 use Laravel\Sanctum\Sanctum;
 use League\CommonMark\Extension\Table\TableExtension;
@@ -282,22 +264,11 @@ final class AppServiceProvider extends ServiceProvider
         // Filament's default amber instead of the brand color.
         FilamentColor::register(['primary' => BrandColors::primary()]);
 
-        Event::listen(Login::class, RecordLoginTimestampListener::class);
-        Event::listen(Verified::class, NewSubscriberListener::class);
-        Event::listen(MessageSending::class, DropBouncedRecipientsListener::class);
-        Event::listen(InactiveRecipientsRejected::class, ParkInactiveRecipientsListener::class);
-        Event::listen(TeamMemberAdded::class, WorkspaceMemberAddedListener::class);
-        Event::listen(WorkspaceCreated::class, WorkspaceCreatedTagListener::class);
-        Event::listen(WorkspaceCreated::class, SeedWorkspaceCreditBalanceListener::class);
-        Event::listen(WorkspaceCreated::class, CreateSetupConversationListener::class);
         Event::listen(SocialiteWasCalled::class, MicrosoftExtendSocialite::class);
-
-        Event::listen(WebhookHandled::class, SyncPlanOnStripeSubscriptionChange::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         Passport::useAuthCodeModel(McpAuthCode::class);
-        Event::listen(AccessTokenCreated::class, CopyWorkspaceIdToAccessToken::class);
         Passport::useAuthorizationServerResponseType(new WorkspaceBearerTokenResponse);
 
         $this->configureTokenScopes();

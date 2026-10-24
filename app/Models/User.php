@@ -9,6 +9,7 @@ use App\Data\NotificationPreferences;
 use App\Enums\EmailGrant;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Enums\SocialiteProvider;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Jobs\PurgeUser;
@@ -46,6 +47,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\PasskeyUser;
 use Laravel\Fortify\PasskeyAuthenticatable;
@@ -120,6 +122,8 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public const int SOCIAL_SIGNUP_WINDOW_SECONDS = 60;
 
+    private const int VERIFICATION_EMAIL_COOLDOWN_SECONDS = 60;
+
     /** @var array<string, bool> */
     private array $ownershipByWorkspaceId = [];
 
@@ -155,10 +159,22 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function sendEmailVerificationNotification(): void
     {
-        $notification = resolve(VerifyEmail::class);
-        $notification->url = Filament::getVerifyEmailUrl($this);
+        RateLimiter::attempt($this->verificationEmailCooldownKey(), 1, function (): void {
+            $notification = resolve(VerifyEmail::class);
+            $notification->url = Filament::getVerifyEmailUrl($this);
 
-        $this->notify($notification);
+            $this->notify($notification);
+        }, self::VERIFICATION_EMAIL_COOLDOWN_SECONDS);
+    }
+
+    public function verificationEmailCooldown(): int
+    {
+        return RateLimiter::availableIn($this->verificationEmailCooldownKey());
+    }
+
+    private function verificationEmailCooldownKey(): string
+    {
+        return 'verification-email:'.$this->getKey().':'.hash('sha256', $this->getEmailForVerification());
     }
 
     public function sendPasswordResetNotification($token): void
@@ -186,6 +202,17 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function socialAccounts(): HasMany
     {
         return $this->hasMany(UserSocialAccount::class);
+    }
+
+    public function availableSocialAccount(): ?UserSocialAccount
+    {
+        $availableProviders = array_filter(SocialiteProvider::cases(), fn (SocialiteProvider $provider): bool => $provider->isAvailable());
+
+        if ($availableProviders === []) {
+            return null;
+        }
+
+        return $this->socialAccounts()->whereIn('provider_name', $availableProviders)->first();
     }
 
     public function hasPassword(): bool

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Laravel\Passport\AccessToken as PassportAccessToken;
+use Laravel\Passport\TransientToken as PassportTransientToken;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -39,6 +40,12 @@ final readonly class SetApiWorkspaceContext
         // `User $user` parameter on resolveWorkspace() below would throw for anything else.
         if (! $user instanceof User) {
             return response()->json(['message' => 'This credential cannot access workspace-scoped resources.'], 403);
+        }
+
+        // Passport's cookie guard hands out a TransientToken whose can() is always true and
+        // which outlives a password reset, so a browser session could bypass every scope.
+        if ($this->isCookieSession($user->currentAccessToken())) {
+            return response()->json(['message' => 'This credential cannot access the API.'], 403);
         }
 
         $workspace = $this->resolveWorkspace($request, $user);
@@ -80,6 +87,11 @@ final readonly class SetApiWorkspaceContext
         $scopes = Model::getAllGlobalScopes();
         unset($scopes[User::class][self::USER_SCOPE]);
         Model::setAllGlobalScopes($scopes);
+    }
+
+    private function isCookieSession(?object $token): bool
+    {
+        return $token instanceof PassportTransientToken;
     }
 
     private function resolveWorkspace(Request $request, User $user): ?Workspace

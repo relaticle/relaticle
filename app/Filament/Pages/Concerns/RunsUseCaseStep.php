@@ -39,6 +39,7 @@ trait RunsUseCaseStep
                 // Stale sub-options from the previous use case are invisible yet fail validation.
                 ->afterStateUpdated(function (Set $set): void {
                     $set('onboarding_context', []);
+                    $this->resetErrorBag('data.onboarding_use_case');
                 }),
             $this->useCaseContextField(),
             TextInput::make('onboarding_other_use_case')

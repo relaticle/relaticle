@@ -1,6 +1,6 @@
 <x-onboarding.shell>
     <div class="flex h-full">
-        <div class="flex flex-1 flex-col px-10 py-10 sm:px-12 sm:py-12">
+        <div class="flex min-w-0 flex-1 flex-col px-10 py-10 sm:px-12 sm:py-12">
             @include('filament.pages.setup-workspace.'.$this->stepView())
         </div>
 

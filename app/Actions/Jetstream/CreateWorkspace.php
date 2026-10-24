@@ -13,9 +13,13 @@ use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Validation\Validator as ValidatorInstance;
 use Laravel\Jetstream\Contracts\CreatesTeams;
 use Laravel\Jetstream\Events\AddingTeam;
@@ -27,37 +31,59 @@ final readonly class CreateWorkspace implements CreatesTeams
     public function __construct(private StartProTrial $startProTrial) {}
 
     /**
-     * Validate and create a new workspace for the given user.
-     *
      * @param  array<string, mixed>  $input
      */
-    public function create(User $user, array $input): Workspace
+    public function create(User $user, array $input, bool $onlyIfFirst = false): Workspace
     {
-        Gate::forUser($user)->authorize('create', Jetstream::newTeamModel());
+        return DB::transaction(function () use ($user, $input, $onlyIfFirst): Workspace {
+            // Serialises one user's creations, so the first-workspace check, the cap and the insert agree.
+            User::query()->whereKey($user->getKey())->lockForUpdate()->first();
 
-        $isFirstWorkspace = ! $user->ownedWorkspaces()->exists();
+            $ownedWorkspace = $user->ownedWorkspaces()->oldest()->first();
 
-        $this->validate($input);
+            // A first-run wizard submitted twice, or from a second tab, opens the workspace it already made.
+            if ($onlyIfFirst && $ownedWorkspace instanceof Workspace) {
+                return $ownedWorkspace;
+            }
 
-        event(new AddingTeam($user));
+            Gate::forUser($user)->authorize('create', Jetstream::newTeamModel());
 
-        $workspace = new Workspace([
-            'name' => $input['name'],
-            'slug' => $input['slug'] ?? null,
-            'personal_workspace' => $isFirstWorkspace,
-            'onboarding_step' => Feature::active(EmailIntegration::class) ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase,
-            ...$this->referralAttributes($input),
-        ]);
-        $workspace->plan = Plan::default();
+            $this->validate($input);
 
-        $user->ownedWorkspaces()->save($workspace);
-        $user->switchWorkspace($workspace);
+            event(new AddingTeam($user));
 
-        if (Feature::active(Billing::class)) {
-            $this->startProTrial->execute($user, $workspace);
+            $workspace = new Workspace([
+                'name' => $input['name'],
+                'slug' => $input['slug'] ?? null,
+                'personal_workspace' => ! $ownedWorkspace instanceof Workspace,
+                'onboarding_step' => Feature::active(EmailIntegration::class) ? WorkspaceSetupStep::Email : WorkspaceSetupStep::UseCase,
+                ...$this->referralAttributes($input),
+            ]);
+            $workspace->plan = Plan::default();
+
+            $this->insert($user, $workspace);
+            $user->switchWorkspace($workspace);
+
+            if (Feature::active(Billing::class)) {
+                $this->startProTrial->execute($user, $workspace);
+            }
+
+            return $workspace;
+        });
+    }
+
+    private function insert(User $user, Workspace $workspace): void
+    {
+        // The savepoint turns a handle taken since validation into a field error instead of a failed transaction.
+        try {
+            DB::transaction(fn (): Model|false => $user->ownedWorkspaces()->save($workspace));
+        } catch (UniqueConstraintViolationException $exception) {
+            throw_unless($exception->index === 'workspaces_slug_unique', $exception);
+
+            throw ValidationException::withMessages([
+                'slug' => __('validation.unique', ['attribute' => __('filament/pages/workspaces.create_workspace.form.workspace_handle.label')]),
+            ])->errorBag('createWorkspace');
         }
-
-        return $workspace;
     }
 
     /**

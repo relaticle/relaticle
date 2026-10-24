@@ -7,6 +7,7 @@ use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
+use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
@@ -248,7 +249,7 @@ describe('Authentication redirects', function () {
     it('redirects forgot password to app panel', function () {
         $response = $this->get('/forgot-password');
 
-        $response->assertRedirect(url()->getAppUrl('forgot-password'));
+        $response->assertRedirect(Filament::getPanel('app')->getRequestPasswordResetUrl());
     });
 
     it('redirects dashboard to app panel', function () {
@@ -278,7 +279,7 @@ describe('Social authentication routes', function () {
         // The 11th request should be throttled
         $response = $this->get('/auth/redirect/github');
 
-        $response->assertStatus(429); // Too Many Requests
+        $response->assertRedirect(route('login'));
     });
 
     it('rejects github as a provider for redirect', function () {

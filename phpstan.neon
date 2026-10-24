@@ -74,12 +74,6 @@ parameters:
             path: app/Livewire/BaseLivewireComponent.php
             reportUnmatched: false
 
-        # i18n: notification ->title() on OAuth callback failure
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: app/Http/Controllers/Auth/CallbackController.php
-            reportUnmatched: false
-
         # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
         -
             identifier: app.i18n.hardcodedUserFacingString

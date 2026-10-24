@@ -29,7 +29,7 @@ final readonly class IdentityConfirmationController
     public function show(Request $request): View
     {
         $user = $this->user($request);
-        $provider = $user->socialAccounts()->first()?->provider_name;
+        $provider = $user->availableSocialAccount()?->provider_name;
 
         return view('auth.confirm-identity', [
             'hasPassword' => $user->hasPassword(),

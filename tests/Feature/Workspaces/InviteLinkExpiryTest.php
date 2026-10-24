@@ -60,7 +60,7 @@ it('the join controller returns the expired view when the token is past its expi
         ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
         ->assertOk()
         ->assertSee(__('workspaces.invite_link.expired.heading'))
-        ->assertSee('This invite link has expired');
+        ->assertSee(__('workspaces.invite_link.expired.body'));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });

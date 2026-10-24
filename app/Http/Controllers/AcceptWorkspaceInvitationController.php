@@ -95,6 +95,7 @@ final readonly class AcceptWorkspaceInvitationController
 
         return view('workspaces.accept-invitation', [
             'state' => 'ready',
+            'accountEmail' => $user->email,
             'workspaceName' => $invitation->workspace->name,
             'workspaceAvatarUrl' => $invitation->workspace->getFilamentAvatarUrl(),
             'inviterName' => $invitation->inviter?->name,

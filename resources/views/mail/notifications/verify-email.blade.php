@@ -2,7 +2,7 @@
 <x-slot:preheader>{{ __('mail.verify_email.preheader') }}</x-slot:preheader>
 # {{ __('mail.verify_email.heading') }}
 
-{{ __('mail.verify_email.body') }}
+{{ __('mail.verify_email.body', ['count' => $count]) }}
 
 <x-mail::button :url="$url">
 {{ __('mail.verify_email.cta') }}

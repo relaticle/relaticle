@@ -16,6 +16,9 @@ final class VerifyEmail extends FilamentVerifyEmail
     {
         return (new MailMessage)
             ->subject(__('mail.verify_email.subject'))
-            ->markdown('mail.notifications.verify-email', ['url' => $this->verificationUrl($notifiable)]);
+            ->markdown('mail.notifications.verify-email', [
+                'url' => $this->verificationUrl($notifiable),
+                'count' => (int) config('auth.verification.expire', 60),
+            ]);
     }
 }

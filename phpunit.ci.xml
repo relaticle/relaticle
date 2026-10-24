@@ -79,5 +79,7 @@
         <env name="PUSHER_APP_CLUSTER" value="mt1"/>
         <env name="RELATICLE_FEATURE_EMAIL_INTEGRATION" value="true"/>
         <env name="GMAIL_CLIENT_ID" value="gmail-client"/>
+        <env name="GOOGLE_CLIENT_ID" value="google-client"/>
+        <env name="MICROSOFT_CLIENT_ID" value="microsoft-client"/>
     </php>
 </phpunit>

@@ -57,13 +57,10 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
 
         event(new InvitingTeamMember($workspace, $email, $role));
 
-        $invitation = $workspace->workspaceInvitations()->make([
-            'email' => $email,
-            'role' => $role,
-            'inviter_id' => $user->id,
-        ]);
-
         /** @var WorkspaceInvitationModel $invitation */
+        $invitation = $workspace->workspaceInvitations()->firstOrNew(['email' => $email]);
+        $invitation->fill(['role' => $role, 'inviter_id' => $user->id]);
+
         $rawToken = $invitation->issueToken();
 
         // The unique rule above is a check-then-write, so a concurrent invite to
@@ -137,7 +134,7 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
             'email' => [
                 'required', ...self::emailRules(),
                 Rule::unique(Jetstream::teamInvitationModel())->where(function (Builder $query) use ($workspace): void {
-                    $query->where('workspace_id', $workspace->id);
+                    $query->where('workspace_id', $workspace->id)->where('expires_at', '>', now());
                 }),
             ],
             'role' => ['required', 'string', new Role],

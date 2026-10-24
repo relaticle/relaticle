@@ -2,7 +2,7 @@
     $mailbox = $this->connectedMailbox();
 @endphp
 
-<form wire:submit="saveSharing" wire:poll.5s class="flex flex-1 flex-col">
+<form wire:submit="saveSharing" wire:poll.5s class="flex min-w-0 flex-1 flex-col">
     <h3 class="text-xl font-bold tracking-tight text-gray-950 dark:text-white">
         {{ __('filament/pages/workspaces.setup_workspace.sharing.heading') }}
     </h3>

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\Auth\VerifyEmail;
 use App\Providers\FortifyServiceProvider;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Notification;
 
 mutates(FortifyServiceProvider::class);
@@ -72,6 +73,86 @@ test('resending starts a cooldown that outlives the page it was started on', fun
         ->toBeGreaterThan(0);
 });
 
+test('a second resend inside the cooldown sends nothing', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user);
+
+    livewire(EmailVerificationPrompt::class)
+        ->callAction('resendNotification')
+        ->callAction('resendNotification');
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+});
+
+test('the Fortify resend route shares the prompt cooldown', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user);
+
+    livewire(EmailVerificationPrompt::class)->callAction('resendNotification');
+
+    $this->post(route('verification.send'));
+    $this->post(route('verification.send'));
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+});
+
+test('signing up starts the resend cooldown', function () {
+    Notification::fake();
+
+    $email = 'cooldown-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate');
+
+    $user = User::query()->where('email', $email)->sole();
+
+    $this->actingAs($user);
+
+    livewire(EmailVerificationPrompt::class)->callAction('resendNotification');
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 1);
+});
+
+test('resending after the address was verified elsewhere moves the user on instead of claiming a resend', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create();
+
+    $this->actingAs($user);
+
+    $prompt = livewire(EmailVerificationPrompt::class);
+
+    $user->markEmailAsVerified();
+
+    $prompt->callAction('resendNotification')
+        ->assertRedirect(Filament::getUrl());
+
+    Notification::assertNothingSent();
+});
+
+test('changing the address again inside the cooldown still mails the new address', function () {
+    Notification::fake();
+
+    $user = User::factory()->unverified()->create(['email' => 'first@example.test']);
+
+    $user->sendEmailVerificationNotification();
+
+    $user->forceFill(['email' => 'second@example.test'])->save();
+
+    $user->sendEmailVerificationNotification();
+
+    Notification::assertSentToTimes($user, VerifyEmail::class, 2);
+});
+
 test('the prompt lets a signed-in user sign out to use another address', function () {
     $user = User::factory()->unverified()->create();
 
@@ -133,7 +214,10 @@ test('an expired verification link leaves the recipient unverified', function ()
     $url = Filament::getVerifyEmailUrl($user);
     $this->travel(61)->minutes();
 
-    $this->actingAs($user)->get($url)->assertForbidden();
+    $this->actingAs($user)->get($url)
+        ->assertRedirect(Filament::getPanel('app')->getEmailVerificationPromptUrl());
+
+    FilamentNotification::assertNotified(__('auth.verify_email.link_unusable'));
 
     expect($user->refresh()->email_verified_at)->toBeNull();
 });
@@ -142,7 +226,8 @@ test('a verification link cannot verify a different signed-in user', function ()
     $recipient = User::factory()->unverified()->create();
     $otherUser = User::factory()->unverified()->create();
 
-    $this->actingAs($otherUser)->get(Filament::getVerifyEmailUrl($recipient))->assertForbidden();
+    $this->actingAs($otherUser)->get(Filament::getVerifyEmailUrl($recipient))
+        ->assertRedirect(Filament::getPanel('app')->getEmailVerificationPromptUrl());
 
     expect($recipient->refresh()->email_verified_at)->toBeNull()
         ->and($otherUser->refresh()->email_verified_at)->toBeNull();

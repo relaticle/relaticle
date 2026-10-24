@@ -79,6 +79,7 @@ return [
     'notifications' => [
         'workspace_invitation_sent' => [
             'success' => 'Invitation sent.',
+            'success_many' => ':count invitations sent.',
         ],
         'workspace_invitation_revoked' => [
             'success' => 'Invitation revoked.',
@@ -122,6 +123,9 @@ return [
     ],
 
     'validation' => [
+        'slug_too_short' => 'The :attribute must be at least 3 characters.',
+        'slug_format' => 'The :attribute may only contain lowercase letters, numbers, and hyphens.',
+        'slug_reserved' => 'The :attribute is reserved and cannot be used.',
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'email_already_member' => 'This user already belongs to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Admin role.',
@@ -351,8 +355,8 @@ return [
             'decline' => 'Not now',
         ],
         'expired' => [
-            'heading' => 'Invite link expired',
-            'body' => 'This invite link has expired. Please ask the workspace owner to share a new link.',
+            'heading' => 'This invite link no longer works',
+            'body' => 'It expired, was turned off, or was replaced by a new one. Ask the workspace owner to share the current link.',
             'action' => 'Go to my workspace',
         ],
     ],
@@ -371,7 +375,7 @@ return [
     ],
 
     'accept' => [
-        'joined' => 'You have joined the :workspace workspace.',
+        'joined' => 'You have joined :workspace.',
         'already_member' => 'You are already a member of :workspace.',
         'no_longer_valid' => 'That invitation is no longer valid. It may have been revoked or it may have expired.',
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
@@ -396,7 +400,7 @@ return [
         ],
         'expired' => [
             'heading' => 'Invitation no longer valid',
-            'body' => 'This invitation has expired or has already been accepted.',
+            'body' => 'This invitation has expired, was already used, or was replaced by a newer one.',
             'action' => 'Go to my workspace',
         ],
     ],

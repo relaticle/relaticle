@@ -141,6 +141,7 @@ return [
         'photo_remove_failed' => 'Could not remove your profile photo. Please try again.',
         'logged_out_other_sessions' => [
             'success' => 'All other browser sessions have been logged out successfully.',
+            'remembered_only' => 'Other devices no longer stay signed in. A session open there right now ends within :minutes minutes, or at once if you change your password.',
         ],
         'delete_account_blocked' => [
             'title' => 'Account deletion blocked',

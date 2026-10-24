@@ -230,11 +230,29 @@ test('a disabled workspace link is unreachable via the token it used to carry', 
 
     $this->actingAs($joiner)
         ->get(route('workspaces.join', ['token' => $originalToken]))
-        ->assertNotFound();
+        ->assertNotFound()
+        ->assertSee(__('workspaces.invite_link.expired.heading'));
 
     $this->actingAs($joiner)
         ->post(route('workspaces.join.confirm', ['token' => $originalToken]))
         ->assertNotFound();
+});
+
+test('a replaced workspace link explains itself instead of a bare not found page', function (): void {
+    $owner = User::factory()->create();
+    $workspace = resolve(CreateWorkspace::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-rotated',
+    ]);
+    $originalToken = $workspace->invite_link_token;
+
+    $workspace->rotateInviteLink();
+
+    $this->actingAs(User::factory()->create(['email_verified_at' => now()]))
+        ->get(route('workspaces.join', ['token' => $originalToken]))
+        ->assertNotFound()
+        ->assertSee(__('workspaces.invite_link.expired.heading'))
+        ->assertSee(__('workspaces.invite_link.expired.action'));
 });
 
 test('guest hitting join link is redirected to login', function (): void {
@@ -263,7 +281,7 @@ test('unauthenticated attempts against the join link route are rate limited', fu
         ->assertStatus(429);
 });
 
-test('user scheduled for deletion cannot view join confirmation', function (): void {
+test('user scheduled for deletion is sent to the deletion interstitial instead of the join confirmation', function (): void {
     $owner = User::factory()->create();
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
@@ -277,7 +295,7 @@ test('user scheduled for deletion cannot view join confirmation', function (): v
 
     $this->actingAs($joiner)
         ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
-        ->assertForbidden();
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
@@ -296,7 +314,7 @@ test('user scheduled for deletion cannot POST to join', function (): void {
 
     $this->actingAs($joiner)
         ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
-        ->assertForbidden();
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });

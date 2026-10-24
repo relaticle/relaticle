@@ -33,6 +33,8 @@ use App\Http\Controllers\PrivacyPolicyController;
 use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Controllers\TermsOfServiceController;
 use App\Http\Middleware\AddVaryAcceptHeader;
+use App\Http\Middleware\CheckScheduledDeletion;
+use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -57,12 +59,14 @@ use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
 Route::middleware('guest')->group(function () {
     if (Feature::for(null)->active(SocialAuth::class)) {
-        Route::get('/auth/redirect/{provider}', RedirectController::class)
-            ->name('auth.socialite.redirect')
-            ->middleware('throttle:10,1,socialite-redirect');
-        Route::get('/auth/callback/{provider}', CallbackController::class)
-            ->name('auth.socialite.callback')
-            ->middleware('throttle:10,1,socialite-callback');
+        Route::middleware(EnsureSocialiteProviderIsAvailable::class)->group(function (): void {
+            Route::get('/auth/redirect/{provider}', RedirectController::class)
+                ->name('auth.socialite.redirect')
+                ->middleware('throttle:10,1,socialite-redirect');
+            Route::get('/auth/callback/{provider}', CallbackController::class)
+                ->name('auth.socialite.callback')
+                ->middleware('throttle:10,1,socialite-callback');
+        });
     }
 
     Route::post('/two-factor-challenge/cancel', [MfaChallengeController::class, 'destroy'])
@@ -72,29 +76,31 @@ Route::middleware('guest')->group(function () {
 
     Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
 
-    Route::get('/forgot-password', fn () => redirect()->to(url()->getAppUrl('forgot-password')))->name('password.request');
+    Route::get('/forgot-password', fn () => redirect()->to(filament()->getPanel('app')->getRequestPasswordResetUrl()))->name('password.request');
 });
 
 Route::middleware('auth')->group(function (): void {
     if (Feature::for(null)->active(SocialAuth::class)) {
-        // Confirmation intent, not login: a linked provider re-authenticated here
-        // proves current access to that identity for one sensitive operation.
-        // Distinct from the link routes below, which establish a new association.
-        Route::get('/auth/confirm/redirect/{provider}', IdentityConfirmationRedirectController::class)
-            ->name('auth.socialite.confirm.redirect')
-            ->middleware('throttle:10,1,socialite-confirm-redirect');
-        Route::get('/auth/confirm/callback/{provider}', IdentityConfirmationCallbackController::class)
-            ->name('auth.socialite.confirm.callback')
-            ->middleware('throttle:10,1,socialite-confirm-callback');
+        Route::middleware(EnsureSocialiteProviderIsAvailable::class)->group(function (): void {
+            // Confirmation intent, not login: a linked provider re-authenticated here
+            // proves current access to that identity for one sensitive operation.
+            // Distinct from the link routes below, which establish a new association.
+            Route::get('/auth/confirm/redirect/{provider}', IdentityConfirmationRedirectController::class)
+                ->name('auth.socialite.confirm.redirect')
+                ->middleware('throttle:10,1,socialite-confirm-redirect');
+            Route::get('/auth/confirm/callback/{provider}', IdentityConfirmationCallbackController::class)
+                ->name('auth.socialite.confirm.callback')
+                ->middleware('throttle:10,1,socialite-confirm-callback');
 
-        // Linking intent, unlike confirm above: establishes a brand-new
-        // association. Gated by password.confirm, then a fresh OAuth round trip.
-        Route::get('/auth/link/redirect/{provider}', LinkSocialAccountRedirectController::class)
-            ->name('auth.socialite.link.redirect')
-            ->middleware(['password.confirm', 'throttle:10,1,socialite-link-redirect']);
-        Route::get('/auth/link/callback/{provider}', LinkSocialAccountCallbackController::class)
-            ->name('auth.socialite.link.callback')
-            ->middleware('throttle:10,1,socialite-link-callback');
+            // Linking intent, unlike confirm above: establishes a brand-new
+            // association. Gated by password.confirm, then a fresh OAuth round trip.
+            Route::get('/auth/link/redirect/{provider}', LinkSocialAccountRedirectController::class)
+                ->name('auth.socialite.link.redirect')
+                ->middleware(['password.confirm', 'throttle:10,1,socialite-link-redirect']);
+            Route::get('/auth/link/callback/{provider}', LinkSocialAccountCallbackController::class)
+                ->name('auth.socialite.link.callback')
+                ->middleware('throttle:10,1,socialite-link-callback');
+        });
     }
 
     Route::get('/identity/confirm/mfa', [IdentityConfirmationMfaController::class, 'show'])
@@ -199,12 +205,12 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
     // spend the allowance the accept POST needs.
     Route::get('/invitations/{token}', [AcceptWorkspaceInvitationController::class, 'show'])
         ->where('token', '[A-Za-z0-9]{40}')
-        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-show')
+        ->middleware([ThrottleBeforeAuthentication::class.':10,1,invitation-show', CheckScheduledDeletion::class])
         ->name('workspace-invitations.token.accept');
 
     Route::post('/invitations/{token}', [AcceptWorkspaceInvitationController::class, 'store'])
         ->where('token', '[A-Za-z0-9]{40}')
-        ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-join')
+        ->middleware([ThrottleBeforeAuthentication::class.':10,1,invitation-join', CheckScheduledDeletion::class])
         ->name('workspace-invitations.token.join');
 
     // Signing out returns here rather than to the marketing home, so the invitee
@@ -219,12 +225,12 @@ Route::middleware(['auth', 'verified', 'no-referrer', AuthenticateSession::class
     ->group(function (): void {
         Route::get('/join/{token}', [JoinWorkspaceViaLinkController::class, 'show'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware(ThrottleBeforeAuthentication::class.':10,1,workspace-join-show')
+            ->middleware([ThrottleBeforeAuthentication::class.':10,1,workspace-join-show', CheckScheduledDeletion::class])
             ->name('workspaces.join');
 
         Route::post('/join/{token}', [JoinWorkspaceViaLinkController::class, 'store'])
             ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware(ThrottleBeforeAuthentication::class.':10,1,workspace-join-confirm')
+            ->middleware([ThrottleBeforeAuthentication::class.':10,1,workspace-join-confirm', CheckScheduledDeletion::class])
             ->name('workspaces.join.confirm');
     });
 

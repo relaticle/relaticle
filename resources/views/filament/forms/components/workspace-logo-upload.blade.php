@@ -183,6 +183,7 @@
         type="file"
         class="sr-only"
         tabindex="-1"
+        aria-hidden="true"
         accept="{{ implode(',', $acceptedFileTypes) }}"
         x-on:change="handle($event.target.files[0]); $event.target.value = ''"
         @disabled($isDisabled)

@@ -166,7 +166,7 @@ return [
         'subject' => 'Verify your email',
         'preheader' => 'One click finishes signing up',
         'heading' => 'Verify your email address',
-        'body' => 'Confirm this address to finish setting up your Relaticle account.',
+        'body' => 'Confirm this address to finish setting up your Relaticle account. This link expires in :count minutes.',
         'ignore' => 'Did not sign up? Ignore this email.',
         'cta' => 'Verify email',
     ],

@@ -23,7 +23,7 @@
     </div>
 
     <div class="mt-auto pt-6">
-        <x-filament::button type="submit" size="lg" class="w-full">
+        <x-filament::button type="submit" size="lg" class="w-full" wire:target="saveUseCase">
             {{ __('filament/pages/workspaces.create_workspace.actions.continue') }}
         </x-filament::button>
     </div>

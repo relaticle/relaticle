@@ -379,3 +379,17 @@ test('a round trip that returns without the proof is not reopened by a later unr
 
     Livewire::test(LogoutOtherBrowserSessions::class)->assertActionNotMounted();
 });
+
+test('rotates the remember token and does not claim other sessions ended when the session driver cannot list them', function (): void {
+    config(['session.driver' => 'redis']);
+    session()->put('auth.password_confirmed_at', time());
+
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
+    $user->forceFill(['remember_token' => 'other-device-token'])->save();
+
+    Livewire::test(LogoutOtherBrowserSessions::class)
+        ->call('logoutOtherBrowserSessions')
+        ->assertNotified(__('profile.notifications.logged_out_other_sessions.remembered_only', ['minutes' => config('session.lifetime')]));
+
+    expect($user->refresh()->remember_token)->not->toBe('other-device-token');
+});

@@ -17,6 +17,11 @@
         </x-slot:description>
 
         <x-slot:details>
+            <x-workspaces.invitation-identity
+                :label="__('workspaces.invite_link.join.joining_as')"
+                :value="$accountEmail"
+            />
+
             <ul class="space-y-3">
                 <x-workspaces.invitation-fact icon="heroicon-m-user-group">
                     {{ trans_choice('workspaces.invitation.members', $memberCount, ['count' => $memberCount]) }}
