@@ -219,6 +219,44 @@ it('emails the owner when the trial ends in three days', function (): void {
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
 });
 
+it('downgrades an expired trial whose only subscription is an unpaid managed invoice', function (): void {
+    Mail::fake();
+
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'managed_pending',
+        'stripe_id' => 'sub_managed_unpaid',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_inline_managed',
+        'quantity' => 1,
+    ]);
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email));
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull();
+});
+
+it('keeps an expired trial on its plan when a paid managed subscription is live', function (): void {
+    [, $workspace] = trialOwnerAndWorkspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'managed',
+        'stripe_id' => 'sub_managed_paid',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_inline_managed',
+        'quantity' => 1,
+    ]);
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    expect($workspace->refresh()->plan)->toBe(Plan::Pro)
+        ->and($workspace->trial_ends_at)->toBeNull();
+});
+
 it('reminds the owner when the only subscription never started', function (): void {
     $this->travelTo(today()->addHours(12));
     Mail::fake();

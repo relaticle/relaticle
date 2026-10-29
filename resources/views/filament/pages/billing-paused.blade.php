@@ -27,14 +27,20 @@
                     </div>
                 @else
                     <h1 class="font-display text-2xl font-semibold tracking-tight text-balance text-gray-950 dark:text-white">
-                        {{ __("billing.paused.heading.{$billingStatus->value}", ['workspace' => $workspace->name]) }}
+                        {{ $lapsedPlan
+                            ? __('billing.paused.heading.managed_ended', ['plan' => $lapsedPlan->marketingLabel()])
+                            : __("billing.paused.heading.{$billingStatus->value}", ['workspace' => $workspace->name]) }}
                     </h1>
 
                     <p class="mt-2 text-[15px] leading-6 text-pretty text-gray-600 dark:text-gray-400">
-                        @if(! $canManageBilling)
+                        @if(! $canManageBilling && $workspace->owner && $lapsedPlan)
+                            {{ __('billing.paused.member_body_managed', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name, 'plan' => $lapsedPlan->marketingLabel()]) }}
+                        @elseif(! $canManageBilling)
                             {{ $workspace->owner
                                 ? __('billing.paused.member_body', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name])
                                 : __('billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
+                        @elseif($lapsedPlan)
+                            {{ __('billing.paused.owner_body_managed', ['plan' => $lapsedPlan->marketingLabel(), 'workspace' => $workspace->name]) }}
                         @else
                             {{ __('billing.paused.owner_body', ['workspace' => $workspace->name]) }}
                         @endif
@@ -45,7 +51,13 @@
 
                     @if($canManageBilling)
                         <div class="mt-8 flex flex-col gap-3">
-                            <x-filament::button size="lg" icon="ri-arrow-up-circle-line" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
+                            @if($lapsedPlan)
+                                <x-filament::button size="lg" tag="a" icon="ri-customer-service-2-line" class="w-full justify-center"
+                                    :href="url()->getPublicUrl(route('contact', ['plan' => $lapsedPlan->value], absolute: false))">
+                                    {{ __('billing.paused.restart_managed', ['plan' => $lapsedPlan->marketingLabel()]) }}
+                                </x-filament::button>
+                            @endif
+                            <x-filament::button size="lg" :color="$lapsedPlan ? 'gray' : 'primary'" icon="ri-arrow-up-circle-line" class="w-full justify-center" x-on:click="$dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
                                 {{ __('billing.paused.continue') }}
                             </x-filament::button>
                         </div>
@@ -72,7 +84,7 @@
                         </div>
                     @endif
 
-                    <div class="mt-14 flex flex-col items-center gap-3">
+                    <div @class(['mt-14 flex flex-col items-center gap-3', 'hidden' => $lapsedPlan && $canManageBilling])>
                         <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('billing.paused.help') }}</p>
                         <x-filament::button tag="a" color="gray" icon="ri-customer-service-2-line" class="w-full justify-center"
                             :href="url()->getPublicUrl(route('contact', absolute: false))">

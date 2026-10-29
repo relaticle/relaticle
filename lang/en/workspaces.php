@@ -132,6 +132,8 @@ return [
         'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Admin role. Invite admins by email instead.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
+        'managed_plan_before_deleting' => 'This workspace is on a plan billed by Relaticle. Talk to us to end the plan before you delete the workspace.',
+        'managed_plan_before_deleting_account' => 'These workspaces are on a plan billed by Relaticle: :workspaces. Talk to us to end the plan before you delete your account.',
         'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :workspaces',
         'workspace_scheduled_for_deletion' => 'This workspace is scheduled for deletion. Cancel the deletion to invite people.',
     ],

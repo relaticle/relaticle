@@ -9,6 +9,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Models\User;
+use App\Notifications\TableLayoutChangedNotification;
 use Illuminate\Support\Facades\DB;
 
 final readonly class UpdateTableLayout
@@ -30,11 +31,12 @@ final readonly class UpdateTableLayout
             $attributes['state'] = $attributes['state']->withoutWidths();
         }
 
-        return DB::transaction(function () use ($layout, $attributes): TableLayout {
+        return DB::transaction(function () use ($user, $layout, $attributes): TableLayout {
             $layout->update($attributes);
 
             if ($layout->wasChanged('is_shared') && ! $layout->is_shared) {
                 $this->forgetForOtherMembers($layout);
+                $layout->user->notify(new TableLayoutChangedNotification($layout->workspace, $user, $layout->name, $layout->entity, TableLayoutChangedNotification::UNSHARED));
             }
 
             return $layout;

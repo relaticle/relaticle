@@ -4,10 +4,21 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\Concerns;
 
+use Filament\Actions\Action;
+use Filament\Forms\Components\TextInput;
 use Livewire\Attributes\Locked;
 
 trait HasColumnMenu
 {
+    public const int COLUMN_LABEL_MAX_LENGTH = 60;
+
+    /** @var array<string, string> */
+    #[Locked]
+    public array $tableColumnLabels = [];
+
+    /** @var array<string, string> */
+    private array $originalTableColumnLabels = [];
+
     /** @var list<string> */
     #[Locked]
     public array $tablePinnedColumns = [];
@@ -40,6 +51,30 @@ trait HasColumnMenu
         $this->tablePinnedColumns = array_values(array_diff($this->tablePinnedColumns, [$columnName]));
 
         $this->applyTablePins();
+    }
+
+    public function editTableColumnLabelAction(): Action
+    {
+        return Action::make('editTableColumnLabel')
+            ->label(__('filament/panel.tables.column_menu.edit_label'))
+            ->modalHeading(__('filament/panel.tables.column_menu.edit_label'))
+            ->modalWidth('md')
+            ->modalSubmitActionLabel(__('filament/panel.tables.column_menu.save_label'))
+            ->fillForm(fn (array $arguments): array => ['label' => $this->tableColumnLabels[$arguments['column'] ?? ''] ?? $this->originalTableColumnLabels[$arguments['column'] ?? ''] ?? null])
+            ->schema([
+                TextInput::make('label')
+                    ->label(__('filament/panel.tables.column_menu.label'))
+                    ->helperText(__('filament/panel.tables.column_menu.label_hint'))
+                    ->maxLength(self::COLUMN_LABEL_MAX_LENGTH),
+            ])
+            ->action(fn (array $data, array $arguments) => $this->labelTableColumn((string) ($arguments['column'] ?? ''), trim((string) $data['label'])));
+    }
+
+    protected function tableColumnLabel(string $columnName, string $original): string
+    {
+        $this->originalTableColumnLabels[$columnName] = $original;
+
+        return $this->tableColumnLabels[$columnName] ?? $original;
     }
 
     public function moveTableColumn(string $columnName, ?string $beforeColumnName): void
@@ -100,6 +135,28 @@ trait HasColumnMenu
     private function isMovableTableColumn(string $columnName): bool
     {
         return in_array($columnName, array_column($this->movableTableColumns(), 'name'), true);
+    }
+
+    private function labelTableColumn(string $columnName, string $label): void
+    {
+        if (! in_array($columnName, array_column($this->movableTableColumns(), 'name'), true)) {
+            return;
+        }
+
+        if ($label === '' || $label === ($this->originalTableColumnLabels[$columnName] ?? null)) {
+            unset($this->tableColumnLabels[$columnName]);
+        } else {
+            $this->tableColumnLabels[$columnName] = $label;
+        }
+
+        $this->refreshTableColumnLabels();
+    }
+
+    // The column manager copies labels from a default state Filament caches per request.
+    private function refreshTableColumnLabels(): void
+    {
+        $this->cachedDefaultTableColumnState = null;
+        $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
     }
 
     /**

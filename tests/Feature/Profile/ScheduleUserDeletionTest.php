@@ -11,6 +11,7 @@ use App\Notifications\UserDeletionCancelledNotification;
 use App\Notifications\UserDeletionScheduledNotification;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 
 mutates(ScheduleUserDeletion::class, CancelUserDeletion::class);
@@ -101,4 +102,16 @@ test('user can cancel scheduled deletion', function () {
         ->and($personalWorkspace->refresh()->scheduled_deletion_at)->toBeNull();
 
     Notification::assertSentTo($user, UserDeletionCancelledNotification::class);
+});
+
+test('an account whose personal workspace holds an open managed plan is not scheduled for deletion', function () {
+    Notification::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Subscription::factory()->active()->create(['workspace_id' => $user->personalWorkspace()->getKey(), 'type' => 'managed']);
+
+    expect(fn () => resolve(ScheduleUserDeletion::class)->schedule($user))
+        ->toThrow(ValidationException::class);
+
+    expect($user->refresh()->scheduled_deletion_at)->toBeNull();
 });

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Http\Controllers\ContactController;
 use App\Http\Requests\ContactRequest;
@@ -82,10 +83,38 @@ it('delivers the Enterprise inquiry details through the contact workflow', funct
         'email' => 'maya@gmail.com',
         'company' => 'Northstar Operations',
         'message' => $message,
-    ])->assertRedirect('/contact')->assertSessionHas('success');
+    ])->assertRedirect('/contact?plan=enterprise')->assertSessionHas('success');
 
     Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->data['message'] === $message
         && $mail->data['company'] === 'Northstar Operations');
+});
+
+it('names the Concierge plan on the inquiry mail and keeps it in the redirect', function (): void {
+    Mail::fake();
+    Feature::define(BillingFeature::class, true);
+
+    $this->post('/contact?plan=concierge', honeypotFields() + [
+        'name' => 'Maya Chen',
+        'email' => 'maya@gmail.com',
+        'message' => 'We want Relaticle set up for our twelve person sales team.',
+    ])->assertRedirect('/contact?plan=concierge')->assertSessionHas('success');
+
+    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->plan === Plan::Concierge
+        && $mail->envelope()->subject === 'New Cloud Concierge inquiry: Maya Chen');
+});
+
+it('keeps the general contact subject and redirect without a managed plan', function (): void {
+    Mail::fake();
+    Feature::define(BillingFeature::class, true);
+
+    $this->post('/contact?plan=pro', honeypotFields() + [
+        'name' => 'Maya Chen',
+        'email' => 'maya@gmail.com',
+        'message' => 'We want Relaticle set up for our twelve person sales team.',
+    ])->assertRedirect('/contact')->assertSessionHas('success');
+
+    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->plan === null
+        && $mail->envelope()->subject === 'New contact: Maya Chen');
 });
 
 it('keeps general contact inquiries free of Enterprise sales copy', function (): void {

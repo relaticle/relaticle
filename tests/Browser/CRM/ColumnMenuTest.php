@@ -111,7 +111,7 @@ it('keeps sorting on the header and leaves the title column without a handle', f
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
         ->assertMissing('.fi-ta-column-menu [data-label="Sort ascending"]')
-        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Hide column'])
+        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Edit column label', 'Hide column'])
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'ascending')
         ->assertNoJavaScriptErrors();
 });
@@ -170,27 +170,48 @@ it('works the handle by keyboard alone and keeps focus on the moved column', fun
         ->assertNoJavaScriptErrors();
 });
 
-it('does not open the menu after a drag that ends on the handle', function (): void {
-    $page = companiesTable($this->user, $this->workspace->slug);
-
-    $page->script(sprintf(<<<'JS'
+function pressHeader(string $column, string $on, int $moveBy, string $pointerType = 'mouse'): string
+{
+    return sprintf(<<<'JS'
         (() => {
-            const handle = document.querySelector(`%s .fi-ta-column-handle`);
-            const box = handle.getBoundingClientRect();
+            const target = document.querySelector(`%s %s`);
+            const box = target.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            const pointer = (type, clientX, target = document) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, clientX, clientY: y }));
-            pointer('pointerdown', x, handle);
-            pointer('pointermove', x + 30);
+            const pointer = (type, clientX, on = document) => on.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, pointerType: %s, clientX, clientY: y }));
+            pointer('pointerdown', x, target);
+            pointer('pointermove', x + %d);
+            const dragging = !!document.querySelector('.fi-ta-column-drag-ghost');
             pointer('pointermove', x);
             pointer('pointerup', x);
-            handle.click();
-            return true;
+            target.click();
+            return dragging;
         })();
-    JS, columnHeader('creator.name')));
+    JS, columnHeader($column), $on, json_encode($pointerType), $moveBy);
+}
+
+it('sorts on a header click but not after a drag that comes back to the header', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $sort = sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at'));
+
+    expect($page->script(pressHeader('created_at', '.fi-ta-header-cell-sort-btn', 2)))->toBeFalse();
+    waitUntil($page, $sort.' === "ascending"');
+
+    expect($page->script(pressHeader('created_at', '.fi-ta-header-cell-sort-btn', 40)))->toBeTrue();
+    $page->wait(0.5)
+        ->assertScript($sort, 'ascending')
+        ->assertNoJavaScriptErrors();
+});
+
+it('starts no drag from the options button or from a touch', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $order = $page->script(headerOrder());
+
+    expect($page->script(pressHeader('created_at', '.fi-ta-column-handle', 40)))->toBeFalse()
+        ->and($page->script(pressHeader('created_at', '.fi-ta-resizable-label', 40, 'touch')))->toBeFalse();
 
     $page->wait(0.3)
-        ->assertMissing(columnMenuItem('Move left'))
+        ->assertScript(headerOrder(), $order)
         ->assertNoJavaScriptErrors();
 });
 
@@ -211,8 +232,8 @@ it('keeps the column manager order in step with the headers', function (): void 
 function dragHeader(string $column, string $overColumn, string $side = 'left', string $finish = 'drop', int $dropBelow = 0): string
 {
     return sprintf(<<<'JS'
-        (() => {
-            const grip = document.querySelector(`%s .fi-ta-column-handle`);
+        (async () => {
+            const grip = document.querySelector(`%s .fi-ta-resizable-label`);
             const over = document.querySelector(`%s`).getBoundingClientRect();
             const start = grip.getBoundingClientRect();
             const x = over.left + over.width * (%s === 'left' ? 0.25 : 0.75);
@@ -221,6 +242,7 @@ function dragHeader(string $column, string $overColumn, string $side = 'left', s
             pointer('pointerdown', start.left + 2, y, grip);
             pointer('pointermove', start.left + 12, y);
             pointer('pointermove', x, y);
+            await new Promise(requestAnimationFrame);
             const mid = {
                 ghost: document.querySelector('.fi-ta-column-drag-ghost')?.isConnected ?? false,
                 shifted: document.querySelector(`%s`).style.transform !== '',
@@ -330,7 +352,7 @@ it('scrolls the table sideways while a header is dragged against its edge', func
 
     $page->script(sprintf(<<<'JS'
         (() => {
-            const grip = document.querySelector(`%s .fi-ta-column-handle`);
+            const grip = document.querySelector(`%s .fi-ta-resizable-label`);
             const wrapper = document.querySelector('.fi-ta-content-ctn');
             const start = grip.getBoundingClientRect();
             const edge = wrapper.getBoundingClientRect().right - 8;
@@ -358,7 +380,7 @@ function dragHeaderBy(string $column, string $neighbour, float $share): string
 {
     return sprintf(<<<'JS'
         (() => {
-            const grip = document.querySelector(`%s .fi-ta-column-handle`);
+            const grip = document.querySelector(`%s .fi-ta-resizable-label`);
             const neighbour = document.querySelector(`%s`).getBoundingClientRect();
             const start = grip.getBoundingClientRect();
             const x = start.left + 2;
@@ -399,7 +421,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
     }
 
     $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
-    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'Enter']);
+    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'ArrowDown', 'Enter']);
     waitUntil($page, headerOrder().'.join() === "name"');
     waitUntil($page, '('.focusedColumn().') === "name"')
         ->assertNoJavaScriptErrors();
@@ -435,7 +457,7 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
-        ->assertScript(visibleMenuItems(), ['Unpin', 'Hide column'])
+        ->assertScript(visibleMenuItems(), ['Unpin', 'Edit column label', 'Hide column'])
         ->assertNoJavaScriptErrors();
 });
 
@@ -445,7 +467,7 @@ it('locks a pinned column and unpins the title column with the last one', functi
         ->assertMissing(columnHeader('name').' .fi-ta-column-handle');
 
     $page->script(openColumnMenu('created_at'));
-    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Hide column"');
+    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Edit column label,Hide column"');
     $page->click(columnMenuItem('Unpin'));
     waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('name')))
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '0')
@@ -592,4 +614,34 @@ it('keeps the handles of scrolled headers under the pinned headers', function ()
 
     expect($covered)->toBe('1');
     $page->assertNoJavaScriptErrors();
+});
+
+it('renames a column from its handle menu and keeps the name after a reload', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $labelOf = fn (string $column): string => sprintf('document.querySelector(`%s .fi-ta-header-cell-field`).textContent.trim()', columnHeader($column));
+
+    $page->script(openColumnMenu('created_at'));
+    $page->click(columnMenuItem('Edit column label'))
+        ->assertVisible('.fi-modal-window input')
+        ->type('.fi-modal-window input', 'Added on')
+        ->click('.fi-modal-window button[type="submit"]');
+
+    waitUntil($page, '('.$labelOf('created_at').') === "Added on"')
+        ->wait(1)
+        ->refresh()
+        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertScript($labelOf('created_at'), 'Added on')
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the move cursor on a movable header and keeps the pointer on its controls', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+    $cursor = fn (string $selector): string => sprintf('getComputedStyle(document.querySelector(`%s`)).cursor', $selector);
+
+    $page->assertScript($cursor(columnHeader('created_at')), 'move')
+        ->assertScript($cursor(columnHeader('created_at').' .fi-ta-header-cell-sort-btn'), 'pointer')
+        ->assertScript($cursor(columnHeader('created_at').' .fi-ta-column-handle'), 'pointer')
+        ->assertScript($cursor(columnHeader('name')).' !== "move"', true)
+        ->assertMissing('.fi-ta-column-grip')
+        ->assertNoJavaScriptErrors();
 });

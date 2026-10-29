@@ -61,6 +61,10 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
      */
     public static function fromWorkspace(Workspace $workspace): self
     {
+        if ($workspace->managedSubscription()?->pastDue() === true) {
+            return self::PastDue;
+        }
+
         $subscription = $workspace->subscription();
 
         if ($subscription?->pastDue() === true && ! $subscription->ended()) {
@@ -227,7 +231,9 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     private function constrain(Builder $query): Builder
     {
         return match ($this) {
-            self::PastDue => $query->whereHas('latestDefaultSubscription', self::pastDue(...)),
+            self::PastDue => $query->where(fn (Builder $overdue): Builder => $overdue
+                ->whereHas('latestDefaultSubscription', self::pastDue(...))
+                ->orWhere(self::managedPlanPastDue(...))),
             self::Subscribed => $query->whereHas('latestDefaultSubscription', self::valid(...)),
             self::Enterprise => $query->where('plan', Plan::Enterprise),
             self::Concierge => $query->where('plan', Plan::Concierge),
@@ -247,6 +253,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     {
         return $workspace->subscriptions->contains(
             fn (Model $subscription): bool => $subscription instanceof Subscription
+                && $subscription->type !== SubscriptionType::ManagedPending->value
                 && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::neverGranted(), true),
         );
     }
@@ -257,7 +264,31 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
      */
     private static function charged(Builder $query): Builder
     {
-        return $query->whereNotIn('stripe_status', StripeSubscriptionStatus::neverGranted());
+        return $query
+            ->where('type', '!=', SubscriptionType::ManagedPending->value)
+            ->whereNotIn('stripe_status', StripeSubscriptionStatus::neverGranted());
+    }
+
+    /**
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    private static function managedPlanPastDue(Builder $query): Builder
+    {
+        foreach (Plan::cases() as $plan) {
+            $product = $plan->stripeProduct();
+
+            if ($product === null) {
+                continue;
+            }
+
+            $query->orWhere(fn (Builder $held): Builder => $held
+                ->where('plan', $plan)
+                ->whereHas('managedSubscriptions', fn (Builder $subscription): Builder => self::pastDue($subscription)
+                    ->whereHas('items', fn (Builder $item): Builder => $item->where('stripe_product', $product))));
+        }
+
+        return $query;
     }
 
     /**

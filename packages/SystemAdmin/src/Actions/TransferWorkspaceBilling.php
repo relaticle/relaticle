@@ -110,6 +110,9 @@ final readonly class TransferWorkspaceBilling
         throw_if($target->isScheduledForDeletion(), TransferRefused::class, 'The target workspace is scheduled for deletion.');
 
         $source->loadMissing('subscriptions');
+
+        throw_if($source->hasOpenManagedSubscription(), TransferRefused::class, 'The source workspace has a managed plan subscription. Withdraw it, or cancel it in Stripe, before transferring billing.');
+
         $subscription = $source->subscription();
 
         throw_if(

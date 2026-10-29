@@ -1,326 +1,192 @@
 /* Styles for resources/js/filament/resizable-columns.js. */
 .fi-ta-resizable-table thead th[x-data^="resizableColumn"],
 .fi-ta-resizable-header {
-    position: relative;
+    @apply relative;
 }
 
 .fi-ta-resizable-label {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
+    @apply block max-w-full truncate;
 }
 
 /* 64px only fits an ActionGroup trigger. `width: auto` drops Filament's w-1, so the actions
    column takes the space the data columns leave and the table still fills its wrapper. */
 .fi-ta-resizable-table .fi-ta-selection-cell {
-    width: 52px;
-    min-width: 52px;
-    max-width: 52px;
+    @apply w-13 min-w-13 max-w-13;
 }
 
 .fi-ta-resizable-table .fi-ta-actions-header-cell,
 .fi-ta-resizable-table td:has(> .fi-ta-actions) {
-    width: auto;
-    min-width: 64px;
-    overflow: hidden;
+    @apply w-auto min-w-16 overflow-hidden;
 }
 
 /* Each cell owns its borders, so a divider travels with a column that slides. Rows cannot draw
    borders in this model, so Filament's row lines move onto the cells. */
 .fi-ta-resizable-table {
-    border-collapse: separate;
-    border-spacing: 0;
+    @apply border-separate border-spacing-0;
 }
 
 .fi-ta-resizable-table > thead > tr > th,
 .fi-ta-resizable-table > tbody > tr:not(:last-child) > td {
-    border-bottom: 1px solid var(--gray-200);
-}
-
-.dark .fi-ta-resizable-table > thead > tr > th,
-.dark .fi-ta-resizable-table > tbody > tr:not(:last-child) > td {
-    border-bottom-color: color-mix(in oklab, var(--color-white) 5%, transparent);
+    @apply border-b border-b-gray-200 dark:border-b-white/5;
 }
 
 /* A cell clips its overflow only when it is positioned. */
 .fi-ta-resizable-table td {
-    position: relative;
+    @apply relative;
 }
 
 .fi-ta-resizable-table th:not(:last-child):not(.fi-ta-selection-cell),
 .fi-ta-resizable-table td:not(:last-child):not(.fi-ta-selection-cell) {
-    border-right: 1px solid var(--gray-200);
-}
-
-.dark .fi-ta-resizable-table th:not(:last-child):not(.fi-ta-selection-cell),
-.dark .fi-ta-resizable-table td:not(:last-child):not(.fi-ta-selection-cell) {
-    border-right-color: var(--gray-700);
+    @apply border-r border-r-gray-200 dark:border-r-gray-700;
 }
 
 /* The script pins the head with a scroll-driven animation. Keyed off the server-rendered
    header, because a morph strips the class the script adds. */
 .fi-ta-content-ctn:has(thead th[x-data^="resizableColumn"]) thead {
-    position: relative;
-    z-index: 16;
+    @apply relative z-16;
 }
 
+/* Opaque in dark mode too, so rows scrolling under the pinned head do not show through. */
 .fi-ta-content-ctn:has(thead th[x-data^="resizableColumn"]) thead th {
-    background-color: var(--gray-50);
-}
-
-/* Opaque, so rows scrolling under the pinned head do not show through. */
-.dark .fi-ta-content-ctn:has(thead th[x-data^="resizableColumn"]) thead th {
-    background-color: color-mix(in oklab, var(--gray-900), white 5%);
+    @apply bg-gray-50 dark:bg-[color-mix(in_oklab,var(--gray-900),white_5%)];
 }
 
 .column-resize-handle-bar {
-    position: absolute;
-    top: 0;
-    right: -0.5rem;
-    width: 1rem;
-    height: 100%;
-    cursor: col-resize;
-    user-select: none;
-    touch-action: none;
-    z-index: 10;
-    background: transparent;
-    border: 0;
-    padding: 0;
-    appearance: none;
+    @apply absolute top-0 -right-2 z-10 h-full w-4 cursor-col-resize touch-none appearance-none border-0 bg-transparent p-0 select-none;
 }
 
 /* Hovering recolours the column's own divider, so the accent lines up with the body rows. */
 .fi-ta-resizable-table thead th.fi-ta-resizable-header {
-    transition: border-right-color 120ms ease;
+    @apply transition-[border-right-color] duration-120;
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover {
-    border-right-color: var(--gray-400);
-}
-
-.dark .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover {
-    border-right-color: var(--gray-500);
+    @apply border-r-gray-400 dark:border-r-gray-500;
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:has(.column-resize-handle-bar:hover),
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:has(.column-resize-handle-bar.active) {
-    border-right-color: var(--primary-500);
+    @apply border-r-primary-500;
 }
 
+/* The handle centres on the padding edge, half a border left of the 1px divider. */
 .column-resize-handle-bar::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    left: 50%;
-    width: 0;
-    /* The handle centres on the padding edge, half a border left of the 1px divider. */
-    transform: translateX(calc(-50% + 0.5px));
-    background-color: transparent;
-    transition: width 120ms ease, background-color 120ms ease;
-    pointer-events: none;
+    @apply pointer-events-none absolute inset-y-0 left-1/2 w-0 translate-x-[calc(-50%+0.5px)] bg-transparent transition-[width,background-color] duration-120 content-[''];
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
-    width: 2px;
-    background-color: var(--gray-400);
-}
-
-.dark .fi-ta-resizable-table thead th.fi-ta-resizable-header:hover .column-resize-handle-bar::before {
-    background-color: var(--gray-500);
+    @apply w-0.5 bg-gray-400 dark:bg-gray-500;
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header .column-resize-handle-bar:hover::before {
-    width: 2px;
-    background-color: var(--primary-500);
+    @apply w-0.5 bg-primary-500;
 }
 
 .fi-ta-resizable-table thead th.fi-ta-resizable-header .column-resize-handle-bar.active::before {
-    width: 3px;
-    background-color: var(--primary-500);
+    @apply w-0.75 bg-primary-500;
 }
 
 /* Between the handle (10) and the pinned head (16). */
 .column-resize-guideline {
-    position: absolute;
-    top: 0;
-    display: none;
-    width: 2px;
-    margin-left: -1px;
-    background-color: var(--primary-500);
-    z-index: 15;
-    pointer-events: none;
+    @apply pointer-events-none absolute top-0 z-15 -ml-px hidden w-0.5 bg-primary-500;
 }
 
 .column-resize-badge {
-    position: fixed;
-    display: none;
-    transform: translate(-50%, calc(-100% - 10px));
-    padding: 3px 6px;
-    border-radius: 4px;
-    background-color: var(--primary-500);
-    color: white;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    line-height: 1;
-    white-space: nowrap;
-    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
-    z-index: 61;
-    pointer-events: none;
+    @apply pointer-events-none fixed z-61 hidden -translate-x-1/2 translate-y-[calc(-100%-10px)] rounded-sm bg-primary-500 px-1.5 py-0.75 text-[length:var(--text-micro)] leading-none font-semibold whitespace-nowrap text-white shadow-sm;
 }
 
 body.resizing-column,
 body.resizing-column * {
-    cursor: col-resize !important;
+    @apply cursor-col-resize!;
 }
 
 body.resizing-column {
-    user-select: none;
+    @apply select-none;
 }
 
-/* One handle at the header's right edge, left of the resize handle: drag to reorder, click for
-   the menu. Its space stays reserved, so the label does not reflow when it appears. */
+/* A movable header is dragged by pressing anywhere on it but its controls. Its name keeps the
+   pointer cursor, because a click there still sorts. */
+.fi-ta-resizable-header:has(> .fi-ta-column-handle) {
+    @apply cursor-move select-none;
+}
+
+/* Filament stretches the sort button across the cell; sized to its name, the rest of the header
+   is free to grab. */
+.fi-ta-resizable-header .fi-ta-header-cell-sort-btn {
+    @apply inline-flex w-auto max-w-full cursor-pointer;
+}
+
+/* The options button sits at the header's right edge, left of the resize handle, and its space
+   is reserved so the label never runs under it. */
 .fi-ta-resizable-header:has(> .fi-ta-column-handle) > .fi-ta-resizable-label {
-    padding-right: 1.5rem;
+    @apply pr-6;
     /* `overflow` clips at the padding edge, so a narrow column would draw its label under the handle. */
     clip-path: inset(0 1.5rem 0 0);
 }
 
 .fi-ta-column-handle {
-    position: absolute;
-    top: 50%;
-    right: 0.5rem;
-    display: grid;
-    place-items: center;
-    width: 1.25rem;
-    height: 1.25rem;
-    padding: 0;
-    border: 0;
-    border-radius: 0.25rem;
-    color: var(--gray-400);
-    background: transparent;
-    cursor: grab;
-    touch-action: none;
-    opacity: 0;
-    transform: translateY(-50%);
-    z-index: 11;
+    @apply absolute top-1/2 right-2 z-11 grid size-5 -translate-y-1/2 cursor-pointer place-items-center rounded-sm border-0 bg-transparent p-0 text-gray-400;
 }
 
+/* Tailwind has no mask utility for an inline SVG, so the icon stays a plain mask. */
 .fi-ta-column-handle::before {
-    content: "";
-    width: 1rem;
-    height: 1rem;
-    background-color: currentColor;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6' cy='4' r='1.2'/%3E%3Ccircle cx='10' cy='4' r='1.2'/%3E%3Ccircle cx='6' cy='8' r='1.2'/%3E%3Ccircle cx='10' cy='8' r='1.2'/%3E%3Ccircle cx='6' cy='12' r='1.2'/%3E%3Ccircle cx='10' cy='12' r='1.2'/%3E%3C/svg%3E") center / contain no-repeat;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='6' cy='4' r='1.2'/%3E%3Ccircle cx='10' cy='4' r='1.2'/%3E%3Ccircle cx='6' cy='8' r='1.2'/%3E%3Ccircle cx='10' cy='8' r='1.2'/%3E%3Ccircle cx='6' cy='12' r='1.2'/%3E%3Ccircle cx='10' cy='12' r='1.2'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.fi-ta-resizable-header:hover > .fi-ta-column-handle,
-.fi-ta-column-handle:focus-visible,
-.fi-ta-column-handle[aria-expanded="true"] {
-    opacity: 1;
+    @apply size-4 bg-current content-[''];
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='3.5' r='1.3'/%3E%3Ccircle cx='8' cy='8' r='1.3'/%3E%3Ccircle cx='8' cy='12.5' r='1.3'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='3.5' r='1.3'/%3E%3Ccircle cx='8' cy='8' r='1.3'/%3E%3Ccircle cx='8' cy='12.5' r='1.3'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 .fi-ta-column-handle:hover,
 .fi-ta-column-handle:focus-visible,
 .fi-ta-column-handle[aria-expanded="true"] {
-    color: var(--gray-700);
-    background-color: var(--gray-200);
-    outline: none;
+    @apply bg-gray-200 text-gray-700 outline-none dark:bg-gray-700 dark:text-gray-200;
 }
 
-.dark .fi-ta-column-handle:hover,
-.dark .fi-ta-column-handle:focus-visible,
-.dark .fi-ta-column-handle[aria-expanded="true"] {
-    color: var(--gray-200);
-    background-color: var(--gray-700);
-}
-
-/* Fixed, so the scrolling table cannot clip it. The script places it from the trigger. */
+/* Fixed, so the scrolling table cannot clip it. The script places it from the trigger.
+   Filament transitions `display`, which keeps a closed menu on screen for the duration. */
 .fi-dropdown-panel.fi-ta-column-menu {
-    position: fixed;
-    width: 13rem;
-    z-index: 60;
-    /* Filament transitions `display`, which keeps a closed menu on screen for the duration. */
-    transition: none;
+    @apply fixed z-60 w-56 transition-none;
 }
 
 /* The dragged column's slot stays empty and travels with the drop position. */
 .fi-ta-resizable-table .fi-ta-column-dragging {
-    background-color: var(--gray-100);
-}
-
-.dark .fi-ta-resizable-table .fi-ta-column-dragging {
-    background-color: var(--gray-800);
+    @apply bg-gray-100 dark:bg-gray-800;
 }
 
 .fi-ta-resizable-table .fi-ta-column-dragging > * {
-    visibility: hidden;
+    @apply invisible;
 }
 
 /* While a column is dragged, the others slide aside to show where it lands. */
 .fi-ta-resizable-table.fi-ta-reordering td,
 .fi-ta-resizable-table.fi-ta-reordering thead th.fi-ta-resizable-header {
-    transition: transform 150ms ease;
+    @apply transition-transform duration-150;
 }
 
 .fi-ta-column-drag-ghost {
-    position: fixed;
-    overflow: hidden;
-    border-radius: 0.5rem;
-    background-color: white;
-    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.2), 0 0 0 1px rgb(0 0 0 / 0.06);
-    font-size: 0.875rem;
-    color: var(--gray-950);
-    z-index: 61;
-    pointer-events: none;
-}
-
-.dark .fi-ta-column-drag-ghost {
-    background-color: var(--gray-900);
-    color: white;
-    box-shadow: 0 10px 25px -5px rgb(0 0 0 / 0.5), 0 0 0 1px rgb(255 255 255 / 0.1);
+    @apply pointer-events-none fixed z-61 overflow-hidden rounded-lg bg-white text-sm text-gray-950 shadow-xl ring-1 ring-gray-950/5 dark:bg-gray-900 dark:text-white dark:ring-white/10;
 }
 
 .fi-ta-column-drag-ghost-header,
 .fi-ta-column-drag-ghost-cell {
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    overflow: hidden;
-    padding: 0 0.75rem;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    @apply box-border flex items-center overflow-hidden px-3 text-ellipsis whitespace-nowrap;
 }
 
 .fi-ta-column-drag-ghost-header {
-    font-weight: 600;
-    background-color: var(--gray-50);
-}
-
-.dark .fi-ta-column-drag-ghost-header {
-    background-color: var(--gray-800);
+    @apply bg-gray-50 font-semibold dark:bg-gray-800;
 }
 
 .fi-ta-column-drag-ghost-cell {
-    border-top: 1px solid var(--gray-200);
-}
-
-.dark .fi-ta-column-drag-ghost-cell {
-    border-top-color: var(--gray-700);
+    @apply border-t border-gray-200 dark:border-gray-700;
 }
 
 body.reordering-column,
 body.reordering-column * {
-    cursor: grabbing !important;
-    user-select: none;
+    @apply cursor-grabbing! select-none;
 }
 
 /* Headers passing under the pointer mid-drag must not light up a resize handle. */
 body.reordering-column .column-resize-handle-bar::before {
-    width: 0 !important;
+    @apply w-0!;
 }
 
 /* A pinned column does not move, so its header shows a lock in place of the grip, always. */

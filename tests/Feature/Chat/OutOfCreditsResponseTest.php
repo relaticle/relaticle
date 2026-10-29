@@ -50,7 +50,7 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
         'message',
         'plan',
         'allowance',
-        'reset_at',
+        'reset_on',
         'upgrade_available',
     ]);
     expect($response->json('error'))->toBe('credits_exhausted');
@@ -350,4 +350,37 @@ it('names the Free allowance, not the Pro one, when a past-due workspace runs ou
     expect($response->json('allowance'))->toBe(Plan::Free->credits())
         ->and($response->json('allowance'))->not->toBe(Plan::Pro->credits())
         ->and($response->json('message'))->toContain((string) Plan::Free->credits());
+});
+
+it('names the reset day the way the billing page does', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    $balance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 0,
+        'credits_used' => Plan::Free->credits(),
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'hi']]],
+        ]],
+    ]);
+
+    $response->assertStatus(402);
+    expect($response->json('reset_on'))->toBe($balance->period_ends_at->toFormattedDateString());
 });

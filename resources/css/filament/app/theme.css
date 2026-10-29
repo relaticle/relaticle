@@ -6,6 +6,7 @@
 @import '../../../../packages/EmailIntegration/resources/css/email-integration.css';
 
 @import './resizable-columns.css';
+@import './table-layouts.css';
 
 @plugin "@tailwindcss/typography";
 
@@ -423,32 +424,6 @@ html.fi-chat-docked .fi-app-main-wrapper {
     .fi-topbar-page-title {
         @apply min-w-0 truncate;
     }
-}
-
-/* The layout trigger, Revert and Save read as one control, like Filament's button group. */
-.fi-ta-layouts {
-    @apply flex items-center rounded-lg shadow-sm ring-1 ring-gray-950/10 dark:ring-white/20;
-
-    & .fi-btn {
-        @apply rounded-none shadow-none ring-0;
-    }
-
-    & > .fi-dropdown .fi-btn {
-        @apply rounded-s-lg;
-    }
-
-    & > .fi-btn {
-        @apply border-s border-gray-200 dark:border-white/10;
-    }
-
-    & > :last-child,
-    & > .fi-dropdown:last-child .fi-btn {
-        @apply rounded-e-lg;
-    }
-}
-
-.fi-ta-layouts-save .fi-icon {
-    @apply text-primary-600 dark:text-primary-400;
 }
 
 .fi-view-switcher-chevron {

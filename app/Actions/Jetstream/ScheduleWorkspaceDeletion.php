@@ -27,6 +27,12 @@ final readonly class ScheduleWorkspaceDeletion
             ]);
         }
 
+        if ($workspace->hasOpenManagedSubscription()) {
+            throw ValidationException::withMessages([
+                'workspace' => [__('workspaces.validation.managed_plan_before_deleting')],
+            ]);
+        }
+
         DB::transaction(function () use ($workspace): void {
             $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(config('relaticle.deletion.grace_period_days'))])->save();
 

@@ -201,6 +201,18 @@ it('keeps the Enterprise starting price consistent with its annual structured of
         ->and($offer['url'])->toBe(route('contact', ['plan' => 'enterprise']));
 });
 
+it('names Cloud Concierge in the meta description when billing is on', function (): void {
+    Feature::define(BillingFeature::class, true);
+
+    $response = $this->get('/pricing')->assertOk();
+    $description = (new Crawler((string) $response->getContent()))
+        ->filter('meta[name="description"]')
+        ->attr('content');
+
+    expect($description)->toContain('Cloud Concierge')
+        ->toContain('$708/year');
+});
+
 it('sells Cloud Concierge through a sales inquiry at its yearly price', function (): void {
     Feature::define(BillingFeature::class, true);
     config(['relaticle.concierge.price_yearly' => 1_200]);

@@ -14,6 +14,7 @@ use Filament\Actions\Action;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
+use Laravel\Cashier\Subscription;
 
 mutates(ScheduleWorkspaceDeletion::class, CancelWorkspaceDeletion::class, WorkspaceDeletionBanner::class);
 
@@ -159,4 +160,29 @@ test('a workspace that is not scheduled for deletion shows no deletion banner', 
         ->get(Dashboard::getUrl(['tenant' => $owner->currentWorkspace]))
         ->assertOk()
         ->assertDontSeeLivewire(WorkspaceDeletionBanner::class);
+});
+
+test('a workspace on an open managed plan is not scheduled for deletion', function (string $type) {
+    Notification::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => $type]);
+
+    expect(fn () => resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace))
+        ->toThrow(ValidationException::class, __('workspaces.validation.managed_plan_before_deleting'));
+
+    expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
+})->with(['managed', 'managed_pending']);
+
+test('a workspace whose managed plan ended can be scheduled for deletion', function () {
+    Notification::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey(), 'type' => 'managed']);
+
+    resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace);
+
+    expect($workspace->refresh()->scheduled_deletion_at)->not->toBeNull();
 });

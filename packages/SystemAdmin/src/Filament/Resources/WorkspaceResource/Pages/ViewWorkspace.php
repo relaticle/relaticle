@@ -11,6 +11,7 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\EndTrial;
 use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
+use Relaticle\SystemAdmin\Filament\Support\ManagedPlan;
 
 final class ViewWorkspace extends ViewRecord
 {
@@ -23,6 +24,8 @@ final class ViewWorkspace extends ViewRecord
             Impersonate::workspaceOwner(),
             ExtendTrial::action(),
             EndTrial::action(),
+            ManagedPlan::startAction(),
+            ManagedPlan::withdrawAction(),
             EditAction::make()->action(null),
         ];
     }

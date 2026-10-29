@@ -121,6 +121,7 @@ it('delivers again once the user changes their email', function (): void {
 dataset('non-essential mailables', [
     'trial ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace),
     'subscription ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace),
+    'managed plan ended' => fn (User $user, Workspace $workspace): Mailable => ProEndedMail::afterManagedPlan($workspace, Plan::Concierge),
     'setup nudge' => fn (User $user, Workspace $workspace): Mailable => new SetupNudgeMail($user, $workspace, 'first_record', 'https://relaticle.test/chat'),
     'task assigned' => fn (User $user, Workspace $workspace): Mailable => new TaskAssignedMail('Call back', 'https://relaticle.test/tasks', $workspace->name),
 ]);

@@ -278,7 +278,7 @@ it('does not reserve a credit on send when the request fails validation', functi
     expect(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(100);
 });
 
-it('returns reset_at and upgrade_url on 402 from send', function (): void {
+it('returns reset_on and upgrade_url on 402 from send', function (): void {
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -294,7 +294,7 @@ it('returns reset_at and upgrade_url on 402 from send', function (): void {
         'document' => ChatDocument::fromText('hi'),
     ])
         ->assertStatus(402)
-        ->assertJsonStructure(['error', 'message', 'reset_at', 'upgrade_url'])
+        ->assertJsonStructure(['error', 'message', 'reset_on', 'upgrade_url'])
         ->assertJsonPath('error', 'credits_exhausted');
 });
 

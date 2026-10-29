@@ -29,7 +29,7 @@ it('can create a new workspace through the browser', function (): void {
         ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
         ->assertScript(asyncAlpineComponentsLoaded())
-        ->click('[id$="onboarding_use_case-other"]')
+        ->click('[for$="onboarding_use_case-other"]')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
         ->press('Get started')

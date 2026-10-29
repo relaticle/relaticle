@@ -230,6 +230,20 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function ensureCanBeDeleted(): void
     {
+        $managedWorkspaces = $this->ownedWorkspaces()
+            ->with('subscriptions')
+            ->get()
+            ->filter(fn (Workspace $workspace): bool => $workspace->hasOpenManagedSubscription())
+            ->pluck('name');
+
+        if ($managedWorkspaces->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'workspace' => [__('workspaces.validation.managed_plan_before_deleting_account', [
+                    'workspaces' => $managedWorkspaces->implode(', '),
+                ])],
+            ]);
+        }
+
         $sharedWorkspaces = $this->ownedWorkspaces()
             ->whereHas('users')
             ->pluck('name');

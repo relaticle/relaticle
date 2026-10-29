@@ -314,7 +314,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ) !== null;
 
         $exceptions->dontReportWhen(function (Throwable $e) use ($isLivewireTamper): bool {
-            if (! request()->hasHeader('X-Livewire') || ! $isLivewireTamper($e)) {
+            if (! $isLivewireTamper($e) || ! request()->hasHeader('X-Livewire')) {
                 return false;
             }
 

@@ -19,6 +19,7 @@ return [
             'contact' => 'You received this because someone submitted the contact form.',
             'account' => 'You received this because of a request on your :company account.',
             'onboarding' => 'You received this because you created a :company workspace.',
+            'billing_contact' => 'You received this because you are the billing contact for :workspace.',
         ],
     ],
 
@@ -53,6 +54,15 @@ return [
             'subject' => 'Your Cloud Pro subscription has ended',
             'heading' => 'Cloud Pro for :workspace has ended',
         ],
+        'managed_ended' => [
+            'subject' => 'Your :plan plan has ended',
+            'heading' => ':plan for :workspace has ended',
+            'preheader' => 'Your records are safe. Talk to us to restart :plan.',
+            'grandfathered' => ':workspace is back on its grandfathered Cloud Free plan. Your data is untouched.',
+            'restore' => 'Talk to us to restart :plan. Your records stay as they are.',
+            'cta' => 'Talk to us',
+            'mailbox_sync_paused' => 'Email and calendar sync are paused too, and resume when :plan restarts.',
+        ],
         'preheader' => 'Your records are safe. Subscribe to reopen the workspace.',
         'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
         'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
@@ -61,6 +71,15 @@ return [
         'grandfathered' => ':workspace is back on its grandfathered Cloud Free plan. Your data is untouched, and you can return to Pro at any time.',
         'cta' => 'Subscribe to Pro',
         'cta_grandfathered' => 'Upgrade to Pro',
+    ],
+
+    'managed_plan_invoice' => [
+        'subject' => 'Your :plan invoice from Relaticle',
+        'preheader' => 'Your yearly :plan invoice for :workspace is ready',
+        'heading' => 'Your :plan invoice is ready',
+        'line' => 'Your yearly :plan invoice for :workspace is :amount, due :date. The plan switches on when it is paid.',
+        'line_without_due' => 'Your yearly :plan invoice for :workspace is :amount. The plan switches on when it is paid.',
+        'cta' => 'View and pay the invoice',
     ],
 
     'setup_nudge' => [
@@ -245,6 +264,7 @@ return [
 
     'contact_submission' => [
         'subject' => 'New contact: :name',
+        'inquiry_subject' => 'New :plan inquiry: :name',
         'preheader' => ':company, :email',
         'preheader_without_company' => ':email',
         'heading' => 'New contact form message',

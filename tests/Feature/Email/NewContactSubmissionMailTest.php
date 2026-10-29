@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Mail\NewContactSubmissionMail;
 
 mutates(NewContactSubmissionMail::class);
@@ -46,4 +47,15 @@ it('falls back to the email-only preheader without a company', function (): void
 
     $mail->assertSeeInHtml(__('mail.contact_submission.preheader_without_company', ['email' => 'ana@example.com']));
     $mail->assertDontSeeInHtml(__('mail.contact_submission.company'));
+});
+
+it('names the managed plan in the subject and the reply subject', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => 'Ana Reyes',
+        'email' => 'ana@example.com',
+        'message' => 'Set us up.',
+    ], Plan::Concierge);
+
+    $mail->assertHasSubject('New Cloud Concierge inquiry: Ana Reyes');
+    $mail->assertSeeInText('mailto:ana@example.com?subject=Re%3A%20New%20Cloud%20Concierge%20inquiry%3A%20Ana%20Reyes');
 });

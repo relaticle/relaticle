@@ -36,7 +36,7 @@ trait HasCustomFieldColumns
                 $field = $fields->get($column->getName());
 
                 return $field instanceof CustomField
-                    ? $column->label(ColumnHeaderLabel::make($field->name, $field->typeData->icon))
+                    ? $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $field->name), $field->typeData->icon))
                     : $column;
             })
             ->all();
@@ -54,7 +54,7 @@ trait HasCustomFieldColumns
                 continue;
             }
 
-            $column->label(ColumnHeaderLabel::make($label, self::nativeColumnIcon($column->getName())));
+            $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), self::nativeColumnIcon($column->getName())));
         }
 
         return $table

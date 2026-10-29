@@ -48,6 +48,22 @@ final readonly class CanonicalRecordUrl
         return $this->routeTo($this->resource($entity), $entity, $recordId, $workspace);
     }
 
+    public function listUrl(CrmEntity $entity, Workspace $workspace): ?string
+    {
+        $resource = $this->resource($entity);
+
+        try {
+            return $resource::getUrl('index', panel: 'app', tenant: $workspace);
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    public function listLabel(CrmEntity $entity): string
+    {
+        return $this->resource($entity)::getPluralModelLabel();
+    }
+
     /**
      * @param  class-string<FilamentResource>  $resource
      */

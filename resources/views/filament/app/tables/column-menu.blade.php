@@ -1,10 +1,11 @@
 @php
     $items = [
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'show' => 'movable'],
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'show' => 'movable'],
-        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.pin'), 'icon' => 'heroicon-m-lock-closed', 'run' => '$wire.pinTableColumn(column)', 'visible' => '! pinned'],
-        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.unpin'), 'icon' => 'heroicon-m-lock-open', 'run' => '$wire.unpinTableColumn(column)', 'visible' => 'pinned'],
-        ['group' => 'hide', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => 'heroicon-m-eye-slash', 'run' => '$wire.hideTableColumn(column)', 'show' => 'hideable'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'show' => 'movable', 'focus' => 'column'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'show' => 'movable', 'focus' => 'column'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.pin'), 'icon' => 'heroicon-m-lock-closed', 'run' => '$wire.pinTableColumn(column)', 'visible' => '! pinned', 'focus' => 'column'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.unpin'), 'icon' => 'heroicon-m-lock-open', 'run' => '$wire.unpinTableColumn(column)', 'visible' => 'pinned', 'focus' => 'column'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.edit_label'), 'icon' => 'heroicon-o-tag', 'run' => "\$wire.mountAction('editTableColumnLabel', { column })", 'focus' => 'null'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => 'heroicon-o-eye-slash', 'run' => '$wire.hideTableColumn(column)', 'visible' => 'hideable', 'focus' => 'neighbour'],
     ];
 @endphp
 
@@ -42,7 +43,7 @@
                             x-bind:aria-disabled="({{ $item['disabled'] }}).toString()"
                             x-bind:class="{ 'fi-disabled': {{ $item['disabled'] }} }"
                         @endisset
-                        x-on:click="choose(() => {{ $item['run'] }}, {{ $item['group'] === 'hide' ? 'neighbour' : 'column' }})"
+                        x-on:click="choose(() => {{ $item['run'] }}, {{ $item['focus'] }})"
                         class="fi-dropdown-list-item"
                     >
                         <x-filament::icon :icon="$item['icon']" class="fi-dropdown-list-item-icon" />

@@ -13,6 +13,7 @@ final class TableStateData extends Data
      * @param  array<string, mixed>  $filters
      * @param  array<string, mixed>  $columnSearches
      * @param  array<string, int>  $widths
+     * @param  array<string, string>  $labels
      * @param  list<string>  $pinned
      */
     public function __construct(
@@ -24,6 +25,7 @@ final class TableStateData extends Data
         public ?string $grouping = null,
         public int|string|null $perPage = null,
         public array $widths = [],
+        public array $labels = [],
         public array $pinned = [],
     ) {}
 
@@ -39,11 +41,11 @@ final class TableStateData extends Data
     // Hashes stored before pins existed carry no `pinned` key, so an empty one is left out.
     public function hash(): string
     {
-        $state = $this->toArray();
-
-        if ($state['pinned'] === []) {
-            unset($state['pinned']);
-        }
+        $state = array_filter(
+            $this->toArray(),
+            fn (mixed $value, string $key): bool => ! in_array($key, ['labels', 'pinned'], true) || $value !== [],
+            ARRAY_FILTER_USE_BOTH,
+        );
 
         return hash('xxh128', json_encode(self::sortKeys($state), JSON_THROW_ON_ERROR));
     }

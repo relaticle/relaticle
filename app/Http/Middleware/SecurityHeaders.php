@@ -15,16 +15,14 @@ final readonly class SecurityHeaders
     {
         $response = $next($request);
 
-        $headers = $this->headersFor($request);
-
-        if ($this->needsContentSecurityPolicy($response)) {
-            $headers = [...$headers, ...$this->contentSecurityPolicyHeaders($request)];
-        }
-
-        foreach ($headers as $name => $value) {
+        foreach ($this->headersFor($request) as $name => $value) {
             if (! $response->headers->has($name)) {
                 $response->headers->set($name, $value);
             }
+        }
+
+        if ($this->needsContentSecurityPolicy($response)) {
+            $response->headers->add($this->contentSecurityPolicyHeaders($request));
         }
 
         return $response;
@@ -70,8 +68,15 @@ final readonly class SecurityHeaders
 
     private function needsContentSecurityPolicy(Response $response): bool
     {
-        return ! $response->headers->has('Content-Security-Policy')
+        return ! $this->hasCompleteContentSecurityPolicy($response)
             && str_contains((string) $response->headers->get('Content-Type'), 'text/html');
+    }
+
+    private function hasCompleteContentSecurityPolicy(Response $response): bool
+    {
+        // laravel/mcp adds a framing-only policy to the OAuth consent screen, a subset of ours.
+        // Only a policy that declares default-src was written for its response and stays.
+        return str_contains(implode('; ', $response->headers->all('Content-Security-Policy')), 'default-src');
     }
 
     private function strictTransportSecurity(): string

@@ -47,6 +47,11 @@ final class WorkspacePolicy
             && in_array($workspace->billingStatus(), [BillingStatus::Trialing, BillingStatus::TrialEnded], true);
     }
 
+    public function manageManagedPlan(SystemAdministrator $admin): bool
+    {
+        return $admin->role->canManageCustomerAccess();
+    }
+
     public function delete(SystemAdministrator $admin): bool
     {
         return $admin->role->canDelete();

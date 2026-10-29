@@ -378,7 +378,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             assistantMsg.content = this.sendTexts.sessionExpired;
             assistantMsg.sessionExpired = true;
         } else if (res.status === 402 && body?.error === 'credits_exhausted') {
-            const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
+            const resetLabel = body.reset_on ?? null;
             assistantMsg.paywall = {
                 heading: this.sendTexts.paywallHeading,
                 body: resetLabel ? this.sendTexts.paywallReset.replace(':date', resetLabel) : this.sendTexts.paywallTopUp,

@@ -64,6 +64,18 @@ enum StripeSubscriptionStatus: string implements HasColor, HasDescription, HasLa
         return [self::Incomplete->value, self::IncompleteExpired->value];
     }
 
+    /** @return list<string> */
+    public static function live(): array
+    {
+        return [self::Active->value, self::PastDue->value, self::Trialing->value];
+    }
+
+    /** @return list<string> */
+    public static function ended(): array
+    {
+        return [self::Canceled->value, self::IncompleteExpired->value];
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

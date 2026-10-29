@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
 use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
@@ -105,6 +106,7 @@ final class ProcessTrialsCommand extends Command
     private function live(Builder $query): void
     {
         $query
+            ->whereIn('type', [SubscriptionType::Default->value, SubscriptionType::Managed->value])
             ->whereNotIn('stripe_status', StripeSubscriptionStatus::neverGranted())
             ->where(fn (Builder $running): Builder => $running->whereNull('ends_at')->orWhere('ends_at', '>', now()));
     }

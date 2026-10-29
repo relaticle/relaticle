@@ -247,6 +247,48 @@ it('throws when the source subscription is no longer valid, called directly', fu
         ->and($subscription->refresh()->workspace_id)->toBe($source->getKey());
 });
 
+it('refuses to move a workspace that holds a managed plan subscription', function (string $type, string $status): void {
+    [$source, $target, $subscription] = transferPair();
+    $managed = $source->subscriptions()->create([
+        'type' => $type,
+        'stripe_id' => 'sub_transfer_managed',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_inline_transfer_managed',
+        'quantity' => 1,
+    ]);
+
+    expect(fn () => app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey()))
+        ->toThrow(TransferRefused::class, 'The source workspace has a managed plan subscription. Withdraw it, or cancel it in Stripe, before transferring billing.');
+
+    expect($source->refresh()->stripe_id)->toBe('cus_transfer_source')
+        ->and($target->refresh()->stripe_id)->toBeNull()
+        ->and($subscription->refresh()->workspace_id)->toBe($source->getKey())
+        ->and($managed->refresh()->workspace_id)->toBe($source->getKey());
+})->with([
+    'an open invoice' => ['managed_pending', 'incomplete'],
+    'a paid plan' => ['managed', 'active'],
+    'an overdue plan' => ['managed', 'past_due'],
+]);
+
+it('moves billing when the only managed subscriptions have ended', function (string $type, string $status): void {
+    [$source, $target, $subscription] = transferPair();
+    $source->subscriptions()->create([
+        'type' => $type,
+        'stripe_id' => 'sub_transfer_ended',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_inline_transfer_ended',
+        'quantity' => 1,
+    ]);
+
+    app(TransferWorkspaceBilling::class)->execute($source, $target, (string) $this->admin->getKey());
+
+    expect($subscription->refresh()->workspace_id)->toBe($target->getKey());
+})->with([
+    'a withdrawn invoice' => ['managed_pending', 'canceled'],
+    'an expired invoice' => ['managed_pending', 'incomplete_expired'],
+    'an ended plan' => ['managed', 'canceled'],
+]);
+
 it('refuses to transfer when the subscription price maps to no plan', function (): void {
     [$source, $target, $subscription] = transferPair(['stripe_price' => 'price_not_in_config']);
 

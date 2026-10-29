@@ -18,11 +18,8 @@ final readonly class ContactController
 {
     public function show(Request $request): View
     {
-        $requestedPlan = $request->query('plan');
-        $plan = is_string($requestedPlan) ? Plan::tryFrom($requestedPlan) : null;
-
         return view('contact', [
-            'inquiryPlan' => $plan?->isManaged() === true && Feature::active(Billing::class) ? $plan : null,
+            'inquiryPlan' => $this->inquiryPlan($request),
         ]);
     }
 
@@ -31,8 +28,19 @@ final readonly class ContactController
         /** @var array{name: string, email: string, company: ?string, message: string} $data */
         $data = $request->validated();
 
-        Mail::to(config('relaticle.contact.email'))->send(new NewContactSubmissionMail($data));
+        $plan = $this->inquiryPlan($request);
 
-        return to_route('contact')->with('success', 'Thanks for reaching out! We\'ll get back to you soon.');
+        Mail::to(config('relaticle.contact.email'))->send(new NewContactSubmissionMail($data, $plan));
+
+        return to_route('contact', $plan instanceof Plan ? ['plan' => $plan->value] : [])
+            ->with('success', __('Thanks for reaching out! We\'ll get back to you soon.'));
+    }
+
+    private function inquiryPlan(Request $request): ?Plan
+    {
+        $requestedPlan = $request->query('plan');
+        $plan = is_string($requestedPlan) ? Plan::tryFrom($requestedPlan) : null;
+
+        return $plan?->isManaged() === true && Feature::active(Billing::class) ? $plan : null;
     }
 }

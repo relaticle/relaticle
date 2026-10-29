@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Actions\Notifications\ArchiveNotification;
 use App\Actions\Task\NotifyTaskAssignees;
+use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
+use App\Enums\Plan;
 use App\Features\EmailIntegration;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\NotificationPreferences;
@@ -13,6 +15,9 @@ use App\Models\Notification;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Notifications\ManagedInvoiceOverdueNotification;
+use App\Notifications\TableLayoutChangedNotification;
+use App\Support\CanonicalRecordUrl;
 use App\Support\CurrentWorkspace;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -243,30 +248,17 @@ it('marks a notification stored before this change as read from its action', fun
 });
 
 it('does not hand related records to the browser', function (): void {
-    assignTaskNotification($this->user, $this->workspaceA, 'Task in A');
-
-    $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)->call('getNotifications');
-    $returned = json_encode($component->effects['returns']);
-
-    expect($returned)->toContain('Task in A')
-        ->not->toContain('pm_last_four')
-        ->not->toContain('ai_preferences')
-        ->not->toContain('notification_preferences');
+    Livewire::actingAs($this->user)
+        ->test(AppDatabaseNotifications::class)
+        ->call('getNotifications')
+        ->assertForbidden();
 });
 
 it('does not hand the workspace billing details to the browser', function (): void {
-    $this->workspaceB->forceFill(['stripe_id' => 'cus_secret123', 'pm_type' => 'visa', 'pm_last_four' => '4242'])->save();
-    $this->user->switchWorkspace($this->workspaceB);
-
-    $component = Livewire::actingAs($this->user->refresh()->load('currentWorkspace'))
+    Livewire::actingAs($this->user)
         ->test(AppDatabaseNotifications::class)
-        ->call('getUser');
-    $returned = json_encode($component->effects['returns']);
-
-    expect($returned)->toContain($this->workspaceB->name)
-        ->not->toContain('cus_secret123')
-        ->not->toContain('4242')
-        ->not->toContain('visa');
+        ->call('getUser')
+        ->assertForbidden();
 });
 
 it('listens for live updates while the list is empty', function (): void {
@@ -612,4 +604,56 @@ it('renders shared email rows without per-row queries beyond the synced copy che
 
     expect($withFifty->reject($isSyncedCopyCheck))->toHaveCount($withFive->reject($isSyncedCopyCheck)->count())
         ->and($withFifty->filter($isSyncedCopyCheck))->toHaveCount(100);
+});
+
+it('shows the owner who deleted their layout and links to the table', function (): void {
+    $admin = User::factory()->create(['name' => 'Dana Whitfield']);
+    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
+
+    $this->user->notify(new TableLayoutChangedNotification($this->workspaceA, $admin, 'Renewals', CrmEntity::Company, TableLayoutChangedNotification::DELETED));
+
+    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
+        ->assertSeeText('Dana Whitfield deleted your layout')
+        ->assertSeeText('Renewals')
+        ->assertSeeText('It was on the companies table.')
+        ->assertSeeText('Open Companies')
+        ->assertSee(resolve(CanonicalRecordUrl::class)->listUrl(CrmEntity::Company, $this->workspaceA));
+});
+
+it('shows a layout notice whose actor has since been deleted', function (): void {
+    $admin = User::factory()->create();
+    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
+
+    $this->user->notify(new TableLayoutChangedNotification($this->workspaceA, $admin, 'Renewals', CrmEntity::Company, TableLayoutChangedNotification::UNSHARED));
+    $admin->delete();
+
+    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
+        ->assertSeeText('is no longer shared')
+        ->assertDontSeeText('stopped sharing your layout')
+        ->assertSeeText('It is private to you again on the companies table.');
+});
+
+it('renders managed invoice rows without per-row queries', function (): void {
+    $overdueWorkspaces = function (int $count): void {
+        Workspace::factory()->count($count)->create(['user_id' => $this->user->getKey(), 'personal_workspace' => false])
+            ->each(fn (Workspace $workspace) => $this->user->notify(new ManagedInvoiceOverdueNotification($workspace, Plan::Concierge)));
+    };
+    $queriesPerRender = function (): int {
+        $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $component->call('$refresh');
+
+        return count(DB::getQueryLog());
+    };
+
+    $overdueWorkspaces(2);
+    $withTwo = $queriesPerRender();
+
+    $overdueWorkspaces(6);
+    $withEight = $queriesPerRender();
+
+    expect($withEight)->toBe($withTwo);
 });

@@ -17,9 +17,11 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\HasTableLayouts;
 use App\Filament\Tables\Concerns\PersistsTableState;
+use App\Models\Notification;
 use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Models\User;
+use App\Notifications\TableLayoutChangedNotification;
 use App\Policies\TableLayoutPolicy;
 use Filament\Facades\Filament;
 
@@ -174,7 +176,7 @@ it('ignores widths when telling whether a layout was changed', function (): void
 
 it('brings back the last state over the default layout, and the modified mark with it', function (): void {
     $layout = layoutFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout')->set('tableSort', 'name:asc');
+    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout', $layout->getKey())->set('tableSort', 'name:asc');
 
     session()->flush();
     $revisit = livewire(ListCompanies::class);
@@ -223,7 +225,7 @@ it('offers the standard layout and nothing to manage when no layout is saved', f
 
 it('shares a layout only after the member confirms', function (): void {
     $layout = layoutFor($this->user, ['name' => 'Hot leads']);
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->mountAction('shareTableLayout');
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->mountAction('shareTableLayout', ['layout' => $layout->getKey()]);
 
     expect($layout->refresh()->is_shared)->toBeFalse();
     $component->assertActionMounted('shareTableLayout');
@@ -231,7 +233,7 @@ it('shares a layout only after the member confirms', function (): void {
     $component->callMountedAction();
     expect($layout->refresh()->is_shared)->toBeTrue();
 
-    $component->call('stopSharingTableLayout');
+    $component->mountAction('stopSharingTableLayout', ['layout' => $layout->getKey()]);
     expect($layout->refresh()->is_shared)->toBeFalse();
 });
 
@@ -265,7 +267,7 @@ it('keeps a member\'s changed copy when the shared layout changes under it', fun
 it('clears other members\' pointers when a layout stops being shared, and keeps their table', function (): void {
     $owner = tableLayoutMember(WorkspaceRole::Member);
     $layout = layoutFor($owner, ['is_shared' => true, 'state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout');
+    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout', $layout->getKey());
 
     resolve(UpdateTableLayout::class)->execute($owner, $layout, ['is_shared' => false]);
     session()->flush();
@@ -278,14 +280,56 @@ it('clears other members\' pointers when a layout stops being shared, and keeps 
 
 it('keeps the table and clears the pointers when a layout is deleted', function (): void {
     $layout = layoutFor($this->user, ['state' => hotLeads()]);
-    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout')
-        ->callAction('deleteTableLayout')
+    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout', $layout->getKey())
+        ->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()])
         ->assertSet('activeTableLayoutId', null)
         ->assertSet('defaultTableLayoutId', null)
         ->assertSet('tableSort', 'created_at:desc');
 
     expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(0)
         ->and(preferenceRow()->active_layout_id)->toBeNull();
+});
+
+it('manages a layout from its own row without switching to it', function (): void {
+    $active = layoutFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $other = layoutFor($this->user, ['name' => 'Renewals']);
+
+    livewire(ListCompanies::class)
+        ->call('applySavedLayout', $active->getKey())
+        ->callAction('renameTableLayout', ['name' => 'Renewals due'], ['layout' => $other->getKey()])
+        ->call('toggleDefaultTableLayout', $other->getKey())
+        ->assertSet('defaultTableLayoutId', $other->getKey())
+        ->callAction('shareTableLayout', arguments: ['layout' => $other->getKey()])
+        ->callAction('deleteTableLayout', arguments: ['layout' => $other->getKey()])
+        ->assertSet('activeTableLayoutId', $active->getKey())
+        ->assertSet('defaultTableLayoutId', null)
+        ->assertSet('tableSort', 'created_at:desc');
+
+    expect(TableLayout::query()->withoutGlobalScopes()->pluck('name')->all())->toBe(['Hot leads']);
+});
+
+it('marks the layout the table is showing, and only that one', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Team pipeline']);
+
+    $component = livewire(ListCompanies::class)
+        ->assertSeeHtmlInOrder(['aria-current="true"', 'Standard layout', 'Team pipeline'])
+        ->call('applySavedLayout', $layout->getKey())
+        ->assertSeeHtmlInOrder(['Standard layout', 'aria-current="true"', 'Team pipeline']);
+
+    expect(substr_count($component->html(), 'aria-current="true"'))->toBe(1);
+});
+
+it('labels the layout that opens by default and the layouts a member shares', function (): void {
+    $shared = layoutFor($this->user, ['name' => 'Team pipeline', 'is_shared' => true]);
+    layoutFor($this->user, ['name' => 'Just me']);
+
+    $component = livewire(ListCompanies::class)
+        ->assertSeeHtmlInOrder(['Standard layout', 'aria-label="Default"', 'Just me', 'Team pipeline', '<span>Shared</span>'])
+        ->call('toggleDefaultTableLayout', $shared->getKey())
+        ->assertSeeHtmlInOrder(['Standard layout', 'Just me', 'Team pipeline', 'aria-label="Default"', '<span>Shared</span>']);
+
+    expect(substr_count($component->html(), 'aria-label="Default"'))->toBe(1)
+        ->and(substr_count($component->html(), '<span>Shared</span>'))->toBe(1);
 });
 
 it('lists own layouts and layouts shared with the workspace, never someone else\'s private one', function (): void {
@@ -313,9 +357,8 @@ it('lets any member, a viewer too, save and share a layout', function (): void {
     $viewer = tableLayoutMember(WorkspaceRole::Viewer);
     $this->actingAs($viewer);
 
-    livewire(ListCompanies::class)
-        ->callAction('saveTableLayoutAs', ['name' => 'Viewer layout'])
-        ->callAction('shareTableLayout');
+    $component = livewire(ListCompanies::class)->callAction('saveTableLayoutAs', ['name' => 'Viewer layout']);
+    $component->callAction('shareTableLayout', arguments: ['layout' => $component->get('activeTableLayoutId')]);
 
     expect(TableLayout::query()->withoutGlobalScopes()->sole()->is_shared)->toBeTrue();
 });
@@ -326,8 +369,8 @@ it('lets a member apply but not change someone else\'s shared layout', function 
 
     livewire(ListCompanies::class)
         ->call('applySavedLayout', $layout->getKey())
-        ->assertActionHidden('renameTableLayout')
-        ->assertActionHidden('deleteTableLayout')
+        ->assertActionHidden('renameTableLayout', ['layout' => $layout->getKey()])
+        ->assertActionHidden('deleteTableLayout', ['layout' => $layout->getKey()])
         ->call('saveTableLayout')
         ->assertForbidden();
 });
@@ -341,16 +384,33 @@ it('lets an admin rename and delete someone else\'s shared layout, but not see a
 
     livewire(ListCompanies::class)
         ->call('applySavedLayout', $shared->getKey())
-        ->callAction('renameTableLayout', ['name' => 'Team pipeline'])
+        ->callAction('renameTableLayout', ['name' => 'Team pipeline'], ['layout' => $shared->getKey()])
         ->assertHasNoActionErrors();
 
     expect($shared->refresh()->name)->toBe('Team pipeline')
         ->and($admin->can('update', $private))->toBeFalse()
         ->and($admin->can('delete', $shared))->toBeTrue();
 
-    livewire(ListCompanies::class)->call('applySavedLayout', $shared->getKey())->callAction('deleteTableLayout');
+    livewire(ListCompanies::class)->call('applySavedLayout', $shared->getKey())->callAction('deleteTableLayout', arguments: ['layout' => $shared->getKey()]);
 
     expect(TableLayout::query()->withoutGlobalScopes()->whereKey($shared->getKey())->exists())->toBeFalse();
+});
+
+it('asks an admin to confirm before taking someone else\'s layout back to its owner', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    $component = livewire(ListCompanies::class)
+        ->mountAction('stopSharingTableLayout', ['layout' => $layout->getKey()])
+        ->assertActionMounted('stopSharingTableLayout')
+        ->assertMountedActionModalSee("It goes back to {$owner->name} as a private layout");
+
+    expect($layout->refresh()->is_shared)->toBeTrue();
+
+    $component->callMountedAction();
+
+    expect($layout->refresh()->is_shared)->toBeFalse();
 });
 
 it('lets an admin who stops sharing someone else\'s layout keep working on the table', function (): void {
@@ -359,7 +419,7 @@ it('lets an admin who stops sharing someone else\'s layout keep working on the t
 
     $component = livewire(ListCompanies::class)
         ->call('applySavedLayout', $layout->getKey())
-        ->call('stopSharingTableLayout')
+        ->callAction('stopSharingTableLayout', arguments: ['layout' => $layout->getKey()])
         ->assertSet('activeTableLayoutId', null)
         ->set('tableSort', 'name:asc')
         ->call('revertTableLayout')
@@ -376,4 +436,153 @@ it('lets the owner keep managing a layout after an admin edits it', function ():
     expect($this->user->can('update', $layout))->toBeTrue()
         ->and(tableLayoutMember(WorkspaceRole::Viewer)->can('update', $layout))->toBeFalse()
         ->and(User::factory()->create()->can('view', $layout))->toBeFalse();
+});
+
+it('offers save as new beside a modified layout, even one the member cannot save', function (): void {
+    $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Member));
+
+    $component = livewire(ListCompanies::class)
+        ->call('applySavedLayout', $layout->getKey())
+        ->assertDontSeeHtml('fi-ta-layouts-save-as')
+        ->set('tableSort', 'name:asc')
+        ->assertSeeHtml('fi-ta-layouts-save-as')
+        ->assertDontSeeHtml('wire:click="saveTableLayout"')
+        ->callAction('saveTableLayoutAs', ['name' => 'My team copy']);
+
+    expect($component->get('activeTableLayoutId'))->not->toBe($layout->getKey())
+        ->and($component->instance()->isTableLayoutModified())->toBeFalse()
+        ->and($layout->refresh()->state->sort)->toBe('created_at:desc');
+});
+
+it('offers a search box only once a member has seven layouts to choose from', function (): void {
+    TableLayout::factory()->for($this->user)->for($this->workspace)->count(6)->sequence(fn ($sequence): array => ['name' => "Layout {$sequence->index}"])->create();
+
+    livewire(ListCompanies::class)->assertDontSeeHtml('placeholder="Search layouts"');
+
+    layoutFor($this->user, ['name' => 'Seventh']);
+
+    livewire(ListCompanies::class)->assertSeeHtml('placeholder="Search layouts"');
+});
+
+it('names the owner when an admin is about to delete someone else\'s layout', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $theirs = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $mine = layoutFor($admin, ['name' => 'Mine']);
+    $this->actingAs($admin);
+
+    livewire(ListCompanies::class)
+        ->mountAction('deleteTableLayout', ['layout' => $theirs->getKey()])
+        ->assertMountedActionModalSee("It belongs to {$owner->name}, who will be told you deleted it.");
+
+    livewire(ListCompanies::class)
+        ->mountAction('deleteTableLayout', ['layout' => $mine->getKey()])
+        ->assertMountedActionModalSee('Members who use this layout keep what their table shows.')
+        ->assertMountedActionModalDontSee('It belongs to');
+});
+
+it('confirms a deleted layout', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Renewals']);
+
+    livewire(ListCompanies::class)
+        ->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()])
+        ->assertNotified('"Renewals" deleted');
+});
+
+it('tells the owner when an admin deletes their layout', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $this->actingAs($admin);
+
+    livewire(ListCompanies::class)->callAction('deleteTableLayout', arguments: ['layout' => $layout->getKey()]);
+
+    $notice = $owner->notifications()->sole();
+
+    expect(TableLayout::query()->withoutGlobalScopes()->whereKey($layout->getKey())->exists())->toBeFalse()
+        ->and($notice->type)->toBe(TableLayoutChangedNotification::class)
+        ->and($notice->actor_id)->toBe($admin->getKey())
+        ->and($notice->subject_id)->toBe($this->workspace->getKey())
+        ->and($notice->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::DELETED]);
+});
+
+it('tells the owner when an admin stops sharing their layout', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Renewals', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    livewire(ListCompanies::class)->callAction('stopSharingTableLayout', arguments: ['layout' => $layout->getKey()]);
+
+    expect($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Renewals', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::UNSHARED]);
+});
+
+it('tells no one when a member deletes or stops sharing their own layout', function (): void {
+    $kept = layoutFor($this->user, ['name' => 'Kept', 'is_shared' => true]);
+    $deleted = layoutFor($this->user, ['name' => 'Deleted', 'is_shared' => true]);
+
+    livewire(ListCompanies::class)
+        ->mountAction('stopSharingTableLayout', ['layout' => $kept->getKey()])
+        ->callAction('deleteTableLayout', arguments: ['layout' => $deleted->getKey()]);
+
+    expect($kept->refresh()->is_shared)->toBeFalse()
+        ->and(Notification::query()->count())->toBe(0);
+});
+
+it('tells no one when an admin renames or overwrites someone else\'s layout', function (): void {
+    $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Team pipeline'], ['layout' => $layout->getKey()])
+        ->call('applySavedLayout', $layout->getKey())
+        ->set('tableSort', 'name:asc')
+        ->call('saveTableLayout');
+
+    expect($layout->refresh()->name)->toBe('Team pipeline')
+        ->and($layout->state->sort)->toBe('name:asc')
+        ->and(Notification::query()->count())->toBe(0);
+});
+
+it('tells the member instead of failing when the layout they revert was deleted elsewhere', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->set('tableSort', 'name:asc');
+
+    $layout->delete();
+
+    $component->call('revertTableLayout')
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null)
+        ->assertSet('appliedTableLayoutHash', null);
+
+    expect($component->get('tableSort'))->toBe('name:asc');
+});
+
+it('tells the member instead of failing when the layout they save over was deleted elsewhere', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->set('tableSort', 'name:asc');
+
+    $layout->delete();
+
+    $component->call('saveTableLayout')
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null);
+
+    expect(TableLayout::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('shows the name error when a rename races another save to the same name', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Old pipeline']);
+
+    TableLayout::updating(function (): void {
+        TableLayout::withoutEvents(function (): void {
+            layoutFor(test()->user, ['name' => 'Hot leads']);
+        });
+    });
+
+    livewire(ListCompanies::class)
+        ->callAction('renameTableLayout', ['name' => 'Hot leads'], ['layout' => $layout->getKey()])
+        ->assertHasActionErrors(['name']);
+
+    expect($layout->refresh()->name)->toBe('Old pipeline');
 });

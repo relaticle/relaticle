@@ -6,6 +6,7 @@ namespace Tests\Helpers;
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Enums\SubscriptionType;
 use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Cashier\Subscription;
@@ -46,6 +47,25 @@ final class BillingStatusFixture
                     Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'ends_at' => now()->subDay()]);
                 },
                 BillingStatus::SubscriptionEnded,
+            ],
+            'a managed plan whose own invoice is overdue reads Past due' => [
+                function (Workspace $workspace): void {
+                    config()->set('services.stripe.products.concierge', 'prod_concierge_fixture');
+                    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+                    Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::Managed->value])
+                        ->items()->create(['stripe_id' => 'si_fixture_overdue', 'stripe_product' => 'prod_concierge_fixture', 'stripe_price' => 'price_fixture_overdue', 'quantity' => 1]);
+                },
+                BillingStatus::PastDue,
+            ],
+            'a managed plan with an overdue invoice for another managed plan still reads its plan' => [
+                function (Workspace $workspace): void {
+                    config()->set('services.stripe.products.concierge', 'prod_concierge_fixture');
+                    config()->set('services.stripe.products.enterprise', 'prod_enterprise_fixture');
+                    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+                    Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::Managed->value])
+                        ->items()->create(['stripe_id' => 'si_fixture_other', 'stripe_product' => 'prod_enterprise_fixture', 'stripe_price' => 'price_fixture_other', 'quantity' => 1]);
+                },
+                BillingStatus::Concierge,
             ],
             'an expired trial awaiting the nightly downgrade reads Trial ended, not Granted' => [
                 fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save(),
@@ -93,6 +113,20 @@ final class BillingStatusFixture
                     Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey()]);
                 },
                 BillingStatus::Grandfathered,
+            ],
+            'a trial-ended workspace with an unpaid managed invoice still reads Trial ended' => [
+                function (Workspace $workspace): void {
+                    $workspace->forceFill(['pro_trial_used_at' => now()->subDays(15)])->save();
+                    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::ManagedPending->value]);
+                },
+                BillingStatus::TrialEnded,
+            ],
+            'a trial-ended workspace whose managed invoice was withdrawn still reads Trial ended' => [
+                function (Workspace $workspace): void {
+                    $workspace->forceFill(['pro_trial_used_at' => now()->subDays(15)])->save();
+                    Subscription::factory()->canceled()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::ManagedPending->value]);
+                },
+                BillingStatus::TrialEnded,
             ],
             'a checkout abandoned without a trial reads Free' => [
                 function (Workspace $workspace): void {

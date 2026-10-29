@@ -52,6 +52,7 @@ trait PersistsTableState
         $this->tableGrouping = blank($this->tableGrouping) ? $initial->grouping : $this->tableGrouping;
         $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $initial->perPage : $this->tableRecordsPerPage;
         $this->tableColumnWidths = $this->storedTablePreference()?->state->widths ?? [];
+        $this->tableColumnLabels = $initial->labels;
         $this->tablePinnedColumns = $initial->pinned;
     }
 
@@ -62,6 +63,7 @@ trait PersistsTableState
         $table = $this->getTable();
 
         $this->tableColumnWidths = array_intersect_key($this->tableColumnWidths, $table->getColumns());
+        $this->tableColumnLabels = array_intersect_key($this->tableColumnLabels, $table->getColumns());
 
         if (filled($this->tableSort) && ! array_key_exists(explode(':', $this->tableSort)[0], $table->getColumns())) {
             $this->tableSort = null;
@@ -110,6 +112,8 @@ trait PersistsTableState
 
     private function applyTableState(TableStateData $state): void
     {
+        $this->tableColumnLabels = array_intersect_key($state->labels, $this->getTable()->getColumns());
+        $this->cachedDefaultTableColumnState = null;
         $this->tablePinnedColumns = $state->pinned;
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
 
@@ -269,6 +273,7 @@ trait PersistsTableState
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,
             perPage: $this->tableRecordsPerPage,
             widths: array_intersect_key($this->tableColumnWidths, $this->getTable()->getColumns()),
+            labels: $this->tableColumnLabels,
             pinned: $this->tablePinnedColumns,
         );
     }

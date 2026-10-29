@@ -11,6 +11,7 @@ use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
+use App\Jobs\RefreshManagedRenewal;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
@@ -20,6 +21,10 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Number;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
@@ -125,7 +130,12 @@ final class Billing extends Page
         }
 
         try {
-            $this->redirect($workspace->billingPortalUrl(self::getUrl(panel: 'app', tenant: $workspace)));
+            $configuration = $workspace->plan->isManaged() ? config('services.stripe.portal_configurations.managed') : null;
+
+            $this->redirect($workspace->billingPortalUrl(
+                self::getUrl(panel: 'app', tenant: $workspace),
+                $configuration === null ? [] : ['configuration' => $configuration],
+            ));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();
@@ -163,6 +173,7 @@ final class Billing extends Page
         $subscription = $workspace->subscription();
         $hasHostedAccess = resolve(HostedWorkspaceAccess::class)->allows($workspace);
         $isGrandfathered = $workspace->hosted_free_grandfathered_at !== null;
+        $managedSubscription = $workspace->managedSubscription();
 
         return [
             'workspace' => $workspace,
@@ -171,6 +182,9 @@ final class Billing extends Page
             'allowance' => resolve(CreditService::class)->allowanceFor($workspace),
             'canManageBilling' => $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             'subscription' => $subscription,
+            'managedSubscription' => $managedSubscription,
+            'managedPastDue' => $managedSubscription?->pastDue() ?? false,
+            'renewalLabel' => $this->renewalLabel($managedSubscription),
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
@@ -184,11 +198,34 @@ final class Billing extends Page
         ];
     }
 
-    /** @return array{billingStatus: BillingStatus, mailboxSyncPaused: bool, otherWorkspaces: Collection<int, Workspace>} */
+    private function renewalLabel(?Subscription $managedSubscription): ?string
+    {
+        if (! $managedSubscription instanceof Subscription || ! $managedSubscription->active() || $managedSubscription->pastDue() || $managedSubscription->onGracePeriod()) {
+            return null;
+        }
+
+        $renewal = Cache::get(RefreshManagedRenewal::CACHE_PREFIX.$managedSubscription->stripe_id);
+
+        if (! is_array($renewal)) {
+            dispatch(new RefreshManagedRenewal($managedSubscription->stripe_id));
+
+            return null;
+        }
+
+        return __('billing.managed.renews', [
+            'date' => Date::createFromTimestamp($renewal['renews_at'])->toFormattedDateString(),
+            'amount' => Number::currency($renewal['amount'] / 100, strtoupper($renewal['currency']), precision: $renewal['amount'] % 100 === 0 ? 0 : 2),
+        ]);
+    }
+
+    /** @return array{billingStatus: BillingStatus, lapsedPlan: ?Plan, mailboxSyncPaused: bool, otherWorkspaces: Collection<int, Workspace>} */
     private function pausedViewData(Workspace $workspace): array
     {
+        $billingStatus = $workspace->billingStatus();
+
         return [
-            'billingStatus' => $workspace->billingStatus(),
+            'billingStatus' => $billingStatus,
+            'lapsedPlan' => $billingStatus === BillingStatus::SubscriptionEnded ? $workspace->lapsedManagedPlan() : null,
             'mailboxSyncPaused' => $workspace->hasConnectedMailbox(),
             'otherWorkspaces' => $this->user()->allWorkspaces()
                 ->reject(fn (Workspace $other): bool => $other->is($workspace))

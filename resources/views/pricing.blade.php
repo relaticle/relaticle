@@ -8,7 +8,7 @@
 <x-guest-layout
     title="Pricing - $19/mo flat, unlimited users - Relaticle"
     :description="$billingActive
-        ? __('Cloud Pro is $19/mo billed yearly. Enterprise implementation from $:price/year. Unlimited users and records. Self-host free.', ['price' => $enterprisePrice])
+        ? __('Cloud Pro is $19/mo billed yearly. Cloud Concierge sets it up for you at $:concierge/year. Enterprise from $:price/year. Unlimited users and records.', ['concierge' => $conciergePrice, 'price' => $enterprisePrice])
         : __('Self-host for free, or let us run Relaticle for you. Unlimited users and records. No per-seat pricing.')"
     ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
 >

@@ -241,12 +241,24 @@ with the workspace.
 The control sits in the table toolbar, after search and before the filter trigger, through
 `TablesRenderHook::TOOLBAR_SEARCH_AFTER` scoped to the five pages. The menu opens with "Standard
 layout", the table as Filament defines it, then the member's own layouts, then the layouts shared
-with the workspace (each with its owner's name). Under a heading carrying the applied layout's
-name come the actions on that layout: Rename, Share with workspace (or Stop sharing), Set as my
-default, Delete layout. Save lives only beside the trigger, where it appears once the layout is
-modified. Save as new layout closes the menu in a group of its own. A star marks the
-member's default layout. With no layout saved, the menu holds only Standard layout and Save as new
-layout. Sharing asks for confirmation first, because every member of the workspace sees the result.
+with the workspace. Each row leads with its type: a table icon for Standard layout, a bookmark for
+a private layout, a group icon for a shared one. Its right edge carries its status: a star on the
+layout that opens by default (Standard layout when the member has picked none), "Shared" on a layout
+the member shares, and the owner's name on someone else's. The applied layout is tinted and
+carries `aria-current`, so the tint is never the only signal.
+
+Every action works on its own row, never on the applied layout alone. Hovering a row swaps its
+status for a Delete button and a vertical `⋯` menu holding Rename, Share with workspace (or Stop
+sharing) and Set as my default (or Remove as my default). Touch has no hover, so it shows status and
+buttons together. Save lives only beside the trigger, where it appears once the layout is modified.
+Save as new layout closes the menu in a group of its own. With no layout saved, the menu holds only
+Standard layout and Save as new layout. Long names truncate in the trigger and the rows, with the
+full name in a tooltip.
+
+Sharing asks for confirmation first, because every member of the workspace sees the result. An
+Admin stopping the share of someone else's layout is asked too, because the layout goes back to its
+owner as a private one and leaves the Admin's list for good. Stopping the share of your own layout
+needs no confirmation, since you can share it again.
 
 ![A changed layout reads "(modified)" and offers Revert and Save](assets/table-layouts/phase-3-layouts-modified.png)
 
@@ -284,6 +296,30 @@ To tell "had not changed it" apart, the preference row stores the hash of the la
 last applied. "Set as my default" may point at any layout the member can see, including someone
 else's shared one. When the member can no longer see it, the default is cleared on load.
 
+#### Telling the owner
+
+When an Admin deletes or stops sharing a member's layout, the owner gets an in-app notice in the
+bell. Without one, the layout simply vanishes from their menu, which reads as a bug.
+
+| The Admin | The owner's notice |
+|---|---|
+| deletes the layout | ":actor deleted your layout "Renewals this quarter"", with the table it was on |
+| stops sharing it | ":actor stopped sharing your layout "Renewals this quarter"", saying it is private to them again |
+| renames or overwrites it | none |
+
+- `TableLayoutChangedNotification` extends `InboxNotification`, with reason `System` and no
+  preference toggle. Its subject is the workspace, as `PaymentFailedNotification`'s is. A deleted
+  layout cannot be its subject: the notice is queued after commit, and `#[DeleteWhenMissingModels]`
+  would drop it.
+- The row stores facts, never a model: the layout's name, its entity and which change happened.
+  `present()` renders them and links to that table's list page in the workspace.
+- `DeleteTableLayout` and `UpdateTableLayout` send it, since an action owns its side effects.
+  `UpdateTableLayout` sends it only when `is_shared` turns false.
+- The actor is the Admin. `InboxNotification::shouldSend()` already skips a notice to its own
+  actor and one to a member who has left the workspace, so the owner's own changes send nothing.
+- In-app only, no email. A layout is low stakes, and the members who used it keep what their table
+  shows.
+
 Prove first: a render hook closure has no access to the page component. The control must still
 mount the page's actions and call `applySavedLayout()`. Settle how before building the menu.
 
@@ -296,48 +332,63 @@ Done when:
 - The permission rules below hold, each covered by a test.
 - Changing the table after applying a layout shows "(modified)"; Revert restores the layout; Save
   overwrites it.
+- An Admin who deletes or stops sharing a member's layout leaves one notice in that member's bell,
+  and the owner's own changes leave none.
 
 ### Phase 4: Column menu and reorder
 
-Each header gets one handle that both drags the column and opens its menu. Both change state
-that phase 2 already saves, so this phase adds no storage.
+Each header gets an options button, and the header itself is dragged to reorder. Order and visibility
+are state phase 2 already saves. Column labels add one field to `TableStateData`, which is JSON,
+so this phase adds no migration.
 
 ![Drag grips on every header](assets/table-layouts/phase-4-header-grips.png)
 ![The column menu](assets/table-layouts/phase-4-column-menu.png)
 
-A `⋮⋮` handle appears at the header's right edge on hover and on keyboard focus. Clicking it
-opens a menu with Move left, Move right and Hide column. Dragging it reorders the column. Sorting
+Each header except the title column always shows a `⋮` options button at its right edge.
+Clicking it opens a menu with Move left and Move right, then Edit column label and Hide column.
+Pressing anywhere else on the header and dragging reorders the column. The cursor there is the
+move cursor, while the column name keeps the pointer cursor because a click on it still sorts:
+a press only becomes a drag past 4px, and the click that ends a drag never sorts. Filament's sort
+button is narrowed to the name so the rest of the header is free to grab. Dragging is off on
+touch screens, where a swipe keeps scrolling the table and the menu moves the column. Sorting
 stays on the header click and its chevron, so the menu does not repeat it. (The mockups show a
-separate grip and a `⋯` button, and a menu with the two sort items. One handle and a shorter menu
-replaced them after the first build.) The script adds the handle beside the resize handle. One
-menu per table, rendered through `TablesRenderHook::TOOLBAR_SEARCH_AFTER` for the five pages,
-opens under whichever handle was clicked. `TablesRenderHook::HEADER_CELL` was not used: it
+`⋯` button, a grip and a menu with the two sort items. A `⋮` button, a draggable header and a
+shorter menu replaced them after the first build.) The script adds the button beside the resize
+handle. One menu per table, rendered through `TablesRenderHook::TOOLBAR_SEARCH_AFTER` for the
+five pages, opens under whichever options button was clicked. `TablesRenderHook::HEADER_CELL` was not used: it
 replaces the whole `<th>`.
 
 ![Dragging a header: the column lifts while the others slide aside](assets/table-layouts/phase-4-drag-reorder.png)
 
-Dragging the handle lifts the column. Its slot stays empty and travels with the drop position while
+Dragging a header lifts the column. Its slot stays empty and travels with the drop position while
 the other columns slide aside, so the table shows the new order before the drop. (The mockup's
 drop line was replaced by this after the first build.) Holding the column near the table's left
 or right edge scrolls the table sideways. A drop anywhere over the table calls one Livewire
 method, `moveTableColumn()`, which reorders the column state through
 `applyTableColumnManager(..., wasReordered: true)`. Move left and Move right call the same
-method, and they are the keyboard path for reordering, as are the arrow keys on a focused handle.
+method, and they are the keyboard path for reordering, as are the arrow keys on a focused options button.
 
 - The drag lives in `resizable-columns.js`, beside the resize handles, so the two never fight
   over a mouse down on the header.
+- Edit column label opens a modal with one field, filled with the name the column shows now. It
+  renames the column for the member only: the header and the column manager show the new name,
+  and exports, filters and other members keep the original. The name is kept in table state and
+  in any layout saved from it, so applying a layout restores its labels and a changed label marks
+  the layout "(modified)". At most 60 characters. Saving it empty, or saving the original name,
+  removes the label. A label for a column the table no longer has is dropped on load.
 - Hide appears only on toggleable columns. Move left and Move right are disabled at the edges.
-- The title column (`CrmEntity::titleColumn()`) stays first: it has no handle, and nothing can be
-  dropped before it. The column manager can still drag it, because
+- The title column (`CrmEntity::titleColumn()`) stays first: it has no options button and does not drag, so it cannot be
+  moved, hidden or renamed, and nothing can be dropped before it. The column manager can still drag it, because
   Filament has no per-item lock, so `HasColumnMenu::applyTableColumnManager()` puts it back
   first on every apply, a stored order and a layout included.
 - Every label goes through `__()`.
 
 Done when:
 
-- Move and Hide from the menu, and a drag, each change the table and survive a reload.
+- Edit column label, Move and Hide from the menu, and a drag, each change the table and survive
+  a reload.
 - The column manager's order and the header order always agree.
-- The handle and its menu work by keyboard alone.
+- The options button and its menu work by keyboard alone.
 
 ### Phase 5: Pinned columns
 
@@ -358,7 +409,7 @@ handles, resizing or reordering keeps every rule, or changes the rule here first
 |---|---|---|
 | 1 | The menu offers "Pin to left" on an unpinned column and "Unpin" on a pinned one. | B: pins a column from its menu and keeps the pin after a reload |
 | 2 | The title column has no handle. It is pinned only beside another pinned column, and unpinning or hiding the last other pinned column unpins it. It is never pinned on its own. | F: pins the title column only beside another pinned column. B: locks a pinned column and unpins the title column with the last one |
-| 3 | A pinned column is locked. Its header shows a lock in the handle's gray, always visible. The lock opens a menu with Unpin, and Hide where the column is toggleable. It never drags, and the arrow keys and Move items never move it. | B: locks a pinned column and unpins the title column with the last one. B: never drags a pinned column or drops another among the pins |
+| 3 | A pinned column is locked. Its header shows a lock in the handle's gray, always visible. The lock opens a menu with Unpin and Edit column label, and Hide where the column is toggleable. It never drags, and the arrow keys and Move items never move it. | B: locks a pinned column and unpins the title column with the last one. B: never drags a pinned column or drops another among the pins |
 | 4 | Pinned columns sit together after the selection checkbox, in pin order. Pinning moves a column to the end of the pins. Unpinning returns it to the first unpinned position. Nothing is dropped among them, by a drag or by the column manager. | F: pins columns in the order they were pinned and unpins to the first unpinned position. F: keeps a column on its side of the pins when the column manager moves it. B: never drags a pinned column or drops another among the pins |
 | 5 | An unpinned column's grip shows on hover and on keyboard focus only. When the table scrolls, every handle of an unpinned header passes under the pinned headers, never over them. | B: keeps the handles of scrolled headers under the pinned headers |
 | 6 | Every pin sticks, however much of the table the pins cover. A member who pins too much unpins from the lock. The one exception is below Filament's `sm` breakpoint (640 px), where rows stack as cards and there are no columns to pin. | B: keeps every pin stuck however much of the table the pins cover. B: unsticks pins where rows stack as cards and sticks them again on a wider screen |
@@ -367,7 +418,7 @@ handles, resizing or reordering keeps every rule, or changes the rule here first
 | 9 | Resizing a pinned column moves the pinned columns after it on every pointer move, and after the save. | B: moves the pinned columns after a pinned column that is resized |
 | 10 | A column at the minimum width shows only its handle. A header label clips at its content edge, so nothing draws under the handle. | B: shows only the handle of a pinned column at the minimum width |
 | 11 | A hidden or deleted column leaves the pins, so a pin can never hold the title column with nothing visible beside it. | F: unpins a column when it is hidden. F: drops a pin for a column the table no longer has |
-| 12 | Pins are saved in table state and in layouts, and a pin change marks the applied layout "(modified)". An empty `pinned` hashes as a state did before pins existed, so a layout applied before the upgrade still reads clean. | F: pins a column after the title column and keeps it on a new visit. F: restores the pins a layout was saved with and marks the layout modified when they change. F: hashes a state without pins as it did before pins existed |
+| 12 | Pins are saved in table state and in layouts, and a pin change marks the applied layout "(modified)". An empty `pinned` or `labels` hashes as a state did before either existed, so a layout applied before the upgrade still reads clean. | F: pins a column after the title column and keeps it on a new visit. F: restores the pins a layout was saved with and marks the layout modified when they change. F: hashes a state without pins as it did before pins existed |
 | 13 | Headers and cells carry `data-column-pinned` in the same response that changed the pins. | F: marks pinned headers and cells in the render that pinned them |
 
 Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
@@ -441,6 +492,7 @@ rebuilt from stored JSON, which is the case `architecture.md` assigns to laravel
 | `grouping` | `"{group}:{direction}"` or null | 2 |
 | `perPage` | int or `"all"` | 2 |
 | `widths` | map of column to pixels; preferences only | 2 |
+| `labels` | map of column to the member's name for it, at most 60 characters; never the title column | 4 |
 | `pinned` | ordered list of column names | 5 |
 
 A field added later defaults to empty, so a row saved before it loads unchanged.

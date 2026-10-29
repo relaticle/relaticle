@@ -42,6 +42,10 @@ API or MCP.
 | View the activity log | Yes | Yes | No | No |
 | Edit and delete table layouts shared with the workspace | Yes | Yes | No | No |
 
+A shared table layout stays with the member who shared it. Admins can also
+rename it, save over its contents, stop sharing it, or delete it, and the
+change applies for everyone who uses it.
+
 Admins manage members, custom fields, and workspace email settings alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:
 promoting someone *to* Admin, renaming or deleting the workspace, and

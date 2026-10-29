@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Billing;
 
+use App\Actions\Billing\ActivateManagedPlan;
 use App\Actions\Billing\GrantPurchasedCredits;
 use App\Actions\Billing\NotifyWorkspaceOfPaymentFailure;
 use App\Actions\Billing\RestoreWorkspaceTrial;
+use App\Actions\Billing\VoidOpenInvoices;
 use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
+use App\Jobs\RefreshManagedRenewal;
+use App\Models\User;
 use App\Models\Workspace;
+use App\Notifications\ManagedInvoiceOverdueNotification;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierWebhookController;
+use Laravel\Cashier\Subscription;
+use Stripe\Invoice;
 use Symfony\Component\HttpFoundation\Response;
+use UnexpectedValueException;
 
 final class StripeWebhookController extends CashierWebhookController
 {
@@ -30,6 +39,8 @@ final class StripeWebhookController extends CashierWebhookController
         private readonly RestoreWorkspaceTrial $restoreTrial,
         private readonly GrantPurchasedCredits $grantCredits,
         private readonly NotifyWorkspaceOfPaymentFailure $notifyPaymentFailure,
+        private readonly ActivateManagedPlan $activateManagedPlan,
+        private readonly VoidOpenInvoices $voidOpenInvoices,
     ) {
         parent::__construct();
     }
@@ -37,7 +48,8 @@ final class StripeWebhookController extends CashierWebhookController
     /**
      * Cashier clears the billable's generic trial for every created
      * subscription, including one that never charged. Restore it so an
-     * abandoned checkout leaves the workspace's running trial intact.
+     * abandoned checkout or an unpaid managed invoice leaves the workspace's
+     * running trial intact.
      *
      * @param  array<string, mixed>  $payload
      */
@@ -46,7 +58,10 @@ final class StripeWebhookController extends CashierWebhookController
         /** @var array<string, mixed> $object */
         $object = $payload['data']['object'] ?? [];
 
-        if (! in_array($object['status'] ?? null, StripeSubscriptionStatus::neverGranted(), true)) {
+        $grantsNothingYet = in_array($object['status'] ?? null, StripeSubscriptionStatus::neverGranted(), true)
+            || ($object['metadata']['type'] ?? null) === SubscriptionType::ManagedPending->value;
+
+        if (! $grantsNothingYet) {
             return parent::handleCustomerSubscriptionCreated($payload);
         }
 
@@ -64,6 +79,23 @@ final class StripeWebhookController extends CashierWebhookController
     }
 
     /** @param  array<string, mixed>  $payload */
+    protected function handleCustomerSubscriptionDeleted(array $payload): Response
+    {
+        $response = parent::handleCustomerSubscriptionDeleted($payload);
+
+        $stripeId = $payload['data']['object']['id'] ?? null;
+        $subscription = is_string($stripeId)
+            ? Subscription::query()->where('stripe_id', $stripeId)->whereIn('type', SubscriptionType::managed())->first()
+            : null;
+
+        if ($subscription instanceof Subscription) {
+            $this->voidOpenInvoices->execute($subscription);
+        }
+
+        return $response;
+    }
+
+    /** @param  array<string, mixed>  $payload */
     protected function handleCustomerSubscriptionUpdated(array $payload): Response
     {
         $stripeId = $payload['data']['object']['id'] ?? null;
@@ -74,7 +106,50 @@ final class StripeWebhookController extends CashierWebhookController
             $payload['data']['object'] = Cashier::stripe()->subscriptions->retrieve($stripeId)->toArray();
         }
 
-        return parent::handleCustomerSubscriptionUpdated($payload);
+        $response = parent::handleCustomerSubscriptionUpdated($payload);
+
+        $this->followManagedSubscription($payload);
+
+        return $response;
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    private function followManagedSubscription(array $payload): void
+    {
+        /** @var array<string, mixed> $object */
+        $object = $payload['data']['object'] ?? [];
+        $stripeId = $object['id'] ?? null;
+
+        $subscription = is_string($stripeId)
+            ? Subscription::query()->where('stripe_id', $stripeId)->where('type', SubscriptionType::Managed->value)->first()
+            : null;
+
+        if (! $subscription instanceof Subscription) {
+            return;
+        }
+
+        dispatch(new RefreshManagedRenewal($subscription->stripe_id));
+
+        $previousStatus = $payload['data']['previous_attributes']['status'] ?? null;
+
+        if (is_string($previousStatus) && $previousStatus !== 'past_due' && ($object['status'] ?? null) === 'past_due') {
+            $this->notifyOwnerOfOverdueInvoice($subscription);
+        }
+    }
+
+    private function notifyOwnerOfOverdueInvoice(Subscription $subscription): void
+    {
+        $workspace = $subscription->owner()->first();
+
+        if (! $workspace instanceof Workspace || ! $workspace->planIsSoldBy($subscription)) {
+            return;
+        }
+
+        $owner = $workspace->owner()->first();
+
+        if ($owner instanceof User) {
+            $owner->notify(new ManagedInvoiceOverdueNotification($workspace, $workspace->plan));
+        }
     }
 
     /**
@@ -124,6 +199,78 @@ final class StripeWebhookController extends CashierWebhookController
         }
 
         return $this->successMethod();
+    }
+
+    // Only a managed subscription's first invoice switches a plan on. A row already `managed`
+    // is admitted so a redelivery can finish a switch that failed part way.
+    /** @param  array<string, mixed>  $payload */
+    protected function handleInvoicePaid(array $payload): Response
+    {
+        /** @var array<string, mixed> $invoice */
+        $invoice = $payload['data']['object'] ?? [];
+        $stripeSubscriptionId = $invoice['parent']['subscription_details']['subscription'] ?? null;
+
+        if (! is_string($stripeSubscriptionId)) {
+            return $this->successMethod();
+        }
+
+        $subscription = Subscription::query()
+            ->where('stripe_id', $stripeSubscriptionId)
+            ->whereIn('type', SubscriptionType::managed())
+            ->first();
+
+        if ($subscription?->ended() === true) {
+            $this->reportPaidAfterEnd($subscription, $invoice['id'] ?? null);
+
+            return $this->successMethod();
+        }
+
+        if (($invoice['billing_reason'] ?? null) !== Invoice::BILLING_REASON_SUBSCRIPTION_CREATE) {
+            return $this->successMethod();
+        }
+
+        $workspace = $subscription?->owner()->first();
+
+        if (! $workspace instanceof Workspace) {
+            return $this->successMethod();
+        }
+
+        $customer = $invoice['customer'] ?? null;
+        $invoiceId = $invoice['id'] ?? null;
+
+        if (! is_string($customer) || ! is_string($invoiceId) || $workspace->stripe_id !== $customer) {
+            Log::warning('Managed plan invoice ignored: workspace/customer mismatch', [
+                'workspace_id' => $workspace->getKey(),
+                'customer' => $customer,
+                'expected_customer' => $workspace->stripe_id,
+                'invoice_id' => $invoiceId,
+            ]);
+
+            report(new UnexpectedValueException(
+                "Managed invoice {$invoiceId} was paid by customer {$customer}, not workspace {$workspace->getKey()}'s; nothing was granted.",
+            ));
+
+            return $this->successMethod();
+        }
+
+        $this->activateManagedPlan->execute($workspace, $stripeSubscriptionId, $invoiceId);
+
+        return $this->successMethod();
+    }
+
+    private function reportPaidAfterEnd(Subscription $subscription, mixed $invoiceId): void
+    {
+        $workspaceId = $subscription->getAttribute($subscription->owner()->getForeignKeyName());
+
+        Log::warning('Managed invoice paid after its subscription ended', [
+            'workspace_id' => $workspaceId,
+            'subscription_id' => $subscription->stripe_id,
+            'invoice_id' => $invoiceId,
+        ]);
+
+        report(new UnexpectedValueException(
+            "Invoice {$invoiceId} was paid on managed subscription {$subscription->stripe_id} of workspace {$workspaceId} after it ended; nothing was granted.",
+        ));
     }
 
     /**

@@ -46,6 +46,7 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
 use Relaticle\SystemAdmin\Filament\Support\EndTrial;
 use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
+use Relaticle\SystemAdmin\Filament\Support\ManagedPlan;
 use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
@@ -353,6 +354,8 @@ final class WorkspaceResource extends Resource
                 EditAction::make()->action(null),
                 ExtendTrial::action(),
                 EndTrial::action(),
+                ManagedPlan::startAction(),
+                ManagedPlan::withdrawAction(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

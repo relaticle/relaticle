@@ -9,6 +9,8 @@ use App\Enums\MediaCollection;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Enums\StripeSubscriptionStatus;
+use App\Enums\SubscriptionType;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
 use App\Events\WorkspaceCreated;
@@ -408,6 +410,68 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
                 ['created_at' => 'MAX', 'id' => 'MAX'],
                 fn (Builder $query): Builder => $query->where('type', 'default'),
             );
+    }
+
+    /** @return HasMany<Subscription, $this> */
+    public function managedSubscriptions(): HasMany
+    {
+        return $this->hasMany(Subscription::class, $this->getForeignKey())->where('type', SubscriptionType::Managed->value);
+    }
+
+    public function managedSubscription(): ?Subscription
+    {
+        return $this->ownedSubscriptions()
+            ->filter(fn (mixed $subscription): bool => $subscription instanceof Subscription
+                && $subscription->type === SubscriptionType::Managed->value
+                && $subscription->valid()
+                && $this->planIsSoldBy($subscription))
+            ->first();
+    }
+
+    public function planIsSoldBy(Subscription $subscription): bool
+    {
+        return Plan::soldBy($subscription) === $this->plan;
+    }
+
+    public function hasOpenManagedSubscription(): bool
+    {
+        return $this->ownedSubscriptions()->contains(fn (mixed $subscription): bool => $subscription instanceof Subscription
+            && in_array($subscription->type, SubscriptionType::managed(), true)
+            && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::ended(), true));
+    }
+
+    public function lapsedManagedPlan(): ?Plan
+    {
+        $lastEnded = $this->ownedSubscriptions()
+            ->filter(fn (mixed $subscription): bool => $subscription instanceof Subscription
+                && in_array($subscription->type, [SubscriptionType::Default->value, SubscriptionType::Managed->value], true)
+                && $subscription->ended())
+            ->sortByDesc('ends_at')
+            ->first();
+
+        if (! $lastEnded instanceof Subscription || $lastEnded->type !== SubscriptionType::Managed->value) {
+            return null;
+        }
+
+        return Plan::soldBy($lastEnded);
+    }
+
+    public function pendingManagedSubscription(): ?Subscription
+    {
+        return $this->ownedSubscriptions()
+            ->filter(fn (mixed $subscription): bool => $subscription instanceof Subscription
+                && $subscription->type === SubscriptionType::ManagedPending->value
+                && ! in_array($subscription->stripe_status, StripeSubscriptionStatus::ended(), true))
+            ->sortByDesc('created_at')
+            ->first();
+    }
+
+    /** @return Collection<int, Model> */
+    private function ownedSubscriptions(): Collection
+    {
+        $this->loadMissing('subscriptions');
+
+        return $this->subscriptions->each(fn (Model $subscription): Model => $subscription->setRelation('owner', $this));
     }
 
     /**

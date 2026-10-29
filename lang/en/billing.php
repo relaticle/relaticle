@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'title' => 'Billing',
     'plans' => [
+        'free' => 'Free',
         'pro' => 'Pro',
         'cloud_pro' => 'Cloud Pro',
         'cloud_concierge' => 'Cloud Concierge',
@@ -59,9 +60,13 @@ return [
             'trial_ended' => 'Your Pro trial has ended',
             'subscription_ended' => 'Your Cloud Pro subscription has ended',
             'free' => ':workspace is paused',
+            'managed_ended' => 'Your :plan plan has ended',
         ],
         'owner_body' => 'Subscribe to Cloud Pro to reopen :workspace. Your records are safe, and nothing has been deleted.',
         'member_body' => ':owner owns :workspace and can reopen it by subscribing to Cloud Pro. Your records are safe.',
+        'owner_body_managed' => 'Talk to us to restart :plan for :workspace. Your records are safe, and nothing has been deleted.',
+        'member_body_managed' => ':owner owns :workspace and can restart :plan with us. Your records are safe.',
+        'restart_managed' => 'Restart :plan',
         'member_body_ownerless' => ':workspace no longer has an owner who can subscribe. Talk to us to reopen it. Your records are safe.',
         'mailbox_sync' => 'Email and calendar sync are paused too, and resume once the workspace reopens.',
         'continue' => 'Continue with Pro',
@@ -162,8 +167,14 @@ return [
     'managed' => [
         'title' => 'Your plan is managed by Relaticle',
         'tagline' => 'Contact us for plan and billing changes.',
+        'tagline_portal' => 'Contact us for plan changes. Pay invoices from Manage subscription.',
         'previous_subscription_canceling' => 'Your previous subscription ends on :date. Your current plan is unchanged.',
         'previous_subscription_past_due' => 'Your previous subscription has a payment issue. Your current plan is unchanged. Contact us to resolve the previous subscription.',
+        'renews' => 'Renews :date · :amount',
+        'overdue_title' => 'Your :plan invoice is overdue',
+        'overdue_body' => 'Pay it from :button to keep the plan. If it stays unpaid, Stripe cancels the plan.',
+        'overdue_notification_body' => ':workspace has an unpaid :plan invoice. Pay it from :button. If it stays unpaid, Stripe cancels the plan.',
+        'overdue_notification_action' => 'Open billing',
     ],
     'concierge' => [
         'tagline' => 'We set it up and keep it current.',

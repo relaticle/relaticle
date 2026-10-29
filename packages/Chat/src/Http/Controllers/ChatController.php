@@ -190,29 +190,7 @@ final readonly class ChatController
         $turnId = (string) Str::ulid();
 
         if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
-            $balance = AiCreditBalance::query()
-                ->where('workspace_id', $workspace->getKey())
-                ->first();
-
-            $isFree = $workspace->plan === Plan::Free;
-            $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
-            // Not $workspace->plan->credits(): a past-due workspace refills at the
-            // Free allowance, so the plan's figure would name credits it never got.
-            $allowance = $this->creditService->allowanceFor($workspace);
-
-            return response()->json([
-                'error' => 'credits_exhausted',
-                'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
-                'plan' => $workspace->plan->value,
-                'allowance' => $allowance,
-                'reset_at' => $balance?->period_ends_at?->toIso8601String(),
-                'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
-                // A top-up is only offered when a pack can actually be bought;
-                // otherwise the CTA lands on a billing page with nothing to buy.
-                'top_up_available' => $canTopUp,
-                'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
-            ], 402);
+            return $this->creditsExhaustedResponse($workspace);
         }
 
         DB::transaction(function () use ($conversation, $user, $workspace): void {
@@ -280,6 +258,33 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    private function creditsExhaustedResponse(Workspace $workspace): JsonResponse
+    {
+        $balance = AiCreditBalance::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->first();
+
+        $isFree = $workspace->plan === Plan::Free;
+        $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
+        // Not $workspace->plan->credits(): a past-due workspace refills at the
+        // Free allowance, so the plan's figure would name credits it never got.
+        $allowance = $this->creditService->allowanceFor($workspace);
+
+        return response()->json([
+            'error' => 'credits_exhausted',
+            'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
+            'plan' => $workspace->plan->value,
+            'allowance' => $allowance,
+            'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),
+            'upgrade_available' => $isFree,
+            'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
+            // A top-up is only offered when a pack can actually be bought;
+            // otherwise the CTA lands on a billing page with nothing to buy.
+            'top_up_available' => $canTopUp,
+            'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
+        ], 402);
     }
 
     // An upload is bound to the conversation it was made in; a message in

@@ -8,6 +8,7 @@ use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Livewire\Exceptions\MethodNotFoundException;
@@ -115,7 +116,7 @@ it('responds 419 and does not report an update to an unknown property', function
 it('responds 419 and does not report a direct call to a lifecycle hook', function (): void {
     Exceptions::fake();
 
-    postTamperedLivewireUpdate($this, [], [['method' => 'mount', 'params' => [], 'metadata' => []]])->assertStatus(419);
+    postTamperedLivewireUpdate($this, [], [['method' => 'boot', 'params' => [], 'metadata' => []]])->assertStatus(419);
 
     Exceptions::assertNotReported(DirectlyCallingLifecycleHooksNotAllowedException::class);
 });
@@ -148,5 +149,20 @@ it('logs a tampered update at warning level with the class and the request ip', 
         fn (string $message, array $context): bool => ($context['exception'] ?? null) === PublicPropertyNotFoundException::class
             && ($context['ip'] ?? null) === '127.0.0.1'
             && isset($context['components']),
+    )->once();
+});
+
+it('reports an exception raised before the console request is bound', function (): void {
+    Log::spy();
+    $request = resolve('request');
+    app()->forgetInstance('request');
+    Request::clearResolvedInstance();
+
+    Exceptions::handler()->report(new RuntimeException('console boot error'));
+
+    app()->instance('request', $request);
+
+    Log::shouldHaveReceived('error')->withArgs(
+        fn (string $message): bool => $message === 'console boot error',
     )->once();
 });

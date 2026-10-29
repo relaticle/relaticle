@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-10-26"
+updated: "2026-10-27"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -26,7 +26,8 @@ pipeline and fields around how you sell, move your existing data in, and walk
 your team through it. After that, we make up to 5 changes a month, each within
 one business day. It includes 5,000 AI credits a month and costs **$708 a year
 per workspace**, invoiced yearly. Ask for it from the [pricing page](/pricing).
-Setup starts once the invoice is paid.
+Setup starts once the invoice is paid. Stripe sends the invoice each year.
+If a renewal stays unpaid, the workspace pauses, as it does when Pro lapses.
 
 ## The trial
 
@@ -40,7 +41,9 @@ a subscription the workspace pauses. Relaticle Cloud has no free plan.
 
 **Manage subscription** opens the billing portal, where you update the
 payment method, download invoices, and switch between monthly and yearly.
-Cancelling keeps Pro until the end of the paid period.
+Cancelling keeps Pro until the end of the paid period. On Cloud Concierge or
+Enterprise, the portal is where you pay invoices and update the payment
+method. Plan changes go through us.
 
 ## If the subscription lapses
 

@@ -372,3 +372,112 @@ it('marks pinned headers and cells in the render that pinned them', function (st
 it('hashes a state without pins as it did before pins existed', function (): void {
     expect((new TableStateData(sort: 'name:desc'))->hash())->toBe('3e415bb40e6c0fb63a7d1b11578db3ea');
 });
+
+function columnLabelText(Testable $component, string $column): string
+{
+    return trim(strip_tags((string) $component->instance()->getTable()->getColumn($column)->getLabel()));
+}
+
+function columnManagerLabel(Testable $component, string $column): string
+{
+    return trim(strip_tags((string) collect($component->get('tableColumns'))->firstWhere('name', $column)['label']));
+}
+
+it('renames a column for the member in the header and the column manager, and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $column = movableColumns($component, $entity)[0];
+
+    $component->callAction('editTableColumnLabel', data: ['label' => '  Owner of record  '], arguments: ['column' => $column])
+        ->assertHasNoActionErrors();
+
+    expect(columnLabelText($component, $column))->toBe('Owner of record')
+        ->and(columnManagerLabel($component, $column))->toBe('Owner of record');
+
+    session()->flush();
+    $revisit = livewire($page);
+
+    expect(columnLabelText($revisit, $column))->toBe('Owner of record')
+        ->and(columnManagerLabel($revisit, $column))->toBe('Owner of record');
+})->with('column menu pages');
+
+it('puts the original name back when the label is cleared', function (): void {
+    $component = livewire(ListCompanies::class);
+    $original = columnLabelText($component, 'created_at');
+
+    $component->callAction('editTableColumnLabel', data: ['label' => 'Added'], arguments: ['column' => 'created_at'])
+        ->callAction('editTableColumnLabel', data: ['label' => ''], arguments: ['column' => 'created_at'])
+        ->assertHasNoActionErrors();
+
+    expect(columnLabelText($component, 'created_at'))->toBe($original)
+        ->and(TablePreference::query()->withoutGlobalScopes()->sole()->state->labels)->toBe([]);
+});
+
+it('refuses a label longer than 60 characters', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('editTableColumnLabel', data: ['label' => str_repeat('a', 61)], arguments: ['column' => 'created_at'])
+        ->assertHasActionErrors(['label' => 'max']);
+
+    expect(columnMenuPreferences())->toBe(0);
+});
+
+it('never renames the title column or a column the table does not have', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $title = columnLabelText($component, $entity->titleColumn());
+
+    $component->callAction('editTableColumnLabel', data: ['label' => 'Renamed'], arguments: ['column' => $entity->titleColumn()])
+        ->callAction('editTableColumnLabel', data: ['label' => 'Renamed'], arguments: ['column' => 'custom_fields.gone']);
+
+    expect(columnLabelText($component, $entity->titleColumn()))->toBe($title)
+        ->and(columnMenuPreferences())->toBe(0);
+})->with('column menu pages');
+
+it('carries labels in a saved layout and marks the layout modified when one changes', function (): void {
+    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(labels: ['created_at' => 'Added']),
+    ]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+
+    expect(columnLabelText($component, 'created_at'))->toBe('Added')
+        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+
+    $component->callAction('editTableColumnLabel', data: ['label' => 'Joined'], arguments: ['column' => 'created_at']);
+
+    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+
+    $component->call('revertTableLayout');
+
+    expect(columnLabelText($component, 'created_at'))->toBe('Added');
+});
+
+it('ignores a saved label for a column the table no longer has', function (): void {
+    $columns = collect(livewire(ListCompanies::class)->get('tableColumns'))
+        ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
+        ->all();
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(columns: $columns, labels: ['custom_fields.gone' => 'Gone', 'created_at' => 'Added']),
+    ]);
+
+    $component = livewire(ListCompanies::class);
+
+    expect(columnLabelText($component, 'created_at'))->toBe('Added')
+        ->and(array_keys($component->get('tableColumnLabels')))->toBe(['created_at']);
+});
+
+it('opens the label editor with the name the column shows and stores nothing for the original name', function (): void {
+    $component = livewire(ListCompanies::class);
+    $original = columnLabelText($component, 'created_at');
+
+    $component->mountAction('editTableColumnLabel', ['column' => 'created_at'])
+        ->assertActionDataSet(['label' => $original])
+        ->callMountedAction()
+        ->callAction('editTableColumnLabel', data: ['label' => 'Added'], arguments: ['column' => 'created_at'])
+        ->mountAction('editTableColumnLabel', ['column' => 'created_at'])
+        ->assertActionDataSet(['label' => 'Added'])
+        ->callMountedAction()
+        ->callAction('editTableColumnLabel', data: ['label' => $original], arguments: ['column' => 'created_at']);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->sole()->state->labels)->toBe([]);
+});
