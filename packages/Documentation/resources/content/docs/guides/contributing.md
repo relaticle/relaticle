@@ -2,7 +2,7 @@
 title: Contributing Guide
 description: Get Relaticle development setup steps and a guide to its PHP 8.5, Laravel 13 and Filament 5 codebase.
 order: 4
-updated: "2026-10-05"
+updated: "2026-10-29"
 ---
 
 Technical documentation for developers and contributors.
@@ -168,8 +168,9 @@ For production deployment instructions, including Docker setup, environment conf
 4. Run tests: `composer test`
 5. Commit with conventional messages
 6. Open a Pull Request
+7. On your first PR, sign the [Contributor License Agreement](https://github.com/relaticle/relaticle/blob/main/.github/CLA.md) by replying with the sentence the CLA bot posts
 
-PRs must pass all checks before merge.
+PRs must pass all checks and have a signed CLA before merge.
 
 ---
 
