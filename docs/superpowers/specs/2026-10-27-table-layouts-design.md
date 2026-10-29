@@ -349,16 +349,28 @@ scrolls sideways under them.
 ![The same in dark mode](assets/table-layouts/phase-5-pinned-dark.png)
 
 - The menu gains "Pin to left", shown as "Unpin" on a pinned column. A pinned header shows a
-  pushpin in place of the handle.
-- Pinned columns sit together at the left, after the selection checkbox, in pin order. Pinning
-  moves a column there; unpinning returns it to the first unpinned position.
-- The title column stays first (phase 4). Pinning any column pins the title column first, and
-  the title column cannot be unpinned while another column is pinned. (Designer's call.)
+  lock in place of the handle, in the handle's gray. (The mockups show a pushpin in the primary
+  colour. The lock replaced it after the first build.)
+- A pinned column is locked: its lock opens the menu with Unpin and Hide, and it neither drags
+  nor moves. Pinned columns sit together at the left, after the selection checkbox, in pin
+  order. Pinning moves a column there; unpinning returns it to the first unpinned position.
+  Nothing can be dropped among them.
+- The title column stays first (phase 4) and has no handle. Pinning any column pins the title
+  column with it, and unpinning or hiding the last other pinned column unpins it too. The title
+  column is never pinned on its own. (The mockup's lone pinned title column was dropped after
+  the first build.)
 - The selection column is pinned whenever any column is.
 - The last pinned column carries an edge shadow while the table is scrolled.
 - Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
   phase 1). It recomputes offsets when a pinned column is resized.
-- `TableStateData` gains `pinned`. Pins are saved in table state and in layouts.
+- Pins stay off while they would leave less than 200 px of the table to scroll the rest
+  through, so a narrow screen keeps a usable table.
+- A header label clips at its content edge, so a column at the minimum width shows only its
+  handle and nothing collides with it.
+- `TableStateData` gains `pinned`. Pins are saved in table state and in layouts. An empty
+  `pinned` hashes as states did before pins existed, so a layout applied before the upgrade
+  does not read "(modified)".
+- A hidden or deleted column leaves the pins.
 
 Done when:
 
@@ -520,7 +532,8 @@ Order matters. `applySavedLayout()`:
    this it shows stale filters.
 8. `applyTableFilters()`.
 9. `flushCachedTableRecords()` if records were already resolved this request.
-10. Phase 5: apply pins.
+10. Phase 5: pins are assigned before step 1, because `applyTableColumnManager()` arranges the
+    columns around them.
 
 Never call `resetTable()`: it re-runs the whole booted block and blanks the filter form.
 
