@@ -22,7 +22,7 @@ trait HasColumnMenu
 
     public function pinTableColumn(string $columnName): void
     {
-        if (! $this->isMenuTableColumn($columnName)) {
+        if (! $this->isMovableTableColumn($columnName)) {
             return;
         }
 
@@ -33,13 +33,11 @@ trait HasColumnMenu
 
     public function unpinTableColumn(string $columnName): void
     {
-        $title = $this->tableEntity()->titleColumn();
-
-        if (! $this->isMenuTableColumn($columnName) || ($columnName === $title && count($this->tablePinnedColumns) > 1)) {
+        if (! $this->isMovableTableColumn($columnName)) {
             return;
         }
 
-        $this->tablePinnedColumns = $columnName === $title ? [] : array_values(array_diff($this->tablePinnedColumns, [$columnName]));
+        $this->tablePinnedColumns = array_values(array_diff($this->tablePinnedColumns, [$columnName]));
 
         $this->applyTablePins();
     }
@@ -99,10 +97,9 @@ trait HasColumnMenu
         $this->getTable()->resizableColumns();
     }
 
-    private function isMenuTableColumn(string $columnName): bool
+    private function isMovableTableColumn(string $columnName): bool
     {
-        return $columnName === $this->tableEntity()->titleColumn()
-            || in_array($columnName, array_column($this->movableTableColumns(), 'name'), true);
+        return in_array($columnName, array_column($this->movableTableColumns(), 'name'), true);
     }
 
     /**
@@ -124,10 +121,12 @@ trait HasColumnMenu
         $title = $this->tableEntity()->titleColumn();
 
         $pinned = array_column(array_filter($columns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE
+            && $item['name'] !== $title
             && $item['isToggled']
             && in_array($item['name'], $this->tablePinnedColumns, true)), 'name');
 
-        $this->tablePinnedColumns = $pinned === [] ? [] : array_values(array_unique([$title, ...$pinned]));
+        // The title column is pinned only beside another pinned column.
+        $this->tablePinnedColumns = $pinned === [] ? [] : [$title, ...$pinned];
 
         $rank = fn (array $item): int => match (true) {
             $item['name'] === $title => 0,

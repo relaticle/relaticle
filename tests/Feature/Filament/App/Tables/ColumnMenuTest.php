@@ -262,34 +262,32 @@ it('pins columns in the order they were pinned and unpins to the first unpinned 
         ->and(columnOrder($component)[2])->toBe($b);
 })->with('column menu pages');
 
-it('keeps the title column pinned while another column is pinned', function (string $page, CrmEntity $entity): void {
+it('pins the title column only beside another pinned column', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $title = $entity->titleColumn();
     $column = shownColumns($component, $entity)[0];
+
+    $component->call('pinTableColumn', $title);
+
+    expect(pinnedColumns($component))->toBe([])
+        ->and(columnMenuPreferences())->toBe(0);
 
     $component->call('pinTableColumn', $column)->call('unpinTableColumn', $title);
 
     expect(pinnedColumns($component))->toBe([$title, $column]);
 
-    $component->call('unpinTableColumn', $column)->call('unpinTableColumn', $title);
+    $component->call('unpinTableColumn', $column);
 
     expect(pinnedColumns($component))->toBe([]);
 })->with('column menu pages');
 
-it('pins the title column on its own', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page)->call('pinTableColumn', $entity->titleColumn());
-
-    expect(pinnedColumns($component))->toBe([$entity->titleColumn()]);
-})->with('column menu pages');
-
 it('unpins a column when it is hidden', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
-    $title = $entity->titleColumn();
     $column = toggleableColumn($component, $entity);
 
     $component->call('pinTableColumn', $column)->call('hideTableColumn', $column);
 
-    expect(pinnedColumns($component))->toBe([$title]);
+    expect(pinnedColumns($component))->toBe([]);
 
     TablePreference::query()->withoutGlobalScopes()->delete();
     $component = livewire($page)->call('pinTableColumn', $column);
@@ -299,7 +297,7 @@ it('unpins a column when it is hidden', function (string $page, CrmEntity $entit
         $component->get('tableColumns'),
     ), true);
 
-    expect(pinnedColumns($component))->toBe([$title]);
+    expect(pinnedColumns($component))->toBe([]);
 })->with('column menu pages');
 
 it('keeps a column on its side of the pins when the column manager moves it', function (string $page, CrmEntity $entity): void {
