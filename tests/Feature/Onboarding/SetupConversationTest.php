@@ -11,7 +11,6 @@ use App\Filament\Pages\CreateWorkspace;
 use App\Listeners\CreateSetupConversationListener;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -27,6 +26,7 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(CreateSetupConversation::class, CreateSetupConversationListener::class, StartSetupGreeting::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 

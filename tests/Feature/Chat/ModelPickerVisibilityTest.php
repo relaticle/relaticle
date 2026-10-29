@@ -9,7 +9,6 @@ use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Models\Company;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
@@ -17,6 +16,7 @@ use Livewire\Livewire;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(ModelRegistry::class, ModelAccess::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 

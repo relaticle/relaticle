@@ -107,6 +107,7 @@
             "Relaticle\\OnboardSeed\\": "packages/OnboardSeed/src",
             "Relaticle\\ImportWizard\\": "packages/ImportWizard/src",
             "Relaticle\\EmailIntegration\\": "packages/EmailIntegration/src",
+            "Relaticle\\Cloud\\": "packages/Cloud/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }

@@ -9,7 +9,6 @@ use App\Contracts\Entitlements;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
@@ -31,7 +30,6 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\DiscordService;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
@@ -104,7 +102,6 @@ use Laravel\Cashier\Cashier;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Passport;
-use Laravel\Pennant\Feature;
 use Laravel\Sanctum\Sanctum;
 use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
@@ -224,9 +221,7 @@ final class AppServiceProvider extends ServiceProvider
 
     private function registerEntitlements(): void
     {
-        $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
-            ? $app->make(PlanEntitlements::class)
-            : $app->make(SelfHostedEntitlements::class));
+        $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
     }
 
     private function registerPassport(): void

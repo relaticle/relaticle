@@ -6,7 +6,6 @@ use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Date;
 use Laravel\Pennant\Feature;
@@ -15,6 +14,7 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditPeriodResolver;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(ResetCreditsCommand::class, CreditPeriodResolver::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 

@@ -125,6 +125,7 @@ it('keeps the Default testsuite limited to non-browser test layers', function ()
         'tests/PHPStan',
         'tests/Smoke',
         'tests/Feature',
+        'packages/Cloud/tests',
     ];
 
     expect(declaredSuites(dirname(__DIR__, 2).'/phpunit.xml')['Default'] ?? null)

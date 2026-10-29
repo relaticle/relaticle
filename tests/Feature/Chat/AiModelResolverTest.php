@@ -6,11 +6,11 @@ use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\ChatCatalog;
 
 mutates(AiModelResolver::class, ModelRegistry::class, SelfHostedEntitlements::class, PlanEntitlements::class);

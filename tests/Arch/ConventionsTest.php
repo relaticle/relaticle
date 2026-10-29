@@ -445,6 +445,7 @@ it('forces a conscious arch-coverage decision when a package is added', function
     expect($packageNamespaces)->toBe(
         [
             'Relaticle\Chat',
+            'Relaticle\Cloud',
             'Relaticle\Documentation',
             'Relaticle\EmailIntegration',
             'Relaticle\ImportWizard',

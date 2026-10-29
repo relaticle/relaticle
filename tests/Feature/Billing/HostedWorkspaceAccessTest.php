@@ -7,7 +7,6 @@ use App\Features\Billing as BillingFeature;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Models\Company;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
@@ -16,6 +15,7 @@ use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\StoreChatAttachment;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\ChatDocument;
 
 mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class);

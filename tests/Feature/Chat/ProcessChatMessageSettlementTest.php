@@ -6,7 +6,6 @@ use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +19,7 @@ use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);

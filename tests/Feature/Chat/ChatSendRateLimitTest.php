@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -14,6 +13,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(SelfHostedEntitlements::class, PlanEntitlements::class);
 

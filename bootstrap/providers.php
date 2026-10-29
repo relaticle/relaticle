@@ -12,6 +12,7 @@ use App\Providers\JetstreamServiceProvider;
 use App\Providers\LocaleServiceProvider;
 use App\Providers\MacroServiceProvider;
 use Relaticle\Chat\ChatServiceProvider;
+use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Documentation\DocumentationServiceProvider;
 use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\ImportWizard\ImportWizardNewServiceProvider;
@@ -32,4 +33,5 @@ return [
     EmailIntegrationServiceProvider::class,
     ImportWizardNewServiceProvider::class,
     SystemAdminPanelProvider::class,
+    ...(class_exists(CloudServiceProvider::class) ? [CloudServiceProvider::class] : []),
 ];

@@ -8,7 +8,6 @@ use App\Features\Billing;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -20,6 +19,7 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\ChatDocument;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Billing;
+namespace Relaticle\Cloud\Entitlements;
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;

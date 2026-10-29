@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Features\Billing;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +13,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(CreditService::class, ReleaseOrphanedReservationsCommand::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 

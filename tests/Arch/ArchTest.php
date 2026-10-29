@@ -266,6 +266,7 @@ $packageServiceLayers = [
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
+    'Relaticle\Cloud\Entitlements',
     'Relaticle\Documentation\Support',
     'Relaticle\EmailIntegration\Actions',
     'Relaticle\EmailIntegration\Services',
@@ -337,6 +338,21 @@ foreach (['App\Http', 'App\Jobs', 'App\Policies', 'App\ActivityLog', 'App\Consol
         ->expect($appLayer)
         ->not
         ->toUse('Relaticle\EmailIntegration');
+}
+
+foreach ([
+    'App',
+    'Relaticle\Chat',
+    'Relaticle\Documentation',
+    'Relaticle\EmailIntegration',
+    'Relaticle\ImportWizard',
+    'Relaticle\OnboardSeed',
+    'Relaticle\SystemAdmin',
+] as $coreLayer) {
+    arch("{$coreLayer} stays free of the cloud package")
+        ->expect($coreLayer)
+        ->not
+        ->toUse('Relaticle\Cloud');
 }
 
 arch('email integration owns its controllers, jobs, policies and timeline entries')

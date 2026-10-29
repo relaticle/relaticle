@@ -10,7 +10,6 @@ use App\Jobs\RefreshManagedRenewal;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
-use App\Services\Billing\PlanEntitlements;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
@@ -20,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\StripeRecorder;
 

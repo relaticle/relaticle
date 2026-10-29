@@ -17,6 +17,7 @@
             <directory>tests/PHPStan</directory>
             <directory>tests/Smoke</directory>
             <directory>tests/Feature</directory>
+            <directory>packages/Cloud/tests</directory>
         </testsuite>
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
@@ -33,6 +34,9 @@
         </testsuite>
         <testsuite name="Browser">
             <directory>tests/Browser</directory>
+        </testsuite>
+        <testsuite name="Cloud">
+            <directory>packages/Cloud/tests</directory>
         </testsuite>
     </testsuites>
     <source>
