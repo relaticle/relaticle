@@ -39,19 +39,19 @@ it('answers the first four questions at a glance and links each to a section on 
 });
 
 it('gives the provider table the anchor the privacy policy links to', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/security')->assertOk()->assertSee('id="providers"', false);
 });
 
 it('names each service provider on a hosted install', function (string $provider): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/security')->assertOk()->assertSee($provider);
 })->with(['Hetzner', 'Laravel Forge', 'Mailcoach', 'Postmark', 'Stripe', 'Sentry', 'Fathom Analytics', 'Anthropic, OpenAI', 'Google, DuckDuckGo', 'Maxforms', 'Oh Dear']);
 
 it('says which country the hosted data lives in', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/security')->assertOk()->assertSee('Hosts the application and its database, in Germany');
 });
@@ -67,7 +67,7 @@ it('names the operator instead of a provider table where hosted billing is off',
 });
 
 it('names the AI providers of the models the product offers', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config()->set('chat.models', [
         ChatCatalog::entry(),
         ChatCatalog::entry(['label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash']),
@@ -82,7 +82,7 @@ it('names the AI providers of the models the product offers', function (): void 
 });
 
 it('lists Cloudflare only while the signup challenge is on', function (bool $enabled): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     Feature::define(SignupChallenge::class, $enabled);
     config()->set('services.turnstile.key', 'site-key');
     config()->set('services.turnstile.secret', 'secret-key');
@@ -95,7 +95,7 @@ it('lists Cloudflare only while the signup challenge is on', function (bool $ena
 })->with([true, false]);
 
 it('says an error report carries no account identity unless the install sends it', function (bool $sendsIdentity, string $expected): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config()->set('sentry.send_default_pii', $sendsIdentity);
 
     $this->get('/security')->assertOk()->assertSee($expected);

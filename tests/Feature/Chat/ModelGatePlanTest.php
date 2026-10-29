@@ -26,7 +26,7 @@ use Tests\Helpers\ChatDocument;
 mutates(ChatController::class, ModelAccess::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('rejects an Opus request from a grandfathered Free user with a 403', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -93,7 +93,7 @@ it('picks a Pro-only model first in the auto chain on a self-hosted install', fu
 });
 
 it('allows an Opus request from a Pro user', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 
@@ -129,7 +129,7 @@ it('allows an Opus request from a Pro user', function (): void {
 });
 
 it('allows a Free user to send with no explicit model (defaults to Auto)', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 
@@ -165,7 +165,7 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
 });
 
 it('allows a Free user to explicitly pick Sonnet', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 
@@ -201,7 +201,7 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
 });
 
 it('rejects a GPT-5 request from a Free user with a 403', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -236,7 +236,7 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
 });
 
 it('allows a Free user to pick Ollama when it is configured', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
     config()->set('chat.ollama.model', 'qwen3:14b');
@@ -302,7 +302,7 @@ it('rejects an unknown model id with a 422', function (): void {
 
 function startTrial(Workspace $workspace): void
 {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
@@ -426,7 +426,7 @@ it('falls back to Auto when a locked trial user saved a premium model as their d
 });
 
 it('keeps Auto on the premium model for a paid Pro workspace', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -450,7 +450,7 @@ it('keeps Auto on the premium model for a paid Pro workspace', function (): void
 });
 
 it('gives a Concierge workspace every Pro model and keeps Enterprise-only models locked', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();

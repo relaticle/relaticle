@@ -138,7 +138,7 @@ it('routes export requests to the export destinations', function (): void {
 });
 
 it('answers credit questions from the balance tool and routes plan changes to billing', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $instructions = resolve(CrmAssistant::class)->instructions();
 

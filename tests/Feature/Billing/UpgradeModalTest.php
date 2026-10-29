@@ -19,7 +19,7 @@ use Tests\Helpers\StripeRecorder;
 mutates(UpgradeModal::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config()->set('cashier.secret', 'sk_test_fake');
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');

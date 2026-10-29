@@ -9,7 +9,6 @@ use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Jobs\PurgeWorkspace;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
@@ -24,7 +23,6 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Subscription;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -714,7 +712,7 @@ it('filters trialing workspaces without own data that farm premium models or sit
 });
 
 it('ends a trial now so the workspace pauses on the pay screen', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
 
     livewire(ListWorkspaces::class)
@@ -796,7 +794,7 @@ it('offers end trial on the workspace page', function (): void {
 });
 
 it('extends a running trial and leaves its credit balance alone', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->travelTo(CarbonImmutable::parse('2026-10-13 12:00:00'));
     $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));
     $balance = AiCreditBalance::query()->updateOrCreate(
@@ -820,7 +818,7 @@ it('extends a running trial and leaves its credit balance alone', function (): v
 });
 
 it('restarts a trial the nightly job already downgraded and grants the pro allowance', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $admin = SystemAdministrator::factory()->create();
     $this->actingAs($admin, 'sysadmin');
     $workspace = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner()));

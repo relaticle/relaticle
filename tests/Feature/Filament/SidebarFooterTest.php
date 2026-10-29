@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
-use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\Workspace\Members;
@@ -11,12 +10,11 @@ use App\Models\User;
 use App\Policies\WorkspacePolicy;
 use App\Services\Billing\SidebarBillingState;
 use Filament\Facades\Filament;
-use Laravel\Pennant\Feature;
 
 mutates(WorkspacePolicy::class, SidebarBillingState::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;

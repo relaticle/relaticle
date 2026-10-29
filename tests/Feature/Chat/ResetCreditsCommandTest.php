@@ -19,7 +19,7 @@ use Relaticle\Cloud\Entitlements\PlanEntitlements;
 mutates(ResetCreditsCommand::class, CreditPeriodResolver::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 it('resets credits for workspaces whose billing period has ended', function (): void {

@@ -24,7 +24,7 @@ beforeEach(function (): void {
 });
 
 it('returns plan-aware copy when a Free user is out of credits', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -71,7 +71,7 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
 });
 
 it('marks upgrade_available false for Pro users', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -110,7 +110,7 @@ it('marks upgrade_available false for Pro users', function (): void {
 });
 
 it('marks upgrade_available false for Enterprise users', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -148,7 +148,7 @@ it('marks upgrade_available false for Enterprise users', function (): void {
 });
 
 it('mentions the plan name in the message', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -185,7 +185,7 @@ it('mentions the plan name in the message', function (): void {
 });
 
 it('offers a top-up url to exhausted paid plans when billing is active', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -238,7 +238,7 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
 });
 
 it('gives free plans the upgrade shape and no top-up', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -276,7 +276,7 @@ it('gives free plans the upgrade shape and no top-up', function (): void {
 });
 
 it('withholds the top-up url when no credit pack has a configured price', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     config()->set('services.stripe.credit_packs', [
         'small' => ['price' => null, 'credits' => 1000],
         'large' => ['price' => null, 'credits' => 5000],
@@ -326,7 +326,7 @@ it('withholds the top-up url when no credit pack has a configured price', functi
 });
 
 it('names the Free allowance, not the Pro one, when a past-due workspace runs out', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -373,7 +373,7 @@ it('names the Free allowance, not the Pro one, when a past-due workspace runs ou
 });
 
 it('names the reset day the way the billing page does', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;

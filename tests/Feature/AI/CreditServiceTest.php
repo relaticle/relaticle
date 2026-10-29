@@ -3,11 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
@@ -17,7 +15,7 @@ use Tests\Helpers\ChatCatalog;
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;

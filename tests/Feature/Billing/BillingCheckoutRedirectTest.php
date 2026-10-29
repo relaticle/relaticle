@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 use App\Actions\Billing\CreateProCheckout;
 use App\Enums\Plan;
-use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
-use Laravel\Pennant\Feature;
 use Tests\Helpers\StripeRecorder;
 
 mutates(Billing::class, CreateProCheckout::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config()->set('cashier.secret', 'sk_test_fake');
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');

@@ -3,11 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -20,7 +18,7 @@ mutates(AiCreditBalanceResource::class);
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));

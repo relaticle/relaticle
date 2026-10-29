@@ -16,7 +16,7 @@ use Tests\Helpers\ChatCatalog;
 mutates(AiModelResolver::class, ModelRegistry::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('falls back to Sonnet when the users preference is not allowed by their plan', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->ai_preferences = ['default_model' => 'claude-opus-5'];
@@ -29,7 +29,7 @@ it('falls back to Sonnet when the users preference is not allowed by their plan'
 });
 
 it('honors the users preference when their plan allows it', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace->plan = Plan::Pro;
@@ -44,7 +44,7 @@ it('honors the users preference when their plan allows it', function (): void {
 });
 
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
 
@@ -113,7 +113,7 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
 });
 
 it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     config()->set('ai.providers.anthropic.key', null);
     config()->set('chat.ollama.model', null);
@@ -163,7 +163,7 @@ it('labels explicit and auto resolutions', function (): void {
 });
 
 it('fails over to the next available chain entry', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
@@ -185,7 +185,7 @@ it('returns null once the auto chain is exhausted', function (): void {
 });
 
 it('does not fail over to a premium model for a locked trial', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [
@@ -199,7 +199,7 @@ it('does not fail over to a premium model for a locked trial', function (): void
 });
 
 it('fails over to a premium model for a paid Pro workspace', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [

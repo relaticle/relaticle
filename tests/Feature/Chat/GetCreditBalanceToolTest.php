@@ -28,7 +28,7 @@ beforeEach(function (): void {
 });
 
 it('reports the remaining credits, the allowance, purchased credits and usage', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $payload = json_decode(app(GetCreditBalanceTool::class)->handle(new Request([])), true);
 
@@ -39,7 +39,7 @@ it('reports the remaining credits, the allowance, purchased credits and usage', 
 });
 
 it('gives the reset time in the viewer timezone', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $payload = json_decode(app(GetCreditBalanceTool::class)->handle(new Request([])), true);
 
@@ -47,7 +47,7 @@ it('gives the reset time in the viewer timezone', function (): void {
 });
 
 it('lets a member without billing access read the balance', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);

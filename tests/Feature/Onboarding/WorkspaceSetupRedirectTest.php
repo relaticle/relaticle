@@ -5,18 +5,16 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
-use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Filament\Resources\PeopleResource;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 
 mutates(RedirectToWorkspaceSetup::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;

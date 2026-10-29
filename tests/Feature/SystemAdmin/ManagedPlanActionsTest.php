@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
-use App\Features\Billing;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -18,7 +17,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Subscription;
-use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\SystemAdmin\Actions\StartManagedPlan;
 use Relaticle\SystemAdmin\Actions\WithdrawManagedInvoice;
@@ -183,7 +181,7 @@ it('offers each managed plan its default yearly amount', function (): void {
 });
 
 it('keeps a paused workspace paused while the managed invoice is unpaid', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $workspace = managedPlanWorkspace();
     $workspace->forceFill(['pro_trial_used_at' => now()->subMonth(), 'trial_ends_at' => now()->subDay()])->save();
 

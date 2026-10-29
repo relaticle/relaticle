@@ -18,7 +18,7 @@ use Relaticle\Cloud\Entitlements\PlanEntitlements;
 mutates(CreditService::class, ReleaseOrphanedReservationsCommand::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 it('reserves exactly once for the same reservation key', function (): void {

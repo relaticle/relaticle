@@ -23,8 +23,7 @@ it('resolves the custom fields destination to an app-panel url', function (): vo
 });
 
 it('resolves every declared destination to a non-null url', function (): void {
-    config()->set('relaticle.features.billing', true);
-    Feature::flushCache();
+    withHostedBilling();
 
     $resolver = app(DestinationResolver::class);
 
@@ -87,8 +86,7 @@ it('resolves email_accounts to the mailbox page while the email integration is o
 });
 
 it('resolves billing to the billing page while billing is on', function (): void {
-    config()->set('relaticle.features.billing', true);
-    Feature::flushCache();
+    withHostedBilling();
 
     $url = app(DestinationResolver::class)->resolve('billing', $this->user->currentWorkspace);
 

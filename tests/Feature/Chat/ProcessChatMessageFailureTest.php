@@ -49,7 +49,7 @@ use Tests\Helpers\AnthropicSse;
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 /** @param array{provider: string|null, model: string|null, id: string|null, source: string} $resolved */

@@ -25,7 +25,7 @@ use Tests\Helpers\AnthropicSse;
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 it('refunds the reservation when a job fails without ever streaming', function (): void {

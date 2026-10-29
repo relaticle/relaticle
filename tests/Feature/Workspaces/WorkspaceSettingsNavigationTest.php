@@ -55,7 +55,7 @@ function activeWorkspaceTabLabels(object $page): array
 }
 
 test('every workspace settings page renders the same tab strip', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $expected = [
         __('workspaces.tabs.general'),
@@ -117,7 +117,7 @@ test('a user outside the workspace cannot open the members tab', function (): vo
 });
 
 test('the tab strip hides admin-only tabs from members without the admin role', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
@@ -236,7 +236,7 @@ test('the tab strip drops billing when the feature is off', function (): void {
 });
 
 test('each page highlights its own tab even when no page route is current', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $tabs = [
         EditWorkspace::class => __('workspaces.tabs.general'),
@@ -257,7 +257,7 @@ test('each page highlights its own tab even when no page route is current', func
 });
 
 test('the tenant menu lists billing directly under workspace settings', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $panel = Filament::getPanel('app');
     Filament::setCurrentPanel($panel);

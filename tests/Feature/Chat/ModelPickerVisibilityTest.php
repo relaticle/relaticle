@@ -114,7 +114,7 @@ it('shows env-configured self-hosted models in the picker', function (): void {
 });
 
 it('locks premium models in the chat picker for a trial workspace without its own data', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
@@ -126,7 +126,7 @@ it('locks premium models in the chat picker for a trial workspace without its ow
 });
 
 it('locks premium models in the dashboard picker for a trial workspace without its own data', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
@@ -138,7 +138,7 @@ it('locks premium models in the dashboard picker for a trial workspace without i
 });
 
 it('keeps premium models locked without the trial flag on the free plan', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
 
@@ -147,7 +147,7 @@ it('keeps premium models locked without the trial flag on the free plan', functi
 });
 
 it('unlocks premium models for a trial workspace once it holds its own record', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $workspace = $this->user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
@@ -172,7 +172,7 @@ it('offers every configured model in the picker on a self-hosted install', funct
 });
 
 it('keeps Pro-only models out of the picker for a billing-on Free workspace', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     useProFirstAutoChain();
 
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
@@ -193,7 +193,7 @@ it('leaves the plan label out of the dashboard composer on a self-hosted install
 });
 
 it('keeps the plan label in the chat when billing is on', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     expect(html_entity_decode(Livewire::test(ChatInterface::class)->html()))
         ->toContain("currentPlanLabel: '".Plan::Free->getLabel()."'")

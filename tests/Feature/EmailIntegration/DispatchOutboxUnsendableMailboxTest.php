@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Notification as NotificationRow;
 use App\Models\User;
@@ -11,7 +10,6 @@ use App\Models\Workspace;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\MarkEmailsSendFailedAction;
 use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
@@ -163,7 +161,7 @@ it('keeps sending due mail on an active mailbox', function (): void {
 });
 
 it('fails due mail in a paused workspace and sends the sender to billing', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->account->update(['status' => EmailAccountStatus::ACTIVE]);
     $due = ($this->queue)();
     $later = ($this->queue)(['scheduled_for' => now()->addDay()]);
@@ -187,7 +185,7 @@ it('fails due mail in a paused workspace and sends the sender to billing', funct
 });
 
 it('holds due mail in a paused workspace when failing it throws', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->account->update(['status' => EmailAccountStatus::ACTIVE]);
     $email = ($this->queue)();
     Email::updating(fn (): never => throw new RuntimeException('database unavailable'));
@@ -199,7 +197,7 @@ it('holds due mail in a paused workspace when failing it throws', function (): v
 });
 
 it('sends due mail in a workspace whose trial is running', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
     $this->account->update(['status' => EmailAccountStatus::ACTIVE]);
     $email = ($this->queue)();

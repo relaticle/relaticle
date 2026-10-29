@@ -3,12 +3,10 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing as BillingFeature;
 use App\Http\Controllers\ContactController;
 use App\Http\Requests\ContactRequest;
 use App\Mail\NewContactSubmissionMail;
 use Illuminate\Support\Facades\Mail;
-use Laravel\Pennant\Feature;
 use Spatie\Honeypot\EncryptedTime;
 
 mutates(ContactController::class, ContactRequest::class);
@@ -20,7 +18,7 @@ it('displays the contact form', function () {
 });
 
 it('carries the Enterprise offer into the inquiry form', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/contact?plan=enterprise')
         ->assertSee('Let’s plan your Enterprise workspace')
@@ -29,7 +27,7 @@ it('carries the Enterprise offer into the inquiry form', function (): void {
 });
 
 it('carries the Concierge offer into the inquiry form', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/contact?plan=concierge')
         ->assertSee('Let’s set up your Concierge workspace')
@@ -39,7 +37,7 @@ it('carries the Concierge offer into the inquiry form', function (): void {
 });
 
 it('treats a malformed plan parameter as a general contact', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/contact?plan[]=concierge')
         ->assertOk()
@@ -48,7 +46,7 @@ it('treats a malformed plan parameter as a general contact', function (): void {
 });
 
 it('treats a self-serve plan as a general contact', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/contact?plan=pro')
         ->assertSee('Get in touch')
@@ -58,7 +56,7 @@ it('treats a self-serve plan as a general contact', function (): void {
 
 it('preserves the visitor message when an Enterprise inquiry fails validation', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->from('/contact?plan=enterprise')->post('/contact?plan=enterprise', honeypotFields() + [
         'name' => 'Maya Chen',
@@ -75,7 +73,7 @@ it('preserves the visitor message when an Enterprise inquiry fails validation', 
 
 it('delivers the Enterprise inquiry details through the contact workflow', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     $message = "We are interested in Relaticle Enterprise.\nIntegrate our Salesforce pipeline with our operations system.\nWorkspace size: 40.\nTarget timeline: November.";
 
     $this->post('/contact?plan=enterprise', honeypotFields() + [
@@ -91,7 +89,7 @@ it('delivers the Enterprise inquiry details through the contact workflow', funct
 
 it('names the Concierge plan on the inquiry mail and keeps it in the redirect', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->post('/contact?plan=concierge', honeypotFields() + [
         'name' => 'Maya Chen',
@@ -105,7 +103,7 @@ it('names the Concierge plan on the inquiry mail and keeps it in the redirect', 
 
 it('keeps the general contact subject and redirect without a managed plan', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->post('/contact?plan=pro', honeypotFields() + [
         'name' => 'Maya Chen',
@@ -118,7 +116,7 @@ it('keeps the general contact subject and redirect without a managed plan', func
 });
 
 it('keeps general contact inquiries free of Enterprise sales copy', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/contact?plan=other')
         ->assertDontSee('From $20,000 / year');

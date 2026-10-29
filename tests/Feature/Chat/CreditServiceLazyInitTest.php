@@ -3,16 +3,14 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 it('lazy-creates a free balance when hasCredits is called on a workspace with no row', function (): void {

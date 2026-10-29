@@ -8,7 +8,6 @@ use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
-use App\Features\Billing as BillingFeature;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
@@ -797,7 +796,7 @@ it('shows the account menu links inside a workspace', function (): void {
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -821,7 +820,7 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
 });
 
 it('starts a fresh trial for each additional hosted workspace', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace?->forceFill(['pro_trial_used_at' => now()])->save();

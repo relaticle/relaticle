@@ -12,7 +12,7 @@ use Laravel\Pennant\Feature;
 mutates(SidebarBillingState::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;

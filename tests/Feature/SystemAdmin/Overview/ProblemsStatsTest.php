@@ -33,7 +33,7 @@ beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
     Cache::flush();
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
 });
 

@@ -22,7 +22,7 @@ it('does not claim hosted models ship with self-hosted installs', function (): v
 });
 
 it('describes the Cloud Pro trial when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $html = $this->get('/ai')->assertOk()->getContent();
 

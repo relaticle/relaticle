@@ -44,7 +44,7 @@ it('is linked from the assistant page so the sitemap crawler can find it', funct
 });
 
 it('describes the Cloud Pro trial when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $html = $this->get('/ai-native-crm')->assertOk()->getContent();
 

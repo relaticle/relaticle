@@ -13,7 +13,6 @@ use App\Enums\BillingStatus;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
-use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
 use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Jobs\RefreshManagedRenewal;
@@ -33,7 +32,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Laravel\Cashier\Subscription;
-use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -159,7 +157,7 @@ it('keeps the workspace on Free while the subscription is incomplete', function 
 });
 
 it('upgrades the workspace to Pro and grants the allowance when the subscription activates', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
 
@@ -174,7 +172,7 @@ it('upgrades the workspace to Pro and grants the allowance when the subscription
 });
 
 it('does not re-reset usage when the same webhook is replayed', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
 
@@ -205,7 +203,7 @@ it('keeps Pro pricing when the subscription switches between pro prices', functi
 });
 
 it('downgrades the workspace to Free when the subscription is deleted', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
 
@@ -256,7 +254,7 @@ it('sends no ended email when an Enterprise grant outlives the subscription', fu
 });
 
 it('preserves a sysadmin-granted plan when an unrelated subscription ends', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
 
@@ -279,7 +277,7 @@ it('preserves a sysadmin-granted plan when an unrelated subscription ends', func
 });
 
 it('preserves an Enterprise grant when an older Pro subscription sends an update', function (string $status): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
     sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
@@ -408,7 +406,7 @@ it('keeps the generic trial when a managed subscription is created awaiting its 
 });
 
 it('never double-grants across a mid-trial conversion', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     test()->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
 
@@ -902,7 +900,7 @@ function proWorkspaceAwaitingManagedPayment(): Workspace
 }
 
 it('switches a managed plan on when its first invoice is paid', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = stripeBillingWorkspace();
     pendingManagedSubscription($workspace);
@@ -1092,7 +1090,7 @@ it('replaces an older managed subscription for a workspace that once paid for Pr
 });
 
 it('grants nothing when a concurrent delivery switched the plan on first', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $workspace = proWorkspaceAwaitingManagedPayment();
     stripeManagedSwitch($workspace);
@@ -1110,7 +1108,7 @@ it('grants nothing when a concurrent delivery switched the plan on first', funct
 });
 
 it('grants and refunds once when Stripe redelivers the paid invoice', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->travelTo(now()->startOfSecond());
 
@@ -1240,7 +1238,7 @@ it('reports and grants nothing when the paid subscription is already canceled at
 });
 
 it('grants the plan and retries the switch refund when the refund call fails', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->travelTo(now()->startOfSecond());
 
@@ -1568,7 +1566,7 @@ it('reports a renewal paid on a managed subscription that already ended', functi
 
 it('drops a lapsed Concierge workspace to Free and tells the owner', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     $workspace = stripeBillingWorkspace();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
     managedSubscriptionOn($workspace);
@@ -1590,7 +1588,7 @@ it('drops a lapsed Concierge workspace to Free and tells the owner', function ()
 
 it('keeps a past-due Concierge workspace on its plan', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     $workspace = stripeBillingWorkspace();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
     managedSubscriptionOn($workspace);
@@ -1633,7 +1631,7 @@ it('grants nothing when a subscription that is still unpaid reports an update', 
 
 it('restores a managed plan when Stripe marks it unpaid and a payment later brings it back', function (): void {
     Mail::fake();
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     $workspace = stripeBillingWorkspace();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
     managedSubscriptionOn($workspace);

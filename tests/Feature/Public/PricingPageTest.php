@@ -22,7 +22,7 @@ it('shows the legacy two-card page when billing is off', function (): void {
 });
 
 it('shows the pro tier when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -42,7 +42,7 @@ it('shows the pro tier when billing is on', function (): void {
 });
 
 it('keeps self-hosting separate from the three paid plan choices', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $response = $this->get('/pricing');
     $crawler = new Crawler((string) $response->getContent());
@@ -53,7 +53,7 @@ it('keeps self-hosting separate from the three paid plan choices', function (): 
 });
 
 it('closes with a trial start and a sales contact when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $response = $this->get('/pricing')->assertOk();
     $crawler = new Crawler((string) $response->getContent());
@@ -78,7 +78,7 @@ it('closes with a free start and a self-hosting link when billing is off', funct
 });
 
 it('answers the trial question right after the hosted plan question when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $response = $this->get('/pricing')->assertOk();
     $questions = (new Crawler((string) $response->getContent()))
@@ -132,7 +132,7 @@ it('answers common pricing questions on the page', function (): void {
 });
 
 it('scopes the hosted-plan faq to the pro tier when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -153,7 +153,7 @@ it('scopes the hosted-plan faq to the free tier when billing is off', function (
 });
 
 it('compares hosted product access with scoped Enterprise services when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -176,7 +176,7 @@ it('shows the comparison list with the free-tier hosted price and updates when b
 });
 
 it('emits accurate product json-ld offers when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -186,7 +186,7 @@ it('emits accurate product json-ld offers when billing is on', function (): void
 });
 
 it('keeps the Enterprise starting price consistent with its annual structured offer', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config(['relaticle.enterprise.starting_price_yearly' => 25_000]);
 
     $response = $this->get('/pricing')->assertSee('From $25,000 / year');
@@ -202,7 +202,7 @@ it('keeps the Enterprise starting price consistent with its annual structured of
 });
 
 it('names Cloud Concierge in the meta description when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $response = $this->get('/pricing')->assertOk();
     $description = (new Crawler((string) $response->getContent()))
@@ -214,7 +214,7 @@ it('names Cloud Concierge in the meta description when billing is on', function 
 });
 
 it('sells Cloud Concierge through a sales inquiry at its yearly price', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config(['relaticle.concierge.price_yearly' => 1_200]);
 
     $response = $this->get('/pricing')->assertOk();
@@ -246,7 +246,7 @@ it('emits accurate product json-ld offers when billing is off', function (): voi
 });
 
 it('discloses the real per-model credit multiplier instead of a flat allowance claim', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -257,7 +257,7 @@ it('discloses the real per-model credit multiplier instead of a flat allowance c
 });
 
 it('does not contradict the credit-multiplier faq with a flat-allowance claim on the billing-on plan card', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -267,7 +267,7 @@ it('does not contradict the credit-multiplier faq with a flat-allowance claim on
 });
 
 it('tells self-hosters their installs do not meter AI credits and keeps the Cloud trial facts', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $html = $this->get('/pricing')->assertOk()->getContent();
     $question = e(__('Are self-hosted installs exempt from AI credit limits?'));
@@ -303,7 +303,7 @@ it('says AI credits are not metered in the billing-off plan-limit answer', funct
 });
 
 it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan-limit answer', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -314,7 +314,7 @@ it('never names a model the app cannot actually serve', function (): void {
     // Gemini 3 Flash and Gemini 3.1 Pro carry supports_tools => false in chat.php, so
     // ModelDescriptor::isAvailable() always returns false for them and they can never
     // be picked, so the page must never claim a plan "unlocks" or is priced for them.
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -331,7 +331,7 @@ it('pins the exact membership of every model list derived from the chat catalog'
     // other test here, since those only assert substrings that come from the OTHER derived
     // lists ($paidCloudModels / $multiplierOneModels). Each line below anchors one full
     // sentence fragment, so an empty/degraded list breaks the exact assertion for that list.
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -351,7 +351,7 @@ it('pins the exact membership of every model list derived from the chat catalog'
  * suite because phpunit.xml sets a fake key for every provider.
  */
 it('names the models a plan includes even when this install holds no provider key', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config(['ai.providers.anthropic.key' => null, 'ai.providers.openai.key' => null]);
     app()->forgetInstance(ModelRegistry::class);
 
@@ -364,7 +364,7 @@ it('names the models a plan includes even when this install holds no provider ke
 });
 
 it('offers Enterprise through a scoped sales inquiry with an annual starting price', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $response = $this->get('/pricing')
         ->assertSee('From $20,000 / year')
@@ -386,7 +386,7 @@ it('does not claim an unconfirmed Enterprise tier is a purchasable offering when
 });
 
 it('describes the chat rate limit as per workspace, not per person', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->get('/pricing')
         ->assertOk()
@@ -444,7 +444,7 @@ function assertNoCopyHoles(string $html): void
 }
 
 it('names every offered model in exactly one multiplier clause', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     catalogOf([
         ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
@@ -463,7 +463,7 @@ it('names every offered model in exactly one multiplier clause', function (): vo
 });
 
 it('leaves no hole when no model carries a given multiplier', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     catalogOf([
         ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
@@ -477,7 +477,7 @@ it('leaves no hole when no model carries a given multiplier', function (): void 
 });
 
 it('leaves no hole when the catalog offers nothing on the free plan', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     catalogOf([
         ['model' => 'b-2', 'label' => 'Beta Two', 'min_plan' => 'pro', 'credit_multiplier' => 2.0],
@@ -491,7 +491,7 @@ it('leaves no hole when the catalog offers nothing on the free plan', function (
 });
 
 it('leaves no hole when the catalog offers nothing on a paid plan', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     catalogOf([
         ['model' => 'a-1', 'label' => 'Alpha One', 'min_plan' => 'free', 'credit_multiplier' => 1.0],
@@ -505,7 +505,7 @@ it('leaves no hole when the catalog offers nothing on a paid plan', function ():
 });
 
 it('keeps the shipped seed catalog free of copy holes on both public pages', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     config(['chat.models' => (require base_path('packages/Chat/config/chat.php'))['models']]);
     app()->forgetInstance(ModelRegistry::class);
@@ -515,7 +515,7 @@ it('keeps the shipped seed catalog free of copy holes on both public pages', fun
 });
 
 it('keeps the plans help article in step with the pricing page', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $pricing = $this->get('/pricing')->assertOk()->getContent();
     $article = $this->get(route('help.show', ['category' => 'workspace', 'slug' => 'billing-and-plans']))->assertOk()->getContent();

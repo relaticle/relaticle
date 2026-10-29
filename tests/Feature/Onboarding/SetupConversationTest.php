@@ -122,7 +122,7 @@ it('has the assistant speak first when the owner opens the setup conversation', 
 });
 
 it('charges the greeting turn a credit', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 
@@ -252,7 +252,7 @@ it('does not greet when the flag is off', function (): void {
 });
 
 it('does not greet when the workspace is out of credits', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 

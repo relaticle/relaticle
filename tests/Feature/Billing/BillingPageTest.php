@@ -32,7 +32,7 @@ mutates(
 
 beforeEach(function (): void {
     Queue::fake([RefreshManagedRenewal::class]);
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 });

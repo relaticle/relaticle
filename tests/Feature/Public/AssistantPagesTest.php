@@ -80,7 +80,7 @@ it('links each assistant page to the other, the setup guide and pricing from its
 });
 
 it('says the workspace needs Cloud Pro after the trial rather than calling the connector free', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $text = assistantPageText($this->get('/crm-for-chatgpt')->assertOk()->getContent());
 
@@ -109,7 +109,7 @@ it('is linked from the AI-native CRM page copy so a reader can reach both pages'
 });
 
 it('names the Cloud Pro trial in the cost answer when billing is on', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     expect($this->get('/crm-for-claude')->assertOk()->getContent())->toContain('14-day Cloud Pro trial');
 });

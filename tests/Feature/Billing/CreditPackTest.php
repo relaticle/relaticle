@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -15,7 +13,7 @@ use Relaticle\Chat\Services\CreditService;
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 /** @return array{0: User, 1: Workspace} */

@@ -21,7 +21,7 @@ use Tests\Helpers\ChatDocument;
 mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class);
 
 beforeEach(function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;

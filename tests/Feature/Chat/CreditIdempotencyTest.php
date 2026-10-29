@@ -2,13 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -17,7 +15,7 @@ use Relaticle\Chat\Services\CreditService;
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 });
 
 it('does not double-charge when settle is called twice with the same idempotency key', function (): void {

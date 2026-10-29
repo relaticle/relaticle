@@ -22,7 +22,7 @@ test('rest api integration link points to scribe docs', function (): void {
 })->skip(fn (): bool => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('web forms link points to the lead capture article on a hosted install', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     Feature::define(Documentation::class, true);
 
     $user = User::factory()->withWorkspace()->create();
@@ -53,7 +53,7 @@ test('web forms link is hidden where hosted billing is off', function (): void {
 })->skip(fn (): bool => ! Features::hasApiFeatures(), 'API support is not enabled.');
 
 test('web forms link is hidden where the help centre is off', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     Feature::define(Documentation::class, false);
 
     $user = User::factory()->withWorkspace()->create();
