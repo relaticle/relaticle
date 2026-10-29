@@ -224,8 +224,8 @@ function trackWrapperScroll(wrapper) {
     }, { passive: true })
 }
 
-// Pins stay off when they would leave less than this much of the table to scroll the rest through.
-const MIN_SCROLLING_WIDTH = 200
+// Below Filament's `sm` breakpoint rows stack as cards, so there are no columns to pin.
+const PINS_MEDIA = '(min-width: 640px)'
 
 function markScrolledSideways(table) {
     table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
@@ -235,14 +235,13 @@ function markScrolledSideways(table) {
 function applyPinnedOffsets(table) {
     const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
     const selection = table.querySelector('thead .fi-ta-selection-cell')
-    const wrapper = table.closest('.fi-ta-content-ctn')
     let left = selection?.offsetWidth ?? 0
     const offsets = pinned.map((th) => {
         const offset = left
         left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
         return offset
     })
-    const active = pinned.length > 0 && left <= (wrapper?.clientWidth ?? 0) - MIN_SCROLLING_WIDTH
+    const active = pinned.length > 0 && window.matchMedia(PINS_MEDIA).matches
 
     table.classList.toggle('fi-ta-has-pinned', active)
     table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))

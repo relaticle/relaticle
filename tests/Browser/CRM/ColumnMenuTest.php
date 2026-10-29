@@ -516,13 +516,61 @@ it('moves the pinned columns after a pinned column that is resized', function ()
         ->assertNoJavaScriptErrors();
 });
 
-it('leaves pins unstuck when they would cover most of a narrow table', function (): void {
-    $page = companiesTable($this->user, $this->workspace->slug)->resize(640, 900)->wait(0.5);
+it('keeps every pin stuck however much of the table the pins cover', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(1024, 900)->wait(0.5);
 
-    pinFromMenu(pinFromMenu($page, 'accountOwner.name'), 'creator.name')
-        ->wait(0.3)
-        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
-        ->assertScript(firstCell('name').'.style.left', '')
+    foreach (['accountOwner.name', 'creator.name', 'created_at'] as $column) {
+        pinFromMenu($page, $column);
+    }
+
+    $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
+
+    $page->wait(0.3)
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
+        ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('unsticks pins where rows stack as cards and sticks them again on a wider screen', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+    $hasPinned = 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")';
+
+    $page->resize(390, 844);
+    waitUntil($page, "! {$hasPinned}")
+        ->assertScript(firstCell('name').'.style.left', '');
+
+    $page->resize(1440, 900);
+    waitUntil($page, $hasPinned)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows only the handle of a pinned column at the minimum width', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(widths: ['created_at' => 40]),
+    ]);
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+
+    $page->assertScript(sprintf(<<<'JS'
+        (() => {
+            const handle = document.querySelector(`%s .fi-ta-column-handle`);
+            const box = handle.getBoundingClientRect();
+            handle.style.visibility = 'hidden';
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+            handle.style.visibility = '';
+            return !hit?.closest('.fi-ta-resizable-label');
+        })();
+    JS, columnHeader('created_at')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('tints pinned cells like the rest of a selected row', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+
+    $page->script('document.querySelector("tbody tr.fi-ta-row .fi-ta-record-checkbox").click()');
+
+    waitUntil($page, 'document.querySelector("tbody tr.fi-ta-row").classList.contains("fi-selected")')
+        ->assertScript(sprintf('getComputedStyle(%s).backgroundColor === getComputedStyle(document.querySelector("tbody tr.fi-ta-row")).backgroundColor', firstCell('created_at')), true)
         ->assertNoJavaScriptErrors();
 });
 
