@@ -13,6 +13,7 @@ final class TableStateData extends Data
      * @param  array<string, mixed>  $filters
      * @param  array<string, mixed>  $columnSearches
      * @param  array<string, int>  $widths
+     * @param  list<string>  $pinned
      */
     public function __construct(
         public array $columns = [],
@@ -23,6 +24,7 @@ final class TableStateData extends Data
         public ?string $grouping = null,
         public int|string|null $perPage = null,
         public array $widths = [],
+        public array $pinned = [],
     ) {}
 
     public function withoutWidths(): self
@@ -34,9 +36,16 @@ final class TableStateData extends Data
     }
 
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
+    // Hashes stored before pins existed carry no `pinned` key, so an empty one is left out.
     public function hash(): string
     {
-        return hash('xxh128', json_encode(self::sortKeys($this->toArray()), JSON_THROW_ON_ERROR));
+        $state = $this->toArray();
+
+        if ($state['pinned'] === []) {
+            unset($state['pinned']);
+        }
+
+        return hash('xxh128', json_encode(self::sortKeys($state), JSON_THROW_ON_ERROR));
     }
 
     /**

@@ -27,10 +27,11 @@ final class ResizableColumns
         }
 
         $widths = $livewire->getResizableColumnWidths();
+        $pinned = method_exists($livewire, 'getPinnedTableColumns') ? $livewire->getPinnedTableColumns() : [];
         $titleColumn = CrmEntity::tryFromModel(new ($table->getModel()))?->titleColumn();
 
         foreach ($table->getColumns() as $name => $column) {
-            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH, $name === $titleColumn);
+            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH, $name === $titleColumn, in_array($name, $pinned, true));
         }
 
         return $table;
@@ -41,7 +42,7 @@ final class ResizableColumns
         return preg_match('/^(\d+)(px)?$/', (string) $width, $match) === 1 ? (int) $match[1] : null;
     }
 
-    private static function stamp(Column $column, string $name, int $width, bool $isTitleColumn): void
+    private static function stamp(Column $column, string $name, int $width, bool $isTitleColumn, bool $isPinned): void
     {
         $min = self::MIN_WIDTH;
         $max = self::MAX_WIDTH;
@@ -50,6 +51,7 @@ final class ResizableColumns
         $attributes = [
             'data-resizable-width' => (string) $width,
             'data-resizable-column-id' => $columnId,
+            'data-column-pinned' => $isPinned ? '1' : '0',
         ];
 
         $column->extraHeaderAttributes([

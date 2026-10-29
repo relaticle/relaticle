@@ -52,6 +52,7 @@ trait PersistsTableState
         $this->tableGrouping = blank($this->tableGrouping) ? $initial->grouping : $this->tableGrouping;
         $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $initial->perPage : $this->tableRecordsPerPage;
         $this->tableColumnWidths = $this->storedTablePreference()?->state->widths ?? [];
+        $this->tablePinnedColumns = $initial->pinned;
     }
 
     public function bootedInteractsWithTable(): void
@@ -109,6 +110,7 @@ trait PersistsTableState
 
     private function applyTableState(TableStateData $state): void
     {
+        $this->tablePinnedColumns = $state->pinned;
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
 
         $this->tableSort = $state->sort;
@@ -267,6 +269,7 @@ trait PersistsTableState
             grouping: filled($this->tableGrouping) ? $this->tableGrouping : null,
             perPage: $this->tableRecordsPerPage,
             widths: array_intersect_key($this->tableColumnWidths, $this->getTable()->getColumns()),
+            pinned: $this->tablePinnedColumns,
         );
     }
 }
