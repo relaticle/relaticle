@@ -348,36 +348,35 @@ scrolls sideways under them.
 ![Company pinned while the table is scrolled right](assets/table-layouts/phase-5-pinned.png)
 ![The same in dark mode](assets/table-layouts/phase-5-pinned-dark.png)
 
-- The menu gains "Pin to left", shown as "Unpin" on a pinned column. A pinned header shows a
-  lock in place of the handle, in the handle's gray. (The mockups show a pushpin in the primary
-  colour. The lock replaced it after the first build.)
-- A pinned column is locked: its lock opens the menu with Unpin and Hide, and it neither drags
-  nor moves. Pinned columns sit together at the left, after the selection checkbox, in pin
-  order. Pinning moves a column there; unpinning returns it to the first unpinned position.
-  Nothing can be dropped among them.
-- The title column stays first (phase 4) and has no handle. Pinning any column pins the title
-  column with it, and unpinning or hiding the last other pinned column unpins it too. The title
-  column is never pinned on its own. (The mockup's lone pinned title column was dropped after
-  the first build.)
-- The selection column is pinned whenever any column is.
-- The last pinned column carries an edge shadow while the table is scrolled.
-- Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
-  phase 1). It recomputes offsets when a pinned column is resized.
-- Pins stay off while they would leave less than 200 px of the table to scroll the rest
-  through, so a narrow screen keeps a usable table.
-- A header label clips at its content edge, so a column at the minimum width shows only its
-  handle and nothing collides with it.
-- `TableStateData` gains `pinned`. Pins are saved in table state and in layouts. An empty
-  `pinned` hashes as states did before pins existed, so a layout applied before the upgrade
-  does not read "(modified)".
-- A hidden or deleted column leaves the pins.
+Phase 5 adds pins to the header controls that phases 1 and 4 built. Each change to one of
+them broke another while it was built, so every rule below names the test that fails when it
+breaks. `F` is `tests/Feature/Filament/App/Tables/ColumnMenuTest.php`. `B` is
+`tests/Browser/CRM/ColumnMenuTest.php`, which runs in Chromium and WebKit. A change to pins,
+handles, resizing or reordering keeps every rule, or changes the rule here first.
 
-Done when:
+| # | Rule | Guarded by |
+|---|---|---|
+| 1 | The menu offers "Pin to left" on an unpinned column and "Unpin" on a pinned one. | B: pins a column from its menu and keeps the pin after a reload |
+| 2 | The title column has no handle. It is pinned only beside another pinned column, and unpinning or hiding the last other pinned column unpins it. It is never pinned on its own. | F: pins the title column only beside another pinned column. B: locks a pinned column and unpins the title column with the last one |
+| 3 | A pinned column is locked. Its header shows a lock in the handle's gray, always visible. The lock opens a menu with Unpin, and Hide where the column is toggleable. It never drags, and the arrow keys and Move items never move it. | B: locks a pinned column and unpins the title column with the last one. B: never drags a pinned column or drops another among the pins |
+| 4 | Pinned columns sit together after the selection checkbox, in pin order. Pinning moves a column to the end of the pins. Unpinning returns it to the first unpinned position. Nothing is dropped among them, by a drag or by the column manager. | F: pins columns in the order they were pinned and unpins to the first unpinned position. F: keeps a column on its side of the pins when the column manager moves it. B: never drags a pinned column or drops another among the pins |
+| 5 | An unpinned column's grip shows on hover and on keyboard focus only. When the table scrolls, every handle of an unpinned header passes under the pinned headers, never over them. | B: keeps the handles of scrolled headers under the pinned headers |
+| 6 | Every pin sticks, however much of the table the pins cover. A member who pins too much unpins from the lock. The one exception is below Filament's `sm` breakpoint (640 px), where rows stack as cards and there are no columns to pin. | B: keeps every pin stuck however much of the table the pins cover. B: unsticks pins where rows stack as cards and sticks them again on a wider screen |
+| 7 | Pinned cells paint above the cells that scroll under them, and the last pinned column carries an edge shadow while the table is scrolled. | B: keeps pinned columns in place while the table scrolls sideways |
+| 8 | Hovered, selected and striped rows keep their tint in pinned cells. Checked by eye in dark mode. | B: tints pinned cells like the rest of a selected row |
+| 9 | Resizing a pinned column moves the pinned columns after it on every pointer move, and after the save. | B: moves the pinned columns after a pinned column that is resized |
+| 10 | A column at the minimum width shows only its handle. A header label clips at its content edge, so nothing draws under the handle. | B: shows only the handle of a pinned column at the minimum width |
+| 11 | A hidden or deleted column leaves the pins, so a pin can never hold the title column with nothing visible beside it. | F: unpins a column when it is hidden. F: drops a pin for a column the table no longer has |
+| 12 | Pins are saved in table state and in layouts, and a pin change marks the applied layout "(modified)". An empty `pinned` hashes as a state did before pins existed, so a layout applied before the upgrade still reads clean. | F: pins a column after the title column and keeps it on a new visit. F: restores the pins a layout was saved with and marks the layout modified when they change. F: hashes a state without pins as it did before pins existed |
+| 13 | Headers and cells carry `data-column-pinned` in the same response that changed the pins. | F: marks pinned headers and cells in the render that pinned them |
 
-- A pin survives a reload and is restored by the layout it was saved in.
-- Resizing a pinned column moves the columns pinned after it.
-- Pinned cells paint above scrolled cells, row hovers and the selection state, in Chromium and
-  WebKit, light and dark.
+Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
+phase 1). `TableStateData` gains `pinned`.
+
+The mockups show a pushpin in the primary colour, a pinned title column on its own, and Move
+items on a pinned column. The first build replaced all three with the rules above.
+
+Done when every rule's tests pass in Chromium and WebKit, and dark mode has been checked by eye.
 
 ## Domain model
 
@@ -576,5 +575,4 @@ WebKit. No migration tests: rehearse each migration on anonymized production dat
 - How the toolbar control reaches the page component (phase 3, proved first).
 - The exact markup and styling, within the mockups and the theme variables.
 - Where the drag threshold sits, and the drag behaviour on touch screens.
-- What happens when pinned columns are wider than the viewport. The table must stay usable on a
-  narrow screen.
+- What happens when pinned columns are wider than the viewport. Decided in phase 5, rule 6.
