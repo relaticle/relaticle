@@ -37,6 +37,8 @@ return [
             'handle_hint' => 'Drag to reorder. Click for options.',
             'move_left' => 'Move left',
             'move_right' => 'Move right',
+            'pin' => 'Pin to left',
+            'unpin' => 'Unpin',
             'hide' => 'Hide column',
         ],
         'layouts' => [

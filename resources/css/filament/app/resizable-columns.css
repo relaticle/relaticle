@@ -184,6 +184,8 @@ body.resizing-column {
    the menu. Its space stays reserved, so the label does not reflow when it appears. */
 .fi-ta-resizable-header:has(> .fi-ta-column-handle) > .fi-ta-resizable-label {
     padding-right: 1.5rem;
+    /* `overflow` clips at the padding edge, so a narrow column would draw its label under the handle. */
+    clip-path: inset(0 1.5rem 0 0);
 }
 
 .fi-ta-column-handle {
@@ -319,4 +321,56 @@ body.reordering-column * {
 /* Headers passing under the pointer mid-drag must not light up a resize handle. */
 body.reordering-column .column-resize-handle-bar::before {
     width: 0 !important;
+}
+
+/* A pinned column does not move, so its header shows a lock in place of the grip, always. */
+th[data-column-pinned="1"] > .fi-ta-column-handle {
+    cursor: pointer;
+    opacity: 1;
+}
+
+th[data-column-pinned="1"] > .fi-ta-column-handle::before {
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill-rule='evenodd' d='M10 1a4.5 4.5 0 0 0-4.5 4.5V9H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-.5V5.5A4.5 4.5 0 0 0 10 1Zm3 8V5.5a3 3 0 1 0-6 0V9h6Z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* The script sets each pinned cell's `left` and the table class, and clears both when pins would
+   crowd out the rest of the table. */
+.fi-ta-has-pinned.fi-ta-resizable-table :is(th, td):is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    position: sticky;
+    z-index: 1;
+}
+
+/* Above the handles of the headers scrolling under them (10 and 11). */
+.fi-ta-has-pinned.fi-ta-resizable-table thead :is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    z-index: 12;
+}
+
+.fi-ta-has-pinned .fi-ta-selection-cell {
+    left: 0;
+}
+
+.fi-ta-has-pinned td:is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    background-color: white;
+}
+
+.dark .fi-ta-has-pinned td:is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    background-color: var(--gray-900);
+}
+
+/* Opaque versions of the row tints, so pinned cells keep the row's state. */
+.fi-ta-has-pinned .fi-ta-row:is(.fi-clickable:hover, .fi-selected, .fi-striped) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    background-color: var(--gray-50);
+}
+
+.dark .fi-ta-has-pinned .fi-ta-row:is(.fi-clickable:hover, .fi-selected, .fi-striped) > :is([data-column-pinned="1"], .fi-ta-selection-cell) {
+    background-color: color-mix(in oklab, var(--gray-900), white 5%);
+}
+
+.fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
+    box-shadow: 6px 0 8px -4px rgb(0 0 0 / 0.12);
+}
+
+.dark .fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
+    box-shadow: 6px 0 8px -4px rgb(0 0 0 / 0.5);
 }

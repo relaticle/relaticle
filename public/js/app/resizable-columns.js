@@ -194,6 +194,7 @@ function scheduleSizingUpdate(table) {
         widthRecalcPending.delete(table)
         if (table.isConnected) {
             applyTableSizing(table)
+            applyPinnedOffsets(table)
             scheduleStickyRecalc()
         }
     })
@@ -219,7 +220,39 @@ function trackWrapperScroll(wrapper) {
     scrollTrackedWrappers.add(wrapper)
     wrapper.addEventListener('scroll', () => {
         wrapperScrollLeft.set(wrapper, wrapper.scrollLeft)
+        markScrolledSideways(wrapper.querySelector('table.fi-ta-table'))
     }, { passive: true })
+}
+
+// Pins stay off when they would leave less than this much of the table to scroll the rest through.
+const MIN_SCROLLING_WIDTH = 200
+
+function markScrolledSideways(table) {
+    table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
+}
+
+// Each pinned cell sticks at the selection column's width plus the pinned widths before it.
+function applyPinnedOffsets(table) {
+    const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
+    const selection = table.querySelector('thead .fi-ta-selection-cell')
+    const wrapper = table.closest('.fi-ta-content-ctn')
+    let left = selection?.offsetWidth ?? 0
+    const offsets = pinned.map((th) => {
+        const offset = left
+        left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
+        return offset
+    })
+    const active = pinned.length > 0 && left <= (wrapper?.clientWidth ?? 0) - MIN_SCROLLING_WIDTH
+
+    table.classList.toggle('fi-ta-has-pinned', active)
+    table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
+    pinned.forEach((th, index) => {
+        [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)].forEach((cell) => {
+            cell.style.left = active ? `${offsets[index]}px` : ''
+            cell.toggleAttribute('data-column-pinned-last', active && index === pinned.length - 1)
+        })
+    })
+    markScrolledSideways(table)
 }
 
 function lockTable(table) {
@@ -241,6 +274,7 @@ function lockTable(table) {
     }
 
     table.dataset.resizableLayoutLocked = '1'
+    applyPinnedOffsets(table)
     scheduleStickyRecalc()
 }
 
@@ -259,6 +293,7 @@ function rebuildResizableTablesAfterMorph({ el } = {}) {
         delete table.dataset.resizableLayoutLocked
         lockTable(table)
         table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
+        applyPinnedOffsets(table)
 
         // Other components morph too, and only the table's own morph has rebuilt its headers.
         if (el?.contains(table)) restoreColumnFocus(table)
@@ -327,10 +362,10 @@ function forgetColumnFocus() {
 
 function restoreColumnFocus(table) {
     if (!pendingColumnFocus) return
-    const handle = columnHandle(table, pendingColumnFocus)
-    if (!handle) return
-    handle.focus()
+    const th = headersOf(table).find((header) => headerName(header) === pendingColumnFocus)
     pendingColumnFocus = null
+    // The title column has no handle, so its sort button takes focus instead.
+    ;(th?.querySelector('.fi-ta-column-handle') ?? th?.querySelector('.fi-ta-header-cell-sort-btn'))?.focus()
 }
 
 // A morph strips and rebuilds the header handles, so a handle is found again by its column.
@@ -348,20 +383,26 @@ function headerName(th) {
     return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
 }
 
-// The title column stays first, so nothing moves into or before its slot.
+// The title column and the pinned columns stay put, so a column moves only among the unpinned ones.
+function isMovable(th) {
+    return th !== undefined && th.dataset.columnLocked !== '1' && th.dataset.columnPinned !== '1'
+}
+
 function moveTargets(th) {
     const headers = headersOf(th.closest('table'))
     const index = headers.indexOf(th)
     const left = headers[index - 1]
+    const canSwapWith = (other) => isMovable(th) && isMovable(other)
 
     return {
-        canMoveLeft: left !== undefined && left.dataset.columnLocked !== '1',
-        canMoveRight: index < headers.length - 1,
+        movable: isMovable(th),
+        canMoveLeft: canSwapWith(left),
+        canMoveRight: canSwapWith(headers[index + 1]),
         before: {
             left: left ? headerName(left) : null,
             right: headers[index + 2] ? headerName(headers[index + 2]) : null,
         },
-        // Where focus goes when this column is hidden: a neighbour that has a handle.
+        // Where focus goes when this column is hidden: a neighbour with a handle, else the title column.
         neighbour: headerName(left?.dataset.columnLocked === '1' ? headers[index + 1] ?? left : left ?? headers[index + 1]),
     }
 }
@@ -411,7 +452,7 @@ function columnSlots(table) {
 }
 
 // A neighbour swaps once the dragged column's leading edge passes its middle, the same distance either way.
-// The title column keeps the first place.
+// The title column and the pinned columns keep their places.
 function dropIndex(slots, source, left) {
     const right = left + source.width
     const start = slots.indexOf(source)
@@ -419,8 +460,9 @@ function dropIndex(slots, source, left) {
     const before = slots.slice(0, start).filter((slot) => middle(slot) < left).length
     const after = slots.slice(start + 1).filter((slot) => middle(slot) < right).length
     const locked = slots.findIndex((slot) => slot.th.dataset.columnLocked === '1')
+    const pinned = slots.filter((slot) => slot.th.dataset.columnPinned === '1').length
 
-    return Math.max(before + after, locked + 1)
+    return Math.max(before + after, pinned, locked + 1)
 }
 
 function shiftColumns(slots, source, index) {
@@ -559,6 +601,8 @@ function registerColumnMenu() {
         trigger: null,
         panel: null,
         hideable: false,
+        movable: false,
+        pinned: false,
         canMoveLeft: false,
         canMoveRight: false,
         before: { left: null, right: null },
@@ -652,9 +696,11 @@ function registerResizableColumn() {
             handle.className = 'fi-ta-column-handle'
             handle.setAttribute('aria-label', window.filamentData?.columnOptionsLabel ?? '')
             handle.setAttribute('aria-haspopup', 'menu')
-            handle.title = window.filamentData?.columnHandleHint ?? ''
-            handle.addEventListener('pointerdown', (e) => startColumnDrag(e, this.column, this.$wire))
-            handle.addEventListener('keydown', (e) => this.moveByKey(e))
+            handle.title = isMovable(this.column) ? (window.filamentData?.columnHandleHint ?? '') : (window.filamentData?.columnOptionsLabel ?? '')
+            if (isMovable(this.column)) {
+                handle.addEventListener('pointerdown', (e) => startColumnDrag(e, this.column, this.$wire))
+                handle.addEventListener('keydown', (e) => this.moveByKey(e))
+            }
             handle.addEventListener('click', (e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -664,6 +710,7 @@ function registerResizableColumn() {
                         column: columnName,
                         trigger: handle,
                         hideable: this.column.dataset.columnHideable === '1',
+                        pinned: this.column.dataset.columnPinned === '1',
                         ...moveTargets(this.column),
                     },
                 }))
@@ -771,6 +818,7 @@ function registerResizableColumn() {
                 cell.style.cssText = cellStyle
                 cell.dataset.resizableWidth = String(width)
             })
+            applyPinnedOffsets(this.table)
             scheduleSizingUpdate(this.table)
         },
 

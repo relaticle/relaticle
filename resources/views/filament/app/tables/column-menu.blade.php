@@ -1,7 +1,9 @@
 @php
     $items = [
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft'],
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'show' => 'movable'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'show' => 'movable'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.pin'), 'icon' => 'heroicon-m-lock-closed', 'run' => '$wire.pinTableColumn(column)', 'visible' => '! pinned'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.unpin'), 'icon' => 'heroicon-m-lock-open', 'run' => '$wire.unpinTableColumn(column)', 'visible' => 'pinned'],
         ['group' => 'hide', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => 'heroicon-m-eye-slash', 'run' => '$wire.hideTableColumn(column)', 'show' => 'hideable'],
     ];
 @endphp
@@ -32,6 +34,9 @@
                         type="button"
                         role="menuitem"
                         data-label="{{ $item['label'] }}"
+                        @isset($item['visible'])
+                            x-bind:style="{ display: {{ $item['visible'] }} ? null : 'none' }"
+                        @endisset
                         @isset($item['disabled'])
                             x-bind:disabled="{{ $item['disabled'] }}"
                             x-bind:aria-disabled="({{ $item['disabled'] }}).toString()"

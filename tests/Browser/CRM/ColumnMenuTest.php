@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Data\TableStateData;
+use App\Enums\CrmEntity;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Models\Company;
+use App\Models\TablePreference;
 use App\Models\User;
+use Illuminate\Support\Str;
 use Pest\Browser\Api\AwaitableWebpage;
 
 mutates(HasColumnMenu::class);
@@ -44,6 +48,11 @@ function openColumnMenu(string $column): string
 function columnMenuItem(string $label): string
 {
     return ".fi-ta-column-menu [role=\"menuitem\"][data-label=\"{$label}\"]";
+}
+
+function visibleMenuItems(): string
+{
+    return '[...document.querySelectorAll(".fi-ta-column-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.dataset.label)';
 }
 
 function menuItemFocused(): string
@@ -102,7 +111,7 @@ it('keeps sorting on the header and leaves the title column without a handle', f
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, menuItemFocused())
         ->assertMissing('.fi-ta-column-menu [data-label="Sort ascending"]')
-        ->assertScript('[...document.querySelectorAll(".fi-ta-column-menu [role=menuitem]")].filter((item) => item.offsetParent !== null).map((item) => item.dataset.label)', ['Move left', 'Move right', 'Hide column'])
+        ->assertScript(visibleMenuItems(), ['Move left', 'Move right', 'Pin to left', 'Hide column'])
         ->assertScript(sprintf('document.querySelector(`%s`).getAttribute("aria-sort")', columnHeader('created_at')), 'ascending')
         ->assertNoJavaScriptErrors();
 });
@@ -379,4 +388,160 @@ it('swaps with a neighbour on either side once the dragged column covers half of
     $page->script(dragHeaderBy('creator.name', $order[$index + 1], 0.6));
     waitUntil($page, headerOrder().'.indexOf("creator.name") === '.$index)
         ->assertNoJavaScriptErrors();
+});
+
+it('focuses the title column after hiding the last column beside it by keyboard', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug);
+
+    foreach (array_diff($page->script(headerOrder()), ['name', 'created_at']) as $column) {
+        $page->script(openColumnMenu($column));
+        $page->click(columnMenuItem('Hide column'))->assertMissing(columnHeader($column));
+    }
+
+    $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
+    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'Enter']);
+    waitUntil($page, headerOrder().'.join() === "name"');
+    waitUntil($page, '('.focusedColumn().') === "name"')
+        ->assertNoJavaScriptErrors();
+});
+
+function pinFromMenu(AwaitableWebpage $page, string $column): AwaitableWebpage
+{
+    $page->script(openColumnMenu($column));
+    $page->click(columnMenuItem('Pin to left'));
+
+    return waitUntil($page, sprintf('document.querySelector(`%s`)?.dataset.columnPinned === "1"', columnHeader($column)));
+}
+
+function firstCell(string $column): string
+{
+    return sprintf('document.querySelector(`tbody td.fi-ta-cell-%s`)', Str::of($column)->camel()->kebab()->replace('.', '\\\\.'));
+}
+
+function leftEdges(string ...$elements): string
+{
+    return '['.implode(', ', array_map(fn (string $element): string => "Math.round({$element}.getBoundingClientRect().left)", $elements)).']';
+}
+
+it('pins a column from its menu and keeps the pin after a reload', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at')
+        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
+        ->wait(1)
+        ->refresh()
+        ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
+        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '1');
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript(visibleMenuItems(), ['Unpin', 'Hide column'])
+        ->assertNoJavaScriptErrors();
+});
+
+it('locks a pinned column and unpins the title column with the last one', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at')
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
+        ->assertMissing(columnHeader('name').' .fi-ta-column-handle');
+
+    $page->script(openColumnMenu('created_at'));
+    waitUntil($page, visibleMenuItems().'.join() === "Unpin,Hide column"');
+    $page->click(columnMenuItem('Unpin'));
+    waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('name')))
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '0')
+        ->assertMissing(columnHeader('name').' .fi-ta-column-handle')
+        ->assertNoJavaScriptErrors();
+});
+
+it('never drags a pinned column or drops another among the pins', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+    $order = $page->script(headerOrder());
+
+    expect($page->script(dragHeader('created_at', end($order))))->toBe(['ghost' => false, 'shifted' => false, 'dragging' => false]);
+
+    $page->script(dragHeader(end($order), 'created_at'));
+    waitUntil($page, headerOrder().'.indexOf('.json_encode(end($order)).') === 2')
+        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
+        ->assertNoJavaScriptErrors();
+});
+
+function wideCompaniesTable(User $user, string $slug): AwaitableWebpage
+{
+    TablePreference::factory()->for($user)->for($user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(widths: ['accountOwner.name' => 700, 'creator.name' => 700]),
+    ]);
+
+    return companiesTable($user, $slug);
+}
+
+it('keeps pinned columns in place while the table scrolls sideways', function (): void {
+    $page = pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'created_at');
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
+    $edges = leftEdges("document.querySelector(`th[x-data^=\"resizableColumn('name'\"]`)", firstCell('name'), firstCell('created_at'));
+    $before = $page->script($edges);
+
+    $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
+
+    waitUntil($page, 'document.querySelector(".fi-ta-content-ctn").scrollLeft > 300')
+        ->wait(0.2)
+        ->assertScript($edges, $before)
+        ->assertScript('document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")', true)
+        ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('moves the pinned columns after a pinned column that is resized', function (): void {
+    $page = pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'created_at');
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
+    $before = (int) $page->script('parseInt('.firstCell('created_at').'.style.left, 10)');
+
+    $page->script(sprintf(<<<'JS'
+        (() => {
+            const handle = document.querySelector(`%s .column-resize-handle-bar`);
+            const box = handle.getBoundingClientRect();
+            const x = box.left + box.width / 2;
+            const y = box.top + box.height / 2;
+            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
+            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 60, clientY: y }));
+            return true;
+        })();
+    JS, columnHeader('name')));
+
+    $page->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60);
+    $page->script('document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))');
+
+    $page->wait(1)
+        ->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60)
+        ->assertNoJavaScriptErrors();
+});
+
+it('leaves pins unstuck when they would cover most of a narrow table', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(640, 900)->wait(0.5);
+
+    pinFromMenu(pinFromMenu($page, 'accountOwner.name'), 'creator.name')
+        ->wait(0.3)
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', false)
+        ->assertScript(firstCell('name').'.style.left', '')
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the handles of scrolled headers under the pinned headers', function (): void {
+    $page = pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'created_at');
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
+
+    $covered = $page->script(sprintf(<<<'JS'
+        (() => {
+            const wrapper = document.querySelector('.fi-ta-content-ctn');
+            const pinned = document.querySelector(`%s`).getBoundingClientRect();
+            const handle = document.querySelector(`%s .fi-ta-column-handle`);
+            wrapper.scrollLeft += handle.getBoundingClientRect().left - (pinned.left + pinned.width / 2);
+            handle.style.opacity = '1';
+            const box = handle.getBoundingClientRect();
+            return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest('th')?.dataset.columnPinned;
+        })();
+    JS, columnHeader('created_at'), columnHeader('accountOwner.name')));
+
+    expect($covered)->toBe('1');
+    $page->assertNoJavaScriptErrors();
 });
