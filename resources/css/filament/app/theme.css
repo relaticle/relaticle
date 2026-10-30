@@ -16,7 +16,7 @@
 /* Chat */
 @source '../../../../packages/Chat/resources/views';
 @source '../../../../packages/Chat/resources/js';
-@source '../../../../packages/Chat/src/Support/ChatProse.php';
+@source inline('dark:prose-headings:text-white');
 
 /* ImportWizard */
 @source '../../../../packages/ImportWizard/resources';
