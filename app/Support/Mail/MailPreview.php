@@ -8,8 +8,6 @@ use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
 use App\Mail\NewContactSubmissionMail;
-use App\Mail\ProEndedMail;
-use App\Mail\ProTrialEndingSoonMail;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
@@ -36,6 +34,18 @@ use InvalidArgumentException;
 
 final readonly class MailPreview
 {
+    /** @param array<string, Closure(User, Workspace): (Mailable|MailMessage)> $extensions */
+    public function __construct(private array $extensions = []) {}
+
+    /** @param Closure(User, Workspace): (Mailable|MailMessage) $mailable */
+    public static function register(string $key, Closure $mailable): void
+    {
+        app()->extend(
+            self::class,
+            static fn (self $preview): self => new self([...$preview->extensions, $key => $mailable]),
+        );
+    }
+
     /** @return list<string> */
     public function names(): array
     {
@@ -56,13 +66,6 @@ final readonly class MailPreview
     private function registry(): array
     {
         return [
-            'trial-ending' => function (User $owner, Workspace $workspace): Mailable {
-                $workspace->setRelation('owner', $owner);
-
-                return new ProTrialEndingSoonMail($workspace);
-            },
-            'trial-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace),
-            'subscription-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace),
             'setup-nudge' => fn (User $owner, Workspace $workspace): Mailable => new SetupNudgeMail($owner, $workspace, 'first_record', url()->getAppUrl('chat')),
             'task-assigned' => fn (User $owner, Workspace $workspace): Mailable => new TaskAssignedMail('Call Ana Reyes about the renewal', url()->getAppUrl('tasks'), $workspace->name),
             'task-digest' => fn (User $owner): Mailable => new TaskDigestMail($owner, new DigestPayload([
@@ -109,6 +112,7 @@ final readonly class MailPreview
 
                 return $notification->toMail($owner);
             },
+            ...$this->extensions,
         ];
     }
 

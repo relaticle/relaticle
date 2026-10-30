@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
@@ -25,6 +24,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\StripeBilling;
 
 mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class, NoBilling::class, StripeBilling::class);

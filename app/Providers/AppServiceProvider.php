@@ -152,8 +152,8 @@ final class AppServiceProvider extends ServiceProvider
 
         // Cashier attaches signature verification only when the webhook secret
         // happens to be set, and also exposes an unauthenticated payment route
-        // this app never links to. Register the webhook ourselves instead so
-        // verification is unconditional. See routes/web.php.
+        // this app never links to. The webhook is registered by the billing
+        // package instead, so verification is unconditional.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Billing;
 
-use App\Actions\Billing\CreateProCheckout;
 use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
@@ -14,6 +13,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Contracts\View\View;
 use Laravel\Pennant\Feature;
 use Livewire\Component;
+use Relaticle\Cloud\Billing\Actions\CreateProCheckout;
 use Throwable;
 
 final class UpgradeModal extends Component

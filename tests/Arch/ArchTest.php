@@ -128,10 +128,6 @@ arch('avoid mutation')
         'App\Health',
         'App\Http\Controllers\Chat',
         'App\Http\Controllers\Mcp',
-        // Extends Cashier's WebhookController, its documented handler
-        // extension point; PHP forbids a readonly class extending a
-        // non-readonly one.
-        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -203,9 +199,6 @@ arch('avoid inheritance')
         'App\Exceptions',
         'App\Filament',
         'App\Http\Controllers\Mcp',
-        // Overrides Cashier's subscription-created handler so an abandoned
-        // checkout does not consume the workspace's generic trial.
-        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -266,6 +259,10 @@ $packageServiceLayers = [
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
+    'Relaticle\Cloud\Billing\Actions',
+    'Relaticle\Cloud\Billing\CreditPackCatalog',
+    'Relaticle\Cloud\Billing\Listeners',
+    'Relaticle\Cloud\Billing\StripeBilling',
     'Relaticle\Cloud\Entitlements',
     'Relaticle\Documentation\Support',
     'Relaticle\EmailIntegration\Actions',
@@ -352,7 +349,12 @@ foreach ([
     arch("{$coreLayer} stays free of the cloud package")
         ->expect($coreLayer)
         ->not
-        ->toUse('Relaticle\Cloud');
+        ->toUse('Relaticle\Cloud')
+        ->ignoring([
+            // Billing UI in app/ that calls the billing actions, until it moves into the cloud package.
+            'App\Filament\Pages\Billing',
+            'App\Livewire\App\Billing\UpgradeModal',
+        ]);
 }
 
 arch('email integration owns its controllers, jobs, policies and timeline entries')

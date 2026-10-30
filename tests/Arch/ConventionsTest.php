@@ -38,6 +38,18 @@ function migrationFiles(): array
     return $files;
 }
 
+/** @return list<string> */
+function actionDirectories(): array
+{
+    $root = dirname(__DIR__, 2);
+
+    return [
+        $root.'/app/Actions',
+        ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: [],
+        ...glob($root.'/packages/Cloud/src/*/Actions', GLOB_ONLYDIR) ?: [],
+    ];
+}
+
 /**
  * @param  list<string>  $directories
  * @return list<string>
@@ -234,7 +246,7 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
 
     $violations = [];
 
-    foreach (phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]) as $path) {
+    foreach (phpFilesUnder(actionDirectories()) as $path) {
         if (str_contains($path, '/Actions/Fortify/') || str_contains($path, '/Actions/Jetstream/')) {
             continue;
         }
@@ -343,7 +355,7 @@ it('names an action for what it does, with no Action suffix', function (): void 
     $suffixed = array_values(array_filter(
         array_map(
             static fn (string $file): string => basename($file, '.php'),
-            phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+            phpFilesUnder(actionDirectories()),
         ),
         static fn (string $name): bool => str_ends_with($name, 'Action'),
     ));
@@ -470,6 +482,8 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
         $root.'/bootstrap/providers.php',
         $root.'/bootstrap/cache/',
         $root.'/packages/Cloud/',
+        $root.'/app/Filament/Pages/Billing.php',
+        $root.'/app/Livewire/App/Billing/UpgradeModal.php',
     ];
 
     $extensions = ['php', 'js', 'ts', 'css', 'json', 'md', 'yml', 'yaml', 'xml', 'txt', 'html'];
@@ -497,7 +511,7 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
     expect($offenders)->toBe(
         [],
         'Core never references Relaticle\Cloud or its cloud:: views and lang namespace (.ai/guidelines/relaticle/architecture.md). '.
-        'Only bootstrap/providers.php may name the provider. Offending files: '.implode(', ', $offenders),
+        'Only bootstrap/providers.php may name the provider, and the billing UI still in app/ until it moves. Offending files: '.implode(', ', $offenders),
     );
 });
 
@@ -729,8 +743,10 @@ it('keeps the retired team word out of identifiers', function (): void {
     ];
 
     $stripeMetadataKeyPaths = [
-        'app/Actions/Billing/CreateCreditPackCheckout.php',
-        'app/Http/Controllers/Billing/StripeWebhookController.php',
+        'packages/Cloud/src/Billing/Actions/CreateCreditPackCheckout.php',
+        'packages/Cloud/src/Billing/Http/StripeWebhookController.php',
+        'packages/Cloud/tests/Feature/Billing/CheckoutOptionsTest.php',
+        'packages/Cloud/tests/Feature/Billing/StripeWebhookTest.php',
     ];
 
     $offenders = [];
@@ -1142,7 +1158,7 @@ it('keeps reads out of the Actions folders', function (): void {
     $root = dirname(__DIR__, 2);
 
     $offenders = array_filter(
-        phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+        phpFilesUnder(actionDirectories()),
         static fn (string $file): bool => preg_match('/^(List|Find|Search|Get|Aggregate)[A-Z]/', basename($file, '.php')) === 1,
     );
 

@@ -33,4 +33,4 @@ Plain `<a>` tags and `target="_blank"` links are unaffected: they never get
 
 A test only catches this when the two hosts differ. Set
 `config()->set('app.url', 'https://marketing.test')` before rendering and
-assert the absolute href, as `tests/Feature/Billing/BillingPageTest.php` does.
+assert the absolute href, as `packages/Cloud/tests/Feature/Billing/BillingPageTest.php` does.

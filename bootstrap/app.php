@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Features\EmailIntegration;
-use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\ConfigureTrustedProxies;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\EnsureAuthenticationComplete;
@@ -39,7 +38,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
-use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 use Laravel\Fortify\Fortify;
 use Laravel\Pennant\Feature;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -67,14 +65,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         health: '/up',
         then: function (): void {
-            // Registered here rather than by Cashier (see AppServiceProvider):
-            // signature verification must apply whether or not the webhook
-            // secret is configured, otherwise an unset secret silently turns
-            // this into an unauthenticated, plan-mutating endpoint.
-            Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
-                ->middleware(VerifyWebhookSignature::class)
-                ->name('cashier.webhook');
-
             $apiDomain = config('app.api_domain');
 
             $routes = Route::middleware('api');
@@ -370,7 +360,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:purge-unsent-attachments')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
-        $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
         $schedule->command('tor:update-exit-nodes')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:reconcile --limit=500')->dailyAt('02:00')
