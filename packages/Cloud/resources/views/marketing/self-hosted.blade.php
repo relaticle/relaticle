@@ -29,7 +29,7 @@
     $faqs = [
         [
             __('What license is Relaticle released under?'),
-            __('AGPL-3.0. The full application, the CRM, :name the AI assistant, and the MCP server, is on GitHub under that license: read it, audit it, modify it, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
+            __('AGPL-3.0. The full CRM, :name the AI assistant, and the MCP server are on GitHub under that license: read it, audit it, modify it, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
         ],
         [
             __('How do I update a self-hosted install?'),
@@ -167,7 +167,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 @foreach([
                     ['ri-database-2-line', __('Your data stays yours'), __('Every company, person, opportunity, task, and uploaded file lives on infrastructure you control. Nothing is sent to Relaticle. Looking up a company logo sends that company\'s domain to Google and DuckDuckGo.')],
-                    ['ri-scales-line', __('Source you can read and change'), __('Relaticle is licensed AGPL-3.0. The full application is on GitHub, not a stripped-down edition, so you can audit it, modify it, and redeploy your fork.')],
+                    ['ri-scales-line', __('Source you can read and change'), __('Relaticle is licensed AGPL-3.0. The full CRM, AI assistant, and MCP server are on GitHub, not a stripped-down edition. Audit them, modify them, and redeploy your fork.')],
                     ['ri-hard-drive-line', __('One flat cost: your server'), __('Unlimited users and unlimited records on every self-hosted install. There is no per-seat pricing and no user-count paywall to hit.')],
                 ] as [$icon, $cardTitle, $cardDesc])
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
@@ -296,7 +296,7 @@
             {{--
                 List layout, not a <table>, so the page still converts cleanly to markdown for
                 the ProvideMarkdownResponse middleware this route runs under (same pattern as
-                the comparison list in resources/views/pricing.blade.php).
+                the comparison list in packages/Cloud/resources/views/marketing/pricing.blade.php).
             --}}
             <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
                 @foreach([
@@ -335,7 +335,7 @@
                     {{ __('Built in the open') }}
                 </h2>
                 <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('No private roadmap, no closed issue tracker. Every self-hosted install runs the same code the maintainers ship on.') }}
+                    {{ __('No private roadmap, no closed issue tracker. Every self-hosted install runs the same CRM the maintainers ship on.') }}
                 </p>
             </div>
 

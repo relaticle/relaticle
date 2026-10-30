@@ -15,9 +15,10 @@ no composer.json of their own. Service providers are registered in
 | `packages/Chat` | AI assistant (agents, chat tools, credit system, streaming) |
 | `packages/SystemAdmin` | Internal admin panel (separate Filament panel) |
 | `packages/ImportWizard` | CSV import flows |
-| `packages/Documentation` | Public docs pages |
+| `packages/Documentation` | Docs and help content, `DocsRepository`, the search index the assistant reads, `DocUrl`, the OpenAPI spec routes |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
 | `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
+| `packages/Cloud` | The hosted business behind relaticle.com: billing, the business half of the sysadmin panel, the marketing site, the docs and help website, the blog front end. Proprietary, absent from self-hosted builds |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle. A new CRM entity is not one of those; it goes in `app/`. Package
@@ -45,6 +46,38 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
   transport: `App\Mcp`, `App\Http`, `App\Filament`, `App\Livewire`, `App\Scribe` or
   `Relaticle\Chat`. Enums stay in `app/Enums`, because the Pest Laravel preset fails one
   anywhere else. `.ai/rules/queries.md` holds the rules for extending it
+
+## The cloud package
+
+`packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
+business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
+managed-plan actions), the marketing site, the docs and help website, and the blog front end.
+Its own `LICENSE` grants no rights. The self-hosted build is this repository without it.
+
+- Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
+  `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,
+  config, routes, views and lang" fails a core file that names it or its `cloud::` view and lang
+  namespace. `bootstrap/providers.php` holds the one allowed mention: a `class_exists` check that
+  loads `CloudServiceProvider` only when the class exists
+- The Docker image never contains it, because `.dockerignore` excludes `/packages/Cloud`. A git
+  clone does, so the self-hosting guide tells that install to delete the directory. The
+  `Self-hosted Build` job in `.github/workflows/ci.yml` deletes it, rebuilds the autoload and runs
+  Arch, Smoke and Feature. A core class, view or route that needs Cloud fails that job
+- Core asks Cloud through two contracts and keeps a self-hosted default for each:
+  `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
+  `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
+  `packages/Cloud/tests/Feature/CloudProviderTest.php` fails when either binding changes. What
+  core needs from billing becomes a method on `Billing`
+- Cloud reaches SystemAdmin through `Relaticle\SystemAdmin\Support\Extensions` for Workspace
+  actions and relation managers, and through `Panel::configureUsing` for its pages.
+  `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` pins the extensions. Register them from a
+  provider's `register()`, never `boot()`, because the panel turns relation managers into Livewire
+  components when it registers. No test reads for that
+- A command Cloud owns is scheduled from `CloudServiceProvider`, never `bootstrap/app.php`. The
+  self-hosted build has no such class to schedule
+- Cloud is analysed by PHPStan, unlike SystemAdmin, and its Filament, Livewire and Http namespaces
+  sit under `EloquentWriteOutsideActionRule`. A literal that PHPStan's i18n rules guard goes in a
+  `__('cloud::...')` key
 
 ## Workspace scope (fails closed)
 
@@ -557,6 +590,7 @@ is the exception that admits the code could not.
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`
+- A package the self-hosted build deletes schedules its own commands from its provider with `callAfterResolving(Schedule::class, ...)`, as `CloudServiceProvider` does. No test reads for this
 
 === .ai/relaticle/custom-fields rules ===
 
@@ -715,9 +749,13 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   scanned all of `vendor/` and shipped different CSS from production.
 - A class written in a directory no entry lists never reaches the CSS. Add the directory to the entry
   whose pages render it.
-- `documentation.css` only `@reference`s `app.css`, because the docs shell loads both. It emits no utilities.
+- The docs, help, marketing and blog pages load `packages/Cloud/resources/css/cloud.css`, which imports core `app.css` and
+  lists Cloud's own `@source` directories. `documentation.css` only `@reference`s `cloud.css`, because the docs shell loads
+  both. It emits no utilities.
 - The Dockerfile frontend stage copies or mounts every `@source` path. `tests/Arch/ConventionsTest.php`
   fails a path that does not exist or that the stage cannot see.
+- Cloud's own stylesheets are exempt from that stage check, because the image never builds them. No core stylesheet may
+  name `packages/Cloud`, and `tests/Arch/ConventionsTest.php` fails one that does.
 
 ## Icons (Remix Icon)
 
@@ -852,7 +890,7 @@ can do. The MCP guide's tool reference is the one place that counts tools.
 
 `tests/Arch/ConventionsTest.php` fails "AI chat" in published copy, and fails the MCP guide
 when its count differs from the tools `RelaticleServer` registers.
-`tests/Feature/Public/PublicPagesTest.php` fails a marketing page that quotes a count.
+`packages/Cloud/tests/Feature/Marketing/PublicPagesTest.php` fails a marketing page that quotes a count.
 
 ## House style
 

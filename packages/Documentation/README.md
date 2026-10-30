@@ -1,122 +1,47 @@
-# Documentation Package
+# Documentation package
 
-A dedicated documentation package for the Relaticle application with a modern, customized frontend architecture.
+The content and the engine behind Relaticle's help centre and developer guides. This package renders no pages. The website that does lives in `packages/Cloud`, which self-hosted builds do not contain.
 
-## Features
+## What it holds
 
-- Modern frontend architecture with TailwindCSS 3 and Alpine.js 3
-- Responsive design with mobile-first approach
-- Dark mode support with system preference detection
-- Interactive table of contents with active state highlighting
-- Code block syntax highlighting with copy functionality
-- Search functionality with highlighted results
-- Custom callout components for warnings, tips, notes
-- Keyboard navigation and accessibility improvements
-- Print styles for documentation pages
+| Piece | Role |
+|---|---|
+| `resources/content/{docs,help}` | The Markdown articles, one file per page |
+| `Support\DocsRepository` | Reads the content into `DocPage` and `DocCategory` objects and caches the manifest |
+| `Support\BuildSearchIndex` | One search record per `##` heading. Rela, the built-in AI assistant, reads it through `SearchDocsTool`, and the website search reads it too |
+| `Support\DocUrl` | The one place that maps a content path onto a public URL |
+| `Support\HeadingAnchors` | The heading ids the renderer and the search index share |
+| `routes/web.php` | `/openapi.json` and `/openapi.yaml`, served from the spec Scribe generates |
 
-## Installation
+## Content
 
-The Documentation package is included in the Relaticle application by default. If you need to install it manually:
+Every article is `{area}/{category}/{slug}.md`, where the area is `docs` or `help`. A category describes itself in its own `_index.md`.
 
-```bash
-# Publish the package's resources
-php artisan vendor:publish --tag=documentation-views
-php artisan vendor:publish --tag=documentation-markdown
-php artisan vendor:publish --tag=documentation-config
+A page needs `title`, `description` and `order` in its front matter. It may add `updated` and `related`. A category's `_index.md` may add `feature`, the name of a class in `App\Features`, to hide the category when that flag is off.
 
-# Install dependencies
-cd packages/Documentation
-pnpm install
+Never put a bare `: ` inside an unquoted front matter value. It throws a parse error that breaks every page.
 
-# Build assets
-pnpm run build
-```
+## URLs
 
-## Development
+`DocUrl` builds absolute links from `documentation.public_url`. The default is `https://relaticle.com`, because a self-hosted install has no docs website of its own. Rela, the panel's help links and the access tokens page all link through it.
 
-To work on the Documentation package's frontend:
+## Configuration
 
-```bash
-# Start the Vite development server
-cd packages/Documentation
-pnpm run dev
-```
+`config/documentation.php` sets four keys. Publish it with `php artisan vendor:publish --tag=documentation-config`, and the content with `--tag=documentation-content`.
 
-## Asset Architecture
+| Key | Env | Role |
+|---|---|---|
+| `content_path` | | Root of the Markdown tree |
+| `public_url` | `DOCUMENTATION_PUBLIC_URL` | Site that serves the pages |
+| `cache.enabled` | `DOCUMENTATION_CACHE_ENABLED` | Cache the manifest and the search index. `app.debug` always bypasses it |
+| `api_reference` | | The REST API reference link, which Scribe generates |
 
-The Documentation package uses a dedicated asset pipeline with separate CSS and JS files:
+`RELATICLE_FEATURE_DOCUMENTATION` gates the OpenAPI routes.
 
-- `resources/css/documentation.css`: Main CSS file with Tailwind directives
-- `resources/js/documentation.js`: Main JS file with Alpine.js components
-- `tailwind.config.js`: TailwindCSS configuration for the Documentation package
-- `vite.config.js`: Vite configuration for the Documentation package
+## Tests
 
-## Components
-
-### Layout Components
-- `<x-documentation::layout>`: The main layout component for documentation pages
-- `<x-documentation::content>`: The content component for documentation pages
-
-### UI Components
-- `<x-documentation::callout>`: Callout component for warnings, tips, notes
-
-## Usage
-
-To render a documentation page:
-
-```php
-<x-documentation::layout :title="$documentTitle">
-    <x-documentation::content :content="$documentContent" />
-</x-documentation::layout>
-```
-
-To create a callout:
-
-```php
-<x-documentation::callout type="tip" title="Quick Tip">
-    This is a helpful tip for the documentation.
-</x-documentation::callout>
-```
-
-Available callout types:
-- `info` (default)
-- `warning`
-- `danger`
-- `tip`
-
-## Customization
-
-### Styling
-The Documentation package uses TailwindCSS 3 with a custom configuration. You can customize the styles by editing:
-
-- `tailwind.config.js`: Colors, typography, and other Tailwind settings
-- `resources/css/documentation.css`: Custom components and utilities
-
-### Templates
-The Documentation package's templates are located in:
-
-- `resources/views/components/`: Blade components
-- `resources/views/`: Blade templates
-
-## Accessibility
-
-The Documentation package is designed with accessibility in mind:
-
-- Proper ARIA attributes on interactive elements
-- Keyboard navigation for all features
-- Focus management for interactive components
-- Color contrast meeting WCAG AA standards
-- Dark mode support for reduced eye strain
-
-## Browser Support
-
-The Documentation package supports all modern browsers:
-
-- Chrome (latest)
-- Firefox (latest)
-- Safari (latest)
-- Edge (latest)
+`php artisan test --compact tests/Feature/Documentation` covers the repository, the content integrity and the OpenAPI routes. The rendered pages are tested in `packages/Cloud/tests/Feature/Docs`.
 
 ## License
 
-The Documentation package is open-source software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Covered by the repository's [AGPL-3.0 license](../../LICENSE).

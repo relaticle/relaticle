@@ -139,7 +139,7 @@ Visit our [documentation](https://relaticle.com/docs) for guides on business usa
 
 # License
 
-Relaticle is open-source software licensed under the [AGPL-3.0 license](LICENSE).
+Relaticle is open-source software licensed under the [AGPL-3.0 license](LICENSE). The one exception is [`packages/Cloud`](packages/Cloud), the code behind relaticle.com, which [its own license](packages/Cloud/LICENSE) governs. Everything else stays AGPL-3.0.
 
 # Star History
 

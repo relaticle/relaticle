@@ -42,9 +42,13 @@
   scanned all of `vendor/` and shipped different CSS from production.
 - A class written in a directory no entry lists never reaches the CSS. Add the directory to the entry
   whose pages render it.
-- `documentation.css` only `@reference`s `app.css`, because the docs shell loads both. It emits no utilities.
+- The docs, help, marketing and blog pages load `packages/Cloud/resources/css/cloud.css`, which imports core `app.css` and
+  lists Cloud's own `@source` directories. `documentation.css` only `@reference`s `cloud.css`, because the docs shell loads
+  both. It emits no utilities.
 - The Dockerfile frontend stage copies or mounts every `@source` path. `tests/Arch/ConventionsTest.php`
   fails a path that does not exist or that the stage cannot see.
+- Cloud's own stylesheets are exempt from that stage check, because the image never builds them. No core stylesheet may
+  name `packages/Cloud`, and `tests/Arch/ConventionsTest.php` fails one that does.
 
 ## Icons (Remix Icon)
 
