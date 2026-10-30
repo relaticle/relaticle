@@ -30,7 +30,9 @@ final class ResizableColumns
         $widths = $livewire->getResizableColumnWidths();
 
         foreach ($table->getColumns() as $name => $column) {
-            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH);
+            $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
+
+            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)));
         }
 
         return $table;

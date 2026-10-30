@@ -296,10 +296,12 @@ function naturalWidth(element) {
     return measured
 }
 
-function horizontalPadding(element) {
+// The cells are border-box, so the width a column is given must also cover its 1px divider.
+function horizontalInset(element) {
     const style = getComputedStyle(element)
 
-    return parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+    return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+        .reduce((total, property) => total + parseFloat(style[property]), 0)
 }
 
 function createHandleBar() {
@@ -618,7 +620,9 @@ function registerColumnMenu() {
             // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
             const rect = detail.trigger.getBoundingClientRect()
             const width = parseFloat(getComputedStyle(this.panel).width) || 0
-            const right = Math.min(window.innerWidth - rect.right, window.innerWidth - width - 8)
+            // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
+            const viewportWidth = document.documentElement.clientWidth
+            const right = Math.min(viewportWidth - rect.right, viewportWidth - width - 8)
             Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
@@ -829,7 +833,6 @@ function registerResizableColumn() {
         // cell's content are laid out at their natural width and measured, icons and padding included.
         autoFit() {
             const width = this.measureContentWidth()
-            if (!width) return
             this.applyWidth(width)
             this.saveWidth(width)
         },
@@ -841,8 +844,8 @@ function registerResizableColumn() {
                 .filter(Boolean)
 
             const widest = Math.max(
-                naturalWidth(label) + horizontalPadding(this.column),
-                ...contents.map((content) => naturalWidth(content) + horizontalPadding(content.parentElement)),
+                naturalWidth(label) + horizontalInset(this.column),
+                ...contents.map((content) => naturalWidth(content) + horizontalInset(content.parentElement)),
             )
 
             return Math.ceil(Math.min(this.maxWidth, Math.max(this.minWidth, widest)))

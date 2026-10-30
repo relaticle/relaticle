@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Filament\Tables\Concerns\HasColumnMenu;
+use App\Filament\Tables\ResizableColumns;
 use App\Models\Company;
 use App\Models\TablePreference;
 use App\Models\User;
@@ -463,7 +464,7 @@ it('shows the move cursor on a movable header and keeps the pointer on its contr
 it('keeps the column menu on screen when its column sits near the left edge', function (): void {
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
-        'state' => new TableStateData(widths: ['name' => 40, 'accountOwner.name' => 40]),
+        'state' => new TableStateData(widths: ['name' => ResizableColumns::MIN_WIDTH, 'accountOwner.name' => ResizableColumns::MIN_WIDTH]),
     ]);
     $page = companiesTable($this->user, $this->workspace->slug)->resize(800, 900)->wait(0.5);
 

@@ -207,6 +207,8 @@ it('fits a column so its header controls and its widest cell stay in view', func
     foreach (['name', 'created_at'] as $column) {
         $page->script(doubleClickColumnEdge($column));
         $page->assertScript(fittedColumnShowsEverything($column), [true, true]);
+
+        expect($page->script(narrowestHeaderState($column)))->toMatchArray(['textEllipsized' => false]);
     }
 
     $page->assertNoJavaScriptErrors();
