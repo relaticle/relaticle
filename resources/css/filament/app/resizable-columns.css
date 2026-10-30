@@ -78,6 +78,13 @@
     @apply w-0.5 bg-gray-400 dark:bg-gray-500;
 }
 
+/* A finger cannot hover, so touch screens always show where a column resizes. */
+@media (hover: none) {
+    .fi-ta-resizable-table thead th.fi-ta-resizable-header .column-resize-handle-bar::before {
+        @apply w-0.5 bg-gray-300 dark:bg-gray-600;
+    }
+}
+
 .fi-ta-resizable-table thead th.fi-ta-resizable-header .column-resize-handle-bar:hover::before {
     @apply w-0.5 bg-primary-500;
 }
@@ -161,20 +168,12 @@ body.resizing-column {
 }
 
 .fi-ta-column-drag-ghost {
-    @apply pointer-events-none fixed z-61 overflow-hidden rounded-lg bg-white text-sm text-gray-950 shadow-xl ring-1 ring-gray-950/5 dark:bg-gray-900 dark:text-white dark:ring-white/10;
+    @apply pointer-events-none fixed z-61 overflow-hidden rounded-lg bg-white shadow-xl ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10;
 }
 
-.fi-ta-column-drag-ghost-header,
+/* The header is copied last, so it covers any row that sat under the sticky head. */
 .fi-ta-column-drag-ghost-cell {
-    @apply box-border flex items-center overflow-hidden px-3 text-ellipsis whitespace-nowrap;
-}
-
-.fi-ta-column-drag-ghost-header {
-    @apply bg-gray-50 font-semibold dark:bg-gray-800;
-}
-
-.fi-ta-column-drag-ghost-cell {
-    @apply border-t border-gray-200 dark:border-gray-700;
+    @apply absolute inset-x-0 box-border flex flex-col justify-center overflow-hidden border-b border-gray-200/60 bg-white dark:border-white/5 dark:bg-gray-900;
 }
 
 body.reordering-column,

@@ -20,7 +20,7 @@ function headerWidth(string $column): string
     return sprintf('(() => Math.round(document.querySelector(`%s`).getBoundingClientRect().width))()', headerSelector($column));
 }
 
-function dragColumnEdge(string $column, int $by): string
+function dragColumnEdge(string $column, int $by, string $pointerType = 'mouse'): string
 {
     return sprintf(<<<'JS'
         (() => {
@@ -28,12 +28,13 @@ function dragColumnEdge(string $column, int $by): string
             const box = handle.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + %d, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + %d, clientY: y }));
+            const pointer = (type, clientX, target = document) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, isPrimary: true, pointerType: %s, clientX, clientY: y }));
+            pointer('pointerdown', x, handle);
+            pointer('pointermove', x + %d);
+            pointer('pointerup', x + %d);
             return true;
         })();
-    JS, headerSelector($column), $by, $by);
+    JS, headerSelector($column), json_encode($pointerType), $by, $by);
 }
 
 function dragFeedbackMidDrag(string $column): string
@@ -44,14 +45,14 @@ function dragFeedbackMidDrag(string $column): string
             const box = handle.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 40, clientY: y }));
+            handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: x, clientY: y }));
+            document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
             const badge = document.querySelector('.column-resize-badge');
             const feedback = {
                 badge: badge !== null && badge.isConnected && getComputedStyle(badge).display !== 'none',
                 handleActive: document.querySelector(`%s .column-resize-handle-bar`).classList.contains('active'),
             };
-            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + 40, clientY: y }));
+            document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
             return feedback.badge && feedback.handleActive;
         })();
     JS, headerSelector($column), headerSelector($column));
@@ -83,6 +84,20 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
         ->refresh()
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar')
         ->assertScript(headerWidth('created_at'), $before + 120)
+        ->assertNoJavaScriptErrors();
+});
+
+it('resizes a column with a finger and shows its edge on a touch screen', function (): void {
+    $page = loginViaBrowser($this->user, page: $this->visit('/app/login')->on()->mobile()->assertPathIs('/app/login'))
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertPresent(headerSelector('name').' .column-resize-handle-bar');
+
+    $before = $page->script(headerWidth('name'));
+
+    $page->assertScript(sprintf('getComputedStyle(document.querySelector(`%s .column-resize-handle-bar`), "::before").width !== "0px"', headerSelector('name')), true);
+    $page->script(dragColumnEdge('name', 60, 'touch'));
+    $page->assertScript(headerWidth('name'), $before + 60)
         ->assertNoJavaScriptErrors();
 });
 

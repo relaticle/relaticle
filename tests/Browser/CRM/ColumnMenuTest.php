@@ -234,10 +234,16 @@ function dragHeader(string $column, string $overColumn, string $side = 'left', s
             pointer('pointermove', start.left + 12, y);
             pointer('pointermove', x, y);
             await new Promise(requestAnimationFrame);
+            const lifted = document.querySelector('.fi-ta-column-drag-ghost');
+            const header = grip.closest('th');
+            const originals = [...header.closest('table').querySelectorAll(`td.fi-ta-cell-${CSS.escape(header.dataset.resizableColumnId)}`), grip];
+            const copies = lifted ? [...lifted.children] : [];
+            const media = (element) => element.querySelectorAll('svg, img').length;
             const mid = {
-                ghost: document.querySelector('.fi-ta-column-drag-ghost')?.isConnected ?? false,
+                ghost: (lifted?.isConnected && lifted.inert) ?? false,
+                copy: copies.length === originals.length && originals.every((original, index) => copies[index].offsetHeight === (original === grip ? header : original).offsetHeight && copies[index].textContent.trim() === original.textContent.trim() && media(copies[index]) === media(original)),
                 shifted: document.querySelector(`%s`).style.transform !== '',
-                dragging: grip.closest('th').classList.contains('fi-ta-column-dragging'),
+                dragging: header.classList.contains('fi-ta-column-dragging'),
             };
             if (%s === 'escape') {
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -281,7 +287,7 @@ it('lifts the header and slides the other columns aside mid-drag', function (): 
 
     $feedback = $page->script(dragHeader('created_at', 'accountOwner.name', finish: 'escape'));
 
-    expect($feedback)->toBe(['ghost' => true, 'shifted' => true, 'dragging' => true]);
+    expect($feedback)->toBe(['ghost' => true, 'copy' => true, 'shifted' => true, 'dragging' => true]);
     $page->assertScript(dragLeftovers(), false);
     $page->assertNoJavaScriptErrors();
 });

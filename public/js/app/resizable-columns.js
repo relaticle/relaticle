@@ -370,29 +370,33 @@ const DRAG_THRESHOLD = 4
 const AUTO_SCROLL_EDGE = 48
 const AUTO_SCROLL_MAX_SPEED = 18
 
+// A copy of the real column follows the pointer: its header and every cell, each at its own height and
+// offset, so group rows keep their gaps. It ends where the table's visible area does.
 function createDragGhost(th, cells) {
+    const top = th.getBoundingClientRect().top
+    const visibleBottom = Math.min(window.innerHeight, th.closest('.fi-ta-content-ctn')?.getBoundingClientRect().bottom ?? window.innerHeight)
     const ghost = document.createElement('div')
     ghost.className = 'fi-ta-column-drag-ghost'
-    ghost.style.width = `${th.offsetWidth}px`
-
-    const header = document.createElement('div')
-    header.className = 'fi-ta-column-drag-ghost-header'
-    header.textContent = th.querySelector('.fi-ta-resizable-label')?.textContent.trim() ?? ''
-    header.style.height = `${th.offsetHeight}px`
-    ghost.appendChild(header)
-
-    // Each row takes its source cell's height, so the lifted column stays level with the table.
-    cells.forEach((cell) => {
-        const row = document.createElement('div')
-        row.className = 'fi-ta-column-drag-ghost-cell'
-        row.textContent = cell.textContent.trim()
-        row.style.height = `${cell.offsetHeight}px`
-        ghost.appendChild(row)
-    })
-
+    // The copied cells carry Livewire and Alpine directives that must not start up again.
+    ghost.setAttribute('x-ignore', '')
+    // A copy for the eye only: screen readers and the keyboard skip it.
+    ghost.inert = true
+    const { font, color } = getComputedStyle(th.closest('table'))
+    Object.assign(ghost.style, { width: `${th.offsetWidth}px`, height: `${Math.min(visibleBottom, (cells.at(-1) ?? th).getBoundingClientRect().bottom) - top}px`, font, color })
+    ghost.append(...[...cells, th].map((cell) => copyColumnCell(cell, cell.getBoundingClientRect().top - top)))
+    ghost.querySelectorAll('[id]').forEach((element) => element.removeAttribute('id'))
     document.body.appendChild(ghost)
 
     return ghost
+}
+
+function copyColumnCell(cell, top) {
+    const copy = document.createElement('div')
+    copy.className = `${cell.className} fi-ta-column-drag-ghost-cell`
+    Object.assign(copy.style, { top: `${top}px`, height: `${cell.offsetHeight}px`, padding: getComputedStyle(cell).padding })
+    copy.append(...[...cell.children].filter((child) => !child.matches('.fi-ta-column-handle, .column-resize-handle-bar')).map((child) => child.cloneNode(true)))
+
+    return copy
 }
 
 // Slots keep the layout from before the drag, so the shifted columns never feed back into the target.
@@ -517,7 +521,7 @@ function startColumnDrag(event, th, wire) {
         if (!ghost) {
             if (Math.abs(moveEvent.clientX - startX) < DRAG_THRESHOLD) return
             window.getSelection()?.removeAllRanges()
-            ghost = createDragGhost(th, source.elements.slice(1, 13))
+            ghost = createDragGhost(th, source.elements.slice(1))
             source.elements.forEach((element) => element.classList.add('fi-ta-column-dragging'))
             table.classList.add('fi-ta-reordering')
             document.body.classList.add('reordering-column')
@@ -719,7 +723,7 @@ function registerResizableColumn() {
 
             this.handleBar = createHandleBar()
             this.column.appendChild(this.handleBar)
-            this.handleBar.addEventListener('mousedown', (e) => this.startResize(e))
+            this.handleBar.addEventListener('pointerdown', (e) => this.startResize(e))
             this.handleBar.addEventListener('dblclick', (e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -728,6 +732,7 @@ function registerResizableColumn() {
         },
 
         startResize(event) {
+            if (event.button !== 0) return
             event.preventDefault()
             event.stopPropagation()
             this.handleBar.classList.add('active')
@@ -746,7 +751,7 @@ function registerResizableColumn() {
             let overlayShown = false
 
             const onMove = (moveEvent) => {
-                if (moveEvent.pageX === startX) return
+                if (moveEvent.pointerId !== event.pointerId || moveEvent.pageX === startX) return
                 currentWidth = Math.round(
                     Math.min(
                         this.maxWidth,
@@ -764,19 +769,22 @@ function registerResizableColumn() {
                 }
             }
 
-            const onUp = () => {
+            const onUp = (upEvent) => {
+                if (upEvent.pointerId !== event.pointerId) return
                 this.handleBar.classList.remove('active')
                 document.body.classList.remove('resizing-column')
                 hideDragOverlay()
                 if (currentWidth !== startColumnWidth) {
                     this.saveWidth(currentWidth)
                 }
-                document.removeEventListener('mousemove', onMove)
-                document.removeEventListener('mouseup', onUp)
+                document.removeEventListener('pointermove', onMove)
+                document.removeEventListener('pointerup', onUp)
+                document.removeEventListener('pointercancel', onUp)
             }
 
-            document.addEventListener('mousemove', onMove)
-            document.addEventListener('mouseup', onUp)
+            document.addEventListener('pointermove', onMove)
+            document.addEventListener('pointerup', onUp)
+            document.addEventListener('pointercancel', onUp)
         },
 
         applyWidth(width) {
