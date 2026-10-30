@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
@@ -20,7 +21,7 @@ it('reads the member count from the invite named in config', function (): void {
 
     expect((new DiscordService)->getFormattedMemberCount())->toBe('157');
 
-    Http::assertSent(fn ($request): bool => $request->url() === 'https://discord.com/api/v10/invites/abc123?with_counts=true');
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://discord.com/api/v10/invites/abc123?with_counts=true');
 });
 
 it('abbreviates member counts from a thousand up', function (): void {
