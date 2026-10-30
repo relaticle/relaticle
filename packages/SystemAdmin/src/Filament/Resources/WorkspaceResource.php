@@ -139,15 +139,18 @@ final class WorkspaceResource extends Resource
                         ->label('Billing')
                         ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                         ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('plan')
                         ->label('Plan')
                         ->tooltip(self::PLAN_TOOLTIP)
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('trial_ends_at')
                         ->label('Trial Ends')
                         ->dateTime()
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('onboarding_use_case')
                         ->label('Use Case')
                         ->badge()
@@ -231,13 +234,15 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                     ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                    ->badge(),
+                    ->badge()
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('plan')
                     ->label('Plan')
                     ->tooltip(self::PLAN_TOOLTIP)
                     ->badge()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('onboarding_use_case')
                     ->label('Use Case')
                     ->badge()
@@ -286,7 +291,8 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->options(BillingStatus::class)
                     ->multiple()
-                    ->query(self::filterByBillingStatus(...)),
+                    ->query(self::filterByBillingStatus(...))
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TernaryFilter::make('personal_workspace')
                     ->label('Personal Workspace'),
                 SelectFilter::make('onboarding_use_case')

@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Jobs\PurgeWorkspace;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Subscription;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -352,6 +354,7 @@ it('keeps a workspace whose deletion is cancelled before the queued purge runs',
 });
 
 it('labels a workspace by why it has its plan, not by the plan alone', function (callable $arrange, BillingStatus $expected): void {
+    Feature::define(Billing::class, true);
     $workspace = BillingStatusFixture::workspace();
     $arrange($workspace);
 
@@ -364,6 +367,7 @@ it('labels a workspace by why it has its plan, not by the plan alone', function 
 })->with(BillingStatusFixture::arrangements());
 
 it('filters workspaces by the badge they show, and by no other', function (): void {
+    Feature::define(Billing::class, true);
     $arranged = [];
 
     foreach (BillingStatusFixture::arrangements() as $name => [$arrange, $status]) {
@@ -390,6 +394,7 @@ it('filters workspaces by the badge they show, and by no other', function (): vo
 });
 
 it('filters on the subscription a workspace bills on now, not a superseded one', function (): void {
+    Feature::define(Billing::class, true);
     $workspace = BillingStatusFixture::workspace();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -413,6 +418,7 @@ it('filters on the subscription a workspace bills on now, not a superseded one',
 });
 
 it('filters a workspace still inside its grace period as Pro, the way the badge reads it', function (): void {
+    Feature::define(Billing::class, true);
     $workspace = BillingStatusFixture::workspace();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -433,6 +439,7 @@ it('filters a workspace still inside its grace period as Pro, the way the badge 
 });
 
 it('filters on the default subscription, ignoring a newer one of another type', function (): void {
+    Feature::define(Billing::class, true);
     $workspace = BillingStatusFixture::workspace();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -464,6 +471,34 @@ it('prefers a live subscription over a trial that has not run out yet', function
     Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey()]);
 
     expect($workspace->fresh()?->billingStatus())->toBe(BillingStatus::Subscribed);
+});
+
+it('shows billing, plan and trial while billing is on', function (): void {
+    Feature::define(Billing::class, true);
+    $workspace = BillingStatusFixture::workspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+
+    livewire(ListWorkspaces::class)
+        ->assertTableColumnVisible('billing_status')
+        ->assertTableColumnVisible('plan')
+        ->assertTableFilterVisible('billing_status');
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getKey()])
+        ->assertSee('Trial Ends');
+});
+
+it('hides billing, plan and trial while billing is off', function (): void {
+    Feature::define(Billing::class, false);
+    $workspace = BillingStatusFixture::workspace();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(5)])->save();
+
+    livewire(ListWorkspaces::class)
+        ->assertTableColumnHidden('billing_status')
+        ->assertTableColumnHidden('plan')
+        ->assertTableFilterHidden('billing_status');
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getKey()])
+        ->assertDontSee('Trial Ends');
 });
 
 it('shows what a workspace said it tracks, and its use case details by label', function (): void {

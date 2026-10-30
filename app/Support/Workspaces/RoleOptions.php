@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Workspaces;
 
+use App\Enums\BillingStatus;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
@@ -59,6 +60,7 @@ final readonly class RoleOptions
             ->prepend(WorkspaceCapability::forOwner(), 'owner');
 
         return collect(WorkspaceCapability::cases())
+            ->reject(fn (WorkspaceCapability $capability): bool => $capability === WorkspaceCapability::BillingManage && ! BillingStatus::billingEnabled())
             ->mapWithKeys(fn (WorkspaceCapability $capability): array => [
                 $capability->value => $roleCapabilities
                     ->map(fn (array $granted): bool => in_array($capability, $granted, true))
