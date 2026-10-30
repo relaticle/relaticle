@@ -8,11 +8,13 @@ use App\Actions\Auth\AuthenticatePassword;
 use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsWorkspaceInvitation;
 use App\Enums\SocialiteProvider;
+use App\Features\SignupChallenge;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
 use App\Rules\RegistrableEmail;
 use App\Rules\TurnstileChallenge;
 use App\Support\EmailAddress;
+use App\Support\Http\TorExitNodes;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Auth\Events\Registered;
@@ -38,6 +40,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Timebox;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use SensitiveParameter;
 use Spatie\Honeypot\Http\Livewire\Concerns\HoneypotData;
@@ -197,17 +200,11 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $this->protectAgainstSpam();
 
-        try {
-            $this->rateLimit(5);
-        } catch (TooManyRequestsException $exception) {
-            Notification::make()
-                ->title(__('auth.login.signup_throttled_title'))
-                ->body(__('auth.login.signup_throttled_body', ['seconds' => $exception->secondsUntilAvailable]))
-                ->danger()
-                ->send();
-
+        if ($this->signupIsThrottled()) {
             return null;
         }
+
+        $this->assertNotSigningUpOverTor();
 
         if (User::query()->where('email', $submittedEmail)->exists()) {
             $this->switchToSignInForExistingAccount();
@@ -243,6 +240,38 @@ final class Login extends \Filament\Auth\Pages\Login
         session()->regenerate();
 
         return resolve(LoginResponse::class);
+    }
+
+    private function signupIsThrottled(): bool
+    {
+        try {
+            $this->rateLimit(5);
+        } catch (TooManyRequestsException $exception) {
+            Notification::make()
+                ->title(__('auth.login.signup_throttled_title'))
+                ->body(__('auth.login.signup_throttled_body', ['seconds' => $exception->secondsUntilAvailable]))
+                ->danger()
+                ->send();
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private function assertNotSigningUpOverTor(): void
+    {
+        if (! Feature::active(SignupChallenge::class)) {
+            return;
+        }
+
+        if (! resolve(TorExitNodes::class)->contains((string) request()->ip())) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'data.email' => __('auth.login.signup_over_tor'),
+        ]);
     }
 
     private function createAccount(string $email, #[SensitiveParameter] string $hashedPassword): User

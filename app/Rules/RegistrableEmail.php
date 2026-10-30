@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Rules;
 
+use Illuminate\Contracts\Validation\ValidationRule;
+
 /**
  * The canonical validation rule set for any caller-supplied email address that
  * can lead to an account.
@@ -15,13 +17,14 @@ namespace App\Rules;
 final readonly class RegistrableEmail
 {
     /**
-     * @return list<string>
+     * @return list<string|ValidationRule>
      */
     public static function rules(bool $checkDns = true): array
     {
-        return [
-            $checkDns ? 'email:rfc,dns' : 'email:rfc',
-            'indisposable',
-        ];
+        if (! $checkDns) {
+            return ['email:rfc', 'indisposable'];
+        }
+
+        return ['email:rfc,dns', 'indisposable', new IndisposableMailHost];
     }
 }

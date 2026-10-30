@@ -6,6 +6,7 @@ namespace Tests;
 
 use App\Features\OnboardSeed;
 use App\Features\SetupConversation;
+use App\Support\Email\MailExchangers;
 use App\Support\Http\HostResolver;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
@@ -62,6 +63,7 @@ abstract class TestCase extends BaseTestCase
         $this->app->instance(HostResolver::class, new HostResolver(
             fn (string $host): array => filter_var($host, FILTER_VALIDATE_IP) !== false ? [$host] : [],
         ));
+        $this->app->instance(MailExchangers::class, new MailExchangers(fn (string $domain): array => []));
         Sleep::fake(syncWithCarbon: true);
         Exceptions::fake();
 
