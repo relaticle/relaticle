@@ -16,8 +16,8 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ComposedEmailsQuery;
 
 #[Title('Delete Email Draft')]
 #[Description('Delete one of the current user\'s saved drafts for good, with its attached files. Nothing is sent.')]
@@ -46,7 +46,7 @@ final class DeleteEmailDraftTool extends Tool
         ];
     }
 
-    public function handle(Request $request, DeleteEmailDraftAction $deleteDraft): Response|ResponseFactory
+    public function handle(Request $request, ComposedEmailsQuery $emails, DeleteEmailDraftAction $deleteDraft): Response|ResponseFactory
     {
         if (($denied = $this->denyIfTokenLacks(EmailGrant::Draft)) instanceof Response) {
             return $denied;
@@ -58,9 +58,7 @@ final class DeleteEmailDraftTool extends Tool
         /** @var array{draft_id: string} $validated */
         $validated = $request->validate(['draft_id' => ['required', 'string', 'max:64']]);
 
-        $exists = Email::query()->composedBy($user)->where('status', EmailStatus::DRAFT)->whereKey($validated['draft_id'])->exists();
-
-        if (! $exists) {
+        if (! $emails->draft($user, $validated['draft_id']) instanceof Email) {
             return Response::error("Draft with ID [{$validated['draft_id']}] not found.");
         }
 

@@ -8,8 +8,8 @@ use App\Enums\EmailGrant;
 use App\Models\User;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ComposedEmailsQuery;
 
 trait FindsOwnOutboundEmail
 {
@@ -36,11 +36,7 @@ trait FindsOwnOutboundEmail
         /** @var array{id: string} $validated */
         $validated = $request->validate(['id' => ['required', 'string', 'max:64']]);
 
-        $email = Email::query()
-            ->composedBy($user)
-            ->whereNot('status', EmailStatus::DRAFT)
-            ->whereKey($validated['id'])
-            ->first();
+        $email = resolve(ComposedEmailsQuery::class)->outbox($user, $validated['id']);
 
         return $email instanceof Email ? $email : Response::error("Email with ID [{$validated['id']}] not found in your outbox.");
     }

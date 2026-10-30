@@ -14,7 +14,6 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -28,6 +27,7 @@ final readonly class PrepareAgentDraftSend
         private EmailTemplateRenderService $renderer,
         private ForwardAttachmentCopyService $attachments,
         private PersonByEmailQuery $people,
+        private CheckAgentDraftSend $checkSend,
     ) {}
 
     /**
@@ -62,14 +62,14 @@ final readonly class PrepareAgentDraftSend
         $draft = $this->lockedDraft($user, $draftId);
         $recipients = $this->recipients($draft);
 
-        $this->assertSendable($user, $draft, $recipients);
+        $this->checkSend->execute($user, $draft);
 
         [$paths, $names, $attributes, $unavailable] = $this->attachments->copyRecords($user, $draft->attachments);
 
         if ($unavailable !== []) {
             $this->attachments->deleteCopiedFiles($paths);
 
-            throw $this->refusal('This draft holds an attachment that is not ready to send. The user can send it from Drafts in Relaticle.');
+            throw ValidationException::withMessages(['draft_id' => 'This draft holds an attachment that is not ready to send. The user can send it from Drafts in Relaticle.']);
         }
 
         $original = $this->original($user, $draft);
@@ -107,10 +107,6 @@ final readonly class PrepareAgentDraftSend
             throw ValidationException::withMessages(['draft_id' => "Draft with ID [{$draftId}] not found."]);
         }
 
-        if ($draft->creation_source === EmailCreationSource::MASS_SEND) {
-            throw $this->refusal('This draft is a mass send, which goes to each person separately. The user can send it from Drafts in Relaticle.');
-        }
-
         return $draft->load(['body', 'participants', 'attachments.email.connectedAccount']);
     }
 
@@ -123,27 +119,6 @@ final readonly class PrepareAgentDraftSend
             ->all());
 
         return ['to' => $of(EmailParticipantRole::TO), 'cc' => $of(EmailParticipantRole::CC), 'bcc' => $of(EmailParticipantRole::BCC)];
-    }
-
-    /** @param  array{to: list<array{email: string, name: null}>, cc: list<array{email: string, name: null}>, bcc: list<array{email: string, name: null}>}  $recipients */
-    private function assertSendable(User $user, Email $draft, array $recipients): void
-    {
-        $account = ConnectedAccount::query()
-            ->ownedBy($user, $user->currentWorkspace)
-            ->whereKey($draft->connected_account_id)
-            ->first();
-
-        $error = match (true) {
-            ! $account instanceof ConnectedAccount || ! $account->isSendable() => 'The mailbox of this draft cannot send right now. List your mailboxes to find one that can, and save the draft there.',
-            $recipients['to'] === [] => 'This draft has no recipient. Update it with at least one address in to.',
-            blank($draft->subject) => 'This draft has no subject. Update it with one.',
-            count($recipients['to']) + count($recipients['cc']) + count($recipients['bcc']) > PrepareAgentEmail::MAX_RECIPIENTS => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
-            default => null,
-        };
-
-        if ($error !== null) {
-            throw $this->refusal($error);
-        }
     }
 
     private function original(User $user, Email $draft): ?Email
@@ -161,10 +136,5 @@ final readonly class PrepareAgentDraftSend
             ->first();
 
         return $original instanceof Email && $user->can('view', $original) ? $original : null;
-    }
-
-    private function refusal(string $message): ValidationException
-    {
-        return ValidationException::withMessages(['draft_id' => $message]);
     }
 }
