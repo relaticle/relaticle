@@ -9,10 +9,8 @@ use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Support\Str;
 
-/**
- * Temp-mail services rotate domains faster than any domain list, but every domain
- * they hand out routes to their own mail server.
- */
+// Temp-mail services rotate domains faster than any domain list can follow,
+// but every domain they hand out routes to their own mail server.
 final readonly class IndisposableMailHost implements ValidationRule
 {
     /** @var list<string> */
