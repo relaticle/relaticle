@@ -87,7 +87,8 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function aliasPreMoveClassNames(): void
     {
-        // Bell rows, queued payloads and failed_jobs rows store a class name, and the previous release wrote these.
+        // Stored bell rows and queued mail and job payloads name these pre-move classes. Queued notifications
+        // still lose their private properties under a new class name, so the deploy drains the queue first.
         foreach ([
             'App\Notifications\PaymentFailedNotification' => PaymentFailedNotification::class,
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
