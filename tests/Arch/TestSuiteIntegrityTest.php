@@ -69,23 +69,30 @@ it('keeps every test file inside a declared phpunit testsuite directory', functi
         ...array_values(declaredSuites(dirname(__DIR__, 2).'/phpunit.xml')),
     )));
 
-    $testFiles = new RegexIterator(
-        new RecursiveIteratorIterator(new RecursiveDirectoryIterator(dirname(__DIR__, 2).'/tests')),
-        '/Test\.php$/',
+    $testDirectories = array_filter(
+        [dirname(__DIR__, 2).'/tests', dirname(__DIR__, 2).'/packages/Cloud/tests'],
+        is_dir(...),
     );
 
     $orphans = [];
 
-    foreach ($testFiles as $file) {
-        $relative = str_replace(dirname(__DIR__, 2).'/', '', (string) $file);
-
-        $covered = array_any(
-            $suiteDirectories,
-            fn (string $directory): bool => str_starts_with($relative, $directory.'/'),
+    foreach ($testDirectories as $testDirectory) {
+        $testFiles = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($testDirectory)),
+            '/Test\.php$/',
         );
 
-        if (! $covered) {
-            $orphans[] = $relative;
+        foreach ($testFiles as $file) {
+            $relative = str_replace(dirname(__DIR__, 2).'/', '', (string) $file);
+
+            $covered = array_any(
+                $suiteDirectories,
+                fn (string $directory): bool => str_starts_with($relative, $directory.'/'),
+            );
+
+            if (! $covered) {
+                $orphans[] = $relative;
+            }
         }
     }
 

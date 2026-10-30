@@ -17,11 +17,9 @@ use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(CreditService::class, ReleaseOrphanedReservationsCommand::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 it('reserves exactly once for the same reservation key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -40,6 +38,8 @@ it('reserves exactly once for the same reservation key', function (): void {
 });
 
 it('writes a reservation ledger row with the key and conversation', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -69,6 +69,8 @@ it('writes a reservation ledger row with the key and conversation', function ():
 });
 
 it('refunds orphaned reservations older than the age window', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -116,6 +118,8 @@ it('neither refunds nor reports an orphaned reservation of an unmetered workspac
 });
 
 it('does not refund reservations that were settled', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -148,6 +152,8 @@ it('does not refund reservations that were settled', function (): void {
 });
 
 it('makes a late settle a no-op after the sweeper refunded the turn', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -181,6 +187,8 @@ it('makes a late settle a no-op after the sweeper refunded the turn', function (
 });
 
 it('still reserves without a key (legacy path) by only decrementing the balance', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -197,6 +205,8 @@ it('still reserves without a key (legacy path) by only decrementing the balance'
 });
 
 it('fails the reservation when the workspace has no credits left', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);

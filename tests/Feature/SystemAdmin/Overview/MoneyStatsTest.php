@@ -22,7 +22,6 @@ beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
     Cache::flush();
-    withHostedBilling();
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
 });
 
@@ -31,6 +30,8 @@ afterEach(function (): void {
 });
 
 it('renders on an empty database with MRR and no errors', function (): void {
+    withHostedBilling();
+
     livewire(MoneyStats::class)
         ->assertOk()
         ->assertSee('Are we making money?')
@@ -41,6 +42,8 @@ it('renders on an empty database with MRR and no errors', function (): void {
 });
 
 it('is the panel home and opens on the money row', function (): void {
+    withHostedBilling();
+
     $this->get(Overview::getUrl())->assertOk();
 
     expect(livewire(Overview::class)->instance()->getVisibleWidgets()[0])->toBe(MoneyStats::class);
@@ -53,6 +56,8 @@ it('leaves the money row out when billing is off', function (): void {
 });
 
 it('keeps MRR typed when the cache hands it back as a string', function (): void {
+    withHostedBilling();
+
     Cache::extend('stringifying', fn (): Repository => new Repository(new class extends ArrayStore
     {
         public function put(mixed $key, mixed $value, mixed $seconds): bool
@@ -71,6 +76,8 @@ it('keeps MRR typed when the cache hands it back as a string', function (): void
 });
 
 it('shows MRR gray when Stripe is unavailable', function (): void {
+    withHostedBilling();
+
     config()->set('cashier.secret', 'sk_test_fake');
     $workspace = OverviewData::workspaceOf(OverviewData::owner());
     $workspace->forceFill(['stripe_id' => 'cus_unreachable'])->save();
@@ -91,6 +98,8 @@ it('shows MRR gray when Stripe is unavailable', function (): void {
 });
 
 it('explains how MRR is counted in a tooltip', function (): void {
+    withHostedBilling();
+
     livewire(MoneyStats::class)
         ->assertSeeHtml('x-tooltip')
         ->assertSee('Each subscription counts its latest invoice, split into months');

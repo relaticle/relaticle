@@ -13,7 +13,6 @@ use Tests\Helpers\StripeRecorder;
 mutates(Billing::class, CreateProCheckout::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
     config()->set('cashier.secret', 'sk_test_fake');
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
@@ -39,6 +38,8 @@ afterEach(function (): void {
 });
 
 it('redirects the owner to the Stripe checkout url when buying a credit pack', function (): void {
+    withHostedBilling();
+
     StripeRecorder::install();
 
     livewire(Billing::class)
@@ -48,6 +49,8 @@ it('redirects the owner to the Stripe checkout url when buying a credit pack', f
 });
 
 it('redirects the owner to the Stripe billing portal', function (): void {
+    withHostedBilling();
+
     StripeRecorder::install();
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -58,6 +61,8 @@ it('redirects the owner to the Stripe billing portal', function (): void {
 });
 
 it('builds a hosted checkout session that keeps managed payments', function (): void {
+    withHostedBilling();
+
     $recorder = StripeRecorder::install();
     config()->set('services.stripe.managed_payments', true);
 
@@ -74,6 +79,8 @@ it('builds a hosted checkout session that keeps managed payments', function (): 
 });
 
 it('returns a paused workspace to a checkout result that reopens it', function (): void {
+    withHostedBilling();
+
     $recorder = StripeRecorder::install();
     $this->workspace->forceFill([
         'hosted_free_grandfathered_at' => null,
@@ -86,6 +93,8 @@ it('returns a paused workspace to a checkout result that reopens it', function (
 });
 
 it('carries a running trial into the subscription', function (): void {
+    withHostedBilling();
+
     $this->freezeTime();
     $recorder = StripeRecorder::install();
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
@@ -99,6 +108,8 @@ it('carries a running trial into the subscription', function (): void {
 });
 
 it('does not grant a trial to a workspace whose trial already ended', function (): void {
+    withHostedBilling();
+
     $recorder = StripeRecorder::install();
     $this->workspace->forceFill(['trial_ends_at' => now()->subMonth()])->save();
 
@@ -110,6 +121,8 @@ it('does not grant a trial to a workspace whose trial already ended', function (
 });
 
 it('rejects an interval that is not on the price map', function (): void {
+    withHostedBilling();
+
     StripeRecorder::install();
 
     expect(fn (): string => resolve(CreateProCheckout::class)->execute($this->workspace, 'weekly'))

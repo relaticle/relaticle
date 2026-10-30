@@ -514,4 +514,5 @@ function withHostedBilling(): void
     }
 
     Feature::define(Billing::class, true);
+    Feature::purge(Billing::class);
 }

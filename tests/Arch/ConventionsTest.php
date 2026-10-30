@@ -139,19 +139,23 @@ it('keeps migrations off the database clock (no useCurrent, CURRENT_TIMESTAMP, o
 it('keeps migrations out of the test suite', function (): void {
     $root = dirname(__DIR__, 2);
 
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/tests', FilesystemIterator::SKIP_DOTS));
+    $testDirectories = array_filter([$root.'/tests', $root.'/packages/Cloud/tests'], is_dir(...));
 
     $offenders = [];
 
-    foreach ($files as $file) {
-        $path = $file->getPathname();
+    foreach ($testDirectories as $testDirectory) {
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($testDirectory, FilesystemIterator::SKIP_DOTS));
 
-        if ($file->getExtension() !== 'php' || str_starts_with($path, $root.'/tests/Arch/')) {
-            continue;
-        }
+        foreach ($files as $file) {
+            $path = $file->getPathname();
 
-        if (preg_match('#database/migrations/|database_path\(\s*[\'"]migrations#', (string) file_get_contents($path)) === 1) {
-            $offenders[] = str_replace($root.'/', '', $path);
+            if ($file->getExtension() !== 'php' || str_starts_with($path, $root.'/tests/Arch/')) {
+                continue;
+            }
+
+            if (preg_match('#database/migrations/|database_path\(\s*[\'"]migrations#', (string) file_get_contents($path)) === 1) {
+                $offenders[] = str_replace($root.'/', '', $path);
+            }
         }
     }
 
@@ -454,6 +458,46 @@ it('forces a conscious arch-coverage decision when a package is added', function
         ],
         'Package list changed. Wire the new namespace into tests/Arch/ArchTest.php (boundary + structure rules), '.
         'the package table in .ai/guidelines/relaticle/architecture.md, and then update this list.',
+    );
+});
+
+it('keeps the cloud package out of core code, config, routes, views and lang', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $directories = ['app', 'bootstrap', 'config', 'database', 'lang', 'packages', 'resources', 'routes'];
+
+    $allowedPrefixes = [
+        $root.'/bootstrap/providers.php',
+        $root.'/bootstrap/cache/',
+        $root.'/packages/Cloud/',
+    ];
+
+    $extensions = ['php', 'js', 'ts', 'css', 'json', 'md', 'yml', 'yaml', 'xml', 'txt', 'html'];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+            $path = $file->getPathname();
+
+            if (! in_array($file->getExtension(), $extensions, true)) {
+                continue;
+            }
+
+            if (array_any($allowedPrefixes, fn (string $prefix): bool => str_starts_with($path, $prefix))) {
+                continue;
+            }
+
+            if (preg_match('/Relaticle\\\\{1,2}Cloud|\bcloud::/', (string) file_get_contents($path)) === 1) {
+                $offenders[] = str_replace($root.'/', '', $path);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Core never references Relaticle\Cloud, its route names, its cloud:: views or its lang namespace (.ai/guidelines/relaticle/architecture.md). '.
+        'Only bootstrap/providers.php may name the provider. Offending files: '.implode(', ', $offenders),
     );
 });
 

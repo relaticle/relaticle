@@ -33,7 +33,6 @@ beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
     Cache::flush();
-    withHostedBilling();
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
 });
 
@@ -80,6 +79,8 @@ function rateMessage(Workspace $workspace, User $user, string $rating, CarbonImm
 }
 
 it('renders on an empty database', function (): void {
+    withHostedBilling();
+
     livewire(ProblemsStats::class)
         ->assertOk()
         ->assertSee("What's going wrong?")
@@ -204,6 +205,8 @@ it('splits wizard leavers by signup method the way the signup method column read
 });
 
 it('counts trial abuse suspects as the workspace list shows them and notes who is still spending', function (): void {
+    withHostedBilling();
+
     config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
 
     $suspect = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran'])));
@@ -228,6 +231,8 @@ it('counts trial abuse suspects as the workspace list shows them and notes who i
 });
 
 it('says no suspect spent credits this week when their spending is older', function (): void {
+    withHostedBilling();
+
     config()->set('system-admin.abuse_timezones', ['Asia/Tehran']);
 
     $suspect = OverviewData::trial(OverviewData::workspaceOf(OverviewData::owner(attributes: ['timezone' => 'Asia/Tehran'])));
@@ -287,6 +292,8 @@ it('starts the thumbs down count again when a new week begins', function (): voi
 });
 
 it('explains every number in a tooltip', function (): void {
+    withHostedBilling();
+
     livewire(ProblemsStats::class)
         ->assertSee('spent at least half their chat credits on premium models')
         ->assertSee('typed no chat message in their first 3 days')

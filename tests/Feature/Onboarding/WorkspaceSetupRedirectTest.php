@@ -14,8 +14,6 @@ use App\Models\User;
 mutates(RedirectToWorkspaceSetup::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
-
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;
     $this->workspace->forceFill([
@@ -70,6 +68,8 @@ it('does not redirect a request that expects JSON', function (): void {
 });
 
 it('leaves a paused workspace in setup to billing instead of looping', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'plan' => Plan::Free,
         'trial_ends_at' => null,

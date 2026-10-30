@@ -12,14 +12,14 @@ use Laravel\Pennant\Feature;
 mutates(SidebarBillingState::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
-
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 });
 
 it('counts the days left on an active trial', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)->addHour()])->save();
 
     $state = resolve(SidebarBillingState::class)->for($this->workspace->fresh());
@@ -31,6 +31,8 @@ it('counts the days left on an active trial', function (): void {
 });
 
 it('says one day, singular, on the final day', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['trial_ends_at' => now()->addHours(6)])->save();
 
     expect(resolve(SidebarBillingState::class)->for($this->workspace->fresh())['label'])
@@ -38,6 +40,8 @@ it('says one day, singular, on the final day', function (): void {
 });
 
 it('asks a paused workspace to subscribe', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'trial_ends_at' => now()->subDay(),
         'hosted_free_grandfathered_at' => null,
@@ -51,6 +55,8 @@ it('asks a paused workspace to subscribe', function (): void {
 });
 
 it('asks a workspace whose subscription ended to subscribe', function (): void {
+    withHostedBilling();
+
     Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
 
     $state = resolve(SidebarBillingState::class)->for($this->workspace->fresh());
@@ -62,6 +68,8 @@ it('asks a workspace whose subscription ended to subscribe', function (): void {
 });
 
 it('flags a past-due workspace even though its subscription still reads valid', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
     $this->workspace->subscriptions()->create([
         'type' => 'default',
@@ -80,6 +88,8 @@ it('flags a past-due workspace even though its subscription still reads valid', 
 });
 
 it('asks a workspace whose past-due subscription has ended to subscribe, not to fix a card', function (): void {
+    withHostedBilling();
+
     $this->workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_sidebar_past_due_ended',
@@ -97,6 +107,8 @@ it('asks a workspace whose past-due subscription has ended to subscribe, not to 
 });
 
 it('asks nothing of a paying subscriber', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
     $this->workspace->subscriptions()->create([
         'type' => 'default',
@@ -110,6 +122,8 @@ it('asks nothing of a paying subscriber', function (): void {
 });
 
 it('asks nothing of a grandfathered free workspace', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'trial_ends_at' => null,
         'plan' => Plan::Free,
@@ -120,6 +134,8 @@ it('asks nothing of a grandfathered free workspace', function (): void {
 });
 
 it('asks nothing of an enterprise workspace', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['trial_ends_at' => null, 'plan' => Plan::Enterprise])->save();
 
     expect(resolve(SidebarBillingState::class)->for($this->workspace->fresh()))->toBeNull();

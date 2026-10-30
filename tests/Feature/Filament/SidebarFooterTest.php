@@ -14,8 +14,6 @@ use Filament\Facades\Filament;
 mutates(WorkspacePolicy::class, SidebarBillingState::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
-
     $this->owner = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
@@ -35,6 +33,8 @@ function sidebarFooterHtml(string $html): string
 }
 
 test('the owner sees both the invite row and the upgrade modal button', function (): void {
+    withHostedBilling();
+
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);
 
@@ -47,6 +47,8 @@ test('the owner sees both the invite row and the upgrade modal button', function
 });
 
 test('an admin sees the invite row but no billing controls', function (): void {
+    withHostedBilling();
+
     $admin = User::factory()->create();
     $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
 
@@ -62,6 +64,8 @@ test('an admin sees the invite row but no billing controls', function (): void {
 });
 
 test('a member sees neither the invite row nor billing controls', function (): void {
+    withHostedBilling();
+
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 

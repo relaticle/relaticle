@@ -14,11 +14,9 @@ use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 it('does not double-charge when settle is called twice with the same idempotency key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -87,6 +85,8 @@ it('requires a non-null idempotency_key', function (): void {
 });
 
 it('settles a reservation exactly once even when called twice with the same key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);
@@ -111,6 +111,8 @@ it('settles a reservation exactly once even when called twice with the same key'
 });
 
 it('makes settle and refund mutually exclusive for one resolution key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = resolve(CreditService::class);

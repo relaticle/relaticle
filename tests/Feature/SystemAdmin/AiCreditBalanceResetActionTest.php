@@ -18,13 +18,14 @@ mutates(AiCreditBalanceResource::class);
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 });
 
 it('resets the period using the chosen plan allowance and logs an audit transaction', function (): void {
+    withHostedBilling();
+
     $workspace = Workspace::factory()->create();
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
     AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->delete();
@@ -63,6 +64,8 @@ it('resets the period using the chosen plan allowance and logs an audit transact
 });
 
 it('resets multiple balances via the bulk action', function (): void {
+    withHostedBilling();
+
     $team1 = Workspace::factory()->create();
     $team2 = Workspace::factory()->create();
     AiCreditBalance::query()->where('workspace_id', $team1->getKey())->delete();
@@ -83,6 +86,8 @@ it('resets multiple balances via the bulk action', function (): void {
 });
 
 it('renders all Plan enum cases as reset-action plan options', function (): void {
+    withHostedBilling();
+
     $workspace = Workspace::factory()->create();
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();
     $balance = AiCreditBalance::factory()->create(['workspace_id' => $workspace->getKey()]);
@@ -95,6 +100,8 @@ it('renders all Plan enum cases as reset-action plan options', function (): void
 });
 
 it('points a workspace with a valid Pro subscription to Start managed plan', function (): void {
+    withHostedBilling();
+
     $workspace = Workspace::factory()->create();
     $workspace->subscriptions()->create([
         'type' => 'default',
@@ -113,6 +120,8 @@ it('points a workspace with a valid Pro subscription to Start managed plan', fun
 });
 
 it('warns that webhook sync restores a paid managed plan', function (): void {
+    withHostedBilling();
+
     $workspace = Workspace::factory()->create();
     $workspace->subscriptions()->create([
         'type' => 'managed',

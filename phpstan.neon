@@ -118,6 +118,7 @@ parameters:
         # internal sysadmin panel is English-only; 92 type issues, 67 of them one
         # identical.alwaysTrue cluster). Re-include when SystemAdmin gets dev time.
         - packages/SystemAdmin
+        - packages/Cloud/tests
 
     configDirectories:
         - config

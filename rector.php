@@ -32,6 +32,7 @@ return RectorConfig::configure()
         __DIR__.'/public',
     ])
     ->withSkip([
+        __DIR__.'/packages/Cloud/tests',
         AddOverrideAttributeToOverriddenMethodsRector::class,
         // PHP 8.5 extends #[\Override] to properties. Skipped for the same reason as
         // the method rule above: it would tag every Filament $navigationIcon/$slug

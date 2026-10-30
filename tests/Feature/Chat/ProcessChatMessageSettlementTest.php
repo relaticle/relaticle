@@ -24,11 +24,9 @@ use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 it('refunds the reservation when a job fails without ever streaming', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
@@ -60,6 +58,8 @@ it('refunds the reservation when a job fails without ever streaming', function (
 });
 
 it('settles the reserved minimum when the turn already streamed before failing', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -119,6 +119,8 @@ it('settles the reserved minimum when the turn already streamed before failing',
  * handle() and failed() therefore asserts a state production never reaches.
  */
 it('bills a turn that streamed even though the queue hands failed() a fresh instance', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -172,6 +174,8 @@ it('bills a turn that streamed even though the queue hands failed() a fresh inst
 });
 
 it('settles a completed turn on the model it requested and the uncached input tokens', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -308,6 +312,8 @@ it('writes no ledger rows when a self-hosted turn dies after streaming', functio
 });
 
 it('records a cancelled turn on the model it streamed and still charges one credit', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -355,6 +361,8 @@ it('records a cancelled turn on the model it streamed and still charges one cred
 });
 
 it('records a turn that died from a provider error as incomplete', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -397,6 +405,8 @@ it('records a turn that died from a provider error as incomplete', function (): 
 });
 
 it('refunds a blank reply to a turn nobody typed without acknowledging it', function (MessageOrigin $origin): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -446,6 +456,8 @@ it('refunds a blank reply to a turn nobody typed without acknowledging it', func
 })->with([MessageOrigin::Resume, MessageOrigin::Greeting]);
 
 it('refunds a turn that ends with no text and no tool call and stores an acknowledgement', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -503,6 +515,8 @@ it('refunds a turn that ends with no text and no tool call and stores an acknowl
 });
 
 it('still bills a turn that called a tool and wrote no text', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -551,6 +565,8 @@ it('still bills a turn that called a tool and wrote no text', function (): void 
 });
 
 it('refunds a blank turn and stores copy chosen by how the model stopped', function (string $reply, string $stopReason, string $expected): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();

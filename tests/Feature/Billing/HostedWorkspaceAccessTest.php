@@ -21,19 +21,21 @@ use Tests\Helpers\ChatDocument;
 mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
-
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;
     $this->actingAs($this->user);
 });
 
 it('redirects a paused hosted workspace to billing', function (): void {
+    withHostedBilling();
+
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
 });
 
 it('keeps billing and workspace deletion controls available while paused', function (): void {
+    withHostedBilling();
+
     $this->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 
@@ -42,6 +44,8 @@ it('keeps billing and workspace deletion controls available while paused', funct
 });
 
 it('keeps personal account controls available while paused', function (): void {
+    withHostedBilling();
+
     $this->get(route('filament.app.settings.pages.profile', ['tenant' => $this->workspace->slug]))
         ->assertOk();
 
@@ -50,6 +54,8 @@ it('keeps personal account controls available while paused', function (): void {
 });
 
 it('allows a workspace during its active Cloud Pro trial', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'plan' => Plan::Pro,
         'trial_ends_at' => now()->addDays(14),
@@ -60,6 +66,8 @@ it('allows a workspace during its active Cloud Pro trial', function (): void {
 });
 
 it('allows a workspace with a manual Pro grant', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
@@ -67,6 +75,8 @@ it('allows a workspace with a manual Pro grant', function (): void {
 });
 
 it('allows a workspace with a managed Enterprise grant', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
@@ -74,6 +84,8 @@ it('allows a workspace with a managed Enterprise grant', function (): void {
 });
 
 it('allows a Concierge grant whose old trial date has passed', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'plan' => Plan::Concierge,
         'trial_ends_at' => now()->subMinute(),
@@ -84,6 +96,8 @@ it('allows a Concierge grant whose old trial date has passed', function (): void
 });
 
 it('allows a workspace with a valid subscription', function (): void {
+    withHostedBilling();
+
     $this->workspace->subscriptions()->create([
         'type' => 'default',
         'stripe_id' => 'sub_hosted_access',
@@ -97,6 +111,8 @@ it('allows a workspace with a valid subscription', function (): void {
 });
 
 it('pauses an expired trial before the daily cleanup command runs', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'plan' => Plan::Pro,
         'trial_ends_at' => now()->subMinute(),
@@ -107,6 +123,8 @@ it('pauses an expired trial before the daily cleanup command runs', function ():
 });
 
 it('preserves hosted access for a grandfathered Free workspace', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
@@ -114,6 +132,8 @@ it('preserves hosted access for a grandfathered Free workspace', function (): vo
 });
 
 it('pauses a workspace whose subscription ended', function (): void {
+    withHostedBilling();
+
     Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
@@ -121,6 +141,8 @@ it('pauses a workspace whose subscription ended', function (): void {
 });
 
 it('keeps a trial paused after the nightly downgrade', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Free, 'pro_trial_used_at' => now()->subDays(15)])->save();
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
@@ -128,6 +150,8 @@ it('keeps a trial paused after the nightly downgrade', function (): void {
 });
 
 it('allows a cancelled subscriber that a sysadmin granted Pro', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['plan' => Plan::Pro])->save();
     Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
 
@@ -136,6 +160,8 @@ it('allows a cancelled subscriber that a sysadmin granted Pro', function (): voi
 });
 
 it('keeps a grandfathered workspace open after its subscription ended', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save();
     Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
 
@@ -151,6 +177,8 @@ it('does not require hosted billing on self-hosted installations', function (): 
 });
 
 it('returns payment required from the REST API for a paused workspace', function (): void {
+    withHostedBilling();
+
     $token = $this->user->createToken('paused-api', ['*'])->plainTextToken;
     auth()->logout();
 
@@ -165,6 +193,8 @@ it('returns payment required from the REST API for a paused workspace', function
 });
 
 it('returns payment required from the MCP transport for a paused workspace', function (): void {
+    withHostedBilling();
+
     $token = $this->user->createToken('paused-mcp', ['*'])->plainTextToken;
 
     $this->withToken($token)
@@ -179,6 +209,8 @@ it('returns payment required from the MCP transport for a paused workspace', fun
 });
 
 it('redirects a paused workspace to billing on the record-redirect route instead of returning raw json', function (): void {
+    withHostedBilling();
+
     $company = Company::factory()->for($this->workspace)->create();
 
     $this->get("/r/company/{$company->getKey()}")
@@ -186,6 +218,8 @@ it('redirects a paused workspace to billing on the record-redirect route instead
 });
 
 it('redirects a paused workspace to billing on the attachment import route instead of returning raw json', function (): void {
+    withHostedBilling();
+
     Storage::fake('local');
 
     $csv = UploadedFile::fake()->createWithContent('contacts.csv', "Name\nJane\n");
@@ -197,6 +231,8 @@ it('redirects a paused workspace to billing on the attachment import route inste
 });
 
 it('blocks chat before reserving credits or dispatching a queued turn', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     $this->postJson(route('chat.conversations.create'), [

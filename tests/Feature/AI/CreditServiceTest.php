@@ -15,8 +15,6 @@ use Tests\Helpers\ChatCatalog;
 mutates(CreditService::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
-
     $this->user = User::factory()->withPersonalWorkspace()->create();
     $this->workspace = $this->user->currentWorkspace;
     $this->service = resolve(CreditService::class);
@@ -41,6 +39,9 @@ it('reports has credits when balance is positive', function (): void {
 });
 
 it('reports no credits when balance is zero', function (): void {
+    withHostedBilling();
+    $this->service = resolve(CreditService::class);
+
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
         'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 0,
@@ -53,6 +54,9 @@ it('reports no credits when balance is zero', function (): void {
 });
 
 it('deducts credits and logs a transaction', function (): void {
+    withHostedBilling();
+    $this->service = resolve(CreditService::class);
+
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
         'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 100,
@@ -139,6 +143,9 @@ it('adds tool call bonus to credit calculation', function (): void {
 });
 
 it('resets period credits', function (): void {
+    withHostedBilling();
+    $this->service = resolve(CreditService::class);
+
     $this->travelTo(Date::create(2026, 4, 1));
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
@@ -167,6 +174,9 @@ it('uses default multiplier for unknown models', function (): void {
 });
 
 it('auto-creates a zero balance when deduct is called on a missing workspace', function (): void {
+    withHostedBilling();
+    $this->service = resolve(CreditService::class);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->delete();

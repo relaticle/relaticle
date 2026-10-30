@@ -19,7 +19,6 @@ use Tests\Helpers\StripeRecorder;
 mutates(UpgradeModal::class);
 
 beforeEach(function (): void {
-    withHostedBilling();
     config()->set('cashier.secret', 'sk_test_fake');
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
@@ -44,6 +43,8 @@ afterEach(function (): void {
 });
 
 it('sends the owner to hosted Stripe checkout for the chosen period', function (): void {
+    withHostedBilling();
+
     $recorder = StripeRecorder::install();
 
     livewire(UpgradeModal::class)
@@ -55,6 +56,8 @@ it('sends the owner to hosted Stripe checkout for the chosen period', function (
 });
 
 it('reviews the plan, the period and the totals before checkout', function (): void {
+    withHostedBilling();
+
     livewire(UpgradeModal::class)
         ->assertSee(__('billing.upgrade.review.billing_period'))
         ->assertSee(__('billing.upgrade.review.summary'))
@@ -67,6 +70,8 @@ it('reviews the plan, the period and the totals before checkout', function (): v
 });
 
 it('tells a workspace on trial that the card is not charged until the trial ends', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
 
     livewire(UpgradeModal::class)
@@ -74,6 +79,8 @@ it('tells a workspace on trial that the card is not charged until the trial ends
 });
 
 it('refuses a member who does not own the workspace', function (): void {
+    withHostedBilling();
+
     StripeRecorder::install();
 
     $member = User::factory()->create();
@@ -87,6 +94,8 @@ it('refuses a member who does not own the workspace', function (): void {
 });
 
 it('refuses a workspace that already subscribes', function (): void {
+    withHostedBilling();
+
     StripeRecorder::install();
 
     $this->workspace->subscriptions()->create([
@@ -103,6 +112,8 @@ it('refuses a workspace that already subscribes', function (): void {
 });
 
 it('refuses a workspace on a managed plan', function (Plan $plan): void {
+    withHostedBilling();
+
     StripeRecorder::install();
     $this->workspace->forceFill(['plan' => $plan])->save();
 
@@ -121,6 +132,8 @@ it('refuses when billing is switched off', function (): void {
 });
 
 it('notifies instead of throwing when the interval is unknown', function (): void {
+    withHostedBilling();
+
     Exceptions::fake();
     StripeRecorder::install();
 
@@ -133,6 +146,8 @@ it('notifies instead of throwing when the interval is unknown', function (): voi
 });
 
 it('reports an unexpected checkout failure instead of swallowing it', function (): void {
+    withHostedBilling();
+
     Exceptions::fake();
 
     app()->bind(CreateProCheckout::class, function (): never {
@@ -148,6 +163,8 @@ it('reports an unexpected checkout failure instead of swallowing it', function (
 });
 
 it('reports a missing price configuration instead of blaming the browser', function (): void {
+    withHostedBilling();
+
     Exceptions::fake();
     StripeRecorder::install();
     config()->set('services.stripe.prices.pro_yearly', null);
@@ -161,12 +178,16 @@ it('reports a missing price configuration instead of blaming the browser', funct
 });
 
 it('mounts the modal for an owner who can upgrade', function (): void {
+    withHostedBilling();
+
     $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
         ->assertOk()
         ->assertSeeLivewire(UpgradeModal::class);
 });
 
 it('mounts the modal on the paused screen so its buttons have something to open', function (): void {
+    withHostedBilling();
+
     $this->workspace->forceFill([
         'hosted_free_grandfathered_at' => null,
         'pro_trial_used_at' => now()->subDays(20),
@@ -180,6 +201,8 @@ it('mounts the modal on the paused screen so its buttons have something to open'
 });
 
 it('does not mount the modal for a member who cannot upgrade', function (): void {
+    withHostedBilling();
+
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => 'admin']);
     $this->actingAs($member);

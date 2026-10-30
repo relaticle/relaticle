@@ -12,10 +12,6 @@ use Relaticle\Chat\Services\CreditService;
 
 mutates(CreditService::class);
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 /** @return array{0: User, 1: Workspace} */
 function packOwnerAndWorkspace(): array
 {
@@ -28,6 +24,8 @@ function packOwnerAndWorkspace(): array
 }
 
 it('grants purchased credits idempotently on the session id', function (): void {
+    withHostedBilling();
+
     [, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
 
@@ -41,6 +39,8 @@ it('grants purchased credits idempotently on the session id', function (): void 
 });
 
 it('spends the allowance before purchased credits', function (): void {
+    withHostedBilling();
+
     [$user, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
     $service->addPurchasedCredits($workspace, 1000, 'pack-cs_test_2');
@@ -56,6 +56,8 @@ it('spends the allowance before purchased credits', function (): void {
 });
 
 it('preserves purchased credits across a period reset', function (): void {
+    withHostedBilling();
+
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
 
     [, $workspace] = packOwnerAndWorkspace();
@@ -76,6 +78,8 @@ it('preserves purchased credits across a period reset', function (): void {
 });
 
 it('keeps purchased credits when the plan changes', function (): void {
+    withHostedBilling();
+
     [, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
     $service->addPurchasedCredits($workspace, 500, 'pack-cs_test_4');
@@ -89,6 +93,8 @@ it('keeps purchased credits when the plan changes', function (): void {
 });
 
 it('returns a refunded reservation to the purchased bucket once the allowance is spent', function (): void {
+    withHostedBilling();
+
     [, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
     $service->addPurchasedCredits($workspace, 10, 'pack-refund-restore');
@@ -115,6 +121,8 @@ it('returns a refunded reservation to the purchased bucket once the allowance is
 });
 
 it('credits a refund to the allowance while allowance credits remain', function (): void {
+    withHostedBilling();
+
     [, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
     $service->addPurchasedCredits($workspace, 10, 'pack-refund-allowance');
@@ -128,6 +136,8 @@ it('credits a refund to the allowance while allowance credits remain', function 
 });
 
 it('does not invent purchased credits when a refund lands on an empty balance', function (): void {
+    withHostedBilling();
+
     [, $workspace] = packOwnerAndWorkspace();
     $service = app(CreditService::class);
 

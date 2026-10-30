@@ -32,7 +32,6 @@ mutates(
 
 beforeEach(function (): void {
     Queue::fake([RefreshManagedRenewal::class]);
-    withHostedBilling();
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 });
@@ -60,6 +59,8 @@ it('is forbidden when the billing feature is off', function (): void {
 });
 
 it('shows trial CTA to an owner who never trialed', function (): void {
+    withHostedBilling();
+
     billingPageOwner();
 
     livewire(Billing::class)
@@ -67,6 +68,8 @@ it('shows trial CTA to an owner who never trialed', function (): void {
 });
 
 it('hides the trial CTA once the workspace used its trial', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['pro_trial_used_at' => now()])->save();
 
@@ -77,6 +80,8 @@ it('hides the trial CTA once the workspace used its trial', function (): void {
 });
 
 it('asks a paused workspace that never trialed to subscribe, without offering a trial', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
@@ -92,6 +97,8 @@ it('asks a paused workspace that never trialed to subscribe, without offering a 
 });
 
 it('refuses to start a trial on a paused workspace', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
 
@@ -104,6 +111,8 @@ it('refuses to start a trial on a paused workspace', function (): void {
 });
 
 it('tells a paused workspace with a mailbox that its sync is paused too', function (): void {
+    withHostedBilling();
+
     [$user, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(15)])->save();
 
@@ -122,6 +131,8 @@ it('tells a paused workspace with a mailbox that its sync is paused too', functi
 });
 
 it('replaces the app shell with a standalone paused screen when the trial ends', function (): void {
+    withHostedBilling();
+
     config()->set('app.url', 'https://marketing.test');
     [, $workspace] = billingPageOwner();
     $workspace->forceFill([
@@ -145,6 +156,8 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
 });
 
 it('opens the upgrade modal from the paused screen instead of a review page', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
 
@@ -156,6 +169,8 @@ it('opens the upgrade modal from the paused screen instead of a review page', fu
 });
 
 it('opens the dashboard when a reopening checkout returns after the subscription landed', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
 
     livewire(Billing::class, ['checkout' => Billing::CHECKOUT_REOPENED])
@@ -163,6 +178,8 @@ it('opens the dashboard when a reopening checkout returns after the subscription
 });
 
 it('keeps an ordinary upgrade on the billing page when checkout returns', function (): void {
+    withHostedBilling();
+
     billingPageOwner();
 
     livewire(Billing::class, ['checkout' => Billing::CHECKOUT_SUCCESS])
@@ -170,6 +187,8 @@ it('keeps an ordinary upgrade on the billing page when checkout returns', functi
 });
 
 it('waits on the paused screen while a reopening checkout is still activating', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
 
@@ -179,6 +198,8 @@ it('waits on the paused screen while a reopening checkout is still activating', 
 });
 
 it('names the ended subscription on the paused screen', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subMonths(2)])->save();
     $workspace->subscriptions()->create([
@@ -197,6 +218,8 @@ it('names the ended subscription on the paused screen', function (): void {
 });
 
 it('names the lapsed managed plan on the paused screen and offers to restart it first', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
     endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test');
@@ -212,6 +235,8 @@ it('names the lapsed managed plan on the paused screen and offers to restart it 
 });
 
 it('names Cloud Pro when Pro ended after an older managed plan', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
     endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test', endedAt: now()->subMonth());
@@ -223,6 +248,8 @@ it('names Cloud Pro when Pro ended after an older managed plan', function (): vo
 });
 
 it('tells a member of a lapsed managed workspace that the owner restarts the plan with us', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
     endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test');
@@ -257,6 +284,8 @@ function endedSubscriptionOn(Workspace $workspace, string $type, string $stripeI
 }
 
 it('calls it a trial ending when the only subscription was an abandoned checkout', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $workspace->subscriptions()->create([
@@ -273,6 +302,8 @@ it('calls it a trial ending when the only subscription was an abandoned checkout
 });
 
 it('tells a member of a paused workspace who can reopen it, without checkout controls', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
@@ -287,6 +318,8 @@ it('tells a member of a paused workspace who can reopen it, without checkout con
 });
 
 it('tells a member of a paused workspace whose owner was deleted who can reopen it', function (): void {
+    withHostedBilling();
+
     [$owner, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
     $member = User::factory()->create();
@@ -302,6 +335,8 @@ it('tells a member of a paused workspace whose owner was deleted who can reopen 
 });
 
 it('tells the owner when paid activation takes longer than expected', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
 
@@ -311,6 +346,8 @@ it('tells the owner when paid activation takes longer than expected', function (
 });
 
 it('lets a paused user switch to another of their workspaces by name and logo', function (): void {
+    withHostedBilling();
+
     Storage::fake('public');
     [$user, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
@@ -327,6 +364,8 @@ it('lets a paused user switch to another of their workspaces by name and logo', 
 });
 
 it('keeps polling while checkout activation is pending, then opens the workspace', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'pro_trial_used_at' => now()->subDays(20)])->save();
 
@@ -341,6 +380,8 @@ it('keeps polling while checkout activation is pending, then opens the workspace
 });
 
 it('lists the MCP server on the authenticated billing page', function (): void {
+    withHostedBilling();
+
     billingPageOwner();
 
     livewire(Billing::class)
@@ -348,6 +389,8 @@ it('lists the MCP server on the authenticated billing page', function (): void {
 });
 
 it('starts a trial via the page action', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
 
     livewire(Billing::class)->call('startTrial')->assertNoRedirect();
@@ -357,6 +400,8 @@ it('starts a trial via the page action', function (): void {
 });
 
 it('refuses a second trial on a workspace even when called directly', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['pro_trial_used_at' => now()])->save();
 
@@ -367,6 +412,8 @@ it('refuses a second trial on a workspace even when called directly', function (
 });
 
 it('blocks the trial action for non-owners', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
     $workspace->users()->attach($member, ['role' => 'admin']);
@@ -380,6 +427,8 @@ it('blocks the trial action for non-owners', function (): void {
 });
 
 it('shows trialing state with subscribe CTA', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(10)])->save();
 
@@ -389,6 +438,8 @@ it('shows trialing state with subscribe CTA', function (): void {
 });
 
 it('shows manage state for an active subscription', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     $workspace->subscriptions()->create([
@@ -405,6 +456,8 @@ it('shows manage state for an active subscription', function (): void {
 });
 
 it('says when the first charge lands instead of claiming the plan renews', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     $workspace->subscriptions()->create([
@@ -422,6 +475,8 @@ it('says when the first charge lands instead of claiming the plan renews', funct
 });
 
 it('shows cancellation-scheduled state on grace period', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     $workspace->subscriptions()->create([
@@ -437,6 +492,8 @@ it('shows cancellation-scheduled state on grace period', function (): void {
 });
 
 it('shows past-due warning', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     $workspace->subscriptions()->create([
@@ -455,6 +512,8 @@ it('shows past-due warning', function (): void {
 });
 
 it('meters a past-due workspace against the allowance it will be refilled with', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     $workspace->subscriptions()->create([
@@ -477,6 +536,8 @@ it('meters a past-due workspace against the allowance it will be refilled with',
 });
 
 it('shows enterprise manual state without upgrade actions', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
@@ -486,6 +547,8 @@ it('shows enterprise manual state without upgrade actions', function (): void {
 });
 
 it('states a Concierge plan as managed once, without repeating the heading in a body', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
 
@@ -496,6 +559,8 @@ it('states a Concierge plan as managed once, without repeating the heading in a 
 });
 
 it('keeps the Enterprise title and body on an Enterprise plan', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
@@ -505,6 +570,8 @@ it('keeps the Enterprise title and body on an Enterprise plan', function (): voi
 });
 
 it('shows Concierge as a managed plan with its allowance and no upgrade actions', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
 
@@ -517,6 +584,8 @@ it('shows Concierge as a managed plan with its allowance and no upgrade actions'
 });
 
 it('shows a managed plan, not a pending activation, when a checkout returns', function (Plan $plan): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => $plan])->save();
 
@@ -526,6 +595,8 @@ it('shows a managed plan, not a pending activation, when a checkout returns', fu
 })->with([Plan::Enterprise, Plan::Concierge]);
 
 it('renders read-only info for members', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
@@ -541,6 +612,8 @@ it('renders read-only info for members', function (): void {
 });
 
 it('shows buy-credit buttons to an owner with hosted access', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     billingPageOwner();
 
@@ -548,6 +621,8 @@ it('shows buy-credit buttons to an owner with hosted access', function (): void 
 });
 
 it('hides buy-credit buttons when no pack price is configured', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs', [
         'small' => ['price' => null, 'credits' => 1000],
         'large' => ['price' => null, 'credits' => 5000],
@@ -558,6 +633,8 @@ it('hides buy-credit buttons when no pack price is configured', function (): voi
 });
 
 it('refuses buyCredits for a paused workspace', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'trial_ends_at' => now()->subDay(), 'plan' => Plan::Free])->save();
@@ -569,6 +646,8 @@ it('refuses buyCredits for a paused workspace', function (): void {
 });
 
 it('refuses buyCredits for a non-owner', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
@@ -584,6 +663,8 @@ it('refuses buyCredits for a non-owner', function (): void {
 });
 
 it('shows the purchased portion of the balance', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
@@ -598,6 +679,8 @@ it('shows the purchased portion of the balance', function (): void {
 });
 
 it('shows a fulfilment-pending notice after a credit pack checkout', function (): void {
+    withHostedBilling();
+
     billingPageOwner();
 
     livewire(Billing::class)
@@ -606,6 +689,8 @@ it('shows a fulfilment-pending notice after a credit pack checkout', function ()
 });
 
 it('does not show the fulfilment-pending notice without the credits query param', function (): void {
+    withHostedBilling();
+
     billingPageOwner();
 
     livewire(Billing::class)
@@ -613,6 +698,8 @@ it('does not show the fulfilment-pending notice without the credits query param'
 });
 
 it('uses the plan allowance as the meter denominator, not remaining plus used', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -631,6 +718,8 @@ it('uses the plan allowance as the meter denominator, not remaining plus used', 
 });
 
 it('keeps the plan allowance as the denominator once the monthly allowance is exhausted and purchased credits are being spent', function (): void {
+    withHostedBilling();
+
     // Old formula (remaining + used - purchased) collapsed to `used` here,
     // rendering "N / N" at 100% with the plan's real allowance nowhere in sight.
     [, $workspace] = billingPageOwner();
@@ -650,6 +739,8 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
 });
 
 it('offers owners an Enterprise conversation without changing their plan', function (): void {
+    withHostedBilling();
+
     config()->set('app.url', 'https://marketing.test');
     [, $workspace] = billingPageOwner();
 
@@ -661,6 +752,8 @@ it('offers owners an Enterprise conversation without changing their plan', funct
 });
 
 it('does not offer Enterprise purchases to workspace members', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $member = User::factory()->create();
     $workspace->users()->attach($member, ['role' => 'member']);
@@ -672,6 +765,8 @@ it('does not offer Enterprise purchases to workspace members', function (): void
 });
 
 it('keeps an Enterprise grant managed after an older subscription ended', function (): void {
+    withHostedBilling();
+
     config()->set('app.url', 'https://marketing.test');
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
@@ -693,6 +788,8 @@ it('keeps an Enterprise grant managed after an older subscription ended', functi
 });
 
 it('keeps a managed plan clear while an older Pro subscription is canceling', function (Plan $plan): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => $plan, 'trial_ends_at' => now()->addDays(5)])->save();
     $workspace->subscriptions()->create([
@@ -712,6 +809,8 @@ it('keeps a managed plan clear while an older Pro subscription is canceling', fu
 })->with([Plan::Enterprise, Plan::Concierge]);
 
 it('keeps the managed allowance when an older Pro subscription is past due', function (Plan $plan): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => $plan])->save();
     $workspace->subscriptions()->create([
@@ -729,6 +828,8 @@ it('keeps the managed allowance when an older Pro subscription is past due', fun
 })->with([Plan::Enterprise, Plan::Concierge]);
 
 it('identifies a manually managed Pro plan without calling it Enterprise', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -738,6 +839,8 @@ it('identifies a manually managed Pro plan without calling it Enterprise', funct
 });
 
 it('shows spendable credits separately after the monthly allowance is exhausted', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Pro])->save();
     AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update([
@@ -790,6 +893,8 @@ function cacheManagedRenewalForPage(): void
 }
 
 it('shows the managed renewal date and amount', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace);
     cacheManagedRenewalForPage();
@@ -801,6 +906,8 @@ it('shows the managed renewal date and amount', function (): void {
 });
 
 it('shows the managed renewal beside the cancelled Pro subscription it replaced', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->subscriptions()->create([
         'type' => 'default',
@@ -825,6 +932,8 @@ it('shows the managed renewal beside the cancelled Pro subscription it replaced'
 });
 
 it('omits the renewal line when nothing is cached and asks Stripe for it in the background', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace);
 
@@ -836,6 +945,8 @@ it('omits the renewal line when nothing is cached and asks Stripe for it in the 
 });
 
 it('warns the owner when the managed invoice is overdue', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace, 'past_due');
 
@@ -846,6 +957,8 @@ it('warns the owner when the managed invoice is overdue', function (): void {
 });
 
 it('marks an overdue managed plan past due with a pay button in its banner', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace, 'past_due');
 
@@ -860,6 +973,8 @@ it('marks an overdue managed plan past due with a pay button in its banner', fun
 });
 
 it('keeps the plain managed tagline when no subscription bills the plan', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['plan' => Plan::Concierge])->save();
 
@@ -869,6 +984,8 @@ it('keeps the plain managed tagline when no subscription bills the plan', functi
 });
 
 it('hides the renewal line while the managed invoice is overdue', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace, 'past_due');
     cacheManagedRenewalForPage();
@@ -879,6 +996,8 @@ it('hides the renewal line while the managed invoice is overdue', function (): v
 });
 
 it('hides the renewal line once the managed plan is set to cancel', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace)->forceFill(['ends_at' => now()->addDays(10)])->save();
     cacheManagedRenewalForPage();
@@ -887,6 +1006,8 @@ it('hides the renewal line once the managed plan is set to cancel', function ():
 });
 
 it('ignores a managed subscription that sells a plan the workspace does not hold', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace, 'past_due', Plan::Concierge, held: Plan::Enterprise);
     cacheManagedRenewalForPage();
@@ -899,6 +1020,8 @@ it('ignores a managed subscription that sells a plan the workspace does not hold
 });
 
 it('shows no overdue warning while the managed invoice is current', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace);
 
@@ -907,6 +1030,8 @@ it('shows no overdue warning while the managed invoice is current', function ():
 });
 
 it('opens the Stripe portal with the managed configuration', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.portal_configurations.managed', 'bpc_managed_test');
     config()->set('cashier.secret', 'sk_test_fake');
     $recorder = StripeRecorder::install();
@@ -920,6 +1045,8 @@ it('opens the Stripe portal with the managed configuration', function (): void {
 });
 
 it('opens the default Stripe portal when no managed configuration is set', function (): void {
+    withHostedBilling();
+
     config()->set('services.stripe.portal_configurations.managed', null);
     config()->set('cashier.secret', 'sk_test_fake');
     $recorder = StripeRecorder::install();
@@ -932,6 +1059,8 @@ it('opens the default Stripe portal when no managed configuration is set', funct
 });
 
 it('shows a member the managed plan without billing controls', function (): void {
+    withHostedBilling();
+
     [, $workspace] = billingPageOwner();
     managedPageWorkspace($workspace, 'past_due');
     cacheManagedRenewalForPage();

@@ -8,11 +8,9 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 it('writes a Refund transaction row when refundReservation is called', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -32,6 +30,8 @@ it('writes a Refund transaction row when refundReservation is called', function 
 });
 
 it('refund is idempotent on the ledger: a second call writes no extra row', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -49,6 +49,8 @@ it('refund is idempotent on the ledger: a second call writes no extra row', func
 });
 
 it('balance and ledger stay consistent after a reserve + refund cycle', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);

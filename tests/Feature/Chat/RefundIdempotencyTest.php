@@ -6,11 +6,9 @@ use App\Models\User;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
-beforeEach(function (): void {
-    withHostedBilling();
-});
-
 it('does not double-refund when failed() runs after a cancel-path refund', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
