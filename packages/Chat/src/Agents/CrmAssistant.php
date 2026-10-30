@@ -43,11 +43,17 @@ use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
+use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
+use Relaticle\Chat\Tools\Email\RetryEmailTool;
+use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -1002,7 +1008,13 @@ PROMPT;
             GetEmailTool::class,
             ListEmailAccountsTool::class,
             CreateEmailDraftTool::class,
+            UpdateEmailDraftTool::class,
+            DeleteEmailDraftTool::class,
             SendEmailTool::class,
+            SendEmailDraftTool::class,
+            CancelEmailTool::class,
+            RescheduleEmailTool::class,
+            RetryEmailTool::class,
         ];
     }
 
