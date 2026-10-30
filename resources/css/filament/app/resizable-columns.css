@@ -106,7 +106,7 @@ body.resizing-column {
 
 /* A movable header is dragged by pressing anywhere on it but its controls. Its name keeps the
    pointer cursor, because a click there still sorts. */
-.fi-ta-resizable-header:has(> .fi-ta-column-handle) {
+.fi-ta-resizable-header:has(> .fi-ta-column-handle):not([data-column-pinned="1"]) {
     @apply cursor-move select-none;
 }
 
@@ -239,4 +239,9 @@ th[data-column-pinned="1"] > .fi-ta-column-handle::before {
 
 .dark .fi-ta-has-pinned[data-scrolled-x] [data-column-pinned-last] {
     box-shadow: 6px 0 8px -4px rgb(0 0 0 / 0.5);
+}
+
+/* A pinned column keeps its place, so the column manager offers no way to move it. */
+.fi-ta-col-manager-items > [data-column-pinned] :is(.fi-ta-col-manager-reorder-handle, .fi-ta-col-manager-reorder-controls) {
+    @apply hidden;
 }

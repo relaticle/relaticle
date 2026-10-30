@@ -249,6 +249,18 @@ function applyPinnedOffsets(table) {
         })
     })
     markScrolledSideways(table)
+    keepPinsInColumnManager(table, pinned.map(headerName))
+}
+
+// Filament's column manager has no per-item lock, so its sortable list leaves the pins where they are.
+function keepPinsInColumnManager(table, pinned) {
+    const list = table.closest('.fi-ta')?.querySelector('.fi-ta-col-manager-items')
+    if (!list?.sortable) return
+
+    const isPinned = (item) => pinned.includes(item?.getAttribute('x-sortable-item')?.replace(/^column::/, ''))
+
+    list.sortable.option('onMove', (event) => !isPinned(event.related))
+    list.querySelectorAll(':scope > [x-sortable-item]').forEach((item) => item.toggleAttribute('data-column-pinned', isPinned(item)))
 }
 
 function lockTable(table) {

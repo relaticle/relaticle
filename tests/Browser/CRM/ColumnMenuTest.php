@@ -488,6 +488,17 @@ it('never drags a pinned column or drops another among the pins', function (): v
         ->assertNoJavaScriptErrors();
 });
 
+it('offers no way to move a pinned column from the column manager or its header', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
+    $display = fn (string $column, string $control): string => sprintf('getComputedStyle(document.querySelector(`.fi-ta-col-manager-items > [x-sortable-item="column::%s"] %s`)).display', $column, $control);
+
+    waitUntil($page, '('.$display('created_at', '.fi-ta-col-manager-reorder-handle').') === "none"')
+        ->assertScript($display('created_at', '.fi-ta-col-manager-reorder-controls'), 'none')
+        ->assertScript('('.$display('name', '.fi-ta-col-manager-reorder-handle').') !== "none"', true)
+        ->assertScript(sprintf('getComputedStyle(document.querySelector(`%s`)).cursor !== "move"', columnHeader('created_at')), true)
+        ->assertNoJavaScriptErrors();
+});
+
 function wideCompaniesTable(User $user, string $slug): AwaitableWebpage
 {
     TablePreference::factory()->for($user)->for($user->currentWorkspace)->create([
