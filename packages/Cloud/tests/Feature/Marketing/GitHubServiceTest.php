@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
@@ -32,7 +33,7 @@ it('gets stars count from GitHub API', function () {
     expect($result)->toBe(125);
 
     // Verify the HTTP request was made
-    Http::assertSent(function ($request) {
+    Http::assertSent(function (Request $request): bool {
         return $request->url() === 'https://api.github.com/repos/Relaticle/relaticle' &&
                $request->hasHeader('Accept', 'application/vnd.github.v3+json');
     });
