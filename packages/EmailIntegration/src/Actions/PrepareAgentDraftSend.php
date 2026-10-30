@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
@@ -26,6 +27,7 @@ final readonly class PrepareAgentDraftSend
     public function __construct(
         private EmailTemplateRenderService $renderer,
         private ForwardAttachmentCopyService $attachments,
+        private PersonByEmailQuery $people,
     ) {}
 
     /**
@@ -72,11 +74,13 @@ final readonly class PrepareAgentDraftSend
 
         $original = $this->original($user, $draft);
         $isForward = $draft->creation_source === EmailCreationSource::FORWARD;
-        $bodyHtml = $this->renderer->renderForSending((string) $draft->body?->body_html);
+        $person = $this->people->first($recipients['to'][0]['email'], (string) $user->current_workspace_id);
+        $person?->loadMissing('company');
+        $bodyHtml = $this->renderer->renderForSending((string) $draft->body?->body_html, $person);
 
         return [
             'connected_account_id' => $draft->connected_account_id,
-            'subject' => $this->renderer->renderPlainText((string) $draft->subject),
+            'subject' => $this->renderer->renderPlainText((string) $draft->subject, $person),
             'body_html' => $original instanceof Email && $user->can('viewBody', $original) ? $original->quotedBelow($bodyHtml, $isForward) : $bodyHtml,
             ...$recipients,
             'in_reply_to_email_id' => $original instanceof Email && ! $isForward ? $original->getKey() : null,

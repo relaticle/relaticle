@@ -56,6 +56,7 @@ use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
@@ -881,7 +882,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 continue;
             }
 
-            $person = $this->personForEmail($email, $workspaceId);
+            $person = resolve(PersonByEmailQuery::class)->first($email, $workspaceId);
 
             if (! $person instanceof People) {
                 continue;
@@ -902,27 +903,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->massRecipients = $nextRecipients;
-    }
-
-    private function personForEmail(string $emailAddress, string $workspaceId): ?People
-    {
-        $emailField = CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $workspaceId)
-            ->where('entity_type', 'people')
-            ->where('code', 'emails')
-            ->first();
-
-        if (! $emailField instanceof CustomField) {
-            return null;
-        }
-
-        return People::query()
-            ->where('workspace_id', $workspaceId)
-            ->whereHas('customFieldValues', fn (Builder $valueQuery): Builder => $valueQuery
-                ->where('custom_field_id', $emailField->getKey())
-                ->whereJsonContains('json_value', $emailAddress))
-            ->first(['id', 'name', 'company_id']);
     }
 
     private function mergeTagRecord(): Company|Opportunity|People|null
@@ -957,7 +937,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return null;
         }
 
-        $person = $this->personForEmail($email, (string) $this->authUser()->current_workspace_id);
+        $person = resolve(PersonByEmailQuery::class)->first($email, (string) $this->authUser()->current_workspace_id);
 
         if (! $person instanceof People) {
             return null;

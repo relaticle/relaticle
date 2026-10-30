@@ -2009,3 +2009,22 @@ it('keeps a draft whose attachment is not ready and sends nothing', function ():
     expect(Email::query()->whereKey($draftId)->value('status'))->toBe(EmailStatus::DRAFT)
         ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
+
+it('fills merge tags in a sent draft from the first recipient, as the composer does', function (): void {
+    $person = People::factory()->recycle([$this->viewer, $this->workspace])->create(['name' => 'Dana Reyes']);
+    $emailsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', PeopleField::EMAILS->value)
+        ->firstOrFail();
+    $person->saveCustomFieldValue($emailsField, ['dana@client.test'], $this->workspace);
+
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, ['to' => ['dana@client.test'], 'subject' => 'Plan for {name}']))['id'];
+    EmailBody::query()->where('email_id', $draftId)->update(['body_html' => '<p>Hi {name},</p>']);
+
+    $email = Email::query()->with('body')->findOrFail(emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId])['id']);
+
+    expect($email->subject)->toBe('Plan for Dana Reyes')
+        ->and($email->body->body_html)->toContain('Hi Dana Reyes,');
+});
