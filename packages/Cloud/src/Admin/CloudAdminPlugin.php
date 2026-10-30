@@ -24,6 +24,8 @@ use Relaticle\SystemAdmin\Support\Extensions;
 
 final class CloudAdminPlugin implements Plugin
 {
+    private const string THEME = 'packages/Cloud/resources/css/filament/admin/theme.css';
+
     public function getId(): string
     {
         return 'cloud-admin';
@@ -52,7 +54,10 @@ final class CloudAdminPlugin implements Plugin
         Extensions::addWorkspaceRelationManagers([SubscriptionsRelationManager::class]);
     }
 
-    public function boot(Panel $panel): void {}
+    public function boot(Panel $panel): void
+    {
+        $panel->viteTheme(self::THEME);
+    }
 
     /**
      * @return list<Action>

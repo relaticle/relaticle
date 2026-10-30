@@ -31,16 +31,17 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Support\Facades\DB;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Admin\Actions\ResetCreditPeriod;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource\Pages\EditAiCreditBalance;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource\Pages\ListAiCreditBalances;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource\Pages\ViewAiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Filament\Support\ViewerTime;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 final class AiCreditBalanceResource extends Resource
 {
@@ -297,20 +298,14 @@ final class AiCreditBalanceResource extends Resource
                     ->options(self::planOptions())
                     ->required(),
             ])
-            ->action(function (array $data, AiCreditBalance $record, CreditService $service): void {
-                $planString = (string) $data['plan'];
-                $workspace = $record->workspace;
-                $sysadminId = (string) auth('sysadmin')->id();
+            ->action(function (array $data, AiCreditBalance $record, ResetCreditPeriod $reset): void {
+                $plan = Plan::from((string) $data['plan']);
 
-                DB::transaction(function () use ($workspace, $planString, $service, $sysadminId): void {
-                    $workspace->plan = Plan::from($planString);
-                    $workspace->save();
-                    $service->resetPeriod($workspace, $sysadminId);
-                });
+                $reset->execute(self::administrator(), $plan, [$record->workspace]);
 
                 Notification::make()
                     ->title(__('cloud::admin.credit_balances.period_reset'))
-                    ->body("Granted {$workspace->plan->credits()} credits.")
+                    ->body("Granted {$plan->credits()} credits.")
                     ->success()
                     ->send();
             });
@@ -330,21 +325,11 @@ final class AiCreditBalanceResource extends Resource
                     ->options(self::planOptions())
                     ->required(),
             ])
-            ->action(function (array $data, EloquentCollection $records, CreditService $service): void {
-                $planString = (string) $data['plan'];
-                $plan = Plan::from($planString);
-                $sysadminId = (string) auth('sysadmin')->id();
+            ->action(function (array $data, EloquentCollection $records, ResetCreditPeriod $reset): void {
+                $plan = Plan::from((string) $data['plan']);
                 $count = $records->count();
 
-                DB::transaction(function () use ($records, $plan, $service, $sysadminId): void {
-                    foreach ($records as $record) {
-                        /** @var AiCreditBalance $record */
-                        $workspace = $record->workspace;
-                        $workspace->plan = $plan;
-                        $workspace->save();
-                        $service->resetPeriod($workspace, $sysadminId);
-                    }
-                });
+                $reset->execute(self::administrator(), $plan, $records->pluck('workspace'));
 
                 Notification::make()
                     ->title(__('cloud::admin.credit_balances.periods_reset'))
@@ -353,6 +338,15 @@ final class AiCreditBalanceResource extends Resource
                     ->send();
             })
             ->deselectRecordsAfterCompletion();
+    }
+
+    private static function administrator(): SystemAdministrator
+    {
+        $administrator = auth('sysadmin')->user();
+
+        abort_unless($administrator instanceof SystemAdministrator, 403);
+
+        return $administrator;
     }
 
     /**

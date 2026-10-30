@@ -11,7 +11,6 @@ use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
@@ -63,7 +62,7 @@ it('sends a system administrator from the panel root to the instance dashboard o
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
     $this->get('/sysadmin')->assertRedirect(Dashboard::getUrl());
-})->skip(fn (): bool => ! Route::has('filament.sysadmin.home'), 'The cloud package serves the panel root.');
+})->skip(fn (): bool => class_exists('Relaticle\Cloud\CloudServiceProvider'), 'The cloud package serves the panel root.');
 
 it('shows the instance dashboard with counts across every workspace', function (): void {
     $first = User::factory()->withWorkspace()->create();

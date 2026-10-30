@@ -145,6 +145,7 @@ services:
                 - App\Filament
                 - Relaticle\Chat\Tools
                 - Relaticle\Chat\Livewire
+                - Relaticle\Cloud\Admin\Filament
                 - Relaticle\Cloud\Billing\Http
                 - Relaticle\Cloud\Billing\Filament
                 - Relaticle\Cloud\Billing\Livewire

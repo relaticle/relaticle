@@ -35,9 +35,10 @@ it('loads the cloud theme instead of the core theme on the app panel', function 
         ->assertDontSee('data-entrypoint="resources/css/filament/app/theme.css"', false);
 });
 
-it('keeps the core theme on the sysadmin panel', function (): void {
+it('loads the cloud theme instead of the core theme on the sysadmin panel', function (): void {
     $this->get(route('filament.sysadmin.auth.login'))
         ->assertOk()
-        ->assertSee('data-entrypoint="resources/css/filament/admin/theme.css"', false)
-        ->assertDontSee('packages/Cloud/resources/css', false);
+        ->assertSee('data-entrypoint="packages/Cloud/resources/css/filament/admin/theme.css"', false)
+        ->assertDontSee('data-entrypoint="resources/css/filament/admin/theme.css"', false)
+        ->assertDontSee('packages/Cloud/resources/css/filament/app/theme.css', false);
 });
