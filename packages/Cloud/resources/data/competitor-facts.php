@@ -51,7 +51,7 @@ return [
         'stack' => 'Laravel 13 + Filament 5, single-server deploy',
         'self_host' => 'Self-host free under AGPL-3.0, no feature gating',
         'ai' => 'A first-party MCP server plus a built-in AI assistant; MCP, the assistant, and Ollama all work self-hosted',
-        'extensibility' => 'REST API plus a first-party MCP server; the CRM, assistant and MCP server are all AGPL-3.0, so anyone can fork and extend any part directly',
+        'extensibility' => 'REST API plus a first-party MCP server; everything a self-hosted install runs is AGPL-3.0, so anyone can fork and extend any part directly',
         'source_urls' => [
             'website' => 'https://relaticle.com',
             'pricing' => 'https://relaticle.com/pricing',

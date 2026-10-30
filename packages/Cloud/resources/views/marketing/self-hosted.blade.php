@@ -29,7 +29,7 @@
     $faqs = [
         [
             __('What license is Relaticle released under?'),
-            __('AGPL-3.0. The full CRM, the MCP server and :name, the built-in AI assistant, are on GitHub under that license. Read them, audit them, modify them, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
+            __('AGPL-3.0. Everything a self-hosted install runs, including :name, the built-in AI assistant, and the MCP server, is on GitHub under that license. Read it, audit it, modify it, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
         ],
         [
             __('How do I update a self-hosted install?'),
@@ -167,7 +167,7 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                 @foreach([
                     ['ri-database-2-line', __('Your data stays yours'), __('Every company, person, opportunity, task, and uploaded file lives on infrastructure you control. Nothing is sent to Relaticle. Looking up a company logo sends that company\'s domain to Google and DuckDuckGo.')],
-                    ['ri-scales-line', __('Source you can read and change'), __('Relaticle is licensed AGPL-3.0. The full CRM, AI assistant, and MCP server are on GitHub, not a stripped-down edition. Audit them, modify them, and redeploy your fork.')],
+                    ['ri-scales-line', __('Source you can read and change'), __('Relaticle is licensed AGPL-3.0. Everything a self-hosted install runs is on GitHub, not a stripped-down edition. Audit it, modify it, and redeploy your fork.')],
                     ['ri-hard-drive-line', __('One flat cost: your server'), __('Unlimited users and unlimited records on every self-hosted install. There is no per-seat pricing and no user-count paywall to hit.')],
                 ] as [$icon, $cardTitle, $cardDesc])
                     <div class="rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">
@@ -289,7 +289,7 @@
                     {{ __('Self-hosted or Cloud: how to choose') }}
                 </h2>
                 <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Both run the same open-source CRM, assistant, and MCP server. The real differences are who operates the server and who provisions the AI models.') }}
+                    {{ __('Both run the same open-source CRM. The real differences are who operates the server and who provisions the AI models.') }}
                 </p>
             </div>
 

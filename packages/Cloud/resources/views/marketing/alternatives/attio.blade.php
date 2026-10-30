@@ -11,7 +11,7 @@
         [__('Self-hosting'), $relaticle['self_host'], $competitor['self_host']],
         [__('Cloud pricing'), $relaticle['pricing'], $competitor['pricing']],
         [__('AI and MCP'), __('Built-in AI assistant and MCP server, available in the cloud and when self-hosted'), $competitor['ai']],
-        [__('Customization'), __('Custom fields, REST API and access to the full source code'), $competitor['extensibility']],
+        [__('Customization'), __('Custom fields, REST API and the AGPL source of everything you self-host'), $competitor['extensibility']],
     ];
 
     $faqs = [
@@ -79,7 +79,7 @@
                         </div>
                         <div class="py-6">
                             <dt class="flex items-center gap-4 text-sm font-semibold"><x-ri-code-s-slash-line class="size-5 shrink-0 text-primary dark:text-primary-400" aria-hidden="true"/>{{ __('Make the code your own') }}</dt>
-                            <dd class="mt-1 pl-9 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Inspect and extend the CRM, assistant and MCP server under :license.', ['license' => $relaticle['license']]) }}</dd>
+                            <dd class="mt-1 pl-9 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Everything you self-host is :license, so you can inspect and extend any part of it.', ['license' => $relaticle['license']]) }}</dd>
                         </div>
                         <div class="py-6">
                             <dt class="flex items-center gap-4 text-sm font-semibold"><x-ri-team-line class="size-5 shrink-0 text-primary dark:text-primary-400" aria-hidden="true"/>{{ __('Bring your whole team') }}</dt>

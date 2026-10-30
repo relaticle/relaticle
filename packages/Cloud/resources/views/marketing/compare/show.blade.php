@@ -11,7 +11,7 @@
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and Twenty pricing compare?'),
-                    'body' => __('Relaticle charges :relaticlePricing. The bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle reserves no functionality: a self-hosted install gets every CRM, assistant and MCP server feature under AGPL-3.0. Only the code behind relaticle.com\'s own billing, staff dashboards and website sits in a separately licensed directory.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
+                    'body' => __('Relaticle charges :relaticlePricing. The bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle reserves no product feature. Everything a self-hosted install runs is AGPL-3.0. Only the code that runs relaticle.com\'s billing and website is licensed separately.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
                 ],
                 [
                     'heading' => __('Which one runs AI and MCP self-hosted?'),
@@ -177,7 +177,7 @@
                     {{ __('Try Relaticle yourself') }}
                 </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 max-w-md mx-auto">
-                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same CRM, assistant and MCP server.') }}
+                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source CRM.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <x-cloud::marketing.button href="{{ route('login') }}">
