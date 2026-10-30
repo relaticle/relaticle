@@ -25,8 +25,30 @@ final class TableStateData extends Data
         public array $widths = [],
     ) {}
 
+    public function withoutWidths(): self
+    {
+        $state = clone $this;
+        $state->widths = [];
+
+        return $state;
+    }
+
+    // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
     public function hash(): string
     {
-        return hash('xxh128', json_encode($this->toArray(), JSON_THROW_ON_ERROR));
+        return hash('xxh128', json_encode(self::sortKeys($this->toArray()), JSON_THROW_ON_ERROR));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
+     */
+    private static function sortKeys(array $value): array
+    {
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return array_map(fn (mixed $item): mixed => is_array($item) ? self::sortKeys($item) : $item, $value);
     }
 }

@@ -25,9 +25,14 @@ use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
@@ -369,6 +374,21 @@ final class AppPanelProvider extends PanelProvider
             ->databaseNotificationsPolling('120s');
     }
 
+    private function registerTableHooks(Panel $panel): void
+    {
+        $panel
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.layouts'),
+                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+            )
+            ->renderHook(
+                TablesRenderHook::FILTER_INDICATORS,
+                fn (): View|Factory => view('filament.app.board-filter-clear'),
+                scopes: [OpportunitiesBoard::class, TasksBoard::class],
+            );
+    }
+
     private function registerInvitationHooks(Panel $panel): void
     {
         $panel
@@ -609,11 +629,6 @@ final class AppPanelProvider extends PanelProvider
                 ])
             )
             ->renderHook(
-                TablesRenderHook::FILTER_INDICATORS,
-                fn (): View|Factory => view('filament.app.board-filter-clear'),
-                scopes: [OpportunitiesBoard::class, TasksBoard::class],
-            )
-            ->renderHook(
                 PanelsRenderHook::HEAD_START,
                 fn (): View|Factory => view('filament.app.appearance-preference')
             )
@@ -664,6 +679,7 @@ final class AppPanelProvider extends PanelProvider
 
         $this->registerBanners($panel);
         $this->registerInvitationHooks($panel);
+        $this->registerTableHooks($panel);
         $this->registerNotifications($panel);
 
         // Hidden without a bound tenant: the old panel-root fallback sent these

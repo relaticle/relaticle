@@ -8,6 +8,7 @@ use App\Actions\TableLayouts\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Models\Scopes\WorkspaceScope;
+use App\Models\TableLayout;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,21 +22,38 @@ trait PersistsTableState
     #[Locked]
     public ?string $tableStateHash = null;
 
-    private ?TableStateData $storedTableState = null;
+    #[Locked]
+    public ?string $activeTableLayoutId = null;
+
+    #[Locked]
+    public ?string $appliedTableLayoutHash = null;
+
+    #[Locked]
+    public ?string $defaultTableLayoutId = null;
+
+    private ?TableStateData $initialTableState = null;
+
+    private ?TablePreference $storedTablePreference = null;
+
+    private bool $hasLoadedTablePreference = false;
+
+    private bool $seededFromTableLayout = false;
+
+    private bool $savesTableStateOnOpen = false;
 
     public function mountInteractsWithTable(): void
     {
         parent::mountInteractsWithTable();
 
-        $stored = $this->storedTableState();
+        $initial = $this->initialTableState();
 
-        $this->tableSort = blank($this->tableSort) ? $stored->sort : $this->tableSort;
-        $this->tableFilters = blank($this->tableFilters) ? ($stored->filters ?: null) : $this->tableFilters;
-        $this->tableSearch = blank($this->tableSearch) ? $stored->search : $this->tableSearch;
-        $this->tableColumnSearches = blank($this->tableColumnSearches) ? $stored->columnSearches : $this->tableColumnSearches;
-        $this->tableGrouping = blank($this->tableGrouping) ? $stored->grouping : $this->tableGrouping;
-        $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $stored->perPage : $this->tableRecordsPerPage;
-        $this->tableColumnWidths = $stored->widths;
+        $this->tableSort = blank($this->tableSort) ? $initial->sort : $this->tableSort;
+        $this->tableFilters = blank($this->tableFilters) ? ($initial->filters ?: null) : $this->tableFilters;
+        $this->tableSearch = blank($this->tableSearch) ? $initial->search : $this->tableSearch;
+        $this->tableColumnSearches = blank($this->tableColumnSearches) ? $initial->columnSearches : $this->tableColumnSearches;
+        $this->tableGrouping = blank($this->tableGrouping) ? $initial->grouping : $this->tableGrouping;
+        $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $initial->perPage : $this->tableRecordsPerPage;
+        $this->tableColumnWidths = $this->storedTablePreference()?->state->widths ?? [];
     }
 
     public function bootedInteractsWithTable(): void
@@ -50,26 +68,38 @@ trait PersistsTableState
             $this->tableSort = null;
         }
 
-        if ($table->isPaginated() && ! in_array($this->tableRecordsPerPage, AppPanelProvider::pageSizeOptions($table))) {
+        if ($table->isPaginated() && ! $this->isOfferedTablePageSize($this->tableRecordsPerPage)) {
             $this->tableRecordsPerPage = $this->getDefaultTableRecordsPerPageSelectOption();
+        }
+
+        if ($this->seededFromTableLayout) {
+            $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
         }
     }
 
     public function dehydratePersistsTableState(): void
     {
         $state = $this->currentTableState();
-        $hash = $state->hash();
+        $hash = hash('xxh128', "{$state->hash()}|{$this->activeTableLayoutId}|{$this->appliedTableLayoutHash}");
 
-        if ($this->tableStateHash !== null && $this->tableStateHash !== $hash) {
+        if ($this->savesTableStateOnOpen || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
             /** @var User $user */
             $user = auth()->user();
             /** @var Workspace $workspace */
             $workspace = Filament::getTenant();
 
-            resolve(SaveTablePreference::class)->execute($user, $workspace, $this->tableEntity(), $state);
+            resolve(SaveTablePreference::class)->execute(
+                $user,
+                $workspace,
+                $this->tableEntity(),
+                $state,
+                $this->visibleTableLayout($this->activeTableLayoutId),
+                $this->appliedTableLayoutHash,
+            );
         }
 
         $this->tableStateHash = $hash;
+        $this->savesTableStateOnOpen = false;
     }
 
     /**
@@ -77,17 +107,59 @@ trait PersistsTableState
      */
     protected function loadTableColumnsFromSession(): array
     {
-        $defaults = $this->getDefaultTableColumnState();
-        $stored = $this->storedTableState()->columns;
+        return $this->tableColumnsFrom($this->initialTableState());
+    }
 
-        if ($stored === []) {
+    private function applyTableState(TableStateData $state): void
+    {
+        $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
+
+        $this->tableSort = $state->sort;
+        $this->updatedTableSort();
+
+        $this->tableGrouping = $state->grouping;
+        $this->updatedTableGrouping();
+
+        if (filled($state->search)) {
+            $this->tableSearch = $state->search;
+            $this->updatedTableSearch();
+        } else {
+            $this->resetTableSearch();
+        }
+
+        if ($state->columnSearches !== []) {
+            $this->tableColumnSearches = $state->columnSearches;
+            $this->updatedTableColumnSearches();
+        } else {
+            $this->resetTableColumnSearches();
+        }
+
+        $this->tableRecordsPerPage = $this->isOfferedTablePageSize($state->perPage)
+            ? $state->perPage
+            : $this->getDefaultTableRecordsPerPageSelectOption();
+        $this->updatedTableRecordsPerPage();
+
+        $this->getTableFiltersForm()->fill($state->filters);
+        $this->updatedTableFilters();
+
+        $this->flushCachedTableRecords();
+    }
+
+    /**
+     * @return array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>
+     */
+    private function tableColumnsFrom(TableStateData $state): array
+    {
+        $defaults = $this->getDefaultTableColumnState();
+
+        if ($state->columns === []) {
             return $defaults;
         }
 
         $byName = array_column($defaults, null, 'name');
         $columns = [];
 
-        foreach ($stored as $item) {
+        foreach ($state->columns as $item) {
             $name = $item['name'] ?? null;
 
             if ($name !== null && isset($byName[$name])) {
@@ -98,6 +170,11 @@ trait PersistsTableState
         return $columns;
     }
 
+    private function isOfferedTablePageSize(int|string|null $perPage): bool
+    {
+        return in_array($perPage, AppPanelProvider::pageSizeOptions($this->getTable()));
+    }
+
     private function tableEntity(): CrmEntity
     {
         $model = $this->getModel();
@@ -106,15 +183,92 @@ trait PersistsTableState
             ?? throw new LogicException("{$model} is not a CRM entity, so its table state cannot be remembered.");
     }
 
-    private function storedTableState(): TableStateData
+    private function visibleTableLayout(?string $id): ?TableLayout
     {
-        return $this->storedTableState ??= TablePreference::query()
-            ->withoutGlobalScope(WorkspaceScope::class)
-            ->where('workspace_id', Filament::getTenant()->getKey())
-            ->whereBelongsTo(auth()->user())
-            ->where('entity', $this->tableEntity())
-            ->first()
-            ->state ?? new TableStateData;
+        if ($id === null) {
+            return null;
+        }
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        return TableLayout::query()
+            ->visibleTo($user, Filament::getTenant()->getKey(), $this->tableEntity())
+            ->find($id);
+    }
+
+    private function storedTablePreference(): ?TablePreference
+    {
+        if (! $this->hasLoadedTablePreference) {
+            $this->hasLoadedTablePreference = true;
+            $this->storedTablePreference = TablePreference::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
+                ->where('workspace_id', Filament::getTenant()->getKey())
+                ->whereBelongsTo(auth()->user())
+                ->where('entity', $this->tableEntity())
+                ->first();
+        }
+
+        return $this->storedTablePreference;
+    }
+
+    private function initialTableState(): TableStateData
+    {
+        if ($this->initialTableState instanceof TableStateData) {
+            return $this->initialTableState;
+        }
+
+        $preference = $this->storedTablePreference();
+        $active = $this->visibleTableLayout($preference?->active_layout_id);
+        $default = $this->visibleTableLayout($preference?->default_layout_id);
+
+        $this->defaultTableLayoutId = $default?->getKey();
+
+        $hasSavedState = $preference !== null && $preference->state->columns !== [];
+        $isCleanCopy = $hasSavedState && $active instanceof TableLayout && $preference->state->withoutWidths()->hash() === $preference->applied_layout_hash;
+
+        // A default starts each session over the last state, which is saved so the rest of the session keeps it.
+        if ($this->opensTableFirstThisSession() && $default instanceof TableLayout) {
+            $this->savesTableStateOnOpen = $hasSavedState && (! $isCleanCopy || ! $active->is($default));
+
+            return $this->initialTableState = $this->seedFromTableLayout($default);
+        }
+
+        if ($hasSavedState) {
+            return $this->initialTableState = $isCleanCopy
+                ? $this->seedFromTableLayout($active)
+                : $this->seedFromPreference($preference, $active);
+        }
+
+        return $this->initialTableState = $default instanceof TableLayout
+            ? $this->seedFromTableLayout($default)
+            : new TableStateData;
+    }
+
+    private function opensTableFirstThisSession(): bool
+    {
+        $key = 'tables.opened.'.Filament::getTenant()->getKey().'.'.$this->tableEntity()->value;
+        $isFirst = ! session()->has($key);
+
+        session()->put($key, true);
+
+        return $isFirst;
+    }
+
+    private function seedFromTableLayout(TableLayout $layout): TableStateData
+    {
+        $this->activeTableLayoutId = $layout->getKey();
+        $this->seededFromTableLayout = true;
+
+        return $layout->state;
+    }
+
+    private function seedFromPreference(TablePreference $preference, ?TableLayout $active): TableStateData
+    {
+        $this->activeTableLayoutId = $active?->getKey();
+        $this->appliedTableLayoutHash = $active instanceof TableLayout ? $preference->applied_layout_hash : null;
+
+        return $preference->state;
     }
 
     private function currentTableState(): TableStateData

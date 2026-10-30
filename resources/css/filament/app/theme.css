@@ -6,6 +6,7 @@
 @import '../../../../packages/EmailIntegration/resources/css/email-integration.css';
 
 @import './resizable-columns.css';
+@import './table-layouts.css';
 
 @plugin "@tailwindcss/typography";
 

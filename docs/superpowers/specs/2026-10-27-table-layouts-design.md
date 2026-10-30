@@ -52,7 +52,8 @@ The feature fails, even if every test passes, when:
   "(modified)" state exists to prevent exactly this.
 - A deleted custom field breaks a saved layout or a member's table. State heals itself (see
   Self-healing).
-- Opening a table writes to the database. Writes happen only when the member changes something.
+- Opening a table writes to the database. Writes happen only when the member changes something,
+  or once a session when their default layout replaces a different saved state.
 - One workspace's custom field columns leak into another's state.
 - A menu item is shown before the phase that makes it work.
 
@@ -63,7 +64,7 @@ The feature fails, even if every test passes, when:
 | Delivery | Five phases, one PR each, each branched from `main` after the phase it needs has merged | One PR with three commits (#944); stacked branches |
 | Where the code lives | `app/`, in the folders listed under Code layout | A `packages/` module: the feature has no panel, routes or lifecycle of its own, and every part depends on `App` models and enums |
 | Row key | `entity`, a `CrmEntity` value | The list page class name (#944): a class rename would orphan every saved row |
-| Layouts control placement | Table toolbar, left of search | Page header beside Import / Export (#944's default) |
+| Layouts control placement | Table toolbar, after search and before the filter trigger | Left of search (the first build); page header beside Import / Export (#944's default) |
 | Sharing | Private layouts, plus share to the workspace; Admins may edit or delete a shared layout | Private only; shared but owner-only |
 | What a layout stores | Columns (visibility, order), sort, filters, search, column searches, grouping, page size, pins | Widths: they stay per member and per table |
 | Auto-save | Yes: the last state persists per member, and saved layouts sit on top | Saved layouts only |
@@ -225,9 +226,10 @@ today, and only within a session; the rest is new.
 Done when:
 
 - A hidden column, a reordered column, a width, a sort, a filter and a page size each survive a
-  logout and login.
+  logout and login, for a member with no default layout.
 - The same member in a second workspace has separate state for the same table.
-- Opening a table without changing anything writes nothing.
+- Opening a table without changing anything writes nothing, except the first open of a session
+  that replaces a different saved state with the member's default layout.
 - A state that names a deleted custom field loads without error (see Self-healing).
 
 ### Phase 3: Saved layouts
@@ -238,11 +240,27 @@ with the workspace.
 ![The layouts menu in the table toolbar](assets/table-layouts/phase-3-layouts-menu.png)
 ![The layouts menu in dark mode](assets/table-layouts/phase-3-layouts-menu-dark.png)
 
-The control sits in the table toolbar, left of search, through
-`TablesRenderHook::TOOLBAR_START` scoped to the five pages. The menu lists the member's own
-layouts, then the layouts shared with the workspace (each with its owner's name), then the actions:
-Save, Save as new layout, Rename, Share with workspace, Set as my default, Reset, Delete layout. A
-star marks the member's default layout.
+The control sits in the table toolbar, after search and before the filter trigger, through
+`TablesRenderHook::TOOLBAR_SEARCH_AFTER` scoped to the five pages. The menu opens with "Standard
+layout", the table as Filament defines it, then the member's own layouts, then the layouts shared
+with the workspace. Each row leads with its type: a table icon for Standard layout, a bookmark for
+a private layout, a group icon for a shared one. Its right edge carries its status: a star on the
+layout that opens by default (Standard layout when the member has picked none), "Shared" on a layout
+the member shares, and the owner's name on someone else's. The applied layout is tinted and
+carries `aria-current`, so the tint is never the only signal.
+
+Every action works on its own row, never on the applied layout alone. Hovering a row swaps its
+status for a Delete button and a vertical `⋯` menu holding Rename, Share with workspace (or Stop
+sharing) and Set as my default (or Remove as my default). Touch has no hover, so it shows status and
+buttons together. Save lives only beside the trigger, where it appears once the layout is modified.
+Save as new layout closes the menu in a group of its own. With no layout saved, the menu holds only
+Standard layout and Save as new layout. Long names truncate in the trigger and the rows, with the
+full name in a tooltip.
+
+Sharing asks for confirmation first, because every member of the workspace sees the result. An
+Admin stopping the share of someone else's layout is asked too, because the layout goes back to its
+owner as a private one and leaves the Admin's list for good. Stopping the share of your own layout
+needs no confirmation, since you can share it again.
 
 ![A changed layout reads "(modified)" and offers Revert and Save](assets/table-layouts/phase-3-layouts-modified.png)
 
@@ -252,21 +270,26 @@ Revert and Save appear beside it. The comparison ignores widths, since layouts d
 - Add `table_layouts` and the `active_layout_id` and `default_layout_id` columns on
   `table_preferences`.
 - Actions in `app/Actions/TableLayouts/`: `CreateTableLayout`, `UpdateTableLayout` (rename, share,
-  overwrite state), `DeleteTableLayout`, `SetDefaultTableLayout`. Each authorizes through the policy.
+  overwrite state), `DeleteTableLayout`, `SetDefaultTableLayout`, and `EnsureTableLayoutNameIsFree`,
+  which the first two share. Each authorizes through the policy.
 - `applySavedLayout()` on the trait follows the apply sequence below. The trait's save, save as
-  new, rename, share, set-default, reset and delete entry points each delegate to one of these
+  new, rename, share, set-default and delete entry points each delegate to one of these
   actions and write nothing themselves.
-- "Reset" returns the table to the member's default layout, or to the table's default state when
-  they have none, and clears the "(modified)" mark.
+- "Standard layout" returns the table to its default state and clears the active layout. There is
+  no Reset: the member's default layout is one click away in the same list.
 - All labels go through `__()` in `lang/en/filament/`.
 
 What a member sees on opening a table:
 
-1. Their last state always wins. They see exactly what they left, with "(modified)" when they
-   had changed an applied layout.
-2. Their default layout applies only when they have no saved state for that table yet, and
-   after Reset.
+1. At the start of a session, their default layout, when they have one. It is saved as their
+   state, so the rest of the session keeps it until they change something.
+2. Otherwise their last state. They see exactly what they left, with "(modified)" when they had
+   changed an applied layout.
 3. With neither, the table's default state.
+
+A session starts at login, so a default is where each working day begins, while switching
+layouts or changing the table during the day sticks. Members with no default keep their last
+state across sessions.
 
 When a shared layout changes under a member who has it applied or as their default:
 
@@ -280,6 +303,30 @@ To tell "had not changed it" apart, the preference row stores the hash of the la
 last applied. "Set as my default" may point at any layout the member can see, including someone
 else's shared one. When the member can no longer see it, the default is cleared on load.
 
+#### Telling the owner
+
+When an Admin deletes or stops sharing a member's layout, the owner gets an in-app notice in the
+bell. Without one, the layout simply vanishes from their menu, which reads as a bug.
+
+| The Admin | The owner's notice |
+|---|---|
+| deletes the layout | ":actor deleted your layout "Renewals this quarter"", with the table it was on |
+| stops sharing it | ":actor stopped sharing your layout "Renewals this quarter"", saying it is private to them again |
+| renames or overwrites it | none |
+
+- `TableLayoutChangedNotification` extends `InboxNotification`, with reason `System` and no
+  preference toggle. Its subject is the workspace, as `PaymentFailedNotification`'s is. A deleted
+  layout cannot be its subject: the notice is queued after commit, and `#[DeleteWhenMissingModels]`
+  would drop it.
+- The row stores facts, never a model: the layout's name, its entity and which change happened.
+  `present()` renders them and links to that table's list page in the workspace.
+- `DeleteTableLayout` and `UpdateTableLayout` send it, since an action owns its side effects.
+  `UpdateTableLayout` sends it only when `is_shared` turns false.
+- The actor is the Admin. `InboxNotification::shouldSend()` already skips a notice to its own
+  actor and one to a member who has left the workspace, so the owner's own changes send nothing.
+- In-app only, no email. A layout is low stakes, and the members who used it keep what their table
+  shows.
+
 Prove first: a render hook closure has no access to the page component. The control must still
 mount the page's actions and call `applySavedLayout()`. Settle how before building the menu.
 
@@ -292,6 +339,8 @@ Done when:
 - The permission rules below hold, each covered by a test.
 - Changing the table after applying a layout shows "(modified)"; Revert restores the layout; Save
   overwrites it.
+- An Admin who deletes or stops sharing a member's layout leaves one notice in that member's bell,
+  and the owner's own changes leave none.
 
 ### Phase 4: Column menu and reorder
 
