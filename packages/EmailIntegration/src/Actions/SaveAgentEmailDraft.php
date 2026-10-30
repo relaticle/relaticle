@@ -7,6 +7,7 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
 use Relaticle\EmailIntegration\Models\Email;
 
@@ -34,8 +35,31 @@ final readonly class SaveAgentEmailDraft
      */
     public function execute(User $user, array $data, EmailCreationSource $source, ?string $draftId = null): Email
     {
+        if ($draftId !== null) {
+            $this->assertRewritable($user, $draftId);
+        }
+
         $draft = $this->saveDraft->execute($user, $this->prepareDraft->execute($user, $data, $source), $draftId);
 
         return $draft->load('connectedAccount');
+    }
+
+    private function assertRewritable(User $user, string $draftId): void
+    {
+        $source = Email::query()
+            ->composedBy($user)
+            ->where('status', EmailStatus::DRAFT)
+            ->whereKey($draftId)
+            ->value('creation_source');
+
+        $error = match ($source) {
+            null => "Draft with ID [{$draftId}] not found.",
+            EmailCreationSource::MASS_SEND => 'This draft is a mass send, which goes to each person separately. The user can edit it from Drafts in Relaticle.',
+            default => null,
+        };
+
+        if ($error !== null) {
+            throw ValidationException::withMessages(['draft_id' => $error]);
+        }
     }
 }

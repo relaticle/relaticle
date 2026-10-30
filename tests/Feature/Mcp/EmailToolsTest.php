@@ -1950,3 +1950,14 @@ it('requeues a failed email behind the hold and tells the user', function (): vo
         ->tool(RetryEmailTool::class, ['id' => $failed->id])
         ->assertHasErrors(['Only failed emails can be retried. Status is queued.']);
 });
+
+it('refuses to rewrite a mass send draft, which goes to each person separately', function (): void {
+    $draft = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::DRAFT, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::MASS_SEND, 'subject' => 'Launch']);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(UpdateEmailDraftTool::class, draftArguments($this->viewerAccount, ['draft_id' => $draft->id, 'to' => ['a@acme.test', 'b@acme.test']]))
+        ->assertHasErrors(['This draft is a mass send, which goes to each person separately. The user can edit it from Drafts in Relaticle.']);
+
+    expect($draft->fresh()->creation_source)->toBe(EmailCreationSource::MASS_SEND)
+        ->and($draft->fresh()->subject)->toBe('Launch');
+});

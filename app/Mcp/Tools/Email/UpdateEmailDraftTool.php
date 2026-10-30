@@ -18,8 +18,6 @@ use Laravel\Mcp\Server\Tool;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Models\Email;
 
 #[Title('Update Email Draft')]
 #[Description('Rewrite one of the current user\'s saved drafts. The arguments replace the draft\'s mailbox, recipients, subject and body, so pass everything the draft should keep. Attached files stay. Nothing is sent. Write `body` as plain text or markdown. The mailbox signature is added unless `include_signature` is false.')]
@@ -61,12 +59,6 @@ final class UpdateEmailDraftTool extends Tool
 
         /** @var array{draft_id: string, connected_account_id: string, to?: list<string>, cc?: list<string>, bcc?: list<string>, subject?: ?string, body?: ?string, include_signature?: bool, in_reply_to_email_id?: string} $validated */
         $validated = $request->validate(['draft_id' => ['required', 'string', 'max:64'], ...PrepareAgentEmailDraft::RULES]);
-
-        $exists = Email::query()->composedBy($user)->where('status', EmailStatus::DRAFT)->whereKey($validated['draft_id'])->exists();
-
-        if (! $exists) {
-            return Response::error("Draft with ID [{$validated['draft_id']}] not found.");
-        }
 
         $draft = $saveDraft->execute($user, $validated, EmailCreationSource::MCP, $validated['draft_id']);
 
