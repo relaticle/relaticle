@@ -174,16 +174,47 @@ it('ignores widths when telling whether a layout was changed', function (): void
     expect($component->instance()->isTableLayoutModified())->toBeFalse();
 });
 
-it('brings back the last state over the default layout, and the modified mark with it', function (): void {
+it('brings back the last state within a session, and the default layout at the start of the next one', function (): void {
     $layout = layoutFor($this->user, ['state' => hotLeads()]);
     livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->call('toggleDefaultTableLayout', $layout->getKey())->set('tableSort', 'name:asc');
 
-    session()->flush();
     $revisit = livewire(ListCompanies::class);
 
     expect($revisit->get('tableSort'))->toBe('name:asc')
         ->and($revisit->get('activeTableLayoutId'))->toBe($layout->getKey())
         ->and($revisit->instance()->isTableLayoutModified())->toBeTrue();
+
+    session()->flush();
+    $nextSession = livewire(ListCompanies::class);
+
+    expect($nextSession->get('tableSort'))->toBe('created_at:desc')
+        ->and($nextSession->get('activeTableLayoutId'))->toBe($layout->getKey())
+        ->and($nextSession->instance()->isTableLayoutModified())->toBeFalse();
+});
+
+it('opens a new session on the default layout over another applied one, and keeps it for that session', function (): void {
+    $default = layoutFor($this->user, ['name' => 'Hot leads', 'state' => hotLeads()]);
+    $other = layoutFor($this->user, ['name' => 'By name', 'state' => new TableStateData(sort: 'name:asc')]);
+    livewire(ListCompanies::class)->call('toggleDefaultTableLayout', $default->getKey())->call('applySavedLayout', $other->getKey());
+
+    session()->flush();
+
+    expect(livewire(ListCompanies::class)->get('activeTableLayoutId'))->toBe($default->getKey());
+
+    $sameSession = livewire(ListCompanies::class);
+
+    expect($sameSession->get('activeTableLayoutId'))->toBe($default->getKey())
+        ->and($sameSession->get('tableSort'))->toBe('created_at:desc')
+        ->and($sameSession->instance()->isTableLayoutModified())->toBeFalse();
+});
+
+it('keeps the last state across sessions for a member with no default layout', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+    livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())->set('tableSort', 'name:asc');
+
+    session()->flush();
+
+    expect(livewire(ListCompanies::class)->get('tableSort'))->toBe('name:asc');
 });
 
 it('opens on the default layout when the member has no saved state, and writes nothing', function (): void {
