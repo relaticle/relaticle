@@ -10,6 +10,8 @@
 @php
     $tag = $href ? 'a' : 'button';
 
+    $isSignupLink = in_array($href, [route('login'), route('register')], true);
+
     $sizes = [
         'sm' => 'h-9 px-5 text-sm rounded-lg',
         'base' => 'h-11 px-8 text-sm rounded-lg',
@@ -31,6 +33,7 @@
         'href' => $href,
         'target' => $external ? '_blank' : null,
         'rel' => $external ? 'noopener' : null,
+        'referrerpolicy' => $isSignupLink ? 'no-referrer-when-downgrade' : null,
         'type' => ! $href ? 'button' : null,
     ]))
 }}>
