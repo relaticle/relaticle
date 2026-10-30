@@ -17,6 +17,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Workspace;
 use Laravel\Pennant\Feature;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
@@ -99,7 +100,7 @@ final readonly class DestinationResolver
                 'export_notes' => NotesCards::getUrl(self::EXPORT_ACTION, panel: 'app', tenant: $workspace),
                 'workspace_members' => Members::getUrl(panel: 'app', tenant: $workspace),
                 'access_tokens' => AccessTokens::getUrl(panel: 'app', tenant: $workspace),
-                'connect_assistant' => url()->getPublicUrl(route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt'], absolute: false)),
+                'connect_assistant' => DocUrl::helpPage('ai-assistant', 'connect-claude-or-chatgpt'),
                 'email_accounts' => Feature::active(EmailIntegration::class) ? EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace) : null,
                 'email_drafts' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::DRAFTS->value], panel: 'app', tenant: $workspace) : null,
                 'email_outbox' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::OUTBOX->value], panel: 'app', tenant: $workspace) : null,

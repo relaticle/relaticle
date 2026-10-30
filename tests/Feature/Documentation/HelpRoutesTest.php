@@ -17,6 +17,10 @@ dataset('documentation shell pages', [
 
 mutates(DocsNavigation::class);
 
+beforeEach(function (): void {
+    config()->set('documentation.public_url', url('/'));
+});
+
 it('renders the help hub with category cards', function (): void {
     $this->get('/help')->assertOk()->assertSee('Getting started', false);
 });

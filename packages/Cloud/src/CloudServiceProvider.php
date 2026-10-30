@@ -74,7 +74,18 @@ final class CloudServiceProvider extends ServiceProvider
             $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         });
 
+        $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
+    }
+
+    private function linkWebsiteFromCore(): void
+    {
+        config([
+            'relaticle.legal.privacy_url' => config('relaticle.legal.privacy_url') ?: url()->getPublicUrl('privacy-policy'),
+            'relaticle.legal.terms_url' => config('relaticle.legal.terms_url') ?: url()->getPublicUrl('terms-of-service'),
+            'relaticle.legal.contact_url' => config('relaticle.legal.contact_url') ?: url()->getPublicUrl('contact'),
+            'documentation.public_url' => url()->getPublicUrl(),
+        ]);
     }
 
     private function extendAppPanel(): void

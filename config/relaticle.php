@@ -21,6 +21,12 @@ return [
         'address' => env('RELATICLE_COMPANY_ADDRESS', ''),
     ],
 
+    'legal' => [
+        'privacy_url' => env('RELATICLE_PRIVACY_URL') ?: null,
+        'terms_url' => env('RELATICLE_TERMS_URL') ?: null,
+        'contact_url' => env('RELATICLE_CONTACT_URL') ?: null,
+    ],
+
     'deletion' => [
         'grace_period_days' => 30,
         'reminder_days_before' => 5,

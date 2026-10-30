@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Relaticle\Documentation\Support\DocUrl;
 use Symfony\Component\HttpFoundation\Response;
 
 final readonly class SubdomainRootResponse
@@ -31,7 +32,7 @@ final readonly class SubdomainRootResponse
             return new JsonResponse([
                 'name' => 'Relaticle MCP Server',
                 'version' => '1.0.0',
-                'docs' => url('/developers/mcp'),
+                'docs' => DocUrl::docsPage('mcp'),
             ]);
         }
 

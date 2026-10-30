@@ -66,12 +66,12 @@ it('resolves access_tokens to the workspace access tokens page', function (): vo
         ->and($url)->toContain('access-tokens');
 });
 
-it('resolves connect_assistant to the public help page on the primary host', function (): void {
-    config()->set('app.url', 'https://marketing.test');
+it('resolves connect_assistant to the help article on the documentation public url', function (): void {
+    config()->set('documentation.public_url', 'https://docs.example.test');
 
     $url = app(DestinationResolver::class)->resolve('connect_assistant', $this->user->currentWorkspace);
 
-    expect($url)->toBe('https://marketing.test/help/ai-assistant/connect-claude-or-chatgpt');
+    expect($url)->toBe('https://docs.example.test/help/ai-assistant/connect-claude-or-chatgpt');
 });
 
 it('resolves email_accounts to the mailbox page while the email integration is on', function (): void {

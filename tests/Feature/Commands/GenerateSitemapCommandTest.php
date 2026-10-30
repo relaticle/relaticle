@@ -30,6 +30,7 @@ function fakeSitemapCrawl(array $responses): void
 beforeEach(function (): void {
     // The generator crawls app.url before adding the blog URLs; keep it off the network.
     fakeSitemapCrawl([config('app.url') => '<html><body></body></html>']);
+    config()->set('documentation.public_url', url('/'));
 
     Storage::fake('public');
 });

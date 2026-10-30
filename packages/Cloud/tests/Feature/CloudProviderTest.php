@@ -47,3 +47,31 @@ it('resolves the pre-move billing page component name to the cloud page', functi
 it('keeps the pre-move managed plan invoice mail name loadable for queued jobs', function (): void {
     expect(class_exists('Relaticle\\SystemAdmin\\Mail\\ManagedPlanInvoiceMail'))->toBeTrue();
 });
+
+it('points the legal links at its own privacy, terms and contact pages', function (): void {
+    expect(config('relaticle.legal.privacy_url'))->toBe(route('policy.show'))
+        ->and(config('relaticle.legal.terms_url'))->toBe(route('terms.show'))
+        ->and(config('relaticle.legal.contact_url'))->toBe(route('contact'));
+});
+
+it('renders the sign-in footer with its legal links', function (): void {
+    $this->get(url()->getAppUrl('login'))
+        ->assertOk()
+        ->assertSee('href="'.route('terms.show').'"', escape: false)
+        ->assertSee('href="'.route('policy.show').'"', escape: false)
+        ->assertSee('href="'.route('contact').'"', escape: false);
+});
+
+it('keeps a legal link the operator configured', function (): void {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+    config()->set('relaticle.legal.terms_url', null);
+
+    (new CloudServiceProvider(app()))->boot();
+
+    expect(config('relaticle.legal.privacy_url'))->toBe('https://legal.example.test/privacy')
+        ->and(config('relaticle.legal.terms_url'))->toBe(route('terms.show'));
+});
+
+it('links the documentation to its own public root', function (): void {
+    expect(config('documentation.public_url'))->toBe(url()->getPublicUrl());
+});

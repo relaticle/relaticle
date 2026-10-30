@@ -83,10 +83,16 @@ final class EmailAccountsPage extends Page
         );
     }
 
-    public function connectedSectionDescription(): HtmlString
+    public function connectedSectionDescription(): ?HtmlString
     {
+        $privacyUrl = config('relaticle.legal.privacy_url');
+
+        if (blank($privacyUrl)) {
+            return null;
+        }
+
         return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
-            'url' => route('policy.show'),
+            'url' => e($privacyUrl),
         ]));
     }
 

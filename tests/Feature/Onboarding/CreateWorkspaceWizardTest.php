@@ -39,6 +39,29 @@ it('renders the create workspace page with wizard for workspaceless users', func
         ->assertSee('Create your workspace');
 });
 
+it('links the configured legal pages in the onboarding footer', function (): void {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+    config()->set('relaticle.legal.terms_url', 'https://legal.example.test/terms');
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/terms"', escape: false);
+});
+
+it('shows no legal links in the onboarding footer when none are configured', function (): void {
+    config()->set('relaticle.legal.privacy_url', null);
+    config()->set('relaticle.legal.terms_url', null);
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee(__('auth.verify_email.sign_out'))
+        ->assertDontSee(__('auth.footer.privacy_policy'))
+        ->assertDontSee(__('auth.footer.terms_of_service'));
+});
+
 it('shows a back affordance but no step counter in the wizard', function (): void {
     $user = User::factory()->create();
 

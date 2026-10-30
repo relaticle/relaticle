@@ -144,7 +144,7 @@
     {{-- Navigation --}}
     <div class="flex items-center justify-between pt-4 mt-6 border-t border-gray-200 dark:border-gray-700 pb-1">
         <a
-            href="{{ url()->getPublicUrl('documentation/import') }}"
+            href="{{ \Relaticle\Documentation\Support\DocUrl::helpCategory('import') }}"
             target="_blank"
             class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
         >

@@ -62,27 +62,28 @@ it('ranks a rare term above a term the whole corpus uses', function (): void {
     expect($results[0]['title'])->toBe('Connect Claude or ChatGPT to Relaticle');
 });
 
-it('cites route-derived urls so self-hosted installs link to themselves', function (): void {
+it('cites urls on the documentation public url', function (): void {
     $results = searchDocs('how do I export my data')['results'];
 
     expect($results)->not->toBeEmpty();
 
     foreach ($results as $result) {
-        expect($result['url'])->toStartWith(rtrim(url('/'), '/').'/help/');
+        expect($result['url'])->toStartWith(rtrim((string) config('documentation.public_url'), '/').'/help/');
     }
 });
 
-it('rewrites root-relative doc links to absolute urls', function (): void {
+it('rewrites root-relative doc links to absolute urls on the documentation public url', function (): void {
     $content = implode("\n", array_column(searchDocs('billing and plans')['results'], 'content'));
 
-    expect($content)->not->toMatch('/]\(\/[a-z]/');
+    expect($content)->not->toMatch('/]\(\/[a-z]/')
+        ->and($content)->toContain(']('.rtrim((string) config('documentation.public_url'), '/').'/');
 });
 
 it('reports no coverage and links the help centre when nothing matches', function (): void {
     $payload = searchDocs('zzzqqxx unrelatedgibberish');
 
     expect($payload['results'])->toBe([])
-        ->and($payload['note'])->toContain(route('help.index'));
+        ->and($payload['note'])->toContain(rtrim((string) config('documentation.public_url'), '/').'/help');
 });
 
 it('returns nothing for a query that is only stop words', function (): void {

@@ -476,6 +476,21 @@ test('the change role modal offers a way to compare roles rendered from the capa
         ->toContain(__('workspaces.capabilities.fields.manage.label'));
 });
 
+test('the compare roles modal links the roles guide on the documentation public url', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    $component = livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->mountAction([
+            TestAction::make('updateWorkspaceRole')->table($member->id),
+            TestAction::make('compareRoles')->schemaComponent('role'),
+        ]);
+
+    $helpAction = $component->instance()->getMountedAction()->getExtraModalFooterActions()['readRolesHelp'];
+
+    expect($helpAction->getUrl())->toBe(rtrim((string) config('documentation.public_url'), '/').'/help/workspace/manage-members-and-roles');
+});
+
 test('removing a member warns that their mailboxes disconnect when email is on', function (bool $emailIsOn): void {
     Feature::define(EmailIntegration::class, $emailIsOn);
     $member = User::factory()->create(['name' => 'Dana Whitfield']);

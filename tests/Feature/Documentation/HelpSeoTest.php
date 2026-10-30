@@ -14,7 +14,11 @@ use Relaticle\Documentation\Support\HeadingAnchors;
 use Relaticle\Documentation\Support\RenderDocMarkdown;
 use Relaticle\Ink\Models\Post;
 
-mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class);
+mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class, DocUrl::class);
+
+beforeEach(function (): void {
+    config()->set('documentation.public_url', url('/'));
+});
 
 /** @return list<string> Real heading-permalink ids, in document order, extracted from rendered HTML. */
 function renderedHeadingIds(string $html): array
@@ -96,6 +100,38 @@ it('indexes the developer guides alongside help, with a link and a crumb per rec
         && $record['section'] === "If you don't see the fields you expect");
 
     expect($section['url'])->toEndWith('#if-you-dont-see-the-fields-you-expect');
+});
+
+it('builds every help and developer url on the path its route serves', function (): void {
+    $repository = app(DocsRepository::class);
+
+    foreach ($repository->pages() as $page) {
+        expect(DocUrl::page($page))->toBe($page->area === DocUrl::HELP
+            ? route('help.show', ['category' => $page->category, 'slug' => $page->slug])
+            : route('documentation.show', ['type' => $page->slug]));
+    }
+
+    foreach ($repository->categories() as $category) {
+        expect(DocUrl::category($category))->toBe($category->area === DocUrl::HELP
+            ? route('help.category', ['category' => Str::after($category->path, '/')])
+            : route('documentation.index'));
+    }
+
+    expect(DocUrl::area(DocUrl::HELP))->toBe(route('help.index'))
+        ->and(DocUrl::area(DocUrl::DOCS))->toBe(route('documentation.index'));
+});
+
+it('rebuilds the cached search index when the documentation public url changes', function (): void {
+    config()->set('app.debug', false);
+
+    config()->set('documentation.public_url', 'https://one.example.test');
+    $first = $this->get('/help/search-index.json')->assertOk()->json('records.0.url');
+
+    config()->set('documentation.public_url', 'https://two.example.test');
+    $second = $this->get('/help/search-index.json')->assertOk()->json('records.0.url');
+
+    expect($first)->toStartWith('https://one.example.test/')
+        ->and($second)->toStartWith('https://two.example.test/');
 });
 
 it('titles every content page base-title-dash-brand, exactly once', function (): void {

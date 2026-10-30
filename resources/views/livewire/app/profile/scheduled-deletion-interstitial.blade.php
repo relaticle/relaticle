@@ -81,10 +81,14 @@
     {{-- Footer --}}
     <div class="flex items-center justify-center gap-x-1 py-6 text-xs text-gray-400 dark:text-gray-500">
         <span>&copy; {{ date('Y') }} Relaticle</span>
-        <span>&middot;</span>
-        <a href="{{ url('/privacy-policy') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Privacy Policy</a>
-        <span>&middot;</span>
-        <a href="{{ url('/terms-of-service') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Terms</a>
+        @if($privacyUrl = config('relaticle.legal.privacy_url'))
+            <span>&middot;</span>
+            <a href="{{ $privacyUrl }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">{{ __('auth.footer.privacy_policy') }}</a>
+        @endif
+        @if($termsUrl = config('relaticle.legal.terms_url'))
+            <span>&middot;</span>
+            <a href="{{ $termsUrl }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">{{ __('auth.footer.terms_of_service') }}</a>
+        @endif
     </div>
 
     <x-filament-actions::modals />
