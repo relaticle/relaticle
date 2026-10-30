@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Support\DetectsPublicMarkdownRequest;
-use Relaticle\Documentation\Http\Controllers\DocumentationController;
-use Relaticle\Documentation\Support\DocsNavigation;
+use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
+use Relaticle\Cloud\Docs\Support\DocsNavigation;
+use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\HeadingAnchors;
-use Relaticle\Documentation\Support\RenderDocMarkdown;
 
 mutates(
     DetectsPublicMarkdownRequest::class,

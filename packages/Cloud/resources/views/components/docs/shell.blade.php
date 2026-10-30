@@ -22,9 +22,9 @@
          as it executes, and the shell's x-data reaches for window.RelaticleDocs
          the moment Alpine initialises. --}}
     @vite([
-        'resources/css/app.css',
-        'packages/Documentation/resources/css/documentation.css',
-        'packages/Documentation/resources/js/documentation.js',
+        'packages/Cloud/resources/css/cloud.css',
+        'packages/Cloud/resources/css/documentation.css',
+        'packages/Cloud/resources/js/documentation.js',
         'resources/js/app.js',
     ])
 
@@ -178,14 +178,14 @@
                     <x-ri-close-line class="h-5 w-5" />
                 </button>
             </div>
-            <x-documentation::sidebar-nav :nav="$nav" :current-path="$currentPath" />
+            <x-cloud::docs.sidebar-nav :nav="$nav" :current-path="$currentPath" />
         </nav>
     </div>
 
     <div class="mx-auto flex w-full max-w-[90rem]">
         <aside class="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-64 shrink-0 border-r border-gray-200/70 lg:block dark:border-white/[0.06]">
             <nav aria-label="{{ __('Documentation navigation') }}" class="docs-scroll h-full overflow-y-auto px-6 py-9">
-                <x-documentation::sidebar-nav :nav="$nav" :current-path="$currentPath" />
+                <x-cloud::docs.sidebar-nav :nav="$nav" :current-path="$currentPath" />
             </nav>
         </aside>
 
@@ -215,7 +215,7 @@
         </div>
     </div>
 
-    <x-documentation::search-dialog />
+    <x-cloud::docs.search-dialog />
 </div>
 
 </body>

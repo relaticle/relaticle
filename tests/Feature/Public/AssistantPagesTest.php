@@ -47,13 +47,6 @@ it('shows an example exchange built from the default pipeline stages', function 
         ->and($text)->toContain('Negotiation/Review');
 })->with(['claude', 'chatgpt']);
 
-it('names each assistant in llms.txt with its own summary', function (): void {
-    $body = $this->get('/llms.txt')->assertOk()->getContent();
-
-    expect($body)->toContain('- [Relaticle for Claude]('.route('assistants.claude').'): Connect Claude to the CRM with OAuth')
-        ->and($body)->toContain('- [Relaticle for ChatGPT]('.route('assistants.chatgpt').'): Install the Relaticle plugin in ChatGPT');
-});
-
 it('sends ChatGPT users to the plugin and tells them to mention it', function (): void {
     $html = $this->get('/crm-for-chatgpt')->assertOk()->getContent();
 

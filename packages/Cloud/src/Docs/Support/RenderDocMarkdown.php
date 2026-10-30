@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Documentation\Support;
+namespace Relaticle\Cloud\Docs\Support;
 
 use Spatie\LaravelMarkdown\MarkdownRenderer;
 

@@ -1,6 +1,6 @@
-@reference "../../../../resources/css/app.css";
+@reference "./cloud.css";
 
-/* The docs shell also loads app.css, so this file emits no utilities and needs no scan. */
+/* The docs shell also loads cloud.css, so this file emits no utilities and needs no scan. */
 @source not "../../../..";
 
 /*

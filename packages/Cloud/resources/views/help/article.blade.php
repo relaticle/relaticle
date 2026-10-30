@@ -1,10 +1,10 @@
-<x-documentation::shell
+<x-cloud::docs.shell
     :title="__(':title - :brand', ['title' => $page->title, 'brand' => config('app.name')])"
     :description="$page->description"
     og-type="article"
     :nav="$nav"
     :current-path="$currentPath">
-    <x-documentation::article
+    <x-cloud::docs.article
         :page="$page"
         :body="$body"
         :headings="$headings"
@@ -22,7 +22,7 @@
                 <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
             </ol>
         </x-slot:breadcrumbs>
-    </x-documentation::article>
+    </x-cloud::docs.article>
 
     @php
         $breadcrumbTrail = [
@@ -35,7 +35,7 @@
 
         $breadcrumbTrail[] = ['name' => $page->title, 'url' => route('help.show', ['category' => $page->category, 'slug' => $page->slug])];
 
-        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->article(
+        $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->article(
             $page,
             route('help.show', ['category' => $page->category, 'slug' => $page->slug]),
             $breadcrumbTrail,
@@ -43,4 +43,4 @@
     @endphp
 
     {!! $jsonLd->toScript() !!}
-</x-documentation::shell>
+</x-cloud::docs.shell>

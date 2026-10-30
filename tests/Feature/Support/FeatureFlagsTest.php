@@ -111,30 +111,6 @@ describe('Documentation', function (): void {
         ]);
     });
 
-    it('serves documentation pages when feature is active', function (): void {
-        $this->get('/developers')
-            ->assertOk();
-    });
-
-    it('does not register documentation routes when feature is inactive', function (): void {
-        putenv('RELATICLE_FEATURE_DOCUMENTATION=false');
-        CachedState::$cachedRoutes = null;
-        CachedState::$cachedConfig = null;
-        RouteServiceProvider::loadCachedRoutesUsing(null);
-        LoadConfiguration::alwaysUse(null);
-        $this->refreshApplication();
-
-        $this->get('/developers')
-            ->assertNotFound();
-
-        $this->get('/docs')
-            ->assertNotFound();
-
-        putenv('RELATICLE_FEATURE_DOCUMENTATION');
-        CachedState::$cachedRoutes = null;
-        CachedState::$cachedConfig = null;
-    });
-
     it('still serves every marketing page when documentation is inactive', function (): void {
         putenv('RELATICLE_FEATURE_DOCUMENTATION=false');
         CachedState::$cachedRoutes = null;

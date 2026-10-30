@@ -4,7 +4,7 @@
     $pageDescription = __('Guides for setting up your workspace, importing records, and using Relaticle day to day.');
 @endphp
 
-<x-documentation::shell
+<x-cloud::docs.shell
     :title="$pageTitle . ' - ' . config('app.name')"
     :description="$pageDescription"
     :nav="$nav">
@@ -35,7 +35,7 @@
             <section aria-labelledby="section-{{ str_replace('/', '-', $section['path']) }}">
                 <div class="flex items-start gap-3.5">
                     <span class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 dark:bg-primary-500/10 dark:text-primary-400">
-                        <x-documentation::doc-icon :topic="$section['path']" class="h-5 w-5" />
+                        <x-cloud::docs.doc-icon :topic="$section['path']" class="h-5 w-5" />
                     </span>
                     <div class="min-w-0">
                         <h2 id="section-{{ str_replace('/', '-', $section['path']) }}" class="font-display text-lg font-semibold tracking-tight text-gray-950 dark:text-white">
@@ -95,10 +95,10 @@
     </div>
 
     @php
-        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
+        $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
             ['name' => $baseTitle, 'url' => route('help.index')],
         ]);
     @endphp
 
     {!! $jsonLd->toScript() !!}
-</x-documentation::shell>
+</x-cloud::docs.shell>

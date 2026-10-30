@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
-use Relaticle\Documentation\Support\DocsNavigation;
+use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
 
 dataset('documentation shell pages', [
@@ -16,10 +16,6 @@ dataset('documentation shell pages', [
 ]);
 
 mutates(DocsNavigation::class);
-
-beforeEach(function (): void {
-    config()->set('documentation.public_url', url('/'));
-});
 
 it('renders the help hub with category cards', function (): void {
     $this->get('/help')->assertOk()->assertSee('Getting started', false);

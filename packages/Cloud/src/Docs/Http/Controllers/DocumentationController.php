@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Documentation\Http\Controllers;
+namespace Relaticle\Cloud\Docs\Http\Controllers;
 
 use Illuminate\View\View;
+use Relaticle\Cloud\Docs\Support\DocsNavigation;
+use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Documentation\Support\DocPage;
-use Relaticle\Documentation\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\HeadingAnchors;
-use Relaticle\Documentation\Support\RenderDocMarkdown;
 
 final readonly class DocumentationController
 {
@@ -32,7 +32,7 @@ final readonly class DocumentationController
 
     public function index(): View
     {
-        return view('documentation::docs.hub', [
+        return view('cloud::docs.hub', [
             'nav' => ($this->navigation)(),
         ]);
     }
@@ -49,7 +49,7 @@ final readonly class DocumentationController
             fn (DocPage $candidate): bool => $candidate->path === $page->path,
         );
 
-        return view('documentation::docs.article', [
+        return view('cloud::docs.article', [
             'page' => $page,
             'body' => ($this->renderMarkdown)($page->body),
             'headings' => $this->headingAnchors->headings($page->body),

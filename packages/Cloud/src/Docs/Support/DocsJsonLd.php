@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Documentation\Support;
+namespace Relaticle\Cloud\Docs\Support;
 
 use Carbon\CarbonImmutable;
+use Relaticle\Documentation\Support\DocPage;
 use Spatie\SchemaOrg\Article;
 use Spatie\SchemaOrg\BreadcrumbList;
 use Spatie\SchemaOrg\Graph;

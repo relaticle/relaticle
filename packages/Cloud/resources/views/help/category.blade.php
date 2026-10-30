@@ -1,4 +1,4 @@
-<x-documentation::shell
+<x-cloud::docs.shell
     :title="__(':title - :brand', ['title' => $category->title, 'brand' => config('app.name')])"
     :description="$category->description"
     :nav="$nav"
@@ -15,7 +15,7 @@
         </nav>
         <div class="flex items-start gap-4">
             <span class="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600 sm:inline-flex dark:bg-primary-500/10 dark:text-primary-400">
-                <x-documentation::doc-icon :topic="$category->path" class="h-5 w-5" />
+                <x-cloud::docs.doc-icon :topic="$category->path" class="h-5 w-5" />
             </span>
             <div class="min-w-0">
                 <h1 class="font-display text-[2rem] font-bold tracking-[-0.02em] text-balance text-gray-950 sm:text-[2.25rem] dark:text-white">
@@ -54,11 +54,11 @@
     </div>
 
     @php
-        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
+        $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
             ['name' => __('Help Centre'), 'url' => route('help.index')],
             ['name' => $category->title, 'url' => \Relaticle\Documentation\Support\DocUrl::category($category)],
         ]);
     @endphp
 
     {!! $jsonLd->toScript() !!}
-</x-documentation::shell>
+</x-cloud::docs.shell>

@@ -5,7 +5,7 @@
     $sections = collect($nav)->where('area', \Relaticle\Documentation\Support\DocUrl::DOCS);
 @endphp
 
-<x-documentation::shell
+<x-cloud::docs.shell
     :title="$baseTitle . ' - ' . config('app.name')"
     :description="$pageDescription"
     :nav="$nav">
@@ -30,7 +30,7 @@
                         <li class="bg-white dark:bg-gray-950">
                             <a href="{{ $link['url'] }}" class="group flex h-full flex-col p-6 transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.03]">
                                 <span class="text-gray-400 transition-colors group-hover:text-primary-600 dark:text-gray-500 dark:group-hover:text-primary-400">
-                                    <x-documentation::doc-icon :topic="$link['path'] ?? 'api-reference'" class="h-5 w-5" />
+                                    <x-cloud::docs.doc-icon :topic="$link['path'] ?? 'api-reference'" class="h-5 w-5" />
                                 </span>
                                 <span class="font-display mt-4 block text-[15px] font-semibold tracking-tight text-gray-900 dark:text-white">
                                     {{ $link['title'] }}
@@ -68,10 +68,10 @@
     </div>
 
     @php
-        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->breadcrumbs([
+        $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
             ['name' => $baseTitle, 'url' => route('documentation.index')],
         ]);
     @endphp
 
     {!! $jsonLd->toScript() !!}
-</x-documentation::shell>
+</x-cloud::docs.shell>

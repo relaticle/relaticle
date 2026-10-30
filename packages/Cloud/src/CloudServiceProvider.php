@@ -7,6 +7,7 @@ namespace Relaticle\Cloud;
 use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
 use App\Features\Billing;
+use App\Features\Documentation;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\Filament\AppPanelProvider;
@@ -19,6 +20,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
@@ -62,6 +64,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
+        $this->registerDocsRoutes();
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
@@ -76,6 +79,17 @@ final class CloudServiceProvider extends ServiceProvider
 
         $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
+    }
+
+    private function registerDocsRoutes(): void
+    {
+        if (! Feature::for(null)->active(Documentation::class)) {
+            return;
+        }
+
+        Route::middleware('web')->group(function (): void {
+            $this->loadRoutesFrom(__DIR__.'/../routes/docs.php');
+        });
     }
 
     private function linkWebsiteFromCore(): void

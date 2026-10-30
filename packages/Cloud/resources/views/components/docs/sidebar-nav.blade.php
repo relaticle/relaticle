@@ -24,7 +24,7 @@
                                'text-gray-900 hover:text-primary-600 dark:text-white dark:hover:text-primary-400' => $currentPath !== $section['path'],
                            ])
                            @if($currentPath === $section['path']) aria-current="page" @endif>
-                            <x-documentation::doc-icon :topic="$section['path']" class="h-4 w-4 shrink-0" />
+                            <x-cloud::docs.doc-icon :topic="$section['path']" class="h-4 w-4 shrink-0" />
                             {{ $section['title'] }}
                         </a>
 

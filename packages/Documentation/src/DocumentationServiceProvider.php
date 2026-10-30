@@ -32,7 +32,6 @@ final class DocumentationServiceProvider extends ServiceProvider
         }
 
         $this->registerRoutes();
-        $this->registerViews();
         $this->registerPublishing();
     }
 
@@ -48,14 +47,6 @@ final class DocumentationServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register the package views.
-     */
-    private function registerViews(): void
-    {
-        $this->loadViewsFrom(__DIR__.'/../resources/views', 'documentation');
-    }
-
-    /**
      * Register publishable resources.
      */
     private function registerPublishing(): void
@@ -65,11 +56,6 @@ final class DocumentationServiceProvider extends ServiceProvider
             $this->publishes([
                 __DIR__.'/../config/documentation.php' => config_path('documentation.php'),
             ], 'documentation-config');
-
-            // Views
-            $this->publishes([
-                __DIR__.'/../resources/views' => resource_path('views/vendor/documentation'),
-            ], 'documentation-views');
 
             // Content
             $this->publishes([

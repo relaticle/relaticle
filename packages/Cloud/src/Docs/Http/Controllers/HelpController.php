@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Documentation\Http\Controllers;
+namespace Relaticle\Cloud\Docs\Http\Controllers;
 
 use App\Enums\ConnectableAssistant;
 use App\Support\CompetitorFacts;
@@ -11,14 +11,14 @@ use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
+use Relaticle\Cloud\Docs\Support\DocsNavigation;
+use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
-use Relaticle\Documentation\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
-use Relaticle\Documentation\Support\RenderDocMarkdown;
 use Relaticle\Ink\Models\Post;
 
 final readonly class HelpController
@@ -44,7 +44,7 @@ final readonly class HelpController
 
     public function index(): View
     {
-        return view('documentation::help.hub', [
+        return view('cloud::help.hub', [
             'nav' => ($this->navigation)(),
         ]);
     }
@@ -56,7 +56,7 @@ final readonly class HelpController
 
         abort_unless($docCategory instanceof DocCategory, 404);
 
-        return view('documentation::help.category', [
+        return view('cloud::help.category', [
             'category' => $docCategory,
             'categoryBody' => trim($docCategory->body) !== '' ? ($this->renderMarkdown)($docCategory->body) : null,
             'pages' => $this->repository->pagesIn($categoryPath)->values(),
@@ -72,7 +72,7 @@ final readonly class HelpController
 
         abort_unless($page instanceof DocPage, 404);
 
-        return view('documentation::help.article', [
+        return view('cloud::help.article', [
             'page' => $page,
             'category' => $this->repository->findCategory(self::AREA."/{$category}"),
             'body' => ($this->renderMarkdown)($page->body),

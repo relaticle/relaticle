@@ -8,7 +8,6 @@
 @source "../views";
 @source "../js";
 @source "../../app";
-@source "../../packages/Documentation";
 @source "../../vendor/relaticle/ink/resources/views";
 
 [x-cloak] {

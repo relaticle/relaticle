@@ -176,58 +176,6 @@ describe('Legal pages', function () {
     ]);
 });
 
-describe('Documentation pages', function () {
-    // Shiki highlights code by spawning a node subprocess per fenced block, and
-    // these pages carry ~59 between them, over half this file's runtime. None
-    // of the assertions here read highlighted output, so it is switched off and
-    // covered once, explicitly, at the end of this block.
-    beforeEach(function () {
-        config()->set('markdown.code_highlighting.enabled', false);
-    });
-
-    it('displays the developers index', function () {
-        $response = $this->get('/developers');
-
-        $response->assertStatus(200);
-        $response->assertSee('Documentation');
-    });
-
-    it('displays the contributing guide', function () {
-        $response = $this->get('/developers/contributing');
-
-        $response->assertStatus(200);
-        $response->assertSee('Contributing Guide');
-    });
-
-    it('displays the self-hosting guide', function () {
-        $response = $this->get('/developers/self-hosting');
-
-        $response->assertStatus(200);
-        $response->assertSee('Self-Hosting Guide');
-    });
-
-    it('displays the MCP guide', function () {
-        $response = $this->get('/developers/mcp');
-
-        $response->assertStatus(200);
-        $response->assertSee('MCP Server');
-    });
-
-    it('shows edit on GitHub link on documentation pages', function () {
-        $response = $this->get('/developers/self-hosting');
-
-        $response->assertStatus(200);
-        $response->assertSee('Edit this page on GitHub');
-    });
-
-    it('returns 404 for non-existent documentation page', function () {
-        $response = $this->get('/developers/non-existent-page');
-
-        $response->assertStatus(404);
-    });
-
-});
-
 describe('Pricing page', function () {
     it('displays the pricing page', function () {
         $response = $this->get('/pricing');
@@ -999,8 +947,6 @@ describe('Page metadata', function () {
         ['/security', true],
         ['/press', true],
         ['/contact', true],
-        ['/help', true],
-        ['/developers', true],
         ['/developers/api', false],
         ['/blog', true],
         ['/compare/relaticle-vs-twenty', true],

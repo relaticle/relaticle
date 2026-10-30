@@ -1,10 +1,10 @@
-<x-documentation::shell
+<x-cloud::docs.shell
     :title="$page->title . ' - ' . config('app.name')"
     :description="$page->description"
     og-type="article"
     :nav="$nav"
     :current-path="$currentPath">
-    <x-documentation::article
+    <x-cloud::docs.article
         :page="$page"
         :body="$body"
         :headings="$headings"
@@ -19,10 +19,10 @@
                 <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
             </ol>
         </x-slot:breadcrumbs>
-    </x-documentation::article>
+    </x-cloud::docs.article>
 
     @php
-        $jsonLd = (new \Relaticle\Documentation\Support\DocsJsonLd)->article(
+        $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->article(
             $page,
             route('documentation.show', ['type' => $page->slug]),
             [
@@ -33,4 +33,4 @@
     @endphp
 
     {!! $jsonLd->toScript() !!}
-</x-documentation::shell>
+</x-cloud::docs.shell>

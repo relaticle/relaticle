@@ -2,7 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Documentation\Support;
+namespace Relaticle\Cloud\Docs\Support;
+
+use Relaticle\Documentation\Support\DocCategory;
+use Relaticle\Documentation\Support\DocPage;
+use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
 
 /**
  * The single navigation tree behind every documentation surface: the sidebar

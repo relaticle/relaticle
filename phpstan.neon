@@ -149,6 +149,7 @@ services:
                 - Relaticle\Cloud\Billing\Http
                 - Relaticle\Cloud\Billing\Filament
                 - Relaticle\Cloud\Billing\Livewire
+                - Relaticle\Cloud\Docs\Http
                 - App\Queries
                 - Relaticle\Chat\Queries
                 - Relaticle\EmailIntegration\Queries

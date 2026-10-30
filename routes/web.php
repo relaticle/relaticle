@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\ConnectableAssistant;
 use App\Enums\Notifications\NotificationType;
-use App\Features\Documentation;
 use App\Features\SocialAuth;
 use App\Http\Controllers\AcceptWorkspaceInvitationController;
 use App\Http\Controllers\AlternativesController;
@@ -36,12 +35,10 @@ use App\Http\Middleware\AddVaryAcceptHeader;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
-use Relaticle\Documentation\Support\DocsRepository;
 use Spatie\Honeypot\ProtectAgainstSpam;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
@@ -234,35 +231,6 @@ Route::middleware(['auth', 'verified', 'no-referrer'])
             ->middleware([ThrottleBeforeAuthentication::class.':10,1,workspace-join-confirm', CheckScheduledDeletion::class])
             ->name('workspaces.join.confirm');
     });
-
-// Legacy documentation redirects. Two indexed generations point here: the
-// original /documentation/* URLs and the /docs/* generation retired 2026-08-13
-// (renamed to /developers; its two end-user guides moved into /help). Every
-// entry maps straight to the final URL so no chain ever exceeds one hop.
-$legacyDocsRedirect = function (DocsRepository $repository, string $slug = ''): RedirectResponse {
-    $map = [
-        'quickstart' => '/help/getting-started',
-        'getting-started' => '/help/getting-started',
-        'import' => '/help/import',
-        'developer' => '/developers/contributing',
-    ];
-
-    if (isset($map[$slug])) {
-        return redirect($map[$slug], 301);
-    }
-
-    $isKnownTarget = $repository->find("docs/guides/{$slug}") !== null
-        || "/developers/{$slug}" === config('documentation.api_reference.url');
-
-    return $isKnownTarget
-        ? redirect("/developers/{$slug}", 301)
-        : redirect('/developers', 301);
-};
-
-if (Feature::for(null)->active(Documentation::class)) {
-    Route::get('/documentation/{slug?}', $legacyDocsRedirect)->where('slug', '.*');
-    Route::get('/docs/{slug?}', $legacyDocsRedirect)->where('slug', '.*');
-}
 
 // Community redirects
 Route::get('/discord', function () {

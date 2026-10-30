@@ -5,20 +5,16 @@ declare(strict_types=1);
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
-use Relaticle\Documentation\Http\Controllers\HelpController;
+use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+use Relaticle\Cloud\Docs\Support\DocsJsonLd;
+use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Documentation\Support\BuildSearchIndex;
-use Relaticle\Documentation\Support\DocsJsonLd;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Documentation\Support\HeadingAnchors;
-use Relaticle\Documentation\Support\RenderDocMarkdown;
 use Relaticle\Ink\Models\Post;
 
 mutates(HelpController::class, DocsJsonLd::class, BuildSearchIndex::class, HeadingAnchors::class, DocUrl::class);
-
-beforeEach(function (): void {
-    config()->set('documentation.public_url', url('/'));
-});
 
 /** @return list<string> Real heading-permalink ids, in document order, extracted from rendered HTML. */
 function renderedHeadingIds(string $html): array
@@ -310,4 +306,11 @@ it('caps the blog section of llms.txt instead of listing every post ever publish
     // above it are already bounded by their on-disk manifests.
     expect($blogLinks)->toBeLessThanOrEqual(50)
         ->and($blogLinks)->toBeGreaterThan(0);
+});
+
+it('names each assistant in llms.txt with its own summary', function (): void {
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    expect($body)->toContain('- [Relaticle for Claude]('.route('assistants.claude').'): Connect Claude to the CRM with OAuth')
+        ->and($body)->toContain('- [Relaticle for ChatGPT]('.route('assistants.chatgpt').'): Install the Relaticle plugin in ChatGPT');
 });
