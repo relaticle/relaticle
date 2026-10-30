@@ -77,7 +77,7 @@
                         'dearestCost' => $dearestReplyCost,
                     ]
                 );
-                $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
+                $paidPlanLabel = __('Cloud Pro');
                 $modelsUnlockAnswer = trim(implode(' ', array_filter([
                     $freeCloudModels === ''
                         ? __('Every plan can use any self-hosted model you connect yourself.')

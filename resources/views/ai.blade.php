@@ -17,25 +17,6 @@
     // runtime, and a tier with no model rendered " is free on every plan".
     $selfHostedNote = __('A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.');
 
-    $whichModelsAnswer = $billingActive ? trim(implode(' ', array_filter([
-        $freeCloudModels === ''
-            ? __('Every plan can use any self-hosted model you connect yourself.')
-            : __(':freeModels on every plan.', ['freeModels' => $freeCloudModels]),
-        $paidCloudModels === ''
-            ? ''
-            : __('A paid plan additionally unlocks :paidModels, which cost more credits per reply.', ['paidModels' => $paidCloudModels]),
-        $selfHostedNote,
-    ]))) : __('Every model this installation offers is open to every workspace. There is no plan gate.').' '.$selfHostedNote;
-
-    $modelChoiceLine = $billingActive ? trim(implode(' ', array_filter([
-        $freeCloudModels === ''
-            ? __('Any self-hosted model you connect is free on every plan.')
-            : __(':freeModels is free on every plan.', ['freeModels' => $freeCloudModels]),
-        $paidCloudModels === ''
-            ? ''
-            : __('Switch to :paidModels on a paid plan when a harder question calls for it.', ['paidModels' => $paidCloudModels]),
-    ]))) : __('Every model this installation offers is open to every workspace.');
-
     $proCredits = number_format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
@@ -46,12 +27,31 @@
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
 
     if ($billingActive) {
+        $whichModelsAnswer = trim(implode(' ', array_filter([
+            $freeCloudModels === ''
+                ? __('Every plan can use any self-hosted model you connect yourself.')
+                : __(':freeModels on every plan.', ['freeModels' => $freeCloudModels]),
+            $paidCloudModels === ''
+                ? ''
+                : __('A paid plan additionally unlocks :paidModels, which cost more credits per reply.', ['paidModels' => $paidCloudModels]),
+            $selfHostedNote,
+        ])));
+        $modelChoiceLine = trim(implode(' ', array_filter([
+            $freeCloudModels === ''
+                ? __('Any self-hosted model you connect is free on every plan.')
+                : __(':freeModels is free on every plan.', ['freeModels' => $freeCloudModels]),
+            $paidCloudModels === ''
+                ? ''
+                : __('Switch to :paidModels on a paid plan when a harder question calls for it.', ['paidModels' => $paidCloudModels]),
+        ])));
         $includedPlanQuestion = __('Is :name included with Relaticle Cloud?', ['name' => $assistantName]);
         $includedPlanAnswer = __(
             'Yes. New Cloud workspaces include :name during a :days-day Cloud Pro trial. Cloud Pro includes a :credits-credit monthly allowance and every supported cloud model. If the trial ends without a subscription, hosted access pauses. Self-hosted installs do not meter credits and require your own provider key or local model.',
             ['name' => $assistantName, 'days' => $trialDays, 'credits' => $proCredits]
         );
     } else {
+        $whichModelsAnswer = __('Every model this installation offers is open to every workspace. There is no plan gate.').' '.$selfHostedNote;
+        $modelChoiceLine = __('Every model this installation offers is open to every workspace.');
         $includedPlanQuestion = __('Is :name included in the free plan?', ['name' => $assistantName]);
         $includedPlanAnswer = __(
             'Yes. :name does not meter AI credits on this installation, so there is no credit limit. A self-hosted install ships without a provider. You add your own key or local model, and pay that provider directly.',
