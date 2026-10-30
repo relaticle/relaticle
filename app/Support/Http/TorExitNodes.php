@@ -16,6 +16,14 @@ final readonly class TorExitNodes
 
     private const string CACHE_KEY = 'tor-exit-nodes';
 
+    private const int CONNECT_TIMEOUT_SECONDS = 5;
+
+    private const int REQUEST_TIMEOUT_SECONDS = 30;
+
+    private const int ATTEMPTS = 2;
+
+    private const int RETRY_BACKOFF_MILLISECONDS = 1000;
+
     // The bulk list held 1,224 exits on 2026-10-31, so a far shorter body is an error page.
     private const int MINIMUM_EXITS = 500;
 
@@ -33,7 +41,11 @@ final readonly class TorExitNodes
      */
     public function refresh(): int
     {
-        $body = Http::timeout(30)->retry(2, 1000)->get(self::SOURCE_URL)->body();
+        $body = Http::connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+            ->timeout(self::REQUEST_TIMEOUT_SECONDS)
+            ->retry(self::ATTEMPTS, self::RETRY_BACKOFF_MILLISECONDS)
+            ->get(self::SOURCE_URL)
+            ->body();
 
         $exits = collect(preg_split('/\R/', $body) ?: [])
             ->map(fn (string $line): string => trim($line))
