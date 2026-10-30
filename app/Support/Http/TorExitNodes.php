@@ -47,19 +47,18 @@ final readonly class TorExitNodes
             ->get(self::SOURCE_URL)
             ->body();
 
-        $exits = collect(preg_split('/\R/', $body) ?: [])
+        $exits = collect(explode("\n", $body))
             ->map(fn (string $line): string => trim($line))
             ->filter(fn (string $line): bool => filter_var($line, FILTER_VALIDATE_IP) !== false)
-            ->unique()
-            ->values();
+            ->mapWithKeys(fn (string $ip): array => [$ip => true]);
 
         throw_if(
             $exits->count() < self::MINIMUM_EXITS,
             UnexpectedValueException::class,
-            "The Tor exit list returned {$exits->count()} addresses, fewer than the ".self::MINIMUM_EXITS.' expected.',
+            "The Tor exit list returned only {$exits->count()} addresses.",
         );
 
-        Cache::forever(self::CACHE_KEY, array_fill_keys($exits->all(), true));
+        Cache::forever(self::CACHE_KEY, $exits->all());
 
         return $exits->count();
     }
