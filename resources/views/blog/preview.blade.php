@@ -1,4 +1,4 @@
-<x-guest-layout title="Preview - {{ $post->title }}">
+<x-cloud::guest-layout title="Preview - {{ $post->title }}">
     @push('header')
         <meta name="robots" content="noindex, nofollow">
     @endpush
@@ -12,4 +12,4 @@
             <x-blog.related-posts :posts="$relatedPosts" />
         </div>
     </div>
-</x-guest-layout>
+</x-cloud::guest-layout>

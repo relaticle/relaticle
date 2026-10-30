@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\ComparisonController;
-use App\Http\Controllers\HomeController;
-use App\Http\Middleware\AddVaryAcceptHeader;
 use Illuminate\Support\Facades\Http;
 use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
+use Relaticle\Cloud\Marketing\Http\Controllers\ComparisonController;
+use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
+use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
 
 mutates(DocumentationController::class, HomeController::class, ComparisonController::class, AddVaryAcceptHeader::class);
 

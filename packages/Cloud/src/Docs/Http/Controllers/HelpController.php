@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Docs\Http\Controllers;
 
 use App\Enums\ConnectableAssistant;
-use App\Support\CompetitorFacts;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -13,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\View\View;
 use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
+use Relaticle\Cloud\Marketing\Support\CompetitorFacts;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;

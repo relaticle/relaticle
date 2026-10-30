@@ -18,9 +18,12 @@ use Filament\Panel;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Mail\Mailable;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
@@ -39,6 +42,13 @@ use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
+use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
+use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
+use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
+use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
+use Relaticle\Cloud\Marketing\Services\DiscordService;
+use Relaticle\Cloud\Marketing\Services\DockerHubService;
+use Relaticle\Cloud\Marketing\Services\GitHubService;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -54,6 +64,10 @@ final class CloudServiceProvider extends ServiceProvider
             ? $app->make(StripeBilling::class)
             : $app->make(NoBilling::class));
 
+        $this->mergeConfigFrom(__DIR__.'/../config/comparisons.php', 'comparisons');
+
+        config(['ink.middleware' => [...config('ink.middleware', ['web']), AddVaryAcceptHeader::class]]);
+
         $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
         $this->extendSystemAdminPanel();
@@ -64,21 +78,33 @@ final class CloudServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
+        $this->registerMarketingRoutes();
         $this->registerDocsRoutes();
+
+        Blade::componentNamespace('Relaticle\\Cloud\\Marketing\\View\\Components', 'cloud');
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
+            $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         });
 
         $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
+        $this->registerCommunityCounts();
+    }
+
+    private function registerMarketingRoutes(): void
+    {
+        Route::middleware('web')->group(function (): void {
+            $this->loadRoutesFrom(__DIR__.'/../routes/marketing.php');
+        });
     }
 
     private function registerDocsRoutes(): void
@@ -139,6 +165,7 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
             'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
             'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
+            'App\Mail\NewContactSubmissionMail' => NewContactSubmissionMail::class,
         ] as $preMoveName => $current) {
             if (! class_exists($preMoveName, false)) {
                 class_alias($current, $preMoveName);
@@ -157,5 +184,32 @@ final class CloudServiceProvider extends ServiceProvider
         MailPreview::register('trial-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace));
 
         MailPreview::register('subscription-ended', static fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace));
+
+        MailPreview::register('contact-submission', static fn (): Mailable => new NewContactSubmissionMail([
+            'name' => 'Ana Reyes',
+            'email' => 'ana@acme-robotics.example',
+            'company' => 'Acme Robotics',
+            'message' => 'We are evaluating CRMs for a 12-person sales workspace and need SSO. Can we talk this week?',
+        ]));
+    }
+
+    private function registerCommunityCounts(): void
+    {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.press'], static function (ViewContract $view): void {
+            $gitHubService = resolve(GitHubService::class);
+
+            $view->with([
+                'githubStars' => $gitHubService->getStarsCount(),
+                'formattedGithubStars' => $gitHubService->getFormattedStarsCount(),
+            ]);
+        });
+
+        View::composer('cloud::components.layout.community-links', static function (ViewContract $view): void {
+            $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
+        });
+
+        View::composer('cloud::marketing.home.partials.works-with', static function (ViewContract $view): void {
+            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
+        });
     }
 }

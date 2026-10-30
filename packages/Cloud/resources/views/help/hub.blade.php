@@ -81,15 +81,15 @@
                 </p>
             </div>
             <div class="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
-                <x-marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="ri-mail-line">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="ri-mail-line">
                     {{ __('Contact us') }}
-                </x-marketing.button>
-                <x-marketing.button variant="secondary" size="sm" href="{{ route('discord') }}" icon="ri-discord-fill" :external="true">
+                </x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('discord') }}" icon="ri-discord-fill" :external="true">
                     {{ __('Join Discord') }}
-                </x-marketing.button>
-                <x-marketing.button variant="secondary" size="sm" href="https://github.com/Relaticle/relaticle/issues" icon="ri-github-fill" :external="true">
+                </x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" size="sm" href="https://github.com/Relaticle/relaticle/issues" icon="ri-github-fill" :external="true">
                     {{ __('Open an issue') }}
-                </x-marketing.button>
+                </x-cloud::marketing.button>
             </div>
         </section>
     </div>

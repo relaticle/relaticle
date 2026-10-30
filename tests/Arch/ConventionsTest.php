@@ -802,12 +802,13 @@ it('keeps the retired contact and deal words out of record copy', function (): v
     $root = dirname(__DIR__, 2);
 
     $labelPathsNamingSomethingElse = [
-        'app/Support/MarketingNavigation.php',
-        'resources/views/alternatives/',
+        'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
+        'packages/Cloud/resources/views/marketing/alternatives/',
     ];
 
     $emailParticipantPaths = [
         'lang/en/filament/pages/email-privacy-settings.php',
+        'packages/Cloud/resources/markdown/policy.md',
         'packages/Documentation/resources/content/help/email-and-calendar/set-workspace-email-privacy.md',
     ];
 

@@ -21,7 +21,7 @@
         : url()->current();
 @endphp
 
-<x-guest-layout
+<x-cloud::guest-layout
     :title="$title"
     :description="$description"
     :ogTitle="$title"
@@ -90,4 +90,4 @@
             @endif
         </div>
     </div>
-</x-guest-layout>
+</x-cloud::guest-layout>

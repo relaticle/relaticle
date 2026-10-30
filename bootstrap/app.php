@@ -353,7 +353,6 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         $schedule->command('import:cleanup')->hourly()->onOneServer();
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();

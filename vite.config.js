@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 
 const cloudInputs = [
     'packages/Cloud/resources/css/cloud.css',
+    'packages/Cloud/resources/js/motion.js',
     'packages/Cloud/resources/css/documentation.css',
     'packages/Cloud/resources/js/documentation.js',
     'packages/Cloud/resources/css/filament/app/theme.css',
@@ -15,10 +16,8 @@ export default defineConfig({
     plugins: [
         laravel({
             input: [
-                // Marketing website
                 'resources/css/app.css',
                 'resources/js/app.js',
-                'resources/js/motion.js',
                 // Passkeys client (loaded on demand by Blade components)
                 'resources/js/passkeys.js',
                 // Chat

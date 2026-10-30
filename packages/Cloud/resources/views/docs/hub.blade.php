@@ -60,9 +60,9 @@
                 </p>
             </div>
             <div class="mt-4 shrink-0 sm:mt-0">
-                <x-marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="ri-arrow-right-line">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="ri-arrow-right-line">
                     {{ __('Visit the help centre') }}
-                </x-marketing.button>
+                </x-cloud::marketing.button>
             </div>
         </section>
     </div>

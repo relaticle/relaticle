@@ -268,6 +268,8 @@ $packageServiceLayers = [
     'Relaticle\Cloud\Billing\StripeBilling',
     'Relaticle\Cloud\Docs\Support',
     'Relaticle\Cloud\Entitlements',
+    'Relaticle\Cloud\Marketing\Services',
+    'Relaticle\Cloud\Marketing\Support',
     'Relaticle\Documentation\Support',
     'Relaticle\EmailIntegration\Actions',
     'Relaticle\EmailIntegration\Services',

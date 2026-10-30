@@ -15,7 +15,6 @@ it('renders every registered preview to html with the layout language attribute'
         'task-assigned',
         'task-digest',
         'workspace-invitation',
-        'contact-submission',
         'workspace-deletion-scheduled',
         'workspace-deletion-reminder',
         'workspace-deletion-cancelled',

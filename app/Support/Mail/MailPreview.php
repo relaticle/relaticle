@@ -7,7 +7,6 @@ namespace App\Support\Mail;
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
-use App\Mail\NewContactSubmissionMail;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
@@ -80,12 +79,6 @@ final readonly class MailPreview
                 $this->invitation($owner, $workspace),
                 'preview-token',
             ),
-            'contact-submission' => fn (): Mailable => new NewContactSubmissionMail([
-                'name' => 'Ana Reyes',
-                'email' => 'ana@acme-robotics.example',
-                'company' => 'Acme Robotics',
-                'message' => 'We are evaluating CRMs for a 12-person sales workspace and need SSO. Can we talk this week?',
-            ]),
             'workspace-deletion-scheduled' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionScheduledNotification($workspace)->toMail($owner),
             'workspace-deletion-reminder' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionReminderNotification($workspace)->toMail($owner),
             'workspace-deletion-cancelled' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionCancelledNotification($workspace)->toMail($owner),

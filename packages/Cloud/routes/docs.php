@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use App\Http\Middleware\AddVaryAcceptHeader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Route;
 use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
 use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;

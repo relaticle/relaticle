@@ -31,9 +31,6 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
-use App\Services\DiscordService;
-use App\Services\DockerHubService;
-use App\Services\GitHubService;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
@@ -98,7 +95,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\AccessToken as PassportAccessToken;
@@ -294,7 +290,6 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureSessions();
         $this->configureModels();
         $this->configureFilament();
-        $this->configureCommunityCounts();
         $this->configureLivewire();
         $this->configureMacros();
         $this->configureRateLimiting();
@@ -860,28 +855,6 @@ final class AppServiceProvider extends ServiceProvider
         ]);
 
         FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
-    }
-
-    private function configureCommunityCounts(): void
-    {
-        Facades\View::composer(['components.layout.community-links', 'home.partials.hero', 'press'], function (View $view): void {
-            $gitHubService = resolve(GitHubService::class);
-            $starsCount = $gitHubService->getStarsCount();
-            $formattedStarsCount = $gitHubService->getFormattedStarsCount();
-
-            $view->with([
-                'githubStars' => $starsCount,
-                'formattedGithubStars' => $formattedStarsCount,
-            ]);
-        });
-
-        Facades\View::composer('components.layout.community-links', function (View $view): void {
-            $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
-        });
-
-        Facades\View::composer('home.partials.works-with', function (View $view): void {
-            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
-        });
     }
 
     private function configureMacros(): void

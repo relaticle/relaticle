@@ -8,7 +8,7 @@
         ?: ($post->excerpt ?: \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', strip_tags($post->content))), 155));
 @endphp
 
-<x-guest-layout
+<x-cloud::guest-layout
     :title="$seoTitle . ' - ' . config('app.name')"
     :description="$seoDescription"
     :ogTitle="$seoTitle"
@@ -76,4 +76,4 @@
             </div>
         </div>
     </div>
-</x-guest-layout>
+</x-cloud::guest-layout>
