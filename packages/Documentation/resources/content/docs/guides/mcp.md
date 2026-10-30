@@ -22,7 +22,7 @@ With the Relaticle MCP server, your AI assistant can:
 - **Read entity schemas** to understand your custom fields
 - **Get a CRM overview** with record counts and recent activity
 
-Writes made over MCP apply immediately. The approval card belongs to the assistant built into Relaticle, and an MCP client relies on its own confirmation prompts. Email tools exist for a connection that was given email access. Meetings are not exposed. A sent email is the one write that does not apply immediately: it is held first and its user can cancel it.
+Writes made over MCP apply immediately. The approval card belongs to the assistant built into Relaticle, and an MCP client relies on its own confirmation prompts. Email tools exist for a connection that was given email access. Meetings are not exposed. A sent email is the one write that does not apply immediately: it is held first and its user can cancel it, in Relaticle or through the agent that sent it.
 
 ---
 
@@ -159,7 +159,7 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 44 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, saving email drafts, and sending email. A connection without email access sees 39 tools.
+The server provides 50 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, managing email drafts, and sending and scheduling email. A connection without email access sees 39 tools.
 
 ### Cross-entity discovery
 
@@ -240,17 +240,23 @@ The server provides 44 tools. They cover account context, cross-entity discovery
 
 ### Email
 
-These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose. The mailbox, draft and send tools work on the user's own mailboxes.
+These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose, plus the user's own drafts and outbox. The mailbox, draft, send and outbox tools work on the user's own mailboxes and emails.
 
-The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the draft tool for one allowed to draft. The send tool needs the send permission and a role that may send through an assistant. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
+The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
 
 | Tool | Description |
 |------|-------------|
-| `list-emails-tool` | List synced emails newest first, with optional search, linked record, direction, thread and date filters. Subject and snippet appear only where the sharing level allows. |
-| `get-email-tool` | Get one synced email by ID. The body and attachment names appear only at full access, and a long body is cut. |
+| `list-emails-tool` | List emails newest first, with optional search, linked record, direction, thread, status and date filters. A teammate's email appears once synced or sent, and the user's own drafts and outbox appear too. Subject and snippet appear only where the sharing level allows. |
+| `get-email-tool` | Get one email by ID, with its status and send time. The body and attachment names appear only at full access, and a long body is cut. |
 | `list-email-accounts-tool` | List the mailboxes the user has connected in this workspace, with the ID to use when drafting and whether each can send. |
 | `create-email-draft-tool` | Save a draft in one of the user's mailboxes, as plain text or markdown, with the default signature unless you turn it off. Nothing is sent: the user reviews the draft in Relaticle. |
-| `send-email-tool` | Send an email from one of the user's mailboxes. Each email waits a few minutes before it leaves, and its user can cancel it from notifications or the Outbox. |
+| `update-email-draft-tool` | Rewrite a saved draft with the same arguments as creating one. Attached files stay. |
+| `delete-email-draft-tool` | Delete a saved draft and its attached files. |
+| `send-email-tool` | Send an email from one of the user's mailboxes, now or at a chosen time. Each email waits a few minutes before it leaves, and its user can cancel it from notifications or the Outbox. |
+| `send-email-draft-tool` | Send a saved draft as it stands, including the user's own edits, and remove it from Drafts. It is held like any other send. |
+| `cancel-email-tool` | Cancel a queued email before it leaves. |
+| `reschedule-email-tool` | Change when a queued email leaves. |
+| `retry-email-tool` | Queue a failed email again, held like a new send. |
 
 ### Files
 

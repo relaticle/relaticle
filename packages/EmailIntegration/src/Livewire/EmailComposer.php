@@ -701,32 +701,19 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function withQuotedBody(string $bodyHtml): string
     {
-        $quotedBodyHtml = $this->quotedBodyHtml();
-
-        if (blank($quotedBodyHtml)) {
+        if ($this->sourceEmailId === null || $this->replyMode === null) {
             return $bodyHtml;
         }
 
-        return $bodyHtml.($this->replyMode === 'forward'
-            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$quotedBodyHtml
-            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
-    }
-
-    // Read at send time: the original can be hundreds of KB, and a public property
-    // would ship it to the browser and back on every composer request.
-    private function quotedBodyHtml(): ?string
-    {
-        if ($this->sourceEmailId === null || $this->replyMode === null) {
-            return null;
-        }
-
+        // Read at send time: the original can be hundreds of KB, and a public property
+        // would ship it to the browser and back on every composer request.
         $source = $this->replyableEmail($this->sourceEmailId);
 
         if (! $source instanceof Email || ! $this->authUser()->can('viewBody', $source)) {
-            return null;
+            return $bodyHtml;
         }
 
-        return $source->quotedBodyHtml();
+        return $source->quotedBelow($bodyHtml, asForward: $this->replyMode === 'forward');
     }
 
     public function minimize(): void

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Mcp\Tools\Email;
 
 use App\Enums\EmailGrant;
-use App\Enums\WorkspaceCapability;
 use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Models\User;
@@ -23,7 +22,7 @@ use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 
 #[Title('Send Email')]
-#[Description('Send an email as the current user from one of their mailboxes. The email reaches people outside the workspace, so call this only when the user asked for it. It is held for a few minutes first, and the user can cancel it from their Relaticle notifications or Outbox. Write `body` as plain text or markdown. Prefer the create email draft tool when the user wants to review before sending.')]
+#[Description('Send an email as the current user from one of their mailboxes. The email reaches people outside the workspace, so call this only when the user asked for it. It is held for a few minutes first, and the user can cancel it from their Relaticle notifications or Outbox. Write `body` as plain text or markdown. Pass `scheduled_for` to send later. Prefer the create email draft tool when the user wants to review before sending, then send that draft with the send email draft tool.')]
 final class SendEmailTool extends Tool
 {
     use ChecksTokenAbility;
@@ -31,7 +30,7 @@ final class SendEmailTool extends Tool
 
     public function shouldRegister(): bool
     {
-        return $this->holdsAnyEmailGrant(EmailGrant::Send) && $this->roleAllowsSending();
+        return $this->holdsAnyEmailGrant(EmailGrant::Send) && $this->roleAllowsAgentSend();
     }
 
     public function schema(JsonSchema $schema): array
@@ -45,6 +44,7 @@ final class SendEmailTool extends Tool
             'body' => $schema->string()->description('The message as plain text or markdown. Raw HTML is escaped.')->required(),
             'include_signature' => $schema->boolean()->description('Add the mailbox default signature.')->default(true),
             'in_reply_to_email_id' => $schema->string()->description('ID of the email this replies to, so it threads.'),
+            'scheduled_for' => $schema->string()->description('ISO 8601 datetime to send at. A time sooner than the hold is moved to the end of the hold.'),
         ];
     }
 
@@ -63,14 +63,14 @@ final class SendEmailTool extends Tool
             return $denied;
         }
 
-        if (! $this->roleAllowsSending()) {
+        if (! $this->roleAllowsAgentSend()) {
             return Response::error('Your role in this workspace cannot send email through an assistant.');
         }
 
         /** @var User $user */
         $user = auth()->user();
 
-        /** @var array{connected_account_id: string, to: list<string>, cc?: list<string>, bcc?: list<string>, subject: string, body: string, include_signature?: bool|int|string, in_reply_to_email_id?: string} $validated */
+        /** @var array{connected_account_id: string, to: list<string>, cc?: list<string>, bcc?: list<string>, subject: string, body: string, include_signature?: bool|int|string, in_reply_to_email_id?: string, scheduled_for?: string} $validated */
         $validated = $request->validate(PrepareAgentEmail::RULES, [
             'to.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
             'cc.max' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
@@ -97,13 +97,5 @@ final class SendEmailTool extends Tool
     protected function openWorldHint(): bool
     {
         return true;
-    }
-
-    private function roleAllowsSending(): bool
-    {
-        $user = auth()->user();
-
-        return $user instanceof User
-            && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::EmailAgentSend);
     }
 }

@@ -32,9 +32,9 @@ final readonly class SaveAgentEmailDraft
      * @throws ValidationException
      * @throws EmptyDraft
      */
-    public function execute(User $user, array $data, EmailCreationSource $source): Email
+    public function execute(User $user, array $data, EmailCreationSource $source, ?string $draftId = null): Email
     {
-        $draft = $this->saveDraft->execute($user, $this->prepareDraft->execute($user, $data, $source));
+        $draft = $this->saveDraft->execute($user, $this->prepareDraft->execute($user, $data, $source), $draftId);
 
         return $draft->load('connectedAccount');
     }

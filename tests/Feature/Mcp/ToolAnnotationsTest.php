@@ -18,11 +18,17 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\CreateUploadUrlTool;
+use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
+use App\Mcp\Tools\Email\DeleteEmailDraftTool;
 use App\Mcp\Tools\Email\GetEmailTool;
 use App\Mcp\Tools\Email\ListEmailAccountsTool;
 use App\Mcp\Tools\Email\ListEmailsTool;
+use App\Mcp\Tools\Email\RescheduleEmailTool;
+use App\Mcp\Tools\Email\RetryEmailTool;
+use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -134,6 +140,12 @@ $toolContracts = [
     ListEmailAccountsTool::class => ['title' => 'List Email Accounts', 'name' => 'list-email-accounts-tool', 'annotations' => $readAnnotations],
     CreateEmailDraftTool::class => ['title' => 'Create Email Draft', 'name' => 'create-email-draft-tool', 'annotations' => $createAnnotations],
     SendEmailTool::class => ['title' => 'Send Email', 'name' => 'send-email-tool', 'annotations' => $sendAnnotations],
+    UpdateEmailDraftTool::class => ['title' => 'Update Email Draft', 'name' => 'update-email-draft-tool', 'annotations' => $updateAnnotations],
+    DeleteEmailDraftTool::class => ['title' => 'Delete Email Draft', 'name' => 'delete-email-draft-tool', 'annotations' => $deleteAnnotations],
+    SendEmailDraftTool::class => ['title' => 'Send Email Draft', 'name' => 'send-email-draft-tool', 'annotations' => $sendAnnotations],
+    CancelEmailTool::class => ['title' => 'Cancel Email', 'name' => 'cancel-email-tool', 'annotations' => $deleteAnnotations],
+    RescheduleEmailTool::class => ['title' => 'Reschedule Email', 'name' => 'reschedule-email-tool', 'annotations' => $updateAnnotations],
+    RetryEmailTool::class => ['title' => 'Retry Email', 'name' => 'retry-email-tool', 'annotations' => $sendAnnotations],
 ];
 
 mutates(...array_merge(
@@ -157,7 +169,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(44);
+    expect($registeredTools)->toBeArray()->toHaveCount(50);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -179,7 +191,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(44);
+    expect($tools)->toBeArray()->toHaveCount(50);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();

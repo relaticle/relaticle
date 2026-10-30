@@ -6,11 +6,17 @@ use App\Enums\CustomFields\PeopleField;
 use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
 use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
+use App\Mcp\Tools\Email\DeleteEmailDraftTool;
 use App\Mcp\Tools\Email\GetEmailTool;
 use App\Mcp\Tools\Email\ListEmailAccountsTool;
 use App\Mcp\Tools\Email\ListEmailsTool;
+use App\Mcp\Tools\Email\RescheduleEmailTool;
+use App\Mcp\Tools\Email\RetryEmailTool;
+use App\Mcp\Tools\Email\SendEmailDraftTool;
 use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Models\CustomField;
 use App\Models\Notification;
 use App\Models\People;
@@ -28,13 +34,18 @@ use Illuminate\Testing\TestResponse;
 use Laravel\Passport\Client;
 use Laravel\Passport\Passport;
 use Laravel\Pennant\Feature;
+use Relaticle\EmailIntegration\Actions\HoldAgentEmail;
+use Relaticle\EmailIntegration\Actions\PickAgentSendTime;
+use Relaticle\EmailIntegration\Actions\PrepareAgentDraftSend;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
+use Relaticle\EmailIntegration\Actions\SendAgentEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -59,7 +70,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SendEmailTool::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -215,11 +226,16 @@ it('leaves another workspace email out of the list', function (): void {
     expect(listedEmails($this->viewer))->toBe([]);
 });
 
-it('leaves unsent mail out of the list', function (EmailStatus $status): void {
+it('lists the caller own unsent mail and leaves a teammate unsent mail out', function (EmailStatus $status): void {
+    $own = ($this->emailFrom)($this->viewer, ['status' => $status, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null]);
+    ($this->emailFrom)($this->coworker, ['status' => $status, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'privacy_tier' => EmailPrivacyTier::FULL]);
     ($this->emailFrom)($this->viewer, ['status' => $status]);
-    ($this->emailFrom)($this->coworker, ['status' => $status, 'privacy_tier' => EmailPrivacyTier::FULL]);
 
-    expect(listedEmails($this->viewer))->toBe([]);
+    $items = listedEmails($this->viewer);
+
+    expect(array_column($items, 'id'))->toBe([$own->id])
+        ->and($items[0]['status'])->toBe($status->value)
+        ->and(fetchedEmail($this->viewer, $own->id)['status'])->toBe($status->value);
 })->with([
     'draft' => EmailStatus::DRAFT,
     'queued' => EmailStatus::QUEUED,
@@ -904,8 +920,8 @@ it('lists the mailbox and draft tools only for a token that holds the draft gran
         ->not->toContain('create-email-draft-tool')
         ->not->toContain('list-email-accounts-tool')
         ->and(listedToolNames($this->viewer, ['read', 'email:draft']))
-        ->toContain('create-email-draft-tool', 'list-email-accounts-tool')
-        ->not->toContain('list-emails-tool');
+        ->toContain('create-email-draft-tool', 'update-email-draft-tool', 'delete-email-draft-tool', 'list-email-accounts-tool')
+        ->not->toContain('list-emails-tool', 'send-email-draft-tool');
 });
 
 it('leaves the signature out of a draft that has no body', function (): void {
@@ -1501,7 +1517,7 @@ it('keeps the send tool from a viewer who holds the send grant', function (): vo
     $viewer = memberWithRole($this->workspace, WorkspaceRole::Viewer);
     $mailbox = mailboxOf($viewer, $this->workspace);
 
-    expect(listedToolNames($viewer, ['read', 'email:send']))->not->toContain('send-email-tool');
+    expect(listedToolNames($viewer, ['read', 'email:send']))->not->toContain('send-email-tool', 'send-email-draft-tool', 'cancel-email-tool', 'reschedule-email-tool', 'retry-email-tool');
 
     RelaticleServer::actingAs($viewer)
         ->tool(SendEmailTool::class, sendArguments($mailbox))
@@ -1548,8 +1564,8 @@ it('takes the send tool away when a member is demoted to viewer', function (): v
 });
 
 it('lists the send tool only for a token that holds the send grant', function (): void {
-    expect(listedToolNames($this->viewer, ['read', 'email:read', 'email:draft']))->not->toContain('send-email-tool')
-        ->and(listedToolNames($this->viewer, ['read', 'email:send']))->toContain('send-email-tool', 'list-email-accounts-tool');
+    expect(listedToolNames($this->viewer, ['read', 'email:read', 'email:draft']))->not->toContain('send-email-tool', 'send-email-draft-tool', 'cancel-email-tool', 'reschedule-email-tool', 'retry-email-tool')
+        ->and(listedToolNames($this->viewer, ['read', 'email:send']))->toContain('send-email-tool', 'send-email-draft-tool', 'cancel-email-tool', 'reschedule-email-tool', 'retry-email-tool', 'list-email-accounts-tool');
 });
 
 it('lists no email tool while the email feature is off', function (): void {
@@ -1756,4 +1772,181 @@ it('gives a wildcard token no email tool', function (): void {
         listedToolNames($this->viewer, ['*']),
         fn (string $name): bool => str_contains($name, 'email'),
     )))->toBe([]);
+});
+
+it('sends a stored draft as the user left it, holds it, and leaves no draft behind', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, ['cc' => ['boss@acme.test']]))['id'];
+    EmailBody::query()->where('email_id', $draftId)->update(['body_html' => '<p>Edited by Dana in Relaticle</p>']);
+
+    $data = emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId]);
+
+    $email = Email::query()->with(['body', 'participants'])->findOrFail($data['id']);
+
+    expect($data['status'])->toBe('queued')
+        ->and($data['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
+        ->and($email->creation_source)->toBe(EmailCreationSource::MCP)
+        ->and($email->body->body_html)->toContain('Edited by Dana in Relaticle')
+        ->and($email->participants->where('role', EmailParticipantRole::CC)->pluck('email_address')->all())->toBe(['boss@acme.test'])
+        ->and(Email::query()->whereKey($draftId)->withTrashed()->exists())->toBeFalse()
+        ->and($this->viewer->notifications()->count())->toBe(1);
+
+    expect(array_column(listedEmails($this->viewer, ['status' => 'queued']), 'id'))->toBe([$email->id])
+        ->and(listedEmails($this->viewer, ['status' => 'draft']))->toBe([]);
+
+    $email->update(['status' => EmailStatus::SENT, 'sent_at' => now()]);
+
+    expect(listedEmails($this->viewer, ['status' => 'sent'])[0]['id'])->toBe($email->id);
+});
+
+it('sends a draft once, however often it is asked to', function (): void {
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount))['id'];
+
+    emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailDraftTool::class, ['draft_id' => $draftId])
+        ->assertHasErrors(["Draft with ID [{$draftId}] not found."]);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
+});
+
+it('refuses to send a teammate draft', function (): void {
+    $draft = ($this->emailFrom)($this->coworker, ['status' => EmailStatus::DRAFT, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailDraftTool::class, ['draft_id' => $draft->id])
+        ->assertHasErrors(["Draft with ID [{$draft->id}] not found."]);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0)
+        ->and($draft->fresh()->status)->toBe(EmailStatus::DRAFT);
+});
+
+it('keeps a draft that cannot be sent yet and says why', function (array $overrides, string $error): void {
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, $overrides))['id'];
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailDraftTool::class, ['draft_id' => $draftId])
+        ->assertHasErrors([$error]);
+
+    expect(Email::query()->whereKey($draftId)->value('status'))->toBe(EmailStatus::DRAFT)
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+})->with([
+    'no recipient' => [['to' => []], 'This draft has no recipient. Update it with at least one address in to.'],
+    'no subject' => [['subject' => null], 'This draft has no subject. Update it with one.'],
+]);
+
+it('threads a sent reply draft and quotes the original below it', function (): void {
+    $original = ($this->emailFrom)($this->viewer);
+    EmailBody::query()->create(['email_id' => $original->id, 'body_html' => '<p>Original question</p>', 'body_text' => 'Original question']);
+
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount, ['in_reply_to_email_id' => $original->id]))['id'];
+
+    $email = Email::query()->with('body')->findOrFail(emailToolData($this->viewer, SendEmailDraftTool::class, ['draft_id' => $draftId])['id']);
+
+    expect($email->in_reply_to)->toBe($original->rfc_message_id)
+        ->and($email->body->body_html)->toContain('<blockquote')
+        ->toContain('Original question');
+});
+
+it('sends at the chosen time, never sooner than the hold', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $later = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => now()->addDay()->toIso8601String()]));
+    $sooner = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => now()->addSeconds(30)->toIso8601String()]));
+
+    expect($later['scheduled_for'])->toBe(now()->addDay()->toIso8601String())
+        ->and($sooner['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String());
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => now()->subHour()->toIso8601String()]))
+        ->assertHasErrors();
+});
+
+it('rewrites the caller own draft and keeps a teammate draft out of reach', function (): void {
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount))['id'];
+
+    emailToolData($this->viewer, UpdateEmailDraftTool::class, draftArguments($this->viewerAccount, [
+        'draft_id' => $draftId,
+        'to' => ['new@acme.test'],
+        'subject' => 'Revised terms',
+    ]));
+
+    $draft = Email::query()->with('participants')->findOrFail($draftId);
+
+    expect($draft->subject)->toBe('Revised terms')
+        ->and($draft->status)->toBe(EmailStatus::DRAFT)
+        ->and($draft->participants->pluck('email_address')->all())->toBe(['new@acme.test']);
+
+    $teammates = ($this->emailFrom)($this->coworker, ['status' => EmailStatus::DRAFT, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'subject' => 'Theirs']);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(UpdateEmailDraftTool::class, draftArguments($this->viewerAccount, ['draft_id' => $teammates->id]))
+        ->assertHasErrors(["Draft with ID [{$teammates->id}] not found."]);
+
+    expect($teammates->fresh()->subject)->toBe('Theirs');
+});
+
+it('deletes the caller own draft and keeps a teammate draft out of reach', function (): void {
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount))['id'];
+
+    expect(emailToolData($this->viewer, DeleteEmailDraftTool::class, ['draft_id' => $draftId]))->toBe(['deleted' => true, 'id' => $draftId])
+        ->and(Email::query()->whereKey($draftId)->withTrashed()->exists())->toBeFalse();
+
+    $teammates = ($this->emailFrom)($this->coworker, ['status' => EmailStatus::DRAFT, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(DeleteEmailDraftTool::class, ['draft_id' => $teammates->id])
+        ->assertHasErrors(["Draft with ID [{$teammates->id}] not found."]);
+
+    expect($teammates->fresh())->not->toBeNull();
+});
+
+it('cancels the caller own held email and nothing else', function (): void {
+    $own = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount));
+
+    expect(emailToolData($this->viewer, CancelEmailTool::class, ['id' => $own['id']])['status'])->toBe('cancelled');
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(CancelEmailTool::class, ['id' => $own['id']])
+        ->assertHasErrors(['Email cannot be cancelled. Status is cancelled.']);
+
+    $teammates = ($this->emailFrom)($this->coworker, ['status' => EmailStatus::QUEUED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(CancelEmailTool::class, ['id' => $teammates->id])
+        ->assertHasErrors(["Email with ID [{$teammates->id}] not found in your outbox."]);
+
+    expect($teammates->fresh()->status)->toBe(EmailStatus::QUEUED);
+});
+
+it('reschedules a held email, never sooner than the hold', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    $id = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount))['id'];
+
+    $later = emailToolData($this->viewer, RescheduleEmailTool::class, ['id' => $id, 'scheduled_for' => now()->addDays(2)->toIso8601String()]);
+
+    expect($later['scheduled_for'])->toBe(now()->addDays(2)->toIso8601String());
+
+    $sooner = emailToolData($this->viewer, RescheduleEmailTool::class, ['id' => $id, 'scheduled_for' => now()->addSeconds(5)->toIso8601String()]);
+
+    expect($sooner['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
+        ->and(Email::query()->findOrFail($id)->scheduled_for->equalTo(now()->addSeconds(300)))->toBeTrue();
+});
+
+it('requeues a failed email behind the hold and tells the user', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    $failed = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::FAILED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'attempts' => 1, 'last_error' => 'boom']);
+
+    $data = emailToolData($this->viewer, RetryEmailTool::class, ['id' => $failed->id]);
+
+    expect($data['status'])->toBe('queued')
+        ->and($data['scheduled_for'])->toBe(now()->addSeconds(300)->toIso8601String())
+        ->and($failed->fresh()->attempts)->toBe(1)
+        ->and($this->viewer->notifications()->count())->toBe(1);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(RetryEmailTool::class, ['id' => $failed->id])
+        ->assertHasErrors(['Only failed emails can be retried. Status is queued.']);
 });
