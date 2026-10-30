@@ -52,9 +52,7 @@ it('resolves task to a record edit deep-link without Filament tenant bound', fun
 
     expect($ref)->not->toBeNull()
         ->and($ref['url'])->toBeString()
-        ->and($ref['url'])->toContain('/tasks')
-        ->and($ref['url'])->toContain('tableAction=edit')
-        ->and($ref['url'])->toContain('tableActionRecord=any-id');
+        ->and($ref['url'])->toEndWith('/tasks?task=any-id');
 });
 
 it('resolves note to a record edit deep-link without Filament tenant bound', function (): void {

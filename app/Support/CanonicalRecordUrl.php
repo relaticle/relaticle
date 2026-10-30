@@ -24,8 +24,8 @@ use Throwable;
  * path that 404s in a browser, and fetch rejected the real URL a user copies from the
  * address bar.
  *
- * Tasks and notes have no per-record page (they are managed from their index table), so
- * their canonical URL is the index deep link that opens the record's edit modal.
+ * Tasks and notes have no per-record page, so their canonical URL is the index deep link that
+ * opens the record's modal: `?task=<id>` for tasks, Filament's table-action parameters for notes.
  */
 final readonly class CanonicalRecordUrl
 {
@@ -54,7 +54,7 @@ final readonly class CanonicalRecordUrl
     private function routeTo(string $resource, CrmEntity $entity, string $recordId, Workspace $workspace): string
     {
         return $this->isModalManaged($entity)
-            ? $resource::getUrl('index', $this->modalQuery($recordId), panel: 'app', tenant: $workspace)
+            ? $resource::getUrl('index', $this->modalQuery($entity, $recordId), panel: 'app', tenant: $workspace)
             : $resource::getUrl('view', ['record' => $recordId], panel: 'app', tenant: $workspace);
     }
 
@@ -84,7 +84,8 @@ final readonly class CanonicalRecordUrl
         }
 
         if ($this->isModalManaged($entity)) {
-            $recordId = $this->queryParam($url, 'tableActionRecord');
+            $recordId = ($entity === CrmEntity::Task ? $this->queryParam($url, 'task') : null)
+                ?? $this->queryParam($url, 'tableActionRecord');
 
             return $recordId === null ? null : ['entity' => $entity, 'id' => $recordId];
         }
@@ -139,8 +140,12 @@ final readonly class CanonicalRecordUrl
     /**
      * @return array<string, string>
      */
-    private function modalQuery(string $recordId): array
+    private function modalQuery(CrmEntity $entity, string $recordId): array
     {
+        if ($entity === CrmEntity::Task) {
+            return ['task' => $recordId];
+        }
+
         return [
             'tableAction' => EditAction::getDefaultName(),
             'tableActionRecord' => $recordId,

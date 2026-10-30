@@ -587,7 +587,5 @@ it('links the in-app assignment notification of an MCP-created task to that task
     $task = Task::query()->where('title', 'Follow Up')->firstOrFail();
     $url = TaskAssignedNotification::present($assignee->notifications()->sole())->getActions()[0]->getUrl();
 
-    expect($url)->toContain("/{$this->workspace->slug}/tasks")
-        ->and($url)->toContain('tableAction=edit')
-        ->and($url)->toContain('tableActionRecord='.$task->getKey());
+    expect($url)->toEndWith("/{$this->workspace->slug}/tasks?task={$task->getKey()}");
 });

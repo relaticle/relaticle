@@ -11,6 +11,7 @@ use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasViewSwitcher;
+use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
@@ -45,6 +46,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 final class TasksBoard extends BoardResourcePage
 {
     use HasViewSwitcher;
+    use KeepsOpenTaskInUrl;
 
     protected static string $resource = TaskResource::class;
 

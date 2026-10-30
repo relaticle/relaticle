@@ -12,7 +12,6 @@ use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
-use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
@@ -88,12 +87,15 @@ it('edits a task in place from the dashboard', function (): void {
 
     livewire(Dashboard::class)
         ->assertSeeHtml("mountAction('editTask', { task: '{$task->id}' })")
+        ->assertSet('openTaskId', null)
         ->mountAction('editTask', ['task' => $task->id])
         ->assertActionMounted('editTask')
+        ->assertSet('openTaskId', $task->id)
         ->assertSchemaStateSet(['title' => 'Ship the widget', 'assignees' => [$user->id]])
         ->setActionData(['title' => 'Ship the gadget'])
         ->callMountedAction()
         ->assertHasNoActionErrors()
+        ->assertSet('openTaskId', null)
         ->assertSee('Ship the gadget')
         ->assertDontSee('Ship the widget');
 
@@ -114,10 +116,7 @@ it('leaves the task link to the tasks page for a viewer who cannot edit', functi
 
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
-        ->assertSeeHtml('href="'.e(TaskResource::getUrl('index', [
-            'tableAction' => EditAction::getDefaultName(),
-            'tableActionRecord' => $task->id,
-        ], panel: 'app', tenant: $workspace)).'"')
+        ->assertSeeHtml('href="'.e(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace)).'"')
         ->assertDontSeeHtml("mountAction('editTask'")
         ->mountAction('editTask', ['task' => $task->id])
         ->assertActionNotMounted('editTask');
