@@ -617,7 +617,9 @@ function registerColumnMenu() {
 
             // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
             const rect = detail.trigger.getBoundingClientRect()
-            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) })
+            const width = parseFloat(getComputedStyle(this.panel).width) || 0
+            const right = Math.min(window.innerWidth - rect.right, window.innerWidth - width - 8)
+            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
             this.$nextTick(() => this.items()[0]?.focus())
