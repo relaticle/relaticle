@@ -50,7 +50,7 @@ it('keeps the blog admin out of the customer panel', function (): void {
 
 it('leaves filament tenant scoping enabled for the crm resources', function (): void {
     // The blog resources used to opt out of tenant scoping with scopeToTenant(false),
-    // which writes a static declared once on Filament's BelongsToTenant trait and so
+    // which writes a static that Filament's BelongsToTenant concern declares once and so
     // switched scoping off for every resource in the app panel, not just the blog.
     expect(CompanyResource::isScopedToTenant())->toBeTrue()
         ->and(PeopleResource::isScopedToTenant())->toBeTrue()

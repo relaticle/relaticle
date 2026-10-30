@@ -106,6 +106,7 @@ final class CloudServiceProvider extends ServiceProvider
         // read the config key App\Features\Blog resolves from.
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
+            'ink.features.mcp' => true,
             'ink.middleware' => [...config('ink.middleware', ['web']), AddVaryAcceptHeader::class],
             'ink.views' => [
                 'index' => 'cloud::blog.index',

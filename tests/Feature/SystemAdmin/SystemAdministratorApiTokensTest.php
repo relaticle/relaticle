@@ -140,3 +140,17 @@ it('allows an administrator to view and revoke its own token', function (): void
     expect(Gate::forUser($this->admin)->allows('view', $token))->toBeTrue()
         ->and(Gate::forUser($this->admin)->allows('delete', $token))->toBeTrue();
 });
+
+it('shows the API tokens tab while the blog MCP endpoint is on', function (): void {
+    config(['ink.features.mcp' => true]);
+
+    livewire(EditSystemAdministrator::class, ['record' => $this->admin->getKey()])
+        ->assertSeeLivewire(ApiTokensRelationManager::class);
+});
+
+it('hides the API tokens tab while the blog MCP endpoint is off', function (): void {
+    config(['ink.features.mcp' => false]);
+
+    livewire(EditSystemAdministrator::class, ['record' => $this->admin->getKey()])
+        ->assertDontSeeLivewire(ApiTokensRelationManager::class);
+});

@@ -20,6 +20,7 @@ use Relaticle\Cloud\Admin\Filament\Widgets\Overview\MoneyStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ProblemsStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\SalesLeads;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ValueStats;
+use Relaticle\Ink\InkPlugin;
 use Relaticle\SystemAdmin\Support\Extensions;
 
 final class CloudAdminPlugin implements Plugin
@@ -46,7 +47,9 @@ final class CloudAdminPlugin implements Plugin
                 CohortTable::class,
                 SalesLeads::class,
                 ProblemsStats::class,
-            ]);
+            ])
+            // Staff write posts before the Blog flag publishes them, so authoring ignores the flag.
+            ->plugin(InkPlugin::make());
 
         Extensions::addWorkspaceTableActions(static fn (): array => self::trialAndPlanActions());
         Extensions::addWorkspaceHeaderActions(static fn (): array => self::trialAndPlanActions());

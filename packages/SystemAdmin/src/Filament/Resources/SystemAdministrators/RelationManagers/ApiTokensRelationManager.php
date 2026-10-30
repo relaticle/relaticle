@@ -11,6 +11,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
+use Override;
 use Relaticle\SystemAdmin\Enums\BlogTokenAbility;
 
 final class ApiTokensRelationManager extends RelationManager
@@ -20,6 +22,12 @@ final class ApiTokensRelationManager extends RelationManager
     protected static ?string $title = 'API Tokens';
 
     public string $plainTextToken = '';
+
+    #[Override]
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return (bool) config('ink.features.mcp') && parent::canViewForRecord($ownerRecord, $pageClass);
+    }
 
     public function table(Table $table): Table
     {

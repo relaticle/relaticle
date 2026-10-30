@@ -15,7 +15,7 @@ no composer.json of their own. Service providers are registered in
 | `packages/Documentation` | Docs and help content, `DocsRepository`, the search index the assistant reads, `DocUrl`, the OpenAPI spec routes |
 | `packages/OnboardSeed` | Demo/onboarding data seeding |
 | `packages/EmailIntegration` | Email + calendar sync (Gmail/Microsoft Graph), sharing, privacy |
-| `packages/Cloud` | The hosted business behind relaticle.com: billing, the business half of the sysadmin panel, the marketing site, the docs and help website, the blog front end. Proprietary, absent from self-hosted builds |
+| `packages/Cloud` | The hosted business behind relaticle.com: billing, the business half of the sysadmin panel, the marketing site, the docs and help website, the blog. Proprietary, absent from self-hosted builds |
 
 Create a new package only for a genuinely separable subsystem with its own panel,
 routes, or lifecycle. A new CRM entity is not one of those; it goes in `app/`. Package
@@ -48,8 +48,9 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 
 `packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
-managed-plan actions), the marketing site, the docs and help website, and the blog front end.
-Its own `LICENSE` grants no rights. The self-hosted build is this repository without it.
+managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
+its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` grants no
+rights. The self-hosted build is this repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
   `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,

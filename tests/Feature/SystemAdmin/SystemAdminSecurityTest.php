@@ -176,9 +176,11 @@ describe('Administrator role', function () {
         'users' => '/sysadmin/users',
         'workspaces' => '/sysadmin/workspaces',
         'activities' => '/sysadmin/activity',
-        'posts' => '/sysadmin/posts',
-        'categories' => '/sysadmin/categories',
-        'tags' => '/sysadmin/tags',
+        ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+            'posts' => '/sysadmin/posts',
+            'categories' => '/sysadmin/categories',
+            'tags' => '/sysadmin/tags',
+        ] : []),
     ]);
 
     it('writes but never deletes', function (string $model) {

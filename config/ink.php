@@ -14,13 +14,13 @@ return [
     'per_page' => 12,
 
     'features' => [
-        // Off unless a package that ships the blog front end switches it on.
+        // Off unless a package that ships the blog switches them on.
         'public_routes' => false,
         'feed' => true,
         'sitemap' => false,
         'tags' => true,
         'media_library' => false,
-        'mcp' => true,
+        'mcp' => false,
     ],
 
     /*
