@@ -37,7 +37,7 @@ trait HasColumnMenu
             return;
         }
 
-        $this->tablePinnedColumns = array_values(array_unique([$this->tableEntity()->titleColumn(), ...$this->tablePinnedColumns, $columnName]));
+        $this->tablePinnedColumns = array_values(array_unique([...$this->tablePinnedColumns, $columnName]));
 
         $this->applyTablePins();
     }
@@ -85,7 +85,7 @@ trait HasColumnMenu
             return;
         }
 
-        if ($beforeColumnName !== null && $beforeColumnName !== $this->tableEntity()->titleColumn() && ! in_array($beforeColumnName, $names, true)) {
+        if ($beforeColumnName !== null && ! in_array($beforeColumnName, $names, true)) {
             return;
         }
 
@@ -164,9 +164,7 @@ trait HasColumnMenu
      */
     private function movableTableColumns(): array
     {
-        $title = $this->tableEntity()->titleColumn();
-
-        return array_filter($this->tableColumns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && $item['name'] !== $title);
+        return array_filter($this->tableColumns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE);
     }
 
     /**
@@ -175,23 +173,13 @@ trait HasColumnMenu
      */
     private function arrangedTableColumns(array $columns): array
     {
-        $title = $this->tableEntity()->titleColumn();
-
-        $pinned = array_column(array_filter($columns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE
-            && $item['name'] !== $title
+        $this->tablePinnedColumns = array_column(array_filter($columns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE
             && $item['isToggled']
             && in_array($item['name'], $this->tablePinnedColumns, true)), 'name');
 
-        // The title column is pinned only beside another pinned column.
-        $this->tablePinnedColumns = $pinned === [] ? [] : [$title, ...$pinned];
+        $isPinned = fn (array $item): bool => in_array($item['name'], $this->tablePinnedColumns, true);
 
-        $rank = fn (array $item): int => match (true) {
-            $item['name'] === $title => 0,
-            in_array($item['name'], $this->tablePinnedColumns, true) => 1,
-            default => 2,
-        };
-
-        usort($columns, fn (array $a, array $b): int => $rank($a) <=> $rank($b));
+        usort($columns, fn (array $a, array $b): int => $isPinned($b) <=> $isPinned($a));
 
         return $columns;
     }

@@ -92,8 +92,8 @@ it('applies columns, sort, filters, search and page size in one call', function 
         ->and((int) $component->get('tableRecordsPerPage'))->toBe(50)
         ->and($component->get('tableFilters.trashed.value'))->toEqual(0)
         ->and($component->instance()->getTableFiltersForm()->getRawState()['trashed']['value'])->toEqual(0)
-        ->and($component->get('tableColumns.1.name'))->toBe('created_at')
-        ->and($component->get('tableColumns.1.isToggled'))->toBeFalse()
+        ->and($component->get('tableColumns.0.name'))->toBe('created_at')
+        ->and($component->get('tableColumns.0.isToggled'))->toBeFalse()
         ->and($component->instance()->isTableLayoutModified())->toBeFalse()
         ->and(preferenceRow()->active_layout_id)->toBe($layout->getKey());
 })->with('layout list pages');
@@ -343,7 +343,8 @@ it('lists own layouts and layouts shared with the workspace, never someone else\
         ->assertDontSeeText('Private plan')
         ->assertSeeHtml("applySavedLayout('{$mine->getKey()}')")
         ->call('applySavedLayout', $private->getKey())
-        ->assertNotFound();
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null);
 });
 
 it('keeps layouts apart per table and per workspace', function (): void {

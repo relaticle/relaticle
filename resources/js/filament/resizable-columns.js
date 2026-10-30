@@ -361,10 +361,9 @@ function forgetColumnFocus() {
 
 function restoreColumnFocus(table) {
     if (!pendingColumnFocus) return
-    const th = headersOf(table).find((header) => headerName(header) === pendingColumnFocus)
+    const handle = columnHandle(table, pendingColumnFocus)
     pendingColumnFocus = null
-    // The title column has no handle, so its sort button takes focus instead.
-    ;(th?.querySelector('.fi-ta-column-handle') ?? th?.querySelector('.fi-ta-header-cell-sort-btn'))?.focus()
+    handle?.focus()
 }
 
 // A morph strips and rebuilds the header handles, so a handle is found again by its column.
@@ -382,9 +381,9 @@ function headerName(th) {
     return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
 }
 
-// The title column and the pinned columns stay put, so a column moves only among the unpinned ones.
+// The pinned columns stay put, so a column moves only among the unpinned ones.
 function isMovable(th) {
-    return th !== undefined && th.dataset.columnLocked !== '1' && th.dataset.columnPinned !== '1'
+    return th !== undefined && th.dataset.columnPinned !== '1'
 }
 
 function moveTargets(th) {
@@ -401,8 +400,8 @@ function moveTargets(th) {
             left: left ? headerName(left) : null,
             right: headers[index + 2] ? headerName(headers[index + 2]) : null,
         },
-        // Where focus goes when this column is hidden: a neighbour with a handle, else the title column.
-        neighbour: headerName(left?.dataset.columnLocked === '1' ? headers[index + 1] ?? left : left ?? headers[index + 1]),
+        // Where focus goes when this column is hidden.
+        neighbour: headerName(left ?? headers[index + 1]),
     }
 }
 
@@ -448,17 +447,16 @@ function columnSlots(table) {
 }
 
 // A neighbour swaps once the dragged column's leading edge passes its middle, the same distance either way.
-// The title column and the pinned columns keep their places.
+// The pinned columns keep their places.
 function dropIndex(slots, source, left) {
     const right = left + source.width
     const start = slots.indexOf(source)
     const middle = (slot) => slot.left + slot.width / 2
     const before = slots.slice(0, start).filter((slot) => middle(slot) < left).length
     const after = slots.slice(start + 1).filter((slot) => middle(slot) < right).length
-    const locked = slots.findIndex((slot) => slot.th.dataset.columnLocked === '1')
     const pinned = slots.filter((slot) => slot.th.dataset.columnPinned === '1').length
 
-    return Math.max(before + after, pinned, locked + 1)
+    return Math.max(before + after, pinned)
 }
 
 function shiftColumns(slots, source, index) {
@@ -714,8 +712,6 @@ function registerResizableColumn() {
 
         createColumnControls() {
             this.column.querySelector(':scope > .fi-ta-column-handle')?.remove()
-
-            if (this.column.dataset.columnLocked === '1') return
 
             const handle = document.createElement('button')
             handle.type = 'button'

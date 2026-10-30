@@ -87,7 +87,7 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
     $page->click(columnMenuItem('Move right'))
         ->assertScript(headerOrder().'.indexOf("creator.name")', $index + 1);
 
-    $beforeHidden = $page->script('(() => { const order = '.headerOrder().'; const at = order.indexOf("accountOwner.name"); return at === 1 ? order[2] : order[at - 1]; })()');
+    $beforeHidden = $page->script('(() => { const order = '.headerOrder().'; const at = order.indexOf("accountOwner.name"); return order[at - 1] ?? order[at + 1]; })()');
 
     $page->script(openColumnMenu('accountOwner.name'));
     $page->click(columnMenuItem('Hide column'))
@@ -101,9 +101,9 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps sorting on the header and leaves the title column without a handle', function (): void {
+it('keeps sorting on the header and gives the title column a handle', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug)
-        ->assertMissing(columnHeader('name').' .fi-ta-column-handle');
+        ->assertPresent(columnHeader('name').' .fi-ta-column-handle');
 
     $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
     waitUntil($page, sprintf('document.querySelector(`%s`).getAttribute("aria-sort") === "ascending"', columnHeader('created_at')));
@@ -120,7 +120,7 @@ it('disables the moves at the edges', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());
 
-    $page->script(openColumnMenu($order[1]));
+    $page->script(openColumnMenu($order[0]));
     waitUntil($page, menuItemFocused())
         ->assertAttribute(columnMenuItem('Move left'), 'aria-disabled', 'true')
         ->keys(':focus', 'Escape');
@@ -295,13 +295,16 @@ it('lifts the header and slides the other columns aside mid-drag', function (): 
     $page->assertNoJavaScriptErrors();
 });
 
-it('never drops before the title column', function (): void {
+it('drags the title column and drops another column before it', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
+    $order = $page->script(headerOrder());
+
+    $page->script(dragHeader('name', $order[2], side: 'right'));
+    waitUntil($page, headerOrder().'.indexOf("name") > 0');
 
     $page->script(dragHeader('created_at', 'name'));
-
-    waitUntil($page, headerOrder().'.indexOf("created_at") === 1')
-        ->assertScript(headerOrder().'[0]', 'name')
+    waitUntil($page, '(() => { const order = '.headerOrder().'; return order.indexOf("created_at") === order.indexOf("name") - 1; })()')
+        ->assertScript(dragLeftovers(), false)
         ->assertNoJavaScriptErrors();
 });
 
@@ -421,7 +424,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
     }
 
     $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
-    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'ArrowDown', 'Enter']);
+    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowUp', 'Enter']);
     waitUntil($page, headerOrder().'.join() === "name"');
     waitUntil($page, '('.focusedColumn().') === "name"')
         ->assertNoJavaScriptErrors();
@@ -447,12 +450,12 @@ function leftEdges(string ...$elements): string
 
 it('pins a column from its menu and keeps the pin after a reload', function (): void {
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at')
-        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
-        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
+        ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '0')
         ->wait(1)
         ->refresh()
         ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
-        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
+        ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '1');
 
     $page->script(openColumnMenu('created_at'));
@@ -461,17 +464,15 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
         ->assertNoJavaScriptErrors();
 });
 
-it('locks a pinned column and unpins the title column with the last one', function (): void {
-    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at')
-        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
-        ->assertMissing(columnHeader('name').' .fi-ta-column-handle');
+it('pins the title column like any other and unpins a column from its lock', function (): void {
+    $page = pinFromMenu(pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'name'), 'created_at')
+        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at']);
 
     $page->script(openColumnMenu('created_at'));
     waitUntil($page, visibleMenuItems().'.join() === "Unpin,Edit column label,Hide column"');
     $page->click(columnMenuItem('Unpin'));
-    waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('name')))
-        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('created_at')), '0')
-        ->assertMissing(columnHeader('name').' .fi-ta-column-handle')
+    waitUntil($page, sprintf('document.querySelector(`%s`).dataset.columnPinned === "0"', columnHeader('created_at')))
+        ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '1')
         ->assertNoJavaScriptErrors();
 });
 
@@ -482,8 +483,8 @@ it('never drags a pinned column or drops another among the pins', function (): v
     expect($page->script(dragHeader('created_at', end($order))))->toBe(['ghost' => false, 'shifted' => false, 'dragging' => false]);
 
     $page->script(dragHeader(end($order), 'created_at'));
-    waitUntil($page, headerOrder().'.indexOf('.json_encode(end($order)).') === 2')
-        ->assertScript(headerOrder().'.slice(0, 2)', ['name', 'created_at'])
+    waitUntil($page, headerOrder().'.indexOf('.json_encode(end($order)).') === 1')
+        ->assertScript(headerOrder().'[0]', 'created_at')
         ->assertNoJavaScriptErrors();
 });
 
@@ -498,7 +499,7 @@ function wideCompaniesTable(User $user, string $slug): AwaitableWebpage
 }
 
 it('keeps pinned columns in place while the table scrolls sideways', function (): void {
-    $page = pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'created_at');
+    $page = pinFromMenu(pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'name'), 'created_at');
     waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
     $edges = leftEdges("document.querySelector(`th[x-data^=\"resizableColumn('name'\"]`)", firstCell('name'), firstCell('created_at'));
     $before = $page->script($edges);
@@ -514,7 +515,7 @@ it('keeps pinned columns in place while the table scrolls sideways', function ()
 });
 
 it('moves the pinned columns after a pinned column that is resized', function (): void {
-    $page = pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'created_at');
+    $page = pinFromMenu(pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'name'), 'created_at');
     waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
     $before = (int) $page->script('parseInt('.firstCell('created_at').'.style.left, 10)');
 
@@ -559,7 +560,7 @@ it('unsticks pins where rows stack as cards and sticks them again on a wider scr
 
     $page->resize(390, 844);
     waitUntil($page, "! {$hasPinned}")
-        ->assertScript(firstCell('name').'.style.left', '');
+        ->assertScript(firstCell('created_at').'.style.left', '');
 
     $page->resize(1440, 900);
     waitUntil($page, $hasPinned)
@@ -641,7 +642,7 @@ it('shows the move cursor on a movable header and keeps the pointer on its contr
     $page->assertScript($cursor(columnHeader('created_at')), 'move')
         ->assertScript($cursor(columnHeader('created_at').' .fi-ta-header-cell-sort-btn'), 'pointer')
         ->assertScript($cursor(columnHeader('created_at').' .fi-ta-column-handle'), 'pointer')
-        ->assertScript($cursor(columnHeader('name')).' !== "move"', true)
+        ->assertScript($cursor(columnHeader('name')), 'move')
         ->assertMissing('.fi-ta-column-grip')
         ->assertNoJavaScriptErrors();
 });

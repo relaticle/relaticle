@@ -46,11 +46,13 @@ trait HasCustomFieldColumns
         foreach ($table->getColumns() as $column) {
             $label = $column->getLabel();
 
-            if ($column->getName() === $titleColumn) {
+            if ($label instanceof Htmlable) {
                 continue;
             }
 
-            if ($label instanceof Htmlable) {
+            if ($column->getName() === $titleColumn) {
+                $column->label(fn (): string => $this->tableColumnLabel($column->getName(), $label));
+
                 continue;
             }
 

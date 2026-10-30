@@ -65,8 +65,8 @@ it('brings back hidden columns, order, sort, filters, search and page size on a 
         ->and($revisit->get('tableSearch'))->toBe('acme')
         ->and((int) $revisit->get('tableRecordsPerPage'))->toBe(50)
         ->and($revisit->get('tableFilters.trashed.value'))->toEqual(0)
-        ->and($revisit->get('tableColumns.1.name'))->toBe('created_at')
-        ->and($revisit->get('tableColumns.1.isToggled'))->toBeFalse();
+        ->and($revisit->get('tableColumns.0.name'))->toBe('created_at')
+        ->and($revisit->get('tableColumns.0.isToggled'))->toBeFalse();
 })->with('remembered list pages');
 
 it('writes nothing when a table is opened', function (string $page): void {

@@ -344,7 +344,7 @@ so this phase adds no migration.
 ![Drag grips on every header](assets/table-layouts/phase-4-header-grips.png)
 ![The column menu](assets/table-layouts/phase-4-column-menu.png)
 
-Each header except the title column always shows a `⋮` options button at its right edge.
+Every header always shows a `⋮` options button at its right edge.
 Clicking it opens a menu with Move left and Move right, then Edit column label and Hide column.
 Pressing anywhere else on the header and dragging reorders the column. The cursor there is the
 move cursor, while the column name keeps the pointer cursor because a click on it still sorts:
@@ -377,10 +377,9 @@ method, and they are the keyboard path for reordering, as are the arrow keys on 
   the layout "(modified)". At most 60 characters. Saving it empty, or saving the original name,
   removes the label. A label for a column the table no longer has is dropped on load.
 - Hide appears only on toggleable columns. Move left and Move right are disabled at the edges.
-- The title column (`CrmEntity::titleColumn()`) stays first: it has no options button and does not drag, so it cannot be
-  moved, hidden or renamed, and nothing can be dropped before it. The column manager can still drag it, because
-  Filament has no per-item lock, so `HasColumnMenu::applyTableColumnManager()` puts it back
-  first on every apply, a stored order and a layout included.
+- The title column (`CrmEntity::titleColumn()`) moves, drags and renames like any other column,
+  because the column manager already let members move it before this phase. It is not
+  toggleable, so its menu has no Hide.
 - Every label goes through `__()`.
 
 Done when:
@@ -408,8 +407,8 @@ handles, resizing or reordering keeps every rule, or changes the rule here first
 | # | Rule | Guarded by |
 |---|---|---|
 | 1 | The menu offers "Pin to left" on an unpinned column and "Unpin" on a pinned one. | B: pins a column from its menu and keeps the pin after a reload |
-| 2 | The title column has no handle. It is pinned only beside another pinned column, and unpinning or hiding the last other pinned column unpins it. It is never pinned on its own. | F: pins the title column only beside another pinned column. B: locks a pinned column and unpins the title column with the last one |
-| 3 | A pinned column is locked. Its header shows a lock in the handle's gray, always visible. The lock opens a menu with Unpin and Edit column label, and Hide where the column is toggleable. It never drags, and the arrow keys and Move items never move it. | B: locks a pinned column and unpins the title column with the last one. B: never drags a pinned column or drops another among the pins |
+| 2 | The title column pins like any other column: on its own, beside other pins, or not at all. | F: pins and unpins the title column like any other column. B: pins the title column like any other and unpins a column from its lock |
+| 3 | A pinned column is locked. Its header shows a lock in the handle's gray, always visible. The lock opens a menu with Unpin and Edit column label, and Hide where the column is toggleable. It never drags, and the arrow keys and Move items never move it. | B: pins the title column like any other and unpins a column from its lock. B: never drags a pinned column or drops another among the pins |
 | 4 | Pinned columns sit together after the selection checkbox, in pin order. Pinning moves a column to the end of the pins. Unpinning returns it to the first unpinned position. Nothing is dropped among them, by a drag or by the column manager. | F: pins columns in the order they were pinned and unpins to the first unpinned position. F: keeps a column on its side of the pins when the column manager moves it. B: never drags a pinned column or drops another among the pins |
 | 5 | An unpinned column's grip shows on hover and on keyboard focus only. When the table scrolls, every handle of an unpinned header passes under the pinned headers, never over them. | B: keeps the handles of scrolled headers under the pinned headers |
 | 6 | Every pin sticks, however much of the table the pins cover. A member who pins too much unpins from the lock. The one exception is below Filament's `sm` breakpoint (640 px), where rows stack as cards and there are no columns to pin. | B: keeps every pin stuck however much of the table the pins cover. B: unsticks pins where rows stack as cards and sticks them again on a wider screen |
@@ -417,15 +416,15 @@ handles, resizing or reordering keeps every rule, or changes the rule here first
 | 8 | Hovered, selected and striped rows keep their tint in pinned cells. Checked by eye in dark mode. | B: tints pinned cells like the rest of a selected row |
 | 9 | Resizing a pinned column moves the pinned columns after it on every pointer move, and after the save. | B: moves the pinned columns after a pinned column that is resized |
 | 10 | A column at the minimum width shows only its handle. A header label clips at its content edge, so nothing draws under the handle. | B: shows only the handle of a pinned column at the minimum width |
-| 11 | A hidden or deleted column leaves the pins, so a pin can never hold the title column with nothing visible beside it. | F: unpins a column when it is hidden. F: drops a pin for a column the table no longer has |
-| 12 | Pins are saved in table state and in layouts, and a pin change marks the applied layout "(modified)". An empty `pinned` or `labels` hashes as a state did before either existed, so a layout applied before the upgrade still reads clean. | F: pins a column after the title column and keeps it on a new visit. F: restores the pins a layout was saved with and marks the layout modified when they change. F: hashes a state without pins as it did before pins existed |
+| 11 | A hidden or deleted column leaves the pins. | F: unpins a column when it is hidden. F: drops a pin for a column the table no longer has |
+| 12 | Pins are saved in table state and in layouts, and a pin change marks the applied layout "(modified)". An empty `pinned` or `labels` hashes as a state did before either existed, so a layout applied before the upgrade still reads clean. | F: pins a column and keeps it on a new visit. F: restores the pins a layout was saved with and marks the layout modified when they change. F: hashes a state without pins as it did before pins existed |
 | 13 | Headers and cells carry `data-column-pinned` in the same response that changed the pins. | F: marks pinned headers and cells in the render that pinned them |
 
 Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
 phase 1). `TableStateData` gains `pinned`.
 
-The mockups show a pushpin in the primary colour, a pinned title column on its own, and Move
-items on a pinned column. The first build replaced all three with the rules above.
+The mockups show a pushpin in the primary colour and Move items on a pinned column. The first
+build replaced both with the rules above.
 
 Done when every rule's tests pass in Chromium and WebKit, and dark mode has been checked by eye.
 
@@ -492,7 +491,7 @@ rebuilt from stored JSON, which is the case `architecture.md` assigns to laravel
 | `grouping` | `"{group}:{direction}"` or null | 2 |
 | `perPage` | int or `"all"` | 2 |
 | `widths` | map of column to pixels; preferences only | 2 |
-| `labels` | map of column to the member's name for it, at most 60 characters; never the title column | 4 |
+| `labels` | map of column to the member's name for it, at most 60 characters | 4 |
 | `pinned` | ordered list of column names | 5 |
 
 A field added later defaults to empty, so a row saved before it loads unchanged.
