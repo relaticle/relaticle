@@ -554,16 +554,14 @@ it('keeps every pin stuck however much of the table the pins cover', function ()
         ->assertNoJavaScriptErrors();
 });
 
-it('unsticks pins where rows stack as cards and sticks them again on a wider screen', function (): void {
-    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
-    $hasPinned = 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")';
+it('keeps pins stuck on a phone-sized screen', function (): void {
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844), 'created_at');
 
-    $page->resize(390, 844);
-    waitUntil($page, "! {$hasPinned}")
-        ->assertScript(firstCell('created_at').'.style.left', '');
+    $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
-    $page->resize(1440, 900);
-    waitUntil($page, $hasPinned)
+    $page->wait(0.3)
+        ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
+        ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
         ->assertNoJavaScriptErrors();
 });
 

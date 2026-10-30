@@ -224,9 +224,6 @@ function trackWrapperScroll(wrapper) {
     }, { passive: true })
 }
 
-// Below Filament's `sm` breakpoint rows stack as cards, so there are no columns to pin.
-const PINS_MEDIA = '(min-width: 640px)'
-
 function markScrolledSideways(table) {
     table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
 }
@@ -241,7 +238,7 @@ function applyPinnedOffsets(table) {
         left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
         return offset
     })
-    const active = pinned.length > 0 && window.matchMedia(PINS_MEDIA).matches
+    const active = pinned.length > 0
 
     table.classList.toggle('fi-ta-has-pinned', active)
     table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
