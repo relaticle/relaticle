@@ -488,7 +488,7 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
                 continue;
             }
 
-            if (preg_match('/Relaticle\\\\{1,2}Cloud|\bcloud::/', (string) file_get_contents($path)) === 1) {
+            if (preg_match('/Relaticle\\\\{1,2}Cloud|\bcloud::/i', (string) file_get_contents($path)) === 1) {
                 $offenders[] = str_replace($root.'/', '', $path);
             }
         }
@@ -496,7 +496,7 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
 
     expect($offenders)->toBe(
         [],
-        'Core never references Relaticle\Cloud, its route names, its cloud:: views or its lang namespace (.ai/guidelines/relaticle/architecture.md). '.
+        'Core never references Relaticle\Cloud or its cloud:: views and lang namespace (.ai/guidelines/relaticle/architecture.md). '.
         'Only bootstrap/providers.php may name the provider. Offending files: '.implode(', ', $offenders),
     );
 });

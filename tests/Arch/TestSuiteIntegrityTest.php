@@ -70,7 +70,7 @@ it('keeps every test file inside a declared phpunit testsuite directory', functi
     )));
 
     $testDirectories = array_filter(
-        [dirname(__DIR__, 2).'/tests', dirname(__DIR__, 2).'/packages/Cloud/tests'],
+        [dirname(__DIR__, 2).'/tests', dirname(__DIR__, 2).'/packages'],
         is_dir(...),
     );
 

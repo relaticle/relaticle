@@ -27,6 +27,9 @@ it('returns zero balance when no balance record exists', function (): void {
 });
 
 it('reports has credits when balance is positive', function (): void {
+    withHostedBilling();
+    $this->service = resolve(CreditService::class);
+
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->getKey()], [
         'workspace_id' => $this->workspace->getKey(),
         'credits_remaining' => 50,
