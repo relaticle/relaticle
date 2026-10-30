@@ -6,6 +6,7 @@ namespace App\Filament\Concerns;
 
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
@@ -16,7 +17,6 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -41,7 +41,6 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Js;
 use Livewire\Attributes\On;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
@@ -193,18 +192,15 @@ trait HasRecordPageLayout
                 }),
             ActionGroup::make([
                 ActionGroup::make([
-                    $this->copyToClipboardAction(
-                        'copyPageUrl',
-                        __('filament/record-page.actions.copy_page_url'),
-                        static::getResource()::getUrl('view', [$this->getRecord()]),
-                        __('filament/record-page.notifications.url_copied'),
-                    ),
-                    $this->copyToClipboardAction(
-                        'copyRecordId',
-                        __('filament/record-page.actions.copy_record_id'),
-                        (string) $this->getRecord()->getKey(),
-                        __('filament/record-page.notifications.id_copied'),
-                    ),
+                    CopyToClipboardAction::make('copyPageUrl')
+                        ->label(__('filament/record-page.actions.copy_page_url'))
+                        ->copies(
+                            static::getResource()::getUrl('view', [$this->getRecord()]),
+                            __('filament/record-page.notifications.url_copied'),
+                        ),
+                    CopyToClipboardAction::make('copyRecordId')
+                        ->label(__('filament/record-page.actions.copy_record_id'))
+                        ->copies((string) $this->getRecord()->getKey(), __('filament/record-page.notifications.id_copied')),
                 ])->dropdown(false),
                 DeleteAction::make(),
             ])
@@ -217,18 +213,6 @@ trait HasRecordPageLayout
         ])
             ->key('recordActions')
             ->extraAttributes(['class' => 'fi-record-rail-actions']);
-    }
-
-    private function copyToClipboardAction(string $name, string $label, string $value, string $notification): Action
-    {
-        return Action::make($name)
-            ->label($label)
-            ->icon('heroicon-o-clipboard-document')
-            ->actionJs(sprintf(
-                'navigator.clipboard.writeText(%s).then(() => new FilamentNotification().title(%s).success().send()); close()',
-                Js::from($value),
-                Js::from($notification),
-            ));
     }
 
     private function detailsSection(Schema $schema): Section
