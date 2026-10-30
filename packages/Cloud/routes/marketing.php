@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\ConnectableAssistant;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Http\Controllers\AlternativesController;
 use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
 use Relaticle\Cloud\Marketing\Http\Controllers\ComparisonController;

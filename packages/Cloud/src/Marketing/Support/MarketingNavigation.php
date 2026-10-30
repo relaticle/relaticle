@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Marketing\Support;
 
-use App\Enums\ConnectableAssistant;
 use App\Features\Blog;
 use App\Features\Documentation;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 
 final readonly class MarketingNavigation
 {

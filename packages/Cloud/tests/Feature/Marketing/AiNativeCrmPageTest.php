@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 use App\Features\Billing as BillingFeature;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\CloudServiceProvider;
+
+mutates(CloudServiceProvider::class);
 
 function aiNativeCrmPageText(string $html): string
 {

@@ -7,7 +7,10 @@ use App\Features\EmailIntegration;
 use App\Features\SignupChallenge;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Cloud\CloudServiceProvider;
 use Tests\Helpers\ChatCatalog;
+
+mutates(CloudServiceProvider::class);
 
 function securityPageText(string $html): string
 {

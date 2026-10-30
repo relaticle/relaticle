@@ -261,16 +261,4 @@ return [
         'ignore' => 'Did not ask for a reset? Ignore this email and your password stays.',
         'cta' => 'Reset password',
     ],
-
-    'contact_submission' => [
-        'subject' => 'New contact: :name',
-        'inquiry_subject' => 'New :plan inquiry: :name',
-        'preheader' => ':company, :email',
-        'preheader_without_company' => ':email',
-        'heading' => 'New contact form message',
-        'name' => 'Name',
-        'email' => 'Email',
-        'company' => 'Company',
-        'cta' => 'Reply to :name',
-    ],
 ];

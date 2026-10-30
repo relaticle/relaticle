@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Marketing\Http\Controllers;
 
-use App\Enums\ConnectableAssistant;
 use Illuminate\View\View;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 
 final readonly class AssistantPagesController
 {

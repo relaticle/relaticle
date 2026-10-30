@@ -162,9 +162,9 @@
                                     ? [__('Email and calendar'), __('Gmail and Outlook sync'), __('Gmail and Outlook sync'), __('Gmail and Outlook sync')]
                                     : null,
                                 [__('Getting started'), __('Self-service setup'), __('Set up for you'), __('Scoped implementation project')],
-                                [__('billing.comparison.integrations'), __('REST API and MCP server'), __('REST API and MCP server'), __('Custom integrations by agreement')],
+                                [__('cloud::billing.comparison.integrations'), __('REST API and MCP server'), __('REST API and MCP server'), __('Custom integrations by agreement')],
                                 [__('Hosting and updates'), __('Managed by Relaticle'), __('Managed by Relaticle'), __('Agreed deployment and maintenance')],
-                                [__('billing.comparison.support'), __('Email support'), __('Changes within one business day'), __('Agreed support with the founding team')],
+                                [__('cloud::billing.comparison.support'), __('Email support'), __('Changes within one business day'), __('Agreed support with the founding team')],
                             ]) as [$feature, $pro, $concierge, $enterprise])
                                 <tr class="block px-5 py-4 sm:table-row sm:p-0">
                                     <th scope="row" class="block pb-2 text-left font-semibold text-gray-900 dark:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:font-medium">{{ $feature }}</th>
@@ -257,10 +257,10 @@
                 ];
 
                 if ($billingActive) {
-                    $pricingFaqs[] = [__('billing.concierge.faq_title'), __('billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])];
-                    $pricingFaqs[] = [__('billing.concierge.change_title'), __('billing.concierge.change_body')];
-                    $pricingFaqs[] = [__('billing.enterprise.faq_title'), __('billing.enterprise.faq_body', ['price' => $enterprisePrice])];
-                    $pricingFaqs[] = [__('billing.enterprise.timeline_title'), __('billing.enterprise.timeline_body')];
+                    $pricingFaqs[] = [__('cloud::billing.concierge.faq_title'), __('cloud::billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])];
+                    $pricingFaqs[] = [__('cloud::billing.concierge.change_title'), __('cloud::billing.concierge.change_body')];
+                    $pricingFaqs[] = [__('cloud::billing.enterprise.faq_title'), __('cloud::billing.enterprise.faq_body', ['price' => $enterprisePrice])];
+                    $pricingFaqs[] = [__('cloud::billing.enterprise.timeline_title'), __('cloud::billing.enterprise.timeline_body')];
                 }
             @endphp
 
@@ -337,7 +337,7 @@
                                 ->priceCurrency('USD')
                                 ->unitText('year'))
                             ->url(route('contact', ['plan' => 'concierge']))
-                            ->description(__('billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])),
+                            ->description(__('cloud::billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Enterprise')
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
@@ -345,7 +345,7 @@
                                 ->priceCurrency('USD')
                                 ->unitText('year'))
                             ->url(route('contact', ['plan' => 'enterprise']))
-                            ->description(__('billing.enterprise.faq_body', ['price' => $enterprisePrice])),
+                            ->description(__('cloud::billing.enterprise.faq_body', ['price' => $enterprisePrice])),
                     ]
                     : [
                         \Spatie\SchemaOrg\Schema::offer()

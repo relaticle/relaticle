@@ -542,7 +542,7 @@ it('shows enterprise manual state without upgrade actions', function (): void {
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
     livewire(Billing::class)
-        ->assertSee(__('billing.enterprise.title'))
+        ->assertSee(__('cloud::billing.enterprise.title'))
         ->assertDontSee(__('cloud::billing.upgrade.button'));
 });
 
@@ -555,7 +555,7 @@ it('states a Concierge plan as managed once, without repeating the heading in a 
     $html = livewire(Billing::class)->html();
 
     expect(substr_count($html, __('cloud::billing.managed.title')))->toBe(1)
-        ->and($html)->not->toContain(__('billing.enterprise.body'));
+        ->and($html)->not->toContain(__('cloud::billing.enterprise.body'));
 });
 
 it('keeps the Enterprise title and body on an Enterprise plan', function (): void {
@@ -565,8 +565,8 @@ it('keeps the Enterprise title and body on an Enterprise plan', function (): voi
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
     livewire(Billing::class)
-        ->assertSee(__('billing.enterprise.title'))
-        ->assertSee(__('billing.enterprise.body'));
+        ->assertSee(__('cloud::billing.enterprise.title'))
+        ->assertSee(__('cloud::billing.enterprise.body'));
 });
 
 it('shows Concierge as a managed plan with its allowance and no upgrade actions', function (): void {
@@ -780,7 +780,7 @@ it('keeps an Enterprise grant managed after an older subscription ended', functi
     ]);
 
     livewire(Billing::class)
-        ->assertSee(__('billing.enterprise.body'))
+        ->assertSee(__('cloud::billing.enterprise.body'))
         ->assertSee('Contact your Relaticle team')
         ->assertSeeHtml('href="https://marketing.test/contact"')
         ->assertDontSee(__('cloud::billing.upgrade.button'))
@@ -835,7 +835,7 @@ it('identifies a manually managed Pro plan without calling it Enterprise', funct
 
     livewire(Billing::class)
         ->assertSee('Your plan is managed by Relaticle')
-        ->assertDontSee(__('billing.enterprise.title'));
+        ->assertDontSee(__('cloud::billing.enterprise.title'));
 });
 
 it('shows spendable credits separately after the monthly allowance is exhausted', function (): void {

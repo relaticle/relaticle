@@ -98,7 +98,7 @@
                                 @elseif($onLegacyFree)
                                     {{ __('cloud::billing.legacy_free.tagline') }}
                                 @else
-                                    {{ __('billing.pro_plan.tagline') }}
+                                    {{ __('cloud::billing.pro_plan.tagline') }}
                                 @endif
                             </p>
                         </div>
@@ -207,15 +207,15 @@
             </div>
         @elseif($showsManagedCard)
             <div class="{{ $card }} p-6">
-                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ $isEnterprise ? __('billing.enterprise.title') : __('cloud::billing.managed.title') }}</h3>
+                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ $isEnterprise ? __('cloud::billing.enterprise.title') : __('cloud::billing.managed.title') }}</h3>
                 @if($isEnterprise)
-                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.body') }}</p>
+                    <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.body') }}</p>
                 @endif
                 @if($renewalLabel)
                     <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ $renewalLabel }}</p>
                 @endif
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', absolute: false))">{{ __('billing.enterprise.manage') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', absolute: false))">{{ __('cloud::billing.enterprise.manage') }}</x-filament::button>
                     @if($managedSubscription || ($canManageSubscription && ! $pastDue))
                         <x-filament::button color="gray" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                     @endif
@@ -256,7 +256,7 @@
             >
                 <div class="flex flex-1 flex-col">
                     <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.cloud_pro') }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.tagline') }}</p>
+                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.pro_plan.tagline') }}</p>
 
                     <div class="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
                         <div>
@@ -264,16 +264,16 @@
                                 <span class="font-display text-4xl font-bold tracking-tight text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
                                 <span class="text-sm text-gray-500 dark:text-gray-400">/mo</span>
                             </div>
-                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.per_workspace') }}</p>
+                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.pro_plan.per_workspace') }}</p>
                         </div>
 
-                        <x-billing.interval-toggle />
+                        <x-cloud::billing.interval-toggle />
                     </div>
 
                     <div class="mt-6 h-px w-full bg-gray-100 dark:bg-white/[0.06]"></div>
 
                     <ul class="mt-6 grid gap-3 sm:grid-cols-2">
-                        @foreach(__('billing.pro_plan.features') as $feature)
+                        @foreach(__('cloud::billing.pro_plan.features') as $feature)
                             <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300">
                                 <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
                                 {{ $feature }}
@@ -298,8 +298,8 @@
                             </x-filament::button>
                         @endif
                         <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"
-                            x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
-                            {{ __('billing.pro_plan.billed_yearly') }}
+                            x-text="yearly ? @js(__('cloud::billing.pro_plan.billed_yearly')) : @js(__('cloud::billing.pro_plan.billed_monthly'))">
+                            {{ __('cloud::billing.pro_plan.billed_yearly') }}
                         </p>
                     </div>
                 </div>
@@ -310,11 +310,11 @@
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.enterprise') }}</h3>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
                     </div>
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('billing.enterprise.contact') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
                 </div>
-                <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.tagline') }} {{ __('billing.enterprise.terms') }}</p>
+                <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }} {{ __('cloud::billing.enterprise.terms') }}</p>
             </section>
         @endif
     </div>

@@ -9,7 +9,7 @@
             width="3xl"
             icon="ri-flashlight-line"
             :heading="__('billing.plans.cloud_pro')"
-            :description="__('billing.pro_plan.tagline')"
+            :description="__('cloud::billing.pro_plan.tagline')"
         >
             <div
                 x-data="{
@@ -35,10 +35,10 @@
                             >
                                 <input type="radio" name="upgrade-interval" class="h-4 w-4 accent-primary-600" x-model.boolean="yearly" value="{{ $isYearly ? 'true' : 'false' }}" @checked($isYearly)>
                                 <span class="text-sm font-medium text-gray-950 dark:text-white">
-                                    {{ $isYearly ? __('billing.pro_plan.yearly') : __('billing.pro_plan.monthly') }}
+                                    {{ $isYearly ? __('cloud::billing.pro_plan.yearly') : __('cloud::billing.pro_plan.monthly') }}
                                 </span>
                                 @if($isYearly)
-                                    <span class="rounded-full bg-primary/[0.1] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-700 dark:bg-primary/[0.25] dark:text-primary-300">{{ __('billing.pro_plan.yearly_save') }}</span>
+                                    <span class="rounded-full bg-primary/[0.1] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-700 dark:bg-primary/[0.25] dark:text-primary-300">{{ __('cloud::billing.pro_plan.yearly_save') }}</span>
                                 @endif
                                 <span class="ms-auto rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700 dark:bg-white/[0.06] dark:text-gray-300">
                                     {{ $isYearly ? __('cloud::billing.upgrade.review.rate_yearly') : __('cloud::billing.upgrade.review.rate_monthly') }}
@@ -47,7 +47,7 @@
                         @endforeach
                     </div>
 
-                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.per_workspace') }}</p>
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.pro_plan.per_workspace') }}</p>
                 </div>
 
                 <aside class="rounded-xl bg-gray-50 p-5 dark:bg-white/[0.03]">

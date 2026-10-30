@@ -27,8 +27,8 @@ final class NewContactSubmissionMail extends Mailable implements ShouldQueue
         return new Envelope(
             replyTo: [$this->data['email']],
             subject: $this->plan instanceof Plan
-                ? __('mail.contact_submission.inquiry_subject', ['plan' => $this->plan->marketingLabel(), 'name' => $this->data['name']])
-                : __('mail.contact_submission.subject', ['name' => $this->data['name']]),
+                ? __('cloud::mail.contact_submission.inquiry_subject', ['plan' => $this->plan->marketingLabel(), 'name' => $this->data['name']])
+                : __('cloud::mail.contact_submission.subject', ['name' => $this->data['name']]),
         );
     }
 
@@ -41,12 +41,12 @@ final class NewContactSubmissionMail extends Mailable implements ShouldQueue
             with: [
                 'replyUrl' => 'mailto:'.$this->data['email'].'?subject='.rawurlencode('Re: '.$this->envelope()->subject),
                 'preheader' => $company === null || $company === ''
-                    ? __('mail.contact_submission.preheader_without_company', ['email' => $this->data['email']])
-                    : __('mail.contact_submission.preheader', ['company' => $company, 'email' => $this->data['email']]),
+                    ? __('cloud::mail.contact_submission.preheader_without_company', ['email' => $this->data['email']])
+                    : __('cloud::mail.contact_submission.preheader', ['company' => $company, 'email' => $this->data['email']]),
                 'rows' => array_filter([
-                    ['label' => __('mail.contact_submission.name'), 'value' => $this->data['name']],
-                    ['label' => __('mail.contact_submission.email'), 'value' => $this->data['email']],
-                    $company === null || $company === '' ? null : ['label' => __('mail.contact_submission.company'), 'value' => $company],
+                    ['label' => __('cloud::mail.contact_submission.name'), 'value' => $this->data['name']],
+                    ['label' => __('cloud::mail.contact_submission.email'), 'value' => $this->data['email']],
+                    $company === null || $company === '' ? null : ['label' => __('cloud::mail.contact_submission.company'), 'value' => $company],
                 ]),
             ],
         );

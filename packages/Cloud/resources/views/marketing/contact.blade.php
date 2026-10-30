@@ -6,8 +6,8 @@
     @php
         $inquiry = $inquiryPlan?->value;
         $inquiryPrice = match ($inquiryPlan) {
-            \App\Enums\Plan::Enterprise => __('billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]),
-            \App\Enums\Plan::Concierge => __('billing.concierge.price', ['price' => number_format(config('relaticle.concierge.price_yearly'))]),
+            \App\Enums\Plan::Enterprise => __('cloud::billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]),
+            \App\Enums\Plan::Concierge => __('cloud::billing.concierge.price', ['price' => number_format(config('relaticle.concierge.price_yearly'))]),
             default => null,
         };
     @endphp
@@ -24,16 +24,16 @@
                         </a>
                     @endif
                     <h1 class="font-display text-3xl sm:text-4xl font-bold text-gray-950 dark:text-white tracking-tight leading-tight">
-                        {{ $inquiry ? __("billing.inquiry.{$inquiry}.title") : __('Get in touch') }}
+                        {{ $inquiry ? __("cloud::billing.inquiry.{$inquiry}.title") : __('Get in touch') }}
                     </h1>
                     <p class="mt-5 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-sm">
-                        {{ $inquiry ? __("billing.inquiry.{$inquiry}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
+                        {{ $inquiry ? __("cloud::billing.inquiry.{$inquiry}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
                     </p>
 
                     @if($inquiry)
                         <div class="mt-6 border-t border-[var(--surface-card-border)] pt-6">
                             <p class="font-display text-xl font-semibold text-gray-950 dark:text-white">{{ $inquiryPrice }}</p>
-                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __("billing.{$inquiry}.terms") }}</p>
+                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __("cloud::billing.{$inquiry}.terms") }}</p>
                         </div>
                     @endif
 
@@ -81,10 +81,10 @@
 
                             <x-cloud::marketing.input label="Company" type="text" name="company" id="company" autocomplete="organization" :value="old('company')" placeholder="Your company"/>
 
-                            <x-cloud::marketing.textarea :label="$inquiry ? __('billing.inquiry.'.$inquiry.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message', $inquiry ? __("billing.inquiry.{$inquiry}.message") : '') }}</x-cloud::marketing.textarea>
+                            <x-cloud::marketing.textarea :label="$inquiry ? __('cloud::billing.inquiry.'.$inquiry.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message', $inquiry ? __("cloud::billing.inquiry.{$inquiry}.message") : '') }}</x-cloud::marketing.textarea>
 
                             <x-cloud::marketing.button type="submit" class="w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-                                {{ $inquiry ? __("billing.inquiry.{$inquiry}.submit") : __('Send message') }}
+                                {{ $inquiry ? __("cloud::billing.inquiry.{$inquiry}.submit") : __('Send message') }}
                             </x-cloud::marketing.button>
                         </form>
                     @endif

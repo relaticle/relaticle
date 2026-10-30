@@ -1,7 +1,7 @@
 @php
     $clients = [
-        ['ri-claude-fill', 'text-[#D4763C]', 'Claude', \App\Enums\ConnectableAssistant::Claude],
-        ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', \App\Enums\ConnectableAssistant::ChatGPT],
+        ['ri-claude-fill', 'text-[#D4763C]', 'Claude', \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude],
+        ['ri-openai-fill', 'text-gray-900 dark:text-gray-200', 'ChatGPT', \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT],
         ['ri-cursor-ai-fill', 'text-gray-900 dark:text-gray-200', 'Cursor', null],
         ['ri-gemini-fill', 'text-blue-500', 'Gemini', null],
     ];

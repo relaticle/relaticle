@@ -26,6 +26,7 @@ use App\Http\Controllers\SwitchInvitationAccountController;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
@@ -141,7 +142,7 @@ Route::get('/media/{media:uuid}', ShowMediaController::class)
 
 // Registered only while nothing serves GET /, so a package that owns the root keeps it (Filament checks the same way).
 if (! isset(Route::getRoutes()->getRoutesByMethod()['GET']['/'])) {
-    Route::get('/', fn () => redirect()->to(url()->getAppUrl()));
+    Route::get('/', fn (): RedirectResponse => redirect()->to(url()->getAppUrl()));
 }
 
 Route::get('/dashboard', fn () => redirect()->to(url()->getAppUrl()))->name('dashboard');

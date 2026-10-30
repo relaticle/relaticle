@@ -5,6 +5,10 @@ declare(strict_types=1);
 use App\Features\Billing as BillingFeature;
 use Illuminate\Support\Js;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
+use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
+
+mutates(AssistantPagesController::class, ConnectableAssistant::class);
 
 function assistantPageText(string $html): string
 {

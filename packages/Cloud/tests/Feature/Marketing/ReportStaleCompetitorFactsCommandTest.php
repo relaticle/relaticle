@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
 use Relaticle\Cloud\Marketing\Support\CompetitorFacts;
+
+mutates(ReportStaleCompetitorFactsCommand::class, CompetitorFacts::class);
 
 it('exposes dated facts for every competitor used on public pages', function (): void {
     $facts = CompetitorFacts::all();

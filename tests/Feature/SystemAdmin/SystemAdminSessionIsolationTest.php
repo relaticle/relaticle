@@ -380,7 +380,6 @@ it('ignores staff authentication retained in a legacy customer session', functio
     $cookies = [];
     $customer = User::factory()->withWorkspace()->create();
     $administrator = SystemAdministrator::factory()->create();
-    $post = Post::factory()->draft()->create();
     $response = isolatedAuthRequest($cookies, 'POST', 'https://app.example.test/login', [
         'email' => $customer->email,
         'password' => 'password',
@@ -390,12 +389,12 @@ it('ignores staff authentication retained in a legacy customer session', functio
     $payload[Auth::guard('sysadmin')->getName()] = $administrator->id;
     DB::table('sessions')->where('id', $id)->update(['payload' => base64_encode(serialize($payload))]);
 
-    isolatedAuthRequest($cookies, 'GET', $post->getUrl())->assertOk()->assertDontSee('Edit Post');
+    isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
     $this->assertGuest('sysadmin');
     $stored = unserialize(base64_decode(DB::table('sessions')->where('id', $id)->value('payload')));
     expect($stored)->not->toHaveKey(Auth::guard('sysadmin')->getName());
     isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
-})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
+});
 
 it('redirects staff published blog links to the public hostname', function (): void {
     $cookies = [];

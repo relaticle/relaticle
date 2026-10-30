@@ -8,12 +8,12 @@
     $sibling = $assistant->sibling();
 
     $steps = match ($assistant) {
-        \App\Enums\ConnectableAssistant::Claude => [
+        \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude => [
             [__('Add the connector'), __('In Claude, open Connectors and add a custom connector with this URL.'), $mcpUrl],
             [__('Approve access'), __('Claude sends you to Relaticle to sign in. Approve access and pick the workspace it may use.'), null],
             [__('Ask'), __('Back in Claude, ask about your pipeline or tell it what to add.'), null],
         ],
-        \App\Enums\ConnectableAssistant::ChatGPT => [
+        \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT => [
             [__('Install the plugin'), __('Open the Relaticle plugin in the ChatGPT plugin directory and click Install plugin.'), null],
             [__('Approve access'), __('ChatGPT sends you to Relaticle to sign in. Approve access and pick the workspace it may use.'), null],
             [__('Ask'), __('Start a message with @Relaticle, then ask about your pipeline or tell it what to add.'), null],
@@ -21,8 +21,8 @@
     };
 
     $selfHostedAnswer = match ($assistant) {
-        \App\Enums\ConnectableAssistant::Claude => __('A self-hosted install includes the same MCP server on your own domain. The MCP server guide covers how a client connects to it.'),
-        \App\Enums\ConnectableAssistant::ChatGPT => __('The plugin in the ChatGPT directory connects to Relaticle Cloud. A self-hosted install includes the same MCP server on your own domain, and the MCP server guide covers how a client connects to it.'),
+        \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude => __('A self-hosted install includes the same MCP server on your own domain. The MCP server guide covers how a client connects to it.'),
+        \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT => __('The plugin in the ChatGPT directory connects to Relaticle Cloud. A self-hosted install includes the same MCP server on your own domain, and the MCP server guide covers how a client connects to it.'),
     };
 
     $title = __('CRM for :name: run your pipeline from chat', ['name' => $name]).' - Relaticle';
@@ -271,7 +271,7 @@
             </ol>
 
             <div class="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
-                @if($assistant === \App\Enums\ConnectableAssistant::ChatGPT)
+                @if($assistant === \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT)
                     <x-cloud::marketing.button variant="secondary" href="{{ $chatGptPluginUrl }}" :external="true">
                         {{ __('Open the ChatGPT plugin') }}
                     </x-cloud::marketing.button>

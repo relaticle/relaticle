@@ -6,11 +6,7 @@ namespace Relaticle\Cloud\Marketing\Support;
 
 final readonly class NavItem
 {
-    /**
-     * @param  list<NavItem>  $children
-     * @param  string|null  $icon  Name of the `icons.*` component the mega menu renders.
-     * @param  string|null  $description  One line shown under the label in the mega menu.
-     */
+    /** @param  list<NavItem>  $children */
     public function __construct(
         public string $label,
         public ?string $url = null,

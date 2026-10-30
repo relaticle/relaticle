@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Enums\ConnectableAssistant;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Support\MarketingNavigation;
 use Relaticle\Cloud\Marketing\Support\NavItem;
 

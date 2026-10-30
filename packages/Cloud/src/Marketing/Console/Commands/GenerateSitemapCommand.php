@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Marketing\Console\Commands;
 
-use App\Enums\ConnectableAssistant;
 use App\Features\Blog;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;

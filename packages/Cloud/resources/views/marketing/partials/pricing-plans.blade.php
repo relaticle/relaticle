@@ -1,6 +1,6 @@
 <div x-data="{ yearly: true }" class="mx-auto max-w-6xl">
     <div class="mb-8 flex justify-center">
-        <x-billing.interval-toggle />
+        <x-cloud::billing.interval-toggle />
     </div>
 
     <div id="pricing-plans" class="grid gap-5 lg:grid-cols-3">
@@ -23,7 +23,7 @@
                         <span class="font-display text-5xl font-bold tracking-[-0.03em] text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
                         <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ month') }}</span>
                     </p>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">{{ __('billing.pro_plan.billed_yearly') }}</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.pro_plan.billed_yearly')) : @js(__('cloud::billing.pro_plan.billed_monthly'))">{{ __('cloud::billing.pro_plan.billed_yearly') }}</p>
                 </div>
 
                 <x-cloud::marketing.button :href="route('login')" iconTrailing="ri-arrow-right-line" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
@@ -35,7 +35,7 @@
             <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
                 <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Your workspace includes') }}</p>
                 <ul class="space-y-3">
-                    @foreach(__('billing.pro_plan.features') as $feature)
+                    @foreach(__('cloud::billing.pro_plan.features') as $feature)
                         <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
                             <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-primary dark:text-primary-400" />
                             {{ $feature }}
@@ -54,7 +54,7 @@
                     </div>
                     <h2 class="font-display text-xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('billing.plans.cloud_concierge') }}</h2>
                 </div>
-                <p class="mt-4 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('billing.concierge.tagline') }}</p>
+                <p class="mt-4 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.concierge.tagline') }}</p>
 
                 <div class="mt-8">
                     <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Per workspace') }}</p>
@@ -62,26 +62,26 @@
                         <span class="font-display text-5xl font-bold tracking-[-0.03em] text-gray-950 dark:text-white">${{ number_format(config('relaticle.concierge.price_yearly') / 12) }}</span>
                         <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ month') }}</span>
                     </p>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('billing.concierge.billed_yearly', ['price' => $conciergePrice])) : @js(__('billing.concierge.yearly_only'))">{{ __('billing.concierge.billed_yearly', ['price' => $conciergePrice]) }}</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.concierge.billed_yearly', ['price' => $conciergePrice])) : @js(__('cloud::billing.concierge.yearly_only'))">{{ __('cloud::billing.concierge.billed_yearly', ['price' => $conciergePrice]) }}</p>
                 </div>
 
                 <x-cloud::marketing.button variant="secondary" :href="route('contact', ['plan' => 'concierge'])" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-                    {{ __('billing.concierge.contact') }}
+                    {{ __('cloud::billing.concierge.contact') }}
                 </x-cloud::marketing.button>
-                <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('billing.concierge.terms') }}</p>
+                <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.concierge.terms') }}</p>
             </div>
 
             <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
-                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('billing.concierge.includes') }}</p>
+                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('cloud::billing.concierge.includes') }}</p>
                 <ul class="space-y-3">
-                    @foreach([__('billing.concierge.credits', ['credits' => $conciergeCredits]), ...__('billing.concierge.features')] as $feature)
+                    @foreach([__('cloud::billing.concierge.credits', ['credits' => $conciergeCredits]), ...__('cloud::billing.concierge.features')] as $feature)
                         <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
                             <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" />
                             {{ $feature }}
                         </li>
                     @endforeach
                 </ul>
-                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('billing.concierge.footnote') }}</p>
+                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('cloud::billing.concierge.footnote') }}</p>
             </div>
         </section>
 
@@ -93,34 +93,34 @@
                     </div>
                     <h2 class="font-display text-xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</h2>
                 </div>
-                <p class="mt-4 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.tagline') }}</p>
+                <p class="mt-4 text-sm leading-5 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }}</p>
 
-                <div class="mt-8" aria-label="{{ __('billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
+                <div class="mt-8" aria-label="{{ __('cloud::billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
                     <p class="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('Starting at') }}</p>
                     <p class="mt-2 flex flex-wrap items-baseline gap-x-1.5">
                         <span class="font-display text-5xl font-bold tracking-[-0.03em] text-gray-950 dark:text-white">${{ $enterprisePrice }}</span>
                         <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('/ year') }}</span>
                     </p>
-                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.billing') }}</p>
+                    <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.billing') }}</p>
                 </div>
 
                 <x-cloud::marketing.button variant="secondary" :href="route('contact', ['plan' => 'enterprise'])" class="mt-8 w-full focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-                    {{ __('billing.enterprise.contact') }}
+                    {{ __('cloud::billing.enterprise.contact') }}
                 </x-cloud::marketing.button>
                 <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('No commitment until scope is agreed.') }}</p>
             </div>
 
             <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
-                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.includes') }}</p>
+                <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.includes') }}</p>
                 <ul class="space-y-3">
-                    @foreach(__('billing.enterprise.features') as $feature)
+                    @foreach(__('cloud::billing.enterprise.features') as $feature)
                         <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
                             <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" />
                             {{ $feature }}
                         </li>
                     @endforeach
                 </ul>
-                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('billing.enterprise.terms') }}</p>
+                <p class="mt-auto pt-6 text-xs leading-5 text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.terms') }}</p>
             </div>
         </section>
     </div>

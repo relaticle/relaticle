@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Enums;
+namespace Relaticle\Cloud\Marketing\Enums;
 
 enum ConnectableAssistant: string
 {

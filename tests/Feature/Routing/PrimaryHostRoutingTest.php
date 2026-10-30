@@ -101,7 +101,7 @@ describe('app plumbing on secondary hosts', function () {
 
 describe('indexing on secondary hosts', function () {
     it('marks every secondary-host response noindex', function (): void {
-        $this->get('http://sysadmin.relaticle.test/pricing')
+        $this->get('http://sysadmin.relaticle.test/.well-known/security.txt')
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     });
 

@@ -134,4 +134,88 @@ return [
     'errors' => [
         'checkout_failed' => "We couldn't start checkout just now. Please try again in a moment.",
     ],
+
+    'pro_plan' => [
+        'tagline' => 'For teams that put AI to work',
+        'per_workspace' => 'Per workspace. Never per seat.',
+        'features' => [
+            'Unlimited users and records',
+            '2,000 AI credits / month',
+            'Premium AI models included',
+            'REST API and MCP server',
+            'Email support',
+        ],
+        'monthly' => 'Monthly',
+        'yearly' => 'Yearly',
+        'yearly_save' => 'Save 21%',
+        'billed_monthly' => 'Billed monthly · cancel anytime',
+        'billed_yearly' => '$228 billed yearly · cancel anytime',
+    ],
+
+    'enterprise' => [
+        'title' => 'Enterprise plan',
+        'body' => 'Your plan is managed by Relaticle. Contact us for changes.',
+        'tagline' => 'We build it around how you work.',
+        'starting_price' => 'From $:price / year',
+        'billing' => 'Billed yearly · never per seat',
+        'includes' => 'Everything in Cloud Pro, plus',
+        'features' => [
+            'Implementation scoped to your workflow',
+            'Custom integrations by agreement',
+            'AI usage agreed with your team',
+            'Ongoing maintenance and support',
+            'Direct access to the founding team',
+        ],
+        'terms' => 'Scope and price agreed before you sign.',
+        'contact' => 'Talk to us',
+        'manage' => 'Contact your Relaticle team',
+        'faq_title' => 'What does Enterprise include?',
+        'faq_body' => 'Enterprise starts at $:price a year. It includes Cloud Pro with a scoped implementation project, agreed integrations, and ongoing maintenance and support. We agree deliverables, AI usage, support terms, and milestones before signing. Additional work requires a separate quote.',
+        'timeline_title' => 'How does an Enterprise project start?',
+        'timeline_body' => 'Tell us about your workflow, integrations, and target date. We assess the requirements together, then agree scope and delivery milestones. Development starts after agreement. Features under discussion are not included until their scope is confirmed.',
+    ],
+
+    'concierge' => [
+        'tagline' => 'We set it up and keep it current.',
+        'billed_yearly' => '$:price billed yearly',
+        'yearly_only' => 'Yearly only',
+        'price' => '$:price / year',
+        'contact' => 'Talk to us',
+        'terms' => 'Setup starts once the invoice is paid.',
+        'includes' => 'Everything in Cloud Pro, plus',
+        'credits' => ':credits AI credits / month',
+        'features' => [
+            'Pipeline and fields designed around your sales process',
+            'Your existing data moved in',
+            'A walkthrough for your team',
+            'Up to 5 changes a month, done within one business day',
+        ],
+        'footnote' => 'Done by the founding team.',
+        'faq_title' => 'What does Cloud Concierge include?',
+        'faq_body' => 'Everything in Cloud Pro, with :credits AI credits a month instead of :pro_credits. We design your pipeline and fields around how you sell, move your existing data in, and walk your team through it. After that, send up to 5 changes a month and we make each one within one business day. Cloud Concierge costs $:price a year, invoiced yearly. Talk to us to start.',
+        'change_title' => 'What counts as a change?',
+        'change_body' => 'One request to adjust your setup: a new field, a renamed stage, a reworked pipeline, or a cleanup of imported records. Send it by email. Unused changes do not carry over to the next month.',
+    ],
+
+    'comparison' => [
+        'integrations' => 'Integrations',
+        'support' => 'Support',
+    ],
+
+    'inquiry' => [
+        'enterprise' => [
+            'title' => 'Let’s plan your Enterprise workspace',
+            'body' => 'Tell us what your team needs to accomplish. We will review your workflow and integrations, then agree the scope together.',
+            'message_label' => 'What would you like to build with Relaticle?',
+            'message' => "We are interested in Relaticle Enterprise.\n\nWorkflow and integrations we need:\n\nTeam size:\n\nTarget timeline:",
+            'submit' => 'Discuss Enterprise',
+        ],
+        'concierge' => [
+            'title' => 'Let’s set up your Concierge workspace',
+            'body' => 'Tell us how you sell today and where your data lives. We reply with a start date and send the yearly invoice.',
+            'message_label' => 'How do you sell today?',
+            'message' => "We are interested in Relaticle Cloud Concierge.\n\nHow we sell today:\n\nWhere our data lives now:\n\nTeam size:",
+            'submit' => 'Discuss Concierge',
+        ],
+    ],
 ];
