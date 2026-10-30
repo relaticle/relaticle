@@ -2028,3 +2028,13 @@ it('fills merge tags in a sent draft from the first recipient, as the composer d
     expect($email->subject)->toBe('Plan for Dana Reyes')
         ->and($email->body->body_html)->toContain('Hi Dana Reyes,');
 });
+
+it('names the date in the notice for a send scheduled past the hour', function (): void {
+    $this->travelTo(now()->setDate(2026, 10, 30)->setTime(9, 0));
+
+    emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => '2026-10-31T14:30:00+00:00']));
+
+    expect(EmailSendHeldNotification::present($this->viewer->notifications()->sole())->getBody())
+        ->toContain('on October 31, 2026 2:30 PM.')
+        ->not->toContain('minutes');
+});

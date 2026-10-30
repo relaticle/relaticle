@@ -11,6 +11,7 @@ use App\Notifications\InboxNotification;
 use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
+use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
@@ -20,6 +21,8 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 final class EmailSendHeldNotification extends InboxNotification
 {
+    private const int MINUTES_BEFORE_A_DATE = 60;
+
     private readonly CarbonInterface $deadline;
 
     public function __construct(
@@ -66,15 +69,18 @@ final class EmailSendHeldNotification extends InboxNotification
     {
         $subject = $row->subject;
         $status = $subject instanceof Email ? $subject->status : null;
-        $holdLasts = now()->isBefore(Date::parse((string) data_get($row->data, 'deadline')));
+        $deadline = Date::parse((string) data_get($row->data, 'deadline'));
+        $holdLasts = now()->isBefore($deadline);
+        $minutes = (int) data_get($row->data, 'minutes');
         $cancellable = $status === EmailStatus::QUEUED || ($status === null && $holdLasts);
 
         $notification = FilamentNotification::make((string) $row->getKey())
             ->title(__('filament/concerns/email-compose.notifications.held.title', ['via' => e((string) data_get($row->data, 'via'))]))
-            ->body(__(self::bodyKey($status, $holdLasts), [
+            ->body(__(self::bodyKey($status, $holdLasts, $minutes > self::MINUTES_BEFORE_A_DATE), [
                 'subject' => e((string) data_get($row->data, 'email_subject')),
                 'recipients' => e(implode(', ', (array) data_get($row->data, 'recipients'))),
-                'minutes' => trans_choice('filament/concerns/email-compose.notifications.held.minutes', (int) data_get($row->data, 'minutes')),
+                'minutes' => trans_choice('filament/concerns/email-compose.notifications.held.minutes', $minutes),
+                'date' => $deadline->setTimezone(FilamentTimezone::get())->isoFormat('LLL'),
                 'workspace' => e($row->workspace->name ?? ''),
             ]))
             ->warning();
@@ -82,13 +88,14 @@ final class EmailSendHeldNotification extends InboxNotification
         return $cancellable ? $notification->actions([self::cancelAction($row)]) : $notification;
     }
 
-    private static function bodyKey(?EmailStatus $status, bool $holdLasts): string
+    private static function bodyKey(?EmailStatus $status, bool $holdLasts, bool $scheduled): string
     {
         $key = match (true) {
             $status === EmailStatus::CANCELLED => 'cancelled_body',
             $status === EmailStatus::FAILED => 'failed_body',
             $status === EmailStatus::SENDING => 'sending_body',
             $status === EmailStatus::SENT, ! $holdLasts && ! $status instanceof EmailStatus => 'sent_body',
+            $holdLasts && $scheduled => 'scheduled_body',
             $holdLasts => 'body',
             default => 'waiting_body',
         };
