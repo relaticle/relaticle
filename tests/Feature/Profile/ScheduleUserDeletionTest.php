@@ -9,12 +9,14 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\UserDeletionCancelledNotification;
 use App\Notifications\UserDeletionScheduledNotification;
+use App\Services\NoBilling;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(ScheduleUserDeletion::class, CancelUserDeletion::class);
+mutates(ScheduleUserDeletion::class, CancelUserDeletion::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     Feature::define(AccountDeletion::class, true);

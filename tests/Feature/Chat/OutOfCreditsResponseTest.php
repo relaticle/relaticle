@@ -7,6 +7,7 @@ use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -18,9 +19,10 @@ use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ModelDescriptor;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
-mutates(ChatController::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+mutates(ChatController::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     Queue::fake();
@@ -241,6 +243,7 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
 });
 
 it('offers no billing link when a metered turn runs out of credits while billing is off', function (Plan $plan): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
     $this->app->bind(Entitlements::class, fn (): Entitlements => new class implements Entitlements
     {
         public function metersCredits(Workspace $workspace): bool

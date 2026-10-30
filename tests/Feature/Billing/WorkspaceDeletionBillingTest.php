@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 use App\Actions\Billing\CancelWorkspaceSubscription;
 use App\Actions\Jetstream\DeleteWorkspace;
+use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
 use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Notification;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Tests\Helpers\StripeRecorder;
 
-mutates(CancelWorkspaceSubscription::class);
+mutates(CancelWorkspaceSubscription::class, StripeBilling::class);
 
 it('does nothing when the workspace has no subscription', function (): void {
     /** @var Workspace $workspace */
@@ -80,4 +83,33 @@ it('cancels managed subscriptions and voids their open invoices when the workspa
     expect($stripe->countFor('DELETE /v1/subscriptions/sub_paid_managed'))->toBe(1)
         ->and($stripe->countFor('DELETE /v1/subscriptions/sub_pending_managed'))->toBe(1)
         ->and($stripe->countFor('POST /v1/invoices/in_open/void'))->toBe(2);
+});
+
+it('cancels the subscription at period end when workspace deletion is scheduled', function (): void {
+    withHostedBilling();
+    config()->set('cashier.secret', 'sk_test_fake');
+    Notification::fake();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['stripe_id' => 'cus_scheduled'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_scheduled',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $stripe = StripeRecorder::install()
+        ->respondTo('/v1/subscriptions/sub_scheduled', ['id' => 'sub_scheduled', 'object' => 'subscription', 'status' => 'active', 'cancel_at_period_end' => true]);
+
+    resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace);
+
+    StripeRecorder::uninstall();
+
+    expect($stripe->countFor('POST /v1/subscriptions/sub_scheduled'))->toBe(1)
+        ->and($stripe->lastParamsFor('POST /v1/subscriptions/sub_scheduled'))->toHaveKey('cancel_at_period_end', true)
+        ->and($stripe->countFor('DELETE /v1/subscriptions'))->toBe(0)
+        ->and($workspace->refresh()->scheduled_deletion_at)->not->toBeNull();
 });

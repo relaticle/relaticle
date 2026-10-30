@@ -12,14 +12,16 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceDeletionCancelledNotification;
 use App\Notifications\WorkspaceDeletionScheduledNotification;
+use App\Services\NoBilling;
 use Filament\Actions\Action;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Subscription;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Tests\Helpers\StripeRecorder;
 
-mutates(ScheduleWorkspaceDeletion::class, CancelWorkspaceDeletion::class, WorkspaceDeletionBanner::class);
+mutates(ScheduleWorkspaceDeletion::class, CancelWorkspaceDeletion::class, WorkspaceDeletionBanner::class, DeleteWorkspace::class, NoBilling::class, StripeBilling::class);
 
 test('workspace owner can schedule workspace deletion', function () {
     Notification::fake();
@@ -181,6 +183,7 @@ test('a workspace on an open managed plan is not scheduled for deletion', functi
 
 test('a workspace on a leftover managed plan is scheduled for deletion without calling Stripe while billing is off', function (string $type): void {
     Notification::fake();
+    config()->set('cashier.secret', 'sk_test_fake');
     $stripe = StripeRecorder::install();
 
     $user = User::factory()->withWorkspace()->create();

@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
+use App\Contracts\Billing;
+use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
-use App\Features\Billing;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
@@ -28,7 +29,6 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Support\PromptText;
@@ -449,7 +449,7 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 
     private function billingInstructions(): string
     {
-        if (! Feature::active(Billing::class)) {
+        if (! $this->metersCreditsWithBillingPage()) {
             return "\n\n## AI credits\nThis installation does not meter AI credits and has no plans or credit purchases: say so when asked about credits, plans, or upgrades.";
         }
 
@@ -460,6 +460,13 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 - How many AI credits are left or used, the allowance, or when credits reset -> call GetCreditBalanceTool and state its figures. Never answer a credit count from the documentation or from memory. You cannot see which messages or members spent credits, so never offer a usage breakdown.
 - Seeing the plan, upgrading, changing the subscription, or buying more AI credits -> call GuideToPageTool with "billing" and give that link. Every member can open that page. Only a member whose capabilities include `billing.manage` can change the plan or buy credits there, so tell anyone else a workspace owner can.
 PROMPT;
+    }
+
+    private function metersCreditsWithBillingPage(): bool
+    {
+        return $this->workspace instanceof Workspace
+            && resolve(Entitlements::class)->metersCredits($this->workspace)
+            && resolve(Billing::class)->url($this->workspace) !== null;
     }
 
     /**

@@ -33,6 +33,8 @@ use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
  */
 trait HasWorkspaceSettingsNavigation
 {
+    private const string BILLING_SLUG = 'billing';
+
     public static function getSubNavigationPosition(): SubNavigationPosition
     {
         return SubNavigationPosition::Top;
@@ -100,7 +102,7 @@ trait HasWorkspaceSettingsNavigation
                 ->label(__('workspaces.tabs.billing'))
                 ->icon(Heroicon::OutlinedCreditCard)
                 ->url(fn (): ?string => $this->billingUrl($tenant))
-                ->isActiveWhen(fn (): bool => $this->billingUrl($tenant) === static::getUrl())
+                ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
                 ->visible(fn (): bool => $this->billingUrl($tenant) !== null),
         ];
     }

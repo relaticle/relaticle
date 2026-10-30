@@ -12,20 +12,23 @@ use App\Filament\Pages\Workspace\Members;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
+use App\Services\NoBilling;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\CustomFields\Livewire\ManageFieldsTable;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
-mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailAccountsPage::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class);
+mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailAccountsPage::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -259,6 +262,7 @@ test('each page highlights its own tab even when no page route is current', func
         EmailAccountsPage::class => __('workspaces.tabs.email'),
         ManageEmailTemplates::class => __('workspaces.tabs.email'),
         EmailPrivacySettingsPage::class => __('workspaces.tabs.email'),
+        EmailAccountSettingsPage::class => __('workspaces.tabs.email'),
         ImportHistory::class => __('workspaces.tabs.import_history'),
         ActivityLog::class => __('workspaces.tabs.activity'),
         Billing::class => __('workspaces.tabs.billing'),

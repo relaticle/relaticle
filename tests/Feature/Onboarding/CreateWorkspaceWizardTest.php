@@ -14,6 +14,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\NoBilling;
 use Filament\Schemas\Components\Wizard;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
@@ -24,8 +25,9 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class);
+mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class, NoBilling::class, StripeBilling::class);
 
 it('renders the create workspace page with wizard for workspaceless users', function (): void {
     $user = User::factory()->create();

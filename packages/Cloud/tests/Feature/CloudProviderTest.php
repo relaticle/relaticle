@@ -12,7 +12,7 @@ use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
-mutates(CloudServiceProvider::class, PlanEntitlements::class, StripeBilling::class);
+mutates(CloudServiceProvider::class, PlanEntitlements::class, StripeBilling::class, NoBilling::class);
 
 it('binds plan entitlements when billing is on', function (): void {
     Feature::define(Billing::class, true);

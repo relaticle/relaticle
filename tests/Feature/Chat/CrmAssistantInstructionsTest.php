@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Billing as BillingContract;
+use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
@@ -15,6 +17,8 @@ use App\Models\Workspace;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterTree;
+use App\Services\NoBilling;
+use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Laravel\Pennant\Feature;
@@ -40,8 +44,9 @@ use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\SearchDocsTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(CrmAssistant::class);
+mutates(CrmAssistant::class, NoBilling::class, StripeBilling::class);
 
 function onboardingWorkspace(OnboardingUseCase $useCase): Workspace
 {
@@ -140,7 +145,8 @@ it('routes export requests to the export destinations', function (): void {
 it('answers credit questions from the balance tool and routes plan changes to billing', function (): void {
     withHostedBilling();
 
-    $instructions = resolve(CrmAssistant::class)->instructions();
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $instructions = resolve(CrmAssistant::class)->withWorkspace($workspace)->instructions();
 
     expect($instructions)
         ->toContain('## AI credits and billing')
@@ -151,13 +157,28 @@ it('answers credit questions from the balance tool and routes plan changes to bi
 it('tells the model a self-hosted install has no credits, plans or credit purchases', function (): void {
     Feature::define(Billing::class, false);
 
-    $instructions = resolve(CrmAssistant::class)->instructions();
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $instructions = resolve(CrmAssistant::class)->withWorkspace($workspace)->instructions();
 
     expect($instructions)
         ->toContain('This installation does not meter AI credits and has no plans or credit purchases')
         ->not->toContain('## AI credits and billing')
         ->not->toContain('call GuideToPageTool with "billing"')
         ->not->toContain('buying more AI credits');
+});
+
+it('tells the model there are no credits or plans when the billing flag is on but the cloud package is absent', function (): void {
+    Feature::define(Billing::class, true);
+    $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
+    $this->app->bind(BillingContract::class, NoBilling::class);
+
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+    $instructions = resolve(CrmAssistant::class)->withWorkspace($workspace)->instructions();
+
+    expect($instructions)
+        ->toContain('This installation does not meter AI credits and has no plans or credit purchases')
+        ->not->toContain('## AI credits and billing')
+        ->not->toContain('call GuideToPageTool with "billing"');
 });
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {

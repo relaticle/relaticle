@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 use App\Livewire\App\Workspaces\DeleteWorkspace;
 use App\Models\User;
+use App\Services\NoBilling;
 use Filament\Actions\Action;
 use Filament\Schemas\Components\Actions;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Cashier\Subscription;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(DeleteWorkspace::class);
+mutates(DeleteWorkspace::class, NoBilling::class, StripeBilling::class);
 
 function deleteWorkspaceModalDescription(Testable $component): string
 {
