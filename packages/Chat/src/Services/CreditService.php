@@ -47,15 +47,8 @@ final readonly class CreditService
         $this->ensureBalance($workspace);
 
         return DB::transaction(function () use ($workspace, $reservationKey, $conversationId, $userId): bool {
-            if ($reservationKey !== null) {
-                $alreadyReserved = AiCreditTransaction::query()
-                    ->where('workspace_id', $workspace->getKey())
-                    ->where('idempotency_key', $reservationKey)
-                    ->exists();
-
-                if ($alreadyReserved) {
-                    return true;
-                }
+            if ($this->isRecorded($workspace, $reservationKey)) {
+                return true;
             }
 
             $balance = AiCreditBalance::query()
