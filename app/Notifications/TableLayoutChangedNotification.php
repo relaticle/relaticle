@@ -7,6 +7,7 @@ namespace App\Notifications;
 use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
 use App\Models\Notification as NotificationRow;
+use App\Models\TableLayout;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
@@ -22,13 +23,29 @@ final class TableLayoutChangedNotification extends InboxNotification
 
     public const string UNSHARED = 'unshared';
 
-    public function __construct(
+    private function __construct(
         private readonly Workspace $workspace,
         private readonly User $actor,
         private readonly string $layoutName,
         private readonly CrmEntity $entity,
         private readonly string $change,
     ) {}
+
+    public static function deleted(TableLayout $layout, User $actor): self
+    {
+        return self::about($layout, $actor, self::DELETED);
+    }
+
+    public static function unshared(TableLayout $layout, User $actor): self
+    {
+        return self::about($layout, $actor, self::UNSHARED);
+    }
+
+    // Copies the layout's values: the queued notice runs after a deleted layout's row is gone.
+    private static function about(TableLayout $layout, User $actor, string $change): self
+    {
+        return new self($layout->workspace, $actor, $layout->name, $layout->entity, $change);
+    }
 
     public function workspace(): Workspace
     {
