@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Support\DestinationResolver;
 
 final readonly class GuideToPageTool implements Tool
@@ -48,9 +47,18 @@ final readonly class GuideToPageTool implements Tool
                     .'"email_accounts" (connect the user\'s own Gmail or Microsoft mailbox to send email); '
                     .'"email_drafts" (the Drafts tab of the Emails page, where a saved email draft is reviewed and sent); '
                     .'"email_outbox" (the Outbox tab of the Emails page, where a queued email can still be undone)'
-                    .(Feature::active(Billing::class) ? '; "billing" (see the plan and AI credit usage, change the plan, or buy more AI credits).' : '.'),
+                    .($this->offersBilling() ? '; "billing" (see the plan and AI credit usage, change the plan, or buy more AI credits).' : '.'),
                 ),
         ];
+    }
+
+    private function offersBilling(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->currentWorkspace instanceof Workspace
+            && $this->destinations->resolve('billing', $user->currentWorkspace) !== null;
     }
 
     public function handle(Request $request): string

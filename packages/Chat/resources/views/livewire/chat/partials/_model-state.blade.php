@@ -12,10 +12,9 @@ currentPlanLabel: @js($modelStateIsMetered ? ($modelStateWorkspace?->plan?->getL
 {{-- Null when billing is off, no tenant is bound, or the viewer cannot reach
      Billing: the locked-model hint then renders without a link. --}}
 upgradeUrl: @js(
-    (\Laravel\Pennant\Feature::active(\App\Features\Billing::class)
-        && auth()->user()?->currentWorkspace !== null
+    (auth()->user()?->currentWorkspace !== null
         && auth()->user()->hasWorkspaceCapability(auth()->user()->currentWorkspace->getKey(), \App\Enums\WorkspaceCapability::BillingManage))
-        ? \App\Filament\Pages\Billing::getUrl(panel: 'app', tenant: auth()->user()->currentWorkspace)
+        ? resolve(\App\Contracts\Billing::class)->url(auth()->user()->currentWorkspace)
         : null
 ),
 allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor($modelStateWorkspace)),

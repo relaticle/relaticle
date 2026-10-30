@@ -4,10 +4,25 @@ declare(strict_types=1);
 
 use App\Livewire\App\Workspaces\DeleteWorkspace;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Schemas\Components\Actions;
 use Illuminate\Support\Facades\Notification;
+use Laravel\Cashier\Subscription;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 
 mutates(DeleteWorkspace::class);
+
+function deleteWorkspaceModalDescription(Testable $component): string
+{
+    $actions = collect($component->instance()->form->getFlatComponents(withActions: true, withHidden: true))
+        ->first(fn (mixed $child): bool => $child instanceof Actions);
+
+    $action = collect($actions->getChildComponents())
+        ->first(fn (mixed $child): bool => $child instanceof Action && $child->getName() === 'scheduleWorkspaceDeletionAction');
+
+    return (string) $action->getModalDescription();
+}
 
 test('workspace owner can schedule workspace deletion', function () {
     Notification::fake();
@@ -42,4 +57,27 @@ test('personal workspaces cant be scheduled for deletion', function () {
     Livewire::test(DeleteWorkspace::class, ['workspace' => $user->personalWorkspace()])
         ->call('deleteWorkspace', $user->personalWorkspace())
         ->assertHasErrors(['workspace']);
+});
+
+test('the delete confirmation adds the billing notice for a subscribed workspace', function () {
+    withHostedBilling();
+
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
+    $workspace = $user->currentWorkspace;
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => 'default']);
+
+    $description = deleteWorkspaceModalDescription(Livewire::test(DeleteWorkspace::class, ['workspace' => $workspace]));
+
+    expect($description)->toContain(__('workspaces.modals.delete_workspace.notice'))
+        ->and($description)->toContain(__('billing.deletion_notice'));
+});
+
+test('the delete confirmation carries no billing notice while billing is off', function () {
+    $this->actingAs($user = User::factory()->withWorkspace()->create());
+    $workspace = $user->currentWorkspace;
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => 'default']);
+
+    $description = deleteWorkspaceModalDescription(Livewire::test(DeleteWorkspace::class, ['workspace' => $workspace]));
+
+    expect($description)->toBe(__('workspaces.modals.delete_workspace.notice'));
 });

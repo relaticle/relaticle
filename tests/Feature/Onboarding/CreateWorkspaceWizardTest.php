@@ -842,6 +842,25 @@ it('starts a fresh trial for each additional hosted workspace', function (): voi
         ->and($workspace->hosted_free_grandfathered_at)->toBeNull();
 });
 
+it('starts no trial when billing is off', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Self Hosted Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Workspace $workspace */
+    $workspace = $user->refresh()->currentWorkspace;
+
+    expect($workspace->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->pro_trial_used_at)->toBeNull();
+});
+
 it('creates a workspace with a custom slug', function (): void {
     $user = User::factory()->create();
 

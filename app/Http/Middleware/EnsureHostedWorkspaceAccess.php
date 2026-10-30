@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Contracts\Billing;
 use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
@@ -33,7 +34,7 @@ final readonly class EnsureHostedWorkspaceAccess
      */
     private const array BROWSER_NAVIGATION_ROUTES = ['chat.record-redirect', 'chat.attachments.import'];
 
-    public function __construct(private Entitlements $entitlements) {}
+    public function __construct(private Entitlements $entitlements, private Billing $billing) {}
 
     /**
      * Handle an incoming request.
@@ -52,7 +53,7 @@ final readonly class EnsureHostedWorkspaceAccess
             return $next($request);
         }
 
-        $billingUrl = route('filament.app.pages.billing', ['tenant' => $workspace->slug]);
+        $billingUrl = $this->billing->url($workspace);
 
         $isXhrChatRoute = $request->routeIs('chat.*') && ! $request->routeIs(...self::BROWSER_NAVIGATION_ROUTES);
 
@@ -63,6 +64,8 @@ final readonly class EnsureHostedWorkspaceAccess
                 'upgrade_url' => $billingUrl,
             ], Response::HTTP_PAYMENT_REQUIRED);
         }
+
+        abort_if($billingUrl === null, Response::HTTP_PAYMENT_REQUIRED);
 
         return redirect()->to($billingUrl);
     }

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
-use App\Actions\Billing\StartProTrial;
+use App\Contracts\Billing;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceSetupStep;
-use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Models\Workspace;
@@ -28,7 +27,7 @@ use Laravel\Pennant\Feature;
 
 final readonly class CreateWorkspace implements CreatesTeams
 {
-    public function __construct(private StartProTrial $startProTrial) {}
+    public function __construct(private Billing $billing) {}
 
     /**
      * @param  array<string, mixed>  $input
@@ -64,9 +63,7 @@ final readonly class CreateWorkspace implements CreatesTeams
             $this->insert($user, $workspace);
             $user->switchWorkspace($workspace);
 
-            if (Feature::active(Billing::class)) {
-                $this->startProTrial->execute($user, $workspace);
-            }
+            $this->billing->startTrial($user, $workspace);
 
             return $workspace;
         });

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use App\Contracts\Billing;
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\AccessTokens;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -63,6 +62,8 @@ final readonly class DestinationResolver
      */
     private const array EXPORT_ACTION = ['action' => 'export'];
 
+    public function __construct(private Billing $billing) {}
+
     public function requiredCapability(string $destination): ?WorkspaceCapability
     {
         return match (true) {
@@ -102,7 +103,7 @@ final readonly class DestinationResolver
                 'email_accounts' => Feature::active(EmailIntegration::class) ? EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace) : null,
                 'email_drafts' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::DRAFTS->value], panel: 'app', tenant: $workspace) : null,
                 'email_outbox' => Feature::active(EmailIntegration::class) ? EmailInboxPage::getUrl(['tab' => EmailPageTab::OUTBOX->value], panel: 'app', tenant: $workspace) : null,
-                'billing' => Feature::active(BillingFeature::class) ? Billing::getUrl(panel: 'app', tenant: $workspace) : null,
+                'billing' => $this->billing->url($workspace),
                 default => null,
             };
         } catch (Throwable) {

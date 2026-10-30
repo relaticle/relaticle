@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Enums;
 
+use App\Contracts\Billing;
 use App\Contracts\Entitlements;
-use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
@@ -32,12 +32,12 @@ enum SendFailureRemedy: string
         return self::Retry;
     }
 
-    public function url(Workspace $workspace): string
+    public function url(Workspace $workspace): ?string
     {
         return match ($this) {
             self::Retry => EmailInboxPage::getUrl(['tab' => EmailPageTab::FAILED->value], panel: 'app', tenant: $workspace),
             self::Reconnect => EmailAccountsPage::getUrl(panel: 'app', tenant: $workspace),
-            self::Subscribe => Billing::getUrl(panel: 'app', tenant: $workspace),
+            self::Subscribe => resolve(Billing::class)->url($workspace),
         };
     }
 }

@@ -235,6 +235,20 @@ test('the tab strip drops billing when the feature is off', function (): void {
         ->not->toContain(__('workspaces.tabs.billing'));
 });
 
+test('the tenant menu drops billing when the feature is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    $items = collect($panel->getTenantMenuItems())
+        ->filter(fn (Action $item): bool => $item->isVisible())
+        ->keys()
+        ->all();
+
+    expect($items)->not->toContain('billing');
+});
+
 test('each page highlights its own tab even when no page route is current', function (): void {
     withHostedBilling();
 

@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
@@ -15,6 +17,7 @@ use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 mutates(ChatController::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
@@ -236,6 +239,71 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
     expect($response->json('top_up_url'))->toBe(url("/app/{$workspace->slug}/billing"));
     expect($response->json('upgrade_available'))->toBeFalse();
 });
+
+it('offers no billing link when a metered turn runs out of credits while billing is off', function (Plan $plan): void {
+    $this->app->bind(Entitlements::class, fn (): Entitlements => new class implements Entitlements
+    {
+        public function metersCredits(Workspace $workspace): bool
+        {
+            return true;
+        }
+
+        public function creditAllowance(Workspace $workspace): int
+        {
+            return 0;
+        }
+
+        public function allowsModel(?Workspace $workspace, ModelDescriptor $model): bool
+        {
+            return true;
+        }
+
+        public function chatRateLimit(Workspace $workspace): int
+        {
+            return 60;
+        }
+
+        public function allowsAccess(Workspace $workspace): bool
+        {
+            return true;
+        }
+    });
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = $plan;
+    $workspace->save();
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 0,
+        'credits_used' => $plan->credits(),
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'hi']]],
+        ]],
+    ]);
+
+    $response->assertStatus(402);
+    expect($response->json('upgrade_url'))->toBeNull()
+        ->and($response->json('top_up_available'))->toBeFalse()
+        ->and($response->json('top_up_url'))->toBeNull();
+})->with([Plan::Free, Plan::Pro]);
 
 it('gives free plans the upgrade shape and no top-up', function (): void {
     withHostedBilling();

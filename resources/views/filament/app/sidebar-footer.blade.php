@@ -74,7 +74,7 @@
                             </span>
                         </button>
                     @else
-                        <a href="{{ \App\Filament\Pages\Billing::getUrl() }}" class="fi-sidebar-item-btn group">
+                        <a href="{{ resolve(\App\Contracts\Billing::class)->url($workspace) }}" class="fi-sidebar-item-btn group">
                             <x-heroicon-o-arrow-up-circle class="fi-icon fi-size-lg fi-sidebar-item-icon" />
 
                             <span class="fi-sidebar-item-label">{{ $billing['label'] }}</span>

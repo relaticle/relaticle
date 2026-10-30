@@ -105,6 +105,7 @@ test('user can cancel scheduled deletion', function () {
 });
 
 test('an account whose personal workspace holds an open managed plan is not scheduled for deletion', function () {
+    withHostedBilling();
     Notification::fake();
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -114,4 +115,15 @@ test('an account whose personal workspace holds an open managed plan is not sche
         ->toThrow(ValidationException::class);
 
     expect($user->refresh()->scheduled_deletion_at)->toBeNull();
+});
+
+test('an account whose personal workspace holds a leftover managed plan is scheduled for deletion while billing is off', function () {
+    Notification::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Subscription::factory()->active()->create(['workspace_id' => $user->personalWorkspace()->getKey(), 'type' => 'managed']);
+
+    resolve(ScheduleUserDeletion::class)->schedule($user);
+
+    expect($user->refresh()->scheduled_deletion_at)->not->toBeNull();
 });

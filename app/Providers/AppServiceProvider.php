@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Contracts\Billing;
 use App\Contracts\Entitlements;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
@@ -33,6 +34,7 @@ use App\Onboarding\ActivationSteps;
 use App\Services\DiscordService;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
+use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\CurrentImport;
@@ -137,7 +139,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->registerNotificationBindings();
-        $this->registerEntitlements();
+        $this->registerSelfHostedDefaults();
 
         // Ink registers its public routes from packageBooted(), which runs after every
         // provider's register(). Read the config key App\Features\Blog resolves from
@@ -219,9 +221,10 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(ExportCompletion::class, CompleteExport::class);
     }
 
-    private function registerEntitlements(): void
+    private function registerSelfHostedDefaults(): void
     {
         $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
+        $this->app->bind(Billing::class, NoBilling::class);
     }
 
     private function registerPassport(): void

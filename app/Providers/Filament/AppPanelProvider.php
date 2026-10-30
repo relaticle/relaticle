@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
+use App\Contracts\Billing;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
@@ -18,7 +19,6 @@ use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditWorkspace;
@@ -389,6 +389,13 @@ final class AppPanelProvider extends PanelProvider
         return Blade::render('@livewire(\App\Livewire\App\Billing\UpgradeModal::class)');
     }
 
+    private function billingUrl(): ?string
+    {
+        $workspace = Filament::getTenant();
+
+        return $workspace instanceof Workspace ? resolve(Billing::class)->url($workspace) : null;
+    }
+
     private function inviteMembersModal(): string
     {
         $workspace = Filament::getTenant();
@@ -690,8 +697,8 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('billing.title'))
                     ->icon(Heroicon::OutlinedCreditCard)
                     ->sort(-1)
-                    ->url(fn (): string => Billing::getUrl())
-                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
+                    ->url(fn (): ?string => $this->billingUrl())
+                    ->visible(fn (): bool => $this->billingUrl() !== null),
             ]);
 
         return $panel;

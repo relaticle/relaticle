@@ -52,6 +52,7 @@ it('logs instead of throwing when stripe is unreachable for a live subscription'
 });
 
 it('cancels managed subscriptions and voids their open invoices when the workspace is deleted', function (): void {
+    withHostedBilling();
     config()->set('cashier.secret', 'sk_test_fake');
 
     /** @var Workspace $workspace */
