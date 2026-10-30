@@ -84,7 +84,7 @@ final readonly class VisibleEmailsQuery
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)
             ->with(['participants', 'shares'])
-            ->orderByRaw('coalesce(emails.sent_at, emails.scheduled_for, emails.created_at) desc')
+            ->latest('sent_at')
             ->orderByDesc('id')
             ->simplePaginate($perPage, ['*'], 'page', $page);
     }
@@ -122,11 +122,7 @@ final readonly class VisibleEmailsQuery
             ->first();
     }
 
-    /**
-     * Delivered mail, plus the viewer's own drafts and outbox. A teammate's unsent mail stays out.
-     *
-     * @return Builder<Email>
-     */
+    /** @return Builder<Email> */
     private function visibleTo(User $viewer): Builder
     {
         return Email::query()->where(fn (Builder $visible): Builder => $visible
