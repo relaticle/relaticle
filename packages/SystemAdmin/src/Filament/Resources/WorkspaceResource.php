@@ -42,11 +42,7 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\NotesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\OpportunitiesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\PeopleRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
-use Relaticle\SystemAdmin\Filament\Support\EndTrial;
-use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
-use Relaticle\SystemAdmin\Filament\Support\ManagedPlan;
 use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
@@ -353,17 +349,12 @@ final class WorkspaceResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
-                ExtendTrial::action(),
-                EndTrial::action(),
-                ManagedPlan::startAction(),
-                ManagedPlan::withdrawAction(),
                 ...resolve(Extensions::class)->workspaceTableActions(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    EndTrial::bulkAction(),
-                    QueuePurge::bulkAction(),
                     ...resolve(Extensions::class)->workspaceBulkActions(),
+                    QueuePurge::bulkAction(),
                 ]),
             ]);
     }
@@ -407,9 +398,8 @@ final class WorkspaceResource extends Resource
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
             MailboxesRelationManager::class,
-            SubscriptionsRelationManager::class,
-            ActivityRelationManager::class,
             ...resolve(Extensions::class)->workspaceRelationManagers(),
+            ActivityRelationManager::class,
         ];
     }
 

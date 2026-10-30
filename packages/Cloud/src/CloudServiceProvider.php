@@ -23,6 +23,8 @@ use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
+use Relaticle\Cloud\Admin\CloudAdminPlugin;
+use Relaticle\Cloud\Admin\Mail\ManagedPlanInvoiceMail;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
@@ -52,6 +54,7 @@ final class CloudServiceProvider extends ServiceProvider
 
         $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
+        $this->extendSystemAdminPanel();
     }
 
     public function boot(): void
@@ -89,6 +92,17 @@ final class CloudServiceProvider extends ServiceProvider
         });
     }
 
+    private function extendSystemAdminPanel(): void
+    {
+        Panel::configureUsing(static function (Panel $panel): void {
+            if ($panel->getId() !== 'sysadmin') {
+                return;
+            }
+
+            $panel->plugin(new CloudAdminPlugin);
+        });
+    }
+
     private function aliasPreMoveClassNames(): void
     {
         // Stored bell rows and queued mail and job payloads name these pre-move classes. Queued notifications
@@ -99,6 +113,7 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Mail\ProEndedMail' => ProEndedMail::class,
             'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
             'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
+            'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
         ] as $preMoveName => $current) {
             if (! class_exists($preMoveName, false)) {
                 class_alias($current, $preMoveName);

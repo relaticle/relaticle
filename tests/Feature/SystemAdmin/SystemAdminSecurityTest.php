@@ -175,8 +175,6 @@ describe('Administrator role', function () {
         'companies' => '/sysadmin/companies',
         'users' => '/sysadmin/users',
         'workspaces' => '/sysadmin/workspaces',
-        'subscriptions' => '/sysadmin/billing/subscriptions',
-        'ai credit balances' => '/sysadmin/ai/credit-balances',
         'activities' => '/sysadmin/activity',
         'posts' => '/sysadmin/posts',
         'categories' => '/sysadmin/categories',

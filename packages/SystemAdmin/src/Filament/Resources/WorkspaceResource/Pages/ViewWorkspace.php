@@ -8,10 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
-use Relaticle\SystemAdmin\Filament\Support\EndTrial;
-use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
 use Relaticle\SystemAdmin\Filament\Support\Impersonate;
-use Relaticle\SystemAdmin\Filament\Support\ManagedPlan;
 use Relaticle\SystemAdmin\Support\Extensions;
 
 final class ViewWorkspace extends ViewRecord
@@ -23,12 +20,8 @@ final class ViewWorkspace extends ViewRecord
     {
         return [
             Impersonate::workspaceOwner(),
-            ExtendTrial::action(),
-            EndTrial::action(),
-            ManagedPlan::startAction(),
-            ManagedPlan::withdrawAction(),
-            EditAction::make()->action(null),
             ...resolve(Extensions::class)->workspaceHeaderActions(),
+            EditAction::make()->action(null),
         ];
     }
 }

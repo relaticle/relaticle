@@ -259,6 +259,7 @@ $packageServiceLayers = [
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
+    'Relaticle\Cloud\Admin\Actions',
     'Relaticle\Cloud\Billing\Actions',
     'Relaticle\Cloud\Billing\CreditPackCatalog',
     'Relaticle\Cloud\Billing\Filament\BillingPanelHooks',

@@ -11,6 +11,7 @@ use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
@@ -56,6 +57,13 @@ it('keeps the chat assistant out of the staff panel', function (): void {
         ->assertDontSee('RECORD_CHIP_ICONS', false)
         ->assertDontSee(__('Ask :name', ['name' => config('chat.assistant_name')]));
 });
+
+it('sends a system administrator from the panel root to the instance dashboard on a self-hosted install', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+
+    $this->get('/sysadmin')->assertRedirect(Dashboard::getUrl());
+})->skip(fn (): bool => ! Route::has('filament.sysadmin.home'), 'The cloud package serves the panel root.');
 
 it('shows the instance dashboard with counts across every workspace', function (): void {
     $first = User::factory()->withWorkspace()->create();

@@ -43,3 +43,7 @@ it('resolves the pre-move billing page component name to the cloud page', functi
     expect(app('livewire.factory')->resolveComponentClass('App\\Filament\\Pages\\Billing'))->toBe(BillingPage::class)
         ->and(app('livewire.factory')->resolveComponentName(BillingPage::class))->toBe(BillingPage::class);
 });
+
+it('keeps the pre-move managed plan invoice mail name loadable for queued jobs', function (): void {
+    expect(class_exists('Relaticle\\SystemAdmin\\Mail\\ManagedPlanInvoiceMail'))->toBeTrue();
+});
