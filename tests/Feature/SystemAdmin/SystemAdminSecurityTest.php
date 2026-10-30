@@ -171,7 +171,7 @@ describe('Administrator role', function () {
     it('reads every panel index it is allowed to see', function (string $route) {
         $this->get($route)->assertOk();
     })->with([
-        'dashboard' => '/sysadmin',
+        'dashboard' => '/sysadmin/instance',
         'companies' => '/sysadmin/companies',
         'users' => '/sysadmin/users',
         'workspaces' => '/sysadmin/workspaces',

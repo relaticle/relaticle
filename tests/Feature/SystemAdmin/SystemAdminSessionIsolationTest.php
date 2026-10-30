@@ -597,7 +597,7 @@ it('requires the native staff password and MFA challenge while keeping the custo
             'calls' => [['path' => '', 'method' => 'authenticate', 'params' => []]],
         ]],
     ])->assertOk()->assertJsonPath('components.0.effects.redirect', 'https://staff.example.test');
-    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test')->assertOk()->assertSee('Dashboard');
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk()->assertSee('Dashboard');
     isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
     expect(DB::table('system_administrator_sessions')->where('user_id', $administrator->id)->exists())->toBeTrue();
 });
