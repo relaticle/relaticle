@@ -88,8 +88,8 @@ it('clamps a width to the allowed range', function (string $sent, int $stored): 
     expect(livewire(ListCompanies::class)->instance()->getResizableColumnWidths())
         ->toBe(['created_at' => $stored]);
 })->with([
-    'below the minimum' => ['5', 40],
-    'above the maximum' => ['99999', 1000],
+    'below the minimum' => ['5', ResizableColumns::MIN_WIDTH],
+    'above the maximum' => ['99999', ResizableColumns::MAX_WIDTH],
 ]);
 
 it('ignores a width that is not a positive number', function (string $sent): void {

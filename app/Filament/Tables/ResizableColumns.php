@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
 
 final class ResizableColumns
 {
-    public const int MIN_WIDTH = 40;
+    // Cell padding, the options button reserve, the type icon and the sort chevron take 94px,
+    // so the floor keeps a few characters of the name beside them.
+    public const int MIN_WIDTH = 120;
 
     public const int MAX_WIDTH = 1000;
 

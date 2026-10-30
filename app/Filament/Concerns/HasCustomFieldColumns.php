@@ -50,13 +50,9 @@ trait HasCustomFieldColumns
                 continue;
             }
 
-            if ($column->getName() === $titleColumn) {
-                $column->label(fn (): string => $this->tableColumnLabel($column->getName(), $label));
+            $icon = $column->getName() === $titleColumn ? null : self::nativeColumnIcon($column->getName());
 
-                continue;
-            }
-
-            $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), self::nativeColumnIcon($column->getName())));
+            $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), $icon));
         }
 
         return $table
