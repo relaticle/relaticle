@@ -486,7 +486,7 @@ it('never drags a pinned column or drops another among the pins', function (): v
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at');
     $order = $page->script(headerOrder());
 
-    expect($page->script(dragHeader('created_at', end($order))))->toBe(['ghost' => false, 'shifted' => false, 'dragging' => false]);
+    expect($page->script(dragHeader('created_at', end($order))))->toBe(['ghost' => false, 'copy' => false, 'shifted' => false, 'dragging' => false]);
 
     $page->script(dragHeader(end($order), 'created_at'));
     waitUntil($page, headerOrder().'.indexOf('.json_encode(end($order)).') === 1')
@@ -542,14 +542,14 @@ it('moves the pinned columns after a pinned column that is resized', function ()
             const box = handle.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 60, clientY: y }));
+            handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: x, clientY: y }));
+            document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 60, clientY: y }));
             return true;
         })();
     JS, columnHeader('name')));
 
     $page->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60);
-    $page->script('document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }))');
+    $page->script('document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, isPrimary: true }))');
 
     $page->wait(1)
         ->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60)
