@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Http;
 
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use UnexpectedValueException;
@@ -29,14 +28,11 @@ final readonly class TorExitNodes
 
     public function contains(string $ip): bool
     {
-        $exits = Cache::get(self::CACHE_KEY);
-
-        return is_array($exits) && isset($exits[$ip]);
+        return isset(Cache::get(self::CACHE_KEY, [])[$ip]);
     }
 
     /**
-     * @throws ConnectionException
-     * @throws RequestException
+     * @throws HttpClientException
      * @throws UnexpectedValueException
      */
     public function refresh(): int

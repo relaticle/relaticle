@@ -20,23 +20,15 @@ final readonly class IndisposableMailHost implements ValidationRule
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        $domain = Str::afterLast(is_string($value) ? $value : '', '@');
+        $hosts = resolve(MailExchangers::class)->hostsFor(Str::afterLast(is_string($value) ? $value : '', '@'));
 
-        if ($domain === '') {
-            return;
-        }
-
-        foreach (resolve(MailExchangers::class)->hostsFor($domain) as $host) {
-            if ($this->isDisposable($host)) {
-                $fail(__('validation.indisposable'));
-
-                return;
-            }
+        if (array_any($hosts, $this->isDisposable(...))) {
+            $fail(__('validation.indisposable'));
         }
     }
 
     private function isDisposable(string $host): bool
     {
-        return array_any(self::DISPOSABLE_HOSTS, fn (string $disposableHost): bool => $host === $disposableHost || str_ends_with($host, ".{$disposableHost}"));
+        return array_any(self::DISPOSABLE_HOSTS, fn (string $disposableHost): bool => str_ends_with(".{$host}", ".{$disposableHost}"));
     }
 }

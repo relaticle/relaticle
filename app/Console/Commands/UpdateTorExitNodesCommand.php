@@ -9,8 +9,7 @@ use App\Support\Http\TorExitNodes;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Support\Facades\Log;
 use Laravel\Pennant\Feature;
 use UnexpectedValueException;
@@ -31,7 +30,7 @@ final class UpdateTorExitNodesCommand extends Command
 
         try {
             $count = $exitNodes->refresh();
-        } catch (ConnectionException|RequestException|UnexpectedValueException $exception) {
+        } catch (HttpClientException|UnexpectedValueException $exception) {
             Log::warning('The Tor exit list could not be refreshed; the previous list stays in use.', [
                 'exception' => $exception->getMessage(),
             ]);

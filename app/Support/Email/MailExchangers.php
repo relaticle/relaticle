@@ -30,19 +30,6 @@ final readonly class MailExchangers
      */
     private function query(string $domain): array
     {
-        $records = @dns_get_record($domain, DNS_MX);
-
-        if ($records === false) {
-            return [];
-        }
-
-        $hosts = [];
-        foreach ($records as $record) {
-            if (isset($record['target'])) {
-                $hosts[] = (string) $record['target'];
-            }
-        }
-
-        return $hosts;
+        return array_column(@dns_get_record($domain, DNS_MX) ?: [], 'target');
     }
 }
