@@ -6,6 +6,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
@@ -17,6 +18,8 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
+use App\Models\Workspace;
+use App\Support\CanonicalRecordUrl;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -26,6 +29,7 @@ use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
@@ -115,6 +119,7 @@ final class TaskResource extends Resource
             ]))
             ->recordActions([
                 ActionGroup::make([
+                    self::copyActions(),
                     EditTaskAction::make(),
                     RestoreAction::make(),
                     DeleteAction::make(),
@@ -168,6 +173,27 @@ final class TaskResource extends Resource
                 ->toggleable()
                 ->toggledHiddenByDefault(),
         ];
+    }
+
+    public static function copyActions(): ActionGroup
+    {
+        return ActionGroup::make([
+            CopyToClipboardAction::make('copyTaskUrl')
+                ->label(__('filament/resources/task.actions.copy_url'))
+                ->copies(
+                    fn (Task $record): string => resolve(CanonicalRecordUrl::class)->buildOrFail(CrmEntity::Task, $record->getKey(), self::currentWorkspace()),
+                    __('filament/record-page.notifications.url_copied'),
+                ),
+            CopyToClipboardAction::make('copyTaskId')
+                ->label(__('filament/resources/task.actions.copy_id'))
+                ->copies(fn (Task $record): string => $record->getKey(), __('filament/record-page.notifications.id_copied')),
+        ])->dropdown(false);
+    }
+
+    private static function currentWorkspace(): Workspace
+    {
+        /** @var Workspace */
+        return Filament::getTenant();
     }
 
     public static function getPages(): array

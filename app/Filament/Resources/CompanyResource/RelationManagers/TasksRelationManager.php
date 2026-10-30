@@ -8,6 +8,7 @@ use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\AttachAction;
@@ -44,6 +45,7 @@ final class TasksRelationManager extends RelationManager
             ])
             ->recordActions([
                 ActionGroup::make([
+                    TaskResource::copyActions(),
                     EditTaskAction::make(),
                     DetachAction::make(),
                     DeleteAction::make(),

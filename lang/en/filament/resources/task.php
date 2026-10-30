@@ -35,6 +35,11 @@ return [
         ],
     ],
 
+    'actions' => [
+        'copy_url' => 'Copy task URL',
+        'copy_id' => 'Copy task ID',
+    ],
+
     'filters' => [
         'assigned_to_me' => [
             'label' => 'Assigned to me',

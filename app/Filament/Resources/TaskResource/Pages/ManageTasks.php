@@ -7,6 +7,7 @@ namespace App\Filament\Resources\TaskResource\Pages;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Concerns\HasCustomFieldColumns;
 use App\Filament\Concerns\HasViewSwitcher;
+use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
@@ -28,6 +29,7 @@ final class ManageTasks extends ManageRecords
     use HasCustomFieldColumns;
     use HasResizableColumn;
     use HasViewSwitcher;
+    use KeepsOpenTaskInUrl;
 
     protected static string $resource = TaskResource::class;
 
