@@ -555,13 +555,22 @@ it('keeps every pin stuck however much of the table the pins cover', function ()
 });
 
 it('keeps pins stuck on a phone-sized screen', function (): void {
-    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844), 'created_at');
+    $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5), 'name');
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
     $page->wait(0.3)
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
-        ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
+        ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return box.left < window.innerWidth && document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('name')), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the column menu on screen beside a column at the left edge', function (): void {
+    $page = companiesTable($this->user, $this->workspace->slug)->resize(390, 844)->wait(0.5);
+
+    $page->script(openColumnMenu('name'));
+    waitUntil($page, menuItemFocused())
+        ->assertScript('Math.round(document.querySelector(".fi-ta-column-menu").getBoundingClientRect().left)', 8)
         ->assertNoJavaScriptErrors();
 });
 

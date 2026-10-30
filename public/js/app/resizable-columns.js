@@ -636,8 +636,10 @@ function registerColumnMenu() {
             this.close(false)
 
             // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
+            // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
             const rect = detail.trigger.getBoundingClientRect()
-            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, window.innerWidth - rect.right) })
+            const width = parseFloat(getComputedStyle(this.panel).width) || 0
+            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.min(Math.max(8, window.innerWidth - rect.right), window.innerWidth - width - 8) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
             this.$nextTick(() => this.items()[0]?.focus())
