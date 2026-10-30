@@ -201,7 +201,7 @@
             <ol class="space-y-4">
                 @foreach([
                     [__('Get the compose file'), __('Download the published compose.yml, set the two secrets it requires (:appKey and :dbPassword), and point :appUrl at the address you will serve from. Invitation and password-reset links are signed against that host, so they break if it is wrong.', ['appKey' => 'APP_KEY', 'dbPassword' => 'DB_PASSWORD', 'appUrl' => 'APP_URL'])],
-                    [__('Start the stack'), __('Run :command and Docker pulls five containers: the app, a queue worker, a scheduler, PostgreSQL, and Redis. Database migrations run automatically on startup.', ['command' => 'docker compose up -d'])],
+                    [__('Start the stack'), __('Run :command and Docker pulls six containers: the app, a queue worker, a scheduler, a websocket server, PostgreSQL, and Redis. Database migrations run automatically on startup.', ['command' => 'docker compose up -d'])],
                     [__('Create your admin account'), __('Run :command, choose the app panel, and sign in with the account you just created.', ['command' => 'docker compose exec app php artisan make:filament-user'])],
                 ] as $index => [$stepTitle, $stepDesc])
                     <li class="flex gap-4 rounded-xl border border-gray-200/80 dark:border-white/[0.06] bg-white dark:bg-white/[0.02] p-6">

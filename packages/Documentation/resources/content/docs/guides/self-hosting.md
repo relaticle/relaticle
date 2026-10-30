@@ -191,7 +191,7 @@ There are two ways to run a self-hosted model, and you can use either or both:
 | `SELF_HOSTED_AI_KEY` | (empty) | API key for that endpoint, if it requires one (blank for most local servers). |
 | `SELF_HOSTED_AI_MODELS` | (empty) | Comma-separated model tags to expose (e.g. `qwen3:14b,llama3.1:70b`). Each becomes a picker entry. |
 
-**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably. `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only; cloud models run through the vendor SDK and are declined).
+**Choosing a model.** The assistant calls CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably. `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only; cloud models run through the vendor SDK and are declined).
 
 **Known limitations with self-hosted models:**
 
@@ -367,7 +367,7 @@ echo "base64:$(openssl rand -base64 32)"
 
 ### 4. Deploy
 
-Click **Deploy**. Dokploy will pull the images and start all 5 containers. Wait for health checks to pass.
+Click **Deploy**. Dokploy will pull the images and start all 6 containers. Wait for health checks to pass.
 
 ### 5. Configure Domain
 
