@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectableAssistant;
+use App\Filament\Pages\Dashboard;
+use App\Models\User;
 use App\Support\MarketingNavigation;
 use App\Support\NavItem;
 use Illuminate\Support\Facades\Blade;
@@ -220,4 +222,24 @@ it('renders the homepage without the product hunt launch badge', function (): vo
     $html = $this->get('/')->assertOk()->getContent();
 
     expect($html)->not->toContain('producthunt.com', 'Product Hunt');
+});
+
+it('swaps the sign in buttons for an open app link to the current workspace once signed in', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+
+    $guestHtml = $this->get('/')->assertOk()->getContent();
+
+    expect($guestHtml)->toContain('Start for free')
+        ->and($guestHtml)->not->toContain(__('Open app'));
+
+    $html = $this->actingAs($user)->get('/')->assertOk()->getContent();
+
+    expect(substr_count($html, 'href="'.e($dashboard).'"'))->toBe(2)
+        ->and(substr_count($html, __('Open app')))->toBe(2)
+        ->and(extractNavRegion($html, __('Mobile menu')))->not->toContain('Sign In', 'Start for free');
+
+    preg_match('/<header[\s\S]*?<\/header>/', $html, $header);
+
+    expect($header[0])->not->toContain('Start for free');
 });
