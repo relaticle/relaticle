@@ -1,9 +1,11 @@
+@use('Filament\Support\Icons\Heroicon')
+
 @php
     $items = [
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'focus' => 'column'],
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'focus' => 'column'],
-        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.edit_label'), 'icon' => 'heroicon-o-tag', 'run' => "\$wire.mountAction('editTableColumnLabel', { column })", 'focus' => 'null'],
-        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => 'heroicon-o-eye-slash', 'run' => '$wire.hideTableColumn(column)', 'visible' => 'hideable', 'focus' => 'neighbour'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => Heroicon::ArrowLeft, 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'focus' => 'column'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => Heroicon::ArrowRight, 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'focus' => 'column'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.edit_label'), 'icon' => Heroicon::OutlinedTag, 'run' => "\$wire.mountAction('editTableColumnLabel', { column })", 'focus' => 'null'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => Heroicon::OutlinedEyeSlash, 'run' => '$wire.hideTableColumn(column)', 'visible' => 'hideable', 'focus' => 'neighbour'],
     ];
 @endphp
 
