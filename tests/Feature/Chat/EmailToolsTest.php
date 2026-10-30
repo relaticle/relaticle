@@ -30,11 +30,17 @@ use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ResolvedActionText;
+use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
+use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
+use Relaticle\Chat\Tools\Email\RetryEmailTool;
+use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
@@ -58,7 +64,7 @@ use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class);
+mutates(SendEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -1745,4 +1751,216 @@ describe('an email card', function (): void {
             ->and($second->fresh()->status)->toBe(PendingActionStatus::Pending)
             ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
     });
+});
+
+describe('a saved draft or a queued email', function (): void {
+    beforeEach(function (): void {
+        $this->draftOf = function (User $user, ConnectedAccount $account, array $overrides = []): Email {
+            resolve(PendingActionService::class)->approve(
+                pendingChatEmail(proposeChatEmails($user, CreateEmailDraftTool::class, [chatDraftRecord($account, $overrides)])),
+                $user,
+            );
+
+            return Email::query()->where('status', EmailStatus::DRAFT)->where('user_id', $user->id)->latest('created_at')->firstOrFail();
+        };
+
+        $this->queued = function (array $overrides = []): Email {
+            resolve(PendingActionService::class)->approve(
+                pendingChatEmail(proposeChatEmails($this->viewer, SendEmailTool::class, [chatSendRecord($this->viewerAccount, $overrides)])),
+                $this->viewer,
+            );
+
+            return Email::query()->whereNot('status', EmailStatus::DRAFT)->latest('created_at')->firstOrFail();
+        };
+    });
+
+    it('proposes sending a draft on a card that names it and sends it, leaving drafts, once approved', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+
+        $result = proposeChatEmails($this->viewer, SendEmailDraftTool::class, [['draft_id' => $draft->getKey()]]);
+        $card = collect($result['display']['fields'])->pluck('value', 'label')->all();
+
+        expect($result['entity_type'])->toBe('email_draft_sends')
+            ->and($card)->toMatchArray(['Subject' => 'Next steps', 'From' => $this->viewerAccount->email_address, 'To' => 'client@acme.test'])
+            ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+
+        resolve(PendingActionService::class)->approve(pendingChatEmail($result), $this->viewer);
+
+        $sent = Email::query()->sole();
+
+        expect($sent->status)->toBe(EmailStatus::QUEUED)
+            ->and($sent->subject)->toBe('Next steps')
+            ->and($sent->creation_source)->toBe(EmailCreationSource::CHAT)
+            ->and($sent->getKey())->not->toBe($draft->getKey());
+    });
+
+    it('reads a send time without an offset in the timezone of the signed-in user', function (): void {
+        $this->travelTo('2026-11-02 08:00:00');
+        $this->viewer->forceFill(['timezone' => 'Asia/Tokyo'])->save();
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+
+        $result = proposeChatEmails($this->viewer, SendEmailDraftTool::class, [['draft_id' => $draft->getKey(), 'scheduled_for' => '2026-11-03T09:00']]);
+        resolve(PendingActionService::class)->approve(pendingChatEmail($result), $this->viewer);
+
+        expect(collect($result['display']['fields'])->pluck('value', 'label')->get('Send at'))->toBe('November 3, 2026 9:00 AM')
+            ->and(Email::query()->sole()->scheduled_for->toIso8601String())->toBe('2026-11-03T00:00:00+00:00');
+    });
+
+    it('schedules a new email sent from chat for the time asked', function (): void {
+        $this->travelTo('2026-11-02 08:00:00');
+
+        $email = ($this->queued)(['scheduled_for' => '2026-11-04T15:30:00+00:00']);
+
+        expect($email->scheduled_for->toIso8601String())->toBe('2026-11-04T15:30:00+00:00');
+    });
+
+    it('refuses a send time that has passed and proposes nothing', function (string $class): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+        $record = $class === SendEmailTool::class ? chatSendRecord($this->viewerAccount) : ['draft_id' => $draft->getKey()];
+
+        $result = proposeChatEmails($this->viewer, $class, [[...$record, 'scheduled_for' => now()->subHour()->toIso8601String()]]);
+
+        expect($result['error'])->toContain('scheduled_for has already passed')
+            ->and(PendingAction::query()->where('status', PendingActionStatus::Pending)->count())->toBe(0);
+    })->with([SendEmailTool::class, SendEmailDraftTool::class]);
+
+    it('refuses to send a draft that cannot go and proposes nothing', function (string $case): void {
+        $draft = match ($case) {
+            'teammate' => ($this->draftOf)($this->coworker, $this->coworkerAccount),
+            'no recipient' => ($this->draftOf)($this->viewer, $this->viewerAccount, ['to' => []]),
+            'mass send' => tap(($this->draftOf)($this->viewer, $this->viewerAccount))->update(['creation_source' => EmailCreationSource::MASS_SEND]),
+        };
+
+        $result = proposeChatEmails($this->viewer, SendEmailDraftTool::class, [['draft_id' => $draft->getKey()]]);
+
+        expect($result['error'])->toContain(match ($case) {
+            'teammate' => 'No draft of yours has that ID',
+            'no recipient' => 'This draft has no recipient',
+            'mass send' => 'This draft is a mass send',
+        })->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+    })->with(['teammate', 'no recipient', 'mass send']);
+
+    it('refuses a viewer who asks to send a draft', function (): void {
+        $viewerRole = chatEmailMember($this->workspace, WorkspaceRole::Viewer);
+        $draft = ($this->draftOf)($viewerRole, chatEmailMailbox($viewerRole, $this->workspace));
+
+        $result = proposeChatEmails($viewerRole, SendEmailDraftTool::class, [['draft_id' => $draft->getKey()]]);
+
+        expect($result)->toHaveKey('error')
+            ->and(PendingAction::query()->where('entity_type', 'email_draft_sends')->count())->toBe(0);
+    });
+
+    it('rewrites a draft in place once the update card is approved', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+
+        $pending = pendingChatEmail(proposeChatEmails($this->viewer, UpdateEmailDraftTool::class, [[
+            ...chatDraftRecord($this->viewerAccount, ['subject' => 'Revised steps', 'body' => 'New plan.']),
+            'draft_id' => $draft->getKey(),
+        ]]));
+
+        resolve(PendingActionService::class)->approve($pending, $this->viewer);
+
+        expect(Email::query()->sole()->getKey())->toBe($draft->getKey())
+            ->and($draft->fresh()->subject)->toBe('Revised steps')
+            ->and(chatDraftBodyHtml($draft->getKey()))->toContain('New plan.');
+    });
+
+    it('refuses to update a teammate draft or a mass send draft', function (string $case): void {
+        $draft = $case === 'teammate'
+            ? ($this->draftOf)($this->coworker, $this->coworkerAccount)
+            : tap(($this->draftOf)($this->viewer, $this->viewerAccount))->update(['creation_source' => EmailCreationSource::MASS_SEND]);
+
+        $result = proposeChatEmails($this->viewer, UpdateEmailDraftTool::class, [[...chatDraftRecord($this->viewerAccount), 'draft_id' => $draft->getKey()]]);
+
+        expect($result['error'])->toContain($case === 'teammate' ? 'No draft of yours has that ID' : 'This draft is a mass send');
+    })->with(['teammate', 'mass send']);
+
+    it('deletes a draft once the card is approved and leaves a teammate draft alone', function (): void {
+        $draft = ($this->draftOf)($this->viewer, $this->viewerAccount);
+        $teammateDraft = ($this->draftOf)($this->coworker, $this->coworkerAccount);
+
+        $refused = proposeChatEmails($this->viewer, DeleteEmailDraftTool::class, [['draft_id' => $teammateDraft->getKey()]]);
+        resolve(PendingActionService::class)->approve(pendingChatEmail(proposeChatEmails($this->viewer, DeleteEmailDraftTool::class, [['draft_id' => $draft->getKey()]])), $this->viewer);
+
+        expect($refused['error'])->toContain('No draft of yours has that ID')
+            ->and(Email::query()->pluck('id')->all())->toBe([$teammateDraft->getKey()]);
+    });
+
+    it('cancels a queued email once the card is approved', function (): void {
+        $email = ($this->queued)();
+
+        resolve(PendingActionService::class)->approve(pendingChatEmail(proposeChatEmails($this->viewer, CancelEmailTool::class, [['email_id' => $email->getKey()]])), $this->viewer);
+
+        expect($email->fresh()->status)->toBe(EmailStatus::CANCELLED);
+    });
+
+    it('moves a queued email to the new time once the card is approved', function (): void {
+        $this->travelTo('2026-11-02 08:00:00');
+        $email = ($this->queued)();
+
+        $result = proposeChatEmails($this->viewer, RescheduleEmailTool::class, [['email_id' => $email->getKey(), 'scheduled_for' => '2026-11-05T10:00:00+00:00']]);
+        resolve(PendingActionService::class)->approve(pendingChatEmail($result), $this->viewer);
+
+        expect(collect($result['display']['fields'])->pluck('label')->all())->toContain('Scheduled for', 'Send at')
+            ->and($email->fresh()->scheduled_for->toIso8601String())->toBe('2026-11-05T10:00:00+00:00');
+    });
+
+    it('queues a failed email again once the card is approved', function (): void {
+        $email = ($this->queued)();
+        $email->update(['status' => EmailStatus::FAILED, 'last_error' => 'Mailbox busy']);
+
+        resolve(PendingActionService::class)->approve(pendingChatEmail(proposeChatEmails($this->viewer, RetryEmailTool::class, [['email_id' => $email->getKey()]])), $this->viewer);
+
+        expect($email->fresh()->status)->toBe(EmailStatus::QUEUED)
+            ->and($email->fresh()->last_error)->toBeNull();
+    });
+
+    it('refuses an outbox change the email is past and proposes nothing', function (string $class, EmailStatus $status, array $extra, string $message): void {
+        $email = ($this->queued)();
+        $email->update(['status' => $status]);
+
+        $result = proposeChatEmails($this->viewer, $class, [['email_id' => $email->getKey(), ...$extra]]);
+
+        expect($result['error'])->toContain($message)
+            ->and($email->fresh()->status)->toBe($status);
+    })->with([
+        'cancel a sent email' => [CancelEmailTool::class, EmailStatus::SENT, [], 'can no longer be cancelled'],
+        'reschedule a cancelled email' => [RescheduleEmailTool::class, EmailStatus::CANCELLED, ['scheduled_for' => '2099-01-01T09:00:00+00:00'], 'can no longer be rescheduled'],
+        'reschedule without a time' => [RescheduleEmailTool::class, EmailStatus::QUEUED, [], 'Pass scheduled_for'],
+        'retry a queued email' => [RetryEmailTool::class, EmailStatus::QUEUED, [], 'Only a failed email can be sent again'],
+    ]);
+
+    it('keeps a teammate queued email out of reach', function (string $class): void {
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->coworker->id,
+            'connected_account_id' => $this->coworkerAccount->getKey(),
+            'status' => $class === RetryEmailTool::class ? EmailStatus::FAILED : EmailStatus::QUEUED,
+            'scheduled_for' => now()->addHour(),
+        ]);
+
+        $result = proposeChatEmails($this->viewer, $class, [['email_id' => $email->getKey(), 'scheduled_for' => now()->addDay()->toIso8601String()]]);
+
+        expect($result['error'])->toContain('No email of yours in the outbox has that ID');
+    })->with([CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class]);
+
+    it('is left pending by approve all when it sends a draft or changes the outbox', function (string $class): void {
+        $this->actingAs($this->viewer);
+        Filament::setTenant($this->workspace);
+        Queue::fake();
+
+        $record = $class === SendEmailDraftTool::class
+            ? ['draft_id' => ($this->draftOf)($this->viewer, $this->viewerAccount)->getKey()]
+            : ['email_id' => ($this->queued)()->getKey()];
+
+        $conversationId = chatEmailConversation($this->viewer);
+        $turnId = (string) Str::ulid();
+        $task = proposeChatPlanTask($this->viewer, $conversationId, $turnId, 'Call Lena');
+        $step = pendingChatEmail(proposeChatEmails($this->viewer, $class, [$record], $conversationId, $turnId));
+
+        openChatEmailDock($task)->call('approveAll')->assertHasNoErrors();
+
+        expect($task->fresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($step->fresh()->status)->toBe(PendingActionStatus::Pending);
+    })->with([SendEmailDraftTool::class, CancelEmailTool::class]);
 });

@@ -29,7 +29,7 @@ final readonly class GetEmailTool implements Tool
 
     public function description(): string
     {
-        return 'Read one synced email by id. `body_text` and `attachments` are returned only when `access` is full.'
+        return 'Read one email by id: synced or sent mail, or one of the user\'s own drafts and outbox emails, with its `status` and `scheduled_for`. `body_text` and `attachments` are returned only when `access` is full.'
             .' A long body is cut and flagged in `body_truncated`.';
     }
 

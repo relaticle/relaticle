@@ -827,8 +827,9 @@ it('keeps the per-turn model and email lines out of the cached prompt', function
 it('tells the model with a ready mailbox that it can read, draft and propose a send, and keeps the other lines', function (): void {
     expect(EmailReach::Ready->promptLine())
         ->toContain('you can read the email this user may see')
-        ->toContain('save drafts')
-        ->toContain('propose a send that the user approves')
+        ->toContain('save, update and delete the user\'s drafts')
+        ->toContain('propose a send that the user approves: a new email or a saved draft')
+        ->toContain('cancelling or rescheduling a queued email and sending a failed one again')
         ->toContain('One email per send call')
         ->toContain('each email is approved on its own')
         ->toContain('save a draft instead of proposing a send')
