@@ -3,23 +3,20 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing as BillingFeature;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Models\Company;
 use App\Models\User;
-use App\Services\SelfHostedEntitlements;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Cashier\Subscription;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\StoreChatAttachment;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\ChatDocument;
 
-mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class, Billing::class);
+mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, Billing::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -173,13 +170,6 @@ it('keeps a grandfathered workspace open after its subscription ended', function
 
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save();
     Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
-
-    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
-        ->assertOk();
-});
-
-it('does not require hosted billing on self-hosted installations', function (): void {
-    Feature::define(BillingFeature::class, false);
 
     $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
         ->assertOk();

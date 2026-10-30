@@ -7,6 +7,8 @@ use App\Models\Workspace;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
+mutates(ProTrialEndingSoonMail::class);
+
 it('renders the trial end date in the owner timezone with the paused-access outcome', function (): void {
     $owner = User::factory()->create(['timezone' => 'Asia/Tokyo']);
     $workspace = Workspace::factory()->create([

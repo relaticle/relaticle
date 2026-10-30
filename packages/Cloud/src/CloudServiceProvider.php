@@ -26,6 +26,7 @@ use Livewire\Livewire;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
+use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
@@ -47,7 +48,7 @@ final class CloudServiceProvider extends ServiceProvider
             ? $app->make(StripeBilling::class)
             : $app->make(NoBilling::class));
 
-        $this->aliasStoredNotificationTypes();
+        $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
     }
 
@@ -84,15 +85,18 @@ final class CloudServiceProvider extends ServiceProvider
         });
     }
 
-    private function aliasStoredNotificationTypes(): void
+    private function aliasPreMoveClassNames(): void
     {
-        // A bell row stores its notification class name, and rows written before the move still carry these.
+        // Bell rows, queued payloads and failed_jobs rows store a class name, and the previous release wrote these.
         foreach ([
             'App\Notifications\PaymentFailedNotification' => PaymentFailedNotification::class,
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
-        ] as $storedType => $notification) {
-            if (! class_exists($storedType, false)) {
-                class_alias($notification, $storedType);
+            'App\Mail\ProEndedMail' => ProEndedMail::class,
+            'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
+            'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
+        ] as $preMoveName => $current) {
+            if (! class_exists($preMoveName, false)) {
+                class_alias($current, $preMoveName);
             }
         }
     }
