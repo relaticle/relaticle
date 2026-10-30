@@ -343,7 +343,8 @@ it('lists own layouts and layouts shared with the workspace, never someone else\
         ->assertDontSeeText('Private plan')
         ->assertSeeHtml("applySavedLayout('{$mine->getKey()}')")
         ->call('applySavedLayout', $private->getKey())
-        ->assertNotFound();
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null);
 });
 
 it('keeps layouts apart per table and per workspace', function (): void {
