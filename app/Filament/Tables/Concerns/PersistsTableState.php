@@ -39,6 +39,8 @@ trait PersistsTableState
 
     private bool $seededFromTableLayout = false;
 
+    private bool $savesTableStateOnOpen = false;
+
     public function mountInteractsWithTable(): void
     {
         parent::mountInteractsWithTable();
@@ -82,7 +84,7 @@ trait PersistsTableState
         $state = $this->currentTableState();
         $hash = hash('xxh128', "{$state->hash()}|{$this->activeTableLayoutId}|{$this->appliedTableLayoutHash}");
 
-        if ($this->tableStateHash !== null && $this->tableStateHash !== $hash) {
+        if ($this->savesTableStateOnOpen || ($this->tableStateHash !== null && $this->tableStateHash !== $hash)) {
             /** @var User $user */
             $user = auth()->user();
             /** @var Workspace $workspace */
@@ -99,6 +101,7 @@ trait PersistsTableState
         }
 
         $this->tableStateHash = $hash;
+        $this->savesTableStateOnOpen = false;
     }
 
     /**
@@ -225,9 +228,17 @@ trait PersistsTableState
 
         $this->defaultTableLayoutId = $default?->getKey();
 
-        if ($preference !== null && $preference->state->columns !== []) {
-            $isCleanCopy = $active instanceof TableLayout && $preference->state->withoutWidths()->hash() === $preference->applied_layout_hash;
+        $hasSavedState = $preference !== null && $preference->state->columns !== [];
+        $isCleanCopy = $hasSavedState && $active instanceof TableLayout && $preference->state->withoutWidths()->hash() === $preference->applied_layout_hash;
 
+        // A default starts each session over the last state, which is saved so the rest of the session keeps it.
+        if ($this->opensTableFirstThisSession() && $default instanceof TableLayout) {
+            $this->savesTableStateOnOpen = $hasSavedState && (! $isCleanCopy || ! $active->is($default));
+
+            return $this->initialTableState = $this->seedFromTableLayout($default);
+        }
+
+        if ($hasSavedState) {
             return $this->initialTableState = $isCleanCopy
                 ? $this->seedFromTableLayout($active)
                 : $this->seedFromPreference($preference, $active);
@@ -236,6 +247,16 @@ trait PersistsTableState
         return $this->initialTableState = $default instanceof TableLayout
             ? $this->seedFromTableLayout($default)
             : new TableStateData;
+    }
+
+    private function opensTableFirstThisSession(): bool
+    {
+        $key = 'tables.opened.'.Filament::getTenant()->getKey().'.'.$this->tableEntity()->value;
+        $isFirst = ! session()->has($key);
+
+        session()->put($key, true);
+
+        return $isFirst;
     }
 
     private function seedFromTableLayout(TableLayout $layout): TableStateData
