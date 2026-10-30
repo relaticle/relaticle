@@ -1,0 +1,24 @@
+services:
+  web:
+    port: 8000
+    # APP_URL stays http://localhost:8000 from .env: config/login-link.php only enables the
+    # dev login buttons on a development host, so agents browse the app at that address.
+    command: >-
+      php artisan optimize:clear --no-interaction >/dev/null &&
+      exec php artisan serve --host=0.0.0.0 --port="$PORT" --no-reload
+    env:
+      PHP_CLI_SERVER_WORKERS: "8"
+    health: /up
+    portal:
+      url: /app/login
+      title: Relaticle
+      description: Type owner@relaticle.test, then password "password". The quick-login buttons only work at http://localhost:8000 inside the orb.
+    portals:
+      - url: /sysadmin/login
+        title: System admin
+        description: Sign in as sysadmin@relaticle.com with password "password".
+  horizon:
+    command: exec bash bin/workspace-queue.sh
+  reverb:
+    port: 8080
+    command: exec php artisan reverb:start --host=0.0.0.0 --port="$PORT"

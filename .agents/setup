@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+# Provisions an Amp orb (Debian 12): PHP 8.5, PostgreSQL 17, Redis, dependencies,
+# a seeded dev database, a testing database and a frontend build.
+# Idempotent: Amp reruns it on a stale snapshot, so every step checks first.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+step() {
+    echo "→ $1"
+    STEP_STARTED=$SECONDS
+}
+
+done_step() {
+    echo "  done in $((SECONDS - STEP_STARTED))s"
+}
+
+PHP_VERSION=8.5
+PG_VERSION=17
+PHP_PACKAGES=(
+    "php${PHP_VERSION}-cli" "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-gd"
+    "php${PHP_VERSION}-imagick" "php${PHP_VERSION}-intl" "php${PHP_VERSION}-mbstring" "php${PHP_VERSION}-pgsql"
+    "php${PHP_VERSION}-redis" "php${PHP_VERSION}-sqlite3" "php${PHP_VERSION}-xml" "php${PHP_VERSION}-zip"
+    "php${PHP_VERSION}-pcov"
+)
+SYSTEM_PACKAGES=("postgresql-${PG_VERSION}" redis-server unzip "${PHP_PACKAGES[@]}")
+
+step "System packages"
+missing=()
+for package in "${SYSTEM_PACKAGES[@]}"; do
+    dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed' || missing+=("$package")
+done
+if ((${#missing[@]} > 0)); then
+    sudo install -d -m 0755 /etc/apt/keyrings
+    if [[ ! -f /etc/apt/sources.list.d/php.list ]]; then
+        curl -fsSL https://packages.sury.org/php/apt.gpg | sudo tee /etc/apt/keyrings/sury-php.gpg >/dev/null
+        echo "deb [signed-by=/etc/apt/keyrings/sury-php.gpg] https://packages.sury.org/php/ bookworm main" |
+            sudo tee /etc/apt/sources.list.d/php.list >/dev/null
+    fi
+    if [[ ! -f /etc/apt/sources.list.d/pgdg.list ]]; then
+        curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor --yes -o /etc/apt/keyrings/pgdg.gpg
+        echo "deb [signed-by=/etc/apt/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" |
+            sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+    fi
+    sudo apt-get update -qq
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends "${missing[@]}"
+fi
+sudo update-alternatives --set php "/usr/bin/php${PHP_VERSION}" >/dev/null
+done_step
+
+step "Composer"
+if ! command -v composer >/dev/null 2>&1; then
+    curl -fsSL https://getcomposer.org/installer | sudo php -- --install-dir=/usr/local/bin --filename=composer --quiet
+fi
+done_step
+
+step "watchexec (restarts Horizon on PHP edits, see bin/workspace-queue.sh)"
+WATCHEXEC_VERSION=2.8.0
+if ! watchexec --version 2>/dev/null | grep -q "$WATCHEXEC_VERSION"; then
+    curl -fsSL "https://github.com/watchexec/watchexec/releases/download/v${WATCHEXEC_VERSION}/watchexec-${WATCHEXEC_VERSION}-x86_64-unknown-linux-gnu.tar.xz" |
+        sudo tar -xJ -C /usr/local/bin --strip-components=1 "watchexec-${WATCHEXEC_VERSION}-x86_64-unknown-linux-gnu/watchexec"
+fi
+done_step
+
+step "PostgreSQL ${PG_VERSION} (tuned for speed, trust auth on localhost)"
+PG_CONF="/etc/postgresql/${PG_VERSION}/main"
+sudo tee "${PG_CONF}/conf.d/orb.conf" >/dev/null <<'CONF'
+fsync = off
+synchronous_commit = off
+full_page_writes = off
+max_connections = 200
+CONF
+sudo tee "${PG_CONF}/pg_hba.conf" >/dev/null <<'CONF'
+local all all trust
+host all all 127.0.0.1/32 trust
+host all all ::1/128 trust
+CONF
+sudo pg_ctlcluster "${PG_VERSION}" main start 2>/dev/null || sudo pg_ctlcluster "${PG_VERSION}" main reload
+until pg_isready -q -h 127.0.0.1; do sleep 0.2; done
+# .env uses postgres; .env.testing uses root with an empty password.
+psql -h 127.0.0.1 -U postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'root'" | grep -q 1 ||
+    psql -h 127.0.0.1 -U postgres -qc "CREATE ROLE root SUPERUSER LOGIN"
+for db in relaticle relaticle_testing; do
+    psql -h 127.0.0.1 -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '${db}'" | grep -q 1 ||
+        psql -h 127.0.0.1 -U postgres -qc "CREATE DATABASE ${db}"
+done
+done_step
+
+step "Redis"
+redis-cli ping >/dev/null 2>&1 || sudo redis-server --daemonize yes --save '' --appendonly no
+done_step
+
+step "Environment"
+if [[ ! -f .env ]]; then
+    cp -- .env.example .env
+    # Orb defaults: production-shaped queue (Redis + Horizon), Reverb on loopback.
+    sed -i \
+        -e 's|^APP_URL=.*|APP_URL=http://localhost:8000|' \
+        -e 's|^QUEUE_CONNECTION=.*|QUEUE_CONNECTION=redis|' \
+        -e 's|^BROADCAST_REVERB_HOST=.*|BROADCAST_REVERB_HOST=127.0.0.1|' \
+        -e 's|^BROADCAST_REVERB_PORT=.*|BROADCAST_REVERB_PORT=8080|' \
+        .env
+fi
+done_step
+
+step "PHP dependencies"
+composer install --no-interaction --no-progress --prefer-dist
+grep -q '^APP_KEY=base64:' .env || php artisan key:generate --no-interaction
+[[ -f storage/oauth-private.key ]] || php artisan passport:keys --no-interaction
+[[ -e public/storage ]] || php artisan storage:link --no-interaction
+done_step
+
+step "Database migrations and seed data"
+php artisan migrate --force --no-interaction
+php artisan db:seed --force --no-interaction
+done_step
+
+step "JS dependencies and frontend build"
+CI=true pnpm install --frozen-lockfile --prefer-offline
+pnpm run build
+done_step
+
+step "Playwright Chromium (tests/Browser)"
+pnpm exec playwright install --with-deps chromium >/dev/null
+done_step
+
+step "Orb guidance for agents (~/.config/amp/AGENTS.md)"
+GUIDANCE_MARKER="# Relaticle in this orb"
+mkdir -p "$HOME/.config/amp"
+if ! grep -Fqx "$GUIDANCE_MARKER" "$HOME/.config/amp/AGENTS.md" 2>/dev/null; then
+    cat >> "$HOME/.config/amp/AGENTS.md" <<'GUIDE'
+
+# Relaticle in this orb
+
+- There is no Herd and no `*.test` host here. Run `amp orb services ensure` to start `web`
+  (php artisan serve on port 8000), `horizon` (Redis queue, restarts on PHP edits) and `reverb`
+  (port 8080). PostgreSQL 17 and Redis run on localhost and `.agents/resume` restarts them.
+- Drive the app with agent-browser at http://localhost:8000, the APP_URL. The login page's
+  quick-login buttons and the chat websocket only work there. `/app/login` is the CRM panel,
+  `/sysadmin/login` the system admin panel.
+- Seeded logins (LocalSeeder) all use password `password`: owner@relaticle.test (Acme Sales),
+  empty@, paused@, trial@, enterprise@, pro@, past-due@relaticle.test, and staff
+  sysadmin@relaticle.com. Re-seed any time with `php artisan db:seed`.
+- Share the portal URL `amp orb services ensure` prints with people. There they type the email,
+  then the password, because login links only work on a development host.
+- Tests use the `relaticle_testing` database. Browser tests run on the installed Playwright Chromium.
+- Chat needs `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, from an Amp project secret or `.env`.
+- After editing `.env`, run `amp orb service restart web` (and horizon or reverb if they read it).
+GUIDE
+fi
+done_step
+
+echo "✓ Relaticle orb ready"
