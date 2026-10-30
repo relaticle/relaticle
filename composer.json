@@ -1,5 +1,5 @@
 {
-    "name": "laravel/laravel",
+    "name": "relaticle/relaticle",
     "type": "project",
     "description": "The Next-Generation Open-Source CRM Platform",
     "keywords": [
@@ -11,7 +11,7 @@
         "sales-pipeline",
         "workspace-collaboration"
     ],
-    "license": "AGPL-3.0",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": "^8.5",
         "ext-intl": "*",
