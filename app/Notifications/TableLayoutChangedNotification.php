@@ -81,8 +81,8 @@ final class TableLayoutChangedNotification extends InboxNotification
 
         $entity = CrmEntity::from((string) data_get($row->data, 'entity'));
         $urls = resolve(CanonicalRecordUrl::class);
-        $table = $urls->listLabel($entity);
-        $url = $row->workspace instanceof Workspace ? $urls->listUrl($entity, $row->workspace) : null;
+        $table = $urls->entityPluralLabel($entity);
+        $url = $row->workspace instanceof Workspace ? $urls->listPageUrl($entity, $row->workspace) : null;
         $name = (string) data_get($row->data, 'layout_name');
         $actorName = $row->actor?->name;
 
