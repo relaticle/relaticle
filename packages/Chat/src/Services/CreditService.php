@@ -23,10 +23,6 @@ final readonly class CreditService
 
     public function hasCredits(Workspace $workspace): bool
     {
-        if (! $this->entitlements->metersCredits($workspace)) {
-            return true;
-        }
-
         $balance = $this->ensureBalance($workspace);
 
         return $balance->credits_remaining > 0;
