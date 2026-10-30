@@ -16,6 +16,6 @@ final readonly class DeleteTableLayout
 
         $layout->delete();
 
-        $layout->user->notify(new TableLayoutChangedNotification($layout->workspace, $user, $layout->name, $layout->entity, TableLayoutChangedNotification::DELETED));
+        $layout->user->notify(TableLayoutChangedNotification::deleted($layout, $user));
     }
 }

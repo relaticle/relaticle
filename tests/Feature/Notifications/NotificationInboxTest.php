@@ -12,6 +12,7 @@ use App\Features\OnboardSeed;
 use App\Filament\Pages\NotificationPreferences;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\Notification;
+use App\Models\TableLayout;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -610,7 +611,9 @@ it('shows the owner who deleted their layout and links to the table', function (
     $admin = User::factory()->create(['name' => 'Dana Whitfield']);
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $this->user->notify(new TableLayoutChangedNotification($this->workspaceA, $admin, 'Renewals', CrmEntity::Company, TableLayoutChangedNotification::DELETED));
+    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
+
+    $this->user->notify(TableLayoutChangedNotification::deleted($layout, $admin));
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
         ->assertSeeText('Dana Whitfield deleted your layout')
@@ -624,7 +627,9 @@ it('shows a layout notice whose actor has since been deleted', function (): void
     $admin = User::factory()->create();
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
 
-    $this->user->notify(new TableLayoutChangedNotification($this->workspaceA, $admin, 'Renewals', CrmEntity::Company, TableLayoutChangedNotification::UNSHARED));
+    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals']);
+
+    $this->user->notify(TableLayoutChangedNotification::unshared($layout, $admin));
     $admin->delete();
 
     Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
