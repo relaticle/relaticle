@@ -209,3 +209,34 @@ it('reads the self-hosted limit from config', function (): void {
     expect($statuses->take(3)->every(fn (int $status): bool => $status < 300))->toBeTrue()
         ->and($statuses->last())->toBe(429);
 });
+
+function chatRateLimitFromEnv(string $value): mixed
+{
+    $previous = $_SERVER['CHAT_RATE_LIMIT_PER_MINUTE'] ?? null;
+    $_SERVER['CHAT_RATE_LIMIT_PER_MINUTE'] = $value;
+
+    try {
+        return (require base_path('packages/Chat/config/chat.php'))['rate_limit_per_minute'];
+    } finally {
+        if ($previous === null) {
+            unset($_SERVER['CHAT_RATE_LIMIT_PER_MINUTE']);
+        } else {
+            $_SERVER['CHAT_RATE_LIMIT_PER_MINUTE'] = $previous;
+        }
+    }
+}
+
+it('keeps 60 sends a minute on a self-hosted install when the configured limit is not a number', function (string $value): void {
+    Feature::define(Billing::class, false);
+    config()->set('chat.rate_limit_per_minute', chatRateLimitFromEnv($value));
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    $statuses = sendChatMessages($user, 61);
+
+    expect($statuses->take(60)->unique()->all())->not->toContain(429)
+        ->and($statuses->last())->toBe(429);
+})->with(['empty' => '', 'misspelled' => 'sixty']);
+
+it('reads an explicit zero or a number from the environment as the limit', function (string $value, int $expected): void {
+    expect(chatRateLimitFromEnv($value))->toBe($expected);
+})->with(['zero' => ['0', 0], 'thirty' => ['30', 30]]);
