@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services\Billing;
+namespace Relaticle\Cloud\Billing;
 
 use App\Enums\BillingStatus;
 use App\Features\Billing;
@@ -32,18 +32,18 @@ final readonly class SidebarBillingState
 
         if ($status === BillingStatus::PastDue) {
             return [
-                'label' => __('billing.sidebar.past_due'),
-                'action' => __('billing.sidebar.fix'),
+                'label' => __('cloud::billing.sidebar.past_due'),
+                'action' => __('cloud::billing.sidebar.fix'),
                 'urgent' => true,
             ];
         }
 
         if ($status === BillingStatus::Trialing) {
             return [
-                'label' => trans_choice('billing.sidebar.trial_days_left', $this->daysLeft($workspace), [
+                'label' => trans_choice('cloud::billing.sidebar.trial_days_left', $this->daysLeft($workspace), [
                     'days' => $this->daysLeft($workspace),
                 ]),
-                'action' => __('billing.sidebar.keep_pro'),
+                'action' => __('cloud::billing.sidebar.keep_pro'),
                 'urgent' => false,
             ];
         }
@@ -53,8 +53,8 @@ final readonly class SidebarBillingState
         }
 
         return [
-            'label' => __('billing.sidebar.paused'),
-            'action' => __('billing.sidebar.subscribe'),
+            'label' => __('cloud::billing.sidebar.paused'),
+            'action' => __('cloud::billing.sidebar.subscribe'),
             'urgent' => false,
         ];
     }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
@@ -70,7 +69,7 @@ test('every workspace settings page renders the same tab strip', function (): vo
         __('workspaces.tabs.billing'),
     ];
 
-    foreach ([EditWorkspace::class, Members::class, CustomFields::class, EmailAccountsPage::class, ManageEmailTemplates::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
+    foreach ([EditWorkspace::class, Members::class, CustomFields::class, EmailAccountsPage::class, ManageEmailTemplates::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class] as $page) {
         expect(workspaceTabLabels(resolve($page)))
             ->toBe($expected, "[{$page}] should render the full tab strip");
     }
@@ -87,11 +86,6 @@ test('workspace settings tabs live under the workspace url without duplicate sta
         ->and(Route::has('filament.app.pages.workspace.custom-fields'))->toBeTrue()
         ->and(Route::has('filament.app.email-settings.pages.accounts'))->toBeFalse()
         ->and(Route::has('filament.app.pages.workspace.email'))->toBeTrue();
-});
-
-test('billing keeps its own url so the paywall allowlist keeps matching', function (): void {
-    expect(Billing::getSlug())->toBe('billing')
-        ->and(Route::has('filament.app.pages.billing'))->toBeTrue();
 });
 
 test('a workspace admin can open every tab', function (): void {
@@ -265,7 +259,6 @@ test('each page highlights its own tab even when no page route is current', func
         EmailAccountSettingsPage::class => __('workspaces.tabs.email'),
         ImportHistory::class => __('workspaces.tabs.import_history'),
         ActivityLog::class => __('workspaces.tabs.activity'),
-        Billing::class => __('workspaces.tabs.billing'),
     ];
 
     foreach ($tabs as $page => $label) {

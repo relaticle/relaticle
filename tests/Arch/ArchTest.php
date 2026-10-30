@@ -261,7 +261,9 @@ $packageServiceLayers = [
     'Relaticle\Chat\Support',
     'Relaticle\Cloud\Billing\Actions',
     'Relaticle\Cloud\Billing\CreditPackCatalog',
+    'Relaticle\Cloud\Billing\Filament\BillingPanelHooks',
     'Relaticle\Cloud\Billing\Listeners',
+    'Relaticle\Cloud\Billing\SidebarBillingState',
     'Relaticle\Cloud\Billing\StripeBilling',
     'Relaticle\Cloud\Entitlements',
     'Relaticle\Documentation\Support',
@@ -349,12 +351,7 @@ foreach ([
     arch("{$coreLayer} stays free of the cloud package")
         ->expect($coreLayer)
         ->not
-        ->toUse('Relaticle\Cloud')
-        ->ignoring([
-            // Billing UI in app/ that calls the billing actions, until it moves into the cloud package.
-            'App\Filament\Pages\Billing',
-            'App\Livewire\App\Billing\UpgradeModal',
-        ]);
+        ->toUse('Relaticle\Cloud');
 }
 
 arch('email integration owns its controllers, jobs, policies and timeline entries')

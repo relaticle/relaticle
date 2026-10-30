@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
@@ -180,7 +179,7 @@ it('fails due mail in a paused workspace and sends the sender to billing', funct
 
         return $notification->facts()['remedy'] === SendFailureRemedy::Subscribe->value
             && $presented->getBody() === "\"{$due->subject}\" was not sent because {$workspaceName} is paused. Once the workspace is reopened, retry the email from the Failed tab."
-            && $presented->getActions()[0]->getUrl() === BillingPage::getUrl(panel: 'app', tenant: $this->workspace);
+            && $presented->getActions()[0]->getUrl() === route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]);
     });
 });
 

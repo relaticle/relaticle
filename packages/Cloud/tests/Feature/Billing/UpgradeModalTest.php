@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\Dashboard;
-use App\Livewire\App\Billing\UpgradeModal;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
@@ -14,6 +12,8 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Exceptions;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CreateProCheckout;
+use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Tests\Helpers\StripeRecorder;
 
 mutates(UpgradeModal::class);
@@ -59,13 +59,13 @@ it('reviews the plan, the period and the totals before checkout', function (): v
     withHostedBilling();
 
     livewire(UpgradeModal::class)
-        ->assertSee(__('billing.upgrade.review.billing_period'))
-        ->assertSee(__('billing.upgrade.review.summary'))
-        ->assertSee(__('billing.upgrade.review.line_item', ['workspace' => $this->workspace->name]))
-        ->assertSee(__('billing.upgrade.review.amount_yearly'))
-        ->assertSee(__('billing.upgrade.review.credits', ['credits' => number_format(Plan::Pro->credits())]))
-        ->assertSee(__('billing.upgrade.review.proceed'))
-        ->assertDontSee(__('billing.upgrade.trial_notice', ['date' => '']))
+        ->assertSee(__('cloud::billing.upgrade.review.billing_period'))
+        ->assertSee(__('cloud::billing.upgrade.review.summary'))
+        ->assertSee(__('cloud::billing.upgrade.review.line_item', ['workspace' => $this->workspace->name]))
+        ->assertSee(__('cloud::billing.upgrade.review.amount_yearly'))
+        ->assertSee(__('cloud::billing.upgrade.review.credits', ['credits' => number_format(Plan::Pro->credits())]))
+        ->assertSee(__('cloud::billing.upgrade.review.proceed'))
+        ->assertDontSee(__('cloud::billing.upgrade.trial_notice', ['date' => '']))
         ->assertDontSee('@js(', false);
 });
 
@@ -75,7 +75,7 @@ it('tells a workspace on trial that the card is not charged until the trial ends
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
 
     livewire(UpgradeModal::class)
-        ->assertSee(__('billing.upgrade.trial_notice', ['date' => now()->addDays(9)->toFormattedDateString()]));
+        ->assertSee(__('cloud::billing.upgrade.trial_notice', ['date' => now()->addDays(9)->toFormattedDateString()]));
 });
 
 it('refuses a member who does not own the workspace', function (): void {
@@ -88,7 +88,7 @@ it('refuses a member who does not own the workspace', function (): void {
     $this->actingAs($member);
 
     livewire(UpgradeModal::class)
-        ->assertDontSee(__('billing.upgrade.review.proceed'))
+        ->assertDontSee(__('cloud::billing.upgrade.review.proceed'))
         ->call('checkout', 'yearly')
         ->assertNoRedirect();
 });
@@ -140,7 +140,7 @@ it('notifies instead of throwing when the interval is unknown', function (): voi
     livewire(UpgradeModal::class)
         ->call('checkout', 'weekly')
         ->assertNoRedirect()
-        ->assertNotified(Notification::make()->title(__('billing.errors.checkout_failed'))->danger());
+        ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
     Exceptions::assertNotReported(InvalidArgumentException::class);
 });
@@ -157,7 +157,7 @@ it('reports an unexpected checkout failure instead of swallowing it', function (
     livewire(UpgradeModal::class)
         ->call('checkout', 'yearly')
         ->assertNoRedirect()
-        ->assertNotified(Notification::make()->title(__('billing.errors.checkout_failed'))->danger());
+        ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
     Exceptions::assertReported(RuntimeException::class);
 });
@@ -172,7 +172,7 @@ it('reports a missing price configuration instead of blaming the browser', funct
     livewire(UpgradeModal::class)
         ->call('checkout', 'yearly')
         ->assertNoRedirect()
-        ->assertNotified(Notification::make()->title(__('billing.errors.checkout_failed'))->danger());
+        ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
     Exceptions::assertReported(InvalidArgumentException::class);
 });
@@ -195,9 +195,9 @@ it('mounts the modal on the paused screen so its buttons have something to open'
 
     $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
         ->assertOk()
-        ->assertSee(__('billing.paused.continue'))
+        ->assertSee(__('cloud::billing.paused.continue'))
         ->assertSeeLivewire(UpgradeModal::class)
-        ->assertSee(__('billing.upgrade.review.proceed'));
+        ->assertSee(__('cloud::billing.upgrade.review.proceed'));
 });
 
 it('does not mount the modal for a member who cannot upgrade', function (): void {
@@ -218,4 +218,10 @@ it('does not mount the modal anywhere in the panel when billing is switched off'
     $this->get(Dashboard::getUrl(panel: 'app', tenant: $this->workspace))
         ->assertOk()
         ->assertDontSeeLivewire(UpgradeModal::class);
+});
+
+it('keeps the component name pages and open browsers already know it by', function (): void {
+    expect(app('livewire.factory')->resolveComponentClass('app.billing.upgrade-modal'))->toBe(UpgradeModal::class)
+        ->and(app('livewire.factory')->resolveComponentName(UpgradeModal::class))->toBe('app.billing.upgrade-modal')
+        ->and(UpgradeModal::MODAL_ID)->toBe('upgrade-plan');
 });

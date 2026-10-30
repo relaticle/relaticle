@@ -9,9 +9,12 @@ use App\Contracts\Entitlements;
 use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Support\Mail\MailPreview;
+use Filament\Panel;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Mail\Mailable;
@@ -19,8 +22,12 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Events\WebhookHandled;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
+use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
+use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
+use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
@@ -41,12 +48,16 @@ final class CloudServiceProvider extends ServiceProvider
             : $app->make(NoBilling::class));
 
         $this->aliasStoredNotificationTypes();
+        $this->extendAppPanel();
     }
 
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
+        $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
+
+        Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
 
@@ -57,6 +68,20 @@ final class CloudServiceProvider extends ServiceProvider
         });
 
         $this->registerMailPreviews();
+    }
+
+    private function extendAppPanel(): void
+    {
+        Panel::configureUsing(static function (Panel $panel): void {
+            if ($panel->getId() !== 'app') {
+                return;
+            }
+
+            $panel
+                ->pages([BillingPage::class])
+                ->renderHook(PanelsRenderHook::BODY_END, static fn (): string => resolve(BillingPanelHooks::class)->upgradeModal())
+                ->renderHook(AppPanelProvider::SIDEBAR_FOOTER_ACTIONS, static fn (): string => resolve(BillingPanelHooks::class)->sidebarBilling());
+        });
     }
 
     private function aliasStoredNotificationTypes(): void

@@ -7,7 +7,6 @@ use App\Enums\BillingStatus;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
-use App\Filament\Pages\Billing;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\User;
 use App\Models\Workspace;
@@ -30,6 +29,7 @@ use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\Actions\SyncWorkspacePlanFromSubscription;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Http\StripeWebhookController;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
@@ -610,7 +610,7 @@ it('notifies the workspace owner when a renewal charge fails', function (): void
     $notification = PaymentFailedNotification::present($workspace->owner->notifications()->sole());
 
     expect($notification->getTitle())->toContain($workspace->name)
-        ->and($notification->getBody())->toBe(__('billing.payment_failed.notification_body'))
+        ->and($notification->getBody())->toBe(__('cloud::billing.payment_failed.notification_body'))
         ->and($notification->getActions()[0]->getUrl())->toBe(Billing::getUrl(panel: 'app', tenant: $workspace));
 });
 
@@ -687,7 +687,7 @@ it('shows a payment failure in the bell of every workspace its owner opens', fun
     sendStripeWebhook(invoicePaymentFailedEvent($failing))->assertOk();
 
     Livewire::actingAs($owner)->test(AppDatabaseNotifications::class)
-        ->assertSee(__('billing.payment_failed.notification_title', ['workspace' => 'Failing Workspace']))
+        ->assertSee(__('cloud::billing.payment_failed.notification_title', ['workspace' => 'Failing Workspace']))
         ->assertSee(Billing::getUrl(panel: 'app', tenant: $failing), false)
         ->assertDontSee(Billing::getUrl(panel: 'app', tenant: $current), false);
 });
@@ -1734,8 +1734,8 @@ it('tells the owner once when a managed invoice becomes overdue', function (): v
         ->and($row->reason)->toBe(NotificationReason::System)
         ->and($row->group_key)->toBe("managed-overdue:{$workspace->getKey()}")
         ->and($row->data)->toMatchArray(['workspace_id' => $workspace->getKey(), 'plan' => 'concierge'])
-        ->and($notification->getTitle())->toBe(__('billing.managed.overdue_title', ['plan' => 'Cloud Concierge']))
-        ->and($notification->getBody())->toContain('Pay it from '.__('billing.manage.button').'.')
+        ->and($notification->getTitle())->toBe(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']))
+        ->and($notification->getBody())->toContain('Pay it from '.__('cloud::billing.manage.button').'.')
         ->and($notification->getBody())->toContain($workspace->name)
         ->and($notification->getActions()[0]->getUrl())->toBe(Billing::getUrl(panel: 'app', tenant: $workspace));
 });

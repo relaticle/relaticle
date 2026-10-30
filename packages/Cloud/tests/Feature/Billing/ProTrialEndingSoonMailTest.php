@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 
 it('renders the trial end date in the owner timezone with the paused-access outcome', function (): void {

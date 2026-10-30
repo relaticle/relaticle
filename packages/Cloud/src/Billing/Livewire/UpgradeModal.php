@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Livewire\App\Billing;
+namespace Relaticle\Cloud\Billing\Livewire;
 
 use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
@@ -59,13 +59,13 @@ final class UpgradeModal extends Component
 
     public function render(): View
     {
-        return view('livewire.app.billing.upgrade-modal', ['workspace' => $this->workspace()]);
+        return view('cloud::livewire.upgrade-modal', ['workspace' => $this->workspace()]);
     }
 
     private function notifyCheckoutFailed(): void
     {
         Notification::make()
-            ->title(__('billing.errors.checkout_failed'))
+            ->title(__('cloud::billing.errors.checkout_failed'))
             ->danger()
             ->send();
     }

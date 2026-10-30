@@ -482,8 +482,6 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
         $root.'/bootstrap/providers.php',
         $root.'/bootstrap/cache/',
         $root.'/packages/Cloud/',
-        $root.'/app/Filament/Pages/Billing.php',
-        $root.'/app/Livewire/App/Billing/UpgradeModal.php',
     ];
 
     $extensions = ['php', 'js', 'ts', 'css', 'json', 'md', 'yml', 'yaml', 'xml', 'txt', 'html'];
@@ -511,7 +509,7 @@ it('keeps the cloud package out of core code, config, routes, views and lang', f
     expect($offenders)->toBe(
         [],
         'Core never references Relaticle\Cloud or its cloud:: views and lang namespace (.ai/guidelines/relaticle/architecture.md). '.
-        'Only bootstrap/providers.php may name the provider, and the billing UI still in app/ until it moves. Offending files: '.implode(', ', $offenders),
+        'Only bootstrap/providers.php may name the provider. Offending files: '.implode(', ', $offenders),
     );
 });
 
@@ -826,7 +824,7 @@ it('keeps the retired contact and deal words out of record copy', function (): v
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
             $checksLabels = ! array_any($labelPathsNamingSomethingElse, fn (string $path): bool => str_starts_with($relativePath, $path));
-            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/resources)/#', $relativePath) === 1
+            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
                 && ! in_array($relativePath, $emailParticipantPaths, true);
 
             foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {

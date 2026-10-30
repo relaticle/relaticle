@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Mail;
 
-use App\Filament\Pages\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Bus\Queueable;
@@ -13,6 +12,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Relaticle\Cloud\Billing\Filament\Billing;
 
 final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 {

@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing\Actions;
 
 use App\Contracts\Entitlements;
-use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use Carbon\CarbonInterface;
 use InvalidArgumentException;
+use Relaticle\Cloud\Billing\Filament\Billing;
 
 final readonly class CreateProCheckout
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Pages;
+namespace Relaticle\Cloud\Billing\Filament;
 
 use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
@@ -40,7 +40,7 @@ final class Billing extends Page
 
     protected static ?string $slug = 'billing';
 
-    protected string $view = 'filament.pages.billing';
+    protected string $view = 'cloud::filament.pages.billing';
 
     public const string CHECKOUT_SUCCESS = 'success';
 
@@ -81,7 +81,7 @@ final class Billing extends Page
     #[Override]
     public function getView(): string
     {
-        return $this->isPaused() ? 'filament.pages.billing-paused' : parent::getView();
+        return $this->isPaused() ? 'cloud::filament.pages.billing-paused' : parent::getView();
     }
 
     public function reopenWhenActive(): void
@@ -99,7 +99,7 @@ final class Billing extends Page
         // The button is only rendered for an eligible workspace, but the
         // Livewire method is reachable regardless, so enforce it server-side.
         if (! $this->trialAvailable()) {
-            Notification::make()->title(__('billing.trial.not_available'))->danger()->send();
+            Notification::make()->title(__('cloud::billing.trial.not_available'))->danger()->send();
 
             return;
         }
@@ -113,12 +113,12 @@ final class Billing extends Page
         }
 
         if (! $started) {
-            Notification::make()->title(__('billing.trial.not_available'))->danger()->send();
+            Notification::make()->title(__('cloud::billing.trial.not_available'))->danger()->send();
 
             return;
         }
 
-        Notification::make()->title(__('billing.trial.started'))->success()->send();
+        Notification::make()->title(__('cloud::billing.trial.started'))->success()->send();
     }
 
     public function managePortal(): void
@@ -161,7 +161,7 @@ final class Billing extends Page
     private function notifyCheckoutFailed(): void
     {
         Notification::make()
-            ->title(__('billing.errors.checkout_failed'))
+            ->title(__('cloud::billing.errors.checkout_failed'))
             ->danger()
             ->send();
     }
@@ -212,7 +212,7 @@ final class Billing extends Page
             return null;
         }
 
-        return __('billing.managed.renews', [
+        return __('cloud::billing.managed.renews', [
             'date' => Date::createFromTimestamp($renewal['renews_at'])->toFormattedDateString(),
             'amount' => Number::currency($renewal['amount'] / 100, strtoupper($renewal['currency']), precision: $renewal['amount'] % 100 === 0 ? 0 : 2),
         ]);

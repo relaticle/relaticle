@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Filament\Pages\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\Cloud\Billing\Actions\CreateProCheckout;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Tests\Helpers\StripeRecorder;
 
 mutates(Billing::class, CreateProCheckout::class);

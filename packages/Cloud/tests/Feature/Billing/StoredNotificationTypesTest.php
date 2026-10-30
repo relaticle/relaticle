@@ -26,11 +26,11 @@ it('still shows a bell row stored under the class name it had before the move', 
     'payment failed' => [
         fn (Workspace $workspace): PaymentFailedNotification => new PaymentFailedNotification($workspace),
         'App\Notifications\PaymentFailedNotification',
-        fn (): string => __('billing.payment_failed.notification_title', ['workspace' => 'Aging Workspace']),
+        fn (): string => __('cloud::billing.payment_failed.notification_title', ['workspace' => 'Aging Workspace']),
     ],
     'managed invoice overdue' => [
         fn (Workspace $workspace): ManagedInvoiceOverdueNotification => new ManagedInvoiceOverdueNotification($workspace, Plan::Concierge),
         'App\Notifications\ManagedInvoiceOverdueNotification',
-        fn (): string => __('billing.managed.overdue_title', ['plan' => Plan::Concierge->marketingLabel()]),
+        fn (): string => __('cloud::billing.managed.overdue_title', ['plan' => Plan::Concierge->marketingLabel()]),
     ],
 ]);

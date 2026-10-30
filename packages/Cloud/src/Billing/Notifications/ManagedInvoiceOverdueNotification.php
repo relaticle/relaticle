@@ -6,13 +6,13 @@ namespace Relaticle\Cloud\Billing\Notifications;
 
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\Plan;
-use App\Filament\Pages\Billing;
 use App\Models\Notification as NotificationRow;
 use App\Models\Workspace;
 use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
 use Filament\Support\Icons\Heroicon;
+use Relaticle\Cloud\Billing\Filament\Billing;
 
 final class ManagedInvoiceOverdueNotification extends InboxNotification
 {
@@ -61,18 +61,18 @@ final class ManagedInvoiceOverdueNotification extends InboxNotification
         $plan = Plan::tryFrom((string) data_get($row->data, 'plan'))?->marketingLabel() ?? '';
 
         return FilamentNotification::make((string) $row->getKey())
-            ->title(__('billing.managed.overdue_title', ['plan' => $plan]))
-            ->body(__('billing.managed.overdue_notification_body', [
+            ->title(__('cloud::billing.managed.overdue_title', ['plan' => $plan]))
+            ->body(__('cloud::billing.managed.overdue_notification_body', [
                 'workspace' => $workspace->name ?? '',
                 'plan' => $plan,
-                'button' => __('billing.manage.button'),
+                'button' => __('cloud::billing.manage.button'),
             ]))
             ->icon(Heroicon::OutlinedExclamationTriangle)
             ->iconColor('danger')
             ->actions($workspace instanceof Workspace ? [
                 Action::make('billing')
                     ->button()
-                    ->label(__('billing.managed.overdue_notification_action'))
+                    ->label(__('cloud::billing.managed.overdue_notification_action'))
                     ->url(Billing::getUrl(panel: 'app', tenant: $workspace))
                     ->markAsRead(),
             ] : []);

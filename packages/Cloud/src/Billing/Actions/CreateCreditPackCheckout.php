@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Actions;
 
-use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use InvalidArgumentException;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
+use Relaticle\Cloud\Billing\Filament\Billing;
 
 final readonly class CreateCreditPackCheckout
 {

@@ -29,14 +29,14 @@
         };
 
         [$statusLabel, $statusClasses] = match (true) {
-            $managedPastDue => [__('billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
-            $isManaged => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
-            $pastDue => [__('billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
-            $onGrace => [__('billing.status.canceling'), 'bg-warning-50 text-warning-700 dark:bg-warning-400/10 dark:text-warning-400'],
-            $onTrial, $onStripeTrial => [__('billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
-            $isSubscribed => [__('billing.status.active'), 'bg-success-50 text-success-700 dark:bg-success-400/10 dark:text-success-400'],
-            $onLegacyFree => [__('billing.status.grandfathered'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
-            default => [__('billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
+            $managedPastDue => [__('cloud::billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
+            $isManaged => [__('cloud::billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
+            $pastDue => [__('cloud::billing.status.past_due'), 'bg-danger-50 text-danger-700 dark:bg-danger-400/10 dark:text-danger-400'],
+            $onGrace => [__('cloud::billing.status.canceling'), 'bg-warning-50 text-warning-700 dark:bg-warning-400/10 dark:text-warning-400'],
+            $onTrial, $onStripeTrial => [__('cloud::billing.status.trialing'), 'bg-primary-50 text-primary-700 dark:bg-primary-400/10 dark:text-primary-400'],
+            $isSubscribed => [__('cloud::billing.status.active'), 'bg-success-50 text-success-700 dark:bg-success-400/10 dark:text-success-400'],
+            $onLegacyFree => [__('cloud::billing.status.grandfathered'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
+            default => [__('cloud::billing.status.managed'), 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300'],
         };
 
         $meterColor = match (true) {
@@ -50,15 +50,15 @@
 
     <div class="w-full max-w-2xl space-y-5">
         @if($activating)
-            <x-billing.activating :card="$card" />
+            <x-cloud::billing.activating :card="$card" />
         @endif
 
         @if($creditsFulfilling)
             <div class="{{ $card }} flex items-center gap-3 p-5">
                 <x-filament::loading-indicator class="h-5 w-5 text-primary" />
                 <div>
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('billing.packs.fulfilling_title') }}</h3>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.packs.fulfilling_body') }}</p>
+                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('cloud::billing.packs.fulfilling_title') }}</h3>
+                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.fulfilling_body') }}</p>
                 </div>
             </div>
         @endif
@@ -82,21 +82,21 @@
 
                             <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
                                 @if($showsManagedCard)
-                                    {{ $managedSubscription && $canManageBilling ? __('billing.managed.tagline_portal') : __('billing.managed.tagline') }}
+                                    {{ $managedSubscription && $canManageBilling ? __('cloud::billing.managed.tagline_portal') : __('cloud::billing.managed.tagline') }}
                                 @elseif($onTrial)
-                                    {{ __('billing.trial.active_title') }} ({{ trans_choice('billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
+                                    {{ __('cloud::billing.trial.active_title') }} ({{ trans_choice('cloud::billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
-                                        ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
-                                        : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                        ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                        : __('cloud::billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
                                 @elseif($pastDue)
-                                    {{ __('billing.manage.past_due_tagline') }}
+                                    {{ __('cloud::billing.manage.past_due_tagline') }}
                                 @elseif($onStripeTrial)
-                                    {{ __('billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
+                                    {{ __('cloud::billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
                                 @elseif($isSubscribed)
-                                    {{ __('billing.manage.auto_renews') }}
+                                    {{ __('cloud::billing.manage.auto_renews') }}
                                 @elseif($onLegacyFree)
-                                    {{ __('billing.legacy_free.tagline') }}
+                                    {{ __('cloud::billing.legacy_free.tagline') }}
                                 @else
                                     {{ __('billing.pro_plan.tagline') }}
                                 @endif
@@ -107,7 +107,7 @@
 
                 <div class="bg-white p-6 sm:col-span-2 dark:bg-transparent">
                     <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('billing.usage.title') }}</span>
+                        <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.title') }}</span>
                         <span class="text-xs text-gray-500 dark:text-gray-400">{{ $usedPercent }}%</span>
                     </div>
 
@@ -116,32 +116,32 @@
                         <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ number_format($allowance) }}</span>
                     </div>
 
-                    <div role="progressbar" aria-label="{{ __('billing.usage.title') }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
+                    <div role="progressbar" aria-label="{{ __('cloud::billing.usage.title') }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
                         <div class="h-full rounded-full {{ $meterColor }} transition-all duration-500" style="width: {{ $usedPercent }}%"></div>
                     </div>
 
                     @if($balance)
-                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('billing.usage.available', ['credits' => number_format($remaining)]) }}</p>
+                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('cloud::billing.usage.available', ['credits' => number_format($remaining)]) }}</p>
                         @if($used > $allowance)
-                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('billing.usage.total_used', ['credits' => number_format($used)]) }}</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.total_used', ['credits' => number_format($used)]) }}</p>
                         @endif
                     @else
-                        <p class="mt-3 text-xs text-gray-600 dark:text-gray-400">{{ __('billing.usage.empty') }}</p>
+                        <p class="mt-3 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.empty') }}</p>
                     @endif
 
                     @if($balance?->period_ends_at)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
                     @endif
 
                     @if($purchased > 0)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
                     @endif
 
                     @if($canManageBilling && $availablePacks !== [])
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach($availablePacks as $key => $pack)
                                 <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
-                                    {{ __('billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
+                                    {{ __('cloud::billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
                                 </x-filament::button>
                             @endforeach
                         </div>
@@ -155,11 +155,11 @@
                 <div class="flex gap-3">
                     <x-ri-error-warning-fill class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
                     <div class="flex-1">
-                        <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('billing.manage.past_due_title') }}</h3>
-                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ $isManaged ? __('billing.managed.previous_subscription_past_due') : __('billing.manage.past_due_body') }}</p>
+                        <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('cloud::billing.manage.past_due_title') }}</h3>
+                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ $isManaged ? __('cloud::billing.managed.previous_subscription_past_due') : __('cloud::billing.manage.past_due_body') }}</p>
                         @if($canManageBilling)
                             <div class="mt-3">
-                                <x-filament::button color="danger" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
+                                <x-filament::button color="danger" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                             </div>
                         @endif
                     </div>
@@ -172,10 +172,10 @@
                 <div class="flex gap-3">
                     <x-ri-error-warning-fill class="mt-0.5 h-5 w-5 shrink-0 text-danger-500 dark:text-danger-400" />
                     <div class="flex-1">
-                        <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('billing.managed.overdue_title', ['plan' => $workspace->plan->marketingLabel()]) }}</h3>
-                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ __('billing.managed.overdue_body', ['button' => __('billing.manage.button')]) }}</p>
+                        <h3 class="text-sm font-semibold text-danger-800 dark:text-danger-300">{{ __('cloud::billing.managed.overdue_title', ['plan' => $workspace->plan->marketingLabel()]) }}</h3>
+                        <p class="mt-0.5 text-sm text-danger-700/80 dark:text-danger-400/70">{{ __('cloud::billing.managed.overdue_body', ['button' => __('cloud::billing.manage.button')]) }}</p>
                         <div class="mt-3">
-                            <x-filament::button color="danger" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
+                            <x-filament::button color="danger" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                         </div>
                     </div>
                 </div>
@@ -187,13 +187,13 @@
                 <div class="flex gap-3">
                     <x-ri-time-line class="mt-0.5 h-5 w-5 shrink-0 text-warning-500 dark:text-warning-400" />
                     <div class="flex-1">
-                        <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('billing.manage.cancel_scheduled_title') }}</h3>
+                        <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('cloud::billing.manage.cancel_scheduled_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">
                             {{ $isManaged
-                                ? __('billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                ? __('cloud::billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
                                 : ($isGrandfathered
-                                ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
-                                : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])) }}
+                                ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                : __('cloud::billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])) }}
                         </p>
                     </div>
                 </div>
@@ -203,11 +203,11 @@
         @if(! $canManageBilling)
             <div class="{{ $card }} flex items-start gap-3 p-6">
                 <x-ri-information-line class="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
-                <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('billing.member.ask_owner', ['owner' => $workspace->owner->name]) }}</p>
+                <p class="text-sm text-gray-600 dark:text-gray-300">{{ __('cloud::billing.member.ask_owner', ['owner' => $workspace->owner->name]) }}</p>
             </div>
         @elseif($showsManagedCard)
             <div class="{{ $card }} p-6">
-                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ $isEnterprise ? __('billing.enterprise.title') : __('billing.managed.title') }}</h3>
+                <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ $isEnterprise ? __('billing.enterprise.title') : __('cloud::billing.managed.title') }}</h3>
                 @if($isEnterprise)
                     <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('billing.enterprise.body') }}</p>
                 @endif
@@ -217,7 +217,7 @@
                 <div class="mt-5 flex flex-wrap gap-3">
                     <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', absolute: false))">{{ __('billing.enterprise.manage') }}</x-filament::button>
                     @if($managedSubscription || ($canManageSubscription && ! $pastDue))
-                        <x-filament::button color="gray" wire:click="managePortal">{{ __('billing.manage.button') }}</x-filament::button>
+                        <x-filament::button color="gray" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                     @endif
                 </div>
             </div>
@@ -230,12 +230,12 @@
                             <x-ri-checkbox-circle-fill class="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.manage.title') }}</h3>
-                            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.manage.body') }}</p>
+                            <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('cloud::billing.manage.title') }}</h3>
+                            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.manage.body') }}</p>
                         </div>
                     </div>
                     <x-filament::button size="lg" icon="heroicon-m-arrow-top-right-on-square" wire:click="managePortal" class="shrink-0 whitespace-nowrap">
-                        {{ __('billing.manage.button') }}
+                        {{ __('cloud::billing.manage.button') }}
                     </x-filament::button>
                 </div>
             </div>
@@ -244,8 +244,8 @@
                 <div class="{{ $card }} flex items-start gap-3 p-5">
                     <x-ri-shield-check-fill class="mt-0.5 h-5 w-5 shrink-0 text-primary dark:text-primary-400" />
                     <div>
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('billing.legacy_free.title') }}</h3>
-                        <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.legacy_free.body') }}</p>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('cloud::billing.legacy_free.title') }}</h3>
+                        <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.legacy_free.body') }}</p>
                     </div>
                 </div>
             @endif
@@ -284,17 +284,17 @@
                     <div class="mt-7">
                         @if($trialAvailable)
                             <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
-                                {{ __('billing.trial.start_button') }}
+                                {{ __('cloud::billing.trial.start_button') }}
                             </x-filament::button>
                             <button type="button"
-                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })"
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })"
                                 class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
-                                {{ __('billing.upgrade.now') }}
+                                {{ __('cloud::billing.upgrade.now') }}
                             </button>
                         @else
                             <x-filament::button type="button" size="lg" class="w-full justify-center"
-                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
-                                {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button') }}
+                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\Relaticle\Cloud\Billing\Livewire\UpgradeModal::MODAL_ID) }} })">
+                                {{ $onTrial ? __('cloud::billing.subscribe.button') : __('cloud::billing.upgrade.button') }}
                             </x-filament::button>
                         @endif
                         <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"

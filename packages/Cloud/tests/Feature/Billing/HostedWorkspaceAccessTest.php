@@ -15,10 +15,11 @@ use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\StoreChatAttachment;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Tests\Helpers\ChatDocument;
 
-mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class);
+mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class, Billing::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -41,6 +42,14 @@ it('keeps billing and workspace deletion controls available while paused', funct
 
     $this->get(route('filament.app.tenant.profile', ['tenant' => $this->workspace->slug]))
         ->assertOk();
+});
+
+it('lets a paused workspace reach the billing page', function (): void {
+    withHostedBilling();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
+        ->assertOk()
+        ->assertSee(__('cloud::billing.paused.continue'));
 });
 
 it('keeps personal account controls available while paused', function (): void {

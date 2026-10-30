@@ -6,12 +6,12 @@ namespace Relaticle\Cloud\Billing;
 
 use App\Contracts\Billing;
 use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing as BillingPage;
 use App\Models\User;
 use App\Models\Workspace;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
+use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 
 final readonly class StripeBilling implements Billing
 {

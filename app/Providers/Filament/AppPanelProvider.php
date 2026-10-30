@@ -10,7 +10,6 @@ use App\Contracts\Billing;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -106,6 +105,8 @@ use Throwable;
 
 final class AppPanelProvider extends PanelProvider
 {
+    public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
+
     /**
      * Datetime format for this panel, and the only place it is decided. Columns and
      * entries call `->dateTime()` with no argument so they resolve to this; a resource
@@ -377,18 +378,6 @@ final class AppPanelProvider extends PanelProvider
             );
     }
 
-    private function upgradeModal(): string
-    {
-        $workspace = Filament::getTenant();
-        $user = $this->signedInUser();
-
-        if (! Feature::active(BillingFeature::class) || ! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
-            return '';
-        }
-
-        return Blade::render('@livewire(\App\Livewire\App\Billing\UpgradeModal::class)');
-    }
-
     private function billingUrl(): ?string
     {
         $workspace = Filament::getTenant();
@@ -651,10 +640,6 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
-            )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                $this->upgradeModal(...),
             );
 
         $this->registerBanners($panel);

@@ -6,7 +6,6 @@ namespace Relaticle\Cloud\Billing\Mail;
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
-use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,6 +13,7 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Relaticle\Cloud\Billing\Filament\Billing;
 
 final class ProEndedMail extends Mailable implements ShouldQueue
 {

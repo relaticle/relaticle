@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Filament\Pages\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
