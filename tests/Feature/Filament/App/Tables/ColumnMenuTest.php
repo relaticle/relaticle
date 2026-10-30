@@ -352,6 +352,25 @@ it('restores the pins a layout was saved with and marks the layout modified when
     expect($component->instance()->isTableLayoutModified())->toBeTrue();
 });
 
+it('marks the pins of a layout in the render that applied it and clears them in the render that left it', function (): void {
+    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(pinned: ['name', 'creator.name']),
+    ]);
+    $component = livewire(ListCompanies::class);
+    $pinned = fn (string $column): string => $component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes()['data-column-pinned'];
+
+    $component->call('applySavedLayout', $layout->getKey());
+
+    expect($pinned('name'))->toBe('1')
+        ->and($pinned('creator.name'))->toBe('1');
+
+    $component->call('useStandardTableLayout');
+
+    expect($pinned('name'))->toBe('0')
+        ->and($pinned('creator.name'))->toBe('0');
+});
+
 it('marks pinned headers and cells in the render that pinned them', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     [$pinned, $unpinned] = shownColumns($component, $entity);

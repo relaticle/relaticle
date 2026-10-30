@@ -116,6 +116,8 @@ trait PersistsTableState
         $this->cachedDefaultTableColumnState = null;
         $this->tablePinnedColumns = $state->pinned;
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
+        // The pins were stamped at boot, and this request renders the new ones.
+        $this->getTable()->resizableColumns();
 
         $this->tableSort = $state->sort;
         $this->updatedTableSort();
