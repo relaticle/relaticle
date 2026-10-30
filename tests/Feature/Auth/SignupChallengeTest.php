@@ -19,14 +19,19 @@ use Psr\Http\Message\RequestInterface;
 
 mutates(Login::class, TurnstileChallenge::class, TurnstileClient::class, SignupChallenge::class, TorExitNodes::class, UpdateTorExitNodesCommand::class);
 
+function enableSignupChallengeWithoutTurnstile(): void
+{
+    config(['relaticle.features.signup_challenge' => true]);
+    Feature::flushCache();
+}
+
 function enableSignupChallenge(): void
 {
     config([
-        'relaticle.features.signup_challenge' => true,
         'services.turnstile.key' => 'test-site-key',
         'services.turnstile.secret' => 'test-secret-key',
     ]);
-    Feature::flushCache();
+    enableSignupChallengeWithoutTurnstile();
 }
 
 function fakeSiteverify(bool $success, array $errorCodes = []): void
@@ -34,15 +39,9 @@ function fakeSiteverify(bool $success, array $errorCodes = []): void
     Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => $success, 'error-codes' => $errorCodes])]);
 }
 
-function enableSignupChallengeWithoutTurnstile(): void
-{
-    config(['relaticle.features.signup_challenge' => true]);
-    Feature::flushCache();
-}
-
 function torExitListBody(string ...$exits): string
 {
-    $relays = collect(range(1, 600))->map(fn (int $relay): string => '10.0.'.intdiv($relay, 256).'.'.($relay % 256));
+    $relays = collect(range(1, 600))->map(fn (int $relay): string => long2ip(ip2long('10.0.0.0') + $relay));
 
     return implode("\n", [...$relays, ...$exits]);
 }
@@ -53,6 +52,13 @@ function startSignup(string $email): Testable
         ->fillForm(['email' => $email])
         ->call('authenticate')
         ->assertSet('authMethod', 'signup');
+}
+
+function completeSignup(string $email): Testable
+{
+    return startSignup($email)
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate');
 }
 
 it('is off by default', function (): void {
@@ -265,10 +271,7 @@ it('refuses a signup from a tor exit relay', function (): void {
 
     $email = 'jane-tor-'.uniqid().'@gmail.com';
 
-    startSignup($email)
-        ->fillForm(['password' => 'Password123!'])
-        ->call('authenticate')
-        ->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')]);
+    completeSignup($email)->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')]);
 
     expect(User::where('email', $email)->exists())->toBeFalse();
 });
@@ -280,10 +283,7 @@ it('creates the account from an address the tor exit list does not carry', funct
 
     $email = 'jane-clearnet-'.uniqid().'@gmail.com';
 
-    startSignup($email)
-        ->fillForm(['password' => 'Password123!'])
-        ->call('authenticate')
-        ->assertHasNoFormErrors();
+    completeSignup($email)->assertHasNoFormErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
@@ -294,10 +294,7 @@ it('creates the account from a tor exit relay when the flag is off', function ()
 
     $email = 'jane-tor-flagoff-'.uniqid().'@gmail.com';
 
-    startSignup($email)
-        ->fillForm(['password' => 'Password123!'])
-        ->call('authenticate')
-        ->assertHasNoFormErrors();
+    completeSignup($email)->assertHasNoFormErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
@@ -307,10 +304,7 @@ it('creates the account before the tor exit list has ever been fetched', functio
 
     $email = 'jane-nolist-'.uniqid().'@gmail.com';
 
-    startSignup($email)
-        ->fillForm(['password' => 'Password123!'])
-        ->call('authenticate')
-        ->assertHasNoFormErrors();
+    completeSignup($email)->assertHasNoFormErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
 });

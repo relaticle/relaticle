@@ -212,7 +212,7 @@ it('rejects a signup from a domain only the local disposable list carries', func
 });
 
 it('rejects a signup whose domain receives mail on a disposable mail host', function (string $mailHost): void {
-    $this->app->instance(MailExchangers::class, new MailExchangers(fn (string $domain): array => [$mailHost]));
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => [$mailHost]));
 
     $email = 'setv'.Str::lower(Str::random(10)).'@gmail.com';
 
@@ -232,7 +232,7 @@ it('rejects a signup whose domain receives mail on a disposable mail host', func
 ]);
 
 it('creates the account when the mail host only resembles a disposable one', function (): void {
-    $this->app->instance(MailExchangers::class, new MailExchangers(fn (string $domain): array => ['mail.notneighbours.sh']));
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => ['mail.notneighbours.sh']));
 
     $email = 'jane-lookalike-'.uniqid().'@gmail.com';
 
