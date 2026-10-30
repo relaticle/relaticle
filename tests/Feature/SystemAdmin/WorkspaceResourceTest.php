@@ -16,6 +16,8 @@ use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Notification;
@@ -31,6 +33,7 @@ use Relaticle\SystemAdmin\Actions\ExtendWorkspaceTrial;
 use Relaticle\SystemAdmin\Actions\UpdateCustomerRecord;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
+use Relaticle\SystemAdmin\Filament\Resources\UserResource\RelationManagers\SocialAccountsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\CreateWorkspace;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\Pages\EditWorkspace;
@@ -44,11 +47,12 @@ use Relaticle\SystemAdmin\Filament\Support\Impersonate;
 use Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery;
 use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
+use Relaticle\SystemAdmin\Support\Extensions;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\BillingStatusFixture;
 use Tests\Helpers\OverviewData;
 
-mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, BillingStatus::class, WorkspaceResource::class, MembersRelationManager::class, CompaniesRelationManager::class, ActivityRelationManager::class, PivotSafeTableQuery::class, Impersonate::class, WorkspaceJourney::class, ExtendWorkspaceTrial::class, ExtendTrial::class);
+mutates(UpdateCustomerRecord::class, EditCustomerRecord::class, BillingStatus::class, WorkspaceResource::class, MembersRelationManager::class, CompaniesRelationManager::class, ActivityRelationManager::class, PivotSafeTableQuery::class, Impersonate::class, WorkspaceJourney::class, ExtendWorkspaceTrial::class, ExtendTrial::class, Extensions::class);
 
 beforeEach(function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
@@ -978,4 +982,37 @@ it('shows the journey of a workspace whose owner no longer exists', function ():
         ->assertSee('Journey')
         ->assertSee('1 active day')
         ->assertSeeInOrder(['Signed up', "\u{2014}", 'Signup method', "\u{2014}", 'First own record']);
+});
+
+it('adds registered workspace actions to the workspace table', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    Extensions::addWorkspaceTableActions(static fn (): array => [Action::make('extensionProbe')]);
+    Extensions::addWorkspaceBulkActions(static fn (): array => [BulkAction::make('extensionBulkProbe')]);
+
+    livewire(ListWorkspaces::class)
+        ->assertActionVisible(TestAction::make('extensionProbe')->table($workspace))
+        ->assertActionExists(TestAction::make('extensionBulkProbe')->table()->bulk());
+});
+
+it('adds registered header actions to the workspace page', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    Extensions::addWorkspaceHeaderActions(static fn (): array => [Action::make('extensionHeaderProbe')]);
+
+    livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
+        ->assertActionVisible('extensionHeaderProbe');
+});
+
+it('adds registered relation managers to the workspace resource', function (): void {
+    Extensions::addWorkspaceRelationManagers([SocialAccountsRelationManager::class]);
+
+    expect(WorkspaceResource::getRelations())->toContain(SocialAccountsRelationManager::class);
+});
+
+it('adds nothing to the workspace pages when no extension is registered', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+
+    livewire(ListWorkspaces::class)
+        ->assertActionDoesNotExist(TestAction::make('extensionProbe')->table($workspace));
+
+    expect(WorkspaceResource::getRelations())->not->toContain(SocialAccountsRelationManager::class);
 });

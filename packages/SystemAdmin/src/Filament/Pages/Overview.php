@@ -17,6 +17,8 @@ use Relaticle\SystemAdmin\Metrics\OverviewCache;
 
 final class Overview extends BaseDashboard
 {
+    protected static string $routePath = '/overview';
+
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-home';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Dashboards';

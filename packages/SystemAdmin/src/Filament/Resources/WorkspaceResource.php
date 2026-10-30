@@ -55,6 +55,7 @@ use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
 use Relaticle\SystemAdmin\Metrics\Scopes\InternalWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
 use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
+use Relaticle\SystemAdmin\Support\Extensions;
 
 final class WorkspaceResource extends Resource
 {
@@ -356,11 +357,13 @@ final class WorkspaceResource extends Resource
                 EndTrial::action(),
                 ManagedPlan::startAction(),
                 ManagedPlan::withdrawAction(),
+                ...resolve(Extensions::class)->workspaceTableActions(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     EndTrial::bulkAction(),
                     QueuePurge::bulkAction(),
+                    ...resolve(Extensions::class)->workspaceBulkActions(),
                 ]),
             ]);
     }
@@ -406,6 +409,7 @@ final class WorkspaceResource extends Resource
             MailboxesRelationManager::class,
             SubscriptionsRelationManager::class,
             ActivityRelationManager::class,
+            ...resolve(Extensions::class)->workspaceRelationManagers(),
         ];
     }
 

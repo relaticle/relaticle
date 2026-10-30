@@ -3,18 +3,24 @@
 declare(strict_types=1);
 
 use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Relaticle\Chat\ChatServiceProvider;
+use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
+use Relaticle\SystemAdmin\Filament\Pages\Overview;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ListCompanies as ListSystemAdminCompanies;
+use Relaticle\SystemAdmin\Filament\Widgets\InstanceStats;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Relaticle\SystemAdmin\SystemAdminPanelProvider;
 
-mutates(SystemAdminPanelProvider::class, ChatServiceProvider::class);
+mutates(SystemAdminPanelProvider::class, ChatServiceProvider::class, Dashboard::class, InstanceStats::class);
 
 it('lets administrators reorder sysadmin table columns', function (): void {
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
@@ -50,6 +56,36 @@ it('keeps the chat assistant out of the staff panel', function (): void {
         ->assertDontSee('chat:toggle-panel', false)
         ->assertDontSee('RECORD_CHIP_ICONS', false)
         ->assertDontSee(__('Ask :name', ['name' => config('chat.assistant_name')]));
+});
+
+it('lands a system administrator on the instance dashboard', function (): void {
+    $first = User::factory()->withWorkspace()->create();
+    $second = User::factory()->withWorkspace()->create();
+    Workspace::factory()->create(['user_id' => $first->getKey()]);
+    Company::withoutEvents(fn () => Company::factory()->count(4)->for($first->currentWorkspace)->create(['account_owner_id' => $first->getKey()]));
+    People::withoutEvents(fn () => People::factory()->count(5)->for($second->currentWorkspace)->create());
+    Opportunity::withoutEvents(fn () => Opportunity::factory()->count(6)->for($second->currentWorkspace)->create());
+    resolve(CurrentWorkspace::class)->forget();
+
+    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+
+    expect(Dashboard::getUrl())->toBe(Filament::getPanel('sysadmin')->getUrl());
+
+    $this->get(Filament::getPanel('sysadmin')->getUrl())
+        ->assertOk()
+        ->assertSeeLivewire(InstanceStats::class)
+        ->assertSeeTextInOrder(['Users', '2', 'Workspaces', '3', 'Companies', '4', 'People', '5', 'Opportunities', '6']);
+});
+
+it('keeps the overview one click from the instance dashboard', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+
+    $this->get(Dashboard::getUrl())->assertOk()->assertSee(Overview::getUrl(), false);
+    $this->get(Overview::getUrl())->assertOk()->assertDontSeeLivewire(InstanceStats::class);
+
+    expect(Overview::getUrl())->not->toBe(Dashboard::getUrl());
 });
 
 it('shows the staff panel the companies of every workspace', function (): void {
