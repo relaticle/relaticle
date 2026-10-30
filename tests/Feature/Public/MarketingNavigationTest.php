@@ -243,3 +243,19 @@ it('swaps the sign in buttons for an open app link to the current workspace once
 
     expect($header[0])->not->toContain('Start for free');
 });
+
+it('suggests the page a missing url most likely meant on the 404 page', function (string $path, ?string $suggestion): void {
+    $html = $this->get($path, ['Accept' => 'text/html'])
+        ->assertNotFound()
+        ->assertSee(__('Page not found'))
+        ->getContent();
+
+    preg_match('/You were probably looking for ([^.<]+)\./', $html, $matches);
+
+    expect($matches[1] ?? null)->toBe($suggestion);
+})->with([
+    'a typo' => ['/pricng', 'Pricing'],
+    'a removed help article' => ['/help/an-old-article', 'Help center'],
+    'a sibling that is not a near spelling' => ['/compare/relaticle-vs-hubspot', null],
+    'nothing alike' => ['/zz-qq-xx', null],
+]);

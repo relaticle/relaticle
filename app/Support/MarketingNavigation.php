@@ -104,6 +104,33 @@ final readonly class MarketingNavigation
         ];
     }
 
+    // A near spelling wins; otherwise the section index, so a removed post suggests `/blog`.
+    public function closestTo(string $path): ?NavItem
+    {
+        $path = '/'.mb_strtolower(trim($path, '/'));
+        $section = '/'.strtok($path, '/');
+        $closest = null;
+        $closestDistance = PHP_INT_MAX;
+
+        foreach (array_merge(...array_map(fn (NavItem $column): array => $column->children, $this->footer())) as $item) {
+            $candidate = parse_url((string) $item->url, PHP_URL_PATH) ?: '/';
+
+            if ($item->external || $candidate === '/' || $candidate === $path) {
+                continue;
+            }
+
+            $distance = levenshtein($path, $candidate);
+            $isNear = $distance <= max(1, min(2, intdiv(mb_strlen($path), 4)));
+
+            if (($isNear || $candidate === $section) && $distance < $closestDistance) {
+                $closest = $item;
+                $closestDistance = $distance;
+            }
+        }
+
+        return $closest;
+    }
+
     /**
      * @param  bool  $withDetail  Adds the icon and one-line description the mega menu renders.
      * @return list<NavItem>
