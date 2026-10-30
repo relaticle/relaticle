@@ -52,7 +52,8 @@ The feature fails, even if every test passes, when:
   "(modified)" state exists to prevent exactly this.
 - A deleted custom field breaks a saved layout or a member's table. State heals itself (see
   Self-healing).
-- Opening a table writes to the database. Writes happen only when the member changes something.
+- Opening a table writes to the database. Writes happen only when the member changes something,
+  or once a session when their default layout replaces a different saved state.
 - One workspace's custom field columns leak into another's state.
 - A menu item is shown before the phase that makes it work.
 
@@ -225,9 +226,10 @@ today, and only within a session; the rest is new.
 Done when:
 
 - A hidden column, a reordered column, a width, a sort, a filter and a page size each survive a
-  logout and login.
+  logout and login, for a member with no default layout.
 - The same member in a second workspace has separate state for the same table.
-- Opening a table without changing anything writes nothing.
+- Opening a table without changing anything writes nothing, except the first open of a session
+  that replaces a different saved state with the member's default layout.
 - A state that names a deleted custom field loads without error (see Self-healing).
 
 ### Phase 3: Saved layouts
@@ -279,10 +281,15 @@ Revert and Save appear beside it. The comparison ignores widths, since layouts d
 
 What a member sees on opening a table:
 
-1. Their last state always wins. They see exactly what they left, with "(modified)" when they
-   had changed an applied layout.
-2. Their default layout applies only when they have no saved state for that table yet.
+1. At the start of a session, their default layout, when they have one. It is saved as their
+   state, so the rest of the session keeps it until they change something.
+2. Otherwise their last state. They see exactly what they left, with "(modified)" when they had
+   changed an applied layout.
 3. With neither, the table's default state.
+
+A session starts at login, so a default is where each working day begins, while switching
+layouts or changing the table during the day sticks. Members with no default keep their last
+state across sessions.
 
 When a shared layout changes under a member who has it applied or as their default:
 
