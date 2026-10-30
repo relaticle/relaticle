@@ -27,7 +27,7 @@ Never put a bare `: ` inside an unquoted front matter value. It throws a parse e
 
 ## Configuration
 
-`config/documentation.php` sets four keys. The provider registers the `documentation-config` and `documentation-content` publish tags only while `RELATICLE_FEATURE_DOCUMENTATION` is on. Published content lands in `resources/content/documentation`, which `content_path` never reads, so point `content_path` there as well.
+`config/documentation.php` sets four keys. The provider registers the `documentation-config` and `documentation-content` publish tags only while `RELATICLE_FEATURE_DOCUMENTATION` is on. Published content lands in `resources/content/documentation`, which the default `content_path` does not read, so point `content_path` there as well.
 
 | Key | Env | Role |
 |---|---|---|

@@ -218,13 +218,13 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, people, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. The API reference at `/developers/api` loads the same spec, so it stays empty until then. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Enable email and calendar sync for Google and Microsoft accounts, the email composer, and the Email & calendar help pages. Requires `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`. Microsoft accounts also need `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The flag also refuses sign-ups from Tor exit relays, which needs no keys. It checks the Tor Project's exit list, refreshed every hour. Sign-in over Tor still works. |
 
 `RELATICLE_FEATURE_BLOG` does nothing on a self-hosted install. It switches on the blog pages, which live in the cloud package. The Docker image leaves that package out, along with the marketing site and the help and developer guide pages.
 
-Leave `RELATICLE_FEATURE_BILLING` unset, because nothing in a self-hosted install can start a subscription. With it on, a workspace created after the July 2026 upgrade resolves to Free or Trial ended, and both deny access. Email sending, mailbox sync and calendar sync then stop for that workspace, and the access tokens page gains a web-form help link.
+Leave `RELATICLE_FEATURE_BILLING` unset, because nothing in a self-hosted install can start a subscription. With it on, every workspace created after your install ran its July 2026 billing migration resolves to Free or Trial ended. On a new install, that is every workspace. Both deny access, so email sending, mailbox sync and calendar sync stop for those workspaces. Mail already queued for them is marked failed and is not resent when you turn the flag off. The access tokens page also gains a web-form help link.
 
 ---
 
@@ -683,20 +683,24 @@ php artisan make:filament-user
 
 ### Updating a Manual Install
 
-A `git pull` brings `packages/Cloud` back, so every update deletes it again before it installs anything. The same steps convert an install that still has the directory.
+Deleting `packages/Cloud` leaves its files as local deletions, and a `git pull` in rebase mode refuses to run over them. Each update restores the directory, pulls, and deletes it again before it installs anything. The same steps convert an install that still has the directory.
 
 ```bash
 cd /var/www/relaticle
+php artisan down
+git checkout -- packages/Cloud
 git pull
 rm -rf packages/Cloud
 composer install --no-dev --optimize-autoloader
+php artisan filament:optimize-clear
 pnpm install --frozen-lockfile && pnpm run build
 php artisan migrate --force
+php artisan up
 php artisan horizon:terminate
 php artisan reverb:restart
 ```
 
-If you cache Filament components with `php artisan filament:optimize`, run `php artisan filament:optimize-clear` before the first request after an update. A cache built while the directory existed names Cloud's pages, and the clear drops them. Run `filament:optimize` again afterwards.
+`filament:optimize-clear` drops a Filament component cache built while the directory existed. If you cache components with `php artisan filament:optimize`, run it again after `php artisan up`. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
 
 Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
