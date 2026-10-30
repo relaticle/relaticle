@@ -66,7 +66,7 @@ final class CloudServiceProvider extends ServiceProvider
 
         $this->mergeConfigFrom(__DIR__.'/../config/comparisons.php', 'comparisons');
 
-        config(['ink.middleware' => [...config('ink.middleware', ['web']), AddVaryAcceptHeader::class]]);
+        $this->configureBlog();
 
         $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
@@ -98,6 +98,24 @@ final class CloudServiceProvider extends ServiceProvider
         $this->linkWebsiteFromCore();
         $this->registerMailPreviews();
         $this->registerCommunityCounts();
+    }
+
+    private function configureBlog(): void
+    {
+        // Ink registers its routes from packageBooted(), after every register(), before Pennant is bound:
+        // read the config key App\Features\Blog resolves from.
+        config([
+            'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
+            'ink.middleware' => [...config('ink.middleware', ['web']), AddVaryAcceptHeader::class],
+            'ink.views' => [
+                'index' => 'cloud::blog.index',
+                'show' => 'cloud::blog.show',
+                'category' => 'cloud::blog.index',
+                'tag' => 'cloud::blog.index',
+                'preview' => 'cloud::blog.preview',
+                'feed' => 'cloud::blog.feed',
+            ],
+        ]);
     }
 
     private function registerMarketingRoutes(): void

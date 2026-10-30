@@ -80,12 +80,12 @@
             @else
                 <div class="divide-y divide-gray-200/60 dark:divide-white/[0.04]">
                     @foreach($posts as $post)
-                        <x-blog.post-card :post="$post" />
+                        <x-cloud::blog.post-card :post="$post" />
                     @endforeach
                 </div>
 
                 <div class="mt-12 pt-8 border-t border-gray-200/60 dark:border-white/[0.04]">
-                    {{ $posts->links('blog.pagination') }}
+                    {{ $posts->links('cloud::blog.pagination') }}
                 </div>
             @endif
         </div>

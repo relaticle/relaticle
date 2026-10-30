@@ -374,7 +374,7 @@ it('serves staff blog previews while still requiring a valid signature', functio
     expect(parse_url($url, PHP_URL_HOST))->toBe('staff.example.test');
     isolatedAuthRequest($cookies, 'GET', $url)->assertOk()->assertSee($post->title)->assertSee('Edit Post');
     isolatedAuthRequest($cookies, 'GET', $url.'&changed=1')->assertForbidden();
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
 
 it('ignores staff authentication retained in a legacy customer session', function (): void {
     $cookies = [];
@@ -395,7 +395,7 @@ it('ignores staff authentication retained in a legacy customer session', functio
     $stored = unserialize(base64_decode(DB::table('sessions')->where('id', $id)->value('payload')));
     expect($stored)->not->toHaveKey(Auth::guard('sysadmin')->getName());
     isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/passkeys/confirm/options')->assertOk();
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
 
 it('redirects staff published blog links to the public hostname', function (): void {
     $cookies = [];
@@ -405,7 +405,7 @@ it('redirects staff published blog links to the public hostname', function (): v
 
     isolatedAuthRequest($cookies, 'GET', $post->getUrl())
         ->assertStatus(301)->assertRedirect('https://example.test/blog/'.$post->slug);
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\\Cloud\\CloudServiceProvider'), 'The blog front end needs the cloud package.');
 
 it('redirects public navigation from the staff hostname', function (string $route, array $parameters): void {
     $cookies = [];
@@ -414,11 +414,14 @@ it('redirects public navigation from the staff hostname', function (string $rout
     isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test'.$path)
         ->assertStatus(301)->assertRedirect('https://example.test'.$path);
 })->with([
-    'pricing' => ['pricing', []],
-    'blog' => ['blog.index', []],
-    'category' => ['blog.category', ['slug' => 'announcements']],
-    'documentation' => ['documentation.index', []],
-    'help' => ['help.index', []],
+    'security.txt' => ['securityTxt', []],
+    ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+        'pricing' => ['pricing', []],
+        'blog' => ['blog.index', []],
+        'category' => ['blog.category', ['slug' => 'announcements']],
+        'documentation' => ['documentation.index', []],
+        'help' => ['help.index', []],
+    ] : []),
 ]);
 
 it('limits the staff development login link to the local environment', function (string $environment): void {

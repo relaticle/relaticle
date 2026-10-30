@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Features\AccountDeletion;
 use App\Features\Billing;
-use App\Features\Blog;
 use App\Features\Documentation;
 use App\Features\OnboardSeed;
 use App\Features\SocialAuth;
@@ -20,7 +19,7 @@ use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
-mutates(AccountDeletion::class, OnboardSeed::class, SaveOnboardingUseCase::class, SocialAuth::class, Documentation::class, Billing::class, Blog::class, EditProfile::class);
+mutates(AccountDeletion::class, OnboardSeed::class, SaveOnboardingUseCase::class, SocialAuth::class, Documentation::class, Billing::class, EditProfile::class);
 
 describe('AccountDeletion', function (): void {
     it('hides account deletion from Profile by default', function (): void {
@@ -104,32 +103,6 @@ describe('SocialAuth', function (): void {
 });
 
 describe('Blog', function (): void {
-    it('serves the blog when the feature is active', function (): void {
-        $this->get(route('blog.index'))
-            ->assertOk();
-    });
-
-    it('does not register blog routes when the feature is inactive', function (): void {
-        putenv('RELATICLE_FEATURE_BLOG=false');
-        unset($_ENV['RELATICLE_FEATURE_BLOG'], $_SERVER['RELATICLE_FEATURE_BLOG']);
-        CachedState::$cachedRoutes = null;
-        CachedState::$cachedConfig = null;
-        RouteServiceProvider::loadCachedRoutesUsing(null);
-        LoadConfiguration::alwaysUse(null);
-        $this->refreshApplication();
-
-        $this->get('/blog')
-            ->assertNotFound();
-
-        $this->get('/blog/feed')
-            ->assertNotFound();
-
-        putenv('RELATICLE_FEATURE_BLOG=true');
-        $_ENV['RELATICLE_FEATURE_BLOG'] = $_SERVER['RELATICLE_FEATURE_BLOG'] = 'true';
-        CachedState::$cachedRoutes = null;
-        CachedState::$cachedConfig = null;
-    });
-
     it('keeps the blog admin in the sysadmin panel and out of the customer panel', function (): void {
         // The flag gates the PUBLIC blog; staff keep the authoring surface either way,
         // so posts can be written before launch.

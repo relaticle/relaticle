@@ -66,12 +66,12 @@
                         </div>
                     @endif
 
-                    <x-blog.related-posts :posts="$relatedPosts" />
+                    <x-cloud::blog.related-posts :posts="$relatedPosts" />
                 </article>
 
                 <!-- Right Sidebar: Table of Contents -->
                 <aside class="hidden lg:block col-span-4 xl:col-span-3">
-                    <x-blog.toc :post="$post" />
+                    <x-cloud::blog.toc :post="$post" />
                 </aside>
             </div>
         </div>

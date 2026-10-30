@@ -137,12 +137,6 @@ final class AppServiceProvider extends ServiceProvider
         $this->registerNotificationBindings();
         $this->registerSelfHostedDefaults();
 
-        // Ink registers its public routes from packageBooted(), which runs after every
-        // provider's register(). Read the config key App\Features\Blog resolves from
-        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
-        // bound this early. Same source of truth, so the flag stays the single switch.
-        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
-
         Cashier::useCustomerModel(Workspace::class);
         Cashier::keepPastDueSubscriptionsActive();
 

@@ -3,6 +3,8 @@
 @source "../views/components";
 @source "../views/layouts";
 @source "../views/marketing";
+@source "../views/blog";
+@source "../../../../vendor/relaticle/ink/resources/views";
 @source "../views/docs";
 @source "../views/help";
 @source "../js";
@@ -20,4 +22,21 @@
     --color-gray-800: var(--color-zinc-800);
     --color-gray-900: var(--color-zinc-900);
     --color-gray-950: var(--color-zinc-950);
+}
+
+/* The markdown renderer puts a "#" permalink in every heading. The docs bundle shows it on hover only, and the blog does the same. */
+.blog-prose :is(h2, h3, h4) {
+    @apply relative w-fit;
+}
+
+.blog-prose .heading-permalink {
+    @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
+}
+
+.blog-prose :is(h2, h3, h4):hover .heading-permalink {
+    @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
+}
+
+.blog-prose h1 .heading-permalink {
+    @apply hidden;
 }

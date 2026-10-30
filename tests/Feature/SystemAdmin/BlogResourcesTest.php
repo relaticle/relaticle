@@ -5,10 +5,12 @@ declare(strict_types=1);
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\TaskResource;
+use App\Http\Middleware\RequireBlogFrontEnd;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\URL;
 use Laravel\Jetstream\Contracts\DeletesUsers;
 use Relaticle\Ink\Filament\Resources\CategoryResource;
 use Relaticle\Ink\Filament\Resources\CategoryResource\Pages\ListCategories;
@@ -22,7 +24,7 @@ use Relaticle\SystemAdmin\Policies\CategoryPolicy;
 use Relaticle\SystemAdmin\Policies\PostPolicy;
 use Relaticle\SystemAdmin\Policies\TagPolicy;
 
-mutates(PostPolicy::class, CategoryPolicy::class, TagPolicy::class);
+mutates(PostPolicy::class, CategoryPolicy::class, TagPolicy::class, RequireBlogFrontEnd::class);
 
 beforeEach(function (): void {
     $this->admin = SystemAdministrator::factory()->create();
@@ -99,4 +101,13 @@ it('denies blog authoring to a signed-in customer', function (): void {
         ->and($customer->can('create', Post::class))->toBeFalse()
         ->and($customer->can('update', $post))->toBeFalse()
         ->and($customer->can('delete', $post))->toBeFalse();
+});
+
+it('answers a signed preview link with 404 when no blog front end is configured', function (): void {
+    config(['ink.views.preview' => null]);
+
+    $post = Post::factory()->create();
+
+    $this->get(URL::temporarySignedRoute('blog.preview', now()->addHour(), ['post' => $post]))
+        ->assertNotFound();
 });
