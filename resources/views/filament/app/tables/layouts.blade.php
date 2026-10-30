@@ -72,7 +72,7 @@
                             wire:key="{{ $this->getId() }}.table.layouts.{{ $layoutId }}"
                         >
                             <x-filament::dropdown.list.item
-                                :icon="$layout->is_shared ? 'heroicon-o-user-group' : 'heroicon-o-view-columns'"
+                                :icon="$layout->is_shared ? 'heroicon-o-user-group' : 'heroicon-o-bookmark-square'"
                                 :color="$layout->is($active) ? 'primary' : 'gray'"
                                 :aria-current="$layout->is($active) ? 'true' : null"
                                 class="min-w-0 flex-1"
