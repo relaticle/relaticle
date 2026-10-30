@@ -94,17 +94,17 @@
     }
 }
 
-/* Search and Save stay in view; only the layouts between them scroll. */
+/* Search and Save stay in view; only the layouts between them scroll.
+   Spacing keeps a 4px grid: 4 between rows, 8 inside them and to the edge, 16 above a group. */
 .fi-ta-layouts-panel {
-    @apply flex max-h-112 flex-col p-1.5;
+    @apply flex max-h-112 flex-col p-1;
 
-    /* Roomier than the app's other menus, which keep their compact rows. */
     & .fi-dropdown-list {
-        @apply gap-0.5;
+        @apply gap-1;
     }
 
     & .fi-dropdown-list-item {
-        @apply py-2;
+        @apply p-2;
     }
 }
 
@@ -113,7 +113,7 @@
 }
 
 .fi-ta-layouts-search {
-    @apply mb-1 flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-gray-400 ring-1 ring-gray-950/10 dark:text-gray-500 dark:ring-white/10;
+    @apply m-1 flex items-center gap-2 rounded-lg p-2 text-gray-400 ring-1 ring-gray-950/10 dark:text-gray-500 dark:ring-white/10;
 
     & .fi-icon {
         @apply size-4!;
@@ -125,7 +125,7 @@
 }
 
 .fi-ta-layouts-heading {
-    @apply flex items-center justify-between gap-2 px-2 pt-2.5 pb-1.5 text-xs font-medium text-gray-500 dark:text-gray-400;
+    @apply flex items-center justify-between gap-2 px-2 pt-2 pb-1 text-xs font-medium text-gray-500 dark:text-gray-400;
 }
 
 .fi-ta-layouts-pill {
