@@ -29,9 +29,6 @@ final readonly class PrepareAgentDraftSend
     ) {}
 
     /**
-     * Run inside the caller's transaction: the draft row stays locked until it is deleted,
-     * so a second send of the same draft finds nothing.
-     *
      * @return array{
      *     connected_account_id: string,
      *     subject: string,
@@ -59,6 +56,7 @@ final readonly class PrepareAgentDraftSend
             403,
         );
 
+        // Callers delete the draft in the same transaction, so a second send of it finds nothing.
         $draft = $this->lockedDraft($user, $draftId);
         $recipients = $this->recipients($draft);
 
