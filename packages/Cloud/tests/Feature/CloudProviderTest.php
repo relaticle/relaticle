@@ -8,6 +8,7 @@ use App\Features\Billing;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
@@ -36,4 +37,9 @@ it('binds no billing when billing is off', function (): void {
     Feature::define(Billing::class, false);
 
     expect(resolve(BillingContract::class))->toBeInstanceOf(NoBilling::class);
+});
+
+it('resolves the pre-move billing page component name to the cloud page', function (): void {
+    expect(app('livewire.factory')->resolveComponentClass('App\\Filament\\Pages\\Billing'))->toBe(BillingPage::class)
+        ->and(app('livewire.factory')->resolveComponentName(BillingPage::class))->toBe(BillingPage::class);
 });

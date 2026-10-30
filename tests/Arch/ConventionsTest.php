@@ -1263,7 +1263,7 @@ it('keeps each negated arch expectation to one layer', function (): void {
     );
 });
 
-it('keeps every Tailwind source on disk and inside the Docker frontend stage', function (): void {
+it('keeps every Tailwind source on disk, and every core one inside the Docker frontend stage', function (): void {
     $root = dirname(__DIR__, 2);
 
     preg_match('/^FROM \S+ AS frontend$(.*?)^FROM /ms', (string) file_get_contents($root.'/Dockerfile'), $stage);
@@ -1289,8 +1289,17 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
     foreach ($stylesheets as $stylesheet) {
         $css = (string) file_get_contents($stylesheet);
         $name = str_replace($root.'/', '', $stylesheet);
+        $isCloudStylesheet = str_starts_with($name, 'packages/Cloud/');
 
         preg_match_all('/^@import\s+([\'"])tailwindcss\1(.*)$/m', $css, $imports);
+
+        preg_match_all('/^@(?:import|source)\s+([\'"])(.+?)\1/m', $css, $references);
+
+        foreach ($references[2] as $reference) {
+            if (! $isCloudStylesheet && str_contains($reference, 'packages/Cloud')) {
+                $problems[] = "{$name}: {$reference} names the cloud package, which the image and self-hosted builds do not contain";
+            }
+        }
 
         foreach ($imports[2] as $modifiers) {
             if (! str_contains($modifiers, 'source(none)')) {
@@ -1311,6 +1320,10 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
 
             $relative = str_replace($root.'/', '', $path);
 
+            if ($isCloudStylesheet) {
+                continue;
+            }
+
             if (! array_any($copied, static fn (string $directory): bool => $relative === $directory || str_starts_with($relative, $directory.'/'))) {
                 $problems[] = "{$name}: {$source} is not copied or mounted in the Dockerfile frontend stage";
             }
@@ -1318,8 +1331,10 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
     }
 
     expect($copied)->not->toBeEmpty()
+        ->and((string) file_get_contents($root.'/.dockerignore'))->toContain('/packages/Cloud')
         ->and($problems)->toBe(
             [],
-            'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md): '.implode(', ', $problems),
+            'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md). '.
+            'The cloud package ships its own stylesheet, which the image never builds, so only core stylesheets must stay inside the frontend stage and none may name the cloud package: '.implode(', ', $problems),
         );
 });

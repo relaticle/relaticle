@@ -38,6 +38,8 @@ use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
 final class CloudServiceProvider extends ServiceProvider
 {
+    private const string APP_THEME = 'packages/Cloud/resources/css/filament/app/theme.css';
+
     public function register(): void
     {
         $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
@@ -59,6 +61,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
+        Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
 
@@ -80,6 +83,7 @@ final class CloudServiceProvider extends ServiceProvider
 
             $panel
                 ->pages([BillingPage::class])
+                ->bootUsing(static fn (Panel $panel): Panel => $panel->viteTheme(self::APP_THEME))
                 ->renderHook(PanelsRenderHook::BODY_END, static fn (): string => resolve(BillingPanelHooks::class)->upgradeModal())
                 ->renderHook(AppPanelProvider::SIDEBAR_FOOTER_ACTIONS, static fn (): string => resolve(BillingPanelHooks::class)->sidebarBilling());
         });

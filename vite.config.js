@@ -1,6 +1,9 @@
+import {existsSync} from 'node:fs';
 import {defineConfig} from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
+
+const cloudAppTheme = 'packages/Cloud/resources/css/filament/app/theme.css';
 
 export default defineConfig({
     plugins: [
@@ -20,6 +23,8 @@ export default defineConfig({
                 // Documentation
                 'packages/Documentation/resources/css/documentation.css',
                 'packages/Documentation/resources/js/documentation.js',
+                // The cloud package is absent from self-hosted builds
+                ...(existsSync(new URL(cloudAppTheme, import.meta.url)) ? [cloudAppTheme] : []),
             ],
             refresh: true,
         }),
