@@ -1436,15 +1436,18 @@ it('refuses to send from a mailbox that needs reconnecting', function (EmailAcco
     'error' => EmailAccountStatus::ERROR,
 ]);
 
-it('refuses a reply aimed at the caller own draft', function (): void {
-    $draft = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::DRAFT]);
+it('refuses a reply aimed at the caller own unsent mail', function (EmailStatus $status): void {
+    $draft = ($this->emailFrom)($this->viewer, ['status' => $status, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null]);
 
     RelaticleServer::actingAs($this->viewer)
         ->tool(SendEmailTool::class, sendArguments($this->viewerAccount, ['in_reply_to_email_id' => $draft->id]))
         ->assertHasErrors(["Email with ID [{$draft->id}] not found."]);
 
-    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
-});
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->whereKeyNot($draft->id)->count())->toBe(0);
+})->with([
+    'draft' => EmailStatus::DRAFT,
+    'queued' => EmailStatus::QUEUED,
+]);
 
 it('follows the workspace an unpinned token names in a header for the send role', function (): void {
     $other = Workspace::factory()->create();
@@ -1981,4 +1984,28 @@ it('does not let a retry hold more than ten assistant emails at once', function 
         ->assertHasErrors(['The user already has 10 assistant emails waiting to send. Wait until they send or the user cancels them.']);
 
     expect($failed->fresh()->status)->toBe(EmailStatus::FAILED);
+});
+
+it('refuses to send a mass send draft, which goes to each person separately', function (): void {
+    $draft = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::DRAFT, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::MASS_SEND]);
+    EmailParticipant::query()->create(['email_id' => $draft->id, 'email_address' => 'a@acme.test', 'role' => EmailParticipantRole::TO]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailDraftTool::class, ['draft_id' => $draft->id])
+        ->assertHasErrors(['This draft is a mass send, which goes to each person separately. The user can send it from Drafts in Relaticle.']);
+
+    expect($draft->fresh()->status)->toBe(EmailStatus::DRAFT)
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
+});
+
+it('keeps a draft whose attachment is not ready and sends nothing', function (): void {
+    $draftId = emailToolData($this->viewer, CreateEmailDraftTool::class, draftArguments($this->viewerAccount))['id'];
+    EmailAttachment::query()->create(['email_id' => $draftId, 'filename' => 'deck.pdf', 'mime_type' => 'application/pdf', 'size' => 10, 'storage_path' => null]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailDraftTool::class, ['draft_id' => $draftId])
+        ->assertHasErrors(['This draft holds an attachment that is not ready to send. The user can send it from Drafts in Relaticle.']);
+
+    expect(Email::query()->whereKey($draftId)->value('status'))->toBe(EmailStatus::DRAFT)
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(0);
 });
