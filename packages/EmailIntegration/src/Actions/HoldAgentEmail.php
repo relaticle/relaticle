@@ -6,12 +6,9 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use DateTimeInterface;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 
@@ -19,6 +16,7 @@ final readonly class HoldAgentEmail
 {
     public function __construct(
         private SendEmailAction $sendEmail,
+        private ReserveAgentHold $reserveHold,
         private PickAgentSendTime $pickSendTime,
         private QueuedSendNotifier $notifier,
     ) {}
@@ -44,9 +42,7 @@ final readonly class HoldAgentEmail
     public function execute(User $user, array $payload, string $via): Email
     {
         return DB::transaction(function () use ($user, $payload, $via): Email {
-            $this->lockOutboxOf($user);
-
-            $this->assertUnderAgentLimit($user);
+            $this->reserveHold->execute($user);
 
             $scheduledFor = $this->pickSendTime->execute($payload['scheduled_for'] ?? null);
 
@@ -56,23 +52,5 @@ final readonly class HoldAgentEmail
 
             return $email;
         });
-    }
-
-    private function lockOutboxOf(User $user): void
-    {
-        User::query()->whereKey($user->getKey())->lockForUpdate()->first();
-    }
-
-    private function assertUnderAgentLimit(User $user): void
-    {
-        $limit = Config::integer('email-integration.outbox.agent_max_held_per_user');
-
-        $held = Email::query()
-            ->where('user_id', $user->getKey())
-            ->where('status', EmailStatus::QUEUED)
-            ->createdOverMcp()
-            ->count();
-
-        throw_if($held >= $limit, AgentOutboxFull::atLimit($limit));
     }
 }

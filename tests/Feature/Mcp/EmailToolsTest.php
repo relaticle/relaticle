@@ -1961,3 +1961,24 @@ it('refuses to rewrite a mass send draft, which goes to each person separately',
     expect($draft->fresh()->creation_source)->toBe(EmailCreationSource::MASS_SEND)
         ->and($draft->fresh()->subject)->toBe('Launch');
 });
+
+it('does not let a retry hold more than ten assistant emails at once', function (): void {
+    foreach (range(1, 10) as $number) {
+        Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->viewer->id,
+            'connected_account_id' => $this->viewerAccount->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'creation_source' => EmailCreationSource::MCP,
+            'scheduled_for' => now()->addMinutes(5),
+        ]);
+    }
+
+    $failed = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::FAILED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::MCP]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(RetryEmailTool::class, ['id' => $failed->id])
+        ->assertHasErrors(['The user already has 10 assistant emails waiting to send. Wait until they send or the user cancels them.']);
+
+    expect($failed->fresh()->status)->toBe(EmailStatus::FAILED);
+});
