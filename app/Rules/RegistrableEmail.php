@@ -25,6 +25,6 @@ final readonly class RegistrableEmail
             return ['email:rfc', 'indisposable'];
         }
 
-        return ['email:rfc,dns', 'indisposable', new IndisposableMailHost];
+        return ['bail', 'email:rfc,dns', 'indisposable', new IndisposableMailHost];
     }
 }

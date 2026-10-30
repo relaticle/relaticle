@@ -247,6 +247,28 @@ it('creates the account when the mail host only resembles a disposable one', fun
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
 
+it('skips the mail host lookup once the domain has failed its dns check', function (): void {
+    $lookups = 0;
+    $this->app->instance(MailExchangers::class, new MailExchangers(function () use (&$lookups): array {
+        $lookups++;
+
+        return [];
+    }));
+
+    $email = 'jane-'.uniqid().'@no-mail-server.invalid';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email']);
+
+    expect($lookups)->toBe(0)
+        ->and(User::where('email', $email)->exists())->toBeFalse();
+});
+
 it('rejects a signup submitted faster than a human could type', function (): void {
     config(['honeypot.enabled' => true]);
     $this->freezeTime();
