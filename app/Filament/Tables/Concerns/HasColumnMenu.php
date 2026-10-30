@@ -33,7 +33,7 @@ trait HasColumnMenu
 
     public function pinTableColumn(string $columnName): void
     {
-        if (! $this->isMovableTableColumn($columnName)) {
+        if (! $this->hasTableColumn($columnName)) {
             return;
         }
 
@@ -44,7 +44,7 @@ trait HasColumnMenu
 
     public function unpinTableColumn(string $columnName): void
     {
-        if (! $this->isMovableTableColumn($columnName)) {
+        if (! $this->hasTableColumn($columnName)) {
             return;
         }
 
@@ -79,13 +79,11 @@ trait HasColumnMenu
 
     public function moveTableColumn(string $columnName, ?string $beforeColumnName): void
     {
-        $names = array_column($this->movableTableColumns(), 'name');
-
-        if (! in_array($columnName, $names, true) || $columnName === $beforeColumnName) {
+        if (! $this->hasTableColumn($columnName) || $columnName === $beforeColumnName) {
             return;
         }
 
-        if ($beforeColumnName !== null && ! in_array($beforeColumnName, $names, true)) {
+        if ($beforeColumnName !== null && ! $this->hasTableColumn($beforeColumnName)) {
             return;
         }
 
@@ -132,14 +130,14 @@ trait HasColumnMenu
         $this->getTable()->resizableColumns();
     }
 
-    private function isMovableTableColumn(string $columnName): bool
+    private function hasTableColumn(string $columnName): bool
     {
-        return in_array($columnName, array_column($this->movableTableColumns(), 'name'), true);
+        return collect($this->tableColumns)->contains(fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && $item['name'] === $columnName);
     }
 
     private function labelTableColumn(string $columnName, string $label): void
     {
-        if (! in_array($columnName, array_column($this->movableTableColumns(), 'name'), true)) {
+        if (! $this->hasTableColumn($columnName)) {
             return;
         }
 
@@ -157,14 +155,6 @@ trait HasColumnMenu
     {
         $this->cachedDefaultTableColumnState = null;
         $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
-    }
-
-    /**
-     * @return array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>
-     */
-    private function movableTableColumns(): array
-    {
-        return array_filter($this->tableColumns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE);
     }
 
     /**

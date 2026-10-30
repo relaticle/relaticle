@@ -38,7 +38,7 @@ final class TableStateData extends Data
     }
 
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
-    // Hashes stored before pins existed carry no `pinned` key, so an empty one is left out.
+    // Hashes stored before pins or labels existed carry neither key, so an empty one is left out.
     public function hash(): string
     {
         $state = array_filter(

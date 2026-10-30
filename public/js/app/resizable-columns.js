@@ -848,7 +848,8 @@ function registerResizableColumn() {
                 cell.style.cssText = cellStyle
                 cell.dataset.resizableWidth = String(width)
             })
-            applyPinnedOffsets(this.table)
+            // The style reset above clears a pinned cell's `left`, and only a pinned column moves the pins after it.
+            if (this.column.dataset.columnPinned === '1') applyPinnedOffsets(this.table)
             scheduleSizingUpdate(this.table)
         },
 
