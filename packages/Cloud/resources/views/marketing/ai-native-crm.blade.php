@@ -75,7 +75,7 @@
         ],
         [
             __('Can an AI-native CRM run on my own server?'),
-            __('Relaticle can. The self-hosted install is the same codebase as the cloud, including the assistant and the MCP server. You supply the model: your own API key for Claude or GPT, or a local model through Ollama, so no record has to leave your infrastructure.'),
+            __('Relaticle can. The self-hosted install has the same CRM, assistant and MCP server as the cloud. You supply the model: your own API key for Claude or GPT, or a local model through Ollama, so no record has to leave your infrastructure.'),
         ],
         [
             __('Does Relaticle work with Claude and ChatGPT?'),
@@ -257,7 +257,7 @@
                 {{ __('The same AI, on your own server') }}
             </h2>
             <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-xl mx-auto">
-                {{ __('The self-hosted install is the same codebase as the cloud, assistant and MCP server included. Bring your own API key for Claude or GPT, or run a local model with Ollama, and keep every request on infrastructure you control.') }}
+                {{ __('The self-hosted install has the same CRM, assistant and MCP server as the cloud. Bring your own API key for Claude or GPT, or run a local model with Ollama, and keep every request on infrastructure you control.') }}
             </p>
 
             <div class="mt-8">

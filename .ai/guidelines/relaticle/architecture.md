@@ -65,11 +65,14 @@ Its own `LICENSE` grants no rights. The self-hosted build is this repository wit
   `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
   `packages/Cloud/tests/Feature/CloudProviderTest.php` fails when either binding changes. What
   core needs from billing becomes a method on `Billing`
-- Cloud reaches SystemAdmin through `Relaticle\SystemAdmin\Support\Extensions` for Workspace
-  actions and relation managers, and through `Panel::configureUsing` for its pages.
-  `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` pins the extensions. Register them from a
-  provider's `register()`, never `boot()`, because the panel turns relation managers into Livewire
-  components when it registers. No test reads for that
+- Cloud reaches SystemAdmin through `CloudAdminPlugin`, which a `Panel::configureUsing` adds to the
+  `sysadmin` panel. The plugin adds pages, resources, widgets and the admin theme. Its `register(Panel)`
+  calls `Relaticle\SystemAdmin\Support\Extensions` for Workspace actions and relation managers, and
+  `tests/Feature/SystemAdmin/WorkspaceResourceTest.php` pins those. A second `Panel::configureUsing`
+  extends the app panel with the Billing page, render hooks and the theme
+- Register actions and relation managers from a provider's or plugin's `register()`, never `boot()`,
+  because the panel turns relation managers into Livewire components when it registers. No test reads
+  for that
 - A command Cloud owns is scheduled from `CloudServiceProvider`, never `bootstrap/app.php`. The
   self-hosted build has no such class to schedule
 - Cloud is analysed by PHPStan, unlike SystemAdmin, and its Filament, Livewire and Http namespaces

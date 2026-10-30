@@ -117,7 +117,7 @@
         ],
         [
             __('Can I move my data out of Relaticle Cloud?'),
-            __('Yes. Export every record type as CSV or Excel, read your records through the REST API, or run the same code on your own server.'),
+            __('Yes. Export every record type as CSV or Excel, read your records through the REST API, or run the same CRM on your own server.'),
         ],
         [
             __('How do I report a security problem?'),

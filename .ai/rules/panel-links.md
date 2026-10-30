@@ -4,6 +4,7 @@ paths:
   - 'app/Filament/**'
   - 'packages/*/src/Filament/**'
   - 'packages/*/resources/views/**'
+  - 'packages/Cloud/src/**/Filament/**'
 ---
 
 # Linking out of a Filament panel

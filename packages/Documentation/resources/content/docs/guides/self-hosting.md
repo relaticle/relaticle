@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Get Docker Compose, Coolify, Dokploy and Laravel Cloud deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
 order: 1
-updated: "2026-10-30"
+updated: "2026-10-31"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -143,7 +143,7 @@ When the websocket is unreachable, the chat still works. Each reply appears a fe
 
 ### Legal and help links
 
-A self-hosted install ships no legal pages and no help website. These settings point its links at yours, or at relaticle.com.
+A self-hosted install ships no legal pages, and relaticle.com's policies do not cover your install. Point the first three settings at your own pages. An unset setting shows no link. Only `DOCUMENTATION_PUBLIC_URL` defaults to relaticle.com.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -218,11 +218,13 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, people, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the generated OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Enable email and calendar sync for Google and Microsoft accounts, the email composer, and the Email & calendar help pages. Requires `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`. Microsoft accounts also need `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The flag also refuses sign-ups from Tor exit relays, which needs no keys. It checks the Tor Project's exit list, refreshed every hour. Sign-in over Tor still works. |
 
-`RELATICLE_FEATURE_BILLING` and `RELATICLE_FEATURE_BLOG` do not apply to a self-hosted install. They switch on pages that live in the cloud package, which the Docker image leaves out, along with the marketing site and the help and developer guide pages. Leave both unset. With the billing flag on, the email outbox applies relaticle.com's subscription rules to your workspaces and can stop sending. Nothing in a self-hosted install can start a subscription.
+`RELATICLE_FEATURE_BLOG` does nothing on a self-hosted install. It switches on the blog pages, which live in the cloud package. The Docker image leaves that package out, along with the marketing site and the help and developer guide pages.
+
+Leave `RELATICLE_FEATURE_BILLING` unset, because nothing in a self-hosted install can start a subscription. With it on, a workspace created after the July 2026 upgrade resolves to Free or Trial ended, and both deny access. Email sending, mailbox sync and calendar sync then stop for that workspace, and the access tokens page gains a web-form help link.
 
 ---
 
@@ -635,21 +637,20 @@ git clone https://github.com/Relaticle/relaticle.git /var/www/relaticle
 cd /var/www/relaticle
 ```
 
-2. Install dependencies:
+2. Remove the cloud package before you install anything:
+
+```bash
+rm -rf packages/Cloud
+```
+
+`packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. Its license grants you no rights, and only the Docker image leaves it out. With it present, your install serves relaticle.com's marketing site at `/`. Delete it first, so Composer never autoloads it and the frontend build never compiles it.
+
+3. Install dependencies:
 
 ```bash
 composer install --no-dev --optimize-autoloader
 pnpm install --frozen-lockfile && pnpm run build
 ```
-
-3. Remove the cloud package:
-
-```bash
-rm -rf packages/Cloud
-composer dump-autoload --no-dev --optimize
-```
-
-`packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. Its license grants you no rights, and only the Docker image leaves it out. With it present, your install serves relaticle.com's marketing site at `/`. A `git pull` brings the directory back, so run both commands again after each update.
 
 4. Configure the environment:
 
@@ -679,6 +680,25 @@ chmod -R 775 storage bootstrap/cache
 ```bash
 php artisan make:filament-user
 ```
+
+### Updating a Manual Install
+
+A `git pull` brings `packages/Cloud` back, so every update deletes it again before it installs anything. The same steps convert an install that still has the directory.
+
+```bash
+cd /var/www/relaticle
+git pull
+rm -rf packages/Cloud
+composer install --no-dev --optimize-autoloader
+pnpm install --frozen-lockfile && pnpm run build
+php artisan migrate --force
+php artisan horizon:terminate
+php artisan reverb:restart
+```
+
+If you cache Filament components with `php artisan filament:optimize`, run `php artisan filament:optimize-clear` before the first request after an update. A cache built while the directory existed names Cloud's pages, and the clear drops them. Run `filament:optimize` again afterwards.
+
+Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
 ### Nginx Configuration
 
@@ -823,7 +843,7 @@ To see whether replies stream live, open the browser's Network tab, filter by WS
 
 ### The homepage shows the Relaticle marketing site
 
-The cloud package is present. A self-hosted install redirects `/` to the app. Delete `packages/Cloud` and rebuild the autoload as described under Manual Deployment, or on Laravel Cloud add the `rm -rf packages/Cloud` line to the build command.
+The cloud package is present. A self-hosted install redirects `/` to the app. Delete `packages/Cloud`, then repeat the install and build steps from Updating a Manual Install. On Laravel Cloud, add the `rm -rf packages/Cloud` line to the build command.
 
 ### Horizon not processing jobs
 

@@ -186,7 +186,7 @@
                         {{ __('Self-hosted or hosted: how to choose') }}
                     </h2>
                     <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">
-                        {{ __('Both options run the identical open-source Relaticle codebase, with unlimited users and unlimited records on every plan. The real differences are who operates the server and how AI usage is metered.') }}
+                        {{ __('Both options run the same CRM, assistant and MCP server, with unlimited users and unlimited records on every plan. The real differences are who operates the server and how AI usage is metered.') }}
                     </p>
                 </div>
                 <ul class="divide-y divide-gray-100 rounded-2xl border border-gray-200/80 bg-white dark:divide-white/[0.04] dark:border-white/[0.06] dark:bg-white/[0.02]">
@@ -227,7 +227,7 @@
                 $trialFaq = [
                     __('What happens after my trial ends?'),
                     __(
-                        'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the exact same open-source codebase is always available as a fallback.',
+                        'New workspaces start a :days-day trial automatically, with no card required. If a payment method isn\'t added before the trial ends, hosted access pauses and you\'re redirected to the billing page to subscribe. Self-hosting the same open-source CRM is always available as a fallback.',
                         ['days' => $trialDays]
                     ),
                 ];
@@ -252,7 +252,7 @@
                     [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
                     [
                         __('Can I switch between self-hosted and cloud?'),
-                        __('Yes. Both options run the same open-source code and store your records the same way, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
+                        __('Yes. Both options run the same open-source CRM and store your records the same way, so neither locks you in. Companies, people, opportunities, tasks, and notes each have a built-in CSV export, and the import wizard on the other side accepts CSV. Moving between a self-hosted install and the hosted plan is a standard export and re-import, not a proprietary migration.'),
                     ],
                 ];
 
@@ -275,7 +275,7 @@
             </h2>
             <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">
                 {{ $billingActive
-                    ? __('No card required. Unlimited users from day one, and the same open-source codebase to self-host whenever you want.')
+                    ? __('No card required. Unlimited users from day one, and the same open-source CRM to self-host whenever you want.')
                     : __('Unlimited users and records. Hosted by us, or on your own server.') }}
             </p>
             <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">

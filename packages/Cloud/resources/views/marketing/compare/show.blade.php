@@ -11,7 +11,7 @@
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and Twenty pricing compare?'),
-                    'body' => __('Relaticle charges :relaticlePricing. The bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle has no equivalent carve-out: the self-hosted and hosted versions run the same codebase with no feature gating.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
+                    'body' => __('Relaticle charges :relaticlePricing. The bill is the same whether two people use the workspace or two hundred. Twenty prices per user (:twentyPricing), so its bill scales with every seat you add, and the gap between the two models widens as your team grows. On licensing, both projects publish under AGPL-3.0; Twenty adds a Twenty Application Exception that license-tags its enterprise files in-repo, which means some functionality stays legally reserved even in a self-hosted deploy. Relaticle reserves no functionality: a self-hosted install gets every CRM, assistant and MCP server feature under AGPL-3.0. Only the code behind relaticle.com\'s own billing and website sits in a separately licensed directory.', ['relaticlePricing' => $relaticle['pricing'], 'twentyPricing' => $competitor['pricing']]),
                 ],
                 [
                     'heading' => __('Which one runs AI and MCP self-hosted?'),
@@ -40,7 +40,7 @@
             'sections' => [
                 [
                     'heading' => __('How do Relaticle and EspoCRM pricing compare?'),
-                    'body' => __('Both are AGPL-3.0, and both can be self-hosted for free. On the hosted side the models split: Relaticle charges :relaticlePricing, while EspoCRM prices per user with seat minimums (:espocrmPricing), so a small team pays for seats it may not fill. Self-hosters should also note the difference in what "free" covers. Relaticle ships one codebase with no feature gating, while EspoCRM sells paid extensions on top of its free core.', ['relaticlePricing' => $relaticle['pricing'], 'espocrmPricing' => $competitor['pricing']]),
+                    'body' => __('Both are AGPL-3.0, and both can be self-hosted for free. On the hosted side the models split: Relaticle charges :relaticlePricing, while EspoCRM prices per user with seat minimums (:espocrmPricing), so a small team pays for seats it may not fill. Self-hosters should also note the difference in what "free" covers. Relaticle gates no feature in a self-hosted install, while EspoCRM sells paid extensions on top of its free core.', ['relaticlePricing' => $relaticle['pricing'], 'espocrmPricing' => $competitor['pricing']]),
                 ],
                 [
                     'heading' => __('Which one has built-in AI and MCP support?'),
@@ -177,7 +177,7 @@
                     {{ __('Try Relaticle yourself') }}
                 </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 max-w-md mx-auto">
-                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source codebase.') }}
+                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same CRM, assistant and MCP server.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <x-cloud::marketing.button href="{{ route('login') }}">

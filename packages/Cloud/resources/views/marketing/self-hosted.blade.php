@@ -29,7 +29,7 @@
     $faqs = [
         [
             __('What license is Relaticle released under?'),
-            __('AGPL-3.0. The full CRM, :name the AI assistant, and the MCP server are on GitHub under that license: read it, audit it, modify it, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
+            __('AGPL-3.0. The full CRM, the MCP server and :name, the built-in AI assistant, are on GitHub under that license. Read them, audit them, modify them, and redeploy your own fork.', ['name' => config('chat.assistant_name')]),
         ],
         [
             __('How do I update a self-hosted install?'),
@@ -56,7 +56,7 @@
         ],
         [
             __('Can I move between self-hosted and Cloud later?'),
-            __('Yes. Both run the identical open-source codebase against the same schema, and every record type has a built-in CSV export, so moving between them is an export and re-import, not a proprietary migration.'),
+            __('Yes. Both run the same CRM against the same schema, and every record type has a built-in CSV export, so moving between them is an export and re-import, not a proprietary migration.'),
         ],
     ];
 @endphp
@@ -289,7 +289,7 @@
                     {{ __('Self-hosted or Cloud: how to choose') }}
                 </h2>
                 <p class="mt-4 text-base text-gray-500 dark:text-gray-400 leading-relaxed">
-                    {{ __('Both run the identical open-source Relaticle codebase. The real differences are who operates the server and who provisions the AI models.') }}
+                    {{ __('Both run the same open-source CRM, assistant, and MCP server. The real differences are who operates the server and who provisions the AI models.') }}
                 </p>
             </div>
 

@@ -138,7 +138,7 @@
                     {{ __('Try Relaticle yourself') }}
                 </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 max-w-md mx-auto">
-                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same open-source codebase.') }}
+                    {{ __('Self-host it free under AGPL-3.0, or start on the hosted plan. Both run the same CRM, assistant and MCP server.') }}
                 </p>
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
                     <x-cloud::marketing.button href="{{ route('login') }}">

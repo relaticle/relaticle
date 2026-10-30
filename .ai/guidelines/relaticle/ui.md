@@ -49,6 +49,9 @@
   fails a path that does not exist or that the stage cannot see.
 - Cloud's own stylesheets are exempt from that stage check, because the image never builds them. No core stylesheet may
   name `packages/Cloud`, and `tests/Arch/ConventionsTest.php` fails one that does.
+- With Cloud present, the app and sysadmin panels load `packages/Cloud/resources/css/filament/{app,admin}/theme.css` in place
+  of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
+  or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
 
 ## Icons (Remix Icon)
 

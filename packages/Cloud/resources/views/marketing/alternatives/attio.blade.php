@@ -79,7 +79,7 @@
                         </div>
                         <div class="py-6">
                             <dt class="flex items-center gap-4 text-sm font-semibold"><x-ri-code-s-slash-line class="size-5 shrink-0 text-primary dark:text-primary-400" aria-hidden="true"/>{{ __('Make the code your own') }}</dt>
-                            <dd class="mt-1 pl-9 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Inspect and extend the full codebase under :license.', ['license' => $relaticle['license']]) }}</dd>
+                            <dd class="mt-1 pl-9 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{{ __('Inspect and extend the CRM, assistant and MCP server under :license.', ['license' => $relaticle['license']]) }}</dd>
                         </div>
                         <div class="py-6">
                             <dt class="flex items-center gap-4 text-sm font-semibold"><x-ri-team-line class="size-5 shrink-0 text-primary dark:text-primary-400" aria-hidden="true"/>{{ __('Bring your whole team') }}</dt>
