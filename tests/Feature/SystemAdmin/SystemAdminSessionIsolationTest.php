@@ -447,9 +447,22 @@ it('limits the staff development login link to the local environment', function 
     }
 })->with(['local', 'production']);
 
-it('allows the local login link only on development hosts', function (string $host, bool $allowed): void {
+it('allows the local login link only on development hosts', function (string $host, ?string $orbPortalDomain, bool $allowed): void {
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();
+    foreach (['AMP_ORB' => $orbPortalDomain === null ? null : '1', 'AMP_PORTAL_DOMAIN' => $orbPortalDomain] as $name => $value) {
+        $original = [getenv($name), $_ENV[$name] ?? null, $_SERVER[$name] ?? null];
+        putenv($value === null ? $name : "{$name}={$value}");
+        unset($_ENV[$name], $_SERVER[$name]);
+        $this->beforeApplicationDestroyed(function () use ($name, $original): void {
+            putenv($original[0] === false ? $name : "{$name}={$original[0]}");
+            foreach ([1 => '_ENV', 2 => '_SERVER'] as $index => $global) {
+                if ($original[$index] !== null) {
+                    $GLOBALS[$global][$name] = $original[$index];
+                }
+            }
+        });
+    }
     config()->set('app.url', "https://{$host}");
     config()->set('app.app_panel_domain', null);
     config()->set('app.sysadmin_domain', $host);
@@ -477,8 +490,11 @@ it('allows the local login link only on development hosts', function (string $ho
     $response->assertServerError();
     expect(DB::table('system_administrator_sessions')->whereNotNull('user_id')->exists())->toBeFalse();
 })->with([
-    'public host' => ['crm.example.com', false],
-    'development host' => ['staff.example.test', true],
+    'public host' => ['crm.example.com', null, false],
+    'development host' => ['staff.example.test', null, true],
+    'amp orb portal host' => ['t-abc-p21109.onamp.dev', 'onamp.dev', true],
+    'amp portal host outside an orb' => ['t-abc-p21109.onamp.dev', null, false],
+    'public host inside an orb' => ['crm.example.com', 'onamp.dev', false],
 ]);
 
 it('refuses the local login link on a spoofed development host when the app url is public', function (): void {

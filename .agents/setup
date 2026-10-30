@@ -102,6 +102,11 @@ if [[ ! -f .env ]]; then
         -e 's|^BROADCAST_REVERB_PORT=.*|BROADCAST_REVERB_PORT=8080|' \
         .env
 fi
+# env() returns "" for an empty value instead of its default, which breaks broadcasts to Reverb.
+sed -i \
+    -e 's|^BROADCAST_REVERB_SCHEME=$|BROADCAST_REVERB_SCHEME=http|' \
+    -e 's|^BROADCAST_REVERB_VERIFY=$|BROADCAST_REVERB_VERIFY=false|' \
+    .env
 done_step
 
 step "PHP dependencies"
@@ -127,28 +132,36 @@ done_step
 
 step "Orb guidance for agents (~/.config/amp/AGENTS.md)"
 GUIDANCE_MARKER="# Relaticle in this orb"
-mkdir -p "$HOME/.config/amp"
-if ! grep -Fqx "$GUIDANCE_MARKER" "$HOME/.config/amp/AGENTS.md" 2>/dev/null; then
-    cat >> "$HOME/.config/amp/AGENTS.md" <<'GUIDE'
+GUIDANCE_FILE="$HOME/.config/amp/AGENTS.md"
+mkdir -p "$(dirname "$GUIDANCE_FILE")"
+touch "$GUIDANCE_FILE"
+# Replace the block from its heading to the next heading, so a changed guide reaches existing orbs.
+awk -v marker="$GUIDANCE_MARKER" '
+    $0 == marker { skipping = 1; next }
+    skipping && /^# / { skipping = 0 }
+    !skipping
+' "$GUIDANCE_FILE" | sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' >"$GUIDANCE_FILE.tmp"
+mv "$GUIDANCE_FILE.tmp" "$GUIDANCE_FILE"
+cat >>"$GUIDANCE_FILE" <<'GUIDE'
 
 # Relaticle in this orb
 
-- There is no Herd and no `*.test` host here. Run `amp orb services ensure` to start `web`
-  (php artisan serve on port 8000), `horizon` (Redis queue, restarts on PHP edits) and `reverb`
-  (port 8080). PostgreSQL 17 and Redis run on localhost and `.agents/resume` restarts them.
-- Drive the app with agent-browser at http://localhost:8000, the APP_URL. The login page's
-  quick-login buttons and the chat websocket only work there. `/app/login` is the CRM panel,
-  `/sysadmin/login` the system admin panel.
-- Seeded logins (LocalSeeder) all use password `password`: owner@relaticle.test (Acme Sales),
-  empty@, paused@, trial@, enterprise@, pro@, past-due@relaticle.test, and staff
-  sysadmin@relaticle.com. Re-seed any time with `php artisan db:seed`.
-- Share the portal URL `amp orb services ensure` prints with people. There they type the email,
-  then the password, because login links only work on a development host.
+- There is no Herd and no `*.test` host here. Run `amp orb services ensure`: it starts `web`
+  (port 8000, the portal: `/reverb` goes to Reverb, the rest to `app`), `app` (php artisan serve
+  on 8001), `horizon` (Redis queue, restarts on PHP edits) and `reverb` (8080), then prints the
+  portal URL. PostgreSQL 17 and Redis run on localhost and `.agents/resume` restarts them.
+- The portal URL is the APP_URL. Drive the app with agent-browser at that URL: inside the orb it
+  reaches the app with no portal sign-in. At http://localhost:8000 sessions, redirects and the chat
+  websocket break. `/app/login` is the CRM panel, `/sysadmin/login` the system admin panel.
+- The login pages list seeded accounts as one-click sign-ins. All use password `password`:
+  owner@relaticle.test (Acme Sales), empty@, paused@, trial@, enterprise@, pro@,
+  past-due@relaticle.test, and staff sysadmin@relaticle.com. Re-seed with `php artisan db:seed`.
+- Artisan commands run from the shell read APP_URL=http://localhost:8000 from `.env`.
 - Tests use the `relaticle_testing` database. Browser tests run on the installed Playwright Chromium.
 - Chat needs `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`, from an Amp project secret or `.env`.
-- After editing `.env`, run `amp orb service restart web` (and horizon or reverb if they read it).
+- After editing `.env`, restart the services that read it: `amp orb service restart app`, then
+  `horizon` and `reverb` the same way.
 GUIDE
-fi
 done_step
 
 echo "✓ Relaticle orb ready"

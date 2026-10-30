@@ -1,24 +1,42 @@
 services:
   web:
     port: 8000
-    # APP_URL stays http://localhost:8000 from .env: config/login-link.php only enables the
-    # dev login buttons on a development host, so agents browse the app at that address.
-    command: >-
-      php artisan optimize:clear --no-interaction >/dev/null &&
-      exec php artisan serve --host=0.0.0.0 --port="$PORT" --no-reload
+    # Same origin for the app and the chat websocket, as production nginx does.
+    command: exec node bin/orb-web-proxy.mjs
     env:
-      PHP_CLI_SERVER_WORKERS: "8"
-    health: /up
+      APP_PORT: "8001"
+      REVERB_PORT: "8080"
     portal:
       url: /app/login
       title: Relaticle
-      description: Type owner@relaticle.test, then password "password". The quick-login buttons only work at http://localhost:8000 inside the orb.
+      description: Click a test account to sign in, or type owner@relaticle.test and the password "password".
     portals:
       - url: /sysadmin/login
         title: System admin
-        description: Sign in as sysadmin@relaticle.com with password "password".
+        description: Click Developer Login, or sign in as sysadmin@relaticle.com with the password "password".
+  app:
+    port: 8001
+    # The portal URL is the app's public origin. REVERB_HOST empty serves the websocket at /reverb.
+    command: >-
+      export APP_URL="$(echo "$APP_URL" | sed "s:/*$::")" &&
+      php artisan optimize:clear --no-interaction >/dev/null &&
+      exec php artisan serve --host=127.0.0.1 --port="$PORT" --no-reload
+    env:
+      APP_URL: ${services.web.publicURL}
+      REVERB_HOST: ""
+      PHP_CLI_SERVER_WORKERS: "8"
+    health: /up
   horizon:
-    command: exec bash bin/workspace-queue.sh
+    # On resume Redis can start after this service, and watchexec never relaunches an exited Horizon.
+    command: >-
+      until redis-cli ping >/dev/null 2>&1; do sleep 0.5; done &&
+      export APP_URL="$(echo "$APP_URL" | sed "s:/*$::")" &&
+      exec bash bin/workspace-queue.sh
+    env:
+      APP_URL: ${services.web.publicURL}
   reverb:
     port: 8080
-    command: exec php artisan reverb:start --host=0.0.0.0 --port="$PORT"
+    # Reverb accepts websocket origins on the APP_URL host only.
+    command: export APP_URL="$(echo "$APP_URL" | sed "s:/*$::")" && exec php artisan reverb:start --host=127.0.0.1 --port="$PORT"
+    env:
+      APP_URL: ${services.web.publicURL}
