@@ -48,6 +48,7 @@ use Livewire\Features\SupportComputed\CannotCallComputedDirectlyException;
 use Livewire\Features\SupportLifecycleHooks\DirectlyCallingLifecycleHooksNotAllowedException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
 use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Sentry\Laravel\Integration;
@@ -228,17 +229,20 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $indexes = array_filter([
-                __('Site index') => 'llms-txt',
-                __('Help centre') => 'help.index',
-                __('Developer docs') => 'documentation.index',
-                __('REST API spec') => 'openapi.json',
-            ], Route::has(...));
+            $indexes = [
+                __('Site index') => DocUrl::root().'/llms.txt',
+                __('Help centre') => DocUrl::area(DocUrl::HELP),
+                __('Developer docs') => DocUrl::area(DocUrl::DOCS),
+            ];
+
+            if (Route::has('openapi.json')) {
+                $indexes[__('REST API spec')] = route('openapi.json');
+            }
 
             $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
 
-            foreach ($indexes as $label => $routeName) {
-                $lines[] = "- {$label}: ".route($routeName);
+            foreach ($indexes as $label => $url) {
+                $lines[] = "- {$label}: {$url}";
             }
 
             $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);

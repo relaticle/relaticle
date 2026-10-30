@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+use Relaticle\Documentation\Support\DocsRepository;
+
+mutates(DocsRepository::class);
+
 it('redirects both legacy documentation generations straight to their final urls', function (string $legacy, string $target): void {
     // /documentation/* is the oldest generation; /docs/* was retired 2026-08-13
     // when the developer area moved to /developers and its two end-user guides

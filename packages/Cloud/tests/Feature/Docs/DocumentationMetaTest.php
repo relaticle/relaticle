@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
+use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+
+mutates(DocumentationController::class, HelpController::class);
+
 it('uses the configured per-document description as the meta description', function (): void {
     $html = $this->get('/developers/self-hosting')->assertOk()->getContent();
 

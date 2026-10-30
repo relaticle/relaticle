@@ -1106,7 +1106,11 @@ it('keeps the role suffix on classes whose directory carries one', function (): 
 
     foreach ($suffixes as $directory => $suffix) {
         $paths = array_filter(
-            [$root.'/app/'.$directory, ...glob($root.'/packages/*/src/'.$directory, GLOB_ONLYDIR) ?: []],
+            [
+                $root.'/app/'.$directory,
+                ...glob($root.'/packages/*/src/'.$directory, GLOB_ONLYDIR) ?: [],
+                ...glob($root.'/packages/Cloud/src/*/'.$directory, GLOB_ONLYDIR) ?: [],
+            ],
             is_dir(...),
         );
 
