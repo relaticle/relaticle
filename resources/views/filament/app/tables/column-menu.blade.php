@@ -1,11 +1,13 @@
+@use('Filament\Support\Icons\Heroicon')
+
 @php
     $items = [
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => 'heroicon-m-arrow-left', 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'show' => 'movable', 'focus' => 'column'],
-        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => 'heroicon-m-arrow-right', 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'show' => 'movable', 'focus' => 'column'],
-        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.pin'), 'icon' => 'heroicon-m-lock-closed', 'run' => '$wire.pinTableColumn(column)', 'visible' => '! pinned', 'focus' => 'column'],
-        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.unpin'), 'icon' => 'heroicon-m-lock-open', 'run' => '$wire.unpinTableColumn(column)', 'visible' => 'pinned', 'focus' => 'column'],
-        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.edit_label'), 'icon' => 'heroicon-o-tag', 'run' => "\$wire.mountAction('editTableColumnLabel', { column })", 'focus' => 'null'],
-        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => 'heroicon-o-eye-slash', 'run' => '$wire.hideTableColumn(column)', 'visible' => 'hideable', 'focus' => 'neighbour'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_left'), 'icon' => Heroicon::ArrowLeft, 'run' => '$wire.moveTableColumn(column, before.left)', 'disabled' => '! canMoveLeft', 'show' => 'movable', 'focus' => 'column'],
+        ['group' => 'move', 'label' => __('filament/panel.tables.column_menu.move_right'), 'icon' => Heroicon::ArrowRight, 'run' => '$wire.moveTableColumn(column, before.right)', 'disabled' => '! canMoveRight', 'show' => 'movable', 'focus' => 'column'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.pin'), 'icon' => Heroicon::LockClosed, 'run' => '$wire.pinTableColumn(column)', 'visible' => '! pinned', 'focus' => 'column'],
+        ['group' => 'pin', 'label' => __('filament/panel.tables.column_menu.unpin'), 'icon' => Heroicon::LockOpen, 'run' => '$wire.unpinTableColumn(column)', 'visible' => 'pinned', 'focus' => 'column'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.edit_label'), 'icon' => Heroicon::OutlinedTag, 'run' => "\$wire.mountAction('editTableColumnLabel', { column })", 'focus' => 'null'],
+        ['group' => 'manage', 'label' => __('filament/panel.tables.column_menu.hide'), 'icon' => Heroicon::OutlinedEyeSlash, 'run' => '$wire.hideTableColumn(column)', 'visible' => 'hideable', 'focus' => 'neighbour'],
     ];
 @endphp
 

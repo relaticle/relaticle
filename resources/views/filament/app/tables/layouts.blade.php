@@ -1,3 +1,6 @@
+@use('Filament\Support\Enums\IconSize')
+@use('Filament\Support\Icons\Heroicon')
+
 @php
     $layouts = $this->getVisibleTableLayouts();
     $active = $this->getActiveTableLayout();
@@ -11,21 +14,21 @@
 <div class="fi-ta-layouts" wire:key="{{ $this->getId() }}.table.layouts">
     <x-filament::dropdown placement="bottom-start" width="xs" shift>
         <x-slot name="trigger">
-            <x-filament::button color="gray" size="sm" icon="heroicon-o-queue-list" class="fi-ta-layouts-trigger">
+            <x-filament::button color="gray" size="sm" :icon="Heroicon::OutlinedQueueList" class="fi-ta-layouts-trigger">
                 <span class="fi-ta-layouts-trigger-label" @if ($active) title="{{ $active->name }}" @endif>{{ $active?->name ?? __('filament/panel.tables.layouts.label') }}</span>
 
                 @if ($isModified)
                     <span class="font-normal text-gray-500 dark:text-gray-400">{{ __('filament/panel.tables.layouts.modified') }}</span>
                 @endif
 
-                <x-filament::icon icon="heroicon-m-chevron-down" class="fi-view-switcher-chevron" />
+                <x-filament::icon :icon="Heroicon::ChevronDown" class="fi-view-switcher-chevron" />
             </x-filament::button>
         </x-slot>
 
         <div class="fi-ta-layouts-panel" x-data="{ query: '' }">
         @if ($layouts->count() >= 7)
             <label class="fi-ta-layouts-search">
-                <x-filament::icon icon="heroicon-o-magnifying-glass" />
+                <x-filament::icon :icon="Heroicon::OutlinedMagnifyingGlass" />
                 <input type="search" x-model="query" x-on:keydown.stop placeholder="{{ __('filament/panel.tables.layouts.search') }}" aria-label="{{ __('filament/panel.tables.layouts.search') }}" />
             </label>
         @endif
@@ -33,7 +36,7 @@
         <div class="fi-ta-layouts-scroll">
         <x-filament::dropdown.list>
             <x-filament::dropdown.list.item
-                icon="heroicon-o-table-cells"
+                :icon="Heroicon::OutlinedTableCells"
                 :color="$active ? 'gray' : 'primary'"
                 :aria-current="$active ? null : 'true'"
                 class="{{ $active ? '' : 'fi-ta-layouts-selected' }}"
@@ -44,7 +47,7 @@
 
                     <span class="fi-ta-layouts-row-meta">
                         @if ($this->defaultTableLayoutId === null)
-                            <span role="img" aria-label="{{ __('filament/panel.tables.layouts.default') }}" class="fi-ta-layouts-row-default"><x-filament::icon icon="heroicon-s-star" /></span>
+                            <span role="img" aria-label="{{ __('filament/panel.tables.layouts.default') }}" class="fi-ta-layouts-row-default"><x-filament::icon :icon="Heroicon::Star" :size="IconSize::Large" /></span>
                         @endif
                     </span>
                 </span>
@@ -72,7 +75,7 @@
                             wire:key="{{ $this->getId() }}.table.layouts.{{ $layoutId }}"
                         >
                             <x-filament::dropdown.list.item
-                                :icon="$layout->is_shared ? 'heroicon-o-user-group' : 'heroicon-o-bookmark-square'"
+                                :icon="$layout->is_shared ? Heroicon::OutlinedUserGroup : Heroicon::OutlinedBookmarkSquare"
                                 :color="$layout->is($active) ? 'primary' : 'gray'"
                                 :aria-current="$layout->is($active) ? 'true' : null"
                                 class="min-w-0 flex-1"
@@ -83,7 +86,7 @@
 
                                     <span class="fi-ta-layouts-row-meta">
                                         @if ($isDefault)
-                                            <span role="img" aria-label="{{ __('filament/panel.tables.layouts.default') }}" class="fi-ta-layouts-row-default"><x-filament::icon icon="heroicon-s-star" /></span>
+                                            <span role="img" aria-label="{{ __('filament/panel.tables.layouts.default') }}" class="fi-ta-layouts-row-default"><x-filament::icon :icon="Heroicon::Star" :size="IconSize::Large" /></span>
                                         @endif
 
                                         @if ($layout->user_id !== $userId)
@@ -98,7 +101,7 @@
                             <div class="fi-ta-layouts-row-actions">
                                 @if ($canUpdateLayout)
                                     <x-filament::icon-button
-                                        icon="heroicon-o-trash"
+                                        :icon="Heroicon::OutlinedTrash"
                                         color="gray"
                                         size="sm"
                                         class="fi-ta-layouts-row-delete"
@@ -111,7 +114,7 @@
                                 <x-filament::dropdown placement="bottom-end" width="fi-ta-layouts-row-menu" teleport>
                                     <x-slot name="trigger">
                                         <x-filament::icon-button
-                                            icon="heroicon-m-ellipsis-vertical"
+                                            :icon="Heroicon::EllipsisVertical"
                                             color="gray"
                                             size="sm"
                                             :label="__('filament/panel.tables.layouts.actions', ['name' => $layout->name])"
@@ -120,29 +123,29 @@
 
                                     <x-filament::dropdown.list>
                                         @if ($canUpdateLayout)
-                                            <x-filament::dropdown.list.item icon="heroicon-o-pencil-square" wire:click="mountAction('renameTableLayout', { layout: '{{ $layoutId }}' })">
+                                            <x-filament::dropdown.list.item :icon="Heroicon::OutlinedPencilSquare" wire:click="mountAction('renameTableLayout', { layout: '{{ $layoutId }}' })">
                                                 {{ __('filament/panel.tables.layouts.rename') }}
                                             </x-filament::dropdown.list.item>
 
                                             @if ($layout->is_shared)
-                                                <x-filament::dropdown.list.item icon="heroicon-o-user-group" wire:click="mountAction('stopSharingTableLayout', { layout: '{{ $layoutId }}' })">
+                                                <x-filament::dropdown.list.item :icon="Heroicon::OutlinedUserGroup" wire:click="mountAction('stopSharingTableLayout', { layout: '{{ $layoutId }}' })">
                                                     {{ __('filament/panel.tables.layouts.unshare') }}
                                                 </x-filament::dropdown.list.item>
                                             @else
-                                                <x-filament::dropdown.list.item icon="heroicon-o-user-group" wire:click="mountAction('shareTableLayout', { layout: '{{ $layoutId }}' })">
+                                                <x-filament::dropdown.list.item :icon="Heroicon::OutlinedUserGroup" wire:click="mountAction('shareTableLayout', { layout: '{{ $layoutId }}' })">
                                                     {{ __('filament/panel.tables.layouts.share') }}
                                                 </x-filament::dropdown.list.item>
                                             @endif
                                         @endif
 
-                                        <x-filament::dropdown.list.item icon="heroicon-o-star" wire:click="toggleDefaultTableLayout('{{ $layoutId }}')">
+                                        <x-filament::dropdown.list.item :icon="Heroicon::OutlinedStar" wire:click="toggleDefaultTableLayout('{{ $layoutId }}')">
                                             {{ $isDefault ? __('filament/panel.tables.layouts.unset_default') : __('filament/panel.tables.layouts.set_default') }}
                                         </x-filament::dropdown.list.item>
                                     </x-filament::dropdown.list>
 
                                     @if ($canUpdateLayout)
                                         <x-filament::dropdown.list>
-                                            <x-filament::dropdown.list.item icon="heroicon-o-trash" color="danger" wire:click="mountAction('deleteTableLayout', { layout: '{{ $layoutId }}' })">
+                                            <x-filament::dropdown.list.item :icon="Heroicon::OutlinedTrash" color="danger" wire:click="mountAction('deleteTableLayout', { layout: '{{ $layoutId }}' })">
                                                 {{ __('filament/panel.tables.layouts.delete') }}
                                             </x-filament::dropdown.list.item>
                                         </x-filament::dropdown.list>
@@ -159,7 +162,7 @@
 
         <x-filament::dropdown.list>
             <button type="button" class="fi-dropdown-list-item fi-ta-layouts-save-current" wire:click="mountAction('saveTableLayoutAs')">
-                <x-filament::icon icon="heroicon-m-plus" />
+                <x-filament::icon :icon="Heroicon::Plus" />
                 {{ __('filament/panel.tables.layouts.save_current') }}
             </button>
         </x-filament::dropdown.list>
@@ -170,7 +173,7 @@
         <x-filament::button
             color="gray"
             size="sm"
-            icon="heroicon-o-arrow-uturn-left"
+            :icon="Heroicon::OutlinedArrowUturnLeft"
             label-sr-only
             :tooltip="__('filament/panel.tables.layouts.revert')"
             wire:click="revertTableLayout"
@@ -182,7 +185,7 @@
             <x-filament::button
                 color="gray"
                 size="sm"
-                icon="heroicon-o-check"
+                :icon="Heroicon::OutlinedCheck"
                 label-sr-only
                 :tooltip="__('filament/panel.tables.layouts.save')"
                 class="fi-ta-layouts-save"
@@ -195,7 +198,7 @@
         <x-filament::button
             color="gray"
             size="sm"
-            icon="heroicon-o-plus"
+            :icon="Heroicon::OutlinedPlus"
             label-sr-only
             :tooltip="__('filament/panel.tables.layouts.save_as')"
             class="fi-ta-layouts-save-as"
