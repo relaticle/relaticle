@@ -48,7 +48,7 @@ final readonly class CanonicalRecordUrl
         return $this->routeTo($this->resource($entity), $entity, $recordId, $workspace);
     }
 
-    public function listUrl(CrmEntity $entity, Workspace $workspace): ?string
+    public function listPageUrl(CrmEntity $entity, Workspace $workspace): ?string
     {
         $resource = $this->resource($entity);
 
@@ -59,7 +59,7 @@ final readonly class CanonicalRecordUrl
         }
     }
 
-    public function listLabel(CrmEntity $entity): string
+    public function entityPluralLabel(CrmEntity $entity): string
     {
         return $this->resource($entity)::getPluralModelLabel();
     }

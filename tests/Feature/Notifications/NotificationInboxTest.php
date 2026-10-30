@@ -620,7 +620,7 @@ it('shows the owner who deleted their layout and links to the table', function (
         ->assertSeeText('Renewals')
         ->assertSeeText('It was on the companies table.')
         ->assertSeeText('Open Companies')
-        ->assertSee(resolve(CanonicalRecordUrl::class)->listUrl(CrmEntity::Company, $this->workspaceA));
+        ->assertSee(resolve(CanonicalRecordUrl::class)->listPageUrl(CrmEntity::Company, $this->workspaceA));
 });
 
 it('shows a layout notice whose actor has since been deleted', function (): void {
