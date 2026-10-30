@@ -26,7 +26,7 @@ return [
     | website points its assistant and its panel links at relaticle.com.
     |
     */
-    'public_url' => env('DOCUMENTATION_PUBLIC_URL', 'https://relaticle.com'),
+    'public_url' => env('DOCUMENTATION_PUBLIC_URL') ?: 'https://relaticle.com',
 
     /*
     |--------------------------------------------------------------------------

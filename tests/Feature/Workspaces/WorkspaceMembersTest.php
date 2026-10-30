@@ -9,6 +9,7 @@ use App\Features\EmailIntegration;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Models\User;
+use App\Support\Workspaces\RoleOptions;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 
-mutates(WorkspaceMembers::class);
+mutates(WorkspaceMembers::class, RoleOptions::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
