@@ -36,7 +36,7 @@ final readonly class UpdateTableLayout
 
             if ($layout->wasChanged('is_shared') && ! $layout->is_shared) {
                 $this->forgetForOtherMembers($layout);
-                $layout->user->notify(new TableLayoutChangedNotification($layout->workspace, $user, $layout->name, $layout->entity, TableLayoutChangedNotification::UNSHARED));
+                $layout->user->notify(TableLayoutChangedNotification::unshared($layout, $user));
             }
 
             return $layout;
