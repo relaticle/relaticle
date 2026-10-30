@@ -13,7 +13,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Relaticle\Chat\ChatServiceProvider;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
-use Relaticle\SystemAdmin\Filament\Pages\Overview;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages\ListCompanies as ListSystemAdminCompanies;
 use Relaticle\SystemAdmin\Filament\Widgets\InstanceStats;
@@ -50,7 +49,7 @@ it('keeps the chat assistant out of the staff panel', function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
-    $this->get(Filament::getPanel('sysadmin')->getUrl())
+    $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertDontSee('app.chat.chat-sidebar-nav', false)
         ->assertDontSee('chat:toggle-panel', false)
@@ -58,7 +57,7 @@ it('keeps the chat assistant out of the staff panel', function (): void {
         ->assertDontSee(__('Ask :name', ['name' => config('chat.assistant_name')]));
 });
 
-it('lands a system administrator on the instance dashboard', function (): void {
+it('shows the instance dashboard with counts across every workspace', function (): void {
     $first = User::factory()->withWorkspace()->create();
     $second = User::factory()->withWorkspace()->create();
     Workspace::factory()->create(['user_id' => $first->getKey()]);
@@ -70,22 +69,13 @@ it('lands a system administrator on the instance dashboard', function (): void {
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
-    expect(Dashboard::getUrl())->toBe(Filament::getPanel('sysadmin')->getUrl());
-
-    $this->get(Filament::getPanel('sysadmin')->getUrl())
+    $page = $this->get(Dashboard::getUrl())
         ->assertOk()
         ->assertSeeLivewire(InstanceStats::class)
-        ->assertSeeTextInOrder(['Users', '2', 'Workspaces', '3', 'Companies', '4', 'People', '5', 'Opportunities', '6']);
-});
+        ->getContent();
+    preg_match_all('/fi-wi-stats-overview-stat-value">\s*(\d+)\s*</', $page, $values);
 
-it('keeps the overview one click from the instance dashboard', function (): void {
-    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
-    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
-
-    $this->get(Dashboard::getUrl())->assertOk()->assertSee(Overview::getUrl(), false);
-    $this->get(Overview::getUrl())->assertOk()->assertDontSeeLivewire(InstanceStats::class);
-
-    expect(Overview::getUrl())->not->toBe(Dashboard::getUrl());
+    expect($values[1])->toBe(['2', '3', '4', '5', '6']);
 });
 
 it('shows the staff panel the companies of every workspace', function (): void {

@@ -305,11 +305,11 @@ it('rejects a saved staff page snapshot on the customer host after staff logout'
     ])->assertStatus(419);
 })->with([
     'model catalog' => ['/ai-models', 'ManageAiSettings'],
-    'dashboard' => ['/', '\\Pages\\Dashboard'],
-    'widget' => ['/', 'InstanceStats'],
-    'shared global search' => ['/', 'GlobalSearch'],
-    'shared notifications' => ['/', 'DatabaseNotifications'],
-    'shared topbar' => ['/', 'Topbar'],
+    'dashboard' => ['/instance', '\\Pages\\Dashboard'],
+    'widget' => ['/instance', 'InstanceStats'],
+    'shared global search' => ['/instance', 'GlobalSearch'],
+    'shared notifications' => ['/instance', 'DatabaseNotifications'],
+    'shared topbar' => ['/instance', 'Topbar'],
 ]);
 
 it('keeps the customer signed in through staff login and logout with identical account ids', function (): void {
@@ -627,7 +627,7 @@ it('loads staff lazy widgets normally and rejects their signed mount parameters 
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();
     signInIsolatedStaff($cookies, $administrator);
-    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     $html = html_entity_decode($page->getContent(), ENT_QUOTES);
     $matched = preg_match("/__lazyLoad\\('([^']+)'\\)/", $html, $lazy);
     expect($matched)->toBe(1);
@@ -678,7 +678,7 @@ it('removes foreign authentication from protected panel requests', function (str
         'password' => 'password',
     ])->assertOk();
     signInIsolatedStaff($cookies, $administrator);
-    $staffResponse = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $staffResponse = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     $isStaff = $context === 'sysadmin';
     $response = $isStaff ? $staffResponse : $customerResponse;
     $cookie = $isStaff ? '__Host-'.config('system-admin.session.cookie') : config('session.cookie');
@@ -690,7 +690,7 @@ it('removes foreign authentication from protected panel requests', function (str
     DB::table($table)->where('id', $id)->update(['payload' => base64_encode(serialize($payload))]);
 
     isolatedAuthRequest($cookies, 'GET', $isStaff
-        ? 'https://staff.example.test/'
+        ? 'https://staff.example.test/instance'
         : 'https://app.example.test/'.$customer->currentWorkspace->slug.'/companies')->assertOk();
 
     $this->assertGuest($foreignGuard);
@@ -702,7 +702,7 @@ it('requires second factor enrollment on an existing staff Livewire page', funct
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();
     signInIsolatedStaff($cookies, $administrator);
-    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertOk();
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
     $snapshot = collect($matches[1])
         ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))

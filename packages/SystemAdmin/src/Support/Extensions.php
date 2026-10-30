@@ -58,6 +58,8 @@ final readonly class Extensions
         ));
     }
 
+    // Call from a provider's or a plugin's register(): the panel registers relation managers as Livewire
+    // components when it registers, so one added later lists but throws ComponentNotFoundException.
     /** @param list<class-string<RelationManager>> $relationManagers */
     public static function addWorkspaceRelationManagers(array $relationManagers): void
     {
