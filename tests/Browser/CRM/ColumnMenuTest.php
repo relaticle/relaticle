@@ -78,7 +78,7 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
     $page->click(columnMenuItem('Move right'))
         ->assertScript(headerOrder().'.indexOf("creator.name")', $index + 1);
 
-    $beforeHidden = $page->script('(() => { const order = '.headerOrder().'; const at = order.indexOf("accountOwner.name"); return at === 1 ? order[2] : order[at - 1]; })()');
+    $beforeHidden = $page->script('(() => { const order = '.headerOrder().'; const at = order.indexOf("accountOwner.name"); return order[at - 1] ?? order[at + 1]; })()');
 
     $page->script(openColumnMenu('accountOwner.name'));
     $page->click(columnMenuItem('Hide column'))
@@ -92,9 +92,9 @@ it('moves and hides a column from its handle menu and keeps it after a reload', 
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps sorting on the header and leaves the title column without a handle', function (): void {
+it('keeps sorting on the header and gives the title column a handle', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug)
-        ->assertMissing(columnHeader('name').' .fi-ta-column-handle');
+        ->assertPresent(columnHeader('name').' .fi-ta-column-handle');
 
     $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', columnHeader('created_at')));
     waitUntil($page, sprintf('document.querySelector(`%s`).getAttribute("aria-sort") === "ascending"', columnHeader('created_at')));
@@ -111,7 +111,7 @@ it('disables the moves at the edges', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
     $order = $page->script(headerOrder());
 
-    $page->script(openColumnMenu($order[1]));
+    $page->script(openColumnMenu($order[0]));
     waitUntil($page, menuItemFocused())
         ->assertAttribute(columnMenuItem('Move left'), 'aria-disabled', 'true')
         ->keys(':focus', 'Escape');
@@ -286,13 +286,16 @@ it('lifts the header and slides the other columns aside mid-drag', function (): 
     $page->assertNoJavaScriptErrors();
 });
 
-it('never drops before the title column', function (): void {
+it('drags the title column and drops another column before it', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
+    $order = $page->script(headerOrder());
+
+    $page->script(dragHeader('name', $order[2], side: 'right'));
+    waitUntil($page, headerOrder().'.indexOf("name") > 0');
 
     $page->script(dragHeader('created_at', 'name'));
-
-    waitUntil($page, headerOrder().'.indexOf("created_at") === 1')
-        ->assertScript(headerOrder().'[0]', 'name')
+    waitUntil($page, '(() => { const order = '.headerOrder().'; return order.indexOf("created_at") === order.indexOf("name") - 1; })()')
+        ->assertScript(dragLeftovers(), false)
         ->assertNoJavaScriptErrors();
 });
 
@@ -412,7 +415,7 @@ it('focuses the title column after hiding the last column beside it by keyboard'
     }
 
     $page->keys(columnHeader('created_at').' .fi-ta-column-handle', 'Enter');
-    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowDown', 'Enter']);
+    waitUntil($page, menuItemFocused())->keys(':focus', ['ArrowUp', 'Enter']);
     waitUntil($page, headerOrder().'.join() === "name"');
     waitUntil($page, '('.focusedColumn().') === "name"')
         ->assertNoJavaScriptErrors();
@@ -443,7 +446,7 @@ it('shows the move cursor on a movable header and keeps the pointer on its contr
     $page->assertScript($cursor(columnHeader('created_at')), 'move')
         ->assertScript($cursor(columnHeader('created_at').' .fi-ta-header-cell-sort-btn'), 'pointer')
         ->assertScript($cursor(columnHeader('created_at').' .fi-ta-column-handle'), 'pointer')
-        ->assertScript($cursor(columnHeader('name')).' !== "move"', true)
+        ->assertScript($cursor(columnHeader('name')), 'move')
         ->assertMissing('.fi-ta-column-grip')
         ->assertNoJavaScriptErrors();
 });

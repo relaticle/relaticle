@@ -344,7 +344,7 @@ so this phase adds no migration.
 ![Drag grips on every header](assets/table-layouts/phase-4-header-grips.png)
 ![The column menu](assets/table-layouts/phase-4-column-menu.png)
 
-Each header except the title column always shows a `⋮` options button at its right edge.
+Every header always shows a `⋮` options button at its right edge.
 Clicking it opens a menu with Move left and Move right, then Edit column label and Hide column.
 Pressing anywhere else on the header and dragging reorders the column. The cursor there is the
 move cursor, while the column name keeps the pointer cursor because a click on it still sorts:
@@ -377,10 +377,9 @@ method, and they are the keyboard path for reordering, as are the arrow keys on 
   the layout "(modified)". At most 60 characters. Saving it empty, or saving the original name,
   removes the label. A label for a column the table no longer has is dropped on load.
 - Hide appears only on toggleable columns. Move left and Move right are disabled at the edges.
-- The title column (`CrmEntity::titleColumn()`) stays first: it has no options button and does not drag, so it cannot be
-  moved, hidden or renamed, and nothing can be dropped before it. The column manager can still drag it, because
-  Filament has no per-item lock, so `HasColumnMenu::applyTableColumnManager()` puts it back
-  first on every apply, a stored order and a layout included.
+- The title column (`CrmEntity::titleColumn()`) moves, drags and renames like any other column,
+  because the column manager already let members move it before this phase. It is not
+  toggleable, so its menu has no Hide.
 - Every label goes through `__()`.
 
 Done when:
@@ -403,8 +402,7 @@ scrolls sideways under them.
   pushpin beside its name.
 - Pinned columns sit together at the left, after the selection checkbox, in pin order. Pinning
   moves a column there; unpinning returns it to the first unpinned position.
-- The title column stays first (phase 4). Pinning any column pins the title column first, and
-  the title column cannot be unpinned while another column is pinned. (Designer's call.)
+- The title column pins like any other column.
 - The selection column is pinned whenever any column is.
 - The last pinned column carries an edge shadow while the table is scrolled.
 - Sticky positioning lives in `resizable-columns.js`, because that script owns cell styles (see
@@ -481,7 +479,7 @@ rebuilt from stored JSON, which is the case `architecture.md` assigns to laravel
 | `grouping` | `"{group}:{direction}"` or null | 2 |
 | `perPage` | int or `"all"` | 2 |
 | `widths` | map of column to pixels; preferences only | 2 |
-| `labels` | map of column to the member's name for it, at most 60 characters; never the title column | 4 |
+| `labels` | map of column to the member's name for it, at most 60 characters | 4 |
 | `pinned` | ordered list of column names | 5 |
 
 A field added later defaults to empty, so a row saved before it loads unchanged.

@@ -50,14 +50,14 @@ function columnOrder(Testable $component): array
 /**
  * @return list<string>
  */
-function movableColumns(Testable $component, CrmEntity $entity): array
+function columnsBesideTitle(Testable $component, CrmEntity $entity): array
 {
     return array_values(array_diff(columnOrder($component), [$entity->titleColumn()]));
 }
 
 function toggleableColumn(Testable $component, CrmEntity $entity): string
 {
-    return collect(movableColumns($component, $entity))
+    return collect(columnsBesideTitle($component, $entity))
         ->first(fn (string $name): bool => (bool) $component->instance()->getTable()->getColumn($name)?->isToggleable());
 }
 
@@ -73,7 +73,7 @@ function withTitleLast(Testable $component, CrmEntity $entity): array
 
 it('moves a column before another and keeps the order on a new visit', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
-    $movable = movableColumns($component, $entity);
+    $movable = columnsBesideTitle($component, $entity);
     [$first, $last] = [$movable[0], end($movable)];
 
     $component->call('moveTableColumn', $last, $first);
@@ -89,11 +89,11 @@ it('moves a column before another and keeps the order on a new visit', function 
 
 it('moves a column to the end when nothing follows it', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
-    $first = movableColumns($component, $entity)[0];
+    $first = columnsBesideTitle($component, $entity)[0];
 
     $component->call('moveTableColumn', $first, null);
 
-    expect(columnOrder($component))->toHaveCount(count(movableColumns($component, $entity)) + 1)
+    expect(columnOrder($component))->toHaveCount(count(columnsBesideTitle($component, $entity)) + 1)
         ->and(last(columnOrder($component)))->toBe($first);
 })->with('column menu pages');
 
@@ -110,35 +110,41 @@ it('hides a toggleable column and keeps it hidden on a new visit', function (str
     expect(collect(livewire($page)->get('tableColumns'))->firstWhere('name', $column)['isToggled'])->toBeFalse();
 })->with('column menu pages');
 
-it('never moves, hides or lands anything before the title column', function (string $page, CrmEntity $entity): void {
+it('moves the title column and lands another column before it', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $title = $entity->titleColumn();
+    $last = last(columnOrder($component));
+
+    $component->call('moveTableColumn', $title, null)->call('moveTableColumn', $last, $title);
+
     $order = columnOrder($component);
+    expect(array_slice($order, -2))->toBe([$last, $title]);
 
-    $component->call('moveTableColumn', $title, null)->call('hideTableColumn', $title);
+    session()->flush();
 
-    expect(columnOrder($component))->toBe($order)
-        ->and(collect($component->get('tableColumns'))->firstWhere('name', $title)['isToggled'])->toBeTrue()
+    expect(columnOrder(livewire($page)))->toBe($order);
+})->with('column menu pages');
+
+it('never hides the title column', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page)->call('hideTableColumn', $entity->titleColumn());
+
+    expect(collect($component->get('tableColumns'))->firstWhere('name', $entity->titleColumn())['isToggled'])->toBeTrue()
         ->and(columnMenuPreferences())->toBe(0);
-
-    $component->call('moveTableColumn', last($order), $title);
-
-    expect(columnOrder($component)[0])->toBe($title);
 })->with('column menu pages');
 
 it('ignores a column the table does not have', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $order = columnOrder($component);
 
-    $component->call('moveTableColumn', 'custom_fields.gone', movableColumns($component, $entity)[0])
-        ->call('moveTableColumn', movableColumns($component, $entity)[0], 'custom_fields.gone')
+    $component->call('moveTableColumn', 'custom_fields.gone', columnsBesideTitle($component, $entity)[0])
+        ->call('moveTableColumn', columnsBesideTitle($component, $entity)[0], 'custom_fields.gone')
         ->call('hideTableColumn', 'custom_fields.gone');
 
     expect(columnOrder($component))->toBe($order)
         ->and(columnMenuPreferences())->toBe(0);
 })->with('column menu pages');
 
-it('opens with the title column first when the stored order put it elsewhere', function (string $page, CrmEntity $entity): void {
+it('opens with the title column where the stored order put it', function (string $page, CrmEntity $entity): void {
     $columns = collect(withTitleLast(livewire($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
@@ -148,15 +154,15 @@ it('opens with the title column first when the stored order put it elsewhere', f
         'state' => new TableStateData(columns: $columns),
     ]);
 
-    expect(columnOrder(livewire($page))[0])->toBe($entity->titleColumn());
+    expect(last(columnOrder(livewire($page))))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
-it('puts the title column back first when the column manager applies it elsewhere', function (string $page, CrmEntity $entity): void {
+it('keeps the title column where the column manager puts it', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
 
     $component->call('applyTableColumnManager', withTitleLast($component, $entity), true);
 
-    expect(columnOrder($component)[0])->toBe($entity->titleColumn());
+    expect(last(columnOrder($component)))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
 it('marks the applied layout modified after a move', function (): void {
@@ -165,7 +171,7 @@ it('marks the applied layout modified after a move', function (): void {
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
     $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
-    $movable = movableColumns($component, CrmEntity::Company);
+    $movable = columnsBesideTitle($component, CrmEntity::Company);
 
     expect($component->instance()->isTableLayoutModified())->toBeFalse();
 
@@ -174,17 +180,17 @@ it('marks the applied layout modified after a move', function (): void {
     expect($component->instance()->isTableLayoutModified())->toBeTrue();
 });
 
-it('tells the browser which headers hide and stay first', function (string $page, CrmEntity $entity): void {
+it('tells the browser which headers hide', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
     $table = $component->instance()->getTable();
     $title = $table->getColumn($entity->titleColumn())->getExtraHeaderAttributes();
     $toggleable = $table->getColumn(toggleableColumn($component, $entity))->getExtraHeaderAttributes();
 
-    expect($title)->toMatchArray(['data-column-locked' => '1', 'data-column-hideable' => '0'])
-        ->and($toggleable)->toMatchArray(['data-column-locked' => '0', 'data-column-hideable' => '1']);
+    expect($title)->toMatchArray(['data-column-hideable' => '0'])
+        ->and($toggleable)->toMatchArray(['data-column-hideable' => '1']);
 })->with('column menu pages');
 
-it('applies a layout that stored the title column elsewhere with the title first and unmodified', function (string $page, CrmEntity $entity): void {
+it('applies a layout that stored the title column elsewhere as stored and unmodified', function (string $page, CrmEntity $entity): void {
     $columns = collect(withTitleLast(livewire($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
@@ -195,7 +201,7 @@ it('applies a layout that stored the title column elsewhere with the title first
 
     $component = livewire($page)->call('applySavedLayout', $layout->getKey());
 
-    expect(columnOrder($component)[0])->toBe($entity->titleColumn())
+    expect(last(columnOrder($component)))->toBe($entity->titleColumn())
         ->and($component->instance()->isTableLayoutModified())->toBeFalse();
 })->with('column menu pages');
 
@@ -211,7 +217,7 @@ function columnManagerLabel(Testable $component, string $column): string
 
 it('renames a column for the member in the header and the column manager, and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
     $component = livewire($page);
-    $column = movableColumns($component, $entity)[0];
+    $column = columnsBesideTitle($component, $entity)[0];
 
     $component->callAction('editTableColumnLabel', data: ['label' => '  Owner of record  '], arguments: ['column' => $column])
         ->assertHasNoActionErrors();
@@ -246,16 +252,24 @@ it('refuses a label longer than 60 characters', function (): void {
     expect(columnMenuPreferences())->toBe(0);
 });
 
-it('never renames the title column or a column the table does not have', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
-    $title = columnLabelText($component, $entity->titleColumn());
+it('renames the title column for the member and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
+    livewire($page)
+        ->callAction('editTableColumnLabel', data: ['label' => 'Record name'], arguments: ['column' => $entity->titleColumn()])
+        ->assertHasNoActionErrors();
 
-    $component->callAction('editTableColumnLabel', data: ['label' => 'Renamed'], arguments: ['column' => $entity->titleColumn()])
+    session()->flush();
+    $revisit = livewire($page);
+
+    expect(columnLabelText($revisit, $entity->titleColumn()))->toBe('Record name')
+        ->and(columnManagerLabel($revisit, $entity->titleColumn()))->toBe('Record name');
+})->with('column menu pages');
+
+it('never renames a column the table does not have', function (): void {
+    livewire(ListCompanies::class)
         ->callAction('editTableColumnLabel', data: ['label' => 'Renamed'], arguments: ['column' => 'custom_fields.gone']);
 
-    expect(columnLabelText($component, $entity->titleColumn()))->toBe($title)
-        ->and(columnMenuPreferences())->toBe(0);
-})->with('column menu pages');
+    expect(columnMenuPreferences())->toBe(0);
+});
 
 it('carries labels in a saved layout and marks the layout modified when one changes', function (): void {
     $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([

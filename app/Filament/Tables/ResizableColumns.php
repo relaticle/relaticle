@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables;
 
-use App\Enums\CrmEntity;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Support\Js;
@@ -27,10 +26,9 @@ final class ResizableColumns
         }
 
         $widths = $livewire->getResizableColumnWidths();
-        $titleColumn = CrmEntity::tryFromModel(new ($table->getModel()))?->titleColumn();
 
         foreach ($table->getColumns() as $name => $column) {
-            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH, $name === $titleColumn);
+            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH);
         }
 
         return $table;
@@ -41,7 +39,7 @@ final class ResizableColumns
         return preg_match('/^(\d+)(px)?$/', (string) $width, $match) === 1 ? (int) $match[1] : null;
     }
 
-    private static function stamp(Column $column, string $name, int $width, bool $isTitleColumn): void
+    private static function stamp(Column $column, string $name, int $width): void
     {
         $min = self::MIN_WIDTH;
         $max = self::MAX_WIDTH;
@@ -55,7 +53,6 @@ final class ResizableColumns
         $column->extraHeaderAttributes([
             ...$attributes,
             'data-column-hideable' => $column->isToggleable() ? '1' : '0',
-            'data-column-locked' => $isTitleColumn ? '1' : '0',
             'x-data' => 'resizableColumn('.Js::from($name).', '.Js::from($columnId).", {$min}, {$max})",
             'class' => 'fi-ta-resizable-header',
             'style' => $style,
