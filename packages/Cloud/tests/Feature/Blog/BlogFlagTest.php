@@ -6,6 +6,7 @@ use App\Features\Blog;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
+use Illuminate\Support\Facades\Route;
 
 mutates(Blog::class);
 
@@ -33,4 +34,11 @@ it('does not register blog routes when the feature is inactive', function (): vo
     $_ENV['RELATICLE_FEATURE_BLOG'] = $_SERVER['RELATICLE_FEATURE_BLOG'] = 'true';
     CachedState::$cachedRoutes = null;
     CachedState::$cachedConfig = null;
+});
+
+it('keeps the blog admin in the sysadmin panel and out of the customer panel', function (): void {
+    expect(Route::has('filament.sysadmin.resources.posts.index'))->toBeTrue()
+        ->and(Route::has('filament.app.resources.posts.index'))->toBeFalse()
+        ->and(Route::has('filament.app.resources.categories.index'))->toBeFalse()
+        ->and(Route::has('filament.app.resources.tags.index'))->toBeFalse();
 });

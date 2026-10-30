@@ -7,6 +7,7 @@ use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Exceptions\WorkspaceInvitationRateLimitedException;
+use App\Features\Billing;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembersModal;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
@@ -29,6 +30,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Laravel\Jetstream\Events\InvitingTeamMember;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -546,6 +548,7 @@ test('shows a hint for every role option in the invite-link default role picker'
 });
 
 test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabilities() says, not a hand-written copy', function (): void {
+    Feature::define(Billing::class, true);
     $component = livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->mountAction([
             TestAction::make('invitePeople'),

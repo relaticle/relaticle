@@ -307,9 +307,11 @@ it('rejects a saved staff page snapshot on the customer host after staff logout'
     'model catalog' => ['/ai-models', 'ManageAiSettings'],
     'dashboard' => ['/instance', '\\Pages\\Dashboard'],
     'widget' => ['/instance', 'InstanceStats'],
-    'shared global search' => ['/instance', 'GlobalSearch'],
     'shared notifications' => ['/instance', 'DatabaseNotifications'],
     'shared topbar' => ['/instance', 'Topbar'],
+    ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+        'shared global search' => ['/instance', 'GlobalSearch'],
+    ] : []),
 ]);
 
 it('keeps the customer signed in through staff login and logout with identical account ids', function (): void {

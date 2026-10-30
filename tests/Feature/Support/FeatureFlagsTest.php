@@ -16,7 +16,6 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
-use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 
 mutates(AccountDeletion::class, OnboardSeed::class, SaveOnboardingUseCase::class, SocialAuth::class, Documentation::class, Billing::class, EditProfile::class);
@@ -99,16 +98,5 @@ describe('SocialAuth', function (): void {
         putenv('RELATICLE_FEATURE_SOCIAL_AUTH');
         CachedState::$cachedRoutes = null;
         CachedState::$cachedConfig = null;
-    });
-});
-
-describe('Blog', function (): void {
-    it('keeps the blog admin in the sysadmin panel and out of the customer panel', function (): void {
-        // The flag gates the PUBLIC blog; staff keep the authoring surface either way,
-        // so posts can be written before launch.
-        expect(Route::has('filament.sysadmin.resources.posts.index'))->toBeTrue()
-            ->and(Route::has('filament.app.resources.posts.index'))->toBeFalse()
-            ->and(Route::has('filament.app.resources.categories.index'))->toBeFalse()
-            ->and(Route::has('filament.app.resources.tags.index'))->toBeFalse();
     });
 });

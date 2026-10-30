@@ -14,6 +14,7 @@ use Relaticle\SystemAdmin\Policies\PersonalAccessTokenPolicy;
 mutates(ApiTokensRelationManager::class, PersonalAccessTokenPolicy::class);
 
 beforeEach(function (): void {
+    config(['ink.features.mcp' => true]);
     $this->admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
