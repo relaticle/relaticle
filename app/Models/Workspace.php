@@ -506,6 +506,30 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     }
 
     /**
+     * Self-serve workspaces that have connected every mailbox their plan allows.
+     *
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function atMailboxCap(Builder $query): Builder
+    {
+        return $query->where(function (Builder $capped): void {
+            foreach (Plan::cases() as $plan) {
+                $limit = $plan->connectedMailboxes();
+
+                if (! $plan->isSelfServe() || $limit === null) {
+                    continue;
+                }
+
+                $capped->orWhere(fn (Builder $onPlan): Builder => $onPlan
+                    ->where('plan', $plan->value)
+                    ->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected(), '>=', $limit));
+            }
+        });
+    }
+
+    /**
      * @param  Builder<Workspace>  $query
      * @return Builder<Workspace>
      */

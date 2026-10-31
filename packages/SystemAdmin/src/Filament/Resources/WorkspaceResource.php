@@ -7,6 +7,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources;
 use App\Enums\BillingStatus;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Enums\Plan;
 use App\Models\Workspace;
 use App\Rules\ValidWorkspaceSlug;
 use Filament\Actions\BulkActionGroup;
@@ -290,6 +291,8 @@ final class WorkspaceResource extends Resource
                     ->options(BillingStatus::class)
                     ->multiple()
                     ->query(self::filterByBillingStatus(...)),
+                SelectFilter::make('plan')
+                    ->options(Plan::class),
                 TernaryFilter::make('personal_workspace')
                     ->label('Personal Workspace'),
                 SelectFilter::make('onboarding_use_case')
@@ -340,6 +343,11 @@ final class WorkspaceResource extends Resource
                     ->toggle()
                     ->visible(fn (): bool => EmailIntegrationServiceProvider::enabled())
                     ->query(fn (Builder $query): Builder => $query->withConnectedMailbox()),
+                Filter::make('at_mailbox_cap')
+                    ->label('At the mailbox cap')
+                    ->toggle()
+                    ->visible(fn (): bool => EmailIntegrationServiceProvider::enabled())
+                    ->query(fn (Builder $query): Builder => $query->atMailboxCap()),
                 Filter::make('stuck_after_setup')
                     ->label('Stuck after setup')
                     ->toggle()
