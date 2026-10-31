@@ -18,13 +18,7 @@
         class="fi-dropdown-panel fi-ta-column-menu"
     >
         @foreach ($this->columnMenuActions() as $actions)
-            @php($visibleWhen = collect($actions)->map->getVisibleWhen()->unique())
-            <div
-                class="fi-dropdown-list"
-                @unless ($visibleWhen->contains(null))
-                    x-bind:style="{ display: ({{ $visibleWhen->implode(') || (') }}) ? null : 'none' }"
-                @endunless
-            >
+            <div class="fi-dropdown-list">
                 @foreach ($actions as $action)
                     {{ $action }}
                 @endforeach

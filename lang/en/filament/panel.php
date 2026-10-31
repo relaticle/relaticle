@@ -40,8 +40,6 @@ return [
             'save_label' => 'Save',
             'move_left' => 'Move left',
             'move_right' => 'Move right',
-            'pin' => 'Pin to left',
-            'unpin' => 'Unpin',
             'hide' => 'Hide column',
         ],
         'layouts' => [

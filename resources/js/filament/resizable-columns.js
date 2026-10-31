@@ -193,7 +193,6 @@ function scheduleSizingUpdate(table) {
         widthRecalcPending.delete(table)
         if (table.isConnected) {
             applyTableSizing(table)
-            applyPinnedOffsets(table)
             scheduleStickyRecalc()
         }
     })
@@ -219,47 +218,7 @@ function trackWrapperScroll(wrapper) {
     scrollTrackedWrappers.add(wrapper)
     wrapper.addEventListener('scroll', () => {
         wrapperScrollLeft.set(wrapper, wrapper.scrollLeft)
-        markScrolledSideways(wrapper.querySelector('table.fi-ta-table'))
     }, { passive: true })
-}
-
-function markScrolledSideways(table) {
-    table?.toggleAttribute('data-scrolled-x', (table.closest('.fi-ta-content-ctn')?.scrollLeft ?? 0) > 0)
-}
-
-// Each pinned cell sticks at the selection column's width plus the pinned widths before it.
-function applyPinnedOffsets(table) {
-    const pinned = headersOf(table).filter((th) => th.dataset.columnPinned === '1')
-    const selection = table.querySelector('thead .fi-ta-selection-cell')
-    let left = selection?.offsetWidth ?? 0
-    const offsets = pinned.map((th) => {
-        const offset = left
-        left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
-        return offset
-    })
-    const active = pinned.length > 0
-
-    table.classList.toggle('fi-ta-has-pinned', active)
-    table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))
-    pinned.forEach((th, index) => {
-        [th, ...table.querySelectorAll(`.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)].forEach((cell) => {
-            cell.style.left = active ? `${offsets[index]}px` : ''
-            cell.toggleAttribute('data-column-pinned-last', active && index === pinned.length - 1)
-        })
-    })
-    markScrolledSideways(table)
-    keepPinsInColumnManager(table, pinned.map(headerName))
-}
-
-// Filament's column manager has no per-item lock, so its sortable list leaves the pins where they are.
-function keepPinsInColumnManager(table, pinned) {
-    const list = table.closest('.fi-ta')?.querySelector('.fi-ta-col-manager-items')
-    if (!list?.sortable) return
-
-    const isPinned = (item) => pinned.includes(item?.getAttribute('x-sortable-item')?.replace(/^column::/, ''))
-
-    list.sortable.option('onMove', (event) => !isPinned(event.related))
-    list.querySelectorAll(':scope > [x-sortable-item]').forEach((item) => item.toggleAttribute('data-column-pinned', isPinned(item)))
 }
 
 function lockTable(table) {
@@ -281,7 +240,6 @@ function lockTable(table) {
     }
 
     table.dataset.resizableLayoutLocked = '1'
-    applyPinnedOffsets(table)
     scheduleStickyRecalc()
 }
 
@@ -300,7 +258,6 @@ function rebuildResizableTablesAfterMorph({ el } = {}) {
         delete table.dataset.resizableLayoutLocked
         lockTable(table)
         table.querySelectorAll('thead th[x-data^="resizableColumn"]').forEach(reapplyHeader)
-        applyPinnedOffsets(table)
 
         // Other components morph too, and only the table's own morph has rebuilt its headers.
         if (el?.contains(table)) restoreColumnFocus(table)
@@ -326,15 +283,17 @@ function ensureGlobalMorphHook() {
     morphHookRegistered = true
 }
 
-// A block laid out at `max-content` takes the width its content asks for. All writes come before
-// any read, because a read between writes forces a full table layout per element.
-function naturalWidths(elements) {
-    const saved = elements.map((element) => element && { width: element.style.width, maxWidth: element.style.maxWidth })
-    elements.forEach((element) => element && Object.assign(element.style, { width: 'max-content', maxWidth: 'none' }))
-    const widths = elements.map((element) => (element ? element.getBoundingClientRect().width : 0))
-    elements.forEach((element, index) => element && Object.assign(element.style, saved[index]))
+// A block laid out at `max-content` takes the width its content asks for, however deep the
+// truncating wrappers go. Restored before the browser paints, so nothing flickers.
+function naturalWidth(element) {
+    if (!element) return 0
 
-    return widths
+    const { width, maxWidth } = element.style
+    Object.assign(element.style, { width: 'max-content', maxWidth: 'none' })
+    const measured = element.getBoundingClientRect().width
+    Object.assign(element.style, { width, maxWidth })
+
+    return measured
 }
 
 // The cells are border-box, so the width a column is given must also cover its 1px divider.
@@ -408,21 +367,14 @@ function headerName(th) {
     return th ? window.Alpine?.$data?.(th)?.columnName ?? null : null
 }
 
-// The pinned columns stay put, so a column moves only among the unpinned ones.
-function isMovable(th) {
-    return th !== undefined && th.dataset.columnPinned !== '1'
-}
-
 function moveTargets(th) {
     const headers = headersOf(th.closest('table'))
     const index = headers.indexOf(th)
     const left = headers[index - 1]
-    const canSwapWith = (other) => isMovable(th) && isMovable(other)
 
     return {
-        movable: isMovable(th),
-        canMoveLeft: canSwapWith(left),
-        canMoveRight: canSwapWith(headers[index + 1]),
+        canMoveLeft: left !== undefined,
+        canMoveRight: index < headers.length - 1,
         before: {
             left: left ? headerName(left) : null,
             right: headers[index + 2] ? headerName(headers[index + 2]) : null,
@@ -478,16 +430,14 @@ function columnSlots(table) {
 }
 
 // A neighbour swaps once the dragged column's leading edge passes its middle, the same distance either way.
-// The pinned columns keep their places.
 function dropIndex(slots, source, left) {
     const right = left + source.width
     const start = slots.indexOf(source)
     const middle = (slot) => slot.left + slot.width / 2
     const before = slots.slice(0, start).filter((slot) => middle(slot) < left).length
     const after = slots.slice(start + 1).filter((slot) => middle(slot) < right).length
-    const pinned = slots.filter((slot) => slot.th.dataset.columnPinned === '1').length
 
-    return Math.max(before + after, pinned)
+    return before + after
 }
 
 function shiftColumns(slots, source, index) {
@@ -519,9 +469,9 @@ function clearShift(slots) {
     }))
 }
 
-// A press on a movable header drags it, except on its controls. Touch keeps swiping the table.
+// A press on a header drags it, except on its controls. Touch keeps swiping the table.
 function startHeaderDrag(event, th, wire) {
-    if (event.button !== 0 || event.pointerType === 'touch' || !isMovable(th)) return
+    if (event.button !== 0 || event.pointerType === 'touch') return
     if (event.target.closest('.fi-ta-column-handle, .column-resize-handle-bar')) return
 
     startColumnDrag(event, th, wire)
@@ -650,8 +600,6 @@ function registerColumnMenu() {
         trigger: null,
         panel: null,
         hideable: false,
-        movable: false,
-        pinned: false,
         canMoveLeft: false,
         canMoveRight: false,
         before: { left: null, right: null },
@@ -670,7 +618,6 @@ function registerColumnMenu() {
             this.close(false)
 
             // Placed by its right edge in the same update that shows it, so it never appears elsewhere first.
-            // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
             const rect = detail.trigger.getBoundingClientRect()
             const width = parseFloat(getComputedStyle(this.panel).width) || 0
             // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
@@ -754,9 +701,7 @@ function registerResizableColumn() {
             handle.className = 'fi-ta-column-handle'
             handle.setAttribute('aria-label', window.filamentData?.columnOptionsLabel ?? '')
             handle.setAttribute('aria-haspopup', 'menu')
-            if (isMovable(this.column)) {
-                handle.addEventListener('keydown', (e) => this.moveByKey(e))
-            }
+            handle.addEventListener('keydown', (e) => this.moveByKey(e))
             handle.addEventListener('click', (e) => {
                 e.preventDefault()
                 e.stopPropagation()
@@ -765,7 +710,6 @@ function registerResizableColumn() {
                         column: columnName,
                         trigger: handle,
                         hideable: this.column.dataset.columnHideable === '1',
-                        pinned: this.column.dataset.columnPinned === '1',
                         ...moveTargets(this.column),
                     },
                 }))
@@ -877,8 +821,6 @@ function registerResizableColumn() {
                 cell.style.cssText = cellStyle
                 cell.dataset.resizableWidth = String(width)
             })
-            // The style reset above clears a pinned cell's `left`, and only a pinned column moves the pins after it.
-            if (this.column.dataset.columnPinned === '1') applyPinnedOffsets(this.table)
             scheduleSizingUpdate(this.table)
         },
 
@@ -901,9 +843,10 @@ function registerResizableColumn() {
                 .map((cell) => cell.firstElementChild)
                 .filter(Boolean)
 
-            const insets = [this.column, ...contents.map((content) => content.parentElement)].map(horizontalInset)
-            const widths = naturalWidths([label, ...contents])
-            const widest = Math.max(...widths.map((width, index) => width + insets[index]))
+            const widest = Math.max(
+                naturalWidth(label) + horizontalInset(this.column),
+                ...contents.map((content) => naturalWidth(content) + horizontalInset(content.parentElement)),
+            )
 
             return Math.ceil(Math.min(this.maxWidth, Math.max(this.minWidth, widest)))
         },
