@@ -112,25 +112,26 @@ final readonly class EmailHtmlSanitizer
 <style>
 :root { color-scheme: light dark; background: #ffffff; }
 html, body { margin: 0; background: #ffffff; color: #111827; }
-body {
-    box-sizing: border-box;
-    padding: 0;
-    overflow-wrap: anywhere;
+:where(body) {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
 }
+body { box-sizing: border-box; padding: 16px; overflow-wrap: anywhere; }
 img, video { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre { white-space: pre-wrap; }
-@media (prefers-color-scheme: dark) {
-    :root { background: transparent; }
-    html, body { background: transparent !important; color: #f3f4f6 !important; }
-    body, table, tbody, thead, tfoot, tr, td, th, div, p, span, section, article, main, blockquote, li {
-        background-color: transparent !important;
-        border-color: #4b5563 !important;
-        color: #f3f4f6 !important;
-    }
-    a { color: #93c5fd !important; }
-    [bgcolor] { background-color: transparent !important; }
+/* The frame canvas follows the root's used color-scheme, so it must match the app's theme too. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; background: transparent; }
+:root[data-theme="dark"] body { background: transparent !important; color: #f3f4f6 !important; }
+:root[data-theme="dark"] :is(table, tbody, thead, tfoot, tr, td, th, div, p, span, section, article, main, blockquote, li) {
+    background-color: transparent !important;
+    border-color: #4b5563 !important;
+    color: #f3f4f6 !important;
 }
+:root[data-theme="dark"] a { color: #93c5fd !important; }
+:root[data-theme="dark"] [bgcolor] { background-color: transparent !important; }
 </style>
 </head>
 <body>

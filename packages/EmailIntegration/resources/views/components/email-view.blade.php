@@ -362,10 +362,21 @@
                         $refs.body.style.height = '1px'
                         $refs.body.style.height = Math.max(doc.documentElement.scrollHeight, 160) + 'px'
                     },
+                    theme() {
+                        const doc = $refs.body?.contentDocument
+
+                        if (doc?.documentElement) doc.documentElement.dataset.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+                    },
+                    themeObserver: null,
                     init() {
                         this.fit()
+                        this.theme()
+
+                        this.themeObserver = new MutationObserver(() => this.theme())
+                        this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
                         $refs.body.addEventListener('load', () => {
+                            this.theme()
                             this.fit()
                             this.ready = true
 
@@ -378,12 +389,15 @@
                         // A frame that never fires load must not leave a spinner forever.
                         setTimeout(() => { this.ready = true }, 5000)
                     },
+                    destroy() {
+                        this.themeObserver?.disconnect()
+                    },
                 }"
                 x-bind:class="ready ? 'shrink-0' : 'flex min-h-0 flex-1 flex-col'"
             >
                 <div
                     x-bind:class="ready ? '' : 'min-h-0 flex-1'"
-                    class="relative w-full overflow-hidden bg-white px-6 py-6 sm:px-8 lg:px-10 dark:bg-gray-900"
+                    class="relative w-full overflow-hidden bg-white px-2 sm:px-4 dark:bg-gray-900"
                 >
                     <div
                         x-show="! ready"
