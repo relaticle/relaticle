@@ -180,7 +180,7 @@ final class CloudServiceProvider extends ServiceProvider
     {
         // Stored bell rows and queued mail and job payloads name these pre-move classes. Queued notifications
         // still lose their private properties under a new class name, so the deploy drains the queue first.
-        foreach ([
+        $aliases = [
             'App\Notifications\PaymentFailedNotification' => PaymentFailedNotification::class,
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
             'App\Mail\ProEndedMail' => ProEndedMail::class,
@@ -188,11 +188,13 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
             'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
             'App\Mail\NewContactSubmissionMail' => NewContactSubmissionMail::class,
-        ] as $preMoveName => $current) {
-            if (! class_exists($preMoveName, false)) {
-                class_alias($current, $preMoveName);
+        ];
+
+        spl_autoload_register(static function (string $class) use ($aliases): void {
+            if (isset($aliases[$class])) {
+                class_alias($aliases[$class], $class);
             }
-        }
+        });
     }
 
     private function registerMailPreviews(): void
