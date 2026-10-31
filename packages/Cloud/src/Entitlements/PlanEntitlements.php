@@ -49,4 +49,9 @@ final readonly class PlanEntitlements implements Entitlements
     {
         return $workspace->billingStatus()->grantsAccess();
     }
+
+    public function mailboxLimit(Workspace $workspace): ?int
+    {
+        return $workspace->plan->connectedMailboxes();
+    }
 }

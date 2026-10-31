@@ -270,6 +270,11 @@ it('offers no billing link when a metered turn runs out of credits while billing
         {
             return true;
         }
+
+        public function mailboxLimit(Workspace $workspace): ?int
+        {
+            return null;
+        }
     });
 
     $user = User::factory()->withPersonalWorkspace()->create();

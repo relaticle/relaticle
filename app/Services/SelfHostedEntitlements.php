@@ -34,4 +34,9 @@ final readonly class SelfHostedEntitlements implements Entitlements
     {
         return true;
     }
+
+    public function mailboxLimit(Workspace $workspace): ?int
+    {
+        return null;
+    }
 }
