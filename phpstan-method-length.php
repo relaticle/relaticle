@@ -28,7 +28,6 @@ return [
                 'App\Mcp\Tools\ListCustomFieldsTool::handle' => 64,
                 'App\Mcp\Tools\SearchTool::handle' => 77,
                 'App\Providers\AppServiceProvider::configureFilament' => 88,
-                'App\Providers\AppServiceProvider::configureRateLimiting' => 70,
                 'App\Providers\AppServiceProvider::register' => 77,
                 'App\Providers\Filament\AppPanelProvider::boot' => 67,
                 'App\Providers\Filament\AppPanelProvider::panel' => 288,

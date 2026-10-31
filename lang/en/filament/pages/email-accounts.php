@@ -64,6 +64,9 @@ return [
         'cancelled' => [
             'title' => 'Nothing was connected. You can connect a mailbox any time.',
         ],
+        'limit_reached' => [
+            'title' => 'The :plan plan allows :limit connected mailboxes in a workspace. Upgrade to connect more.',
+        ],
         'calendar_sync_queued' => [
             'title' => 'Calendar sync started.',
             'body' => 'Your meetings will update on this page as the sync finishes.',

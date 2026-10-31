@@ -380,6 +380,13 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->connectedAccounts()->connected()->exists();
     }
 
+    public function hasMailboxCapacity(): bool
+    {
+        $limit = $this->plan->connectedMailboxes();
+
+        return $limit === null || $this->connectedAccounts()->connected()->count() < $limit;
+    }
+
     /**
      * Reads the `subscriptions` relation, so eager load it when rendering this
      * for more than one workspace. It deliberately does not `loadMissing()` on your

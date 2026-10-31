@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\Http\RequestAbility;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\TransientToken;
@@ -126,6 +128,22 @@ describe('rate limit headers', function (): void {
         expect((int) $response->headers->get('Retry-After'))->toBeGreaterThan(0)
             ->and($response->headers->get('X-RateLimit-Remaining'))->toBe('0');
     });
+
+    it('multiplies the API and MCP limits by the plan throughput', function (Plan $plan, int $factor): void {
+        $this->user->currentWorkspace->forceFill(['plan' => $plan])->save();
+
+        $read = Request::create('/api/v1/companies')->setUserResolver(fn (): User => $this->user);
+        $write = Request::create('/api/v1/companies', 'POST')->setUserResolver(fn (): User => $this->user);
+        $maxAttempts = fn (array $limits): array => array_map(fn (Limit $limit): int => $limit->maxAttempts, $limits);
+
+        expect($maxAttempts(RateLimiter::limiter('api')($read)))->toBe([600 * $factor, 300 * $factor])
+            ->and($maxAttempts(RateLimiter::limiter('api')($write)))->toBe([600 * $factor, 60 * $factor])
+            ->and(RateLimiter::limiter('mcp')($read)->maxAttempts)->toBe(120 * $factor);
+    })->with([
+        'Pro' => [Plan::Pro, 1],
+        'Scale' => [Plan::Scale, 3],
+        'Enterprise' => [Plan::Enterprise, 10],
+    ]);
 });
 
 describe('session credentials', function (): void {

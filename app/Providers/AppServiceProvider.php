@@ -550,29 +550,44 @@ final class AppServiceProvider extends ServiceProvider
         };
     }
 
+    private function planThroughput(?User $user): int
+    {
+        return ($user?->currentWorkspace->plan ?? Plan::default())->throughputMultiplier();
+    }
+
+    /** @return list<Limit> */
+    private function apiLimits(Request $request): array
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+        $tokenId = $this->rateLimitTokenId($user?->currentAccessToken());
+        $workspaceId = $user?->currentWorkspace?->getKey();
+        $key = $tokenId ?: $request->ip();
+        $throughput = $this->planThroughput($user);
+
+        $limits = [
+            Limit::perMinute(600 * $throughput)->by('workspace:'.($workspaceId ?? $request->ip())),
+        ];
+
+        if (RequestAbility::isRead($request)) {
+            $limits[] = Limit::perMinute(300 * $throughput)->by("token:{$key}:read");
+        } else {
+            $limits[] = Limit::perMinute(60 * $throughput)->by("token:{$key}:write");
+        }
+
+        return $limits;
+    }
+
     private function configureRateLimiting(): void
     {
-        RateLimiter::for('api', function (Request $request): array {
+        RateLimiter::for('api', fn (Request $request): array => $this->apiLimits($request));
+
+        RateLimiter::for('mcp', function (Request $request): Limit {
             /** @var User|null $user */
             $user = $request->user();
-            $tokenId = $this->rateLimitTokenId($user?->currentAccessToken());
-            $workspaceId = $user?->currentWorkspace?->getKey();
-            $key = $tokenId ?: $request->ip();
 
-            $limits = [
-                Limit::perMinute(600)->by('workspace:'.($workspaceId ?? $request->ip())),
-            ];
-
-            if (RequestAbility::isRead($request)) {
-                $limits[] = Limit::perMinute(300)->by("token:{$key}:read");
-            } else {
-                $limits[] = Limit::perMinute(60)->by("token:{$key}:write");
-            }
-
-            return $limits;
+            return Limit::perMinute(120 * $this->planThroughput($user))->by($user?->getKey() ?: $request->ip());
         });
-
-        RateLimiter::for('mcp', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
 
         RateLimiter::for(
             'mcp-oauth',
