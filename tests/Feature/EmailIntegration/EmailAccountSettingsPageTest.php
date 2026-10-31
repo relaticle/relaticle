@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
@@ -15,7 +16,7 @@ use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 
-mutates(EmailAccountSettingsPage::class);
+mutates(EmailAccountSettingsPage::class, StripeBilling::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -44,6 +45,25 @@ it('loads the account form and existing blocklist entries on mount', function ()
         ->assertSet('data.sync_inbox', $this->account->fresh()->sync_inbox)
         ->assertSet('data.sharing_tier', EmailPrivacyTier::SUBJECT->value)
         ->assertCount('blocklistEntries', 1);
+});
+
+it('loads the account form and existing blocklist entries on mount while billing is on', function (): void {
+    withHostedBilling();
+
+    $this->account->forceFill(['sharing_tier' => EmailPrivacyTier::SUBJECT])->save();
+
+    EmailBlocklist::factory()->create([
+        'user_id' => $this->user->id,
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'type' => EmailBlocklistType::DOMAIN,
+        'value' => 'spammy.com',
+    ]);
+
+    livewire(EmailAccountSettingsPage::class, ['account' => $this->account->id])
+        ->assertSet('data.sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->assertCount('blocklistEntries', 1)
+        ->assertSee(__('workspaces.tabs.billing'));
 });
 
 it('does not expose workspace record creation controls on a personal account', function (): void {

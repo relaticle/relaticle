@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
 use App\Enums\MediaCollection;
 use App\Enums\OnboardingReferralSource;
@@ -382,7 +383,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public function hasMailboxCapacity(): bool
     {
-        $limit = $this->plan->connectedMailboxes();
+        $limit = resolve(Entitlements::class)->mailboxLimit($this);
 
         return $limit === null || $this->connectedAccounts()->connected()->count() < $limit;
     }

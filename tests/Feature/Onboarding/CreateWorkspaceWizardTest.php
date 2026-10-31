@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\StartProTrial;
 use App\Actions\Jetstream\CreateWorkspace as CreateWorkspaceAction;
 use App\Actions\User\UpdateUserName;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\Plan;
 use App\Enums\WorkspaceRole;
-use App\Features\Billing as BillingFeature;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\NoBilling;
 use Filament\Schemas\Components\Wizard;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
@@ -25,8 +24,10 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Cloud\Billing\Actions\StartProTrial;
+use Relaticle\Cloud\Billing\StripeBilling;
 
-mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class);
+mutates(CreateWorkspace::class, CreateWorkspaceAction::class, StartProTrial::class, UpdateUserName::class, NoBilling::class, StripeBilling::class);
 
 it('renders the create workspace page with wizard for workspaceless users', function (): void {
     $user = User::factory()->create();
@@ -36,6 +37,29 @@ it('renders the create workspace page with wizard for workspaceless users', func
     livewire(CreateWorkspace::class)
         ->assertSuccessful()
         ->assertSee('Create your workspace');
+});
+
+it('links the configured legal pages in the onboarding footer', function (): void {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+    config()->set('relaticle.legal.terms_url', 'https://legal.example.test/terms');
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/terms"', escape: false);
+});
+
+it('shows no legal links in the onboarding footer when none are configured', function (): void {
+    config()->set('relaticle.legal.privacy_url', null);
+    config()->set('relaticle.legal.terms_url', null);
+
+    $this->actingAs(User::factory()->create());
+
+    livewire(CreateWorkspace::class)
+        ->assertSee(__('auth.verify_email.sign_out'))
+        ->assertDontSee(__('auth.footer.privacy_policy'))
+        ->assertDontSee(__('auth.footer.terms_of_service'));
 });
 
 it('shows a back affordance but no step counter in the wizard', function (): void {
@@ -797,7 +821,7 @@ it('shows the account menu links inside a workspace', function (): void {
 });
 
 it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->create();
     $this->actingAs($user);
@@ -821,7 +845,7 @@ it('automatically starts one 14-day Cloud Pro trial after hosted onboarding', fu
 });
 
 it('starts a fresh trial for each additional hosted workspace', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace?->forceFill(['pro_trial_used_at' => now()])->save();
@@ -841,6 +865,25 @@ it('starts a fresh trial for each additional hosted workspace', function (): voi
         ->and($workspace->onGenericTrial())->toBeTrue()
         ->and($workspace->pro_trial_used_at)->not->toBeNull()
         ->and($workspace->hosted_free_grandfathered_at)->toBeNull();
+});
+
+it('starts no trial when billing is off', function (): void {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm([
+            'name' => 'Self Hosted Workspace',
+        ])
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    /** @var Workspace $workspace */
+    $workspace = $user->refresh()->currentWorkspace;
+
+    expect($workspace->plan)->toBe(Plan::Free)
+        ->and($workspace->trial_ends_at)->toBeNull()
+        ->and($workspace->pro_trial_used_at)->toBeNull();
 });
 
 it('creates a workspace with a custom slug', function (): void {

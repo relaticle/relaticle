@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -10,7 +9,6 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\ConversationStore;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
 use Relaticle\Chat\Actions\StoreImportHandoff;
@@ -252,7 +250,7 @@ it('hands off a wide file sent alone instead of inlining megabytes of prompt', f
 });
 
 it('stores a handoff reply for a large file sent alone without running the model or spending a credit', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     Queue::fake();
@@ -608,7 +606,7 @@ it('keeps the typed text when a text file carries its own attached file lead', f
 });
 
 it('runs the model on a preview of a large file when the user typed a request', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     Queue::fake();
@@ -634,7 +632,7 @@ it('runs the model on a preview of a large file when the user typed a request', 
 });
 
 it('answers a large file with a typed request like any send when the workspace is out of credits', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     Queue::fake();

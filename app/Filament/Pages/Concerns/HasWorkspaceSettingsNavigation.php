@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Concerns;
 
-use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing;
+use App\Contracts\Billing;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
@@ -16,7 +15,6 @@ use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Filament\Pages\Enums\SubNavigationPosition;
 use Filament\Support\Icons\Heroicon;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
@@ -35,6 +33,8 @@ use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
  */
 trait HasWorkspaceSettingsNavigation
 {
+    private const string BILLING_SLUG = 'billing';
+
     public static function getSubNavigationPosition(): SubNavigationPosition
     {
         return SubNavigationPosition::Top;
@@ -98,13 +98,25 @@ trait HasWorkspaceSettingsNavigation
                 ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
 
-            NavigationItem::make()
-                ->label(__('workspaces.tabs.billing'))
-                ->icon(Heroicon::OutlinedCreditCard)
-                ->url(fn (): string => Billing::getUrl())
-                ->isActiveWhen($this->isCurrentPage(Billing::class))
-                ->visible(fn (): bool => Feature::active(BillingFeature::class)),
+            $this->billingNavigationItem($tenant),
         ];
+    }
+
+    private function billingNavigationItem(Workspace $tenant): NavigationItem
+    {
+        $billingUrl = $this->billingUrl($tenant);
+
+        return NavigationItem::make()
+            ->label(__('workspaces.tabs.billing'))
+            ->icon(Heroicon::OutlinedCreditCard)
+            ->url($billingUrl)
+            ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
+            ->visible($billingUrl !== null);
+    }
+
+    private function billingUrl(Workspace $tenant): ?string
+    {
+        return resolve(Billing::class)->url($tenant);
     }
 
     /**

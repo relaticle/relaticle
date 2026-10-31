@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
 use App\Http\Middleware\RequireConsent;
@@ -271,7 +270,7 @@ it('rejects the approve POST when the user does not belong to the workspace', fu
 });
 
 it('marks a billing-paused workspace as unselectable on the consent screen', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->actingAs($this->user);
 
@@ -282,7 +281,7 @@ it('marks a billing-paused workspace as unselectable on the consent screen', fun
 });
 
 it('refuses to approve a connector for a billing-paused workspace', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->actingAs($this->user);
 

@@ -118,12 +118,14 @@ parameters:
         # internal sysadmin panel is English-only; 92 type issues, 67 of them one
         # identical.alwaysTrue cluster). Re-include when SystemAdmin gets dev time.
         - packages/SystemAdmin
+        - packages/Cloud/tests (?)
 
     configDirectories:
         - config
         - packages/Chat/config
         - packages/ImportWizard/config
         - packages/Documentation/config
+        - packages/Cloud/config
         - packages/EmailIntegration/config
 
 services:
@@ -144,6 +146,12 @@ services:
                 - App\Filament
                 - Relaticle\Chat\Tools
                 - Relaticle\Chat\Livewire
+                - Relaticle\Cloud\Admin\Filament
+                - Relaticle\Cloud\Billing\Http
+                - Relaticle\Cloud\Billing\Filament
+                - Relaticle\Cloud\Billing\Livewire
+                - Relaticle\Cloud\Docs\Http
+                - Relaticle\Cloud\Marketing\Http
                 - App\Queries
                 - Relaticle\Chat\Queries
                 - Relaticle\EmailIntegration\Queries

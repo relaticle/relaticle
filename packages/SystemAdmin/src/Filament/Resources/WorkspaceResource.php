@@ -43,11 +43,7 @@ use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\NotesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\OpportunitiesRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\PeopleRelationManager;
-use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\SubscriptionsRelationManager;
 use Relaticle\SystemAdmin\Filament\Resources\WorkspaceResource\RelationManagers\TasksRelationManager;
-use Relaticle\SystemAdmin\Filament\Support\EndTrial;
-use Relaticle\SystemAdmin\Filament\Support\ExtendTrial;
-use Relaticle\SystemAdmin\Filament\Support\ManagedPlan;
 use Relaticle\SystemAdmin\Filament\Support\QueuePurge;
 use Relaticle\SystemAdmin\Filament\Support\RecordLink;
 use Relaticle\SystemAdmin\Metrics\Scopes\AbuseSuspect;
@@ -56,6 +52,7 @@ use Relaticle\SystemAdmin\Metrics\Scopes\FormedHabit;
 use Relaticle\SystemAdmin\Metrics\Scopes\InternalWorkspace;
 use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
 use Relaticle\SystemAdmin\Metrics\WorkspaceJourney;
+use Relaticle\SystemAdmin\Support\Extensions;
 
 final class WorkspaceResource extends Resource
 {
@@ -143,15 +140,18 @@ final class WorkspaceResource extends Resource
                         ->label('Billing')
                         ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                         ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('plan')
                         ->label('Plan')
                         ->tooltip(self::PLAN_TOOLTIP)
-                        ->badge(),
+                        ->badge()
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('trial_ends_at')
                         ->label('Trial Ends')
                         ->dateTime()
-                        ->placeholder('—'),
+                        ->placeholder('—')
+                        ->visible(BillingStatus::billingEnabled(...)),
                     TextEntry::make('onboarding_use_case')
                         ->label('Use Case')
                         ->badge()
@@ -235,13 +235,15 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->state(fn (Workspace $record): BillingStatus => $record->billingStatus())
                     ->tooltip(fn (BillingStatus $state): string => $state->getDescription())
-                    ->badge(),
+                    ->badge()
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('plan')
                     ->label('Plan')
                     ->tooltip(self::PLAN_TOOLTIP)
                     ->badge()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->visible(BillingStatus::billingEnabled(...)),
                 TextColumn::make('onboarding_use_case')
                     ->label('Use Case')
                     ->badge()
@@ -290,7 +292,8 @@ final class WorkspaceResource extends Resource
                     ->label('Billing')
                     ->options(BillingStatus::class)
                     ->multiple()
-                    ->query(self::filterByBillingStatus(...)),
+                    ->query(self::filterByBillingStatus(...))
+                    ->visible(BillingStatus::billingEnabled(...)),
                 SelectFilter::make('plan')
                     ->options(Plan::class),
                 TernaryFilter::make('personal_workspace')
@@ -360,14 +363,11 @@ final class WorkspaceResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()->action(null),
-                ExtendTrial::action(),
-                EndTrial::action(),
-                ManagedPlan::startAction(),
-                ManagedPlan::withdrawAction(),
+                ...resolve(Extensions::class)->workspaceTableActions(),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    EndTrial::bulkAction(),
+                    ...resolve(Extensions::class)->workspaceBulkActions(),
                     QueuePurge::bulkAction(),
                 ]),
             ]);
@@ -412,7 +412,7 @@ final class WorkspaceResource extends Resource
             ConversationsRelationManager::class,
             ImportsRelationManager::class,
             MailboxesRelationManager::class,
-            SubscriptionsRelationManager::class,
+            ...resolve(Extensions::class)->workspaceRelationManagers(),
             ActivityRelationManager::class,
         ];
     }

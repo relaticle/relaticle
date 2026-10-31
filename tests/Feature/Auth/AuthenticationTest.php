@@ -75,6 +75,34 @@ test('login screen can be rendered', function () {
     $response->assertStatus(200);
 });
 
+it('renders the sign-in footer without legal links when none are configured', function (): void {
+    config()->set('relaticle.legal', ['privacy_url' => null, 'terms_url' => null, 'contact_url' => null]);
+
+    $this->get(url()->getAppUrl('login'))
+        ->assertOk()
+        ->assertSee(__('auth.footer.copyright', ['year' => now()->year]))
+        ->assertDontSeeHtml('>'.__('auth.footer.terms_of_service').'</a>')
+        ->assertDontSeeHtml('>'.__('auth.footer.privacy_policy').'</a>')
+        ->assertDontSeeHtml('>'.__('auth.footer.support').'</a>');
+});
+
+it('renders the sign-in footer with the configured legal links', function (): void {
+    config()->set('relaticle.legal', [
+        'privacy_url' => 'https://legal.example.test/privacy',
+        'terms_url' => 'https://legal.example.test/terms',
+        'contact_url' => 'https://legal.example.test/contact',
+    ]);
+
+    $this->get(url()->getAppUrl('login'))
+        ->assertOk()
+        ->assertSee('href="https://legal.example.test/terms"', escape: false)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/contact"', escape: false)
+        ->assertSee(__('auth.footer.terms_of_service'))
+        ->assertSee(__('auth.footer.privacy_policy'))
+        ->assertSee(__('auth.footer.support'));
+});
+
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

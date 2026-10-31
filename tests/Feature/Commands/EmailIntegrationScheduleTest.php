@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Models\Workspace;
@@ -117,7 +116,7 @@ it('dispatches incremental calendar sync jobs only for accounts with calendar en
 });
 
 it('syncs mailboxes only in workspaces whose billing status grants hosted access', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     Bus::fake([IncrementalEmailSyncJob::class, IncrementalCalendarSyncJob::class]);
 
     $accounts = collect(BillingStatusFixture::arrangements())->map(function (array $arrangement): array {
@@ -148,7 +147,7 @@ it('syncs mailboxes only in workspaces whose billing status grants hosted access
 });
 
 it('resumes a paused workspace mailbox sync once the workspace subscribes', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     Bus::fake([IncrementalEmailSyncJob::class]);
 
     $workspace = BillingStatusFixture::workspace();
@@ -171,7 +170,7 @@ it('resumes a paused workspace mailbox sync once the workspace subscribes', func
 });
 
 it('keeps renewing calendar push channels only in workspaces with hosted access', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     config()->set('app.url', 'https://app.relaticle.com');
     Bus::fake([EnsureCalendarPushChannelJob::class]);
 

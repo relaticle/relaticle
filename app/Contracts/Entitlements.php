@@ -18,4 +18,6 @@ interface Entitlements
     public function chatRateLimit(Workspace $workspace): int;
 
     public function allowsAccess(Workspace $workspace): bool;
+
+    public function mailboxLimit(Workspace $workspace): ?int;
 }

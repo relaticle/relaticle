@@ -7,7 +7,6 @@ use App\Actions\Company\DeleteCompany;
 use App\Actions\People\CreatePeople;
 use App\Actions\People\UpdatePeople;
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Features\OnboardSeed;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -365,7 +364,7 @@ it('hands the resume back when the queued turn finds a step still pending', func
 });
 
 it('skips the resume when the workspace is out of credits', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 
@@ -381,7 +380,7 @@ it('skips the resume when the workspace is out of credits', function (): void {
 });
 
 it('charges one credit for the resumed turn', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     Queue::fake();
 

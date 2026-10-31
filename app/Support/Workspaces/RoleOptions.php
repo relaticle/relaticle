@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Workspaces;
 
+use App\Enums\BillingStatus;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
@@ -11,6 +12,7 @@ use App\Models\Workspace;
 use Filament\Actions\Action;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
+use Relaticle\Documentation\Support\DocUrl;
 
 final readonly class RoleOptions
 {
@@ -58,6 +60,7 @@ final readonly class RoleOptions
             ->prepend(WorkspaceCapability::forOwner(), 'owner');
 
         return collect(WorkspaceCapability::cases())
+            ->reject(fn (WorkspaceCapability $capability): bool => $capability === WorkspaceCapability::BillingManage && ! BillingStatus::billingEnabled())
             ->mapWithKeys(fn (WorkspaceCapability $capability): array => [
                 $capability->value => $roleCapabilities
                     ->map(fn (array $granted): bool => in_array($capability, $granted, true))
@@ -87,7 +90,7 @@ final readonly class RoleOptions
                     ->icon('heroicon-m-arrow-top-right-on-square')
                     ->iconPosition('after')
                     ->link()
-                    ->url(url()->getPublicUrl(route('help.show', ['category' => 'workspace', 'slug' => 'manage-members-and-roles'], false)))
+                    ->url(DocUrl::helpPage('workspace', 'manage-members-and-roles'))
                     ->openUrlInNewTab()
                     ->extraAttributes(['aria-label' => __('workspaces.actions.compare_roles_help_link').' '.__('workspaces.role_matrix.opens_in_new_tab')]),
             ]);

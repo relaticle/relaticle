@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 return [
 
+    'cloud' => filter_var(env('RELATICLE_CLOUD', false), FILTER_VALIDATE_BOOLEAN),
+
     'contact' => [
         'email' => env('CONTACT_EMAIL', 'hello@relaticle.com'),
     ],
@@ -29,6 +31,12 @@ return [
     'company' => [
         'name' => env('RELATICLE_COMPANY_NAME', 'Relaticle'),
         'address' => env('RELATICLE_COMPANY_ADDRESS', ''),
+    ],
+
+    'legal' => [
+        'privacy_url' => env('RELATICLE_PRIVACY_URL') ?: null,
+        'terms_url' => env('RELATICLE_TERMS_URL') ?: null,
+        'contact_url' => env('RELATICLE_CONTACT_URL') ?: null,
     ],
 
     'deletion' => [

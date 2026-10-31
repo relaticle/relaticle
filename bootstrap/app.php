@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Features\EmailIntegration;
-use App\Http\Controllers\Billing\StripeWebhookController;
 use App\Http\Middleware\ConfigureTrustedProxies;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\EnsureAuthenticationComplete;
@@ -39,7 +38,6 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
-use Laravel\Cashier\Http\Middleware\VerifyWebhookSignature;
 use Laravel\Fortify\Fortify;
 use Laravel\Pennant\Feature;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -50,6 +48,7 @@ use Livewire\Features\SupportComputed\CannotCallComputedDirectlyException;
 use Livewire\Features\SupportLifecycleHooks\DirectlyCallingLifecycleHooksNotAllowedException;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Livewire\Mechanisms\HandleComponents\CorruptComponentPayloadException;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
 use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Sentry\Laravel\Integration;
@@ -67,14 +66,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         health: '/up',
         then: function (): void {
-            // Registered here rather than by Cashier (see AppServiceProvider):
-            // signature verification must apply whether or not the webhook
-            // secret is configured, otherwise an unset secret silently turns
-            // this into an unauthenticated, plan-mutating endpoint.
-            Route::post('stripe/webhook', [StripeWebhookController::class, 'handleWebhook'])
-                ->middleware(VerifyWebhookSignature::class)
-                ->name('cashier.webhook');
-
             $apiDomain = config('app.api_domain');
 
             $routes = Route::middleware('api');
@@ -240,16 +231,16 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $indexes = array_filter([
-                __('Site index') => 'llms-txt',
-                __('Help centre') => 'help.index',
-                __('Developer docs') => 'documentation.index',
-                __('REST API spec') => 'openapi.json',
-            ], Route::has(...));
+                __('Site index') => DocUrl::root().'/llms.txt',
+                __('Help centre') => DocUrl::area(DocUrl::HELP),
+                __('Developer docs') => DocUrl::area(DocUrl::DOCS),
+                __('REST API spec') => Route::has('openapi.json') ? route('openapi.json') : null,
+            ]);
 
             $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
 
-            foreach ($indexes as $label => $routeName) {
-                $lines[] = "- {$label}: ".route($routeName);
+            foreach ($indexes as $label => $url) {
+                $lines[] = "- {$label}: {$url}";
             }
 
             $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
@@ -360,7 +351,6 @@ return Application::configure(basePath: dirname(__DIR__))
         });
     })
     ->withSchedule(function (Schedule $schedule): void {
-        $schedule->command('app:generate-sitemap')->daily()->onOneServer();
         $schedule->command('import:cleanup')->hourly()->onOneServer();
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();
@@ -371,7 +361,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:purge-unsent-attachments')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('chat:reset-credits')->hourly()->withoutOverlapping()->onOneServer();
-        $schedule->command('billing:process-trials')->dailyAt('00:15')->withoutOverlapping()->onOneServer();
         $schedule->command('disposable:update')->weekly()->withoutOverlapping()->onOneServer();
         $schedule->command('tor:update-exit-nodes')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('subscribers:reconcile --limit=500')->dailyAt('02:00')

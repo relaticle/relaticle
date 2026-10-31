@@ -2,17 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
-beforeEach(function (): void {
-    Feature::define(Billing::class, true);
-});
-
 it('does not double-refund when failed() runs after a cancel-path refund', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
