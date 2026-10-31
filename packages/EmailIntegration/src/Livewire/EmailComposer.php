@@ -319,7 +319,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // Only prefill the original subject when the viewer is entitled to see it.
         // `can('view')` is true at METADATA_ONLY; `viewSubject` is not.
         $originalSubject = $user->can('viewSubject', $email) ? ($email->subject ?? '') : '';
-        $this->subject = ($this->replyMode === 'forward' ? 'Fwd: ' : 'Re: ').$originalSubject;
+        $this->subject = $this->prefixedSubject($originalSubject);
 
         $this->sourceEmailId = (string) $email->getKey();
         // A forward carries its source for display, but must not thread against it.
@@ -411,6 +411,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         return $this->replyableEmail($this->sourceEmailId);
+    }
+
+    private function prefixedSubject(string $subject): string
+    {
+        $isForward = $this->replyMode === 'forward';
+        $existingPrefix = $isForward ? '/^\s*(fwd?|wg)\s*:/iu' : '/^\s*(re|aw|sv)\s*:/iu';
+
+        if (preg_match($existingPrefix, $subject) === 1) {
+            return $subject;
+        }
+
+        return ($isForward ? 'Fwd: ' : 'Re: ').$subject;
     }
 
     /**
