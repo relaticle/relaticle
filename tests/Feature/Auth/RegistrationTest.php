@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Login;
 use App\Models\User;
+use App\Rules\IndisposableMailHost;
+use App\Support\Email\MailExchangers;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 
-mutates(Login::class);
+mutates(Login::class, IndisposableMailHost::class);
 
 it('flags the session for signup analytics tracking on signup', function (): void {
     $email = 'jane-track-'.uniqid().'@gmail.com';
@@ -62,6 +64,25 @@ it('throttles repeated signup submissions on one discovery', function (): void {
     $component->fillForm(['password' => 'short'])
         ->call('authenticate')
         ->assertNotified(__('auth.login.signup_throttled_title'));
+});
+
+it('creates no account from a throttled signup submission', function (): void {
+    $email = 'throttled-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertNotified(__('auth.login.signup_throttled_title'));
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
 });
 
 it('renders the signup event once and clears the flag', function (): void {
@@ -207,6 +228,64 @@ it('rejects a signup from a domain only the local disposable list carries', func
     }
 
     expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('rejects a signup whose domain receives mail on a disposable mail host', function (string $mailHost): void {
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => [$mailHost]));
+
+    $email = 'setv'.Str::lower(Str::random(10)).'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('validation.indisposable')]);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+})->with([
+    'mail.neighbours.sh.',
+    'MX2.Neighbours.SH',
+    'neighbours.sh',
+]);
+
+it('creates the account when the mail host only resembles a disposable one', function (): void {
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => ['mail.notneighbours.sh']));
+
+    $email = 'jane-lookalike-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('skips the mail host lookup once the domain has failed its dns check', function (): void {
+    $lookups = 0;
+    $this->app->instance(MailExchangers::class, new MailExchangers(function () use (&$lookups): array {
+        $lookups++;
+
+        return [];
+    }));
+
+    $email = 'jane-'.uniqid().'@no-mail-server.invalid';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email']);
+
+    expect($lookups)->toBe(0)
+        ->and(User::where('email', $email)->exists())->toBeFalse();
 });
 
 it('rejects a signup submitted faster than a human could type', function (): void {

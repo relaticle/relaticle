@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Enums;
 
+use App\Contracts\Entitlements;
 use App\Filament\Pages\Billing;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -21,7 +21,7 @@ enum SendFailureRemedy: string
 
     public static function for(Workspace $workspace, ?ConnectedAccount $account): self
     {
-        if (resolve(HostedWorkspaceAccess::class)->isPaused($workspace->loadMissing('subscriptions'))) {
+        if (! resolve(Entitlements::class)->allowsAccess($workspace->loadMissing('subscriptions'))) {
             return self::Subscribe;
         }
 

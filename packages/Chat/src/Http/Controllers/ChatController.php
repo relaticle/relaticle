@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Http\Controllers;
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Filament\Pages\Billing as BillingPage;
@@ -67,6 +68,7 @@ final readonly class ChatController
         private MarkAttachmentSent $markAttachmentSent,
         private CreateConversation $createConversation,
         private ModelAccess $modelAccess,
+        private Entitlements $entitlements,
     ) {}
 
     /** @return list<string> */
@@ -138,7 +140,7 @@ final readonly class ChatController
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($this->modelAccess->planFor($workspace))) {
+            if ($descriptor instanceof ModelDescriptor && ! $this->entitlements->allowsModel($workspace, $descriptor)) {
                 if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
                     return response()->json([
                         'error' => 'model_not_allowed',

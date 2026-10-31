@@ -2,15 +2,24 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\User;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Laravel\Pennant\Feature;
+use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
-mutates(CreditService::class);
+mutates(CreditService::class, ReleaseOrphanedReservationsCommand::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+
+beforeEach(function (): void {
+    Feature::define(Billing::class, true);
+});
 
 it('reserves exactly once for the same reservation key', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -80,6 +89,30 @@ it('refunds orphaned reservations older than the age window', function (): void 
         ->where('idempotency_key', 'resolve-orphan-1')
         ->where('type', AiCreditType::Refund->value)
         ->exists())->toBeTrue();
+});
+
+it('neither refunds nor reports an orphaned reservation of an unmetered workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $service = app(CreditService::class);
+    $service->resetPeriod($workspace);
+
+    $service->reserveCredit($workspace, reservationKey: 'reserve-unmetered-1', conversationId: null, userId: (string) $user->getKey());
+    $afterReserve = $service->getBalance($workspace);
+
+    AiCreditTransaction::query()
+        ->where('idempotency_key', 'reserve-unmetered-1')
+        ->update(['created_at' => now()->subHour()]);
+
+    Feature::define(Billing::class, false);
+    Feature::flushCache();
+
+    Artisan::call('chat:release-orphaned-reservations', ['--age' => 30]);
+
+    expect(Artisan::output())->not->toContain('Refunding orphaned reservation')
+        ->toContain('Refunded 0 orphaned reservations.')
+        ->and($service->getBalance($workspace))->toBe($afterReserve)
+        ->and(AiCreditTransaction::query()->where('idempotency_key', 'resolve-unmetered-1')->exists())->toBeFalse();
 });
 
 it('does not refund reservations that were settled', function (): void {

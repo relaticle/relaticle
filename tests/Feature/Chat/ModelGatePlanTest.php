@@ -8,6 +8,8 @@ use App\Features\Billing;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -15,12 +17,13 @@ use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\ChatDocument;
 
-mutates(ChatController::class, ModelAccess::class);
+mutates(ChatController::class, ModelAccess::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('rejects an Opus request from a grandfathered Free user with a 403', function (): void {
     Feature::define(Billing::class, true);
@@ -62,7 +65,36 @@ it('rejects an Opus request from a grandfathered Free user with a 403', function
     expect($response->json('upgrade_url'))->toBeString();
 });
 
+it('lets a self-hosted workspace send with a Pro-only model', function (): void {
+    Queue::fake();
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    expect($user->currentWorkspace->plan)->toBe(Plan::Free);
+
+    $this->actingAs($user)->postJson('/chat/'.seedGateConversation($user), [
+        'document' => ChatDocument::fromText('hi'),
+        'model' => 'claude-opus-5',
+    ])->assertSuccessful();
+
+    Queue::assertPushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $job): bool => (fn (): array => $this->resolved)->call($job)['id'] === 'claude-opus-5',
+    );
+});
+
+it('picks a Pro-only model first in the auto chain on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    useProFirstAutoChain();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    expect(resolve(AiModelResolver::class)->resolve($user)['model'])->toBe('claude-opus-5');
+});
+
 it('allows an Opus request from a Pro user', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -97,10 +129,13 @@ it('allows an Opus request from a Pro user', function (): void {
 });
 
 it('allows a Free user to send with no explicit model (defaults to Auto)', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     expect($workspace->plan)->toBe(Plan::Free);
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
@@ -130,10 +165,13 @@ it('allows a Free user to send with no explicit model (defaults to Auto)', funct
 });
 
 it('allows a Free user to explicitly pick Sonnet', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     expect($workspace->plan)->toBe(Plan::Free);
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
@@ -163,8 +201,11 @@ it('allows a Free user to explicitly pick Sonnet', function (): void {
 });
 
 it('rejects a GPT-5 request from a Free user with a 403', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
@@ -195,12 +236,15 @@ it('rejects a GPT-5 request from a Free user with a 403', function (): void {
 });
 
 it('allows a Free user to pick Ollama when it is configured', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
     config()->set('chat.ollama.model', 'qwen3:14b');
     app()->forgetInstance(ModelRegistry::class);
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'credits_remaining' => 100,
@@ -258,6 +302,8 @@ it('rejects an unknown model id with a 422', function (): void {
 
 function startTrial(Workspace $workspace): void
 {
+    Feature::define(Billing::class, true);
+
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
@@ -283,15 +329,6 @@ function seedGateConversation(User $user): string
     ]);
 
     return $conversationId;
-}
-
-function useProFirstAutoChain(): void
-{
-    config()->set('chat.models', [
-        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0]),
-        ChatCatalog::entry(),
-    ]);
-    app()->forgetInstance(ModelRegistry::class);
 }
 
 it('refuses a premium model during a trial while the workspace holds only sample data', function (): void {
@@ -389,6 +426,8 @@ it('falls back to Auto when a locked trial user saved a premium model as their d
 });
 
 it('keeps Auto on the premium model for a paid Pro workspace', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();
     useProFirstAutoChain();
@@ -411,6 +450,8 @@ it('keeps Auto on the premium model for a paid Pro workspace', function (): void
 });
 
 it('gives a Scale workspace every Pro model and keeps Enterprise-only models locked', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [

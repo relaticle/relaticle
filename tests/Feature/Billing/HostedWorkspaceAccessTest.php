@@ -7,7 +7,8 @@ use App\Features\Billing as BillingFeature;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Models\Company;
 use App\Models\User;
-use App\Services\Billing\HostedWorkspaceAccess;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -17,7 +18,7 @@ use Relaticle\Chat\Actions\StoreChatAttachment;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Tests\Helpers\ChatDocument;
 
-mutates(EnsureHostedWorkspaceAccess::class, HostedWorkspaceAccess::class);
+mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, SelfHostedEntitlements::class);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);

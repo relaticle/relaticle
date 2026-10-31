@@ -29,16 +29,29 @@ it('describes the Cloud Pro trial when billing is on', function (): void {
     expect($html)->toContain(__('Is Rela included with Relaticle Cloud?'))
         ->and($html)->toContain('14-day Cloud Pro trial')
         ->and($html)->toContain('2,000-credit monthly allowance')
+        ->and($html)->toContain('Self-hosted installs do not meter credits')
+        ->and($html)->not->toContain('300-credit monthly allowance')
         ->and($html)->not->toContain('every workspace, free or paid');
 });
 
-it('describes the free Cloud plan when billing is off', function (): void {
+it('says AI credits are not metered when billing is off', function (): void {
     Feature::define(BillingFeature::class, false);
 
     $html = $this->get('/ai')->assertOk()->getContent();
 
     expect($html)->toContain(__('Is Rela included in the free plan?'))
-        ->and($html)->toContain('300-credit monthly allowance');
+        ->and($html)->toContain('Rela does not meter AI credits on this installation')
+        ->and($html)->not->toContain('300-credit monthly allowance');
+});
+
+it('offers every model without a plan gate when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $html = $this->get('/ai')->assertOk()->getContent();
+
+    expect($html)->toContain(__('Every model this installation offers is open to every workspace.'))
+        ->not->toContain('on a paid plan')
+        ->not->toContain('A paid plan additionally unlocks');
 });
 
 it('describes batch approval as per record, matching how the service resolves batches', function (): void {
@@ -87,6 +100,13 @@ it('renders the self-hosted page with the real quick start', function (): void {
         ->and($html)->toContain('AGPL')
         ->and($html)->toContain(__('Ollama'))
         ->and($html)->toContain('"FAQPage"');
+});
+
+it('tells self-hosters their provider key is not metered', function (): void {
+    $this->get('/self-hosted')
+        ->assertOk()
+        ->assertSee('Relaticle does not meter AI credits on a self-hosted install.')
+        ->assertDontSee('still meters');
 });
 
 it('links the full self-hosting guide', function (): void {

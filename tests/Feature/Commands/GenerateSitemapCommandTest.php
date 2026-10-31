@@ -97,7 +97,7 @@ it('adds developer guide urls with lastmod from front matter', function (): void
         ->and($xml)->toContain('<loc>'.route('assistants.claude').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.chatgpt').'</loc>')
         ->and($xml)->toContain('<loc>'.route('security').'</loc>')
-        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-10-13#')
+        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-10-29#')
         ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-10-07#');
 });
 

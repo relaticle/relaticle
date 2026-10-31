@@ -55,6 +55,12 @@ final class AiCreditBalanceResource extends Resource
     protected static ?string $slug = 'ai/credit-balances';
 
     #[Override]
+    public static function canAccess(): bool
+    {
+        return BillingStatus::billingEnabled() && parent::canAccess();
+    }
+
+    #[Override]
     public static function form(Schema $schema): Schema
     {
         return $schema

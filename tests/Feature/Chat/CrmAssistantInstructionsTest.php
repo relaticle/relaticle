@@ -7,6 +7,7 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceCapability;
 use App\Enums\WorkspaceRole;
+use App\Features\Billing;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
@@ -16,6 +17,7 @@ use App\Queries\EntityFilters;
 use App\Queries\FilterTree;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Tools\BaseReadListTool;
@@ -136,11 +138,26 @@ it('routes export requests to the export destinations', function (): void {
 });
 
 it('answers credit questions from the balance tool and routes plan changes to billing', function (): void {
+    Feature::define(Billing::class, true);
+
     $instructions = resolve(CrmAssistant::class)->instructions();
 
     expect($instructions)
+        ->toContain('## AI credits and billing')
         ->toContain('call GetCreditBalanceTool and state its figures')
         ->toContain('buying more AI credits -> call GuideToPageTool with "billing"');
+});
+
+it('tells the model a self-hosted install has no credits, plans or credit purchases', function (): void {
+    Feature::define(Billing::class, false);
+
+    $instructions = resolve(CrmAssistant::class)->instructions();
+
+    expect($instructions)
+        ->toContain('This installation does not meter AI credits and has no plans or credit purchases')
+        ->not->toContain('## AI credits and billing')
+        ->not->toContain('call GuideToPageTool with "billing"')
+        ->not->toContain('buying more AI credits');
 });
 
 it('tells the model who it is talking to so "me" and "mine" resolve without a question', function (): void {

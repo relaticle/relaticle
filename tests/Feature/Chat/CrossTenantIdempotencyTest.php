@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\User;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
 it('allows the same idempotency key in two different workspaces', function (): void {
+    Feature::define(Billing::class, true);
+
     $userA = User::factory()->withPersonalWorkspace()->create();
     $userB = User::factory()->withPersonalWorkspace()->create();
 

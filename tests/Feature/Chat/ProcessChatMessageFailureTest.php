@@ -5,9 +5,12 @@ declare(strict_types=1);
 use App\Actions\Onboarding\StartSetupGreeting;
 use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Features\SetupConversation;
 use App\Models\Task;
 use App\Models\User;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Queue\MaxAttemptsExceededException;
@@ -43,7 +46,11 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\AnthropicSse;
 
-mutates(ProcessChatMessage::class);
+mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+
+beforeEach(function (): void {
+    Feature::define(Billing::class, true);
+});
 
 /** @param array{provider: string|null, model: string|null, id: string|null, source: string} $resolved */
 function makeFailedTurnJob(User $user, string $conversationId, array $resolved = ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto']): ProcessChatMessage
@@ -818,6 +825,46 @@ it('refunds the reservation when the job dies before it ever runs', function ():
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0);
+});
+
+it('writes no ledger rows when a self-hosted job dies before it ever runs', function (): void {
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: $conversationId,
+        userId: (string) $user->getKey(),
+    );
+
+    $ledgerRowsBefore = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count();
+
+    $job = new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: $turnId,
+    );
+
+    $job->failed(new MaxAttemptsExceededException('job expired'));
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
+
+    expect(AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count())->toBe($ledgerRowsBefore)
+        ->and($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);
 });
 

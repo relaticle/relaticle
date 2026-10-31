@@ -272,6 +272,8 @@ it('emits accurate product json-ld offers when billing is off', function (): voi
 });
 
 it('discloses the real per-model credit multiplier instead of a flat allowance claim', function (): void {
+    Feature::define(BillingFeature::class, true);
+
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('What counts as an AI credit?'))
@@ -290,7 +292,7 @@ it('does not contradict the credit-multiplier faq with a flat-allowance claim on
         ->assertDontSee('All AI models, including premium');
 });
 
-it('discloses that self-hosted installs are not exempt from the free-tier credit cap', function (): void {
+it('tells self-hosters their installs do not meter AI credits and keeps the Cloud trial facts', function (): void {
     Feature::define(BillingFeature::class, true);
 
     $html = $this->get('/pricing')->assertOk()->getContent();
@@ -298,9 +300,10 @@ it('discloses that self-hosted installs are not exempt from the free-tier credit
     $windows = collect(explode($question, $html))->skip(1)->map(fn (string $after): string => mb_substr($after, 0, 3000));
 
     expect($windows)->not->toBeEmpty()
-        ->and($windows->contains(fn (string $answer): bool => str_contains($answer, (string) Plan::Free->credits())
+        ->and($windows->contains(fn (string $answer): bool => str_contains($answer, 'Self-hosted installs do not meter AI credits')
             && str_contains($answer, number_format(Plan::Pro->credits()))
-            && str_contains($answer, Workspace::PRO_TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must state the Free credits, the Pro credits and the trial length')
+            && str_contains($answer, Workspace::PRO_TRIAL_DAYS.'-day')))->toBeTrue('the FAQ answer must say self-hosted is unmetered and keep the Pro credits and trial length')
+        ->and($html)->not->toContain('does not disable credit metering')
         ->and($html)->not->toContain('brand-new Cloud signup gets exactly the same one')
         ->and($html)->not->toContain("\u{2014}");
 });
@@ -311,16 +314,18 @@ it('keeps the Cloud Pro trial out of the self-hosted credit answer when billing 
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('Are self-hosted installs exempt from AI credit limits?'))
+        ->assertSee('Self-hosted installs do not meter AI credits')
         ->assertDontSee('Cloud Pro trial');
 });
 
-it('discloses the free-tier credit cap in the billing-off plan-limit answer', function (): void {
+it('says AI credits are not metered in the billing-off plan-limit answer', function (): void {
     Feature::define(BillingFeature::class, false);
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee("Free plan's 300 credits a month")
-        ->assertDontSee('CRM data is never capped on any plan — every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan.');
+        ->assertSee('does not meter credits on a self-hosted install')
+        ->assertDontSee("Free plan's 300 credits a month")
+        ->assertDontSee('That includes self-hosted installs');
 });
 
 it('offers a prepaid credit top-up instead of a hard stop in the billing-on plan-limit answer', function (): void {
@@ -408,17 +413,20 @@ it('does not claim an unconfirmed Enterprise tier is a purchasable offering when
 });
 
 it('describes the chat rate limit as per workspace, not per person', function (): void {
+    Feature::define(BillingFeature::class, true);
+
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('Is there a message rate limit?'))
         ->assertSee('shared across the whole workspace, not per person');
 });
 
-it('does not overstate the self-hoster\'s lever over the credit cap', function (): void {
+it('does not tell self-hosters a plan or a sysadmin action controls their AI credits', function (): void {
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('no plan removes metering entirely')
-        ->assertSee('reset its credit period from the sysadmin panel')
+        ->assertSee('Only a per-minute send limit applies')
+        ->assertDontSee('no plan removes metering entirely')
+        ->assertDontSee('reset its credit period from the sysadmin panel')
         ->assertDontSee('raising or removing that cap is a matter of updating your own workspace\'s plan; there is no separate self-hosted billing UI for it.');
 });
 
@@ -571,6 +579,17 @@ it('keeps the credits help article in step with each plan allowance', function (
         'Cloud Pro and its trial' => ['Cloud Pro and its trial', number_format(Plan::Pro->credits()), (string) Plan::Pro->rateLimit()],
         'Cloud Scale' => ['Cloud Scale', number_format(Plan::Scale->credits()), (string) Plan::Scale->rateLimit()],
         'Enterprise' => ['Enterprise', 'Agreed with your team', 'Agreed with your team'],
-        'Self-hosted (default)' => ['Self-hosted (default)', number_format(Plan::default()->credits()), (string) Plan::default()->rateLimit()],
+        'Self-hosted' => ['Self-hosted', 'Not metered', config('chat.rate_limit_per_minute').', set by CHAT_RATE_LIMIT_PER_MINUTE (0 for no limit)'],
     ]);
+});
+
+it('leaves the cloud metering questions off a self-hosted pricing page', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertSee(__('Are self-hosted installs exempt from AI credit limits?'))
+        ->assertDontSee(__('What counts as an AI credit?'))
+        ->assertDontSee(__('Which AI models does my plan unlock?'))
+        ->assertDontSee(__('Is there a message rate limit?'));
 });

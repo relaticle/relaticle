@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Features\Billing;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
@@ -27,6 +28,7 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Support\PromptText;
@@ -447,6 +449,10 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 
     private function billingInstructions(): string
     {
+        if (! Feature::active(Billing::class)) {
+            return "\n\n## AI credits\nThis installation does not meter AI credits and has no plans or credit purchases: say so when asked about credits, plans, or upgrades.";
+        }
+
         return <<<'PROMPT'
 
 

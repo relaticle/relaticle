@@ -5,11 +5,14 @@ declare(strict_types=1);
 use App\Actions\Onboarding\CreateSetupConversation;
 use App\Actions\Onboarding\StartSetupGreeting;
 use App\Enums\OnboardingUseCase;
+use App\Features\Billing;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
 use App\Listeners\CreateSetupConversationListener;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
@@ -21,10 +24,11 @@ use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\TurnPresence;
 
-mutates(CreateSetupConversation::class, CreateSetupConversationListener::class, StartSetupGreeting::class);
+mutates(CreateSetupConversation::class, CreateSetupConversationListener::class, StartSetupGreeting::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 beforeEach(function (): void {
     Feature::define(SetupConversation::class, true);
@@ -118,6 +122,8 @@ it('has the assistant speak first when the owner opens the setup conversation', 
 });
 
 it('charges the greeting turn a credit', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
 
     $user = User::factory()->create();
@@ -129,6 +135,27 @@ it('charges the greeting turn a credit', function (): void {
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     expect($balance->credits_used)->toBe(1);
+});
+
+it('starts the setup greeting for a self-hosted workspace with no credits', function (): void {
+    Feature::define(Billing::class, false);
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
+    $this->actingAs($user);
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 0,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    openSetupConversation($user, $workspace)->assertSet('turnInFlight', true);
+
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Greeting);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining'))->toBe(0);
 });
 
 it('greets once however often the thread is opened', function (): void {
@@ -225,6 +252,8 @@ it('does not greet when the flag is off', function (): void {
 });
 
 it('does not greet when the workspace is out of credits', function (): void {
+    Feature::define(Billing::class, true);
+
     Queue::fake();
 
     $user = User::factory()->create();

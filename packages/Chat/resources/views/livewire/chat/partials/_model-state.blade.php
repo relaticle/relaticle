@@ -3,8 +3,12 @@
      gates, picker options, and provider icons cannot drift between surfaces.
      $persistSelection: whether picking a model writes chat:model to
      localStorage (the full chat persists, the dashboard does not). --}}
-currentPlan: @js(auth()->user()?->currentWorkspace?->plan?->value ?? \App\Enums\Plan::default()->value),
-currentPlanLabel: @js(auth()->user()?->currentWorkspace?->plan?->getLabel() ?? \App\Enums\Plan::default()->getLabel()),
+@php
+    $modelStateWorkspace = auth()->user()?->currentWorkspace;
+    $modelStateIsMetered = $modelStateWorkspace === null || resolve(\App\Contracts\Entitlements::class)->metersCredits($modelStateWorkspace);
+@endphp
+currentPlan: @js($modelStateWorkspace?->plan?->value ?? \App\Enums\Plan::default()->value),
+currentPlanLabel: @js($modelStateIsMetered ? ($modelStateWorkspace?->plan?->getLabel() ?? \App\Enums\Plan::default()->getLabel()) : null),
 {{-- Null when billing is off, no tenant is bound, or the viewer cannot reach
      Billing: the locked-model hint then renders without a link. --}}
 upgradeUrl: @js(
@@ -14,8 +18,8 @@ upgradeUrl: @js(
         ? \App\Filament\Pages\Billing::getUrl(panel: 'app', tenant: auth()->user()->currentWorkspace)
         : null
 ),
-allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor(app(\Relaticle\Chat\Services\ModelAccess::class)->planFor(auth()->user()?->currentWorkspace))),
-trialLocked: @js(app(\Relaticle\Chat\Services\ModelAccess::class)->isTrialLocked(auth()->user()?->currentWorkspace)),
+allowedModels: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->allowedIdsFor($modelStateWorkspace)),
+trialLocked: @js(app(\Relaticle\Chat\Services\ModelAccess::class)->isTrialLocked($modelStateWorkspace)),
 modelOptions: @js(app(\Relaticle\Chat\Services\ModelRegistry::class)->pickerOptions()),
 ...window.ChatModules.modelPickerModule({
     persistSelection: @js($persistSelection ?? false),

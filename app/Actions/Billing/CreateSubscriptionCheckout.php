@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Filament\Pages\Billing;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Carbon\CarbonInterface;
 use InvalidArgumentException;
 
@@ -16,7 +16,7 @@ final readonly class CreateSubscriptionCheckout
     /** @var list<string> */
     public const array INTERVALS = ['monthly', 'yearly'];
 
-    public function __construct(private HostedWorkspaceAccess $hostedAccess) {}
+    public function __construct(private Entitlements $entitlements) {}
 
     public function execute(Workspace $workspace, Plan $plan, string $interval): string
     {
@@ -31,7 +31,7 @@ final readonly class CreateSubscriptionCheckout
             : $builder->skipTrial();
 
         return (string) $builder
-            ->checkout($this->sessionOptions($workspace, $this->hostedAccess->isPaused($workspace)))
+            ->checkout($this->sessionOptions($workspace, ! $this->entitlements->allowsAccess($workspace)))
             ->asStripeCheckoutSession()
             ->url;
     }

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Contracts\Entitlements;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
@@ -29,10 +31,11 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
-use App\Services\Billing\HostedWorkspaceAccess;
+use App\Services\Billing\PlanEntitlements;
 use App\Services\DiscordService;
 use App\Services\DockerHubService;
 use App\Services\GitHubService;
+use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
@@ -73,6 +76,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Cache\RateLimiting\Unlimited;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
@@ -100,6 +104,7 @@ use Laravel\Cashier\Cashier;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Passport;
+use Laravel\Pennant\Feature;
 use Laravel\Sanctum\Sanctum;
 use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
@@ -132,10 +137,10 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Date::use(CarbonImmutable::class);
-
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->registerNotificationBindings();
+        $this->registerEntitlements();
 
         // Ink registers its public routes from packageBooted(), which runs after every
         // provider's register(). Read the config key App\Features\Blog resolves from
@@ -215,6 +220,13 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(NoticeOfEmailChangeRequest::class, \App\Notifications\Auth\NoticeOfEmailChangeRequest::class);
         $this->app->bind(DatabaseChannel::class, InboxChannel::class);
         $this->app->bind(ExportCompletion::class, CompleteExport::class);
+    }
+
+    private function registerEntitlements(): void
+    {
+        $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
+            ? $app->make(PlanEntitlements::class)
+            : $app->make(SelfHostedEntitlements::class));
     }
 
     private function registerPassport(): void
@@ -301,9 +313,9 @@ final class AppServiceProvider extends ServiceProvider
             $user = $parameters['user'] ?? null;
 
             $workspaces = $user instanceof User ? $user->allWorkspaces() : collect();
-            $access = resolve(HostedWorkspaceAccess::class);
+            $access = resolve(Entitlements::class);
 
-            // Re-read the workspaces with their subscriptions eager-loaded: isPaused() reaches
+            // Re-read the workspaces with their subscriptions eager-loaded: allowsAccess() reaches
             // for $workspace->subscription(), and allWorkspaces() hydrates more than one row, which
             // is exactly when strict lazy loading throws.
             /** @var list<string> $pausedWorkspaceIds */
@@ -311,7 +323,7 @@ final class AppServiceProvider extends ServiceProvider
                 ->whereIn('id', $workspaces->pluck('id')->all())
                 ->with('subscriptions')
                 ->get()
-                ->filter(fn (Workspace $workspace): bool => $access->isPaused($workspace))
+                ->filter(fn (Workspace $workspace): bool => ! $access->allowsAccess($workspace))
                 ->map(fn (Workspace $workspace): string => (string) $workspace->getKey())
                 ->values()
                 ->all();
@@ -608,33 +620,42 @@ final class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes(1440, 240)->by('transcribe-workspace:'.($workspace?->getKey() ?? $request->ip()));
         });
 
-        RateLimiter::for('chat-send', function (Request $request) {
-            /** @var User|null $user */
-            $user = $request->user();
-            $workspace = $user?->currentWorkspace;
+        RateLimiter::for('chat-send', fn (Request $request): Limit|Unlimited => $this->chatSendLimit($request));
+    }
 
-            if ($workspace === null) {
-                return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
-            }
+    private function chatSendLimit(Request $request): Limit|Unlimited
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+        $workspace = $user?->currentWorkspace;
 
-            return Limit::perMinute($workspace->plan->rateLimit())
-                ->by($workspace->getKey())
-                ->response(function (Request $request, array $headers) use ($workspace) {
-                    ChatTelemetry::rateLimited(
-                        workspaceId: (string) $workspace->getKey(),
-                        plan: $workspace->plan->value,
-                    );
+        if ($workspace === null) {
+            return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
+        }
 
-                    $seconds = (int) ($headers['Retry-After'] ?? 0);
+        $limit = resolve(Entitlements::class)->chatRateLimit($workspace);
 
-                    return response()->json([
-                        'error' => 'rate_limited',
-                        'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
-                        'retry_after_seconds' => $seconds,
-                        'plan' => $workspace->plan->value,
-                    ], 429, $headers);
-                });
-        });
+        if ($limit <= 0) {
+            return Limit::none();
+        }
+
+        return Limit::perMinute($limit)
+            ->by($workspace->getKey())
+            ->response(function (Request $request, array $headers) use ($workspace) {
+                ChatTelemetry::rateLimited(
+                    workspaceId: (string) $workspace->getKey(),
+                    plan: $workspace->plan->value,
+                );
+
+                $seconds = (int) ($headers['Retry-After'] ?? 0);
+
+                return response()->json([
+                    'error' => 'rate_limited',
+                    'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
+                    'retry_after_seconds' => $seconds,
+                    'plan' => $workspace->plan->value,
+                ], 429, $headers);
+            });
     }
 
     private function configureScribe(): void

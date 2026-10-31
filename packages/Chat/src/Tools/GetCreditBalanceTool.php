@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Tools;
 
+use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -17,7 +18,10 @@ final readonly class GetCreditBalanceTool implements Tool
 {
     use LocalisesDatetimes;
 
-    public function __construct(private CreditService $credits) {}
+    public function __construct(
+        private CreditService $credits,
+        private Entitlements $entitlements,
+    ) {}
 
     public function description(): string
     {
@@ -39,6 +43,13 @@ final readonly class GetCreditBalanceTool implements Tool
 
         if (! $workspace instanceof Workspace) {
             return (string) json_encode(['error' => 'No workspace is selected.'], JSON_UNESCAPED_SLASHES);
+        }
+
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return (string) json_encode([
+                'metered' => false,
+                'note' => 'This installation does not meter AI credits. There is no credit limit.',
+            ], JSON_UNESCAPED_SLASHES);
         }
 
         $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();

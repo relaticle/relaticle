@@ -258,7 +258,7 @@
                         {{ __('Bring your own provider key') }}
                     </h3>
                     <p class="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
-                        {{ __('Set :anthropicKey or :openaiKey and the assistant calls Claude or GPT with your own account, at your own usage rates. Relaticle still meters :credits AI credits a month per workspace by default.', ['anthropicKey' => 'ANTHROPIC_API_KEY', 'openaiKey' => 'OPENAI_API_KEY', 'credits' => number_format(\App\Enums\Plan::Free->credits())]) }}
+                        {{ __('Set :anthropicKey or :openaiKey and the assistant calls Claude or GPT with your own account, at your own usage rates. Relaticle does not meter AI credits on a self-hosted install.', ['anthropicKey' => 'ANTHROPIC_API_KEY', 'openaiKey' => 'OPENAI_API_KEY']) }}
                     </p>
                 </div>
 
