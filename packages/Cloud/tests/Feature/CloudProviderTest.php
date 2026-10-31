@@ -39,6 +39,18 @@ it('binds no billing when billing is off', function (): void {
     expect(resolve(BillingContract::class))->toBeInstanceOf(NoBilling::class);
 });
 
+it('stays out of the provider list while the foss-only switch is on', function (): void {
+    config()->set('relaticle.foss_only', true);
+
+    expect(require base_path('bootstrap/providers.php'))->not->toContain(CloudServiceProvider::class);
+});
+
+it('joins the provider list while the foss-only switch is off', function (): void {
+    config()->set('relaticle.foss_only', false);
+
+    expect(require base_path('bootstrap/providers.php'))->toContain(CloudServiceProvider::class);
+});
+
 it('resolves the pre-move billing page component name to the cloud page', function (): void {
     expect(app('livewire.factory')->resolveComponentClass('App\\Filament\\Pages\\Billing'))->toBe(BillingPage::class)
         ->and(app('livewire.factory')->resolveComponentName(BillingPage::class))->toBe(BillingPage::class);

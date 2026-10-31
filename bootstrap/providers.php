@@ -33,5 +33,5 @@ return [
     EmailIntegrationServiceProvider::class,
     ImportWizardNewServiceProvider::class,
     SystemAdminPanelProvider::class,
-    ...(class_exists(CloudServiceProvider::class) ? [CloudServiceProvider::class] : []),
+    ...(class_exists(CloudServiceProvider::class) && ! config()->boolean('relaticle.foss_only') ? [CloudServiceProvider::class] : []),
 ];

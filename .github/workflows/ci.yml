@@ -243,18 +243,24 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
 
+      - name: Prepare Laravel
+        run: |
+          cp .env.ci .env
+          php artisan key:generate
+          php artisan passport:keys --force --no-interaction
+
+      # A clone install keeps the directory and sets the switch instead.
+      - name: Boot with the cloud package switched off
+        run: |
+          php artisan route:list --json | grep -q '"uri":"pricing"'
+          ! RELATICLE_FOSS_ONLY=true php artisan route:list --json | grep -q '"uri":"pricing"'
+
       # The image never contains packages/Cloud. The optimized classmap still lists
       # its classes, so the autoload is rebuilt before Laravel boots.
       - name: Remove the cloud package
         run: |
           rm -rf packages/Cloud
           composer dump-autoload
-
-      - name: Prepare Laravel
-        run: |
-          cp .env.ci .env
-          php artisan key:generate
-          php artisan passport:keys --force --no-interaction
 
       - name: Tests
         run: vendor/bin/pest --compact --parallel --configuration phpunit.ci.xml --testsuite=Arch,Smoke,Feature --ci --no-tia

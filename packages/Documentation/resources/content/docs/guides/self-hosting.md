@@ -637,22 +637,13 @@ git clone https://github.com/Relaticle/relaticle.git /var/www/relaticle
 cd /var/www/relaticle
 ```
 
-2. Remove the cloud package before you install anything:
-
-```bash
-rm -rf packages/Cloud
-```
-
-`packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. Its license grants you no rights, and only the Docker image leaves it out. With it present, your install serves relaticle.com's marketing site at `/`. Delete it first, so Composer never autoloads it and the frontend build never compiles it.
-
-3. Install dependencies:
+2. Install PHP dependencies:
 
 ```bash
 composer install --no-dev --optimize-autoloader
-pnpm install --frozen-lockfile && pnpm run build
 ```
 
-4. Configure the environment:
+3. Configure the environment:
 
 ```bash
 cp .env.example .env
@@ -660,6 +651,16 @@ php artisan key:generate
 ```
 
 Edit `.env` with your database credentials, mail settings, and `APP_URL`. Set `APP_ENV=production` and `APP_DEBUG=false`. The example file ships `local` and `true`, and debug pages in production expose your configuration.
+
+Set `RELATICLE_FOSS_ONLY=true`. `packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. The Docker image leaves it out, and a clone contains it. The switch keeps it out of the app and out of the frontend build, so your install never serves relaticle.com's marketing site at `/`. Its license allows development and testing use, so the directory stays on disk and `git pull` keeps working.
+
+4. Build the frontend:
+
+```bash
+pnpm install --frozen-lockfile && pnpm run build
+```
+
+The build reads `RELATICLE_FOSS_ONLY` from `.env`, so set it before this step.
 
 5. Set up the database:
 
@@ -683,16 +684,11 @@ php artisan make:filament-user
 
 ### Updating a Manual Install
 
-Deleting `packages/Cloud` leaves its files as local deletions, and a `git pull` in rebase mode refuses to run over them. Each update restores the directory, pulls, and deletes it again before it installs anything. The same steps convert an install that still has the directory.
-
 ```bash
 cd /var/www/relaticle
 php artisan down
-git checkout -- packages/Cloud
 git pull
-rm -rf packages/Cloud
 composer install --no-dev --optimize-autoloader
-php artisan filament:optimize-clear
 pnpm install --frozen-lockfile && pnpm run build
 php artisan migrate --force
 php artisan up
@@ -700,7 +696,7 @@ php artisan horizon:terminate
 php artisan reverb:restart
 ```
 
-`filament:optimize-clear` drops a Filament component cache built while the directory existed. If you cache components with `php artisan filament:optimize`, run it again after `php artisan up`. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
+An install that deleted `packages/Cloud` under an earlier version of this guide restores it once with `git checkout -- packages/Cloud` before the pull, and sets `RELATICLE_FOSS_ONLY=true` in `.env`. If you cache components with `php artisan filament:optimize`, run `php artisan filament:optimize-clear` and then `filament:optimize` again after the switch changes. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
 
 Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
@@ -847,7 +843,7 @@ To see whether replies stream live, open the browser's Network tab, filter by WS
 
 ### The homepage shows the Relaticle marketing site
 
-The cloud package is present. A self-hosted install redirects `/` to the app. Delete `packages/Cloud`, then repeat the install and build steps from Updating a Manual Install. On Laravel Cloud, add the `rm -rf packages/Cloud` line to the build command.
+The cloud package is loaded. A self-hosted install redirects `/` to the app. Set `RELATICLE_FOSS_ONLY=true` in `.env`, run `php artisan config:clear` (and `php artisan optimize` again if you cache configuration), then rebuild the frontend with `pnpm run build`. On Laravel Cloud, add the `rm -rf packages/Cloud` line to the build command.
 
 ### Horizon not processing jobs
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 return [
 
+    'foss_only' => (bool) env('RELATICLE_FOSS_ONLY', false),
+
     'contact' => [
         'email' => env('CONTACT_EMAIL', 'hello@relaticle.com'),
     ],

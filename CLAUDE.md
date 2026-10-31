@@ -52,18 +52,23 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 `packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
-its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` grants no
-rights. The self-hosted build is this repository without it.
+its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
+development and testing use, and production use only under an agreement. The root `LICENSE` opens
+by naming that split, the shape GitLab, PostHog and Metabase use. The self-hosted build is this
+repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
   `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,
   config, routes, views and lang" fails a core file that names it or its `cloud::` view and lang
   namespace. `bootstrap/providers.php` holds the one allowed mention: a `class_exists` check that
-  loads `CloudServiceProvider` only when the class exists
+  loads `CloudServiceProvider` only when the class exists and `config('relaticle.foss_only')` is off
 - The Docker image never contains it, because `.dockerignore` excludes `/packages/Cloud`. A git
-  clone does, so the self-hosting guide tells that install to delete the directory. The
-  `Self-hosted Build` job in `.github/workflows/ci.yml` deletes it, rebuilds the autoload and runs
-  Arch, Smoke and Feature. A core class, view or route that needs Cloud fails that job
+  clone does, so the self-hosting guide tells that install to set `RELATICLE_FOSS_ONLY=true`, which
+  keeps the provider out of `bootstrap/providers.php` and the package's entries out of
+  `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php` pins the provider half.
+  The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with the switch on, then
+  deletes the directory, rebuilds the autoload and runs Arch, Smoke and Feature. A core class, view
+  or route that needs Cloud fails that job
 - Core asks Cloud through two contracts and keeps a self-hosted default for each:
   `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
   `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.
