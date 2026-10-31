@@ -25,6 +25,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
+use Symfony\Component\DomCrawler\Crawler;
 
 use function Pest\Laravel\actingAs;
 
@@ -144,6 +145,24 @@ it('badges the outbox with what its default segment lists', function (): void {
     }
 
     expect(Livewire::test(EmailInboxPage::class)->instance()->tabCounts()[EmailPageTab::OUTBOX->value])->toBe(1);
+});
+
+it('hides a tab badge when its count is zero', function (): void {
+    makeDraft($this->user, $this->account);
+
+    $html = Livewire::test(EmailInboxPage::class)->html();
+
+    $tabs = (new Crawler($html))
+        ->filter('button')
+        ->reduce(fn (Crawler $button): bool => str_starts_with((string) $button->attr('wire:click'), 'setTab('))
+        ->each(fn (Crawler $button): string => $button->text());
+
+    expect($tabs)->toBe([
+        EmailPageTab::DRAFTS->getLabel().' 1',
+        EmailPageTab::OUTBOX->getLabel(),
+        EmailPageTab::FAILED->getLabel(),
+        EmailPageTab::TEMPLATES->getLabel(),
+    ]);
 });
 
 it('refreshes the tab badges when the composer saves a draft', function (): void {
