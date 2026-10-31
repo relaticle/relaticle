@@ -105,29 +105,36 @@ it('raises the notes tab count when a note is added from the tab', function (): 
     );
 });
 
-it('keeps the active record tab in view on a phone', function (): void {
+it('keeps the active record tab in view on a phone, on load and after navigating', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Northwind Traders']);
+    $other = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Contoso Supply']);
     $relation = array_search(EmailsRelationManager::class, CompanyResource::getRelations(), true);
+
+    $inView = <<<'JS'
+        (() => {
+            const bar = document.querySelector('.fi-record-pane .fi-tabs');
+            const tab = bar.querySelector('.fi-tabs-item.fi-active').getBoundingClientRect();
+            const box = bar.getBoundingClientRect();
+
+            return bar.scrollLeft > 0 && tab.left >= box.left && tab.right <= box.right && window.scrollY === 0;
+        })()
+    JS;
 
     $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(390, 844)
         ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}?relation={$relation}")
-        ->assertSeeIn('.fi-record-pane .fi-tabs-item.fi-active', 'Emails');
+        ->assertSeeIn('.fi-record-pane .fi-tabs-item.fi-active', 'Emails')
+        ->assertScript($inView);
 
-    $inView = <<<'JS'
-        (() => {
-            const tab = document.querySelector('.fi-record-pane .fi-tabs-item.fi-active').getBoundingClientRect();
-            const bar = document.querySelector('.fi-record-pane .fi-tabs').getBoundingClientRect();
+    $page->script("Livewire.navigate('/app/{$workspace->slug}/companies/{$other->getKey()}?relation={$relation}')");
 
-            return tab.left >= bar.left && tab.right <= bar.right && window.scrollY === 0;
-        })();
-    JS;
-
-    expect($page->script($inView))->toBeTrue();
-    $page->assertNoJavaScriptErrors();
+    $page->assertSeeIn('[data-page-heading] h1', 'Contoso Supply')
+        ->assertSeeIn('.fi-record-pane .fi-tabs-item.fi-active', 'Emails')
+        ->assertScript($inView)
+        ->assertNoJavaScriptErrors();
 });
