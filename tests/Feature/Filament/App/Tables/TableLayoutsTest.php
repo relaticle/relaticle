@@ -166,6 +166,19 @@ it('marks a changed layout as modified, reverts it and saves over it', function 
         ->and($component->instance()->isTableLayoutModified())->toBeFalse();
 });
 
+it('stays unmodified when the page size is changed and set back from the select', function (): void {
+    $layout = layoutFor($this->user, ['state' => hotLeads()]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey())
+        ->set('tableRecordsPerPage', '100')
+        ->set('tableRecordsPerPage', '50');
+
+    $preference = preferenceRow();
+
+    expect($component->instance()->isTableLayoutModified())->toBeFalse()
+        ->and($preference->state->withoutWidths()->hash())->toBe($preference->applied_layout_hash);
+});
+
 it('ignores widths when telling whether a layout was changed', function (): void {
     $layout = layoutFor($this->user, ['state' => hotLeads()]);
 
@@ -383,6 +396,24 @@ it('keeps layouts apart per table and per workspace', function (): void {
     TableLayout::factory()->for($this->user)->for(User::factory()->withWorkspace()->create()->currentWorkspace)->create(['name' => 'Elsewhere']);
 
     livewire(ListCompanies::class)->assertDontSeeText(['People layout', 'Elsewhere']);
+});
+
+it('refuses a layout id from another workspace at every entry point', function (): void {
+    $stranger = User::factory()->withWorkspace()->create();
+    $foreign = TableLayout::factory()->for($stranger)->for($stranger->currentWorkspace)->create(['name' => 'Elsewhere', 'is_shared' => true]);
+
+    livewire(ListCompanies::class)
+        ->call('applySavedLayout', $foreign->getKey())
+        ->assertNotified('That layout is no longer available.')
+        ->assertSet('activeTableLayoutId', null)
+        ->assertActionHidden('renameTableLayout', ['layout' => $foreign->getKey()])
+        ->assertActionHidden('shareTableLayout', ['layout' => $foreign->getKey()])
+        ->assertActionHidden('deleteTableLayout', ['layout' => $foreign->getKey()])
+        ->call('toggleDefaultTableLayout', $foreign->getKey())
+        ->assertStatus(404);
+
+    expect($foreign->refresh()->name)->toBe('Elsewhere')
+        ->and(preferenceRow()?->default_layout_id)->toBeNull();
 });
 
 it('lets any member, a viewer too, save and share a layout', function (): void {

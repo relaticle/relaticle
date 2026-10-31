@@ -28,7 +28,9 @@ final class TableStateData extends Data
         public array $widths = [],
         public array $labels = [],
         public array $pinned = [],
-    ) {}
+    ) {
+        $this->perPage = is_numeric($perPage) ? (int) $perPage : $perPage;
+    }
 
     public function withoutWidths(): self
     {
