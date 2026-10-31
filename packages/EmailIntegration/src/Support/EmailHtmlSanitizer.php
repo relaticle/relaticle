@@ -97,14 +97,19 @@ final readonly class EmailHtmlSanitizer
 
     private static function paintsSomething(string $value): bool
     {
-        $value = mb_strtolower(str_replace('!important', '', $value));
+        $value = str_replace('!important', '', mb_strtolower($value));
 
         if (str_contains($value, 'url(') || str_contains($value, 'gradient(')) {
             return true;
         }
 
-        $value = (string) preg_replace('/(?:rgba|hsla)\([^)]*[,\/]\s*0(?:\.0*)?%?\s*\)/', ' ', $value);
-        $neutral = '/^(?:transparent|none|inherit|initial|unset|repeat|repeat-x|repeat-y|no-repeat|scroll|fixed|local|left|right|top|bottom|center|-?[\d.]+[a-z%]*)$/';
+        // White is the page the dark reader already replaces, so pasted white spans keep a reply dark.
+        $value = (string) preg_replace([
+            '/(?:rgba|hsla)\((?:[^,)]*,){3}\s*(?:0(?:\.0*)?|\.0+)%?\s*\)/',
+            '/(?:rgba?|hsla?)\([^)\/]*\/\s*(?:0(?:\.0*)?|\.0+)%?\s*\)/',
+            '/rgba?\(\s*255\s*,?\s*255\s*,?\s*255\s*(?:[,\/]\s*[\d.]+%?\s*)?\)/',
+        ], ' ', $value);
+        $neutral = '/^(?:transparent|none|inherit|initial|unset|white|#fff|#ffffff|repeat|repeat-x|repeat-y|no-repeat|scroll|fixed|local|left|right|top|bottom|center|-?[\d.]+[a-z%]*)$/';
 
         foreach (preg_split('/[\s,\/]+/', trim($value), flags: PREG_SPLIT_NO_EMPTY) ?: [] as $token) {
             if (preg_match($neutral, $token) !== 1) {

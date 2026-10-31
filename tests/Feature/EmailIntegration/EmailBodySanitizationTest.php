@@ -215,7 +215,8 @@ it('marks an email that paints its own background so the dark reader leaves it a
     'inline background colour' => '<div style="background-color:#f4f1ea">Hi</div>',
     'inline background shorthand' => '<div style="padding:8px; background: #0f3d2e url(https://example.test/band.png) no-repeat">Hi</div>',
     'inline background image' => '<div style="background-image: url(https://example.test/hero.png)">Hi</div>',
-    'outlook white page' => '<div style="background:white">Hi</div>',
+    'black background' => '<div style="background-color: rgb(0, 0, 0)">Hi</div>',
+    'gmail highlight' => '<span style="background-color: rgb(255, 255, 0)">Hi</span>',
 ]);
 
 it('leaves an email that paints no background to the dark reader', function (string $body): void {
@@ -233,6 +234,12 @@ it('leaves an email that paints no background to the dark reader', function (str
     'shorthand with nothing painted' => '<div style="background: none repeat scroll 0% 0% transparent !important">x</div>',
     'zero alpha background' => '<div style="background-color: rgba(0, 0, 0, 0)">x</div>',
     'transparent bgcolor' => '<table><tr><td bgcolor="transparent">x</td></tr></table>',
+    'zero alpha without leading zero' => '<div style="background-color: rgba(0,0,0,.0)">x</div>',
+    'zero alpha slash syntax' => '<div style="background-color: rgb(255 255 255 / 0)">x</div>',
+    'upper case important' => '<div style="background: transparent !IMPORTANT">x</div>',
+    'outlook white page' => '<div style="background:white">Hi</div>',
+    'white bgcolor' => '<table><tr><td bgcolor="#FFFFFF">Hi</td></tr></table>',
+    'pasted white span' => '<p>Thanks</p><span style="background-color: rgb(255, 255, 255)">pasted</span>',
     'border colour only' => '<table style="border-color: #dddddd"><tr><td>Hi</td></tr></table>',
     'colour named in the text' => '<p>Pick a color: blue, or a background: red.</p>',
 ]);
