@@ -56,10 +56,12 @@ final class EmailTemplateResource extends Resource
             ))
             ->columns([
                 TextColumn::make('name')
+                    ->label(__('filament/resources/email-template.columns.name.label'))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('subject')
+                    ->label(__('filament/resources/email-template.columns.subject.label'))
                     ->limit(60)
                     ->placeholder(__('filament/resources/email-template.columns.subject.placeholder')),
 
@@ -76,28 +78,11 @@ final class EmailTemplateResource extends Resource
                     ->date()
                     ->sortable(),
             ])
-            ->recordActions([
-                // The edit schema is set explicitly rather than inferred from the
-                // resource: this table is also rendered outside a resource page
-                // (the Templates tab hosted by TemplatesTable), where there is no
-                // resource context to infer it from.
-                EditAction::make()
-                    ->schema(fn (Schema $schema): Schema => self::form($schema))
-                    ->hiddenLabel()
-                    ->tooltip(__('filament/resources/email-template.actions.edit.label'))
-                    ->icon(Heroicon::OutlinedPencilSquare)
-                    ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('update', $record) === true),
-
-                DeleteAction::make()
-                    ->label(__('filament/resources/email-template.actions.delete.label'))
-                    ->hiddenLabel()
-                    ->tooltip(__('filament/resources/email-template.actions.delete.label'))
-                    ->icon(Heroicon::OutlinedTrash)
-                    ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('delete', $record) === true),
-            ])
+            ->recordActions(self::recordActions())
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
+                        ->label(__('filament/resources/email-template.actions.bulk_delete.label'))
                         ->action(function (Collection $records, DeleteEmailTemplatesAction $deleteEmailTemplatesAction): void {
                             /** @var User $user */
                             $user = auth()->user();
@@ -106,6 +91,33 @@ final class EmailTemplateResource extends Resource
                         }),
                 ]),
             ]);
+    }
+
+    /**
+     * @return list<EditAction|DeleteAction>
+     */
+    private static function recordActions(): array
+    {
+        return [
+            // The edit schema is set explicitly rather than inferred from the
+            // resource: this table is also rendered outside a resource page
+            // (the Templates tab hosted by TemplatesTable), where there is no
+            // resource context to infer it from.
+            EditAction::make()
+                ->schema(fn (Schema $schema): Schema => self::form($schema))
+                ->label(__('filament/resources/email-template.actions.edit.label'))
+                ->hiddenLabel()
+                ->tooltip(__('filament/resources/email-template.actions.edit.label'))
+                ->icon(Heroicon::OutlinedPencilSquare)
+                ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('update', $record) === true),
+
+            DeleteAction::make()
+                ->label(__('filament/resources/email-template.actions.delete.label'))
+                ->hiddenLabel()
+                ->tooltip(__('filament/resources/email-template.actions.delete.label'))
+                ->icon(Heroicon::OutlinedTrash)
+                ->visible(fn (EmailTemplate $record): bool => auth()->user()?->can('delete', $record) === true),
+        ];
     }
 
     #[Override]

@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Columns\TextColumn;
+use Illuminate\Translation\Translator;
 use Relaticle\EmailIntegration\Actions\DeleteEmailTemplatesAction;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
@@ -160,4 +163,26 @@ it('denies template writes to a creator who no longer belongs to the workspace',
         ->and($this->user->can('delete', $template))->toBeFalse()
         ->and($this->user->can('forceDelete', $template))->toBeFalse()
         ->and($this->user->can('restore', $template))->toBeFalse();
+});
+
+it('labels every column and action through the translator', function (): void {
+    __('filament/resources/email-template.navigation_label');
+
+    resolve(Translator::class)->addLines([
+        'filament/resources/email-template.columns.name.label' => 'Column template title',
+        'filament/resources/email-template.columns.subject.label' => 'Column subject line',
+        'filament/resources/email-template.actions.edit.label' => 'Change this template',
+        'filament/resources/email-template.actions.bulk_delete.label' => 'Remove chosen templates',
+    ], 'en');
+
+    $template = EmailTemplate::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'created_by' => $this->user->id,
+    ]);
+
+    livewire(ManageEmailTemplates::class)
+        ->assertTableColumnExists('name', fn (TextColumn $column): bool => $column->getLabel() === 'Column template title')
+        ->assertTableColumnExists('subject', fn (TextColumn $column): bool => $column->getLabel() === 'Column subject line')
+        ->assertActionHasLabel(TestAction::make('edit')->table($template), 'Change this template')
+        ->assertActionHasLabel(TestAction::make('delete')->table()->bulk(), 'Remove chosen templates');
 });
