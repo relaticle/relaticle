@@ -69,7 +69,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->configureBlog();
 
         // Laravel finds errors::404 under each view path, so this root holds error pages only.
-        config(['view.paths' => [...config('view.paths', []), __DIR__.'/../resources/views/overrides']]);
+        config(['view.paths' => array_values(array_unique([...config('view.paths', []), __DIR__.'/../resources/views/overrides']))]);
 
         $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
@@ -110,7 +110,7 @@ final class CloudServiceProvider extends ServiceProvider
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
             'ink.features.mcp' => true,
-            'ink.middleware' => [...config('ink.middleware', ['web']), AddVaryAcceptHeader::class],
+            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class])),
             'ink.views' => [
                 'index' => 'cloud::blog.index',
                 'show' => 'cloud::blog.show',
