@@ -7,6 +7,7 @@ use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Models\Company;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\Http\RequestAbility;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -144,6 +145,23 @@ describe('rate limit headers', function (): void {
         'Scale' => [Plan::Scale, 3],
         'Enterprise' => [Plan::Enterprise, 10],
     ]);
+
+    it('reads the plan throughput from the workspace the token is pinned to, not the one open in the browser', function (): void {
+        $scaleWorkspace = Workspace::factory()->create(['plan' => Plan::Scale]);
+        $scaleWorkspace->users()->attach($this->user, ['role' => 'admin']);
+        $raw = Str::random(40);
+        $token = $this->user->tokens()->create([
+            'name' => 'scale',
+            'token' => hash('sha256', $raw),
+            'abilities' => ['*'],
+            'workspace_id' => $scaleWorkspace->id,
+        ]);
+
+        $response = $this->withToken("{$token->id}|{$raw}")->getJson('/api/v1/companies')->assertOk();
+
+        expect($this->user->fresh()->current_workspace_id)->toBe($this->workspace->id)
+            ->and((int) $response->headers->get('X-RateLimit-Limit'))->toBe(300 * Plan::Scale->throughputMultiplier());
+    });
 });
 
 describe('session credentials', function (): void {
