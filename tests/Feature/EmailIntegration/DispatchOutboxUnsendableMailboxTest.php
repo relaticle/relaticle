@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Billing as BillingContract;
 use App\Enums\Plan;
 use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\NoBilling;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Notification;
@@ -181,6 +183,16 @@ it('fails due mail in a paused workspace and sends the sender to billing', funct
             && $presented->getBody() === "\"{$due->subject}\" was not sent because {$workspaceName} is paused. Once the workspace is reopened, retry the email from the Failed tab."
             && $presented->getActions()[0]->getUrl() === route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]);
     });
+});
+
+it('presents a stored subscribe remedy without a button once billing has no page', function (): void {
+    app()->instance(BillingContract::class, new NoBilling);
+    $notification = new EmailSendFailedNotification($this->workspace, $this->account, 1, 'Hello', SendFailureRemedy::Subscribe, 'g', 0);
+
+    $presented = presentedSendFailure($notification, $this->user, $this->workspace);
+
+    expect($presented->getActions())->toBe([])
+        ->and($presented->getBody())->toContain('paused');
 });
 
 it('holds due mail in a paused workspace when failing it throws', function (): void {
