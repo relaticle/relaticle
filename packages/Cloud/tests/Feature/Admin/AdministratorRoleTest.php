@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use Filament\Facades\Filament;
+use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Admin\Filament\Pages\Overview;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditBalanceResource;
 use Relaticle\Cloud\Admin\Filament\Resources\AiCreditTransactions\AiCreditTransactionResource;
@@ -12,6 +14,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 mutates(Overview::class, SubscriptionResource::class, AiCreditBalanceResource::class, AiCreditTransactionResource::class);
 
 beforeEach(function (): void {
+    Feature::define(Billing::class, true);
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
     $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
