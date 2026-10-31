@@ -4,6 +4,7 @@
     type="button"
     wire:click="setTab('{{ $tab->value }}')"
     wire:loading.attr="disabled"
+    @if ($active) aria-current="true" @endif
     @class([
         'flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none',
         'bg-gray-100 text-gray-900 dark:bg-white/10 dark:text-white' => $active,
