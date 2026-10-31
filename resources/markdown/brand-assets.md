@@ -25,7 +25,7 @@ Commit the generated files alongside their sources. Production serves them direc
 
 Run `pnpm brand:check` to compare a temporary rebuild with every published file and the ZIP.
 Use the same librsvg version when checking byte-for-byte output; a renderer upgrade can change PNG bytes.
-Run `php artisan test --compact tests/Feature/Public/PressPageTest.php` to verify published links, source checksums, dimensions, and archive contents.
+Run `php artisan test --compact packages/Cloud/tests/Feature/Marketing/PressPageTest.php` to verify published links, source checksums, dimensions, and archive contents.
 
 The press page reads its download catalog from the generated manifest.
 Platform presets are convenient export sizes, not permanent platform requirements. Check the final crop when uploading.
@@ -49,9 +49,9 @@ Platform presets are convenient export sizes, not permanent platform requirement
 ## Current Usage
 
 - Marketing header, footer, and mobile menu use lockup component:
-  - `resources/views/components/layout/header.blade.php`
-  - `resources/views/components/layout/footer.blade.php`
-  - `resources/views/components/layout/mobile-menu.blade.php`
+  - `packages/Cloud/resources/views/components/layout/header.blade.php`
+  - `packages/Cloud/resources/views/components/layout/footer.blade.php`
+  - `packages/Cloud/resources/views/components/layout/mobile-menu.blade.php`
 - Filament app panel logo uses symbol-only component:
   - `resources/views/filament/app/logo.blade.php`
 - Email HTML header uses static PNG for client compatibility:

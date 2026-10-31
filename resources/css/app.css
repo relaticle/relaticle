@@ -6,48 +6,8 @@
 @import "./theme.css";
 
 @source "../views";
-@source "../js";
 @source "../../app";
-@source "../../packages/Documentation";
-@source "../../vendor/relaticle/ink/resources/views";
 
 [x-cloak] {
     display: none !important;
-}
-
-/* The hero mock mirrors the app panel, whose gray is zinc. This bundle's gray is Tailwind's cool gray. */
-.hero-agent-preview {
-    --color-gray-50: var(--color-zinc-50);
-    --color-gray-100: var(--color-zinc-100);
-    --color-gray-200: var(--color-zinc-200);
-    --color-gray-300: var(--color-zinc-300);
-    --color-gray-400: var(--color-zinc-400);
-    --color-gray-500: var(--color-zinc-500);
-    --color-gray-600: var(--color-zinc-600);
-    --color-gray-700: var(--color-zinc-700);
-    --color-gray-800: var(--color-zinc-800);
-    --color-gray-900: var(--color-zinc-900);
-    --color-gray-950: var(--color-zinc-950);
-}
-
-/*
- * The markdown renderer injects a "#" permalink anchor into every heading. The
- * documentation bundle hides it until hover; the blog renders through the main
- * bundle, where it was showing as a stray underlined hash fused to the heading
- * text ("#Why we built it").
- */
-.blog-prose :is(h2, h3, h4) {
-    @apply relative w-fit;
-}
-
-.blog-prose .heading-permalink {
-    @apply absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 text-gray-300 dark:text-gray-600 transition-all no-underline;
-}
-
-.blog-prose :is(h2, h3, h4):hover .heading-permalink {
-    @apply opacity-100 text-[var(--color-primary)] dark:text-[var(--color-primary-400)];
-}
-
-.blog-prose h1 .heading-permalink {
-    @apply hidden;
 }

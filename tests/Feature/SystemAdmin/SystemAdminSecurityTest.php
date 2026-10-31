@@ -171,16 +171,16 @@ describe('Administrator role', function () {
     it('reads every panel index it is allowed to see', function (string $route) {
         $this->get($route)->assertOk();
     })->with([
-        'dashboard' => '/sysadmin',
+        'dashboard' => '/sysadmin/instance',
         'companies' => '/sysadmin/companies',
         'users' => '/sysadmin/users',
         'workspaces' => '/sysadmin/workspaces',
-        'subscriptions' => '/sysadmin/billing/subscriptions',
-        'ai credit balances' => '/sysadmin/ai/credit-balances',
         'activities' => '/sysadmin/activity',
-        'posts' => '/sysadmin/posts',
-        'categories' => '/sysadmin/categories',
-        'tags' => '/sysadmin/tags',
+        ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+            'posts' => '/sysadmin/posts',
+            'categories' => '/sysadmin/categories',
+            'tags' => '/sysadmin/tags',
+        ] : []),
     ]);
 
     it('writes but never deletes', function (string $model) {

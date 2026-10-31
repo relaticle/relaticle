@@ -14,6 +14,9 @@ paths:
   - 'packages/ImportWizard/src/**'
   - 'packages/EmailIntegration/src/Livewire/**'
   - 'packages/EmailIntegration/src/Services/EmailTemplateRenderService.php'
+  - 'packages/Cloud/src/**/Filament/**'
+  - 'packages/Cloud/src/**/Livewire/**'
+  - 'packages/Cloud/src/**/Commands/**'
 ---
 
 # File uploads

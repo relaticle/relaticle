@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -12,10 +10,6 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(CreditService::class);
-
-beforeEach(function (): void {
-    Feature::define(Billing::class, true);
-});
 
 /**
  * `credits_used` on `ai_credit_balances` is the period's spend meter.
@@ -61,6 +55,8 @@ it('revocation adjustments do not touch credits_used', function (): void {
 });
 
 it('reserve + settle + refund cycles move credits_used in lockstep with the chat ledger', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->delete();

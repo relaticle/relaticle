@@ -38,6 +38,18 @@ function migrationFiles(): array
     return $files;
 }
 
+/** @return list<string> */
+function actionDirectories(): array
+{
+    $root = dirname(__DIR__, 2);
+
+    return [
+        $root.'/app/Actions',
+        ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: [],
+        ...glob($root.'/packages/Cloud/src/*/Actions', GLOB_ONLYDIR) ?: [],
+    ];
+}
+
 /**
  * @param  list<string>  $directories
  * @return list<string>
@@ -139,19 +151,23 @@ it('keeps migrations off the database clock (no useCurrent, CURRENT_TIMESTAMP, o
 it('keeps migrations out of the test suite', function (): void {
     $root = dirname(__DIR__, 2);
 
-    $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/tests', FilesystemIterator::SKIP_DOTS));
+    $testDirectories = array_filter([$root.'/tests', $root.'/packages/Cloud/tests'], is_dir(...));
 
     $offenders = [];
 
-    foreach ($files as $file) {
-        $path = $file->getPathname();
+    foreach ($testDirectories as $testDirectory) {
+        $files = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($testDirectory, FilesystemIterator::SKIP_DOTS));
 
-        if ($file->getExtension() !== 'php' || str_starts_with($path, $root.'/tests/Arch/')) {
-            continue;
-        }
+        foreach ($files as $file) {
+            $path = $file->getPathname();
 
-        if (preg_match('#database/migrations/|database_path\(\s*[\'"]migrations#', (string) file_get_contents($path)) === 1) {
-            $offenders[] = str_replace($root.'/', '', $path);
+            if ($file->getExtension() !== 'php' || str_starts_with($path, $root.'/tests/Arch/')) {
+                continue;
+            }
+
+            if (preg_match('#database/migrations/|database_path\(\s*[\'"]migrations#', (string) file_get_contents($path)) === 1) {
+                $offenders[] = str_replace($root.'/', '', $path);
+            }
         }
     }
 
@@ -230,7 +246,7 @@ it('keeps every action on the canonical single-execute() shape', function (): vo
 
     $violations = [];
 
-    foreach (phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]) as $path) {
+    foreach (phpFilesUnder(actionDirectories()) as $path) {
         if (str_contains($path, '/Actions/Fortify/') || str_contains($path, '/Actions/Jetstream/')) {
             continue;
         }
@@ -339,7 +355,7 @@ it('names an action for what it does, with no Action suffix', function (): void 
     $suffixed = array_values(array_filter(
         array_map(
             static fn (string $file): string => basename($file, '.php'),
-            phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+            phpFilesUnder(actionDirectories()),
         ),
         static fn (string $name): bool => str_ends_with($name, 'Action'),
     ));
@@ -445,6 +461,7 @@ it('forces a conscious arch-coverage decision when a package is added', function
     expect($packageNamespaces)->toBe(
         [
             'Relaticle\Chat',
+            'Relaticle\Cloud',
             'Relaticle\Documentation',
             'Relaticle\EmailIntegration',
             'Relaticle\ImportWizard',
@@ -453,6 +470,46 @@ it('forces a conscious arch-coverage decision when a package is added', function
         ],
         'Package list changed. Wire the new namespace into tests/Arch/ArchTest.php (boundary + structure rules), '.
         'the package table in .ai/guidelines/relaticle/architecture.md, and then update this list.',
+    );
+});
+
+it('keeps the cloud package out of core code, config, routes, views and lang', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $directories = ['app', 'bootstrap', 'config', 'database', 'lang', 'packages', 'resources', 'routes'];
+
+    $allowedPrefixes = [
+        $root.'/bootstrap/providers.php',
+        $root.'/bootstrap/cache/',
+        $root.'/packages/Cloud/',
+    ];
+
+    $extensions = ['php', 'js', 'ts', 'css', 'json', 'md', 'yml', 'yaml', 'xml', 'txt', 'html'];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory, FilesystemIterator::SKIP_DOTS)) as $file) {
+            $path = $file->getPathname();
+
+            if (! in_array($file->getExtension(), $extensions, true)) {
+                continue;
+            }
+
+            if (array_any($allowedPrefixes, fn (string $prefix): bool => str_starts_with($path, $prefix))) {
+                continue;
+            }
+
+            if (preg_match('/Relaticle\\\\{1,2}Cloud|\bcloud::/i', (string) file_get_contents($path)) === 1) {
+                $offenders[] = str_replace($root.'/', '', $path);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Core never references Relaticle\Cloud or its cloud:: views and lang namespace (.ai/guidelines/relaticle/architecture.md). '.
+        'Only bootstrap/providers.php may name the provider. Offending files: '.implode(', ', $offenders),
     );
 });
 
@@ -684,8 +741,10 @@ it('keeps the retired team word out of identifiers', function (): void {
     ];
 
     $stripeMetadataKeyPaths = [
-        'app/Actions/Billing/CreateCreditPackCheckout.php',
-        'app/Http/Controllers/Billing/StripeWebhookController.php',
+        'packages/Cloud/src/Billing/Actions/CreateCreditPackCheckout.php',
+        'packages/Cloud/src/Billing/Http/StripeWebhookController.php',
+        'packages/Cloud/tests/Feature/Billing/CheckoutOptionsTest.php',
+        'packages/Cloud/tests/Feature/Billing/StripeWebhookTest.php',
     ];
 
     $offenders = [];
@@ -743,12 +802,13 @@ it('keeps the retired contact and deal words out of record copy', function (): v
     $root = dirname(__DIR__, 2);
 
     $labelPathsNamingSomethingElse = [
-        'app/Support/MarketingNavigation.php',
-        'resources/views/alternatives/',
+        'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
+        'packages/Cloud/resources/views/marketing/alternatives/',
     ];
 
     $emailParticipantPaths = [
         'lang/en/filament/pages/email-privacy-settings.php',
+        'packages/Cloud/resources/markdown/policy.md',
         'packages/Documentation/resources/content/help/email-and-calendar/set-workspace-email-privacy.md',
     ];
 
@@ -765,7 +825,7 @@ it('keeps the retired contact and deal words out of record copy', function (): v
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
             $checksLabels = ! array_any($labelPathsNamingSomethingElse, fn (string $path): bool => str_starts_with($relativePath, $path));
-            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/resources)/#', $relativePath) === 1
+            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
                 && ! in_array($relativePath, $emailParticipantPaths, true);
 
             foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
@@ -1047,7 +1107,11 @@ it('keeps the role suffix on classes whose directory carries one', function (): 
 
     foreach ($suffixes as $directory => $suffix) {
         $paths = array_filter(
-            [$root.'/app/'.$directory, ...glob($root.'/packages/*/src/'.$directory, GLOB_ONLYDIR) ?: []],
+            [
+                $root.'/app/'.$directory,
+                ...glob($root.'/packages/*/src/'.$directory, GLOB_ONLYDIR) ?: [],
+                ...glob($root.'/packages/Cloud/src/*/'.$directory, GLOB_ONLYDIR) ?: [],
+            ],
             is_dir(...),
         );
 
@@ -1097,7 +1161,7 @@ it('keeps reads out of the Actions folders', function (): void {
     $root = dirname(__DIR__, 2);
 
     $offenders = array_filter(
-        phpFilesUnder([$root.'/app/Actions', ...glob($root.'/packages/*/src/Actions', GLOB_ONLYDIR) ?: []]),
+        phpFilesUnder(actionDirectories()),
         static fn (string $file): bool => preg_match('/^(List|Find|Search|Get|Aggregate)[A-Z]/', basename($file, '.php')) === 1,
     );
 
@@ -1204,7 +1268,7 @@ it('keeps each negated arch expectation to one layer', function (): void {
     );
 });
 
-it('keeps every Tailwind source on disk and inside the Docker frontend stage', function (): void {
+it('keeps every Tailwind source on disk, and every core one inside the Docker frontend stage', function (): void {
     $root = dirname(__DIR__, 2);
 
     preg_match('/^FROM \S+ AS frontend$(.*?)^FROM /ms', (string) file_get_contents($root.'/Dockerfile'), $stage);
@@ -1230,8 +1294,17 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
     foreach ($stylesheets as $stylesheet) {
         $css = (string) file_get_contents($stylesheet);
         $name = str_replace($root.'/', '', $stylesheet);
+        $isCloudStylesheet = str_starts_with($name, 'packages/Cloud/');
 
         preg_match_all('/^@import\s+([\'"])tailwindcss\1(.*)$/m', $css, $imports);
+
+        preg_match_all('/^@(?:import|source)\s+([\'"])(.+?)\1/m', $css, $references);
+
+        foreach ($references[2] as $reference) {
+            if (! $isCloudStylesheet && str_contains($reference, 'packages/Cloud')) {
+                $problems[] = "{$name}: {$reference} names the cloud package, which the image and self-hosted builds do not contain";
+            }
+        }
 
         foreach ($imports[2] as $modifiers) {
             if (! str_contains($modifiers, 'source(none)')) {
@@ -1252,6 +1325,10 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
 
             $relative = str_replace($root.'/', '', $path);
 
+            if ($isCloudStylesheet) {
+                continue;
+            }
+
             if (! array_any($copied, static fn (string $directory): bool => $relative === $directory || str_starts_with($relative, $directory.'/'))) {
                 $problems[] = "{$name}: {$source} is not copied or mounted in the Dockerfile frontend stage";
             }
@@ -1259,8 +1336,10 @@ it('keeps every Tailwind source on disk and inside the Docker frontend stage', f
     }
 
     expect($copied)->not->toBeEmpty()
+        ->and((string) file_get_contents($root.'/.dockerignore'))->toContain('/packages/Cloud')
         ->and($problems)->toBe(
             [],
-            'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md): '.implode(', ', $problems),
+            'Self-hosted images would ship CSS that differs from production (.ai/guidelines/relaticle/ui.md). '.
+            'The cloud package ships its own stylesheet, which the image never builds, so only core stylesheets must stay inside the frontend stage and none may name the cloud package: '.implode(', ', $problems),
         );
 });

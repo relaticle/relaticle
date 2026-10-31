@@ -1,0 +1,220 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Dated, sourced facts about Relaticle and its CRM competitors.
+ *
+ * Single source of truth for every public competitor claim (press page,
+ * comparison pages). Every field that carries a number or price has its own
+ * `*_verified` date, and the whole entry has a `verified` date. Both are
+ * read by `php artisan gtm:stale-facts` to flag claims older than 90 days.
+ *
+ * `stars` is 0 for closed-source products with no public repository. That
+ * is the verified fact, not a placeholder. `contributors` is `'n/a'` for the
+ * same reason (Attio, HubSpot) rather than a number, since there is no public
+ * repository to count contributors on. Where a public repository exists,
+ * `contributors` is the total contributor count from the GitHub API
+ * (`contributors_url`, unauthenticated commits only, no `anon=true`).
+ *
+ * `source_urls` carries the primary sources behind the claims: `website` and
+ * `pricing` always, `repository` only where a public repository exists. The
+ * comparison pages render them so every fact is one click from its origin.
+ *
+ * @return array<string, array{
+ *     name: string,
+ *     license: string,
+ *     stars: int,
+ *     stars_verified: string,
+ *     contributors: int|string,
+ *     contributors_verified: string,
+ *     pricing: string,
+ *     pricing_verified: string,
+ *     stack: string,
+ *     self_host: string,
+ *     ai: string,
+ *     extensibility: string,
+ *     source_urls: array{website: string, pricing: string, repository?: string, mcp?: string, apps?: string, exports?: string, backup?: string},
+ *     verified: string,
+ * }>
+ */
+return [
+    'relaticle' => [
+        'name' => 'Relaticle',
+        'license' => 'AGPL-3.0',
+        'stars' => 1_700,
+        'stars_verified' => '2026-09-26',
+        'contributors' => 9,
+        'contributors_verified' => '2026-09-26',
+        'pricing' => '$24/mo flat (or $19/mo billed annually), unlimited users, AI credit packs on top',
+        'pricing_verified' => '2026-08-13',
+        'stack' => 'Laravel 13 + Filament 5, single-server deploy',
+        'self_host' => 'Self-host free under AGPL-3.0, no feature gating',
+        'ai' => 'A first-party MCP server plus a built-in AI assistant; MCP, the assistant, and Ollama all work self-hosted',
+        'extensibility' => 'REST API plus a first-party MCP server; everything a self-hosted install runs is AGPL-3.0, so anyone can fork and extend any part directly',
+        'source_urls' => [
+            'website' => 'https://relaticle.com',
+            'pricing' => 'https://relaticle.com/pricing',
+            'repository' => 'https://github.com/relaticle/relaticle',
+        ],
+        'verified' => '2026-09-26',
+    ],
+    'twenty' => [
+        'name' => 'Twenty',
+        'license' => 'AGPL-3.0 + Twenty Application Exception (enterprise files license-tagged in-repo)',
+        'stars' => 54_877,
+        'stars_verified' => '2026-08-13',
+        'contributors' => 466,
+        'contributors_verified' => '2026-08-13',
+        'pricing' => 'Pro $9/user/mo, Organization $19/user/mo (billed yearly), Enterprise from $50k/yr',
+        'pricing_verified' => '2026-08-13',
+        'stack' => 'Node/NestJS + Redis + Postgres + background workers',
+        'self_host' => 'Self-hostable core; enterprise-tagged files are license-restricted',
+        'ai' => 'First-party MCP server with OAuth, documented for both Cloud and self-hosted deployments (docs.twenty.com)',
+        'extensibility' => 'MIT-licensed apps SDK (twenty-sdk, create-twenty-app) for building custom objects, server logic, and UI components as TypeScript packages, per docs.twenty.com/developers; the core CRM repo itself stays AGPL-3.0 + Twenty Application Exception',
+        'source_urls' => [
+            'website' => 'https://twenty.com',
+            'pricing' => 'https://twenty.com/pricing',
+            'repository' => 'https://github.com/twentyhq/twenty',
+        ],
+        'verified' => '2026-08-30',
+    ],
+    'espocrm' => [
+        'name' => 'EspoCRM',
+        'license' => 'AGPL-3.0',
+        'stars' => 3_226,
+        'stars_verified' => '2026-08-13',
+        'contributors' => 54,
+        'contributors_verified' => '2026-08-13',
+        'pricing' => 'Cloud Basic $15/user/mo (min 3 users), Enterprise $25/user/mo (min 5), Ultimate $69/user/mo (min 10)',
+        'pricing_verified' => '2026-08-13',
+        'stack' => 'PHP',
+        'self_host' => 'Free self-hosted core; paid extensions for self-hosters',
+        'ai' => 'Official paid AI add-on (Intelligence: OpenAI, Gemini, Claude providers); no first-party MCP tooling',
+        'extensibility' => 'First-party paid extension store at espocrm.com/extensions (Advanced Pack, Sales Pack, Intelligence); no MCP/agent surface',
+        'source_urls' => [
+            'website' => 'https://www.espocrm.com',
+            'pricing' => 'https://www.espocrm.com/pricing/',
+            'repository' => 'https://github.com/espocrm/espocrm',
+        ],
+        'verified' => '2026-08-30',
+    ],
+    'attio' => [
+        'name' => 'Attio',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-08-13',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-08-13',
+        'pricing' => 'Free (up to 3 seats), Plus $35/user/mo, Pro $79/user/mo (billed yearly; $44/$99 monthly), Enterprise custom; see attio.com/pricing',
+        'pricing_verified' => '2026-09-17',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'Ask Attio, AI research and enrichment, plus an official MCP server on every plan',
+        'extensibility' => 'REST API, App SDK, and an app marketplace with native and third-party integrations',
+        'source_urls' => [
+            'website' => 'https://attio.com',
+            'pricing' => 'https://attio.com/pricing',
+            'mcp' => 'https://attio.com/help/reference/attio-ai/attio-mcp',
+            'apps' => 'https://attio.com/apps',
+            'exports' => 'https://attio.com/help/reference/imports-exports/exporting-lists-and-views',
+            'backup' => 'https://attio.com/help/reference/imports-exports/back-up-your-workspace-data',
+        ],
+        'verified' => '2026-09-17',
+    ],
+    'hubspot' => [
+        'name' => 'HubSpot',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-08-13',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-08-13',
+        'pricing' => 'Free CRM (up to 2 users), paid Hubs from $20/seat/mo (Starter); see hubspot.com/pricing',
+        'pricing_verified' => '2026-08-13',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'Proprietary AI features bundled into paid Hubs',
+        'extensibility' => 'Official App Marketplace for third-party integrations, agents, and templates',
+        'source_urls' => [
+            'website' => 'https://www.hubspot.com',
+            'pricing' => 'https://www.hubspot.com/pricing/crm',
+        ],
+        'verified' => '2026-08-13',
+    ],
+    'folk' => [
+        'name' => 'Folk',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-09-05',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-09-05',
+        'pricing' => 'Standard $24/member/mo, Premium $48/member/mo, Enterprise from $80/member/mo (billed yearly; $30/$60/$100 monthly), 2-week trial; see folk.app/pricing',
+        'pricing_verified' => '2026-09-05',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'Magic Fields plus Research, Workflow, Follow-up and Recap assistants, metered per plan (2,000 Magic Fields and 200 Research runs a month on Standard)',
+        'extensibility' => 'Public REST API (developer.folk.app) plus native integrations',
+        'source_urls' => [
+            'website' => 'https://www.folk.app',
+            'pricing' => 'https://www.folk.app/pricing',
+        ],
+        'verified' => '2026-09-05',
+    ],
+    'clarify' => [
+        'name' => 'Clarify',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-09-05',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-09-05',
+        'pricing' => 'Free (1,000 credits/mo, unlimited seats), Starter $50/mo (5,000 credits), Growth from $1,000/mo (100,000 credits); metered in AI credits, not per seat; see clarify.ai/pricing',
+        'pricing_verified' => '2026-09-05',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'AI sales agent, custom agents, deal and meeting intelligence, call recorder and notetaker, AI fields and autofill; all metered in credits (30 credits per meeting summary)',
+        'extensibility' => 'API, Slack and Zapier integrations (docs.clarify.ai)',
+        'source_urls' => [
+            'website' => 'https://www.clarify.ai',
+            'pricing' => 'https://www.clarify.ai/pricing',
+        ],
+        'verified' => '2026-09-05',
+    ],
+    'salesforce' => [
+        'name' => 'Salesforce Sales Cloud',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-09-05',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-09-05',
+        'pricing' => 'Starter Suite $25, Pro Suite $100, Core $195, Advanced $395, Max $550 per user/mo billed annually; Agentforce for Sales add-on from $125/user/mo, bundled only in Max; see salesforce.com/sales/pricing',
+        'pricing_verified' => '2026-09-05',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'Einstein scoring purchasable on Core and above; Agentforce for Sales agents as a paid add-on from $125/user/mo, bundled only in the Max edition',
+        'extensibility' => 'Partner ecosystem of apps and integrations (AppExchange) plus MuleSoft for integration and automation',
+        'source_urls' => [
+            'website' => 'https://www.salesforce.com',
+            'pricing' => 'https://www.salesforce.com/sales/pricing/',
+        ],
+        'verified' => '2026-09-05',
+    ],
+    'close' => [
+        'name' => 'Close',
+        'license' => 'Closed-source SaaS',
+        'stars' => 0,
+        'stars_verified' => '2026-09-05',
+        'contributors' => 'n/a',
+        'contributors_verified' => '2026-09-05',
+        'pricing' => 'Solo $9, Essentials $35, Growth $99, Scale $139 per user/mo billed annually ($19/$49/$109/$149 monthly), 14-day trial; see close.com/pricing',
+        'pricing_verified' => '2026-09-05',
+        'stack' => 'Closed-source SaaS, proprietary stack',
+        'self_host' => 'No self-hosting option',
+        'ai' => 'Chloe AI assistant on every plan with per-plan credit pools (500 credits per user a month on Solo, 2,000 on Scale); Chloe in workflows and auto-updates on Growth and Scale',
+        'extensibility' => 'Public REST API (developer.close.com) plus Zapier and native integrations',
+        'source_urls' => [
+            'website' => 'https://www.close.com',
+            'pricing' => 'https://www.close.com/pricing',
+        ],
+        'verified' => '2026-09-05',
+    ],
+];

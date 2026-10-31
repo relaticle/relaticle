@@ -46,6 +46,21 @@ beforeEach(function (): void {
     ]));
 });
 
+it('links the configured privacy policy from the connected accounts section', function (): void {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false);
+});
+
+it('shows no privacy policy link on the connected accounts section when none is configured', function (): void {
+    config()->set('relaticle.legal.privacy_url', null);
+
+    livewire(EmailAccountsPage::class)
+        ->assertSee(__('filament/pages/email-accounts.sections.connected.heading'))
+        ->assertDontSee('Read how we handle your data');
+});
+
 it('links reconnect to the mailbox oauth redirect for the account provider', function (EmailProvider $provider): void {
     $this->account->update(['provider' => $provider]);
 

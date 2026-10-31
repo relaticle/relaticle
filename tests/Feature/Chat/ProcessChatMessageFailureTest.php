@@ -9,7 +9,6 @@ use App\Features\Billing;
 use App\Features\SetupConversation;
 use App\Models\Task;
 use App\Models\User;
-use App\Services\Billing\PlanEntitlements;
 use App\Services\SelfHostedEntitlements;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
@@ -42,15 +41,12 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
-
-beforeEach(function (): void {
-    Feature::define(Billing::class, true);
-});
 
 /** @param array{provider: string|null, model: string|null, id: string|null, source: string} $resolved */
 function makeFailedTurnJob(User $user, string $conversationId, array $resolved = ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto']): ProcessChatMessage
@@ -88,6 +84,8 @@ function seedFailedTurnMessage(string $conversationId, User $user, string $role,
 }
 
 it('makes a failed turn coherent: user message, failure note, superseded proposal, one credit', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -278,6 +276,8 @@ it('backfills a newly failed turn even when a prior completed turn exists', func
 });
 
 it('shows timeout-specific copy when the turn times out', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -384,6 +384,8 @@ function seedFailoverConversation(User $user, string $conversationId): void
 }
 
 it('redispatches once on a terminal pre-stream failure when resolution was auto', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -438,6 +440,8 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
 });
 
 it('does not fail over for an explicit model pick', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -517,6 +521,8 @@ it('offers Retry on Auto when the provider rejects an explicit pick mid-stream',
 });
 
 it('offers no Retry on Auto when Auto has no other model to answer with', function (): void {
+    withHostedBilling();
+
     Event::fake([ChatStreamFailed::class]);
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -788,6 +794,8 @@ it('lets the model recover from calling a tool that does not exist instead of fa
 });
 
 it('refunds the reservation when the job dies before it ever runs', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();

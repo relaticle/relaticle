@@ -2,12 +2,10 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
@@ -106,7 +104,7 @@ it('returns 401 for unauthenticated cancel', function (): void {
 });
 
 it('settles the reserved minimum (not refund) when a stream is cancelled mid-flight', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;

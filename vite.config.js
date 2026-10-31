@@ -1,33 +1,44 @@
-import {defineConfig} from 'vite';
+import {existsSync} from 'node:fs';
+import {defineConfig, loadEnv} from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
 
-export default defineConfig({
-    plugins: [
-        laravel({
-            input: [
-                // Marketing website
-                'resources/css/app.css',
-                'resources/js/app.js',
-                'resources/js/motion.js',
-                // Passkeys client (loaded on demand by Blade components)
-                'resources/js/passkeys.js',
-                // Chat
-                'packages/Chat/resources/js/chat.js',
-                // Filament
-                'resources/css/filament/app/theme.css',
-                'resources/css/filament/admin/theme.css',
-                // Documentation
-                'packages/Documentation/resources/css/documentation.css',
-                'packages/Documentation/resources/js/documentation.js',
-            ],
-            refresh: true,
-        }),
-        tailwindcss(),
-    ],
-    resolve: {
-        alias: {
-            '@': '/resources/js',
+const cloudInputs = (cloud) => cloud ? [
+    'packages/Cloud/resources/css/cloud.css',
+    'packages/Cloud/resources/js/motion.js',
+    'packages/Cloud/resources/css/documentation.css',
+    'packages/Cloud/resources/js/documentation.js',
+    'packages/Cloud/resources/css/filament/app/theme.css',
+    'packages/Cloud/resources/css/filament/admin/theme.css',
+].filter((input) => existsSync(new URL(input, import.meta.url))) : [];
+
+export default defineConfig(({mode}) => {
+    const cloud = ['1', 'true'].includes(String(loadEnv(mode, process.cwd(), '').RELATICLE_CLOUD ?? '').toLowerCase());
+
+    return {
+        plugins: [
+            laravel({
+                input: [
+                    'resources/css/app.css',
+                    'resources/js/app.js',
+                    // Passkeys client (loaded on demand by Blade components)
+                    'resources/js/passkeys.js',
+                    // Chat
+                    'packages/Chat/resources/js/chat.js',
+                    // Filament
+                    'resources/css/filament/app/theme.css',
+                    'resources/css/filament/admin/theme.css',
+                    // The cloud package is absent from self-hosted builds
+                    ...cloudInputs(cloud),
+                ],
+                refresh: true,
+            }),
+            tailwindcss(),
+        ],
+        resolve: {
+            alias: {
+                '@': '/resources/js',
+            },
         },
-    },
+    };
 });

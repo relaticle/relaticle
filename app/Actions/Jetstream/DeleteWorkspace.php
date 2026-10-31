@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
-use App\Actions\Billing\CancelWorkspaceSubscription;
+use App\Contracts\Billing;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Laravel\Jetstream\Contracts\DeletesTeams;
@@ -12,11 +12,11 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class DeleteWorkspace implements DeletesTeams
 {
-    public function __construct(private CancelWorkspaceSubscription $cancelSubscription) {}
+    public function __construct(private Billing $billing) {}
 
     public function delete(Workspace $workspace): void
     {
-        $this->cancelSubscription->execute($workspace, immediately: true);
+        $this->billing->cancelForDeletion($workspace, immediately: true);
 
         $workspace->purge();
 

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Http\Controllers;
 
+use App\Contracts\Billing;
 use App\Contracts\Entitlements;
 use App\Enums\Plan;
-use App\Features\Billing;
-use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -15,7 +14,6 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\CreditPackCatalog;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -26,7 +24,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
@@ -69,26 +66,13 @@ final readonly class ChatController
         private CreateConversation $createConversation,
         private ModelAccess $modelAccess,
         private Entitlements $entitlements,
+        private Billing $billing,
     ) {}
 
     /** @return list<string> */
     private function modelIds(): array
     {
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
-    }
-
-    /**
-     * Billing page URL for the workspace, or null when billing is switched off.
-     * Resolved through the panel route so it stays correct whether the app panel
-     * is served from a path prefix or its own subdomain.
-     */
-    private function billingUrl(Workspace $workspace): ?string
-    {
-        if (! Feature::active(Billing::class)) {
-            return null;
-        }
-
-        return BillingPage::getUrl(panel: 'app', tenant: $workspace);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -160,7 +144,7 @@ final readonly class ChatController
                     'plan' => $workspace->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
+                    'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
                 ], 403);
             }
         }
@@ -269,7 +253,7 @@ final readonly class ChatController
             ->first();
 
         $isFree = $workspace->plan === Plan::Free;
-        $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
+        $canTopUp = ! $isFree && $this->billing->sellsCredits($workspace);
         // Not $workspace->plan->credits(): a past-due workspace refills at the
         // Free allowance, so the plan's figure would name credits it never got.
         $allowance = $this->creditService->allowanceFor($workspace);
@@ -281,11 +265,11 @@ final readonly class ChatController
             'allowance' => $allowance,
             'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),
             'upgrade_available' => $isFree,
-            'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
+            'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
             // A top-up is only offered when a pack can actually be bought;
             // otherwise the CTA lands on a billing page with nothing to buy.
             'top_up_available' => $canTopUp,
-            'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
+            'top_up_url' => $canTopUp ? $this->billing->url($workspace) : null,
         ], 402);
     }
 

@@ -52,7 +52,7 @@ it('does not create a pending action because it is not a write', function (): vo
  * written by hand in separate files; this is the only thing stopping drift.
  */
 it('advertises every resolvable destination in its schema description', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $schema = app(GuideToPageTool::class)->schema(new JsonSchemaTypeFactory);
     $destination = (new Serializer)->serialize($schema['destination']);
@@ -63,7 +63,7 @@ it('advertises every resolvable destination in its schema description', function
 });
 
 it('declares every destination its schema description advertises', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $schema = app(GuideToPageTool::class)->schema(new JsonSchemaTypeFactory);
     $destination = (new Serializer)->serialize($schema['destination']);

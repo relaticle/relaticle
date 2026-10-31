@@ -1,0 +1,243 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Enums\Plan;
+use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Models\Company;
+use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Cashier\Subscription;
+use Relaticle\Chat\Actions\StoreChatAttachment;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
+use Tests\Helpers\ChatDocument;
+
+mutates(EnsureHostedWorkspaceAccess::class, PlanEntitlements::class, Billing::class);
+
+beforeEach(function (): void {
+    $this->user = User::factory()->withPersonalWorkspace()->create();
+    $this->workspace = $this->user->currentWorkspace;
+    $this->actingAs($this->user);
+});
+
+it('redirects a paused hosted workspace to billing', function (): void {
+    withHostedBilling();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('keeps billing and workspace deletion controls available while paused', function (): void {
+    withHostedBilling();
+
+    $this->get(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+
+    $this->get(route('filament.app.tenant.profile', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('lets a paused workspace reach the billing page', function (): void {
+    withHostedBilling();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $this->workspace))
+        ->assertOk()
+        ->assertSee(__('cloud::billing.paused.continue'));
+});
+
+it('keeps personal account controls available while paused', function (): void {
+    withHostedBilling();
+
+    $this->get(route('filament.app.settings.pages.profile', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+
+    $this->get(route('filament.app.settings.pages.access-tokens', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('allows a workspace during its active Cloud Pro trial', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->addDays(14),
+    ])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('allows a workspace with a manual Pro grant', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('allows a workspace with a managed Enterprise grant', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['plan' => Plan::Enterprise])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('allows a Concierge grant whose old trial date has passed', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill([
+        'plan' => Plan::Concierge,
+        'trial_ends_at' => now()->subMinute(),
+    ])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('allows a workspace with a valid subscription', function (): void {
+    withHostedBilling();
+
+    $this->workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_hosted_access',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('pauses an expired trial before the daily cleanup command runs', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill([
+        'plan' => Plan::Pro,
+        'trial_ends_at' => now()->subMinute(),
+    ])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('preserves hosted access for a grandfathered Free workspace', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('pauses a workspace whose subscription ended', function (): void {
+    withHostedBilling();
+
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('keeps a trial paused after the nightly downgrade', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['plan' => Plan::Free, 'pro_trial_used_at' => now()->subDays(15)])->save();
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('allows a cancelled subscriber that a sysadmin granted Pro', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['plan' => Plan::Pro])->save();
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('keeps a grandfathered workspace open after its subscription ended', function (): void {
+    withHostedBilling();
+
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()->subYear()])->save();
+    Subscription::factory()->canceled()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    $this->get(route('filament.app.pages.dashboard', ['tenant' => $this->workspace->slug]))
+        ->assertOk();
+});
+
+it('returns payment required from the REST API for a paused workspace', function (): void {
+    withHostedBilling();
+
+    $token = $this->user->createToken('paused-api', ['*'])->plainTextToken;
+    auth()->logout();
+
+    $this->withToken($token)
+        ->getJson('/api/v1/user')
+        ->assertStatus(402)
+        ->assertJson([
+            'error' => 'workspace_subscription_required',
+            'message' => __('billing.access.paused_api'),
+            'upgrade_url' => route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]),
+        ]);
+});
+
+it('returns payment required from the MCP transport for a paused workspace', function (): void {
+    withHostedBilling();
+
+    $token = $this->user->createToken('paused-mcp', ['*'])->plainTextToken;
+
+    $this->withToken($token)
+        ->postJson('/mcp', [
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [],
+        ])
+        ->assertStatus(402)
+        ->assertJsonPath('error', 'workspace_subscription_required');
+});
+
+it('redirects a paused workspace to billing on the record-redirect route instead of returning raw json', function (): void {
+    withHostedBilling();
+
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $this->get("/r/company/{$company->getKey()}")
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('redirects a paused workspace to billing on the attachment import route instead of returning raw json', function (): void {
+    withHostedBilling();
+
+    Storage::fake('local');
+
+    $csv = UploadedFile::fake()->createWithContent('contacts.csv', "Name\nJane\n");
+
+    $attachment = resolve(StoreChatAttachment::class)->execute($this->user, $csv);
+
+    $this->get(route('chat.attachments.import', ['attachment' => $attachment->id(), 'entity' => 'people']))
+        ->assertRedirect(route('filament.app.pages.billing', ['tenant' => $this->workspace->slug]));
+});
+
+it('blocks chat before reserving credits or dispatching a queued turn', function (): void {
+    withHostedBilling();
+
+    Queue::fake();
+
+    $this->postJson(route('chat.conversations.create'), [
+        'document' => ChatDocument::fromText('Create a company'),
+    ])->assertStatus(402)
+        ->assertJsonPath('error', 'workspace_subscription_required');
+
+    Queue::assertNotPushed(ProcessChatMessage::class);
+});

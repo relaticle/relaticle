@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Contracts\Billing;
 use App\Contracts\Entitlements;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Filament\CustomFields\DateFieldType;
 use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
@@ -31,10 +31,7 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
-use App\Services\Billing\PlanEntitlements;
-use App\Services\DiscordService;
-use App\Services\DockerHubService;
-use App\Services\GitHubService;
+use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\CurrentImport;
@@ -98,13 +95,11 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Passport;
-use Laravel\Pennant\Feature;
 use Laravel\Sanctum\Sanctum;
 use League\CommonMark\Extension\Table\TableExtension;
 use Livewire\Livewire;
@@ -140,21 +135,15 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->registerNotificationBindings();
-        $this->registerEntitlements();
-
-        // Ink registers its public routes from packageBooted(), which runs after every
-        // provider's register(). Read the config key App\Features\Blog resolves from
-        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
-        // bound this early. Same source of truth, so the flag stays the single switch.
-        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
+        $this->registerSelfHostedDefaults();
 
         Cashier::useCustomerModel(Workspace::class);
         Cashier::keepPastDueSubscriptionsActive();
 
         // Cashier attaches signature verification only when the webhook secret
         // happens to be set, and also exposes an unauthenticated payment route
-        // this app never links to. Register the webhook ourselves instead so
-        // verification is unconditional. See routes/web.php.
+        // this app never links to. The webhook is registered by the billing
+        // package instead, so verification is unconditional.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between
@@ -222,11 +211,10 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(ExportCompletion::class, CompleteExport::class);
     }
 
-    private function registerEntitlements(): void
+    private function registerSelfHostedDefaults(): void
     {
-        $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
-            ? $app->make(PlanEntitlements::class)
-            : $app->make(SelfHostedEntitlements::class));
+        $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
+        $this->app->bind(Billing::class, NoBilling::class);
     }
 
     private function registerPassport(): void
@@ -296,7 +284,6 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureSessions();
         $this->configureModels();
         $this->configureFilament();
-        $this->configureCommunityCounts();
         $this->configureLivewire();
         $this->configureMacros();
         $this->configureRateLimiting();
@@ -862,28 +849,6 @@ final class AppServiceProvider extends ServiceProvider
         ]);
 
         FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
-    }
-
-    private function configureCommunityCounts(): void
-    {
-        Facades\View::composer(['components.layout.community-links', 'home.partials.hero', 'press'], function (View $view): void {
-            $gitHubService = resolve(GitHubService::class);
-            $starsCount = $gitHubService->getStarsCount();
-            $formattedStarsCount = $gitHubService->getFormattedStarsCount();
-
-            $view->with([
-                'githubStars' => $starsCount,
-                'formattedGithubStars' => $formattedStarsCount,
-            ]);
-        });
-
-        Facades\View::composer('components.layout.community-links', function (View $view): void {
-            $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
-        });
-
-        Facades\View::composer('home.partials.works-with', function (View $view): void {
-            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
-        });
     }
 
     private function configureMacros(): void

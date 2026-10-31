@@ -3,20 +3,25 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelWorkspaceDeletion;
+use App\Actions\Jetstream\DeleteWorkspace;
 use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
 use App\Enums\WorkspaceRole;
 use App\Filament\Pages\Dashboard;
 use App\Livewire\App\Workspaces\WorkspaceDeletionBanner;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Notifications\WorkspaceDeletionCancelledNotification;
 use App\Notifications\WorkspaceDeletionScheduledNotification;
+use App\Services\NoBilling;
 use Filament\Actions\Action;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Subscription;
+use Relaticle\Cloud\Billing\StripeBilling;
+use Tests\Helpers\StripeRecorder;
 
-mutates(ScheduleWorkspaceDeletion::class, CancelWorkspaceDeletion::class, WorkspaceDeletionBanner::class);
+mutates(ScheduleWorkspaceDeletion::class, CancelWorkspaceDeletion::class, WorkspaceDeletionBanner::class, DeleteWorkspace::class, NoBilling::class, StripeBilling::class);
 
 test('workspace owner can schedule workspace deletion', function () {
     Notification::fake();
@@ -163,6 +168,7 @@ test('a workspace that is not scheduled for deletion shows no deletion banner', 
 });
 
 test('a workspace on an open managed plan is not scheduled for deletion', function (string $type) {
+    withHostedBilling();
     Notification::fake();
 
     $user = User::factory()->withWorkspace()->create();
@@ -174,6 +180,40 @@ test('a workspace on an open managed plan is not scheduled for deletion', functi
 
     expect($workspace->refresh()->scheduled_deletion_at)->toBeNull();
 })->with(['managed', 'managed_pending']);
+
+test('a workspace on a leftover managed plan is scheduled for deletion without calling Stripe while billing is off', function (string $type): void {
+    Notification::fake();
+    config()->set('cashier.secret', 'sk_test_fake');
+    $stripe = StripeRecorder::install();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => $type]);
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => 'default']);
+
+    resolve(ScheduleWorkspaceDeletion::class)->schedule($user, $workspace);
+
+    StripeRecorder::uninstall();
+
+    expect($workspace->refresh()->scheduled_deletion_at)->not->toBeNull()
+        ->and($stripe->requests)->toBeEmpty();
+})->with(['managed', 'managed_pending']);
+
+test('deleting a workspace calls no Stripe while billing is off', function (): void {
+    config()->set('cashier.secret', 'sk_test_fake');
+    $stripe = StripeRecorder::install();
+
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['stripe_id' => 'cus_leftover'])->save();
+    Subscription::factory()->active()->create(['workspace_id' => $workspace->getKey(), 'type' => 'managed']);
+
+    resolve(DeleteWorkspace::class)->delete($workspace);
+
+    StripeRecorder::uninstall();
+
+    expect(Workspace::query()->whereKey($workspace->getKey())->exists())->toBeFalse()
+        ->and($stripe->requests)->toBeEmpty();
+});
 
 test('a workspace whose managed plan ended can be scheduled for deletion', function () {
     Notification::fake();

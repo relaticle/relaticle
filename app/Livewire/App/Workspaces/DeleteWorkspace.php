@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Livewire\App\Workspaces;
 
 use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
+use App\Contracts\Billing;
 use App\Livewire\App\Workspaces\Concerns\CancelsWorkspaceDeletion;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
@@ -51,8 +52,10 @@ final class DeleteWorkspace extends BaseLivewireComponent
                                 ->color('danger')
                                 ->requiresConfirmation()
                                 ->modalHeading(__('workspaces.sections.delete_workspace.title'))
-                                ->modalDescription(fn (): string => __('workspaces.modals.delete_workspace.notice')
-                                    .($this->workspace->subscribed() ? ' '.__('billing.deletion_notice') : ''))
+                                ->modalDescription(fn (): string => collect([
+                                    __('workspaces.modals.delete_workspace.notice'),
+                                    resolve(Billing::class)->deletionNotice($this->workspace),
+                                ])->filter()->implode(' '))
                                 ->modalSubmitActionLabel(__('workspaces.actions.delete_workspace'))
                                 ->modalCancelAction(false)
                                 ->visible(fn (): bool => ! $this->workspace->isScheduledForDeletion())

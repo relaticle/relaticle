@@ -450,7 +450,7 @@ final class InstallCommand extends Command
         $this->line('  • Real-time logs (Pail)');
 
         $this->newLine();
-        $this->line('  Documentation: https://relaticle.com/documentation');
+        $this->line('  Documentation: https://relaticle.com/developers');
         $this->newLine();
 
         $this->info('Happy CRM-ing! 🚀');

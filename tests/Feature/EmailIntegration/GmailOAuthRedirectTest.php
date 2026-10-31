@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
-use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
-use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 
@@ -110,7 +108,7 @@ it('rejects a return page that was not signed with the connect url', function ()
 });
 
 it('refuses to start a mailbox connect for a workspace whose hosted access is paused', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     $user = User::factory()->withWorkspace()->create();
     $user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subMinute()])->save();
     $this->actingAs($user);

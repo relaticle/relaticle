@@ -44,6 +44,7 @@ it('completes installation without demo data and system admin', function (): voi
         ->expectsOutputToContain('Environment Setup completed')
         ->expectsOutputToContain('Database completed')
         ->expectsOutputToContain('Relaticle installed successfully!')
+        ->expectsOutputToContain('Documentation: https://relaticle.com/developers')
         ->assertSuccessful();
 
     // Verify .env was modified in temp file
