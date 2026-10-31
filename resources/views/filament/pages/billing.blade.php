@@ -269,7 +269,6 @@
                     @foreach([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale] as $plan)
                         @php
                             $isScale = $plan === \App\Enums\Plan::Scale;
-                            $openModal = "\$dispatch('upgrade-plan-changed', { plan: '{$plan->value}', interval: yearly ? 'yearly' : 'monthly' }); \$dispatch('open-modal', { id: ".\Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID).' })';
                         @endphp
                         <div
                             id="{{ $plan->value }}-plan"
@@ -311,7 +310,7 @@
                             </ul>
 
                             <div class="mt-auto pt-6">
-                                <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" x-on:click="{{ $openModal }}">
+                                <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" x-on:click="$dispatch('upgrade-plan-changed', { plan: {{ \Illuminate\Support\Js::from($plan->value) }}, interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
                                     {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button', ['plan' => $plan->marketingLabel()]) }}
                                 </x-filament::button>
                             </div>

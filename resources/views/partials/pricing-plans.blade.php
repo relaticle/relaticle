@@ -7,9 +7,6 @@
         @foreach([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale] as $plan)
             @php
                 $isScale = $plan === \App\Enums\Plan::Scale;
-                $features = $isScale
-                    ? __('billing.scale_plan.features')
-                    : __('billing.pro_plan.features');
             @endphp
             <section
                 id="{{ $plan->value }}-plan"
@@ -58,7 +55,7 @@
                 <div class="flex flex-1 flex-col border-t border-gray-100 p-6 dark:border-white/[0.06] sm:px-8">
                     <p class="mb-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ $isScale ? __('billing.scale_plan.includes') : __('Your workspace includes') }}</p>
                     <ul class="space-y-3">
-                        @foreach($features as $feature)
+                        @foreach(__("billing.{$plan->value}_plan.features") as $feature)
                             <li class="flex items-start gap-3 text-sm leading-5 text-gray-700 dark:text-gray-300">
                                 <x-ri-check-line class="mt-0.5 size-4 shrink-0 text-primary dark:text-primary-400" />
                                 {{ $feature }}
