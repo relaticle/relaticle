@@ -112,8 +112,6 @@ The five tables are `ListCompanies`, `ListPeople`, `ListOpportunities`, `ManageT
 Replace `asmit/resized-column` with the Maxforms implementation at today's behaviour: widths are
 remembered in the session, as they are now. Phase 2 moves them to the database.
 
-![Dragging a column edge shows a guideline and the width](assets/table-layouts/phase-1-resize-drag.png)
-![The ported resizer in dark mode](assets/table-layouts/phase-1-resize-dark.png)
 
 Source: the `maxforms-resizable` extract (Maxforms commit `de1c8eeb9`), kept beside the
 repository. Its README names each file.
@@ -237,8 +235,6 @@ Done when:
 A member saves the current table as a named layout, switches between layouts, and may share a layout
 with the workspace.
 
-![The layouts menu in the table toolbar](assets/table-layouts/phase-3-layouts-menu.png)
-![The layouts menu in dark mode](assets/table-layouts/phase-3-layouts-menu-dark.png)
 
 The control sits in the table toolbar, after search and before the filter trigger, through
 `TablesRenderHook::TOOLBAR_SEARCH_AFTER` scoped to the five pages. The menu opens with "Standard
@@ -262,7 +258,6 @@ Admin stopping the share of someone else's layout is asked too, because the layo
 owner as a private one and leaves the Admin's list for good. Stopping the share of your own layout
 needs no confirmation, since you can share it again.
 
-![A changed layout reads "(modified)" and offers Revert and Save](assets/table-layouts/phase-3-layouts-modified.png)
 
 When the live state differs from the applied layout, the trigger reads "Hot leads (modified)" and
 Revert and Save appear beside it. The comparison ignores widths, since layouts do not store them.
@@ -348,8 +343,6 @@ Each header gets an options button, and the header itself is dragged to reorder.
 are state phase 2 already saves. Column labels add one field to `TableStateData`, which is JSON,
 so this phase adds no migration.
 
-![Drag grips on every header](assets/table-layouts/phase-4-header-grips.png)
-![The column menu](assets/table-layouts/phase-4-column-menu.png)
 
 Every header always shows a `⋮` options button at its right edge.
 Clicking it opens a menu with Move left and Move right, then Edit column label and Hide column.
@@ -365,7 +358,6 @@ handle. One menu per table, rendered through `TablesRenderHook::TOOLBAR_SEARCH_A
 five pages, opens under whichever options button was clicked. `TablesRenderHook::HEADER_CELL` was not used: it
 replaces the whole `<th>`.
 
-![Dragging a header: the column lifts while the others slide aside](assets/table-layouts/phase-4-drag-reorder.png)
 
 Dragging a header lifts the column. Its slot stays empty and travels with the drop position while
 the other columns slide aside, so the table shows the new order before the drop. (The mockup's
@@ -401,9 +393,6 @@ Done when:
 A member pins columns to the left edge. Pinned columns stay put while the rest of the table
 scrolls sideways under them.
 
-![The column menu with Pin to left](assets/table-layouts/phase-5-column-menu.png)
-![Company pinned while the table is scrolled right](assets/table-layouts/phase-5-pinned.png)
-![The same in dark mode](assets/table-layouts/phase-5-pinned-dark.png)
 
 Phase 5 adds pins to the header controls that phases 1 and 4 built. Each change to one of
 them broke another while it was built, so every rule below names the test that fails when it
