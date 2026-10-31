@@ -11,7 +11,7 @@
     $from    = $record->fromParticipant();
     $toList  = $record->toParticipants();
     $ccList  = $record->ccParticipants();
-    $categoryLabel = $record->categoryLabel();
+    $category = $record->systemCategory();
 
     $canViewSubject = $authUser->can('viewSubject', $record);
     $canViewBody    = $authUser->can('viewBody', $record);
@@ -65,8 +65,6 @@
     $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
     $subject = $decode($record->subject);
-    $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($record->snippet)) ?? '');
-    $isReply = filled($record->in_reply_to);
 
     // Hoisted so the reader knows up front whether there is a frame to wait for: a
     // text-only body or a privacy gate has nothing to load and must not sit behind
@@ -96,8 +94,7 @@
          Two quiet rows, subject then who and when, instead of one block that
          crams sender, address, date, badges and every recipient together. --}}
 
-    {{-- Subject row: title, category pill, and sharing actions. Snippet sits on
-         the line below so the headline stays scannable. --}}
+    {{-- Subject row: title, category pill, and sharing actions. --}}
     <div class="flex shrink-0 items-start gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 pr-12 sm:px-6 sm:pr-14">
         {{-- Back to the list on narrow viewports, where the two panes alternate.
              The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
@@ -123,8 +120,8 @@
                         <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.subject.hidden') }}</p>
                     @endif
 
-                    @if ($categoryLabel)
-                        <x-email-integration::category-badge :label="$categoryLabel->label" />
+                    @if ($category)
+                        <x-email-integration::category-badge :category="$category" />
                     @endif
                 </div>
 
@@ -134,17 +131,6 @@
                     <x-email-integration::detail-action-bar :email="$record" />
                 </div>
             </div>
-
-            @if ($canViewSubject && filled($snippet))
-                <p class="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-gray-500 dark:text-gray-400">
-                    @if ($isReply)
-                        <x-ri-reply-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-                    @else
-                        <x-ri-file-text-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-                    @endif
-                    <span>{{ $snippet }}</span>
-                </p>
-            @endif
         </div>
     </div>
 

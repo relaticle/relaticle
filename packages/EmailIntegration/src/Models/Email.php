@@ -273,6 +273,13 @@ final class Email extends Model
         return $label;
     }
 
+    public function systemCategory(): ?EmailCategory
+    {
+        $label = $this->categoryLabel();
+
+        return $label instanceof EmailLabel ? EmailCategory::from($label->label) : null;
+    }
+
     /**
      * Name of the mailbox that imported this email, for list-row "via …" copy.
      * Prefer the provider display name on the connected account, then the
