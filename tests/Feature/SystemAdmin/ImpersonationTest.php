@@ -499,7 +499,7 @@ it('records no request for the stop or the sign out that ends the impersonation'
 
     $this->call($method, route($routeName));
 
-    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('log_name', Impersonator::LOG_NAME)->pluck('event')->all())
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('log_name', Impersonator::LOG_NAME)->orderBy('id')->pluck('event')->all())
         ->toBe(['impersonation_started', 'impersonation_stopped']);
 })->with([
     'stop' => ['DELETE', 'impersonation.stop'],
