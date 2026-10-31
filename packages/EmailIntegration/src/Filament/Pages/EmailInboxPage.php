@@ -11,8 +11,10 @@ use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Support\Htmlable;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Url;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -98,7 +100,7 @@ final class EmailInboxPage extends Page
 
     /**
      * Badge counts for the tab bar. Drafts are the user's own unsent messages,
-     * the outbox counts what is still waiting to go out, failed counts delivery
+     * the outbox counts what its default Queued segment lists, failed counts delivery
      * failures, and templates count what the user may actually apply.
      *
      * @return array<string, int>
@@ -115,10 +117,10 @@ final class EmailInboxPage extends Page
                 ->where('user_id', $user->getKey())
                 ->where('status', EmailStatus::DRAFT)
                 ->count(),
-            EmailPageTab::OUTBOX->value => Email::query()
+            EmailPageTab::OUTBOX->value => OutboxTab::QUEUED->constrain(Email::query()
                 ->forWorkspace($workspaceId)
                 ->where('user_id', $user->getKey())
-                ->where('status', EmailStatus::QUEUED)
+                ->where('direction', EmailDirection::OUTBOUND))
                 ->count(),
             EmailPageTab::FAILED->value => Email::query()
                 ->forWorkspace($workspaceId)

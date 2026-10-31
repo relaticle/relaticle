@@ -10,11 +10,12 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
-mutates(OutboxTable::class);
+mutates(OutboxTable::class, OutboxTab::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -105,7 +106,7 @@ it('keeps a later send on the scheduled tab instead of queued', function (): voi
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$undoWindow])
         ->assertCanNotSeeTableRecords([$later])
-        ->filterTable('status_tab', 'scheduled')
+        ->call('setStatusTab', 'scheduled')
         ->assertCanSeeTableRecords([$later])
         ->assertCanNotSeeTableRecords([$undoWindow]);
 });
@@ -117,7 +118,7 @@ it('failed tab filters to failed emails', function (): void {
     ]);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertCanSeeTableRecords([$failed])
         ->assertCanNotSeeTableRecords([$queued]);
 });
@@ -155,7 +156,7 @@ it('locked failed mode lists every failed email owned by the user', function ():
         ->assertCanNotSeeTableRecords([$queued, $teammateFailure, $otherTeamFailure])
         ->assertTableColumnVisible('last_error');
 
-    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
+    expect($component->instance()->segments())->toBe([]);
 });
 
 it('locked failed mode has a dedicated empty state', function (): void {
@@ -176,22 +177,47 @@ it('uses an outlined clock for the outbox empty state', function (): void {
         ->toBe(Heroicon::OutlinedClock);
 });
 
-it('can exclude failed from the status filter without changing standalone outbox', function (): void {
-    $emailPageOptions = livewire(OutboxTable::class, ['includeFailedFilter' => false])
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
+it('can exclude failed from the segments without changing standalone outbox', function (): void {
+    $emailPageSegments = livewire(OutboxTable::class, ['includeFailedFilter' => false])->instance()->segments();
+    $standaloneSegments = livewire(OutboxTable::class)->instance()->segments();
 
-    $standaloneOptions = livewire(OutboxTable::class)
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
+    expect($emailPageSegments)
+        ->not->toContain(OutboxTab::FAILED)
+        ->and($standaloneSegments)->toContain(OutboxTab::FAILED);
+});
 
-    expect($emailPageOptions)
-        ->not->toHaveKey('failed')
-        ->and($standaloneOptions)->toHaveKey('failed');
+it('shows statuses as labelled segments, not as a removable filter chip', function (): void {
+    $component = livewire(OutboxTable::class);
+
+    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
+
+    $component->assertDontSee('Status tab')
+        ->assertSee(__('filament/pages/email-outbox.tabs.scheduled'))
+        ->assertSee(__('filament/pages/email-outbox.columns.subject'))
+        ->assertSee(__('filament/pages/email-outbox.columns.status'));
+});
+
+it('labels every row action', function (): void {
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    livewire(OutboxTable::class)
+        ->assertActionHasLabel(TestAction::make('cancel')->table($queued), __('filament/pages/email-outbox.actions.cancel'))
+        ->assertActionHasLabel(TestAction::make('reschedule')->table($queued), __('filament/pages/email-outbox.actions.reschedule'))
+        ->call('setStatusTab', 'failed')
+        ->assertActionHasLabel(TestAction::make('retry')->table($failed), __('filament/pages/email-outbox.actions.retry'));
+});
+
+it('lists scheduled sends soonest first', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    $later = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHours(3)]);
+    $soonest = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHour()]);
+    $middle = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED, ['scheduled_for' => now()->addHours(2)]);
+
+    livewire(OutboxTable::class)
+        ->call('setStatusTab', 'scheduled')
+        ->assertCanSeeTableRecords([$soonest, $middle, $later], inOrder: true);
 });
 
 it('cancel row action moves a queued email to CANCELLED', function (): void {
@@ -209,7 +235,7 @@ it('cancel row action is hidden for non-queued emails', function (): void {
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertActionHidden(TestAction::make('cancel')->table($failed));
 });
 
@@ -235,7 +261,7 @@ it('retry row action re-queues a failed email', function (): void {
     ]);
 
     livewire(OutboxTable::class)
-        ->filterTable('status_tab', 'failed')
+        ->call('setStatusTab', 'failed')
         ->assertCanSeeTableRecords([$email])
         ->callAction([['name' => 'retry', 'context' => ['table' => true, 'recordKey' => $email->getKey()]]])
         ->assertNotified()
