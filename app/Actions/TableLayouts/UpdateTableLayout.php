@@ -32,15 +32,32 @@ final readonly class UpdateTableLayout
         }
 
         return DB::transaction(function () use ($user, $layout, $attributes): TableLayout {
+            $previousName = $layout->name;
+            $previousStateHash = $layout->state->withoutWidths()->hash();
             $layout->update($attributes);
 
             if ($layout->wasChanged('is_shared') && ! $layout->is_shared) {
                 $this->forgetForOtherMembers($layout);
-                $layout->user->notify(TableLayoutChangedNotification::unshared($layout, $user));
+            }
+
+            $notice = $this->noticeFor($layout, $user, $previousName, $previousStateHash);
+
+            if ($notice instanceof TableLayoutChangedNotification) {
+                $layout->user->notify($notice);
             }
 
             return $layout;
         });
+    }
+
+    private function noticeFor(TableLayout $layout, User $actor, string $previousName, string $previousStateHash): ?TableLayoutChangedNotification
+    {
+        return match (true) {
+            $layout->wasChanged('is_shared') && ! $layout->is_shared => TableLayoutChangedNotification::unshared($layout, $actor),
+            $layout->wasChanged('name') => TableLayoutChangedNotification::renamed($layout, $actor, $previousName),
+            $layout->state->withoutWidths()->hash() !== $previousStateHash => TableLayoutChangedNotification::updated($layout, $actor),
+            default => null,
+        };
     }
 
     private function forgetForOtherMembers(TableLayout $layout): void

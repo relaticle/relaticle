@@ -258,6 +258,11 @@ Admin stopping the share of someone else's layout is asked too, because the layo
 owner as a private one and leaves the Admin's list for good. Stopping the share of your own layout
 needs no confirmation, since you can share it again.
 
+An Admin saving over someone else's layout is asked too: "Save over "Renewals"?", naming the owner
+and saying they will be told. The Rename and Delete modals carry the same owner line in their
+description instead of a second modal, since each is already a dialog. Saving, renaming or deleting
+your own layout asks nothing beyond the dialog itself.
+
 
 When the live state differs from the applied layout, the trigger reads "Hot leads (modified)" and
 Revert and Save appear beside it. The comparison ignores widths, since layouts do not store them.
@@ -300,23 +305,31 @@ else's shared one. When the member can no longer see it, the default is cleared 
 
 #### Telling the owner
 
-When an Admin deletes or stops sharing a member's layout, the owner gets an in-app notice in the
-bell. Without one, the layout simply vanishes from their menu, which reads as a bug.
+When an Admin changes a member's layout, the owner gets an in-app notice in the bell. Without one,
+a deleted or renamed layout simply vanishes from their menu, which reads as a bug, and an
+overwritten one changes under them with no way to tell who did it.
 
 | The Admin | The owner's notice |
 |---|---|
 | deletes the layout | ":actor deleted your layout "Renewals this quarter"", with the table it was on |
 | stops sharing it | ":actor stopped sharing your layout "Renewals this quarter"", saying it is private to them again |
-| renames or overwrites it | none |
+| renames it | ":actor renamed your layout "Renewals" to "Renewals this quarter"" |
+| overwrites its state | ":actor changed your layout "Renewals this quarter"", saying its columns, sort or filters changed |
+
+One save sends one notice. Stopping the share wins over a rename, and a rename over a state
+change. A save whose state hashes the same as the stored one sends nothing. Only the owner is
+told: members who use the layout take the new version on their next visit, and a notice to each
+of them would be noise.
 
 - `TableLayoutChangedNotification` extends `InboxNotification`, with reason `System` and no
   preference toggle. Its subject is the workspace, as `PaymentFailedNotification`'s is. A deleted
   layout cannot be its subject: the notice is queued after commit, and `#[DeleteWhenMissingModels]`
   would drop it.
-- The row stores facts, never a model: the layout's name, its entity and which change happened.
-  `present()` renders them and links to that table's list page in the workspace.
+- The row stores facts, never a model: the layout's name, its entity, which change happened and,
+  for a rename, the previous name. `present()` renders them and links to that table's list page in
+  the workspace.
 - `DeleteTableLayout` and `UpdateTableLayout` send it, since an action owns its side effects.
-  `UpdateTableLayout` sends it only when `is_shared` turns false.
+  `UpdateTableLayout` picks the change from what the update altered.
 - The actor is the Admin. `InboxNotification::shouldSend()` already skips a notice to its own
   actor and one to a member who has left the workspace, so the owner's own changes send nothing.
 - In-app only, no email. A layout is low stakes, and the members who used it keep what their table
@@ -334,8 +347,9 @@ Done when:
 - The permission rules below hold, each covered by a test.
 - Changing the table after applying a layout shows "(modified)"; Revert restores the layout; Save
   overwrites it.
-- An Admin who deletes or stops sharing a member's layout leaves one notice in that member's bell,
-  and the owner's own changes leave none.
+- An Admin who deletes, stops sharing, renames or saves over a member's layout leaves one notice
+  in that member's bell, and the owner's own changes leave none.
+- An Admin saving over someone else's layout confirms first. Saving over your own asks nothing.
 
 ### Phase 4: Column menu and reorder
 

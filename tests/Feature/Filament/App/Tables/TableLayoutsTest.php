@@ -161,7 +161,7 @@ it('marks a changed layout as modified, reverts it and saves over it', function 
     expect($component->get('tableSort'))->toBe('created_at:desc')
         ->and($component->instance()->isTableLayoutModified())->toBeFalse();
 
-    $component->set('tableSort', 'name:asc')->call('saveTableLayout');
+    $component->set('tableSort', 'name:asc')->callAction('saveTableLayout');
     expect($layout->refresh()->state->sort)->toBe('name:asc')
         ->and($component->instance()->isTableLayoutModified())->toBeFalse();
 });
@@ -434,7 +434,7 @@ it('lets a member apply but not change someone else\'s shared layout', function 
         ->call('applySavedLayout', $layout->getKey())
         ->assertActionHidden('renameTableLayout', ['layout' => $layout->getKey()])
         ->assertActionHidden('deleteTableLayout', ['layout' => $layout->getKey()])
-        ->call('saveTableLayout')
+        ->callAction('saveTableLayout')
         ->assertForbidden();
 });
 
@@ -510,7 +510,7 @@ it('offers save as new beside a modified layout, even one the member cannot save
         ->assertDontSeeHtml('fi-ta-layouts-save-as')
         ->set('tableSort', 'name:asc')
         ->assertSeeHtml('fi-ta-layouts-save-as')
-        ->assertDontSeeHtml('wire:click="saveTableLayout"')
+        ->assertDontSeeHtml("mountAction('saveTableLayout')")
         ->callAction('saveTableLayoutAs', ['name' => 'My team copy']);
 
     expect($component->get('activeTableLayoutId'))->not->toBe($layout->getKey())
@@ -592,19 +592,71 @@ it('tells no one when a member deletes or stops sharing their own layout', funct
         ->and(Notification::query()->count())->toBe(0);
 });
 
-it('tells no one when an admin renames or overwrites someone else\'s layout', function (): void {
+it('tells the owner when an admin renames their layout', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Team', 'is_shared' => true]);
+    layoutFor($owner, ['name' => 'Other', 'is_shared' => true]);
+    $admin = tableLayoutMember(WorkspaceRole::Admin);
+    $this->actingAs($admin);
+
+    livewire(ListCompanies::class)
+        ->mountAction('renameTableLayout', ['layout' => $layout->getKey()])
+        ->assertMountedActionModalSee("It belongs to {$owner->name}, who will be told you renamed it.")
+        ->setActionData(['name' => 'Team pipeline'])
+        ->callMountedAction();
+
+    $notice = $owner->notifications()->sole();
+
+    expect($layout->refresh()->name)->toBe('Team pipeline')
+        ->and($notice->actor_id)->toBe($admin->getKey())
+        ->and($notice->data)->toBe(['layout_name' => 'Team pipeline', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::RENAMED, 'previous_name' => 'Team']);
+});
+
+it('asks an admin before saving over someone else\'s layout, then tells the owner', function (): void {
+    $owner = tableLayoutMember(WorkspaceRole::Member);
+    $layout = layoutFor($owner, ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
+    layoutFor($owner, ['name' => 'Other', 'is_shared' => true]);
+    $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
+
+    livewire(ListCompanies::class)
+        ->call('applySavedLayout', $layout->getKey())
+        ->set('tableSort', 'name:asc')
+        ->mountAction('saveTableLayout')
+        ->assertMountedActionModalSee('Save over "Team"?')
+        ->assertMountedActionModalSee("It belongs to {$owner->name}, who will be told you changed it.")
+        ->callMountedAction()
+        ->assertNotified('"Team" saved');
+
+    expect($layout->refresh()->state->sort)->toBe('name:asc')
+        ->and($owner->notifications()->sole()->data)->toBe(['layout_name' => 'Team', 'entity' => CrmEntity::Company->value, 'change' => TableLayoutChangedNotification::UPDATED]);
+});
+
+it('saves over your own layout without asking and tells no one', function (): void {
+    $layout = layoutFor($this->user, ['name' => 'Mine', 'is_shared' => true, 'state' => hotLeads()]);
+
+    livewire(ListCompanies::class)
+        ->call('applySavedLayout', $layout->getKey())
+        ->set('tableSort', 'name:asc')
+        ->mountAction('saveTableLayout')
+        ->assertActionNotMounted()
+        ->callAction('renameTableLayout', ['name' => 'Still mine'], ['layout' => $layout->getKey()]);
+
+    expect($layout->refresh()->state->sort)->toBe('name:asc')
+        ->and($layout->name)->toBe('Still mine')
+        ->and(Notification::query()->count())->toBe(0);
+});
+
+it('tells the owner once when a second save changes nothing', function (): void {
     $layout = layoutFor(tableLayoutMember(WorkspaceRole::Member), ['name' => 'Team', 'is_shared' => true, 'state' => hotLeads()]);
     $this->actingAs(tableLayoutMember(WorkspaceRole::Admin));
 
     livewire(ListCompanies::class)
-        ->callAction('renameTableLayout', ['name' => 'Team pipeline'], ['layout' => $layout->getKey()])
         ->call('applySavedLayout', $layout->getKey())
         ->set('tableSort', 'name:asc')
-        ->call('saveTableLayout');
+        ->callAction('saveTableLayout')
+        ->callAction('saveTableLayout');
 
-    expect($layout->refresh()->name)->toBe('Team pipeline')
-        ->and($layout->state->sort)->toBe('name:asc')
-        ->and(Notification::query()->count())->toBe(0);
+    expect(Notification::query()->count())->toBe(1);
 });
 
 it('tells the member instead of failing when the layout they revert was deleted elsewhere', function (): void {
@@ -627,7 +679,7 @@ it('tells the member instead of failing when the layout they save over was delet
 
     $layout->delete();
 
-    $component->call('saveTableLayout')
+    $component->callAction('saveTableLayout')
         ->assertNotified('That layout is no longer available.')
         ->assertSet('activeTableLayoutId', null);
 

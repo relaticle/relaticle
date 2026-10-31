@@ -623,6 +623,20 @@ it('shows the owner who deleted their layout and links to the table', function (
         ->assertSee(resolve(CanonicalRecordUrl::class)->listPageUrl(CrmEntity::Company, $this->workspaceA));
 });
 
+it('shows a renamed layout notice with both names', function (): void {
+    $admin = User::factory()->create(['name' => 'Dana Whitfield']);
+    $this->workspaceA->users()->attach($admin, ['role' => 'admin']);
+
+    $layout = TableLayout::factory()->for($this->user)->for($this->workspaceA)->create(['entity' => CrmEntity::Company, 'name' => 'Renewals this quarter']);
+
+    $this->user->notify(TableLayoutChangedNotification::renamed($layout, $admin, 'Renewals'));
+
+    Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class)
+        ->assertSeeText('Dana Whitfield renamed your layout')
+        ->assertSeeText('Renewals this quarter')
+        ->assertSeeText('It is still shared on the companies table.');
+});
+
 it('shows a layout notice whose actor has since been deleted', function (): void {
     $admin = User::factory()->create();
     $this->workspaceA->users()->attach($admin, ['role' => 'admin']);

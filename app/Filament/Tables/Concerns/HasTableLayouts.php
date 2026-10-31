@@ -84,21 +84,31 @@ trait HasTableLayouts
         }
     }
 
-    public function saveTableLayout(): void
+    public function saveTableLayoutAction(): Action
     {
-        $layout = $this->getActiveTableLayout();
+        return Action::make('saveTableLayout')
+            ->label(__('filament/panel.tables.layouts.save'))
+            ->requiresConfirmation()
+            ->modalHidden(fn (): bool => ! $this->isSomeoneElsesTableLayout($this->getActiveTableLayout()))
+            ->modalIcon('heroicon-o-user-group')
+            ->modalHeading(fn (): string => __('filament/panel.tables.layouts.save_heading', ['name' => $this->getActiveTableLayout()?->name]))
+            ->modalDescription(fn (): string => __('filament/panel.tables.layouts.save_description', ['owner' => $this->getActiveTableLayout()?->user?->name]))
+            ->modalSubmitActionLabel(__('filament/panel.tables.layouts.save'))
+            ->action(function (): void {
+                $layout = $this->getActiveTableLayout();
 
-        if (! $layout instanceof TableLayout) {
-            $this->handleMissingTableLayout($this->activeTableLayoutId);
+                if (! $layout instanceof TableLayout) {
+                    $this->handleMissingTableLayout($this->activeTableLayoutId);
 
-            return;
-        }
+                    return;
+                }
 
-        $layout = resolve(UpdateTableLayout::class)->execute($this->tableLayoutUser(), $layout, ['state' => $this->currentTableState()]);
-        $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
-        $this->visibleTableLayouts = null;
+                $layout = resolve(UpdateTableLayout::class)->execute($this->tableLayoutUser(), $layout, ['state' => $this->currentTableState()]);
+                $this->appliedTableLayoutHash = $this->currentTableState()->withoutWidths()->hash();
+                $this->visibleTableLayouts = null;
 
-        Notification::make()->success()->title(__('filament/panel.tables.layouts.saved', ['name' => $layout->name]))->send();
+                Notification::make()->success()->title(__('filament/panel.tables.layouts.saved', ['name' => $layout->name]))->send();
+            });
     }
 
     public function toggleDefaultTableLayout(string $layoutId): void
@@ -149,6 +159,11 @@ trait HasTableLayouts
             ->modalHeading(__('filament/panel.tables.layouts.rename'))
             ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.layouts.save'))
+            ->modalDescription(function (array $arguments): ?string {
+                $layout = $this->argumentTableLayout($arguments);
+
+                return $this->isSomeoneElsesTableLayout($layout) ? __('filament/panel.tables.layouts.rename_description_other', ['owner' => $layout?->user?->name]) : null;
+            })
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentTableLayout($arguments))
             ->fillForm(fn (array $arguments): array => ['name' => $this->argumentTableLayout($arguments)?->name])
             ->schema([$this->tableLayoutNameInput()])
@@ -183,7 +198,7 @@ trait HasTableLayouts
         return Action::make('stopSharingTableLayout')
             ->label(__('filament/panel.tables.layouts.unshare'))
             ->requiresConfirmation()
-            ->modalHidden(fn (array $arguments): bool => $this->argumentTableLayout($arguments)?->user_id === $this->tableLayoutUser()->getKey())
+            ->modalHidden(fn (array $arguments): bool => ! $this->isSomeoneElsesTableLayout($this->argumentTableLayout($arguments)))
             ->modalIcon('heroicon-o-lock-closed')
             ->modalHeading(fn (array $arguments): string => __('filament/panel.tables.layouts.unshare_heading', ['name' => $this->argumentTableLayout($arguments)?->name]))
             ->modalDescription(fn (array $arguments): string => __('filament/panel.tables.layouts.unshare_description', ['owner' => $this->argumentTableLayout($arguments)?->user?->name]))
@@ -202,7 +217,7 @@ trait HasTableLayouts
             ->modalDescription(function (array $arguments): string {
                 $layout = $this->argumentTableLayout($arguments);
 
-                return $layout instanceof TableLayout && $layout->user_id !== $this->tableLayoutUser()->getKey()
+                return $this->isSomeoneElsesTableLayout($layout)
                     ? __('filament/panel.tables.layouts.delete_description_other', ['owner' => $layout->user?->name])
                     : __('filament/panel.tables.layouts.delete_description');
             })
@@ -251,6 +266,11 @@ trait HasTableLayouts
         $layout = $this->argumentTableLayout($arguments);
 
         return $layout instanceof TableLayout && $this->canUpdateTableLayout($layout);
+    }
+
+    private function isSomeoneElsesTableLayout(?TableLayout $layout): bool
+    {
+        return $layout instanceof TableLayout && $layout->user_id !== $this->tableLayoutUser()->getKey();
     }
 
     private function handleMissingTableLayout(?string $layoutId): void

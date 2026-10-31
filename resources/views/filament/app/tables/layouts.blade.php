@@ -189,7 +189,7 @@
                 label-sr-only
                 :tooltip="__('filament/panel.tables.layouts.save')"
                 class="fi-ta-layouts-save"
-                wire:click="saveTableLayout"
+                wire:click="mountAction('saveTableLayout')"
             >
                 {{ __('filament/panel.tables.layouts.save') }}
             </x-filament::button>
