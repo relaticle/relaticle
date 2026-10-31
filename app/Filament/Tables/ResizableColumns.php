@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
 
 final class ResizableColumns
 {
-    public const int MIN_WIDTH = 40;
+    // Cell padding, the options button reserve, the type icon and the sort chevron take 94px,
+    // so the floor keeps a few characters of the name beside them.
+    public const int MIN_WIDTH = 120;
 
     public const int MAX_WIDTH = 1000;
 
@@ -28,7 +30,9 @@ final class ResizableColumns
         $widths = $livewire->getResizableColumnWidths();
 
         foreach ($table->getColumns() as $name => $column) {
-            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH);
+            $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
+
+            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)));
         }
 
         return $table;
@@ -52,6 +56,7 @@ final class ResizableColumns
 
         $column->extraHeaderAttributes([
             ...$attributes,
+            'data-column-hideable' => $column->isToggleable() ? '1' : '0',
             'x-data' => 'resizableColumn('.Js::from($name).', '.Js::from($columnId).", {$min}, {$max})",
             'class' => 'fi-ta-resizable-header',
             'style' => $style,

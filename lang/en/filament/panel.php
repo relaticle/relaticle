@@ -32,6 +32,16 @@ return [
     'tables' => [
         'resize_column' => 'Resize column',
         'resize_column_hint' => 'Drag to resize. Double-click to fit.',
+        'column_menu' => [
+            'options' => 'Column options',
+            'edit_label' => 'Edit column label',
+            'label' => 'Label',
+            'label_hint' => 'Only your table shows this name. Leave it empty to use the original.',
+            'save_label' => 'Save',
+            'move_left' => 'Move left',
+            'move_right' => 'Move right',
+            'hide' => 'Hide column',
+        ],
         'layouts' => [
             'label' => 'Layouts',
             'modified' => '(modified)',

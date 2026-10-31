@@ -6,6 +6,7 @@ namespace App\Filament\Concerns;
 
 use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
+use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\Concerns\HasResizableColumns;
 use App\Filament\Tables\Concerns\HasTableLayouts;
 use App\Filament\Tables\Concerns\PersistsTableState;
@@ -19,6 +20,7 @@ use Relaticle\CustomFields\Facades\CustomFields;
 
 trait HasCustomFieldColumns
 {
+    use HasColumnMenu;
     use HasResizableColumns;
     use HasTableLayouts;
     use PersistsTableState;
@@ -34,7 +36,7 @@ trait HasCustomFieldColumns
                 $field = $fields->get($column->getName());
 
                 return $field instanceof CustomField
-                    ? $column->label(ColumnHeaderLabel::make($field->name, $field->typeData->icon))
+                    ? $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $field->name), $field->typeData->icon))
                     : $column;
             })
             ->all();
@@ -44,15 +46,13 @@ trait HasCustomFieldColumns
         foreach ($table->getColumns() as $column) {
             $label = $column->getLabel();
 
-            if ($column->getName() === $titleColumn) {
-                continue;
-            }
-
             if ($label instanceof Htmlable) {
                 continue;
             }
 
-            $column->label(ColumnHeaderLabel::make($label, self::nativeColumnIcon($column->getName())));
+            $icon = $column->getName() === $titleColumn ? null : self::nativeColumnIcon($column->getName());
+
+            $column->label(fn (): Htmlable => ColumnHeaderLabel::make($this->tableColumnLabel($column->getName(), $label), $icon));
         }
 
         return $table

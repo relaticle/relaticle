@@ -13,6 +13,7 @@ final class TableStateData extends Data
      * @param  array<string, mixed>  $filters
      * @param  array<string, mixed>  $columnSearches
      * @param  array<string, int>  $widths
+     * @param  array<string, string>  $labels
      */
     public function __construct(
         public array $columns = [],
@@ -23,6 +24,7 @@ final class TableStateData extends Data
         public ?string $grouping = null,
         public int|string|null $perPage = null,
         public array $widths = [],
+        public array $labels = [],
     ) {}
 
     public function withoutWidths(): self

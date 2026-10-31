@@ -383,6 +383,11 @@ final class AppPanelProvider extends PanelProvider
                 scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
             )
             ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.column-menu'),
+                scopes: [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class],
+            )
+            ->renderHook(
                 TablesRenderHook::FILTER_INDICATORS,
                 fn (): View|Factory => view('filament.app.board-filter-clear'),
                 scopes: [OpportunitiesBoard::class, TasksBoard::class],

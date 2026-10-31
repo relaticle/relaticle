@@ -845,6 +845,7 @@ final class AppServiceProvider extends ServiceProvider
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
             'resizeColumnLabel' => __('filament/panel.tables.resize_column'),
             'resizeColumnHint' => __('filament/panel.tables.resize_column_hint'),
+            'columnOptionsLabel' => __('filament/panel.tables.column_menu.options'),
         ]);
     }
 

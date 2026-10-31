@@ -20,7 +20,7 @@ function headerWidth(string $column): string
     return sprintf('(() => Math.round(document.querySelector(`%s`).getBoundingClientRect().width))()', headerSelector($column));
 }
 
-function dragColumnEdge(string $column, int $by): string
+function dragColumnEdge(string $column, int $by, string $pointerType = 'mouse'): string
 {
     return sprintf(<<<'JS'
         (() => {
@@ -28,12 +28,13 @@ function dragColumnEdge(string $column, int $by): string
             const box = handle.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + %d, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + %d, clientY: y }));
+            const pointer = (type, clientX, target = document) => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, pointerId: 1, isPrimary: true, pointerType: %s, clientX, clientY: y }));
+            pointer('pointerdown', x, handle);
+            pointer('pointermove', x + %d);
+            pointer('pointerup', x + %d);
             return true;
         })();
-    JS, headerSelector($column), $by, $by);
+    JS, headerSelector($column), json_encode($pointerType), $by, $by);
 }
 
 function dragFeedbackMidDrag(string $column): string
@@ -44,14 +45,14 @@ function dragFeedbackMidDrag(string $column): string
             const box = handle.getBoundingClientRect();
             const x = box.left + box.width / 2;
             const y = box.top + box.height / 2;
-            handle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0, clientX: x, clientY: y }));
-            document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: x + 40, clientY: y }));
+            handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: x, clientY: y }));
+            document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
             const badge = document.querySelector('.column-resize-badge');
             const feedback = {
                 badge: badge !== null && badge.isConnected && getComputedStyle(badge).display !== 'none',
                 handleActive: document.querySelector(`%s .column-resize-handle-bar`).classList.contains('active'),
             };
-            document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: x + 40, clientY: y }));
+            document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
             return feedback.badge && feedback.handleActive;
         })();
     JS, headerSelector($column), headerSelector($column));
@@ -86,6 +87,48 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
         ->assertNoJavaScriptErrors();
 });
 
+it('resizes a column with a finger and shows its edge on a touch screen', function (): void {
+    $page = loginViaBrowser($this->user, page: $this->visit('/app/login')->on()->mobile()->assertPathIs('/app/login'))
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertPresent(headerSelector('name').' .column-resize-handle-bar');
+
+    $before = $page->script(headerWidth('name'));
+
+    $page->assertScript(sprintf('getComputedStyle(document.querySelector(`%s .column-resize-handle-bar`), "::before").width !== "0px"', headerSelector('name')), true);
+    $page->script(dragColumnEdge('name', 60, 'touch'));
+    $page->assertScript(headerWidth('name'), $before + 60)
+        ->assertNoJavaScriptErrors();
+});
+
+function doubleClickColumnEdge(string $column): string
+{
+    return sprintf(
+        'document.querySelector(`%s .column-resize-handle-bar`).dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))',
+        headerSelector($column),
+    );
+}
+
+function fittedColumnShowsEverything(string $column): string
+{
+    return sprintf(<<<'JS'
+        (() => {
+            const th = document.querySelector(`%s`);
+            const rightEdge = (root) => {
+                const range = document.createRange();
+                range.selectNodeContents(root);
+                return Math.max(...[...range.getClientRects()].map((box) => box.right));
+            };
+            const handle = th.querySelector('.fi-ta-column-handle').getBoundingClientRect();
+            const cells = [...document.querySelectorAll(`td.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)];
+            return [
+                rightEdge(th.querySelector('.fi-ta-header-cell-sort-btn')) <= handle.left,
+                cells.every((td) => rightEdge(td) <= td.getBoundingClientRect().right),
+            ];
+        })()
+    JS, headerSelector($column));
+}
+
 it('fits a column to its content on double-click', function (): void {
     $page = loginViaBrowser($this->user)
         ->assertPathIs("/app/{$this->workspace->slug}")
@@ -95,14 +138,79 @@ it('fits a column to its content on double-click', function (): void {
 
     $before = $page->script(headerWidth('created_at'));
 
-    $page->script(sprintf(
-        'document.querySelector(`%s .column-resize-handle-bar`).dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))',
-        headerSelector('created_at'),
-    ));
+    $page->script(doubleClickColumnEdge('created_at'));
 
     $after = $page->script(headerWidth('created_at'));
 
-    expect($after)->not->toBe($before)->toBeGreaterThanOrEqual(40)->toBeLessThanOrEqual(1000);
+    expect($after)->not->toBe($before)->toBeGreaterThanOrEqual(ResizableColumns::MIN_WIDTH)->toBeLessThanOrEqual(ResizableColumns::MAX_WIDTH);
+    $page->assertNoJavaScriptErrors();
+});
+
+function narrowestHeaderState(string $column): string
+{
+    return sprintf(<<<'JS'
+        (() => {
+            const th = document.querySelector(`%s`);
+            const menuLeft = th.querySelector('.fi-ta-column-handle').getBoundingClientRect().left;
+            const chevron = th.querySelector('.fi-ta-header-cell-sort-btn > svg')?.getBoundingClientRect();
+            const text = th.querySelector('.fi-ta-header-cell-field > .truncate');
+            const textBox = text.getBoundingClientRect();
+            return {
+                width: Math.round(th.getBoundingClientRect().width),
+                textVisible: textBox.width >= 16,
+                textEllipsized: text.scrollWidth > text.clientWidth,
+                textClearOfMenu: textBox.right <= menuLeft,
+                chevronAfterText: chevron ? chevron.width > 0 && chevron.left >= textBox.right : true,
+                chevronClearOfMenu: chevron ? chevron.right <= menuLeft : true,
+                chevronGap: chevron ? Math.round(menuLeft - chevron.right) : null,
+            };
+        })()
+    JS, headerSelector($column));
+}
+
+it('stops narrowing where the name, the sort chevron and the options button still fit', function (): void {
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $states = [];
+
+    foreach (['name', 'created_at', 'custom_fields.domains'] as $column) {
+        $page->script(dragColumnEdge($column, -$page->script(headerWidth($column))));
+        $states[$column] = $page->script(narrowestHeaderState($column));
+
+        expect($states[$column])->toMatchArray([
+            'width' => ResizableColumns::MIN_WIDTH,
+            'textVisible' => true,
+            'textEllipsized' => true,
+            'textClearOfMenu' => true,
+            'chevronAfterText' => true,
+            'chevronClearOfMenu' => true,
+        ]);
+    }
+
+    expect($states['name']['chevronGap'])->toBe($states['created_at']['chevronGap']);
+    $page->assertNoJavaScriptErrors();
+});
+
+it('fits a column so its header controls and its widest cell stay in view', function (): void {
+    Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beekeepers International Holdings']);
+
+    $page = loginViaBrowser($this->user)
+        ->assertPathIs("/app/{$this->workspace->slug}")
+        ->resize(1440, 900)
+        ->navigate("/app/{$this->workspace->slug}/companies")
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    foreach (['name', 'created_at'] as $column) {
+        $page->script(doubleClickColumnEdge($column));
+        $page->assertScript(fittedColumnShowsEverything($column), [true, true]);
+
+        expect($page->script(narrowestHeaderState($column)))->toMatchArray(['textEllipsized' => false]);
+    }
+
     $page->assertNoJavaScriptErrors();
 });
 
