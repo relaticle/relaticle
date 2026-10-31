@@ -43,7 +43,7 @@ final class PlanStats extends StatsOverviewWidget
 
         return [
             $this->plan($cache, Plan::Pro, $customers, 'Customer workspaces on Cloud Pro, including the ones still on the 14-day trial.'),
-            $this->plan($cache, Plan::Scale, $customers, 'Customer workspaces on Cloud Scale, the plan with more credits, more mailboxes and 3x API throughput.'),
+            $this->plan($cache, Plan::Scale, $customers, 'Customer workspaces on Cloud Scale, the plan with more credits, more mailboxes and '.Plan::Scale->throughputMultiplier().'x API throughput.'),
             $this->plan($cache, Plan::Enterprise, $customers, 'Customer workspaces on an Enterprise grant, started by hand from the workspace list and invoiced outside self-serve checkout.'),
             $this->packs($cache),
             ...(EmailIntegrationServiceProvider::enabled() ? [$this->mailboxCap($cache)] : []),
