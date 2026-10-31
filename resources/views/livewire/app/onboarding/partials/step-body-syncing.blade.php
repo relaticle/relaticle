@@ -6,7 +6,7 @@
     <x-heroicon-o-arrow-path class="h-3.5 w-3.5 motion-safe:animate-spin" />
 </span>
 
-<span class="min-w-0 flex-1 truncate text-sm font-medium text-gray-900 dark:text-white">
+<span class="min-w-0 flex-1 text-sm leading-snug font-medium text-gray-900 dark:text-white">
     {{ __('filament/pages/dashboard.activation.steps.sync_email.syncing') }}
 </span>
 
