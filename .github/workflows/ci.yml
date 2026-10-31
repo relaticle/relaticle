@@ -253,8 +253,13 @@ jobs:
       - name: Boot with the cloud package switched off
         run: |
           sed -i '/^RELATICLE_CLOUD=/d' .env
-          ! php artisan route:list --json | grep -q '"uri":"pricing"'
-          RELATICLE_CLOUD=true php artisan route:list --json | grep -q '"uri":"pricing"'
+          routes=$(php artisan route:list --json)
+          if grep -q '"uri":"pricing"' <<<"$routes"; then
+            echo "the cloud package loaded with RELATICLE_CLOUD unset"
+            exit 1
+          fi
+          routes=$(RELATICLE_CLOUD=true php artisan route:list --json)
+          grep -q '"uri":"pricing"' <<<"$routes"
 
       # The image never contains packages/Cloud. The optimized classmap still lists
       # its classes, so the autoload is rebuilt before Laravel boots.
