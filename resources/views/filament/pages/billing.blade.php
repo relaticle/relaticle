@@ -259,12 +259,6 @@
                     <x-billing.interval-toggle />
                 </div>
 
-                @if($trialAvailable)
-                    <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
-                        {{ __('billing.trial.start_button') }}
-                    </x-filament::button>
-                @endif
-
                 <div class="grid gap-4 sm:grid-cols-2">
                     @foreach([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale] as $plan)
                         @php
@@ -310,9 +304,16 @@
                             </ul>
 
                             <div class="mt-auto pt-6">
-                                <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" x-on:click="$dispatch('upgrade-plan-changed', { plan: {{ \Illuminate\Support\Js::from($plan->value) }}, interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
-                                    {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button', ['plan' => $plan->marketingLabel()]) }}
-                                </x-filament::button>
+                                @if($trialAvailable && ! $isScale)
+                                    <p class="mb-2.5 text-center text-xs text-gray-500 dark:text-gray-400">{{ __('billing.trial.no_card') }}</p>
+                                    <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
+                                        {{ __('billing.trial.start_button') }}
+                                    </x-filament::button>
+                                @else
+                                    <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" x-on:click="$dispatch('upgrade-plan-changed', { plan: {{ \Illuminate\Support\Js::from($plan->value) }}, interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
+                                        {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button', ['plan' => $plan->marketingLabel()]) }}
+                                    </x-filament::button>
+                                @endif
                             </div>
                         </div>
                     @endforeach

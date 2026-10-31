@@ -44,7 +44,8 @@ return [
     ],
 
     'trial' => [
-        'start_button' => 'Start 14-day Pro trial, no card needed',
+        'start_button' => 'Start 14-day Pro trial',
+        'no_card' => 'No card needed. Cancel anytime.',
         'active_title' => 'Pro trial active',
         'days_left' => ':days day left|:days days left',
         'started' => 'Your Pro trial is active. Enjoy!',
