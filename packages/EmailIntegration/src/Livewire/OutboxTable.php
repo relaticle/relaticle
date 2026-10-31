@@ -236,7 +236,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
     private function activeSegment(): OutboxTab
     {
-        return $this->statusTab ?? OutboxTab::QUEUED;
+        return in_array($this->statusTab, $this->segments(), true) ? $this->statusTab : OutboxTab::QUEUED;
     }
 
     /**
