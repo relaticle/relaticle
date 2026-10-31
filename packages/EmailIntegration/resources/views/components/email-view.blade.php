@@ -414,7 +414,7 @@
                         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                         referrerpolicy="no-referrer"
                         scrolling="no"
-                        class="block w-full border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-gray-900 dark:[color-scheme:dark]"
+                        class="block w-full rounded-lg border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-gray-900 dark:[color-scheme:dark]"
                         {{-- A placeholder tall enough to centre the spinner in; replaced by
                              the measured content height the moment the frame loads. --}}
                         style="height: 24rem"

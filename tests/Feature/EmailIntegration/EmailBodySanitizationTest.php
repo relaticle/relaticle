@@ -208,6 +208,27 @@ it('wraps sanitized email html in a scriptless dark-mode preview document', func
         ->not->toContain('<script');
 });
 
+it('marks an email that sets its own colours so the dark reader leaves it as designed', function (string $body): void {
+    expect(EmailHtmlSanitizer::sanitize($body))->toContain('<html class="email-own-colors">');
+})->with([
+    'font colour' => '<table><tr><td><font color="#000000">Hi</font></td></tr></table>',
+    'cell background' => '<table><tr><td bgcolor="#ffffff">Hi</td></tr></table>',
+    'inline text colour' => '<p style="color: #333333">Hi</p>',
+    'inline background colour' => '<div style="background-color:#f5f5f5">Hi</div>',
+    'inline background image' => '<div style="background-image: url(https://example.test/hero.png)">Hi</div>',
+    'inline colour scheme' => '<div style="color-scheme: light">Hi</div>',
+]);
+
+it('leaves an email without colours of its own to the dark reader', function (string $body): void {
+    expect(EmailHtmlSanitizer::sanitize($body))
+        ->toContain('<html>')
+        ->not->toContain('<html class="email-own-colors">');
+})->with([
+    'plain reply' => '<div dir="ltr"><p>Thanks for the call.</p><blockquote>On Monday you wrote:</blockquote></div>',
+    'border colour only' => '<table style="border-color: #dddddd"><tr><td>Hi</td></tr></table>',
+    'colour named in the text' => '<p>Pick a color: blue, or a background: none.</p>',
+]);
+
 it('rewrites cid image references to authorized inline attachment urls', function (): void {
     $email = makeEmailWithBody('<p><img src="cid:logo@example.test"></p>');
     $attachment = EmailAttachment::factory()->inline()->create([

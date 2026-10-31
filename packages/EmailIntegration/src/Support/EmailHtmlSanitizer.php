@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Support;
 
+use Dom\HTMLDocument;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
@@ -68,7 +69,26 @@ final readonly class EmailHtmlSanitizer
             return null;
         }
 
-        return self::wrapPreviewDocument($clean);
+        return self::wrapPreviewDocument($clean, self::setsOwnColors($clean));
+    }
+
+    private static function setsOwnColors(string $html): bool
+    {
+        $document = HTMLDocument::createFromString('<!doctype html>'.$html, LIBXML_NOERROR);
+
+        if ($document->querySelector('[bgcolor], [background], [color], meta[name="color-scheme" i]') !== null) {
+            return true;
+        }
+
+        foreach ($document->querySelectorAll('[style], style') as $node) {
+            $css = $node->localName === 'style' ? $node->textContent : $node->getAttribute('style');
+
+            if (preg_match('/(?<![\w-])(?:color|background(?:-color|-image)?|color-scheme)\s*:/i', (string) $css) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -101,11 +121,13 @@ final readonly class EmailHtmlSanitizer
         }, $html) ?? $html;
     }
 
-    private static function wrapPreviewDocument(string $html): string
+    private static function wrapPreviewDocument(string $html, bool $ownColors): string
     {
-        return <<<'HTML'
+        $rootClass = $ownColors ? ' class="email-own-colors"' : '';
+
+        return <<<HTML
 <!doctype html>
-<html>
+<html{$rootClass}>
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="light dark">
@@ -121,17 +143,17 @@ body { box-sizing: border-box; padding: 16px; overflow-wrap: anywhere; }
 img, video { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre { white-space: pre-wrap; }
-/* The frame canvas follows the root's used color-scheme, so it must match the app's theme too. */
-:root[data-theme="light"] { color-scheme: light; }
-:root[data-theme="dark"] { color-scheme: dark; background: transparent; }
-:root[data-theme="dark"] body { background: transparent !important; color: #f3f4f6 !important; }
-:root[data-theme="dark"] :is(table, tbody, thead, tfoot, tr, td, th, div, p, span, section, article, main, blockquote, li) {
+/* The frame canvas follows the root's used color-scheme, so it must match the app's theme too.
+   Mail that sets its own colours keeps them on a light page, as Apple Mail and HEY do. */
+:root[data-theme="light"], :root.email-own-colors { color-scheme: light; }
+:root[data-theme="dark"]:not(.email-own-colors) { color-scheme: dark; background: transparent; }
+:root[data-theme="dark"]:not(.email-own-colors) body { background: transparent !important; color: #f3f4f6 !important; }
+:root[data-theme="dark"]:not(.email-own-colors) :is(table, tbody, thead, tfoot, tr, td, th, div, p, span, font, b, strong, em, i, u, center, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, pre, code, header, footer, section, article, main) {
     background-color: transparent !important;
     border-color: #4b5563 !important;
     color: #f3f4f6 !important;
 }
-:root[data-theme="dark"] a { color: #93c5fd !important; }
-:root[data-theme="dark"] [bgcolor] { background-color: transparent !important; }
+:root[data-theme="dark"]:not(.email-own-colors) a { color: #93c5fd !important; }
 </style>
 </head>
 <body>
