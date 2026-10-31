@@ -31,20 +31,28 @@ function openEmailInReader(string $systemTheme, string $bodyHtml): AwaitableWebp
     $person->emails()->attach($email->id);
     $relation = array_search(EmailsRelationManager::class, PeopleResource::getRelations(), true);
 
-    return loginViaBrowser($user, $systemTheme)
+    $page = loginViaBrowser($user, $systemTheme)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$workspace->slug}/people/{$person->id}?relation={$relation}")
         ->waitForText('Pricing for 40 seats')
         ->click('Pricing for 40 seats')
-        ->assertVisible('.fi-email-reader-panel iframe')
-        ->assertScript("(() => { const doc = document.querySelector('.fi-email-reader-panel iframe').contentDocument; return doc.readyState === 'complete' && doc.querySelector('.own') !== null; })()");
+        ->assertVisible('.fi-email-reader-panel iframe');
+
+    waitForReaderFrame($page, "doc.readyState === 'complete' && doc.querySelector('.own') !== null");
+
+    return $page;
+}
+
+function waitForReaderFrame(AwaitableWebpage $page, string $condition): void
+{
+    $page->assertScript("(() => { const doc = document.querySelector('.fi-email-reader-panel iframe')?.contentDocument; return !! doc && {$condition}; })()");
 }
 
 function switchAppTheme(AwaitableWebpage $page, string $theme): void
 {
     $page->script("window.dispatchEvent(new CustomEvent('theme-changed', { detail: '{$theme}' }))");
-    $page->assertScript("document.querySelector('.fi-email-reader-panel iframe').contentDocument.documentElement.dataset.theme === '{$theme}'");
+    waitForReaderFrame($page, "doc.documentElement.dataset.theme === '{$theme}'");
 }
 
 function readerFrameStyle(): string
@@ -94,14 +102,26 @@ it('renders an email body in the app font and follows the app theme rather than 
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
 
-it('keeps the colours of an email that sets its own on a light page in the dark app', function (string $systemTheme): void {
-    $page = openEmailInReader($systemTheme, '<table><tr><td bgcolor="#ffffff"><font class="own" color="#1a2b3c">Thanks for the call.</font></td></tr></table>');
+it('keeps an email that paints its own background on a light page in the dark app', function (string $systemTheme): void {
+    $page = openEmailInReader($systemTheme, '<table><tr><td bgcolor="#f4f1ea"><font class="own" color="#1a2b3c">Thanks for the call.</font></td></tr></table>');
 
     switchAppTheme($page, 'dark');
 
     expect($page->script(readerFrameStyle()))
         ->toMatchArray(['scheme' => 'light', 'background' => 'rgb(255, 255, 255)', 'ownColor' => 'rgb(26, 43, 60)']);
 
-    $page->screenshot(filename: "email-reader-body-own-colours-{$systemTheme}")
+    $page->screenshot(filename: "email-reader-body-own-background-{$systemTheme}")
+        ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('renders an Outlook reply that only sets a text colour dark with light text in the dark app', function (string $systemTheme): void {
+    $page = openEmailInReader($systemTheme, '<div><p><span class="own" style="font-size:11.0pt;color:windowtext">Thanks for the call.</span></p></div>');
+
+    switchAppTheme($page, 'dark');
+
+    expect($page->script(readerFrameStyle()))
+        ->toMatchArray(['scheme' => 'dark', 'background' => 'rgba(0, 0, 0, 0)', 'ownColor' => 'rgb(243, 244, 246)']);
+
+    $page->screenshot(filename: "email-reader-body-outlook-reply-{$systemTheme}")
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);

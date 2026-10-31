@@ -69,21 +69,45 @@ final readonly class EmailHtmlSanitizer
             return null;
         }
 
-        return self::wrapPreviewDocument($clean, self::setsOwnColors($clean));
+        return self::wrapPreviewDocument($clean, self::paintsOwnBackground($clean));
     }
 
-    private static function setsOwnColors(string $html): bool
+    private static function paintsOwnBackground(string $html): bool
     {
         $document = HTMLDocument::createFromString('<!doctype html>'.$html, LIBXML_NOERROR);
 
-        if ($document->querySelector('[bgcolor], [background], [color], meta[name="color-scheme" i]') !== null) {
+        foreach ($document->querySelectorAll('[bgcolor]') as $node) {
+            if (self::paintsSomething((string) $node->getAttribute('bgcolor'))) {
+                return true;
+            }
+        }
+
+        foreach ($document->querySelectorAll('[style]') as $node) {
+            preg_match_all('/(?<![\w-])background(?:-color|-image)?\s*:([^;]*)/i', (string) $node->getAttribute('style'), $values);
+
+            foreach ($values[1] as $value) {
+                if (self::paintsSomething($value)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static function paintsSomething(string $value): bool
+    {
+        $value = mb_strtolower(str_replace('!important', '', $value));
+
+        if (str_contains($value, 'url(') || str_contains($value, 'gradient(')) {
             return true;
         }
 
-        foreach ($document->querySelectorAll('[style], style') as $node) {
-            $css = $node->localName === 'style' ? $node->textContent : $node->getAttribute('style');
+        $value = (string) preg_replace('/(?:rgba|hsla)\([^)]*[,\/]\s*0(?:\.0*)?%?\s*\)/', ' ', $value);
+        $neutral = '/^(?:transparent|none|inherit|initial|unset|repeat|repeat-x|repeat-y|no-repeat|scroll|fixed|local|left|right|top|bottom|center|-?[\d.]+[a-z%]*)$/';
 
-            if (preg_match('/(?<![\w-])(?:color|background(?:-color|-image)?|color-scheme)\s*:/i', (string) $css) === 1) {
+        foreach (preg_split('/[\s,\/]+/', trim($value), flags: PREG_SPLIT_NO_EMPTY) ?: [] as $token) {
+            if (preg_match($neutral, $token) !== 1) {
                 return true;
             }
         }
@@ -144,16 +168,16 @@ img, video { max-width: 100%; height: auto; }
 table { max-width: 100%; }
 pre { white-space: pre-wrap; }
 /* The frame canvas follows the root's used color-scheme, so it must match the app's theme too.
-   Mail that sets its own colours keeps them on a light page, as Apple Mail and HEY do. */
+   Mail that paints its own background keeps it on a light page, as Apple Mail and HEY do. */
 :root[data-theme="light"], :root.email-own-colors { color-scheme: light; }
 :root[data-theme="dark"]:not(.email-own-colors) { color-scheme: dark; background: transparent; }
 :root[data-theme="dark"]:not(.email-own-colors) body { background: transparent !important; color: #f3f4f6 !important; }
-:root[data-theme="dark"]:not(.email-own-colors) :is(table, tbody, thead, tfoot, tr, td, th, div, p, span, font, b, strong, em, i, u, center, h1, h2, h3, h4, h5, h6, ul, ol, li, blockquote, pre, code, header, footer, section, article, main) {
+:root[data-theme="dark"]:not(.email-own-colors) body * {
     background-color: transparent !important;
     border-color: #4b5563 !important;
     color: #f3f4f6 !important;
 }
-:root[data-theme="dark"]:not(.email-own-colors) a { color: #93c5fd !important; }
+:root[data-theme="dark"]:not(.email-own-colors) :is(a, a *) { color: #93c5fd !important; }
 </style>
 </head>
 <body>
