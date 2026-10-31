@@ -13,7 +13,7 @@ const cloudInputs = (cloud) => cloud ? [
 ].filter((input) => existsSync(new URL(input, import.meta.url))) : [];
 
 export default defineConfig(({mode}) => {
-    const cloud = ['1', 'true'].includes(String(loadEnv(mode, process.cwd(), '').RELATICLE_CLOUD ?? '').toLowerCase());
+    const cloud = ['1', 'true', 'yes', 'on'].includes(String(loadEnv(mode, process.cwd(), '').RELATICLE_CLOUD ?? '').trim().toLowerCase());
 
     return {
         plugins: [

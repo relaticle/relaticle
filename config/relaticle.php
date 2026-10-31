@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
 
-    'cloud' => (bool) env('RELATICLE_CLOUD', false),
+    'cloud' => filter_var(env('RELATICLE_CLOUD', false), FILTER_VALIDATE_BOOLEAN),
 
     'contact' => [
         'email' => env('CONTACT_EMAIL', 'hello@relaticle.com'),

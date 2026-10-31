@@ -45,6 +45,35 @@ it('stays out of the provider list while the cloud switch is off', function (): 
     expect(require base_path('bootstrap/providers.php'))->not->toContain(CloudServiceProvider::class);
 });
 
+it('stays out of the provider list when a cached config predates the cloud switch', function (): void {
+    $relaticle = config('relaticle');
+    unset($relaticle['cloud']);
+    config()->set('relaticle', $relaticle);
+
+    expect(config()->has('relaticle.cloud'))->toBeFalse()
+        ->and(require base_path('bootstrap/providers.php'))->not->toContain(CloudServiceProvider::class);
+});
+
+it('reads the cloud switch as a boolean however the operator spells it', function (string $value, bool $expected): void {
+    $_SERVER['RELATICLE_CLOUD'] = $value;
+
+    try {
+        expect((require base_path('config/relaticle.php'))['cloud'])->toBe($expected);
+    } finally {
+        unset($_SERVER['RELATICLE_CLOUD']);
+    }
+})->with([
+    'true' => ['true', true],
+    '1' => ['1', true],
+    'yes' => ['yes', true],
+    'on' => ['on', true],
+    'false' => ['false', false],
+    '0' => ['0', false],
+    'off' => ['off', false],
+    'no' => ['no', false],
+    'empty' => ['', false],
+]);
+
 it('joins the provider list while the cloud switch is on', function (): void {
     config()->set('relaticle.cloud', true);
 
