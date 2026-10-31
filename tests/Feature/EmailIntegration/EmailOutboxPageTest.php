@@ -172,13 +172,28 @@ it('locked failed mode has a dedicated empty state', function (): void {
 });
 
 it('uses an outlined clock for the outbox empty state', function (): void {
-    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false])
-        ->assertSee(__('filament/pages/email-inbox.outbox.empty.heading'))
-        ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
+    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false]);
 
     expect($component->instance()->getTable()->getEmptyStateIcon())
         ->toBe(Heroicon::OutlinedClock);
 });
+
+it('gives each empty segment its own heading and description', function (OutboxTab $segment): void {
+    overrideOutboxLines([
+        "empty.{$segment->value}.heading" => "Empty heading for {$segment->value}",
+        "empty.{$segment->value}.description" => "Empty description for {$segment->value}",
+    ]);
+
+    livewire(OutboxTable::class, ['includeFailedFilter' => false])
+        ->call('setStatusTab', $segment->value)
+        ->assertSee("Empty heading for {$segment->value}")
+        ->assertSee("Empty description for {$segment->value}");
+})->with([
+    'queued' => [OutboxTab::QUEUED],
+    'scheduled' => [OutboxTab::SCHEDULED],
+    'sending' => [OutboxTab::SENDING],
+    'sent' => [OutboxTab::SENT],
+]);
 
 it('can exclude failed from the segments without changing standalone outbox', function (): void {
     $emailPageSegments = livewire(OutboxTable::class, ['includeFailedFilter' => false])->instance()->segments();
