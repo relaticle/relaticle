@@ -203,7 +203,6 @@ it('keeps each Boost guideline override a copy of the bundled file minus its pin
 
     $removedLines = [
         'laravel/core' => ["- When creating tests, make use of `{{ \$assist->artisanCommand('make:test [options] {name}') }}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests."],
-        'pest/core' => ["- After the feature tests pass, ask the user to run the complete suite with `{{ \$assist->artisanCommand('test --compact') }}`."],
         'php/core' => ['- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.'],
     ];
 
