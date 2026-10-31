@@ -87,8 +87,8 @@
                                     {{ __('billing.trial.active_title') }} ({{ trans_choice('billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
-                                        ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
-                                        : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                        ? __('billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
+                                        : __('billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()]) }}
                                 @elseif($pastDue)
                                     {{ __('billing.manage.past_due_tagline') }}
                                 @elseif($onStripeTrial)
@@ -192,8 +192,8 @@
                             {{ $isManaged
                                 ? __('billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
                                 : ($isGrandfathered
-                                ? __('billing.manage.cancel_scheduled_legacy_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])
-                                : __('billing.manage.cancel_scheduled_body', ['date' => $subscription?->ends_at?->toFormattedDateString()])) }}
+                                ? __('billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
+                                : __('billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])) }}
                         </p>
                     </div>
                 </div>
@@ -230,7 +230,7 @@
                             <x-ri-checkbox-circle-fill class="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.manage.title') }}</h3>
+                            <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.manage.title', ['plan' => $planLabel]) }}</h3>
                             <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.manage.body') }}</p>
                         </div>
                     </div>
@@ -250,58 +250,73 @@
                 </div>
             @endif
 
-            <div
-                x-data="{ yearly: true }"
-                class="relative flex w-full flex-col rounded-2xl border border-primary-200 bg-white p-6 shadow-sm sm:p-8 dark:border-primary-400/25 dark:bg-[var(--surface-card-bg)] dark:shadow-none"
-            >
-                <div class="flex flex-1 flex-col">
-                    <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.cloud_pro') }}</h3>
-                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.tagline') }}</p>
+            <div x-data="{ yearly: true }" class="space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('billing.upgrade.heading') }}</h3>
+                        <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('billing.per_workspace') }}</p>
+                    </div>
+                    <x-billing.interval-toggle />
+                </div>
 
-                    <div class="mt-5 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-                        <div>
-                            <div class="flex items-baseline gap-1.5">
-                                <span class="font-display text-4xl font-bold tracking-tight text-gray-950 dark:text-white" x-text="yearly ? '$19' : '$24'">$19</span>
-                                <span class="text-sm text-gray-500 dark:text-gray-400">/mo</span>
+                @if($trialAvailable)
+                    <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
+                        {{ __('billing.trial.start_button') }}
+                    </x-filament::button>
+                @endif
+
+                <div class="grid gap-4 sm:grid-cols-2">
+                    @foreach([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale] as $plan)
+                        @php
+                            $isScale = $plan === \App\Enums\Plan::Scale;
+                            $openModal = "\$dispatch('upgrade-plan-changed', { plan: '{$plan->value}', interval: yearly ? 'yearly' : 'monthly' }); \$dispatch('open-modal', { id: ".\Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID).' })';
+                        @endphp
+                        <div
+                            id="{{ $plan->value }}-plan"
+                            @class([
+                                'relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm dark:bg-[var(--surface-card-bg)] dark:shadow-none',
+                                'border-primary-300 dark:border-primary-400/40' => $isScale,
+                                'border-[var(--surface-card-border)]' => ! $isScale,
+                            ])
+                        >
+                            @if($isScale)
+                                <span class="absolute -top-3 left-6 rounded-full bg-primary px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-white">{{ __('billing.scale_plan.badge') }}</span>
+                            @endif
+
+                            <h3 class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ $plan->marketingLabel() }}</h3>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __("billing.{$plan->value}_plan.tagline") }}</p>
+
+                            <div class="mt-5 flex items-baseline gap-1.5">
+                                <span class="font-display text-4xl font-bold tracking-tight text-gray-950 dark:text-white" x-text="yearly ? @js('$'.$plan->yearlyPricePerMonth()) : @js('$'.$plan->monthlyPrice())">${{ $plan->yearlyPricePerMonth() }}</span>
+                                <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('billing.per_month') }}</span>
+                                <span x-show="yearly" class="ms-1 rounded-full bg-primary/[0.1] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-700 dark:bg-primary/[0.25] dark:text-primary-300">{{ __('billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]) }}</span>
                             </div>
-                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">{{ __('billing.pro_plan.per_workspace') }}</p>
+                            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400"
+                                x-text="yearly ? @js(__('billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())])) : @js(__('billing.billed_monthly'))">
+                                {{ __('billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())]) }}
+                            </p>
+
+                            <div class="mt-5 h-px w-full bg-gray-100 dark:bg-white/[0.06]"></div>
+
+                            @if($isScale)
+                                <p class="mt-5 text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('billing.scale_plan.includes') }}</p>
+                            @endif
+                            <ul @class(['grid gap-2.5', 'mt-2.5' => $isScale, 'mt-5' => ! $isScale])>
+                                @foreach(__("billing.{$plan->value}_plan.features") as $feature)
+                                    <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300">
+                                        <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
+                                        {{ $feature }}
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            <div class="mt-auto pt-6">
+                                <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" x-on:click="{{ $openModal }}">
+                                    {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button', ['plan' => $plan->marketingLabel()]) }}
+                                </x-filament::button>
+                            </div>
                         </div>
-
-                        <x-billing.interval-toggle />
-                    </div>
-
-                    <div class="mt-6 h-px w-full bg-gray-100 dark:bg-white/[0.06]"></div>
-
-                    <ul class="mt-6 grid gap-3 sm:grid-cols-2">
-                        @foreach(__('billing.pro_plan.features') as $feature)
-                            <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300">
-                                <x-ri-check-line class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
-                                {{ $feature }}
-                            </li>
-                        @endforeach
-                    </ul>
-
-                    <div class="mt-7">
-                        @if($trialAvailable)
-                            <x-filament::button wire:click="startTrial" size="lg" class="w-full justify-center">
-                                {{ __('billing.trial.start_button') }}
-                            </x-filament::button>
-                            <button type="button"
-                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })"
-                                class="mt-3 w-full text-center text-sm font-medium text-primary-600 transition hover:text-primary-500 dark:text-primary-400">
-                                {{ __('billing.upgrade.now') }}
-                            </button>
-                        @else
-                            <x-filament::button type="button" size="lg" class="w-full justify-center"
-                                x-on:click="$dispatch('upgrade-interval-changed', { interval: yearly ? 'yearly' : 'monthly' }); $dispatch('open-modal', { id: {{ \Illuminate\Support\Js::from(\App\Livewire\App\Billing\UpgradeModal::MODAL_ID) }} })">
-                                {{ $onTrial ? __('billing.subscribe.button') : __('billing.upgrade.button') }}
-                            </x-filament::button>
-                        @endif
-                        <p class="mt-3 text-center text-xs text-gray-500 dark:text-gray-400"
-                            x-text="yearly ? @js(__('billing.pro_plan.billed_yearly')) : @js(__('billing.pro_plan.billed_monthly'))">
-                            {{ __('billing.pro_plan.billed_yearly') }}
-                        </p>
-                    </div>
+                    @endforeach
                 </div>
             </div>
         @endif

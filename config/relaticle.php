@@ -12,7 +12,17 @@ return [
         'starting_price_yearly' => 20_000,
     ],
 
-    'concierge' => [
+    'scale' => [
+        'price_monthly' => 59,
+        'price_yearly' => 588,
+    ],
+
+    'pro' => [
+        'price_monthly' => 24,
+        'price_yearly' => 228,
+    ],
+
+    'guided_setup' => [
         'price_yearly' => 708,
     ],
 

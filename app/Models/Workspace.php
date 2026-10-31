@@ -380,6 +380,13 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->connectedAccounts()->connected()->exists();
     }
 
+    public function hasMailboxCapacity(): bool
+    {
+        $limit = $this->plan->connectedMailboxes();
+
+        return $limit === null || $this->connectedAccounts()->connected()->count() < $limit;
+    }
+
     /**
      * Reads the `subscriptions` relation, so eager load it when rendering this
      * for more than one workspace. It deliberately does not `loadMissing()` on your
@@ -496,6 +503,30 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     protected function withConnectedMailbox(Builder $query): Builder
     {
         return $query->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected());
+    }
+
+    /**
+     * Self-serve workspaces that have connected every mailbox their plan allows.
+     *
+     * @param  Builder<Workspace>  $query
+     * @return Builder<Workspace>
+     */
+    #[Scope]
+    protected function atMailboxCap(Builder $query): Builder
+    {
+        return $query->where(function (Builder $capped): void {
+            foreach (Plan::cases() as $plan) {
+                $limit = $plan->connectedMailboxes();
+
+                if (! $plan->isSelfServe() || $limit === null) {
+                    continue;
+                }
+
+                $capped->orWhere(fn (Builder $onPlan): Builder => $onPlan
+                    ->where('plan', $plan->value)
+                    ->whereHas('connectedAccounts', fn (Builder $accounts): Builder => $accounts->connected(), '>=', $limit));
+            }
+        });
     }
 
     /**

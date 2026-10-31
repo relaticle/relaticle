@@ -410,7 +410,7 @@ it('keeps Auto on the premium model for a paid Pro workspace', function (): void
     );
 });
 
-it('gives a Concierge workspace every Pro model and keeps Enterprise-only models locked', function (): void {
+it('gives a Scale workspace every Pro model and keeps Enterprise-only models locked', function (): void {
     Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [
@@ -419,7 +419,7 @@ it('gives a Concierge workspace every Pro model and keeps Enterprise-only models
         ChatCatalog::entry(['label' => 'GPT 5.5 Pro', 'provider' => 'openai', 'model' => 'gpt-5.5-pro', 'min_plan' => 'enterprise']),
     ]);
     app()->forgetInstance(ModelRegistry::class);
-    $user->currentWorkspace->forceFill(['plan' => Plan::Concierge])->save();
+    $user->currentWorkspace->forceFill(['plan' => Plan::Scale])->save();
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [
         'credits_remaining' => 100,
         'credits_used' => 0,
@@ -437,7 +437,7 @@ it('gives a Concierge workspace every Pro model and keeps Enterprise-only models
         'model' => 'gpt-5.5-pro',
     ])->assertStatus(403)->assertJson([
         'error' => 'model_not_allowed',
-        'message' => 'GPT 5.5 Pro is not available on the Concierge plan.',
+        'message' => 'GPT 5.5 Pro is not available on the Scale plan.',
         'upgrade_available' => false,
     ]);
 });

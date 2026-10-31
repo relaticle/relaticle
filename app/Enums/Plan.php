@@ -13,7 +13,7 @@ enum Plan: string implements HasColor, HasLabel
 {
     case Free = 'free';
     case Pro = 'pro';
-    case Concierge = 'concierge';
+    case Scale = 'scale';
     case Enterprise = 'enterprise';
 
     public static function default(): self
@@ -106,7 +106,7 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => 'Free',
             self::Pro => 'Pro',
-            self::Concierge => 'Concierge',
+            self::Scale => 'Scale',
             self::Enterprise => 'Enterprise',
         };
     }
@@ -116,7 +116,7 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => 'gray',
             self::Pro => 'success',
-            self::Concierge => 'info',
+            self::Scale => 'info',
             self::Enterprise => 'primary',
         };
     }
@@ -126,7 +126,7 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => __('billing.plans.free'),
             self::Pro => __('billing.plans.cloud_pro'),
-            self::Concierge => __('billing.plans.cloud_concierge'),
+            self::Scale => __('billing.plans.cloud_scale'),
             self::Enterprise => __('billing.plans.enterprise'),
         };
     }
@@ -136,7 +136,7 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => 300,
             self::Pro => 2_000,
-            self::Concierge => 5_000,
+            self::Scale => 5_000,
             self::Enterprise => 10_000,
         };
     }
@@ -146,8 +146,43 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => 10,
             self::Pro => 30,
-            self::Concierge => 30,
+            self::Scale => 60,
             self::Enterprise => 60,
+        };
+    }
+
+    /**
+     * How many mailboxes a workspace on this plan may connect. Null is unlimited.
+     * Checked when a mailbox is connected, never when a plan changes, so a
+     * downgrade disconnects nothing.
+     */
+    public function connectedMailboxes(): ?int
+    {
+        return match ($this) {
+            self::Free => 1,
+            self::Pro => 10,
+            self::Scale => 50,
+            self::Enterprise => null,
+        };
+    }
+
+    /**
+     * The factor the REST API and MCP per-minute limits are multiplied by.
+     */
+    public function throughputMultiplier(): int
+    {
+        return match ($this) {
+            self::Free, self::Pro => 1,
+            self::Scale => 3,
+            self::Enterprise => 10,
+        };
+    }
+
+    public function isSelfServe(): bool
+    {
+        return match ($this) {
+            self::Free, self::Enterprise => false,
+            self::Pro, self::Scale => true,
         };
     }
 
@@ -156,7 +191,7 @@ enum Plan: string implements HasColor, HasLabel
         return match ($this) {
             self::Free => 0,
             self::Pro => 1,
-            self::Concierge => 2,
+            self::Scale => 2,
             self::Enterprise => 3,
         };
     }
@@ -166,16 +201,15 @@ enum Plan: string implements HasColor, HasLabel
     public function isManaged(): bool
     {
         return match ($this) {
-            self::Free, self::Pro => false,
-            self::Concierge, self::Enterprise => true,
+            self::Free, self::Pro, self::Scale => false,
+            self::Enterprise => true,
         };
     }
 
     public function stripeProduct(): ?string
     {
         return match ($this) {
-            self::Free, self::Pro => null,
-            self::Concierge => config('services.stripe.products.concierge'),
+            self::Free, self::Pro, self::Scale => null,
             self::Enterprise => config('services.stripe.products.enterprise'),
         };
     }
@@ -183,9 +217,51 @@ enum Plan: string implements HasColor, HasLabel
     public function defaultYearlyPrice(): ?int
     {
         return match ($this) {
-            self::Free, self::Pro => null,
-            self::Concierge => config()->integer('relaticle.concierge.price_yearly'),
+            self::Free, self::Pro, self::Scale => null,
             self::Enterprise => config()->integer('relaticle.enterprise.starting_price_yearly'),
         };
+    }
+
+    /**
+     * The per-month price of a self-serve plan billed monthly.
+     */
+    public function monthlyPrice(): ?int
+    {
+        return match ($this) {
+            self::Free, self::Enterprise => null,
+            self::Pro => config()->integer('relaticle.pro.price_monthly'),
+            self::Scale => config()->integer('relaticle.scale.price_monthly'),
+        };
+    }
+
+    /**
+     * The per-year price of a self-serve plan billed yearly.
+     */
+    public function yearlyPrice(): ?int
+    {
+        return match ($this) {
+            self::Free, self::Enterprise => null,
+            self::Pro => config()->integer('relaticle.pro.price_yearly'),
+            self::Scale => config()->integer('relaticle.scale.price_yearly'),
+        };
+    }
+
+    public function yearlyPricePerMonth(): ?int
+    {
+        $yearly = $this->yearlyPrice();
+
+        return $yearly === null ? null : intdiv($yearly, 12);
+    }
+
+    public function yearlySavingPercent(): ?int
+    {
+        $monthly = $this->monthlyPrice();
+        $yearly = $this->yearlyPrice();
+
+        if ($monthly === null || $yearly === null) {
+            return null;
+        }
+
+        return (int) round((1 - $yearly / ($monthly * 12)) * 100);
     }
 }

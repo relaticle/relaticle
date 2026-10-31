@@ -35,10 +35,10 @@ return [
 
     'trial_ending' => [
         'subject' => 'Your Pro trial ends in 3 days',
-        'preheader' => 'Keep every AI model and 2,000 credits for one flat price',
+        'preheader' => 'Keep every AI model and :credits credits for one flat price',
         'heading' => '3 days left on Pro for :workspace',
         'ends_on' => 'Your 14-day Pro trial ends on :date.',
-        'keeps' => 'Pro keeps every AI model, 2,000 monthly credits, and higher rate limits.',
+        'keeps' => 'Pro keeps every AI model, :credits monthly credits, and higher rate limits.',
         'flat_price' => 'There is no per-seat pricing. One flat price covers the whole workspace.',
         'grandfathered' => 'If you do nothing, :workspace returns to its grandfathered Cloud Free plan. Your data is untouched.',
         'paused' => 'If you do nothing, Cloud access pauses when the trial ends. Your data stays stored, and you can subscribe at any time to pick up where you left off.',
@@ -51,8 +51,8 @@ return [
             'heading' => 'Your Pro trial for :workspace has ended',
         ],
         'subscription_ended' => [
-            'subject' => 'Your Cloud Pro subscription has ended',
-            'heading' => 'Cloud Pro for :workspace has ended',
+            'subject' => 'Your Cloud subscription has ended',
+            'heading' => 'Cloud access for :workspace has ended',
         ],
         'managed_ended' => [
             'subject' => 'Your :plan plan has ended',
@@ -67,10 +67,10 @@ return [
         'preheader_grandfathered' => 'Your workspace is back on its Cloud Free plan.',
         'paused' => 'Cloud access to :workspace is now paused. Your records are safe, and nothing has been deleted.',
         'mailbox_sync_paused' => 'Email and calendar sync are paused too, and resume once you subscribe.',
-        'restore' => 'Subscribe to Cloud Pro to reopen the app, REST API, MCP server, and AI assistant exactly where you left off.',
-        'grandfathered' => ':workspace is back on its grandfathered Cloud Free plan. Your data is untouched, and you can return to Pro at any time.',
-        'cta' => 'Subscribe to Pro',
-        'cta_grandfathered' => 'Upgrade to Pro',
+        'restore' => 'Subscribe to a Cloud plan to reopen the app, REST API, MCP server, and AI assistant exactly where you left off.',
+        'grandfathered' => ':workspace is back on its grandfathered Cloud Free plan. Your data is untouched, and you can subscribe again at any time.',
+        'cta' => 'Choose a plan',
+        'cta_grandfathered' => 'Choose a plan',
     ],
 
     'managed_plan_invoice' => [

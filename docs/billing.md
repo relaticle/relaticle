@@ -5,8 +5,9 @@ pricing page says "No per-seat pricing. Ever." and the billing architecture enfo
 nothing in the billing pipeline reads or multiplies by member count.
 
 Cloud Pro launches at **$24 per workspace month-to-month** or **$228 per year** ($19/month
-equivalent, save 21%). Pricing surfaces show yearly first while also disclosing the annual total;
-monthly remains a one-click option.
+equivalent, save 21%). Cloud Scale sells at **$59 month-to-month** or **$588 per year** ($49/month
+equivalent) with more credits, more mailboxes and 3x API throughput. Pricing surfaces show yearly
+first while also disclosing the annual total; monthly remains a one-click option.
 
 The workspace metric is intentional for the demand-validation stage: it keeps invitations
 frictionless and matches a plan whose primary variable allowance is shared AI credits. The first
@@ -19,7 +20,7 @@ the published commitment. The full comparison is recorded in the
 ## Model
 
 - Plans are flat, workspace-scoped capability bundles: `App\Enums\Plan` (`free`, `pro`,
-  `enterprise`). `free` remains the default for self-hosted installs and grandfathered Cloud
+  `scale`, `enterprise`). `free` remains the default for self-hosted installs and grandfathered Cloud
   workspaces; it is not offered to new managed-Cloud workspaces.
 - Managed-Cloud access is a separate entitlement. `App\Enums\BillingStatus` owns the state and
   `grantsAccess()` answers per state. `HostedWorkspaceAccess` only adds the billing feature flag,
@@ -30,7 +31,8 @@ the published commitment. The full comparison is recorded in the
   the value metric is the work AI does for a workspace, not how many people log in.
 - Member counts are tracked for visibility and enterprise license compliance only.
 - Enterprise is sales-assisted: manual invoicing plus a sysadmin plan grant. Self-serve
-  checkout covers trial, paused, and grandfathered workspaces → Pro.
+  checkout covers trial, paused, and grandfathered workspaces → Pro or Scale. Guided setup is a
+  service add-on sold through the contact form, not a plan.
 
 ## Provider
 
@@ -53,7 +55,7 @@ Workspace onboarding (billing enabled)
 
 Billing page (/app/{team}/billing, flag-gated)
   ├─ Legacy trial fallback ► StartProTrial (grandfathered eligible workspaces only)
-  ├─ Upgrade ──────────────► Upgrade modal → CreateProCheckout → hosted Stripe Checkout
+  ├─ Upgrade ──────────────► Upgrade modal → CreateSubscriptionCheckout → hosted Stripe Checkout
   │                            └ managed_payments[enabled] = config('services.stripe.managed_payments')
   └─ Manage subscription ──► Stripe Billing Portal (redirectToBillingPortal)
 
@@ -101,6 +103,8 @@ workspaces retain the previously promised Cloud Free access; new rows default to
 | `STRIPE_MANAGED_PAYMENTS` | `true` enables the MoR layer per checkout (the off-ramp switch) |
 | `STRIPE_PRICE_PRO_MONTHLY` | Stripe price id mapped to the `pro` plan (monthly) |
 | `STRIPE_PRICE_PRO_YEARLY` | Stripe price id mapped to the `pro` plan (yearly) |
+| `STRIPE_PRICE_SCALE_MONTHLY` | Stripe price id mapped to the `scale` plan (monthly) |
+| `STRIPE_PRICE_SCALE_YEARLY` | Stripe price id mapped to the `scale` plan (yearly) |
 | `RELATICLE_FEATURE_BILLING` | Pennant flag gating every billing surface; keep `false` in prod until Stripe is live |
 
 Stripe products must carry an eligible Managed Payments tax code (AIaaS for Business Use,
@@ -149,4 +153,6 @@ reconciliation command.
 
 1. ✅ Foundation: billable `Team`, webhook → plan + credit lifecycle, trial, billing page,
    pricing page, sysadmin visibility (this document)
-2. Later: AI-credit top-ups / usage overage via Stripe Billing meters
+2. Later: automatic AI-credit top-ups. Managed Payments cannot charge a stored card off-session
+   or add a one-off invoice item to a subscription, so a top-up is a Checkout the customer starts
+   until Stripe ships off-session payments for merchant-of-record accounts

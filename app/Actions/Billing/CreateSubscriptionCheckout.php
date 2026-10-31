@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Enums\Plan;
 use App\Filament\Pages\Billing;
 use App\Models\Workspace;
 use App\Services\Billing\HostedWorkspaceAccess;
 use Carbon\CarbonInterface;
 use InvalidArgumentException;
 
-final readonly class CreateProCheckout
+final readonly class CreateSubscriptionCheckout
 {
     /** @var list<string> */
     public const array INTERVALS = ['monthly', 'yearly'];
@@ -18,13 +19,14 @@ final readonly class CreateProCheckout
     public function __construct(private HostedWorkspaceAccess $hostedAccess) {}
 
     /**
-     * Create the hosted Stripe Checkout session and return its redirect URL.
-     * Stripe round-trip, covered by the staging E2E checklist, not unit tests.
+     * Create the hosted Stripe Checkout session for a self-serve plan and return
+     * its redirect URL. Stripe round-trip, covered by the staging E2E checklist,
+     * not unit tests.
      */
-    public function execute(Workspace $workspace, string $interval): string
+    public function execute(Workspace $workspace, Plan $plan, string $interval): string
     {
         $builder = $workspace
-            ->newSubscription('default', $this->priceId($interval))
+            ->newSubscription('default', $this->priceId($plan, $interval))
             ->allowPromotionCodes();
 
         $trialEndsAt = $workspace->onGenericTrial() ? $workspace->trial_ends_at : null;
@@ -39,15 +41,16 @@ final readonly class CreateProCheckout
             ->url;
     }
 
-    private function priceId(string $interval): string
+    private function priceId(Plan $plan, string $interval): string
     {
-        // $interval arrives from the browser, so pin it to the known intervals and
-        // an arbitrary string never reaches a config lookup.
+        // Both arrive from the browser, so pin them to the sellable plans and the
+        // known intervals before anything reaches a config lookup.
+        throw_unless($plan->isSelfServe(), InvalidArgumentException::class, "Plan [{$plan->value}] is not sold through checkout.");
         throw_unless(in_array($interval, self::INTERVALS, true), InvalidArgumentException::class, "Unsupported billing interval [{$interval}].");
 
-        $priceId = config("services.stripe.prices.pro_{$interval}");
+        $priceId = config("services.stripe.prices.{$plan->value}_{$interval}");
 
-        throw_if(! is_string($priceId) || $priceId === '', InvalidArgumentException::class, "No Stripe price configured for interval [{$interval}].");
+        throw_if(! is_string($priceId) || $priceId === '', InvalidArgumentException::class, "No Stripe price configured for [{$plan->value}_{$interval}].");
 
         return $priceId;
     }
