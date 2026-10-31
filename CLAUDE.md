@@ -53,9 +53,10 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
 its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
-development and testing use, and production use only under an agreement. The root `LICENSE` opens
-by naming that split, the shape GitLab, PostHog and Metabase use. The self-hosted build is this
-repository without it.
+development and testing use, and production use only under an agreement. The root `LICENSE` is
+verbatim AGPL-3.0, so GitHub and every directory that reads its license field detect it, and
+`LICENSING.md` names that split, the shape GitLab, PostHog and Metabase use. The self-hosted build
+is this repository without it.
 
 - Core never references it. `tests/Arch/ArchTest.php` fails a core layer that uses
   `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,

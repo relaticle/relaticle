@@ -1,6 +1,6 @@
 # Relaticle Integration Exception
 
-[LICENSE](LICENSE) licenses Relaticle under the GNU Affero General Public License v3.0 (AGPLv3), except the code in `packages/Cloud`, which its own license governs. The AGPLv3 part carries the following additional permission.
+[LICENSE](LICENSE) licenses Relaticle under the GNU Affero General Public License v3.0 (AGPLv3), except the code in `packages/Cloud`, which its own license governs ([LICENSING.md](LICENSING.md) states the split). The AGPLv3 part carries the following additional permission.
 
 ## Additional permission under AGPLv3 section 7
 
