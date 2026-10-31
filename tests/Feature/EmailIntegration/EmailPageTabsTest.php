@@ -237,12 +237,14 @@ it('keeps drafts and templates reachable under the connect card when no mailbox 
     EmailTemplate::factory()->create(['workspace_id' => $this->workspace->id, 'created_by' => $this->user->id, 'name' => 'Intro call']);
 
     Livewire::test(EmailInboxPage::class)
-        ->assertSeeHtml('data-connect-card')
+        ->assertSeeHtmlInOrder(['data-connect-card', EmailPageTab::DRAFTS->getLabel()])
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
         ->assertSee(EmailPageTab::DRAFTS->getLabel())
         ->assertSee(EmailPageTab::TEMPLATES->getLabel())
         ->call('setTab', EmailPageTab::TEMPLATES->value)
         ->assertSeeLivewire(TemplatesTable::class);
+
+    Livewire::test(TemplatesTable::class)->assertSee('Intro call');
 
     Livewire::test(DraftsTable::class)
         ->assertSee(__('filament/pages/email-inbox.drafts.empty.heading'))
