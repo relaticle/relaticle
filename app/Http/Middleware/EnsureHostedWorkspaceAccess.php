@@ -34,7 +34,7 @@ final readonly class EnsureHostedWorkspaceAccess
      */
     private const array BROWSER_NAVIGATION_ROUTES = ['chat.record-redirect', 'chat.attachments.import'];
 
-    public function __construct(private Entitlements $entitlements, private Billing $billing) {}
+    public function __construct(private Entitlements $entitlements) {}
 
     /**
      * Handle an incoming request.
@@ -53,7 +53,7 @@ final readonly class EnsureHostedWorkspaceAccess
             return $next($request);
         }
 
-        $billingUrl = $this->billing->url($workspace);
+        $billingUrl = resolve(Billing::class)->url($workspace);
 
         $isXhrChatRoute = $request->routeIs('chat.*') && ! $request->routeIs(...self::BROWSER_NAVIGATION_ROUTES);
 

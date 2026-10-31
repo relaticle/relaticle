@@ -98,13 +98,20 @@ trait HasWorkspaceSettingsNavigation
                 ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
 
-            NavigationItem::make()
-                ->label(__('workspaces.tabs.billing'))
-                ->icon(Heroicon::OutlinedCreditCard)
-                ->url(fn (): ?string => $this->billingUrl($tenant))
-                ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
-                ->visible(fn (): bool => $this->billingUrl($tenant) !== null),
+            $this->billingNavigationItem($tenant),
         ];
+    }
+
+    private function billingNavigationItem(Workspace $tenant): NavigationItem
+    {
+        $billingUrl = $this->billingUrl($tenant);
+
+        return NavigationItem::make()
+            ->label(__('workspaces.tabs.billing'))
+            ->icon(Heroicon::OutlinedCreditCard)
+            ->url($billingUrl)
+            ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
+            ->visible($billingUrl !== null);
     }
 
     private function billingUrl(Workspace $tenant): ?string
