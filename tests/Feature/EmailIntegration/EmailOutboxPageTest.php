@@ -245,6 +245,16 @@ it('falls back to the queued segment for an unknown status in the URL', function
         ->assertCanNotSeeTableRecords([$failed]);
 });
 
+it('falls back to the queued segment when the URL names the failed status the outbox does not show', function (): void {
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    Livewire::withQueryParams(['status' => 'failed'])
+        ->test(OutboxTable::class, ['includeFailedFilter' => false])
+        ->assertCanSeeTableRecords([$queued])
+        ->assertCanNotSeeTableRecords([$failed]);
+});
+
 it('falls back to the queued segment for an unknown status', function (): void {
     $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
     $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
