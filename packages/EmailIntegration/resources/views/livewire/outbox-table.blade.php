@@ -5,7 +5,7 @@
                 @foreach ($this->segments() as $segment)
                     @php($count = $this->segmentCounts[$segment->value] ?? 0)
                     <x-filament::tabs.item
-                        :active="$statusTab === $segment"
+                        :active="$activeSegment === $segment"
                         :badge="$count > 0 ? ($count > 99 ? '99+' : (string) $count) : null"
                         badge-color="primary"
                         wire:click="setStatusTab('{{ $segment->value }}')"

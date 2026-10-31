@@ -47,12 +47,13 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
     public bool $includeFailedFilter = true;
 
+    // Nullable so Livewire reads an unknown ?status= with tryFrom() instead of throwing.
     #[Url(as: 'status')]
-    public OutboxTab $statusTab = OutboxTab::QUEUED;
+    public ?OutboxTab $statusTab = OutboxTab::QUEUED;
 
     public function setStatusTab(string $tab): void
     {
-        $this->statusTab = OutboxTab::from($tab);
+        $this->statusTab = OutboxTab::tryFrom($tab) ?? OutboxTab::QUEUED;
         $this->resetTable();
     }
 
@@ -86,9 +87,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
     {
         return $table
             ->query(fn (): Builder => $this->buildQuery())
-            ->defaultSort(fn (Builder $query): Builder => $this->statusTab === OutboxTab::SENT
-                ? $query->latest('sent_at')
-                : $query->orderByRaw('scheduled_for asc nulls first')->oldest('created_at'))
+            ->defaultSort($this->sortSegment(...))
             ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
                 ? __('filament/pages/email-inbox.failed.empty.heading')
                 : __('filament/pages/email-inbox.outbox.empty.heading'))
@@ -159,7 +158,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
     public function render(): View
     {
-        return view('email-integration::livewire.outbox-table');
+        return view('email-integration::livewire.outbox-table', ['activeSegment' => $this->activeSegment()]);
     }
 
     /**
@@ -194,6 +193,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                 ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
                 ->action(function (Email $record, array $data): void {
                     resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
+                    $this->dispatch('outbox:changed');
                     Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
                 }),
             Action::make('retry')
@@ -218,7 +218,25 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
         return $this->lockedStatus instanceof EmailStatus
             ? $query->where('status', $this->lockedStatus)
-            : $this->statusTab->constrain($query);
+            : $this->activeSegment()->constrain($query);
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    private function sortSegment(Builder $query): Builder
+    {
+        return match (true) {
+            $this->lockedStatus instanceof EmailStatus => $query,
+            $this->activeSegment() === OutboxTab::SENT => $query->latest('sent_at'),
+            default => $query->orderByRaw('scheduled_for asc nulls first')->oldest('created_at'),
+        };
+    }
+
+    private function activeSegment(): OutboxTab
+    {
+        return $this->statusTab ?? OutboxTab::QUEUED;
     }
 
     /**
