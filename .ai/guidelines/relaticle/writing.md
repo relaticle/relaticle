@@ -66,7 +66,7 @@ can do. The MCP guide's tool reference is the one place that counts tools.
 
 `tests/Arch/ConventionsTest.php` fails "AI chat" in published copy, and fails the MCP guide
 when its count differs from the tools `RelaticleServer` registers.
-`tests/Feature/Public/PublicPagesTest.php` fails a marketing page that quotes a count.
+`packages/Cloud/tests/Feature/Marketing/PublicPagesTest.php` fails a marketing page that quotes a count.
 
 ## House style
 

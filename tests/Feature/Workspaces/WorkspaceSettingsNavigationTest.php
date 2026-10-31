@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Billing as BillingContract;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
@@ -12,20 +12,23 @@ use App\Filament\Pages\Workspace\Members;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
+use App\Services\NoBilling;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
 use Illuminate\Support\Facades\Route;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\CustomFields\Livewire\ManageFieldsTable;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailPrivacySettingsPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
 
-mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailAccountsPage::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class);
+mutates(AppPanelProvider::class, Members::class, CustomFields::class, EmailAccountsPage::class, EmailPrivacySettingsPage::class, ActivityLog::class, ImportHistory::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -55,7 +58,7 @@ function activeWorkspaceTabLabels(object $page): array
 }
 
 test('every workspace settings page renders the same tab strip', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $expected = [
         __('workspaces.tabs.general'),
@@ -67,7 +70,7 @@ test('every workspace settings page renders the same tab strip', function (): vo
         __('workspaces.tabs.billing'),
     ];
 
-    foreach ([EditWorkspace::class, Members::class, CustomFields::class, EmailAccountsPage::class, ManageEmailTemplates::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class, Billing::class] as $page) {
+    foreach ([EditWorkspace::class, Members::class, CustomFields::class, EmailAccountsPage::class, ManageEmailTemplates::class, EmailPrivacySettingsPage::class, ImportHistory::class, ActivityLog::class] as $page) {
         expect(workspaceTabLabels(resolve($page)))
             ->toBe($expected, "[{$page}] should render the full tab strip");
     }
@@ -84,11 +87,6 @@ test('workspace settings tabs live under the workspace url without duplicate sta
         ->and(Route::has('filament.app.pages.workspace.custom-fields'))->toBeTrue()
         ->and(Route::has('filament.app.email-settings.pages.accounts'))->toBeFalse()
         ->and(Route::has('filament.app.pages.workspace.email'))->toBeTrue();
-});
-
-test('billing keeps its own url so the paywall allowlist keeps matching', function (): void {
-    expect(Billing::getSlug())->toBe('billing')
-        ->and(Route::has('filament.app.pages.billing'))->toBeTrue();
 });
 
 test('a workspace admin can open every tab', function (): void {
@@ -117,7 +115,7 @@ test('a user outside the workspace cannot open the members tab', function (): vo
 });
 
 test('the tab strip hides admin-only tabs from members without the admin role', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
@@ -235,8 +233,30 @@ test('the tab strip drops billing when the feature is off', function (): void {
         ->not->toContain(__('workspaces.tabs.billing'));
 });
 
+test('the tab strip drops billing when no provider offers a billing page', function (): void {
+    withHostedBilling();
+    app()->instance(BillingContract::class, new NoBilling);
+
+    expect(workspaceTabLabels(resolve(EditWorkspace::class)))
+        ->not->toContain(__('workspaces.tabs.billing'));
+});
+
+test('the tenant menu drops billing when the feature is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    $items = collect($panel->getTenantMenuItems())
+        ->filter(fn (Action $item): bool => $item->isVisible())
+        ->keys()
+        ->all();
+
+    expect($items)->not->toContain('billing');
+});
+
 test('each page highlights its own tab even when no page route is current', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $tabs = [
         EditWorkspace::class => __('workspaces.tabs.general'),
@@ -245,9 +265,9 @@ test('each page highlights its own tab even when no page route is current', func
         EmailAccountsPage::class => __('workspaces.tabs.email'),
         ManageEmailTemplates::class => __('workspaces.tabs.email'),
         EmailPrivacySettingsPage::class => __('workspaces.tabs.email'),
+        EmailAccountSettingsPage::class => __('workspaces.tabs.email'),
         ImportHistory::class => __('workspaces.tabs.import_history'),
         ActivityLog::class => __('workspaces.tabs.activity'),
-        Billing::class => __('workspaces.tabs.billing'),
     ];
 
     foreach ($tabs as $page => $label) {
@@ -257,7 +277,7 @@ test('each page highlights its own tab even when no page route is current', func
 });
 
 test('the tenant menu lists billing directly under workspace settings', function (): void {
-    Feature::define(BillingFeature::class, true);
+    withHostedBilling();
 
     $panel = Filament::getPanel('app');
     Filament::setCurrentPanel($panel);

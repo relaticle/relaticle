@@ -1,0 +1,100 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Support\Mail\MailPreview;
+use Illuminate\Mail\Transport\ArrayTransport;
+use Illuminate\Support\Facades\Mail;
+use Relaticle\Cloud\CloudServiceProvider;
+use Relaticle\Cloud\Marketing\Enums\ContactInquiry;
+use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
+use Symfony\Component\Mime\Email;
+
+mutates(NewContactSubmissionMail::class, CloudServiceProvider::class);
+
+it('lists the submission fields and offers a reply link', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => 'Ana Reyes',
+        'email' => 'ana@example.com',
+        'company' => 'Acme',
+        'message' => 'We need SSO.',
+    ]);
+
+    $mail->assertHasSubject(__('cloud::mail.contact_submission.subject', ['name' => 'Ana Reyes']));
+    $mail->assertHasReplyTo('ana@example.com');
+    $mail->assertSeeInHtml(__('cloud::mail.contact_submission.preheader', ['company' => 'Acme', 'email' => 'ana@example.com']));
+    $mail->assertSeeInHtml('We need SSO.');
+    $mail->assertSeeInHtml('href="mailto:ana@example.com?subject=Re%3A%20New%20contact%3A%20Ana%20Reyes"', escape: false);
+    $mail->assertSeeInText(__('cloud::mail.contact_submission.email').': ana@example.com');
+    $mail->assertSeeInText(__('cloud::mail.contact_submission.cta', ['name' => 'Ana Reyes']).': mailto:ana@example.com?subject=Re%3A%20New%20contact%3A%20Ana%20Reyes');
+});
+
+it('encodes contact names in the reply subject without adding mailto parameters', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => 'Zoë & cc=other@example.com #1',
+        'email' => 'zoe+crm@example.com',
+        'message' => 'We would like to discuss licensing.',
+    ]);
+
+    $replyUrl = 'mailto:zoe+crm@example.com?subject=Re%3A%20New%20contact%3A%20Zo%C3%AB%20%26%20cc%3Dother%40example.com%20%231';
+
+    $mail->assertSeeInHtml('href="'.$replyUrl.'"', escape: false);
+    $mail->assertSeeInText($replyUrl);
+});
+
+it('falls back to the email-only preheader without a company', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => 'Ana Reyes',
+        'email' => 'ana@example.com',
+        'company' => null,
+        'message' => 'Hello',
+    ]);
+
+    $mail->assertSeeInHtml(__('cloud::mail.contact_submission.preheader_without_company', ['email' => 'ana@example.com']));
+    $mail->assertDontSeeInHtml(__('cloud::mail.contact_submission.company'));
+});
+
+it('names the inquiry in the subject and the reply subject', function (): void {
+    $mail = new NewContactSubmissionMail([
+        'name' => 'Ana Reyes',
+        'email' => 'ana@example.com',
+        'message' => 'Set us up.',
+    ], ContactInquiry::Setup);
+
+    $mail->assertHasSubject('New Guided setup inquiry: Ana Reyes');
+    $mail->assertSeeInText('mailto:ana@example.com?subject=Re%3A%20New%20Guided%20setup%20inquiry%3A%20Ana%20Reyes');
+});
+
+it('keeps the submitter reply-to alongside the global one on contact mail', function (): void {
+    config()->set('mail.reply_to', ['address' => 'support@relaticle.com', 'name' => 'Relaticle']);
+
+    Mail::to('hello@relaticle.com')->sendNow(new NewContactSubmissionMail([
+        'name' => 'Jane Doe',
+        'email' => 'jane@gmail.com',
+        'company' => null,
+        'message' => 'I would like to learn more.',
+    ]));
+
+    $transport = Mail::getSymfonyTransport();
+    assert($transport instanceof ArrayTransport);
+
+    $original = $transport->messages()->sole()->getOriginalMessage();
+    assert($original instanceof Email);
+
+    expect(collect($original->getReplyTo())->map->getAddress()->all())->toContain('support@relaticle.com', 'jane@gmail.com');
+});
+
+it('registers the contact submission mail preview and renders it', function (): void {
+    $preview = resolve(MailPreview::class);
+
+    expect($preview->names())->toContain('contact-submission')
+        ->and($preview->render('contact-submission'))
+        ->toContain('<html xmlns="http://www.w3.org/1999/xhtml" lang="en">')
+        ->not->toMatch('/\bmail\.[a-z_]+\.[a-z_]+/');
+});
+
+it('loads a payload queued under the class name it had before the move', function (): void {
+    $preMoveName = 'App\Mail\NewContactSubmissionMail';
+
+    expect(unserialize('O:'.strlen($preMoveName).':"'.$preMoveName.'":0:{}'))->toBeInstanceOf(NewContactSubmissionMail::class);
+});

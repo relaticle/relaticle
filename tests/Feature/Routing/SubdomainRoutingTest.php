@@ -8,6 +8,7 @@ use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Route;
 use Laravel\Mcp\Facades\Mcp;
 use Laravel\Sanctum\Sanctum;
+use Relaticle\Documentation\Support\DocUrl;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -134,6 +135,7 @@ describe('MCP routing - subdomain mode', function () {
         $json = $response->json();
         expect($json)->toHaveKeys(['name', 'version', 'docs']);
         expect($json['name'])->toBe('Relaticle MCP Server');
+        expect($json['docs'])->toBe(DocUrl::docsPage('mcp'));
     });
 
     /**

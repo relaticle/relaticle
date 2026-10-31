@@ -37,6 +37,9 @@ it('rejects unauthenticated requests', function (): void {
 });
 
 it('returns 402 when credits are exhausted on send', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -236,6 +239,9 @@ it('returns the conversation id so the client can subscribe', function (): void 
 });
 
 it('atomically reserves a credit on send so concurrent sends cannot overspend', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     AiCreditBalance::query()
         ->where('workspace_id', $this->workspace->getKey())
         ->update(['credits_remaining' => 1, 'credits_used' => 99]);
@@ -264,6 +270,9 @@ it('atomically reserves a credit on send so concurrent sends cannot overspend', 
 });
 
 it('does not reserve a credit on send when the request fails validation', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -279,6 +288,9 @@ it('does not reserve a credit on send when the request fails validation', functi
 });
 
 it('returns reset_on and upgrade_url on 402 from send', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [

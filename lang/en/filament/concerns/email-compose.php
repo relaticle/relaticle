@@ -29,6 +29,7 @@ return [
         'held' => [
             'title' => ':via queued an email',
             'body' => '":subject" goes to :recipients in :minutes. Workspace: :workspace. Cancel it if you did not ask for it.',
+            'scheduled_body' => '":subject" goes to :recipients on :date. Workspace: :workspace. Cancel it if you did not ask for it.',
             'sent_body' => '":subject" was sent to :recipients. Workspace: :workspace.',
             'cancelled_body' => '":subject" to :recipients was cancelled and not sent. Workspace: :workspace.',
             'failed_body' => '":subject" to :recipients could not be sent. Workspace: :workspace.',

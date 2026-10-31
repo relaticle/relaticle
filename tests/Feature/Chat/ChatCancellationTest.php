@@ -104,8 +104,11 @@ it('returns 401 for unauthenticated cancel', function (): void {
 });
 
 it('settles the reserved minimum (not refund) when a stream is cancelled mid-flight', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     actingAs($user);
 
     $conversationId = (string) Str::uuid7();

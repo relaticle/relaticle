@@ -10,7 +10,9 @@
                  teardown; throwing here aborts Alpine's flush queue
                  and silently drops queued callbacks. --}}
             <span x-text="@js(__('Sending too fast. Sending again in :seconds.')).replace(':seconds', (rateLimit?.secondsLeft ?? 0) + 's')"></span>
-            <span class="text-amber-700/70 dark:text-amber-300/70" x-text="'· ' + @js(__(':plan plan')).replace(':plan', currentPlanLabel)"></span>
+            <template x-if="currentPlanLabel">
+                <span class="text-amber-700/70 dark:text-amber-300/70" x-text="'· ' + @js(__(':plan plan')).replace(':plan', currentPlanLabel)"></span>
+            </template>
         </span>
         <button
             type="button"

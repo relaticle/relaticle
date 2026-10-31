@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-10-27"
+updated: "2026-10-30"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -13,21 +13,30 @@ workspace owner, and other members see who to ask.
 
 ## What Cloud Pro costs
 
-Cloud Pro is the self-serve plan: unlimited users and records, 2,000 AI
-credits a month, premium AI models, the REST API and MCP server, and email
-support. It costs **$19/mo per workspace billed yearly** ($228 a year), or
-**$24/mo billed monthly**. For larger rollouts, Enterprise implementation
-starts at $20,000 a year. The [pricing page](/pricing) has the details.
+Cloud Pro is the entry plan: unlimited users and records, 2,000 AI
+credits a month, premium AI models, up to 10 connected mailboxes, the REST
+API and MCP server, and email support. It costs **$19/mo per workspace billed
+yearly** ($228 a year), or **$24/mo billed monthly**. For larger rollouts,
+Enterprise implementation starts at $20,000 a year. The
+[pricing page](/pricing) has the details.
 
-## Cloud Concierge
+## What Cloud Scale costs
 
-Cloud Concierge is Cloud Pro with the setup done for you. We design your
-pipeline and fields around how you sell, move your existing data in, and walk
-your team through it. After that, we make up to 5 changes a month, each within
-one business day. It includes 5,000 AI credits a month and costs **$708 a year
-per workspace**, invoiced yearly. Ask for it from the [pricing page](/pricing).
-Setup starts once the invoice is paid. Stripe sends the invoice each year.
-If a renewal stays unpaid, the workspace pauses, as it does when Pro lapses.
+Cloud Scale is for teams that run on Relaticle all day. It includes everything
+in Cloud Pro, raises the allowance to 5,000 AI credits a month, allows up to
+50 connected mailboxes, triples REST API and MCP throughput, and comes with
+priority support. It costs **$49/mo per workspace billed yearly** ($588 a
+year), or **$59/mo billed monthly**. Switch between Pro and Scale from the
+Billing page; Stripe prorates the change.
+
+## Guided setup
+
+Guided setup is a service for Cloud Scale workspaces, and is included with
+Enterprise. We design your pipeline and fields around how you sell, move your
+existing data in, and walk your team through it. After that, we make up to 5
+changes a month, each within one business day. It costs **$708 a year per
+workspace**, invoiced yearly. Ask for it from the [pricing page](/pricing).
+Setup starts once the invoice is paid.
 
 ## The trial
 
@@ -41,9 +50,9 @@ a subscription the workspace pauses. Relaticle Cloud has no free plan.
 
 **Manage subscription** opens the billing portal, where you update the
 payment method, download invoices, and switch between monthly and yearly.
-Cancelling keeps Pro until the end of the paid period. On Cloud Concierge or
-Enterprise, the portal is where you pay invoices and update the payment
-method. Plan changes go through us.
+Cancelling keeps your plan until the end of the paid period. On Enterprise,
+the portal is where you pay invoices and update the payment method. Plan
+changes go through us.
 
 ## If the subscription lapses
 
@@ -54,7 +63,7 @@ deleted by its owner, and its 30-day deletion grace period applies as usual.
 
 ## AI credits
 
-The plan's monthly credit allowance resets each billing period. Pro
+The plan's monthly credit allowance resets each billing period. Paid
 workspaces can buy one-time **credit packs** from the Billing page.
 Purchased credits are spent only after the monthly allowance and never
 expire. The same page shows how many credits the workspace has used this
@@ -65,6 +74,6 @@ period. What credits are and what messages cost is covered in
 
 Relaticle is open source (AGPL-3.0). Self-hosted installs are free forever,
 with no subscription and no workspace pausing, and AI runs on your own
-provider keys. The assistant still meters credits there: a workspace gets
-300 a month by default, which the operator can raise. See the
-[Self-Hosting Guide](/developers/self-hosting).
+provider keys. The assistant does not meter credits there. Only a per-minute
+send limit applies, which defaults to 60 and which the operator can change.
+See the [Self-Hosting Guide](/developers/self-hosting).

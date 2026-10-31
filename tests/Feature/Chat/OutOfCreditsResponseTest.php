@@ -2,22 +2,38 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Services\NoBilling;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Http\Controllers\ChatController;
+use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
+use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Support\ModelDescriptor;
+use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
+
+mutates(ChatController::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class, NoBilling::class, StripeBilling::class);
 
 beforeEach(function (): void {
     Queue::fake();
 });
 
 it('returns plan-aware copy when a Free user is out of credits', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'workspace_id' => $workspace->getKey(),
@@ -60,6 +76,8 @@ it('returns plan-aware copy when a Free user is out of credits', function (): vo
 });
 
 it('marks upgrade_available false for Pro users', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->plan = Plan::Pro;
@@ -97,6 +115,8 @@ it('marks upgrade_available false for Pro users', function (): void {
 });
 
 it('marks upgrade_available false for Enterprise users', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->plan = Plan::Enterprise;
@@ -133,8 +153,11 @@ it('marks upgrade_available false for Enterprise users', function (): void {
 });
 
 it('mentions the plan name in the message', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'workspace_id' => $workspace->getKey(),
@@ -167,7 +190,7 @@ it('mentions the plan name in the message', function (): void {
 });
 
 it('offers a top-up url to exhausted paid plans when billing is active', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -177,7 +200,7 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
 
     // A valid Cashier subscription is how a real paying customer reaches this
     // plan/state (SyncWorkspacePlanFromSubscription only sets Plan::Pro when the
-    // subscription is valid()); it also satisfies HostedWorkspaceAccess::allows()
+    // subscription is valid()); it also satisfies Entitlements::allowsAccess()
     // via subscription()?->valid(), so the request isn't paused before reaching
     // ChatController.
     $workspace->subscriptions()->create([
@@ -219,8 +242,79 @@ it('offers a top-up url to exhausted paid plans when billing is active', functio
     expect($response->json('upgrade_available'))->toBeFalse();
 });
 
+it('offers no billing link when a metered turn runs out of credits while billing is off', function (Plan $plan): void {
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+    $this->app->bind(Entitlements::class, fn (): Entitlements => new class implements Entitlements
+    {
+        public function metersCredits(Workspace $workspace): bool
+        {
+            return true;
+        }
+
+        public function creditAllowance(Workspace $workspace): int
+        {
+            return 0;
+        }
+
+        public function allowsModel(?Workspace $workspace, ModelDescriptor $model): bool
+        {
+            return true;
+        }
+
+        public function chatRateLimit(Workspace $workspace): int
+        {
+            return 60;
+        }
+
+        public function allowsAccess(Workspace $workspace): bool
+        {
+            return true;
+        }
+
+        public function mailboxLimit(Workspace $workspace): ?int
+        {
+            return null;
+        }
+    });
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->plan = $plan;
+    $workspace->save();
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 0,
+        'credits_used' => $plan->credits(),
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'hi']]],
+        ]],
+    ]);
+
+    $response->assertStatus(402);
+    expect($response->json('upgrade_url'))->toBeNull()
+        ->and($response->json('top_up_available'))->toBeFalse()
+        ->and($response->json('top_up_url'))->toBeNull();
+})->with([Plan::Free, Plan::Pro]);
+
 it('gives free plans the upgrade shape and no top-up', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -258,7 +352,7 @@ it('gives free plans the upgrade shape and no top-up', function (): void {
 });
 
 it('withholds the top-up url when no credit pack has a configured price', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
     config()->set('services.stripe.credit_packs', [
         'small' => ['price' => null, 'credits' => 1000],
         'large' => ['price' => null, 'credits' => 5000],
@@ -308,6 +402,8 @@ it('withholds the top-up url when no credit pack has a configured price', functi
 });
 
 it('names the Free allowance, not the Pro one, when a past-due workspace runs out', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->plan = Plan::Pro;
@@ -353,8 +449,11 @@ it('names the Free allowance, not the Pro one, when a past-due workspace runs ou
 });
 
 it('names the reset day the way the billing page does', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
 
     $balance = AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
         'workspace_id' => $workspace->getKey(),
@@ -383,4 +482,41 @@ it('names the reset day the way the billing page does', function (): void {
 
     $response->assertStatus(402);
     expect($response->json('reset_on'))->toBe($balance->period_ends_at->toFormattedDateString());
+});
+
+it('lets a self-hosted workspace send with no credits left', function (): void {
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 0,
+        'credits_used' => Plan::Free->credits(),
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $workspace->getKey(),
+        'title' => 'test',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $ledgerRowsBefore = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count();
+
+    $this->actingAs($user)->postJson("/chat/{$conversationId}", [
+        'document' => ['type' => 'doc', 'content' => [
+            ['type' => 'paragraph', 'content' => [['type' => 'text', 'text' => 'hi']]],
+        ]],
+    ])->assertSuccessful();
+
+    Queue::assertPushed(ProcessChatMessage::class);
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining'))->toBe(0)
+        ->and(AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count())->toBe($ledgerRowsBefore);
 });

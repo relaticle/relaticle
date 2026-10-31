@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services;
 
-use App\Enums\Plan;
+use App\Contracts\Entitlements;
 use App\Models\User;
+use App\Models\Workspace;
 use Relaticle\Chat\Support\ModelDescriptor;
 use RuntimeException;
 
 final readonly class AiModelResolver
 {
-    public function __construct(private ModelRegistry $registry, private ModelAccess $access) {}
+    public function __construct(private ModelRegistry $registry, private Entitlements $entitlements) {}
 
     /**
      * Resolve the provider and model for a chat request. An available,
@@ -32,18 +33,18 @@ final readonly class AiModelResolver
      */
     public function resolve(User $user, ?string $override = null): array
     {
-        $plan = $this->access->planFor($user->currentWorkspace);
+        $workspace = $user->currentWorkspace;
         $requested = $override ?? ($user->ai_preferences['default_model'] ?? 'auto');
 
         if (is_string($requested) && $requested !== 'auto') {
             $descriptor = $this->registry->find($requested);
 
-            if ($descriptor instanceof ModelDescriptor && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+            if ($descriptor instanceof ModelDescriptor && $descriptor->isAvailable() && $this->entitlements->allowsModel($workspace, $descriptor)) {
                 return $this->describe($descriptor, 'explicit');
             }
         }
 
-        return $this->describe($this->autoPick($plan), 'auto');
+        return $this->describe($this->autoPick($workspace), 'auto');
     }
 
     /**
@@ -55,7 +56,7 @@ final readonly class AiModelResolver
      */
     public function failoverNext(User $user, string $failedId): ?array
     {
-        $plan = $this->access->planFor($user->currentWorkspace);
+        $workspace = $user->currentWorkspace;
         $passed = false;
 
         foreach ($this->registry->autoChain() as $descriptor) {
@@ -65,7 +66,7 @@ final readonly class AiModelResolver
                 continue;
             }
 
-            if ($passed && $descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+            if ($passed && $descriptor->isAvailable() && $this->entitlements->allowsModel($workspace, $descriptor)) {
                 return $this->describe($descriptor, 'auto');
             }
         }
@@ -75,22 +76,22 @@ final readonly class AiModelResolver
 
     public function autoOffersAnotherModel(User $user, string $failedId): bool
     {
-        $plan = $this->access->planFor($user->currentWorkspace);
+        $workspace = $user->currentWorkspace;
 
         return array_any(
             $this->registry->autoChain(),
-            static fn (ModelDescriptor $descriptor): bool => $descriptor->id !== $failedId
+            fn (ModelDescriptor $descriptor): bool => $descriptor->id !== $failedId
                 && $descriptor->isAvailable()
-                && $descriptor->allowedForPlan($plan),
+                && $this->entitlements->allowsModel($workspace, $descriptor),
         );
     }
 
-    private function autoPick(Plan $plan): ModelDescriptor
+    private function autoPick(?Workspace $workspace): ModelDescriptor
     {
         $chain = $this->registry->autoChain();
 
         foreach ($chain as $descriptor) {
-            if ($descriptor->isAvailable() && $descriptor->allowedForPlan($plan)) {
+            if ($descriptor->isAvailable() && $this->entitlements->allowsModel($workspace, $descriptor)) {
                 return $descriptor;
             }
         }

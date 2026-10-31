@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
+use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -180,6 +183,85 @@ it('does not connect a gmail mailbox when the mail read permission was not grant
     ]);
 
     Bus::assertNothingDispatched();
+});
+
+it('does not connect a new mailbox when the workspace has reached its limit', function (): void {
+    withHostedBilling();
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(10)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionHas('error', 'The Pro plan allows 10 connected mailboxes in a workspace. Upgrade to connect more.');
+
+    $this->assertDatabaseMissing(ConnectedAccount::class, [
+        'email_address' => 'connected@example.com',
+    ]);
+
+    Bus::assertNothingDispatched();
+});
+
+it('connects a mailbox past every plan limit on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Free])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(60)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionMissing('error');
+
+    $this->assertDatabaseHas(ConnectedAccount::class, [
+        'workspace_id' => $workspace->getKey(),
+        'email_address' => 'connected@example.com',
+    ]);
+});
+
+it('reconnects an existing mailbox when the workspace has reached its limit', function (): void {
+    withHostedBilling();
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(9)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'email_address' => 'connected@example.com',
+        'access_token' => 'stale-token',
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(__('filament/pages/email-accounts.notifications.connected.title'));
+
+    expect(ConnectedAccount::query()->where('email_address', 'connected@example.com')->count())->toBe(1)
+        ->and(ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->access_token)->toBe('access-token');
 });
 
 function connectedGmailUser(): SocialiteUser

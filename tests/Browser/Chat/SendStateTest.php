@@ -49,6 +49,8 @@ mutates(ChatInterface::class);
  */
 function chatWarmUpRateLimiter(AwaitableWebpage $page): void
 {
+    config()->set('chat.rate_limit_per_minute', 10);
+
     // 10 real sequential HTTP round trips through the in-process server, each
     // sharing this dev box's CPU with every other Horizon/Reverb worker across
     // sibling checkouts (chronic load average well above core count here). The
@@ -231,6 +233,17 @@ it('marks an optimistic bubble failed on rate limit, and a real click resend doe
     $afterFailure = chatTriggerRateLimitedFailure($page, $resolveInterface);
     expect($afterFailure)->toMatchArray(['userCount' => 1, 'domUserBubbles' => 1, 'domFailedBubbles' => 1]);
     expect($afterFailure['clientKey'])->not->toBeNull();
+
+    $throttleBanner = $page->script(<<<'JS'
+        (() => {
+            const banner = [...document.querySelectorAll('span[aria-hidden="true"]')]
+                .find((el) => el.textContent.includes('Sending again in'));
+            return banner ? banner.textContent.replace(/\s+/g, ' ').trim() : null;
+        })();
+    JS);
+    expect($throttleBanner)->toContain('Sending too fast. Sending again in')
+        ->not->toContain(' plan')
+        ->not->toContain('null');
 
     // The failed bubble above lives in the dashboard's side-panel chatInterface
     // (see file docblock), which renders collapsed (x-show="open", open=false)

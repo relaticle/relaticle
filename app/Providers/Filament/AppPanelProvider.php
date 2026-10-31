@@ -6,10 +6,10 @@ namespace App\Providers\Filament;
 
 use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
+use App\Contracts\Billing;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -18,7 +18,6 @@ use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditWorkspace;
@@ -106,6 +105,8 @@ use Throwable;
 
 final class AppPanelProvider extends PanelProvider
 {
+    public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
+
     /**
      * Datetime format for this panel, and the only place it is decided. Columns and
      * entries call `->dateTime()` with no argument so they resolve to this; a resource
@@ -377,16 +378,11 @@ final class AppPanelProvider extends PanelProvider
             );
     }
 
-    private function upgradeModal(): string
+    private function billingUrl(): ?string
     {
         $workspace = Filament::getTenant();
-        $user = $this->signedInUser();
 
-        if (! Feature::active(BillingFeature::class) || ! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
-            return '';
-        }
-
-        return Blade::render('@livewire(\App\Livewire\App\Billing\UpgradeModal::class)');
+        return $workspace instanceof Workspace ? resolve(Billing::class)->url($workspace) : null;
     }
 
     private function inviteMembersModal(): string
@@ -644,10 +640,6 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
-            )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                $this->upgradeModal(...),
             );
 
         $this->registerBanners($panel);
@@ -690,8 +682,8 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('billing.title'))
                     ->icon(Heroicon::OutlinedCreditCard)
                     ->sort(-1)
-                    ->url(fn (): string => Billing::getUrl())
-                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
+                    ->url(fn (): ?string => $this->billingUrl())
+                    ->visible(fn (): bool => $this->billingUrl() !== null),
             ]);
 
         return $panel;

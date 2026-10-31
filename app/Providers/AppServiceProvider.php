@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Console\Commands\MakeFilamentUserCommand;
+use App\Contracts\Billing;
+use App\Contracts\Entitlements;
 use App\Enums\CrmEntity;
 use App\Enums\EmailGrant;
 use App\Enums\Plan;
@@ -29,10 +31,8 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use App\Notifications\Channels\InboxChannel;
 use App\Onboarding\ActivationSteps;
-use App\Services\Billing\HostedWorkspaceAccess;
-use App\Services\DiscordService;
-use App\Services\DockerHubService;
-use App\Services\GitHubService;
+use App\Services\NoBilling;
+use App\Services\SelfHostedEntitlements;
 use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
@@ -73,6 +73,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Facades\FilamentColor;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Cache\RateLimiting\Unlimited;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Database\Eloquent\Model;
@@ -94,7 +95,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\View\View;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
 use Laravel\Passport\AccessToken as PassportAccessToken;
@@ -132,24 +132,15 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Date::use(CarbonImmutable::class);
-
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->registerNotificationBindings();
-
-        // Ink registers its public routes from packageBooted(), which runs after every
-        // provider's register(). Read the config key App\Features\Blog resolves from
-        // rather than the Pennant facade: Pennant needs the `hash` service, which is not
-        // bound this early. Same source of truth, so the flag stays the single switch.
-        config(['ink.features.public_routes' => (bool) config('relaticle.features.blog', false)]);
+        $this->registerSelfHostedDefaults();
 
         Cashier::useCustomerModel(Workspace::class);
         Cashier::keepPastDueSubscriptionsActive();
 
-        // Cashier attaches signature verification only when the webhook secret
-        // happens to be set, and also exposes an unauthenticated payment route
-        // this app never links to. Register the webhook ourselves instead so
-        // verification is unconditional. See routes/web.php.
+        // Cashier's own routes verify signatures only when a secret is set; the billing package registers a verified webhook.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between
@@ -215,6 +206,12 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(NoticeOfEmailChangeRequest::class, \App\Notifications\Auth\NoticeOfEmailChangeRequest::class);
         $this->app->bind(DatabaseChannel::class, InboxChannel::class);
         $this->app->bind(ExportCompletion::class, CompleteExport::class);
+    }
+
+    private function registerSelfHostedDefaults(): void
+    {
+        $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
+        $this->app->bind(Billing::class, NoBilling::class);
     }
 
     private function registerPassport(): void
@@ -284,7 +281,6 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureSessions();
         $this->configureModels();
         $this->configureFilament();
-        $this->configureCommunityCounts();
         $this->configureLivewire();
         $this->configureMacros();
         $this->configureRateLimiting();
@@ -301,9 +297,9 @@ final class AppServiceProvider extends ServiceProvider
             $user = $parameters['user'] ?? null;
 
             $workspaces = $user instanceof User ? $user->allWorkspaces() : collect();
-            $access = resolve(HostedWorkspaceAccess::class);
+            $access = resolve(Entitlements::class);
 
-            // Re-read the workspaces with their subscriptions eager-loaded: isPaused() reaches
+            // Re-read the workspaces with their subscriptions eager-loaded: allowsAccess() reaches
             // for $workspace->subscription(), and allWorkspaces() hydrates more than one row, which
             // is exactly when strict lazy loading throws.
             /** @var list<string> $pausedWorkspaceIds */
@@ -311,7 +307,7 @@ final class AppServiceProvider extends ServiceProvider
                 ->whereIn('id', $workspaces->pluck('id')->all())
                 ->with('subscriptions')
                 ->get()
-                ->filter(fn (Workspace $workspace): bool => $access->isPaused($workspace))
+                ->filter(fn (Workspace $workspace): bool => ! $access->allowsAccess($workspace))
                 ->map(fn (Workspace $workspace): string => (string) $workspace->getKey())
                 ->values()
                 ->all();
@@ -550,29 +546,45 @@ final class AppServiceProvider extends ServiceProvider
         };
     }
 
+    private function planThroughput(?Authenticatable $user): int
+    {
+        $plan = $user instanceof User ? $user->currentWorkspace?->plan : null;
+
+        return ($plan ?? Plan::default())->throughputMultiplier();
+    }
+
+    /** @return list<Limit> */
+    private function apiLimits(Request $request): array
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+        $tokenId = $this->rateLimitTokenId($user?->currentAccessToken());
+        $workspaceId = $user?->currentWorkspace?->getKey();
+        $key = $tokenId ?: $request->ip();
+        $throughput = $this->planThroughput($user);
+
+        $limits = [
+            Limit::perMinute(600 * $throughput)->by('workspace:'.($workspaceId ?? $request->ip())),
+        ];
+
+        if (RequestAbility::isRead($request)) {
+            $limits[] = Limit::perMinute(300 * $throughput)->by("token:{$key}:read");
+        } else {
+            $limits[] = Limit::perMinute(60 * $throughput)->by("token:{$key}:write");
+        }
+
+        return $limits;
+    }
+
     private function configureRateLimiting(): void
     {
-        RateLimiter::for('api', function (Request $request): array {
-            /** @var User|null $user */
+        RateLimiter::for('api', fn (Request $request): array => $this->apiLimits($request));
+
+        RateLimiter::for('mcp', function (Request $request): Limit {
             $user = $request->user();
-            $tokenId = $this->rateLimitTokenId($user?->currentAccessToken());
-            $workspaceId = $user?->currentWorkspace?->getKey();
-            $key = $tokenId ?: $request->ip();
 
-            $limits = [
-                Limit::perMinute(600)->by('workspace:'.($workspaceId ?? $request->ip())),
-            ];
-
-            if (RequestAbility::isRead($request)) {
-                $limits[] = Limit::perMinute(300)->by("token:{$key}:read");
-            } else {
-                $limits[] = Limit::perMinute(60)->by("token:{$key}:write");
-            }
-
-            return $limits;
+            return Limit::perMinute(120 * $this->planThroughput($user))->by($user?->getAuthIdentifier() ?: $request->ip());
         });
-
-        RateLimiter::for('mcp', fn (Request $request) => Limit::perMinute(120)->by($request->user()?->id ?: $request->ip()));
 
         RateLimiter::for(
             'mcp-oauth',
@@ -592,33 +604,42 @@ final class AppServiceProvider extends ServiceProvider
             return Limit::perMinutes(1440, 240)->by('transcribe-workspace:'.($workspace?->getKey() ?? $request->ip()));
         });
 
-        RateLimiter::for('chat-send', function (Request $request) {
-            /** @var User|null $user */
-            $user = $request->user();
-            $workspace = $user?->currentWorkspace;
+        RateLimiter::for('chat-send', fn (Request $request): Limit|Unlimited => $this->chatSendLimit($request));
+    }
 
-            if ($workspace === null) {
-                return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
-            }
+    private function chatSendLimit(Request $request): Limit|Unlimited
+    {
+        /** @var User|null $user */
+        $user = $request->user();
+        $workspace = $user?->currentWorkspace;
 
-            return Limit::perMinute($workspace->plan->rateLimit())
-                ->by($workspace->getKey())
-                ->response(function (Request $request, array $headers) use ($workspace) {
-                    ChatTelemetry::rateLimited(
-                        workspaceId: (string) $workspace->getKey(),
-                        plan: $workspace->plan->value,
-                    );
+        if ($workspace === null) {
+            return Limit::perMinute(Plan::default()->rateLimit())->by('chat-anon');
+        }
 
-                    $seconds = (int) ($headers['Retry-After'] ?? 0);
+        $limit = resolve(Entitlements::class)->chatRateLimit($workspace);
 
-                    return response()->json([
-                        'error' => 'rate_limited',
-                        'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
-                        'retry_after_seconds' => $seconds,
-                        'plan' => $workspace->plan->value,
-                    ], 429, $headers);
-                });
-        });
+        if ($limit <= 0) {
+            return Limit::none();
+        }
+
+        return Limit::perMinute($limit)
+            ->by($workspace->getKey())
+            ->response(function (Request $request, array $headers) use ($workspace) {
+                ChatTelemetry::rateLimited(
+                    workspaceId: (string) $workspace->getKey(),
+                    plan: $workspace->plan->value,
+                );
+
+                $seconds = (int) ($headers['Retry-After'] ?? 0);
+
+                return response()->json([
+                    'error' => 'rate_limited',
+                    'message' => "You're sending messages quickly. You can send again in {$seconds} seconds.",
+                    'retry_after_seconds' => $seconds,
+                    'plan' => $workspace->plan->value,
+                ], 429, $headers);
+            });
     }
 
     private function configureScribe(): void
@@ -841,28 +862,6 @@ final class AppServiceProvider extends ServiceProvider
         ]);
 
         FilamentAsset::registerScriptData(['payloadTooLarge' => __('filament/panel.payload_too_large')]);
-    }
-
-    private function configureCommunityCounts(): void
-    {
-        Facades\View::composer(['components.layout.community-links', 'home.partials.hero', 'press'], function (View $view): void {
-            $gitHubService = resolve(GitHubService::class);
-            $starsCount = $gitHubService->getStarsCount();
-            $formattedStarsCount = $gitHubService->getFormattedStarsCount();
-
-            $view->with([
-                'githubStars' => $starsCount,
-                'formattedGithubStars' => $formattedStarsCount,
-            ]);
-        });
-
-        Facades\View::composer('components.layout.community-links', function (View $view): void {
-            $view->with('formattedDiscordMembers', resolve(DiscordService::class)->getFormattedMemberCount());
-        });
-
-        Facades\View::composer('home.partials.works-with', function (View $view): void {
-            $view->with('formattedDockerPulls', resolve(DockerHubService::class)->getFormattedPullCount());
-        });
     }
 
     private function configureMacros(): void

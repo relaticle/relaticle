@@ -9,7 +9,6 @@ use App\Jobs\PurgeWorkspace;
 use App\Models\Note;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Notifications\PaymentFailedNotification;
 use App\Notifications\UserDeletionReminderNotification;
 use App\Notifications\WorkspaceDeletionReminderNotification;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +16,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBody;
@@ -159,6 +159,8 @@ test('expired workspaces are permanently deleted', function () {
 });
 
 it('removes the payment failure notice of a purged workspace and keeps the owner\'s other notices', function (): void {
+    withHostedBilling();
+
     $owner = User::factory()->withWorkspace()->create();
     $doomed = $owner->currentWorkspace;
     $kept = Workspace::factory()->for($owner, 'owner')->create();

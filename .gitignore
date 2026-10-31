@@ -68,8 +68,11 @@ test-results.xml
 # in so workspace setup/archive scripts run consistently across the team.
 /.codex
 /.gemini
-/.amp
-/.agents
+/.amp/*
+!/.amp/services.yaml
+/.agents/*
+!/.agents/setup
+!/.agents/resume
 
 # business-review regression ledger is machine-local (~/.claude/business-review/); never commit it
 .claude/skills/business-review/regressions.json

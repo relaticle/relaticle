@@ -88,7 +88,7 @@
                             @if($canEdit)
                                 x-on:click="if (! ($event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey)) { $event.preventDefault(); $wire.mountAction('editTask', { task: @js($task->id) }) }"
                             @endif
-                            class="flex flex-1 items-center gap-3 py-3 pr-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+                            class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
                         >
                             <span
                                 class="flex-1 truncate text-sm transition duration-200 motion-reduce:transition-none"
@@ -96,9 +96,11 @@
                                 title="{{ $task->title }}"
                             >{{ $task->title }}</span>
                             @if($task->dueAt)
-                                <time datetime="{{ $task->dueAt->toDateString() }}" class="text-xs {{ $dateClass }}">
-                                    {{ $task->dueAt->isoFormat('MMM D, YYYY') }}
-                                </time>
+                                <time
+                                    datetime="{{ $task->dueAt->toDateString() }}"
+                                    title="{{ $task->dueAt->isoFormat('LL') }}"
+                                    class="shrink-0 whitespace-nowrap text-xs tabular-nums {{ $dateClass }}"
+                                >{{ $task->dueAt->isoFormat($task->dueAt->isSameYear(now($task->dueAt->timezone)) ? 'MMM D' : 'MMM D, YYYY') }}</time>
                             @endif
                         </a>
                     </div>

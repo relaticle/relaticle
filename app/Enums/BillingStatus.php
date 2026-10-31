@@ -24,8 +24,8 @@ use Laravel\Pennant\Feature;
  *
  * Read-only and derived. Nothing persists it. It is the one owner of billing
  * state: the access gate, the sidebar, the paused screen, and the ended email
- * all read it. `HostedWorkspaceAccess` only layers the billing feature flag on
- * top of `grantsAccess()`.
+ * all read it. `PlanEntitlements::allowsAccess()` returns `grantsAccess()`; with the
+ * billing flag off, `SelfHostedEntitlements` grants every workspace access.
  */
 enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 {
@@ -34,8 +34,6 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     case Subscribed = 'subscribed';
 
     case Enterprise = 'enterprise';
-
-    case Concierge = 'concierge';
 
     case Trialing = 'trialing';
 
@@ -77,10 +75,6 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 
         if ($workspace->plan === Plan::Enterprise) {
             return self::Enterprise;
-        }
-
-        if ($workspace->plan === Plan::Concierge) {
-            return self::Concierge;
         }
 
         if ($workspace->onGenericTrial()) {
@@ -167,7 +161,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     public function grantsAccess(): bool
     {
         return match ($this) {
-            self::PastDue, self::Subscribed, self::Enterprise, self::Concierge, self::Trialing, self::Grandfathered, self::Granted => true,
+            self::PastDue, self::Subscribed, self::Enterprise, self::Trialing, self::Grandfathered, self::Granted => true,
             self::SubscriptionEnded, self::TrialEnded, self::Free => false,
         };
     }
@@ -176,9 +170,8 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     {
         return match ($this) {
             self::PastDue => 'Past due',
-            self::Subscribed => 'Pro',
+            self::Subscribed => 'Subscribed',
             self::Enterprise => 'Enterprise',
-            self::Concierge => 'Concierge',
             self::Trialing => 'Trial',
             self::Grandfathered => 'Free (legacy)',
             self::SubscriptionEnded => 'Subscription ended',
@@ -197,9 +190,8 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     {
         return match ($this) {
             self::PastDue => 'Paid subscription whose latest charge failed. Access stays open until Stripe cancels it.',
-            self::Subscribed => 'Paying for Pro through a live Stripe subscription.',
+            self::Subscribed => 'Paying for Cloud Pro or Cloud Scale through a live Stripe subscription.',
             self::Enterprise => 'Put on the Enterprise plan by hand. No self-serve price exists for it.',
-            self::Concierge => 'Put on the Concierge plan by hand and invoiced outside Stripe Managed Payments.',
             self::Trialing => 'Running an unexpired Pro trial. Nothing has been charged yet.',
             self::Grandfathered => 'Existed before billing shipped, so hosted access stays free for good.',
             self::SubscriptionEnded => 'Paid subscription ended with nothing behind it. Hosted access is paused until the owner subscribes again.',
@@ -214,7 +206,7 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
         return match ($this) {
             self::PastDue, self::SubscriptionEnded, self::TrialEnded => 'danger',
             self::Subscribed => 'success',
-            self::Enterprise, self::Concierge => 'primary',
+            self::Enterprise => 'primary',
             self::Trialing => 'info',
             self::Grandfathered, self::Free => 'gray',
             self::Granted => 'warning',
@@ -236,7 +228,6 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
                 ->orWhere(self::managedPlanPastDue(...))),
             self::Subscribed => $query->whereHas('latestDefaultSubscription', self::valid(...)),
             self::Enterprise => $query->where('plan', Plan::Enterprise),
-            self::Concierge => $query->where('plan', Plan::Concierge),
             self::Trialing => $query->onGenericTrial(),
             self::Grandfathered => $query->whereNotNull('hosted_free_grandfathered_at'),
             // Any row, not the latest: a later abandoned checkout must not hide one that ended.

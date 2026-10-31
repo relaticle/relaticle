@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -19,6 +20,7 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Laravel\Cashier\Subscription;
+use Laravel\Pennant\Feature;
 use Laravel\Sanctum\PersonalAccessToken;
 use PragmaRX\Google2FAQRCode\Google2FA;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -159,6 +161,7 @@ describe('SystemAdmin Security', function () {
 
 describe('Administrator role', function () {
     beforeEach(function () {
+        Feature::define(Billing::class, true);
         Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 
         $this->administrator = SystemAdministrator::factory()->administrator()->create();
@@ -168,16 +171,16 @@ describe('Administrator role', function () {
     it('reads every panel index it is allowed to see', function (string $route) {
         $this->get($route)->assertOk();
     })->with([
-        'dashboard' => '/sysadmin',
+        'dashboard' => '/sysadmin/instance',
         'companies' => '/sysadmin/companies',
         'users' => '/sysadmin/users',
         'workspaces' => '/sysadmin/workspaces',
-        'subscriptions' => '/sysadmin/billing/subscriptions',
-        'ai credit balances' => '/sysadmin/ai/credit-balances',
         'activities' => '/sysadmin/activity',
-        'posts' => '/sysadmin/posts',
-        'categories' => '/sysadmin/categories',
-        'tags' => '/sysadmin/tags',
+        ...(class_exists('Relaticle\\Cloud\\CloudServiceProvider') ? [
+            'posts' => '/sysadmin/posts',
+            'categories' => '/sysadmin/categories',
+            'tags' => '/sysadmin/tags',
+        ] : []),
     ]);
 
     it('writes but never deletes', function (string $model) {

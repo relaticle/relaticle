@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 use App\Enums\CreationSource;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Dashboard;
 use App\Models\Company;
 use App\Models\User;
+use App\Services\SelfHostedEntitlements;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
-mutates(ModelRegistry::class, ModelAccess::class);
+mutates(ModelRegistry::class, ModelAccess::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 /**
  * @return array{
@@ -111,6 +114,8 @@ it('shows env-configured self-hosted models in the picker', function (): void {
 });
 
 it('locks premium models in the chat picker for a trial workspace without its own data', function (): void {
+    withHostedBilling();
+
     $this->user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
@@ -121,6 +126,8 @@ it('locks premium models in the chat picker for a trial workspace without its ow
 });
 
 it('locks premium models in the dashboard picker for a trial workspace without its own data', function (): void {
+    withHostedBilling();
+
     $this->user->currentWorkspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
 
     $state = pickerState(livewire(Dashboard::class)->html());
@@ -131,6 +138,8 @@ it('locks premium models in the dashboard picker for a trial workspace without i
 });
 
 it('keeps premium models locked without the trial flag on the free plan', function (): void {
+    withHostedBilling();
+
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
 
     expect($state['trialLocked'])->toBeFalse()
@@ -138,6 +147,8 @@ it('keeps premium models locked without the trial flag on the free plan', functi
 });
 
 it('unlocks premium models for a trial workspace once it holds its own record', function (): void {
+    withHostedBilling();
+
     $workspace = $this->user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->addDays(14)])->save();
     Company::factory()->create([
@@ -149,4 +160,42 @@ it('unlocks premium models for a trial workspace once it holds its own record', 
 
     expect($state['trialLocked'])->toBeFalse()
         ->and($state['allowedModels'])->toContain('claude-opus-5');
+});
+
+it('offers every configured model in the picker on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    useProFirstAutoChain();
+
+    $state = pickerState(Livewire::test(ChatInterface::class)->html());
+
+    expect($state['allowedModels'])->toContain('claude-opus-5');
+});
+
+it('keeps Pro-only models out of the picker for a billing-on Free workspace', function (): void {
+    withHostedBilling();
+    useProFirstAutoChain();
+
+    $state = pickerState(Livewire::test(ChatInterface::class)->html());
+
+    expect($state['allowedModels'])->not->toContain('claude-opus-5');
+});
+
+it('leaves the plan label out of the chat on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+
+    expect(html_entity_decode(Livewire::test(ChatInterface::class)->html()))->toContain('currentPlanLabel: null');
+});
+
+it('leaves the plan label out of the dashboard composer on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+
+    expect(html_entity_decode(livewire(Dashboard::class)->html()))->toContain('currentPlanLabel: null');
+});
+
+it('keeps the plan label in the chat when billing is on', function (): void {
+    withHostedBilling();
+
+    expect(html_entity_decode(Livewire::test(ChatInterface::class)->html()))
+        ->toContain("currentPlanLabel: '".Plan::Free->getLabel()."'")
+        ->not->toContain('currentPlanLabel: null');
 });

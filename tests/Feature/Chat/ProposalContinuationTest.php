@@ -364,6 +364,8 @@ it('hands the resume back when the queued turn finds a step still pending', func
 });
 
 it('skips the resume when the workspace is out of credits', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     AiCreditBalance::query()
@@ -378,6 +380,8 @@ it('skips the resume when the workspace is out of credits', function (): void {
 });
 
 it('charges one credit for the resumed turn', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     $before = AiCreditBalance::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->value('credits_remaining');

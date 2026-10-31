@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\WorkspaceSetupStep;
+use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
 use App\Models\Notification as NotificationRow;
@@ -38,10 +39,12 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Passport\AccessToken;
 use Laravel\Passport\Client;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -52,6 +55,7 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
+use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -59,7 +63,7 @@ PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature', 'Smoke', 'Browser');
+    ->in('Feature', 'Smoke', 'Browser', '../packages/Cloud/tests');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);
@@ -492,4 +496,23 @@ function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboa
     }
 
     return $created->fresh();
+}
+
+function useProFirstAutoChain(): void
+{
+    config()->set('chat.models', [
+        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0]),
+        ChatCatalog::entry(),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+}
+
+function withHostedBilling(): void
+{
+    if (! class_exists('Relaticle\Cloud\CloudServiceProvider')) {
+        test()->markTestSkipped('Hosted billing needs the cloud package.');
+    }
+
+    Feature::define(Billing::class, true);
+    Feature::purge(Billing::class);
 }

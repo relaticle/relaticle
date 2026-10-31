@@ -11,6 +11,7 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
 
 /**
  * Phase 2 of the No Dead Ends contract. GuideToPageTool escorts the user to a
@@ -103,7 +104,7 @@ final readonly class SearchDocsTool implements Tool
             return (string) json_encode([
                 'results' => [],
                 'note' => 'The documentation has no section on this. Tell the user it is not covered and '
-                    .'link the help centre: '.route('help.index'),
+                    .'link the help centre: '.DocUrl::area(DocUrl::HELP),
             ], JSON_UNESCAPED_SLASHES);
         }
 
@@ -328,7 +329,7 @@ final readonly class SearchDocsTool implements Tool
     private function readable(string $markdown): string
     {
         $text = preg_replace('/!\[[^\]]*]\([^)]*\)/', '', $markdown) ?? $markdown;
-        $text = preg_replace('/]\(\/(?!\/)/', ']('.rtrim(url('/'), '/').'/', $text) ?? $text;
+        $text = preg_replace('/]\(\/(?!\/)/', ']('.DocUrl::root().'/', $text) ?? $text;
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
         return Str::limit(trim($text), self::CONTENT_LIMIT);

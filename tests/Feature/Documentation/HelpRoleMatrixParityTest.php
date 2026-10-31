@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceCapability;
+use App\Features\Billing;
 use App\Support\Workspaces\RoleOptions;
+use Laravel\Pennant\Feature;
 use Relaticle\Documentation\Support\DocsRepository;
 
 mutates(RoleOptions::class);
@@ -36,6 +38,7 @@ function parseHelpRoleMatrix(string $markdown): array
 }
 
 test('the help page matrix renders every WorkspaceCapability label with the map\'s own Yes/No cells', function (): void {
+    Feature::define(Billing::class, true);
     $page = app(DocsRepository::class)->find('help/workspace/manage-members-and-roles');
 
     expect($page)->not->toBeNull();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Notifications;
 
+use App\Contracts\Entitlements;
 use App\Data\DigestPayload;
 use App\Data\DigestTaskItem;
 use App\Data\DigestWorkspaceSection;
@@ -12,7 +13,6 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use App\Support\CanonicalRecordUrl;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
 final readonly class DigestService
 {
     public function __construct(
-        private HostedWorkspaceAccess $hostedAccess,
+        private Entitlements $entitlements,
         private CanonicalRecordUrl $urls,
     ) {}
 
@@ -36,7 +36,7 @@ final readonly class DigestService
         $sections = [];
 
         foreach ($user->allWorkspaces() as $workspace) {
-            if ($this->hostedAccess->isPaused($workspace)) {
+            if (! $this->entitlements->allowsAccess($workspace)) {
                 continue;
             }
 

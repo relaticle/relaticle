@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Agents;
 
+use App\Contracts\Billing;
+use App\Contracts\Entitlements;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
@@ -43,11 +45,17 @@ use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
+use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
+use Relaticle\Chat\Tools\Email\RetryEmailTool;
+use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -441,6 +449,10 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 
     private function billingInstructions(): string
     {
+        if (! $this->metersCreditsWithBillingPage()) {
+            return "\n\n## AI credits\nThis installation does not meter AI credits and has no plans or credit purchases: say so when asked about credits, plans, or upgrades.";
+        }
+
         return <<<'PROMPT'
 
 
@@ -448,6 +460,13 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 - How many AI credits are left or used, the allowance, or when credits reset -> call GetCreditBalanceTool and state its figures. Never answer a credit count from the documentation or from memory. You cannot see which messages or members spent credits, so never offer a usage breakdown.
 - Seeing the plan, upgrading, changing the subscription, or buying more AI credits -> call GuideToPageTool with "billing" and give that link. Every member can open that page. Only a member whose capabilities include `billing.manage` can change the plan or buy credits there, so tell anyone else a workspace owner can.
 PROMPT;
+    }
+
+    private function metersCreditsWithBillingPage(): bool
+    {
+        return $this->workspace instanceof Workspace
+            && resolve(Entitlements::class)->metersCredits($this->workspace)
+            && resolve(Billing::class)->url($this->workspace) !== null;
     }
 
     /**
@@ -1002,7 +1021,13 @@ PROMPT;
             GetEmailTool::class,
             ListEmailAccountsTool::class,
             CreateEmailDraftTool::class,
+            UpdateEmailDraftTool::class,
+            DeleteEmailDraftTool::class,
             SendEmailTool::class,
+            SendEmailDraftTool::class,
+            CancelEmailTool::class,
+            RescheduleEmailTool::class,
+            RetryEmailTool::class,
         ];
     }
 

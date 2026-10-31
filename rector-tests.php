@@ -17,7 +17,7 @@ use RectorLaravel\Rector\StaticCall\CarbonToDateFacadeRector;
 
 return RectorConfig::configure()
     ->withCache(cacheDirectory: __DIR__.'/.cache/rector-tests')
-    ->withPaths([__DIR__.'/tests'])
+    ->withPaths([__DIR__.'/tests', __DIR__.'/packages/Cloud/tests'])
     ->withSkip([
         ChainExpectCallsRector::class,
         EnsureTypeChecksFirstRector::class,

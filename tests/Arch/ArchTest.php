@@ -128,10 +128,6 @@ arch('avoid mutation')
         'App\Health',
         'App\Http\Controllers\Chat',
         'App\Http\Controllers\Mcp',
-        // Extends Cashier's WebhookController, its documented handler
-        // extension point; PHP forbids a readonly class extending a
-        // non-readonly one.
-        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -203,9 +199,6 @@ arch('avoid inheritance')
         'App\Exceptions',
         'App\Filament',
         'App\Http\Controllers\Mcp',
-        // Overrides Cashier's subscription-created handler so an abandoned
-        // checkout does not consume the workspace's generic trial.
-        'App\Http\Controllers\Billing\StripeWebhookController',
         'App\Http\Requests',
         'App\Http\Resources',
         'App\Jobs',
@@ -266,6 +259,17 @@ $packageServiceLayers = [
     'Relaticle\Chat\Agents',
     'Relaticle\Chat\Services',
     'Relaticle\Chat\Support',
+    'Relaticle\Cloud\Admin\Actions',
+    'Relaticle\Cloud\Billing\Actions',
+    'Relaticle\Cloud\Billing\CreditPackCatalog',
+    'Relaticle\Cloud\Billing\Filament\BillingPanelHooks',
+    'Relaticle\Cloud\Billing\Listeners',
+    'Relaticle\Cloud\Billing\SidebarBillingState',
+    'Relaticle\Cloud\Billing\StripeBilling',
+    'Relaticle\Cloud\Docs\Support',
+    'Relaticle\Cloud\Entitlements',
+    'Relaticle\Cloud\Marketing\Services',
+    'Relaticle\Cloud\Marketing\Support',
     'Relaticle\Documentation\Support',
     'Relaticle\EmailIntegration\Actions',
     'Relaticle\EmailIntegration\Services',
@@ -337,6 +341,21 @@ foreach (['App\Http', 'App\Jobs', 'App\Policies', 'App\ActivityLog', 'App\Consol
         ->expect($appLayer)
         ->not
         ->toUse('Relaticle\EmailIntegration');
+}
+
+foreach ([
+    'App',
+    'Relaticle\Chat',
+    'Relaticle\Documentation',
+    'Relaticle\EmailIntegration',
+    'Relaticle\ImportWizard',
+    'Relaticle\OnboardSeed',
+    'Relaticle\SystemAdmin',
+] as $coreLayer) {
+    arch("{$coreLayer} stays free of the cloud package")
+        ->expect($coreLayer)
+        ->not
+        ->toUse('Relaticle\Cloud');
 }
 
 arch('email integration owns its controllers, jobs, policies and timeline entries')

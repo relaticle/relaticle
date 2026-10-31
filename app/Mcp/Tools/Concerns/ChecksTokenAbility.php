@@ -65,6 +65,14 @@ trait ChecksTokenAbility
         return array_any($grants, fn (EmailGrant $grant): bool => in_array($grant, $held, true));
     }
 
+    protected function roleAllowsAgentSend(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::EmailAgentSend);
+    }
+
     protected function connectionName(): string
     {
         $token = $this->currentToken();

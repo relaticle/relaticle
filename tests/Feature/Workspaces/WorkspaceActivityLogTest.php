@@ -542,7 +542,7 @@ test('a task row links to the modal that edits it', function (): void {
     livewire(ActivityLog::class)
         ->assertOk()
         ->assertSee('Renew the contract')
-        ->assertSee('tableActionRecord='.$task->getKey());
+        ->assertSee('tasks?task='.$task->getKey());
 });
 
 test('searching never reaches into another workspace records', function (): void {

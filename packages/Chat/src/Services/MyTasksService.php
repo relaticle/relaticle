@@ -81,8 +81,8 @@ final readonly class MyTasksService
 
         $urls = resolve(CanonicalRecordUrl::class);
 
-        return $rows->map(function (object $row) use ($urls, $workspace, $startOfToday, $startOfDayAfter): MyTaskItem {
-            $dueAt = $row->due_at !== null ? Date::parse($row->due_at) : null;
+        return $rows->map(function (object $row) use ($urls, $workspace, $timezone, $startOfToday, $startOfDayAfter): MyTaskItem {
+            $dueAt = $row->due_at !== null ? Date::parse($row->due_at)->setTimezone($timezone) : null;
 
             return new MyTaskItem(
                 id: (string) $row->id,

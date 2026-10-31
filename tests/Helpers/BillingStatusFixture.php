@@ -50,22 +50,21 @@ final class BillingStatusFixture
             ],
             'a managed plan whose own invoice is overdue reads Past due' => [
                 function (Workspace $workspace): void {
-                    config()->set('services.stripe.products.concierge', 'prod_concierge_fixture');
-                    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+                    config()->set('services.stripe.products.enterprise', 'prod_enterprise_fixture');
+                    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
                     Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::Managed->value])
-                        ->items()->create(['stripe_id' => 'si_fixture_overdue', 'stripe_product' => 'prod_concierge_fixture', 'stripe_price' => 'price_fixture_overdue', 'quantity' => 1]);
+                        ->items()->create(['stripe_id' => 'si_fixture_overdue', 'stripe_product' => 'prod_enterprise_fixture', 'stripe_price' => 'price_fixture_overdue', 'quantity' => 1]);
                 },
                 BillingStatus::PastDue,
             ],
-            'a managed plan with an overdue invoice for another managed plan still reads its plan' => [
+            'a managed plan with an overdue invoice for another product still reads its plan' => [
                 function (Workspace $workspace): void {
-                    config()->set('services.stripe.products.concierge', 'prod_concierge_fixture');
                     config()->set('services.stripe.products.enterprise', 'prod_enterprise_fixture');
-                    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+                    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
                     Subscription::factory()->pastDue()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::Managed->value])
-                        ->items()->create(['stripe_id' => 'si_fixture_other', 'stripe_product' => 'prod_enterprise_fixture', 'stripe_price' => 'price_fixture_other', 'quantity' => 1]);
+                        ->items()->create(['stripe_id' => 'si_fixture_other', 'stripe_product' => 'prod_other_fixture', 'stripe_price' => 'price_fixture_other', 'quantity' => 1]);
                 },
-                BillingStatus::Concierge,
+                BillingStatus::Enterprise,
             ],
             'an expired trial awaiting the nightly downgrade reads Trial ended, not Granted' => [
                 fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save(),
@@ -142,13 +141,9 @@ final class BillingStatusFixture
                 fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Enterprise])->save(),
                 BillingStatus::Enterprise,
             ],
-            'a concierge workspace reads Concierge' => [
-                fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Concierge])->save(),
-                BillingStatus::Concierge,
-            ],
-            'a concierge grant past an old trial date reads Concierge, not Trial ended' => [
-                fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Concierge, 'trial_ends_at' => now()->subHour()])->save(),
-                BillingStatus::Concierge,
+            'an enterprise grant past an old trial date reads Enterprise, not Trial ended' => [
+                fn (Workspace $workspace) => $workspace->forceFill(['plan' => Plan::Enterprise, 'trial_ends_at' => now()->subHour()])->save(),
+                BillingStatus::Enterprise,
             ],
             'a pre-billing workspace reads Free (legacy)' => [
                 fn (Workspace $workspace) => $workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save(),

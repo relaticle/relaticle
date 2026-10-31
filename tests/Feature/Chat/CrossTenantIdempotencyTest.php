@@ -9,6 +9,8 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
 it('allows the same idempotency key in two different workspaces', function (): void {
+    withHostedBilling();
+
     $userA = User::factory()->withPersonalWorkspace()->create();
     $userB = User::factory()->withPersonalWorkspace()->create();
 

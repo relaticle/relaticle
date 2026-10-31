@@ -79,6 +79,9 @@ it('returns 422 when document text is empty', function (): void {
 });
 
 it('returns 402 on send when credit balance is insufficient', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -136,6 +139,9 @@ it('returns 422 when document text exceeds 5000 characters', function (): void {
 });
 
 it('does not consume a credit on send when the document is empty', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -154,6 +160,9 @@ it('does not consume a credit on send when the document is empty', function (): 
 });
 
 it('does not consume a credit on send when the document text is too long', function (): void {
+    withHostedBilling();
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -209,7 +218,9 @@ it('returns 403 when the user has no current workspace', function (): void {
 });
 
 it('rate-limits createConversation per workspace plan', function (): void {
+    withHostedBilling();
     $user = User::factory()->withPersonalWorkspace()->create();
+    $user->currentWorkspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     actingAs($user);
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [
