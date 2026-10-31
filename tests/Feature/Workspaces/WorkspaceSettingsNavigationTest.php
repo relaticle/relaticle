@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Billing as BillingContract;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\EditWorkspace;
@@ -227,6 +228,14 @@ test('the custom fields table renders a field name as text, never as markup', fu
 
 test('the tab strip drops billing when the feature is off', function (): void {
     Feature::define(BillingFeature::class, false);
+
+    expect(workspaceTabLabels(resolve(EditWorkspace::class)))
+        ->not->toContain(__('workspaces.tabs.billing'));
+});
+
+test('the tab strip drops billing when no provider offers a billing page', function (): void {
+    withHostedBilling();
+    app()->instance(BillingContract::class, new NoBilling);
 
     expect(workspaceTabLabels(resolve(EditWorkspace::class)))
         ->not->toContain(__('workspaces.tabs.billing'));
