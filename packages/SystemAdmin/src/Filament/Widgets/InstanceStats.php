@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Cache;
 
 final class InstanceStats extends StatsOverviewWidget
 {
@@ -23,12 +24,17 @@ final class InstanceStats extends StatsOverviewWidget
      */
     protected function getStats(): array
     {
-        return [
-            Stat::make(__('instance.stats.users'), number_format(User::query()->count())),
-            Stat::make(__('instance.stats.workspaces'), number_format(Workspace::query()->count())),
-            Stat::make(__('instance.stats.companies'), number_format(Company::query()->count())),
-            Stat::make(__('instance.stats.people'), number_format(People::query()->count())),
-            Stat::make(__('instance.stats.opportunities'), number_format(Opportunity::query()->count())),
-        ];
+        $counts = Cache::remember('sysadmin.instance-stats', now()->addMinute(), fn (): array => [
+            'users' => User::query()->count(),
+            'workspaces' => Workspace::query()->count(),
+            'companies' => Company::query()->count(),
+            'people' => People::query()->count(),
+            'opportunities' => Opportunity::query()->count(),
+        ]);
+
+        return array_map(
+            fn (string $key): Stat => Stat::make(__("instance.stats.{$key}"), number_format($counts[$key])),
+            array_keys($counts),
+        );
     }
 }
