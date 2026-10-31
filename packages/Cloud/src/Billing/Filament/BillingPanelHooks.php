@@ -9,7 +9,6 @@ use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\SidebarBillingState;
@@ -20,10 +19,7 @@ final readonly class BillingPanelHooks
 
     public function upgradeModal(): string
     {
-        $workspace = Filament::getTenant();
-        $user = Auth::user();
-
-        if (! Feature::active(BillingFeature::class) || ! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
+        if (! Feature::active(BillingFeature::class) || ! $this->billingManagedWorkspace() instanceof Workspace) {
             return '';
         }
 
@@ -32,19 +28,25 @@ final readonly class BillingPanelHooks
 
     public function sidebarBilling(): string
     {
-        $workspace = Filament::getTenant();
-        $user = Filament::auth()->user();
-
-        if (! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
-            return '';
-        }
-
-        $billing = $this->sidebarState->for($workspace);
+        $workspace = $this->billingManagedWorkspace();
+        $billing = $workspace instanceof Workspace ? $this->sidebarState->for($workspace) : null;
 
         if ($billing === null) {
             return '';
         }
 
         return view('cloud::filament.app.sidebar-billing', ['billing' => $billing, 'workspace' => $workspace])->render();
+    }
+
+    private function billingManagedWorkspace(): ?Workspace
+    {
+        $workspace = Filament::getTenant();
+        $user = Filament::auth()->user();
+
+        if (! $workspace instanceof Workspace || ! $user instanceof User) {
+            return null;
+        }
+
+        return $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) ? $workspace : null;
     }
 }
