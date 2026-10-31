@@ -72,6 +72,15 @@ return [
         'requested' => 'Requested',
         'opening' => 'Opening…',
     ],
+    'categories' => [
+        'scheduling' => 'Scheduling',
+        'marketing' => 'Marketing',
+        'invoice' => 'Invoice',
+        'support' => 'Support',
+        'sales' => 'Sales',
+        'personal' => 'Personal',
+        'other' => 'Other',
+    ],
     'pending_access' => [
         'heading' => '{1}1 pending access request|[2,*]:count pending access requests',
         'unknown_user' => 'Unknown user',
