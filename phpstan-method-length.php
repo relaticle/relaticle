@@ -88,7 +88,7 @@ return [
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::companyTeamRecipientOptions' => 62,
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::send' => 73,
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::sendMass' => 88,
-                'Relaticle\EmailIntegration\Livewire\OutboxTable::table' => 67,
+                'Relaticle\EmailIntegration\Livewire\OutboxTable::table' => 65,
                 'Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder::embed' => 77,
                 'Relaticle\EmailIntegration\Services\EmailVisibilityService::connectionFor' => 70,
                 'Relaticle\EmailIntegration\Services\Factories\NormalizedMeetingPayloadFactory::fromCalendarEvent' => 73,
