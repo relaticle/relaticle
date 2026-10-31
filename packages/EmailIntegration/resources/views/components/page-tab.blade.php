@@ -14,7 +14,7 @@
     <x-filament::icon :icon="$tab->getIcon()" class="h-4 w-4 shrink-0" wire:loading.remove wire:target="setTab('{{ $tab->value }}')" />
     <x-filament::loading-indicator class="h-4 w-4 shrink-0" wire:loading wire:target="setTab('{{ $tab->value }}')" />
     {{ $tab->getLabel() }}
-    @if ($badge !== null)
+    @if ($badge > 0)
         <span @class([
             'rounded px-1.5 py-0.5 text-[11px] font-semibold leading-none tabular-nums',
             'bg-gray-200 text-gray-700 dark:bg-white/10 dark:text-gray-200' => $active,
