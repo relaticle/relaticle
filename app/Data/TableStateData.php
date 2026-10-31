@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data;
 
+use Illuminate\Support\Arr;
 use Spatie\LaravelData\Data;
 
 final class TableStateData extends Data
@@ -38,14 +39,10 @@ final class TableStateData extends Data
     }
 
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
-    // Hashes stored before pins or labels existed carry neither key, so an empty one is left out.
+    // Hashes stored before pins existed carry no pinned key, so an empty one is left out.
     public function hash(): string
     {
-        $state = array_filter(
-            $this->toArray(),
-            fn (mixed $value, string $key): bool => ! in_array($key, ['labels', 'pinned'], true) || $value !== [],
-            ARRAY_FILTER_USE_BOTH,
-        );
+        $state = $this->pinned === [] ? Arr::except($this->toArray(), 'pinned') : $this->toArray();
 
         return hash('xxh128', json_encode(self::sortKeys($state), JSON_THROW_ON_ERROR));
     }
