@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Console\Commands\InstallCommand;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -44,7 +45,7 @@ it('completes installation without demo data and system admin', function (): voi
         ->expectsOutputToContain('Environment Setup completed')
         ->expectsOutputToContain('Database completed')
         ->expectsOutputToContain('Relaticle installed successfully!')
-        ->expectsOutputToContain('Documentation: https://relaticle.com/developers')
+        ->expectsOutputToContain('Documentation: '.DocUrl::area(DocUrl::DOCS))
         ->assertSuccessful();
 
     // Verify .env was modified in temp file
