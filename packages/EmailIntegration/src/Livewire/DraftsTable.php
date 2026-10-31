@@ -28,7 +28,6 @@ use Livewire\Attributes\On;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 
@@ -44,17 +43,6 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
 
     private ?bool $hasMailbox = null;
 
-    /**
-     * @return list<ConnectMailboxAction>
-     */
-    private function connectMailboxActions(): array
-    {
-        return [
-            ConnectMailboxAction::make()->hidden(fn (): bool => $this->hasMailbox()),
-            ConnectMailboxAction::microsoft()->hidden(fn (): bool => $this->hasMailbox()),
-        ];
-    }
-
     public function table(Table $table): Table
     {
         $composeEmail = $this->composeEmailAction();
@@ -63,19 +51,10 @@ final class DraftsTable extends Component implements HasActions, HasSchemas, Has
             ->query($this->buildQuery())
             ->defaultSort('updated_at', 'desc')
             ->headerActions([$composeEmail])
-            ->emptyStateHeading(fn (): string => $this->hasMailbox()
-                ? __('filament/pages/email-inbox.drafts.empty.heading')
-                : __('filament/pages/email-accounts.not_connected.inbox.heading'))
-            ->emptyStateDescription(fn (): string => $this->hasMailbox()
-                ? __('filament/pages/email-inbox.drafts.empty.description')
-                : __('filament/pages/email-accounts.not_connected.inbox.description'))
-            ->emptyStateIcon(fn (): Heroicon => $this->hasMailbox()
-                ? Heroicon::OutlinedPencilSquare
-                : Heroicon::OutlinedEnvelope)
-            ->emptyStateActions([
-                $composeEmail,
-                ...$this->connectMailboxActions(),
-            ])
+            ->emptyStateHeading(__('filament/pages/email-inbox.drafts.empty.heading'))
+            ->emptyStateDescription(__('filament/pages/email-inbox.drafts.empty.description'))
+            ->emptyStateIcon(Heroicon::OutlinedPencilSquare)
+            ->emptyStateActions([$composeEmail])
             ->recordAction('openDraft')
             ->columns([
                 TextColumn::make('subject')

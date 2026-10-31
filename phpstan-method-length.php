@@ -84,7 +84,7 @@ return [
                 'Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob::handle' => 67,
                 'Relaticle\EmailIntegration\Jobs\InitialSyncPageStoreBatch::dispatchEmails' => 75,
                 'Relaticle\EmailIntegration\Jobs\StoreEmailJob::handle' => 68,
-                'Relaticle\EmailIntegration\Livewire\DraftsTable::table' => 96,
+                'Relaticle\EmailIntegration\Livewire\DraftsTable::table' => 87,
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::companyTeamRecipientOptions' => 62,
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::send' => 73,
                 'Relaticle\EmailIntegration\Livewire\EmailComposer::sendMass' => 88,
