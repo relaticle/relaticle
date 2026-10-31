@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Contracts\Entitlements;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use App\Support\CurrentWorkspace;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -148,7 +148,7 @@ final class ProcessChatMessage implements ShouldQueue
 
         $this->workspace->refresh();
 
-        if (resolve(HostedWorkspaceAccess::class)->isPaused($this->workspace)) {
+        if (! resolve(Entitlements::class)->allowsAccess($this->workspace)) {
             $creditService->refundReservation(
                 $this->workspace,
                 resolutionKey: $this->resolutionKey(),

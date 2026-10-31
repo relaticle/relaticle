@@ -3,14 +3,24 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Date;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditPeriodResolver;
+use Relaticle\Chat\Services\CreditService;
 
-mutates(ResetCreditsCommand::class, CreditPeriodResolver::class);
+mutates(ResetCreditsCommand::class, CreditPeriodResolver::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
+
+beforeEach(function (): void {
+    Feature::define(Billing::class, true);
+});
 
 it('resets credits for workspaces whose billing period has ended', function (): void {
     // Pinned mid-month: on the 31st, now()->subMonth() overflows forward (31 Jul -> 1 Jul),
@@ -34,6 +44,31 @@ it('resets credits for workspaces whose billing period has ended', function (): 
     expect($balance->credits_remaining)->toBe(Plan::Free->credits());
     expect($balance->credits_used)->toBe(0);
     expect($balance->period_ends_at->greaterThan(now()))->toBeTrue();
+});
+
+it('leaves an expired self-hosted balance untouched', function (): void {
+    Feature::define(Billing::class, false);
+    $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 0,
+        'credits_used' => 100,
+        'period_starts_at' => now()->subMonths(2)->startOfMonth(),
+        'period_ends_at' => now()->subMonth()->endOfMonth(),
+    ]);
+    $ledgerRowsBefore = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count();
+
+    $this->artisan('chat:reset-credits')->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
+    expect($balance->credits_remaining)->toBe(0)
+        ->and($balance->credits_used)->toBe(100)
+        ->and($balance->period_ends_at->lessThan(now()))->toBeTrue()
+        ->and(AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count())->toBe($ledgerRowsBefore);
 });
 
 it('does not reset credits for workspaces whose period has not yet ended', function (): void {

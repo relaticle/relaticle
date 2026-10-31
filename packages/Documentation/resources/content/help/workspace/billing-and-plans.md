@@ -2,7 +2,7 @@
 title: Billing and plans
 description: Relaticle Cloud is priced per workspace, never per seat. Trials, subscriptions, credits, and pausing explained.
 order: 3
-updated: "2026-10-27"
+updated: "2026-10-30"
 related: [help/ai-assistant/ai-credits-and-limits, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -65,6 +65,6 @@ period. What credits are and what messages cost is covered in
 
 Relaticle is open source (AGPL-3.0). Self-hosted installs are free forever,
 with no subscription and no workspace pausing, and AI runs on your own
-provider keys. The assistant still meters credits there: a workspace gets
-300 a month by default, which the operator can raise. See the
-[Self-Hosting Guide](/developers/self-hosting).
+provider keys. The assistant does not meter credits there. Only a per-minute
+send limit applies, which defaults to 60 and which the operator can change.
+See the [Self-Hosting Guide](/developers/self-hosting).

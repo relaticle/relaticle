@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Actions\Chat\SeedWorkspaceCreditBalance;
-use App\Enums\BillingStatus;
-use App\Enums\Plan;
+use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +19,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 
 final readonly class CreditService
 {
-    public function __construct(private ModelRegistry $registry, private CreditPeriodResolver $periods) {}
+    public function __construct(private ModelRegistry $registry, private CreditPeriodResolver $periods, private Entitlements $entitlements) {}
 
     public function hasCredits(Workspace $workspace): bool
     {
@@ -41,18 +40,15 @@ final readonly class CreditService
      */
     public function reserveCredit(Workspace $workspace, ?string $reservationKey = null, ?string $conversationId = null, ?string $userId = null): bool
     {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return true;
+        }
+
         $this->ensureBalance($workspace);
 
         return DB::transaction(function () use ($workspace, $reservationKey, $conversationId, $userId): bool {
-            if ($reservationKey !== null) {
-                $alreadyReserved = AiCreditTransaction::query()
-                    ->where('workspace_id', $workspace->getKey())
-                    ->where('idempotency_key', $reservationKey)
-                    ->exists();
-
-                if ($alreadyReserved) {
-                    return true;
-                }
+            if ($this->isRecorded($workspace, $reservationKey)) {
+                return true;
             }
 
             $balance = AiCreditBalance::query()
@@ -100,6 +96,10 @@ final readonly class CreditService
      */
     public function refundReservation(Workspace $workspace, int $credits = 1, string $resolutionKey = '', ?string $conversationId = null): void
     {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return;
+        }
+
         $this->recordResolution(
             workspace: $workspace,
             resolutionKey: $resolutionKey,
@@ -208,6 +208,14 @@ final readonly class CreditService
         return resolve(SeedWorkspaceCreditBalance::class)->execute($workspace);
     }
 
+    private function isRecorded(Workspace $workspace, ?string $idempotencyKey): bool
+    {
+        return $idempotencyKey !== null && AiCreditTransaction::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('idempotency_key', $idempotencyKey)
+            ->exists();
+    }
+
     public function deduct(
         Workspace $workspace,
         User $user,
@@ -219,11 +227,11 @@ final readonly class CreditService
         ?string $conversationId = null,
         ?string $idempotencyKey = null,
     ): void {
-        if ($idempotencyKey !== null && AiCreditTransaction::query()
-            ->where('workspace_id', $workspace->getKey())
-            ->where('idempotency_key', $idempotencyKey)
-            ->exists()
-        ) {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return;
+        }
+
+        if ($this->isRecorded($workspace, $idempotencyKey)) {
             return;
         }
 
@@ -288,6 +296,10 @@ final readonly class CreditService
         int $reservedCredits = 1,
         string $resolutionKey = '',
     ): void {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return;
+        }
+
         $creditsCharged = $this->calculateCredits($model, $toolCallsCount);
         $adjustment = $creditsCharged - $reservedCredits;
 
@@ -322,6 +334,10 @@ final readonly class CreditService
         ?string $model = null,
         ?TextUsage $usage = null,
     ): void {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return;
+        }
+
         if ($model === null || ! $usage instanceof TextUsage) {
             $this->recordResolution(
                 workspace: $workspace,
@@ -471,21 +487,15 @@ final readonly class CreditService
 
     public function allowanceFor(Workspace $workspace): int
     {
-        $workspace->loadMissing('subscriptions');
-
-        if (! $workspace->plan->isManaged() && $workspace->subscription()?->pastDue() === true) {
-            return Plan::Free->credits();
-        }
-
-        if ($workspace->billingStatus() === BillingStatus::TrialEnded) {
-            return Plan::Free->credits();
-        }
-
-        return $workspace->plan->credits();
+        return $this->entitlements->creditAllowance($workspace);
     }
 
     public function resetPeriod(Workspace $workspace, ?string $sysadminId = null): void
     {
+        if (! $this->entitlements->metersCredits($workspace)) {
+            return;
+        }
+
         DB::transaction(function () use ($workspace, $sysadminId): void {
             $plan = $workspace->plan;
             $allowance = $this->allowanceFor($workspace);

@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -37,6 +39,9 @@ it('rejects unauthenticated requests', function (): void {
 });
 
 it('returns 402 when credits are exhausted on send', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -236,6 +241,9 @@ it('returns the conversation id so the client can subscribe', function (): void 
 });
 
 it('atomically reserves a credit on send so concurrent sends cannot overspend', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     AiCreditBalance::query()
         ->where('workspace_id', $this->workspace->getKey())
         ->update(['credits_remaining' => 1, 'credits_used' => 99]);
@@ -264,6 +272,9 @@ it('atomically reserves a credit on send so concurrent sends cannot overspend', 
 });
 
 it('does not reserve a credit on send when the request fails validation', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -279,6 +290,9 @@ it('does not reserve a credit on send when the request fails validation', functi
 });
 
 it('returns reset_on and upgrade_url on 402 from send', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Billing;
 
+use App\Contracts\Entitlements;
 use App\Filament\Pages\Billing;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Carbon\CarbonInterface;
 use InvalidArgumentException;
 
@@ -15,7 +15,7 @@ final readonly class CreateProCheckout
     /** @var list<string> */
     public const array INTERVALS = ['monthly', 'yearly'];
 
-    public function __construct(private HostedWorkspaceAccess $hostedAccess) {}
+    public function __construct(private Entitlements $entitlements) {}
 
     /**
      * Create the hosted Stripe Checkout session and return its redirect URL.
@@ -34,7 +34,7 @@ final readonly class CreateProCheckout
             : $builder->skipTrial();
 
         return (string) $builder
-            ->checkout($this->sessionOptions($workspace, $this->hostedAccess->isPaused($workspace)))
+            ->checkout($this->sessionOptions($workspace, ! $this->entitlements->allowsAccess($workspace)))
             ->asStripeCheckoutSession()
             ->url;
     }

@@ -2,11 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\User;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+
+beforeEach(function (): void {
+    Feature::define(Billing::class, true);
+});
 
 it('writes a Refund transaction row when refundReservation is called', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Http\Request;
@@ -33,7 +33,7 @@ final readonly class EnsureHostedWorkspaceAccess
      */
     private const array BROWSER_NAVIGATION_ROUTES = ['chat.record-redirect', 'chat.attachments.import'];
 
-    public function __construct(private HostedWorkspaceAccess $access) {}
+    public function __construct(private Entitlements $entitlements) {}
 
     /**
      * Handle an incoming request.
@@ -44,7 +44,7 @@ final readonly class EnsureHostedWorkspaceAccess
     {
         $workspace = $this->resolveWorkspace($request);
 
-        if (! $workspace instanceof Workspace || $this->access->allows($workspace)) {
+        if (! $workspace instanceof Workspace || $this->entitlements->allowsAccess($workspace)) {
             return $next($request);
         }
 

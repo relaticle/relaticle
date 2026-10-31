@@ -2,16 +2,22 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
+use App\Services\Billing\PlanEntitlements;
+use App\Services\SelfHostedEntitlements;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\AiModelResolver;
-use Relaticle\Chat\Services\ModelAccess;
 use Relaticle\Chat\Services\ModelRegistry;
 use Tests\Helpers\ChatCatalog;
 
-mutates(AiModelResolver::class, ModelRegistry::class);
+mutates(AiModelResolver::class, ModelRegistry::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('falls back to Sonnet when the users preference is not allowed by their plan', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->ai_preferences = ['default_model' => 'claude-opus-5'];
     $user->save();
@@ -23,6 +29,8 @@ it('falls back to Sonnet when the users preference is not allowed by their plan'
 });
 
 it('honors the users preference when their plan allows it', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace->plan = Plan::Pro;
     $user->currentWorkspace->save();
@@ -36,6 +44,8 @@ it('honors the users preference when their plan allows it', function (): void {
 });
 
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5.5');
@@ -103,6 +113,8 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
 });
 
 it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
+    Feature::define(Billing::class, true);
+
     config()->set('ai.providers.anthropic.key', null);
     config()->set('chat.ollama.model', null);
     app()->forgetInstance(ModelRegistry::class);
@@ -151,6 +163,8 @@ it('labels explicit and auto resolutions', function (): void {
 });
 
 it('fails over to the next available chain entry', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
 
@@ -171,6 +185,8 @@ it('returns null once the auto chain is exhausted', function (): void {
 });
 
 it('does not fail over to a premium model for a locked trial', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [
         ChatCatalog::entry(),
@@ -183,6 +199,8 @@ it('does not fail over to a premium model for a locked trial', function (): void
 });
 
 it('fails over to a premium model for a paid Pro workspace', function (): void {
+    Feature::define(Billing::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     config()->set('chat.models', [
         ChatCatalog::entry(),
@@ -206,8 +224,23 @@ it('throws a clear error when no chat model is configured', function (): void {
         'chat.self_hosted' => ['url' => null, 'key' => '', 'models' => null],
     ]);
 
-    $resolver = new AiModelResolver(new ModelRegistry, new ModelAccess);
+    $resolver = new AiModelResolver(new ModelRegistry, resolve(Entitlements::class));
 
     expect(fn (): array => $resolver->resolve($user))
         ->toThrow(RuntimeException::class, 'No chat model is configured');
+});
+
+it('fails over to a Pro-only model on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    config()->set('chat.models', [
+        ChatCatalog::entry(),
+        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'auto' => true]),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    $next = resolve(AiModelResolver::class)->failoverNext($user, 'claude-sonnet-5');
+
+    expect($next)->not->toBeNull()
+        ->and($next['id'])->toBe('claude-opus-5');
 });
