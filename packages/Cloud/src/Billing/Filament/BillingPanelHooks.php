@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Filament;
 
+use App\Enums\BillingStatus;
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Blade;
-use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\SidebarBillingState;
 
 final readonly class BillingPanelHooks
@@ -19,7 +18,7 @@ final readonly class BillingPanelHooks
 
     public function upgradeModal(): string
     {
-        if (! Feature::active(BillingFeature::class) || ! $this->billingManagedWorkspace() instanceof Workspace) {
+        if (! BillingStatus::billingEnabled() || ! $this->billingManagedWorkspace() instanceof Workspace) {
             return '';
         }
 
