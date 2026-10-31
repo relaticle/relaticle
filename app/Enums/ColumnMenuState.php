@@ -15,5 +15,7 @@ enum ColumnMenuState: string
     case RightTarget = 'before.right';
     case CanMoveLeft = 'canMoveLeft';
     case CanMoveRight = 'canMoveRight';
+    case Movable = 'movable';
+    case Pinned = 'pinned';
     case Hideable = 'hideable';
 }
