@@ -550,9 +550,11 @@ final class AppServiceProvider extends ServiceProvider
         };
     }
 
-    private function planThroughput(?User $user): int
+    private function planThroughput(?Authenticatable $user): int
     {
-        return ($user?->currentWorkspace->plan ?? Plan::default())->throughputMultiplier();
+        $plan = $user instanceof User ? $user->currentWorkspace?->plan : null;
+
+        return ($plan ?? Plan::default())->throughputMultiplier();
     }
 
     /** @return list<Limit> */
@@ -583,10 +585,9 @@ final class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api', fn (Request $request): array => $this->apiLimits($request));
 
         RateLimiter::for('mcp', function (Request $request): Limit {
-            /** @var User|null $user */
             $user = $request->user();
 
-            return Limit::perMinute(120 * $this->planThroughput($user))->by($user?->getKey() ?: $request->ip());
+            return Limit::perMinute(120 * $this->planThroughput($user))->by($user?->getAuthIdentifier() ?: $request->ip());
         });
 
         RateLimiter::for(
