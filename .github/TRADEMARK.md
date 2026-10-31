@@ -1,6 +1,6 @@
 # Trademark Policy
 
-Relaticle Inc owns the Relaticle name and logo (the "Marks"). The [AGPL-3.0 license](../LICENSE) governs the code. This policy governs the Marks. It takes away none of the rights the license gives you over the code.
+Relaticle Inc owns the Relaticle name and logo (the "Marks"). The [LICENSE](../LICENSE) file governs the code: AGPL-3.0 everywhere except `packages/Cloud`, which carries its own license. This policy governs the Marks. It takes away none of the rights those licenses give you over the code.
 
 The goal is simple: when someone sees the Relaticle name, they should be able to trust it means software and services from us.
 
@@ -23,12 +23,13 @@ The goal is simple: when someone sees the Relaticle name, they should be able to
 
 ## If you host or fork Relaticle for others
 
-The license lets you do this. The Marks are what you leave behind:
+The AGPL-3.0 lets you do this. Two things stay behind: the code in `packages/Cloud` and the Marks.
 
-1. Choose your own name and logo, and remove ours from the interface, the marketing pages, and outgoing emails.
-2. Do not copy relaticle.com marketing copy, screenshots, or pricing pages.
-3. You may state the origin factually, for example: "Based on Relaticle, an open source CRM. Not affiliated with or endorsed by Relaticle Inc."
-4. Under section 13 of the AGPL-3.0, offer the source of your modified version to every user who interacts with it over a network.
+1. Leave out `packages/Cloud`. Its license allows production use only under an agreement with Relaticle Inc. The official Docker image already ships without it.
+2. Choose your own name and logo, and remove ours from the interface, the marketing pages, and outgoing emails.
+3. Do not copy relaticle.com marketing copy, screenshots, or pricing pages.
+4. You may state the origin factually, for example: "Based on Relaticle, an open source CRM. Not affiliated with or endorsed by Relaticle Inc."
+5. Under section 13 of the AGPL-3.0, offer the source of your modified version to every user who interacts with it over a network.
 
 ## Contact
 
