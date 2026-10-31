@@ -28,17 +28,17 @@ final readonly class DocUrl
 
     public static function helpPage(string $category, string $slug): string
     {
-        return self::root()."/help/{$category}/{$slug}";
+        return self::area(self::HELP)."/{$category}/{$slug}";
     }
 
     public static function helpCategory(string $category): string
     {
-        return self::root()."/help/{$category}";
+        return self::area(self::HELP)."/{$category}";
     }
 
     public static function docsPage(string $slug): string
     {
-        return self::root()."/developers/{$slug}";
+        return self::area(self::DOCS)."/{$slug}";
     }
 
     public static function page(DocPage $page): string
