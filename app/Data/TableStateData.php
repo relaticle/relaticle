@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data;
 
+use Illuminate\Support\Arr;
 use Spatie\LaravelData\Data;
 
 final class TableStateData extends Data
@@ -14,6 +15,7 @@ final class TableStateData extends Data
      * @param  array<string, mixed>  $columnSearches
      * @param  array<string, int>  $widths
      * @param  array<string, string>  $labels
+     * @param  list<string>  $pinned
      */
     public function __construct(
         public array $columns = [],
@@ -25,6 +27,7 @@ final class TableStateData extends Data
         public int|string|null $perPage = null,
         public array $widths = [],
         public array $labels = [],
+        public array $pinned = [],
     ) {}
 
     public function withoutWidths(): self
@@ -36,9 +39,12 @@ final class TableStateData extends Data
     }
 
     // jsonb reorders object keys, so a stored state only hashes like the live one with keys sorted.
+    // Hashes stored before pins existed carry no pinned key, so an empty one is left out.
     public function hash(): string
     {
-        return hash('xxh128', json_encode(self::sortKeys($this->toArray()), JSON_THROW_ON_ERROR));
+        $state = $this->pinned === [] ? Arr::except($this->toArray(), 'pinned') : $this->toArray();
+
+        return hash('xxh128', json_encode(self::sortKeys($state), JSON_THROW_ON_ERROR));
     }
 
     /**

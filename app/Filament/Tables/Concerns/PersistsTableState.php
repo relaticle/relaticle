@@ -55,6 +55,7 @@ trait PersistsTableState
         $this->tableRecordsPerPage = blank($this->tableRecordsPerPage) ? $initial->perPage : $this->tableRecordsPerPage;
         $this->tableColumnWidths = $this->storedTablePreference()?->state->widths ?? [];
         $this->tableColumnLabels = $initial->labels;
+        $this->tablePinnedColumns = $initial->pinned;
     }
 
     public function bootedInteractsWithTable(): void
@@ -116,7 +117,10 @@ trait PersistsTableState
     {
         $this->tableColumnLabels = array_intersect_key($state->labels, $this->getTable()->getColumns());
         $this->cachedDefaultTableColumnState = null;
+        $this->tablePinnedColumns = $state->pinned;
         $this->applyTableColumnManager($this->tableColumnsFrom($state), wasReordered: true);
+        // The pins were stamped at boot, and this request renders the new ones.
+        $this->getTable()->resizableColumns();
 
         $this->tableSort = $state->sort;
         $this->updatedTableSort();
@@ -293,6 +297,7 @@ trait PersistsTableState
             perPage: $this->tableRecordsPerPage,
             widths: array_intersect_key($this->tableColumnWidths, $this->getTable()->getColumns()),
             labels: $this->tableColumnLabels,
+            pinned: $this->tablePinnedColumns,
         );
     }
 }

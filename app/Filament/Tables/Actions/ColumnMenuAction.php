@@ -19,7 +19,7 @@ final class ColumnMenuAction extends Action
 
     private ?ColumnMenuState $enabledWhen = null;
 
-    private ?ColumnMenuState $visibleWhen = null;
+    private ?string $visibleWhen = null;
 
     protected function setUp(): void
     {
@@ -30,7 +30,7 @@ final class ColumnMenuAction extends Action
         $this->extraAttributes(fn (): array => array_filter([
             'data-label' => e($this->getLabel()),
             ...$this->disabledAttributes(),
-            'x-bind:style' => $this->visibleWhen instanceof ColumnMenuState ? "{ display: {$this->visibleWhen->value} ? null : 'none' }" : null,
+            'x-bind:style' => $this->visibleWhen === null ? null : "{ display: {$this->visibleWhen} ? null : 'none' }",
         ]));
     }
 
@@ -65,9 +65,21 @@ final class ColumnMenuAction extends Action
 
     public function visibleWhen(ColumnMenuState $state): static
     {
-        $this->visibleWhen = $state;
+        $this->visibleWhen = $state->value;
 
         return $this;
+    }
+
+    public function hiddenWhen(ColumnMenuState $state): static
+    {
+        $this->visibleWhen = "! {$state->value}";
+
+        return $this;
+    }
+
+    public function getVisibleWhen(): ?string
+    {
+        return $this->visibleWhen;
     }
 
     /** @return array<string, string> */

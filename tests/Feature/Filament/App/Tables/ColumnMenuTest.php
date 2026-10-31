@@ -205,6 +205,220 @@ it('applies a layout that stored the title column elsewhere as stored and unmodi
         ->and($component->instance()->isTableLayoutModified())->toBeFalse();
 })->with('column menu pages');
 
+/**
+ * @return list<string>
+ */
+function pinnedColumns(Testable $component): array
+{
+    return $component->get('tablePinnedColumns');
+}
+
+/**
+ * @return list<string>
+ */
+function shownColumns(Testable $component, CrmEntity $entity): array
+{
+    return collect($component->get('tableColumns'))
+        ->filter(fn (array $item): bool => $item['isToggled'] && $item['name'] !== $entity->titleColumn())
+        ->pluck('name')
+        ->values()
+        ->all();
+}
+
+/**
+ * @return list<array{type: string, name: string, isToggled: bool}>
+ */
+function storedColumns(Testable $component): array
+{
+    return collect($component->get('tableColumns'))
+        ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
+        ->all();
+}
+
+it('pins a column and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $column = shownColumns($component, $entity)[2];
+
+    $component->call('pinTableColumn', $column);
+
+    expect(pinnedColumns($component))->toBe([$column])
+        ->and(columnOrder($component)[0])->toBe($column);
+
+    $order = columnOrder($component);
+    session()->flush();
+    $fresh = livewire($page);
+
+    expect(pinnedColumns($fresh))->toBe([$column])
+        ->and(columnOrder($fresh))->toBe($order);
+})->with('column menu pages');
+
+it('pins columns in the order they were pinned and unpins to the first unpinned position', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    [, $a, $b] = shownColumns($component, $entity);
+
+    $component->call('pinTableColumn', $b)->call('pinTableColumn', $a);
+
+    expect(array_slice(columnOrder($component), 0, 2))->toBe([$b, $a]);
+
+    $component->call('unpinTableColumn', $b);
+
+    expect(pinnedColumns($component))->toBe([$a])
+        ->and(columnOrder($component)[1])->toBe($b);
+})->with('column menu pages');
+
+it('pins and unpins the title column like any other column', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $title = $entity->titleColumn();
+    $column = shownColumns($component, $entity)[0];
+
+    $component->call('pinTableColumn', $title);
+
+    expect(pinnedColumns($component))->toBe([$title]);
+
+    $component->call('pinTableColumn', $column)->call('unpinTableColumn', $title);
+
+    expect(pinnedColumns($component))->toBe([$column])
+        ->and(array_slice(columnOrder($component), 0, 2))->toBe([$column, $title]);
+})->with('column menu pages');
+
+it('unpins a column when it is hidden', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $column = toggleableColumn($component, $entity);
+
+    $component->call('pinTableColumn', $column)->call('hideTableColumn', $column);
+
+    expect(pinnedColumns($component))->toBe([]);
+
+    TablePreference::query()->withoutGlobalScopes()->delete();
+    $component = livewire($page)->call('pinTableColumn', $column);
+
+    $component->call('applyTableColumnManager', array_map(
+        fn (array $item): array => $item['name'] === $column ? [...$item, 'isToggled' => false] : $item,
+        $component->get('tableColumns'),
+    ), true);
+
+    expect(pinnedColumns($component))->toBe([]);
+})->with('column menu pages');
+
+it('keeps a column on its side of the pins when the column manager moves it', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    [$pinned, $unpinned] = shownColumns($component, $entity);
+
+    $component->call('pinTableColumn', $pinned);
+
+    $columns = collect($component->get('tableColumns'));
+    [$moved, $rest] = $columns->partition(fn (array $item): bool => $item['name'] === $unpinned);
+
+    $component->call('applyTableColumnManager', [...$moved->values()->all(), ...$rest->values()->all()], true);
+
+    expect(array_slice(columnOrder($component), 0, 2))->toBe([$pinned, $unpinned]);
+})->with('column menu pages');
+
+it('never moves a pinned column', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    [$first, $second] = shownColumns($component, $entity);
+
+    $component->call('pinTableColumn', $first)->call('pinTableColumn', $second);
+    $order = columnOrder($component);
+
+    $component->call('moveTableColumn', $first, null)->call('moveTableColumn', $second, $first);
+
+    expect(columnOrder($component))->toBe($order)
+        ->and(pinnedColumns($component))->toBe([$first, $second]);
+})->with('column menu pages');
+
+it('clears the pins when the column manager resets the columns', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $defaultOrder = columnOrder($component);
+    $column = shownColumns($component, $entity)[2];
+
+    $component->call('pinTableColumn', $column)->call('resetTableColumnManager');
+
+    expect(pinnedColumns($component))->toBe([])
+        ->and(columnOrder($component))->toBe($defaultOrder)
+        ->and($component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '0']);
+
+    session()->flush();
+
+    expect(pinnedColumns(livewire($page)))->toBe([]);
+})->with('column menu pages');
+
+it('drops a pin for a column the table no longer has', function (string $page, CrmEntity $entity): void {
+    $title = $entity->titleColumn();
+    $component = livewire($page);
+    $column = shownColumns($component, $entity)[0];
+
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => $entity,
+        'state' => new TableStateData(columns: storedColumns($component), pinned: [$title, 'custom_fields.gone', $column]),
+    ]);
+
+    $component = livewire($page);
+
+    expect(pinnedColumns($component))->toBe([$title, $column]);
+
+    TablePreference::query()->withoutGlobalScopes()->delete();
+    $component = livewire($page)->call('pinTableColumn', 'custom_fields.gone');
+
+    expect(pinnedColumns($component))->toBe([])
+        ->and(columnMenuPreferences())->toBe(0);
+})->with('column menu pages');
+
+it('restores the pins a layout was saved with and marks the layout modified when they change', function (): void {
+    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(pinned: ['name', 'creator.name']),
+    ]);
+
+    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+
+    expect(pinnedColumns($component))->toBe(['name', 'creator.name'])
+        ->and(array_slice(columnOrder($component), 0, 2))->toBe(['name', 'creator.name'])
+        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+
+    $component->call('unpinTableColumn', 'creator.name');
+
+    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+});
+
+it('marks the pins of a layout in the render that applied it and clears them in the render that left it', function (): void {
+    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(pinned: ['name', 'creator.name']),
+    ]);
+    $component = livewire(ListCompanies::class);
+    $pinned = fn (string $column): string => $component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes()['data-column-pinned'];
+
+    $component->call('applySavedLayout', $layout->getKey());
+
+    expect($pinned('name'))->toBe('1')
+        ->and($pinned('creator.name'))->toBe('1');
+
+    $component->call('useStandardTableLayout');
+
+    expect($pinned('name'))->toBe('0')
+        ->and($pinned('creator.name'))->toBe('0');
+});
+
+it('marks pinned headers and cells in the render that pinned them', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    [$pinned, $unpinned] = shownColumns($component, $entity);
+
+    $component->call('pinTableColumn', $pinned);
+
+    $table = $component->instance()->getTable();
+
+    expect($table->getColumn($pinned)->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '1'])
+        ->and($table->getColumn($pinned)->getExtraCellAttributes())->toMatchArray(['data-column-pinned' => '1'])
+        ->and($table->getColumn($unpinned)->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '0'])
+        ->and($table->getColumn($entity->titleColumn())->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '0']);
+})->with('column menu pages');
+
+it('hashes a state without pins as it did before pins existed', function (): void {
+    expect(new TableStateData(sort: 'name:desc')->hash())->toBe('23e7785210a1334232fd2d9bfef34e77')
+        ->and(new TableStateData(sort: 'name:desc', labels: ['name' => 'Account'])->hash())->toBe('b5259410e4fba1a33f8a84a42134054b');
+});
+
 function columnLabelText(Testable $component, string $column): string
 {
     return trim(strip_tags((string) $component->instance()->getTable()->getColumn($column)->getLabel()));
