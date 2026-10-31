@@ -11,6 +11,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Throwable;
@@ -450,7 +451,7 @@ final class InstallCommand extends Command
         $this->line('  • Real-time logs (Pail)');
 
         $this->newLine();
-        $this->line('  Documentation: https://relaticle.com/developers');
+        $this->line('  Documentation: '.DocUrl::area(DocUrl::DOCS));
         $this->newLine();
 
         $this->info('Happy CRM-ing! 🚀');

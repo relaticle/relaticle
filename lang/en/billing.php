@@ -16,5 +16,4 @@ return [
         'paused_api' => 'This workspace is paused. Subscribe to Cloud Pro to restore access.',
         'paused_chat' => 'This workspace is paused because its Cloud trial or subscription ended. Subscribe to Cloud Pro to continue.',
     ],
-    'deletion_notice' => 'Any active Pro subscription is canceled. Pro stays until the end of the paid period.',
 ];

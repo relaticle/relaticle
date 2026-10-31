@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    'deletion_notice' => 'Any active Pro subscription is canceled. Pro stays until the end of the paid period.',
+
     'status' => [
         'trialing' => 'Trial',
         'active' => 'Active',

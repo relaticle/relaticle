@@ -56,6 +56,6 @@ final readonly class StripeBilling implements Billing
             return null;
         }
 
-        return __('billing.deletion_notice');
+        return __('cloud::billing.deletion_notice');
     }
 }
