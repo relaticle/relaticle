@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire;
 
-use Carbon\CarbonInterface;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -17,14 +16,14 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
+use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RescheduleQueuedEmailAction;
@@ -48,11 +47,48 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
     public bool $includeFailedFilter = true;
 
+    #[Url(as: 'status')]
+    public OutboxTab $statusTab = OutboxTab::QUEUED;
+
+    public function setStatusTab(string $tab): void
+    {
+        $this->statusTab = OutboxTab::from($tab);
+        $this->resetTable();
+    }
+
+    /**
+     * @return list<OutboxTab>
+     */
+    public function segments(): array
+    {
+        if ($this->lockedStatus instanceof EmailStatus) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            OutboxTab::cases(),
+            fn (OutboxTab $tab): bool => $this->includeFailedFilter || $tab !== OutboxTab::FAILED,
+        ));
+    }
+
+    /**
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function segmentCounts(): array
+    {
+        return collect($this->segments())
+            ->mapWithKeys(fn (OutboxTab $tab): array => [$tab->value => $tab->constrain($this->ownOutboundQuery())->count()])
+            ->all();
+    }
+
     public function table(Table $table): Table
     {
         return $table
-            ->query($this->buildQuery())
-            ->filters($this->lockedStatus instanceof EmailStatus ? [] : [$this->statusFilter()])
+            ->query(fn (): Builder => $this->buildQuery())
+            ->defaultSort(fn (Builder $query): Builder => $this->statusTab === OutboxTab::SENT
+                ? $query->latest('sent_at')
+                : $query->orderByRaw('scheduled_for asc nulls first')->oldest('created_at'))
             ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
                 ? __('filament/pages/email-inbox.failed.empty.heading')
                 : __('filament/pages/email-inbox.outbox.empty.heading'))
@@ -63,55 +99,20 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                 ? Heroicon::OutlinedExclamationCircle
                 : Heroicon::OutlinedClock)
             ->columns([
-                TextColumn::make('subject')->limit(50)->searchable(),
+                TextColumn::make('subject')->label(__('filament/pages/email-outbox.columns.subject'))->limit(50)->searchable(),
                 TextColumn::make('participants_to')
                     ->label(__('filament/pages/email-outbox.columns.recipients'))
                     ->state(fn (Email $record): string => $record->participants
                         ->where('role', 'to')->pluck('email_address')->implode(', ')),
-                TextColumn::make('status')->badge(),
+                TextColumn::make('status')->label(__('filament/pages/email-outbox.columns.status'))->badge(),
                 TextColumn::make('scheduled_for')->dateTime()->label(__('filament/pages/email-outbox.columns.scheduled_for')),
                 TextColumn::make('priority')->label(__('filament/pages/email-outbox.columns.type'))->badge(),
                 TextColumn::make('last_error')
+                    ->label(__('filament/pages/email-outbox.columns.last_error'))
                     ->toggleable(isToggledHiddenByDefault: $this->lockedStatus !== EmailStatus::FAILED)
                     ->wrap(),
             ])
-            ->recordActions([
-                Action::make('cancel')
-                    ->icon(Heroicon::OutlinedXMark)
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
-                    ->action(function (Email $record): void {
-                        resolve(CancelQueuedEmailAction::class)->execute($record);
-                        $this->dispatch('outbox:changed');
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
-                    }),
-                Action::make('reschedule')
-                    ->icon(Heroicon::OutlinedClock)
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
-                    ->schema([
-                        DateTimePicker::make('scheduled_for')
-                            ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
-                            ->native(false)
-                            ->seconds(false)
-                            ->minDate(now())
-                            ->required(),
-                    ])
-                    ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
-                    ->action(function (Email $record, array $data): void {
-                        resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
-                    }),
-                Action::make('retry')
-                    ->icon(Heroicon::OutlinedArrowPath)
-                    ->color('warning')
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
-                    ->action(function (Email $record): void {
-                        resolve(RetryFailedEmailAction::class)->execute($record);
-                        $this->dispatch('outbox:changed');
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
-                    }),
-            ])
+            ->recordActions($this->rowActions())
             ->toolbarActions([
                 BulkAction::make('bulkCancel')
                     ->label(__('filament/pages/email-outbox.actions.bulk_cancel'))
@@ -158,7 +159,54 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
 
     public function render(): View
     {
-        return view('email-integration::livewire.table');
+        return view('email-integration::livewire.outbox-table');
+    }
+
+    /**
+     * @return list<Action>
+     */
+    private function rowActions(): array
+    {
+        return [
+            Action::make('cancel')
+                ->label(__('filament/pages/email-outbox.actions.cancel'))
+                ->icon(Heroicon::OutlinedXMark)
+                ->color('danger')
+                ->requiresConfirmation()
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
+                ->action(function (Email $record): void {
+                    resolve(CancelQueuedEmailAction::class)->execute($record);
+                    $this->dispatch('outbox:changed');
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
+                }),
+            Action::make('reschedule')
+                ->label(__('filament/pages/email-outbox.actions.reschedule'))
+                ->icon(Heroicon::OutlinedClock)
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
+                ->schema([
+                    DateTimePicker::make('scheduled_for')
+                        ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
+                        ->native(false)
+                        ->seconds(false)
+                        ->minDate(now())
+                        ->required(),
+                ])
+                ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
+                ->action(function (Email $record, array $data): void {
+                    resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
+                }),
+            Action::make('retry')
+                ->label(__('filament/pages/email-outbox.actions.retry'))
+                ->icon(Heroicon::OutlinedArrowPath)
+                ->color('warning')
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
+                ->action(function (Email $record): void {
+                    resolve(RetryFailedEmailAction::class)->execute($record);
+                    $this->dispatch('outbox:changed');
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
+                }),
+        ];
     }
 
     /**
@@ -166,67 +214,21 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
      */
     private function buildQuery(): Builder
     {
-        return Email::query()
-            ->with(['participants'])
-            ->where('workspace_id', filament()->getTenant()?->getKey())
-            ->where('user_id', auth()->id())
-            ->where('direction', EmailDirection::OUTBOUND)
-            ->when(
-                $this->lockedStatus instanceof EmailStatus,
-                fn (Builder $query): Builder => $query->where('status', $this->lockedStatus),
-            );
-    }
+        $query = $this->ownOutboundQuery()->with(['participants']);
 
-    private function statusFilter(): SelectFilter
-    {
-        return SelectFilter::make('status_tab')
-            ->options($this->statusFilterOptions())
-            ->default(OutboxTab::QUEUED->value)
-            ->selectablePlaceholder(false)
-            ->query(fn (Builder $query, array $data): Builder => $this->applyStatusTab(
-                $query,
-                OutboxTab::tryFrom((string) ($data['value'] ?? '')) ?? OutboxTab::QUEUED,
-            ));
+        return $this->lockedStatus instanceof EmailStatus
+            ? $query->where('status', $this->lockedStatus)
+            : $this->statusTab->constrain($query);
     }
 
     /**
-     * @return array<string, string>
-     */
-    private function statusFilterOptions(): array
-    {
-        return collect(OutboxTab::cases())
-            ->reject(fn (OutboxTab $tab): bool => ! $this->includeFailedFilter && $tab === OutboxTab::FAILED)
-            ->mapWithKeys(fn (OutboxTab $tab): array => [$tab->value => $tab->getLabel()])
-            ->all();
-    }
-
-    /**
-     * @param  Builder<Email>  $query
      * @return Builder<Email>
      */
-    private function applyStatusTab(Builder $query, OutboxTab $tab): Builder
+    private function ownOutboundQuery(): Builder
     {
-        $dueCutoff = $this->queuedDueCutoff();
-
-        return match ($tab) {
-            OutboxTab::SCHEDULED => $query->where('status', EmailStatus::QUEUED)
-                ->whereNotNull('scheduled_for')->where('scheduled_for', '>', $dueCutoff)
-                ->whereNot(fn (Builder $held): Builder => $held->createdOverMcp()),
-            OutboxTab::QUEUED => $query->where('status', EmailStatus::QUEUED)
-                ->where(fn (Builder $dueQuery): Builder => $dueQuery
-                    ->whereNull('scheduled_for')
-                    ->orWhere('scheduled_for', '<=', $dueCutoff)
-                    ->orWhere(fn (Builder $held): Builder => $held->createdOverMcp())),
-            OutboxTab::SENDING => $query->where('status', EmailStatus::SENDING),
-            OutboxTab::FAILED => $query->where('status', EmailStatus::FAILED),
-            OutboxTab::SENT => $query->where('status', EmailStatus::SENT)->where('sent_at', '>=', now()->subDay()),
-        };
-    }
-
-    // An undo window and an assistant's hold are not scheduled sends, so the queued tab
-    // shows both at once, matching the outbox badge.
-    private function queuedDueCutoff(): CarbonInterface
-    {
-        return now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));
+        return Email::query()
+            ->where('workspace_id', filament()->getTenant()?->getKey())
+            ->where('user_id', auth()->id())
+            ->where('direction', EmailDirection::OUTBOUND);
     }
 }

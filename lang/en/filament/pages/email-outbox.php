@@ -5,6 +5,9 @@ declare(strict_types=1);
 return [
     'title' => 'Outbox',
     'columns' => [
+        'subject' => 'Subject',
+        'status' => 'Status',
+        'last_error' => 'Last error',
         'recipients' => 'Recipients',
         'scheduled_for' => 'Scheduled for',
         'type' => 'Type',
@@ -20,6 +23,7 @@ return [
         'partial_failure' => 'Partial failure',
     ],
     'tabs' => [
+        'aria' => 'Outbox status',
         'queued' => 'Queued',
         'scheduled' => 'Scheduled',
         'sending' => 'Sending',
@@ -27,6 +31,9 @@ return [
         'sent' => 'Sent in the last 24 hours',
     ],
     'actions' => [
+        'cancel' => 'Cancel',
+        'reschedule' => 'Reschedule',
+        'retry' => 'Retry',
         'reschedule_field' => 'Send at',
         'bulk_cancel' => 'Cancel selected',
     ],

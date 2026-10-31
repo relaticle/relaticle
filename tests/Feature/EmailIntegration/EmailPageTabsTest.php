@@ -131,6 +131,21 @@ it('counts drafts, pending outbox mail and available templates for the tab badge
     ]);
 });
 
+it('badges the outbox with what its default segment lists', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
+    foreach ([null, now()->addDay(), now()->addDays(2)] as $scheduledFor) {
+        Email::query()->create([
+            'workspace_id' => $this->workspace->id, 'user_id' => $this->user->id,
+            'connected_account_id' => $this->account->id, 'direction' => EmailDirection::OUTBOUND,
+            'status' => EmailStatus::QUEUED, 'privacy_tier' => EmailPrivacyTier::FULL,
+            'creation_source' => EmailCreationSource::COMPOSE, 'scheduled_for' => $scheduledFor,
+        ]);
+    }
+
+    expect(Livewire::test(EmailInboxPage::class)->instance()->tabCounts()[EmailPageTab::OUTBOX->value])->toBe(1);
+});
+
 it('refreshes the tab badges when the composer saves a draft', function (): void {
     $page = Livewire::test(EmailInboxPage::class);
 
