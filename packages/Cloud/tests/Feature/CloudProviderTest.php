@@ -39,14 +39,14 @@ it('binds no billing when billing is off', function (): void {
     expect(resolve(BillingContract::class))->toBeInstanceOf(NoBilling::class);
 });
 
-it('stays out of the provider list while the foss-only switch is on', function (): void {
-    config()->set('relaticle.foss_only', true);
+it('stays out of the provider list while the cloud switch is off', function (): void {
+    config()->set('relaticle.cloud', false);
 
     expect(require base_path('bootstrap/providers.php'))->not->toContain(CloudServiceProvider::class);
 });
 
-it('joins the provider list while the foss-only switch is off', function (): void {
-    config()->set('relaticle.foss_only', false);
+it('joins the provider list while the cloud switch is on', function (): void {
+    config()->set('relaticle.cloud', true);
 
     expect(require base_path('bootstrap/providers.php'))->toContain(CloudServiceProvider::class);
 });

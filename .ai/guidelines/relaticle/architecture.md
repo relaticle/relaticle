@@ -58,14 +58,15 @@ repository without it.
   `Relaticle\Cloud`. The `ConventionsTest` check "keeps the cloud package out of core code,
   config, routes, views and lang" fails a core file that names it or its `cloud::` view and lang
   namespace. `bootstrap/providers.php` holds the one allowed mention: a `class_exists` check that
-  loads `CloudServiceProvider` only when the class exists and `config('relaticle.foss_only')` is off
-- The Docker image never contains it, because `.dockerignore` excludes `/packages/Cloud`. A git
-  clone does, so the self-hosting guide tells that install to set `RELATICLE_FOSS_ONLY=true`, which
-  keeps the provider out of `bootstrap/providers.php` and the package's entries out of
-  `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php` pins the provider half.
-  The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with the switch on, then
-  deletes the directory, rebuilds the autoload and runs Arch, Smoke and Feature. A core class, view
-  or route that needs Cloud fails that job
+  loads `CloudServiceProvider` only when the class exists and `config('relaticle.cloud')` is on
+- Cloud is off unless `RELATICLE_CLOUD=true`. relaticle.com sets it, and so do `.env.ci`, both
+  phpunit files and a developer's `.env`. A self-hosted install never sets it. The Docker image
+  also leaves the code out, because `.dockerignore` excludes `/packages/Cloud`. A git clone keeps
+  the directory, and the unset switch keeps the provider out of `bootstrap/providers.php` and the
+  package's entries out of `vite.config.js`. `packages/Cloud/tests/Feature/CloudProviderTest.php`
+  pins the provider half. The `Self-hosted Build` job in `.github/workflows/ci.yml` boots once with
+  the switch unset, then deletes the directory, rebuilds the autoload and runs Arch, Smoke and
+  Feature. A core class, view or route that needs Cloud fails that job
 - Core asks Cloud through two contracts and keeps a self-hosted default for each:
   `App\Contracts\Entitlements` (`SelfHostedEntitlements`) and `App\Contracts\Billing` (`NoBilling`).
   `CloudServiceProvider` binds Cloud's implementation only while the billing flag is on.

@@ -503,7 +503,6 @@ Cloud does not install pnpm, so the build installs the version `package.json` pi
 Build command:
 
 ```bash
-rm -rf packages/Cloud
 composer install --no-dev --optimize-autoloader
 npm install -g "$(node -p 'require("./package.json").packageManager')"
 pnpm install --frozen-lockfile --ignore-scripts
@@ -519,7 +518,7 @@ Deploy command:
 php artisan migrate --force
 ```
 
-The first build line removes `packages/Cloud`, relaticle.com's own code. A fork contains it, and only the Docker image leaves it out. Without that line the install serves relaticle.com's marketing site.
+A fork contains `packages/Cloud`, relaticle.com's own code. It stays out of the app while `RELATICLE_CLOUD` is unset, so leave that variable out of the environment.
 
 Cloud restarts Horizon on every deployment, so no `horizon:terminate` step is needed.
 
@@ -652,15 +651,13 @@ php artisan key:generate
 
 Edit `.env` with your database credentials, mail settings, and `APP_URL`. Set `APP_ENV=production` and `APP_DEBUG=false`. The example file ships `local` and `true`, and debug pages in production expose your configuration.
 
-Set `RELATICLE_FOSS_ONLY=true`. `packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. The Docker image leaves it out, and a clone contains it. The switch keeps it out of the app and out of the frontend build, so your install never serves relaticle.com's marketing site at `/`. Its license allows development and testing use, so the directory stays on disk and `git pull` keeps working.
+Leave `RELATICLE_CLOUD` unset. `packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. The Docker image leaves it out, and a clone contains it. With the switch unset it stays out of the app and out of the frontend build, so your install never serves relaticle.com's marketing site at `/`. Its license allows development and testing use, so the directory stays on disk and `git pull` keeps working.
 
 4. Build the frontend:
 
 ```bash
 pnpm install --frozen-lockfile && pnpm run build
 ```
-
-The build reads `RELATICLE_FOSS_ONLY` from `.env`, so set it before this step.
 
 5. Set up the database:
 
@@ -695,8 +692,6 @@ php artisan up
 php artisan horizon:terminate
 php artisan reverb:restart
 ```
-
-An install that deleted `packages/Cloud` under an earlier version of this guide restores it once with `git checkout -- packages/Cloud` before the pull, and sets `RELATICLE_FOSS_ONLY=true` in `.env`. If you cache components with `php artisan filament:optimize`, run `php artisan filament:optimize-clear` and then `filament:optimize` again after the switch changes. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
 
 Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
@@ -843,7 +838,7 @@ To see whether replies stream live, open the browser's Network tab, filter by WS
 
 ### The homepage shows the Relaticle marketing site
 
-The cloud package is loaded. A self-hosted install redirects `/` to the app. Set `RELATICLE_FOSS_ONLY=true` in `.env`, run `php artisan config:clear` (and `php artisan optimize` again if you cache configuration), then rebuild the frontend with `pnpm run build`. On Laravel Cloud, add the `rm -rf packages/Cloud` line to the build command.
+The cloud package is loaded, because `RELATICLE_CLOUD` is set in `.env` or in the server environment. A self-hosted install redirects `/` to the app. Remove the variable, run `php artisan config:clear` (and `php artisan optimize` again if you cache configuration), then rebuild the frontend with `pnpm run build`.
 
 ### Horizon not processing jobs
 

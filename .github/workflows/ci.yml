@@ -249,11 +249,12 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      # A clone install keeps the directory and sets the switch instead.
+      # A clone install keeps the directory and leaves the switch unset.
       - name: Boot with the cloud package switched off
         run: |
-          php artisan route:list --json | grep -q '"uri":"pricing"'
-          ! RELATICLE_FOSS_ONLY=true php artisan route:list --json | grep -q '"uri":"pricing"'
+          sed -i '/^RELATICLE_CLOUD=/d' .env
+          ! php artisan route:list --json | grep -q '"uri":"pricing"'
+          RELATICLE_CLOUD=true php artisan route:list --json | grep -q '"uri":"pricing"'
 
       # The image never contains packages/Cloud. The optimized classmap still lists
       # its classes, so the autoload is rebuilt before Laravel boots.
