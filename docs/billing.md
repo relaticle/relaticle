@@ -22,7 +22,7 @@ the published commitment. The full comparison is recorded in the
   `enterprise`). `free` remains the default for self-hosted installs and grandfathered Cloud
   workspaces; it is not offered to new managed-Cloud workspaces.
 - Managed-Cloud access is a separate entitlement. `App\Enums\BillingStatus` owns the state and
-  `grantsAccess()` answers per state. `HostedWorkspaceAccess` only adds the billing feature flag,
+  `grantsAccess()` answers per state. `Entitlements::allowsAccess()` only adds the billing feature flag,
   which is off on self-hosted installs. A live trial or subscription, a manual paid grant,
   Enterprise, or `workspaces.hosted_free_grandfathered_at` grants access. Trial ended, Subscription
   ended, and Free are paused. The paused screen and the ended email name which one.

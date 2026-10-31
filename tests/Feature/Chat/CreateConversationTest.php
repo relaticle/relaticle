@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\Company;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\ChatController;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AgentConversation;
@@ -79,6 +81,9 @@ it('returns 422 when document text is empty', function (): void {
 });
 
 it('returns 402 on send when credit balance is insufficient', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -136,6 +141,9 @@ it('returns 422 when document text exceeds 5000 characters', function (): void {
 });
 
 it('does not consume a credit on send when the document is empty', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -154,6 +162,9 @@ it('does not consume a credit on send when the document is empty', function (): 
 });
 
 it('does not consume a credit on send when the document text is too long', function (): void {
+    Feature::define(Billing::class, true);
+    $this->workspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
+
     Queue::fake();
 
     $createRes = $this->postJson(route('chat.conversations.create'), [
@@ -209,7 +220,9 @@ it('returns 403 when the user has no current workspace', function (): void {
 });
 
 it('rate-limits createConversation per workspace plan', function (): void {
+    Feature::define(Billing::class, true);
     $user = User::factory()->withPersonalWorkspace()->create();
+    $user->currentWorkspace->forceFill(['hosted_free_grandfathered_at' => now()])->save();
     actingAs($user);
 
     AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [

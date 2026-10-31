@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\CancelWorkspaceDeletion;
+use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
 use App\Enums\CreationSource;
 use App\Enums\OnboardingReferralSource;
@@ -15,7 +16,6 @@ use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -723,7 +723,7 @@ it('ends a trial now so the workspace pauses on the pay screen', function (): vo
     $workspace->refresh();
 
     expect($workspace->billingStatus())->toBe(BillingStatus::TrialEnded)
-        ->and(resolve(HostedWorkspaceAccess::class)->isPaused($workspace))->toBeTrue();
+        ->and(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
 });
 
 it('ends several trials at once and skips workspaces that are not trialing', function (): void {
@@ -829,7 +829,7 @@ it('restarts a trial the nightly job already downgraded and grants the pro allow
     $this->artisan('billing:process-trials')->assertSuccessful();
 
     expect($workspace->refresh()->plan)->toBe(Plan::Free)
-        ->and(resolve(HostedWorkspaceAccess::class)->isPaused($workspace))->toBeTrue();
+        ->and(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
 
     $endsAt = now()->addDays(7)->startOfMinute();
 
@@ -849,7 +849,7 @@ it('restarts a trial the nightly job already downgraded and grants the pro allow
     expect($workspace->plan)->toBe(Plan::Pro)
         ->and($workspace->trial_ends_at?->equalTo($endsAt))->toBeTrue()
         ->and($workspace->billingStatus())->toBe(BillingStatus::Trialing)
-        ->and(resolve(HostedWorkspaceAccess::class)->isPaused($workspace))->toBeFalse()
+        ->and(resolve(Entitlements::class)->allowsAccess($workspace))->toBeTrue()
         ->and($balance->credits_remaining)->toBe(Plan::Pro->credits())
         ->and($transaction->metadata['sysadmin_id'])->toBe((string) $admin->getKey());
 });

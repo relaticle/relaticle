@@ -147,6 +147,20 @@ final class Email extends Model
      * @return Builder<Email>
      */
     #[Scope]
+    protected function composedBy(Builder $query, User $user): Builder
+    {
+        return $query
+            ->where($query->qualifyColumn('user_id'), $user->getKey())
+            ->where($query->qualifyColumn('workspace_id'), $user->current_workspace_id)
+            ->where($query->qualifyColumn('direction'), EmailDirection::OUTBOUND)
+            ->whereNot($query->qualifyColumn('status'), EmailStatus::SYNCED);
+    }
+
+    /**
+     * @param  Builder<Email>  $query
+     * @return Builder<Email>
+     */
+    #[Scope]
     protected function createdOverMcp(Builder $query): Builder
     {
         return $query->where('creation_source', EmailCreationSource::MCP);
@@ -336,6 +350,19 @@ final class Email extends Model
         }
 
         return nl2br(e($text), false);
+    }
+
+    public function quotedBelow(string $bodyHtml, bool $asForward): string
+    {
+        $quotedBodyHtml = $this->quotedBodyHtml();
+
+        if (blank($quotedBodyHtml)) {
+            return $bodyHtml;
+        }
+
+        return $bodyHtml.($asForward
+            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$quotedBodyHtml
+            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
     }
 
     /**

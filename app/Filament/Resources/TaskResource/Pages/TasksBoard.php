@@ -11,6 +11,7 @@ use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Concerns\HasViewSwitcher;
+use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Models\CustomField;
@@ -20,6 +21,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Exception;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Infolists\Components\ImageEntry;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
@@ -45,6 +47,7 @@ use Relaticle\Flowforge\Modern\BoardResourcePage;
 final class TasksBoard extends BoardResourcePage
 {
     use HasViewSwitcher;
+    use KeepsOpenTaskInUrl;
 
     protected static string $resource = TaskResource::class;
 
@@ -128,29 +131,38 @@ final class TasksBoard extends BoardResourcePage
             })
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')
-            ->cardActions([
-                EditTaskAction::make('edit')
-                    ->authorize('update')
-                    ->label(__('filament/pages/boards.tasks.actions.edit'))
-                    ->slideOver()
-                    ->modalWidth(Width::ThreeExtraLarge)
-                    ->icon('heroicon-o-pencil-square')
-                    ->schema(fn (Schema $schema): Schema => TaskForm::get($schema)),
-                Action::make('delete')
-                    ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
-                    ->label(__('filament/pages/boards.tasks.actions.delete'))
-                    ->icon('heroicon-o-trash')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->action(function (Task $record): void {
-                        $record->delete();
-                    }),
-            ])
+            ->cardActions($this->cardActions())
             ->groupings([$this->assigneeGrouping()])
             ->filters($this->boardFilters())
             ->filtersFormWidth(Width::Medium)
             ->filtersTriggerAction(fn (Action $action): Action => $action->button()->labeledFrom('sm')->size(Size::Small)->label(__('filament/pages/boards.filters_button.label')))
             ->headerToolbar();
+    }
+
+    /**
+     * @return array<int, Action|ActionGroup>
+     */
+    private function cardActions(): array
+    {
+        return [
+            TaskResource::copyActions(),
+            EditTaskAction::make('edit')
+                ->authorize('update')
+                ->label(__('filament/pages/boards.tasks.actions.edit'))
+                ->slideOver()
+                ->modalWidth(Width::ThreeExtraLarge)
+                ->icon('heroicon-o-pencil-square')
+                ->schema(fn (Schema $schema): Schema => TaskForm::get($schema)),
+            Action::make('delete')
+                ->authorize(fn (?Task $record): bool => $record instanceof Task && Gate::allows('delete', $record))
+                ->label(__('filament/pages/boards.tasks.actions.delete'))
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->action(function (Task $record): void {
+                    $record->delete();
+                }),
+        ];
     }
 
     /**

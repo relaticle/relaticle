@@ -1,0 +1,62 @@
+name: Feature request
+description: Suggest a feature or an improvement for Relaticle
+labels: ["enhancement"]
+projects: ["Relaticle/1"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, please search the existing issues (both open and closed).
+
+        ---
+
+        Describe the problem first. The best requests explain what you were trying to do and where Relaticle got in the way.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what stops you today?
+      placeholder: When I import a CSV of people, I cannot map a column to a custom field, so I edit each record by hand afterwards.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How would you like Relaticle to behave? Mockups and examples from other tools are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you use today, or other designs you rejected and why.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Relaticle does this touch?
+      options:
+        - Companies, people, opportunities
+        - Tasks and notes
+        - Custom fields
+        - Import and export
+        - Rela, the built-in AI assistant
+        - MCP server and agents
+        - REST API
+        - Email and calendar
+        - Self-hosting and deployment
+        - Other
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

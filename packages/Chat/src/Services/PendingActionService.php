@@ -53,8 +53,13 @@ use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\ProposalProgress;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
+use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
+use Relaticle\EmailIntegration\Actions\DeleteAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\RescheduleAssistantEmail;
+use Relaticle\EmailIntegration\Actions\RetryAssistantEmail;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmailDraft;
 use RuntimeException;
 use Throwable;
 
@@ -95,6 +100,11 @@ final readonly class PendingActionService
         RemoveSampleData::class,
         SaveAssistantEmailDraft::class,
         SendAssistantEmail::class,
+        SendAssistantEmailDraft::class,
+        DeleteAssistantEmailDraft::class,
+        CancelAssistantEmail::class,
+        RescheduleAssistantEmail::class,
+        RetryAssistantEmail::class,
     ];
 
     /**

@@ -146,7 +146,7 @@
 
                 <span aria-hidden="true" class="mx-1 hidden h-5 w-px bg-gray-200 sm:block dark:bg-white/10"></span>
 
-                <a href="{{ route('login') }}"
+                <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade"
                    class="hidden rounded-lg px-2 py-1.5 text-[13px] font-medium text-gray-600 transition-colors hover:text-gray-900 sm:block dark:text-gray-400 dark:hover:text-white">
                     {{ __('Sign in') }}
                 </a>

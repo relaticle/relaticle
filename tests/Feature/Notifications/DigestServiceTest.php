@@ -7,7 +7,6 @@ use App\Filament\Resources\TaskResource;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\Notifications\DigestService;
-use Filament\Actions\EditAction;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -95,10 +94,7 @@ it('links each digest task to its edit modal in the task workspace', function ()
 
     $payload = resolve(DigestService::class)->forUser($user);
 
-    expect($payload->workspaces[0]->overdue[0]->editUrl)->toBe(TaskResource::getUrl('index', [
-        'tableAction' => EditAction::getDefaultName(),
-        'tableActionRecord' => $task->id,
-    ], panel: 'app', tenant: $workspace));
+    expect($payload->workspaces[0]->overdue[0]->editUrl)->toBe(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace));
 });
 
 it('excludes done tasks and tasks without a due date', function (): void {

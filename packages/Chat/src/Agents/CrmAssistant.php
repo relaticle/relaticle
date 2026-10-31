@@ -8,6 +8,7 @@ use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
+use App\Features\Billing;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
@@ -27,6 +28,7 @@ use Laravel\Ai\Contracts\HasTools;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Support\PromptText;
@@ -43,11 +45,17 @@ use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\ListCustomFieldsTool;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\Chat\Tools\CustomField\UpdateCustomFieldTool;
+use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
+use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
+use Relaticle\Chat\Tools\Email\RetryEmailTool;
+use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\Chat\Tools\GuideToPageTool;
@@ -441,6 +449,10 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
 
     private function billingInstructions(): string
     {
+        if (! Feature::active(Billing::class)) {
+            return "\n\n## AI credits\nThis installation does not meter AI credits and has no plans or credit purchases: say so when asked about credits, plans, or upgrades.";
+        }
+
         return <<<'PROMPT'
 
 
@@ -1002,7 +1014,13 @@ PROMPT;
             GetEmailTool::class,
             ListEmailAccountsTool::class,
             CreateEmailDraftTool::class,
+            UpdateEmailDraftTool::class,
+            DeleteEmailDraftTool::class,
             SendEmailTool::class,
+            SendEmailDraftTool::class,
+            CancelEmailTool::class,
+            RescheduleEmailTool::class,
+            RetryEmailTool::class,
         ];
     }
 

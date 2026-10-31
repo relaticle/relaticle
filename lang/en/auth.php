@@ -21,6 +21,7 @@ return [
         'sign_up' => 'Sign up',
         'signup_throttled_title' => 'Too many sign-up attempts',
         'signup_throttled_body' => 'Please try again in :seconds seconds.',
+        'signup_over_tor' => 'Sign-up is not available over Tor. Turn Tor off to create your account, then sign in over Tor if you like.',
         'password_helper' => 'At least 8 characters long.',
         'email_placeholder' => 'Enter your email address',
         'password_placeholder' => 'Password',

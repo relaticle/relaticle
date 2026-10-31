@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Enums\ConnectableAssistant;
+use App\Filament\Pages\Dashboard;
+use App\Models\User;
 use App\Support\MarketingNavigation;
 use App\Support\NavItem;
 use Illuminate\Support\Facades\Blade;
@@ -221,3 +223,39 @@ it('renders the homepage without the product hunt launch badge', function (): vo
 
     expect($html)->not->toContain('producthunt.com', 'Product Hunt');
 });
+
+it('swaps the sign in buttons for an open app link to the current workspace once signed in', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+
+    $guestHtml = $this->get('/')->assertOk()->getContent();
+
+    expect($guestHtml)->toContain('Start for free')
+        ->and($guestHtml)->not->toContain(__('Open app'));
+
+    $html = $this->actingAs($user)->get('/')->assertOk()->getContent();
+
+    expect(substr_count($html, 'href="'.e($dashboard).'"'))->toBe(2)
+        ->and(substr_count($html, __('Open app')))->toBe(2)
+        ->and(extractNavRegion($html, __('Mobile menu')))->not->toContain('Sign In', 'Start for free');
+
+    preg_match('/<header[\s\S]*?<\/header>/', $html, $header);
+
+    expect($header[0])->not->toContain('Start for free');
+});
+
+it('suggests the page a missing url most likely meant on the 404 page', function (string $path, ?string $suggestion): void {
+    $html = $this->get($path, ['Accept' => 'text/html'])
+        ->assertNotFound()
+        ->assertSee(__('Page not found'))
+        ->getContent();
+
+    preg_match('/You were probably looking for ([^.<]+)\./', $html, $matches);
+
+    expect($matches[1] ?? null)->toBe($suggestion);
+})->with([
+    'a typo' => ['/pricng', 'Pricing'],
+    'a removed help article' => ['/help/an-old-article', 'Help center'],
+    'a sibling that is not a near spelling' => ['/compare/relaticle-vs-hubspot', null],
+    'nothing alike' => ['/zz-qq-xx', null],
+]);

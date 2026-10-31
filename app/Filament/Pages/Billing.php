@@ -6,6 +6,7 @@ namespace App\Filament\Pages;
 
 use App\Actions\Billing\CreateCreditPackCheckout;
 use App\Actions\Billing\StartProTrial;
+use App\Contracts\Entitlements;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
@@ -15,7 +16,6 @@ use App\Jobs\RefreshManagedRenewal;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\Billing\CreditPackCatalog;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -146,7 +146,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
 
-        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || ! resolve(HostedWorkspaceAccess::class)->allows($workspace)) {
+        if (! $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage) || ! resolve(Entitlements::class)->allowsAccess($workspace)) {
             return;
         }
 
@@ -171,7 +171,7 @@ final class Billing extends Page
     {
         $workspace = $this->workspace();
         $subscription = $workspace->subscription();
-        $hasHostedAccess = resolve(HostedWorkspaceAccess::class)->allows($workspace);
+        $hasHostedAccess = resolve(Entitlements::class)->allowsAccess($workspace);
         $isGrandfathered = $workspace->hosted_free_grandfathered_at !== null;
         $managedSubscription = $workspace->managedSubscription();
 
@@ -235,7 +235,7 @@ final class Billing extends Page
 
     private function isPaused(): bool
     {
-        return resolve(HostedWorkspaceAccess::class)->isPaused($this->workspace());
+        return ! resolve(Entitlements::class)->allowsAccess($this->workspace());
     }
 
     /**

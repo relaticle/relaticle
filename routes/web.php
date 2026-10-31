@@ -71,9 +71,11 @@ Route::middleware('guest')->group(function () {
     Route::post('/two-factor-challenge/cancel', [MfaChallengeController::class, 'destroy'])
         ->name('two-factor.cancel');
 
-    Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login')))->name('login');
+    // The app panel is another origin. This policy, with the CTA's matching referrerpolicy,
+    // carries the marketing page's path to the panel so a signup is attributed to it.
+    Route::get('/login', fn () => redirect()->to(url()->getAppUrl('login'))->header('Referrer-Policy', 'no-referrer-when-downgrade'))->name('login');
 
-    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login')))->name('register');
+    Route::get('/register', fn () => redirect()->to(url()->getAppUrl('login'))->header('Referrer-Policy', 'no-referrer-when-downgrade'))->name('register');
 
     Route::get('/forgot-password', fn () => redirect()->to(filament()->getPanel('app')->getRequestPasswordResetUrl()))->name('password.request');
 });

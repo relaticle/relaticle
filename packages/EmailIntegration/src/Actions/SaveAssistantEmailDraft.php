@@ -22,10 +22,11 @@ final readonly class SaveAssistantEmailDraft
      *     body?: ?string,
      *     include_signature?: bool,
      *     in_reply_to_email_id?: ?string,
+     *     draft_id?: ?string,
      * }  $data
      */
     public function execute(User $user, array $data): Email
     {
-        return $this->saveDraft->execute($user, $data, EmailCreationSource::CHAT);
+        return $this->saveDraft->execute($user, $data, EmailCreationSource::CHAT, $data['draft_id'] ?? null);
     }
 }

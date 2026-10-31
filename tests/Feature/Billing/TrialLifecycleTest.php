@@ -6,12 +6,14 @@ use App\Actions\Billing\StartProTrial;
 use App\Console\Commands\ProcessTrialsCommand;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Mail\ProEndedMail;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
@@ -32,6 +34,8 @@ function trialOwnerAndWorkspace(): array
 }
 
 it('starts a pro trial for an eligible owner', function (): void {
+    Feature::define(Billing::class, true);
+
     [$user, $workspace] = trialOwnerAndWorkspace();
 
     $started = app(StartProTrial::class)->execute($user, $workspace);
@@ -97,6 +101,8 @@ it('does not start a trial when the workspace ever had a subscription', function
 });
 
 it('downgrades expired trials and resets the allowance', function (): void {
+    Feature::define(Billing::class, true);
+
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subDay()])->save();
 
@@ -321,6 +327,8 @@ it('keeps a sysadmin-granted plan when a stale trial timestamp expires', functio
 });
 
 it('grants exactly one allowance for a trial that crosses a month boundary', function (): void {
+    Feature::define(Billing::class, true);
+
     $this->travelTo(new DateTimeImmutable('2026-06-25 12:00:00', new DateTimeZone('UTC')));
 
     [$user, $workspace] = trialOwnerAndWorkspace();
@@ -340,6 +348,8 @@ it('grants exactly one allowance for a trial that crosses a month boundary', fun
 });
 
 it('grants no second pro allowance when the hourly reset runs before the nightly downgrade', function (): void {
+    Feature::define(Billing::class, true);
+
     $this->travelTo(new DateTimeImmutable('2026-06-10 03:00:00', new DateTimeZone('UTC')));
 
     [$user, $workspace] = trialOwnerAndWorkspace();
@@ -355,6 +365,8 @@ it('grants no second pro allowance when the hourly reset runs before the nightly
 });
 
 it('keeps the pro allowance for an expired trial that converted to a subscription', function (): void {
+    Feature::define(Billing::class, true);
+
     [, $workspace] = trialOwnerAndWorkspace();
     $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour()])->save();
     $workspace->subscriptions()->create([
@@ -377,6 +389,8 @@ it('keeps the pro allowance for an expired trial that converted to a subscriptio
 });
 
 it('downgrades two or more expired trials in a single chunked run', function (): void {
+    Feature::define(Billing::class, true);
+
     // chunkById() hydrates both workspaces in one query, which is what arms Eloquent's
     // strict lazy-loading guard (a single find() never does) -- a one-workspace test
     // cannot catch a resolver call that lazy loads the subscriptions relation.

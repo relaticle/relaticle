@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Enums\SubscriptionType;
 use App\Features\Billing;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -187,12 +187,12 @@ it('keeps a paused workspace paused while the managed invoice is unpaid', functi
     $workspace = managedPlanWorkspace();
     $workspace->forceFill(['pro_trial_used_at' => now()->subMonth(), 'trial_ends_at' => now()->subDay()])->save();
 
-    expect(resolve(HostedWorkspaceAccess::class)->allows($workspace))->toBeFalse();
+    expect(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
 
     startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
         ->assertHasNoActionErrors();
 
-    expect(resolve(HostedWorkspaceAccess::class)->allows($workspace->refresh()))->toBeFalse();
+    expect(resolve(Entitlements::class)->allowsAccess($workspace->refresh()))->toBeFalse();
 });
 
 it('keeps a running trial when the managed invoice is sent', function (): void {

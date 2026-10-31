@@ -24,8 +24,8 @@ use Laravel\Pennant\Feature;
  *
  * Read-only and derived. Nothing persists it. It is the one owner of billing
  * state: the access gate, the sidebar, the paused screen, and the ended email
- * all read it. `HostedWorkspaceAccess` only layers the billing feature flag on
- * top of `grantsAccess()`.
+ * all read it. `PlanEntitlements::allowsAccess()` returns `grantsAccess()`; with the
+ * billing flag off, `SelfHostedEntitlements` grants every workspace access.
  */
 enum BillingStatus: string implements HasColor, HasDescription, HasLabel
 {

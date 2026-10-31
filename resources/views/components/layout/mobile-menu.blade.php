@@ -97,13 +97,21 @@
              aria-hidden="true"></div>
         <x-layout.community-links class="mobile-nav-enter mb-4 flex w-fit" style="--stagger: {{ count($mobileNavItems) }}"/>
 
-        <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
-            <x-marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]">
-                Sign In
-            </x-marketing.button>
-            <x-marketing.button href="{{ route('login') }}" class="active:scale-[0.98]">
-                Start for free
-            </x-marketing.button>
-        </div>
+        @auth('web')
+            <div class="grid mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
+                <x-marketing.button icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)" class="active:scale-[0.98]">
+                    {{ __('Open app') }}
+                </x-marketing.button>
+            </div>
+        @else
+            <div class="grid grid-cols-2 gap-3 mobile-nav-enter" style="--stagger: {{ count($mobileNavItems) }}">
+                <x-marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]">
+                    Sign In
+                </x-marketing.button>
+                <x-marketing.button href="{{ route('login') }}" class="active:scale-[0.98]">
+                    Start for free
+                </x-marketing.button>
+            </div>
+        @endauth
     </div>
 </nav>

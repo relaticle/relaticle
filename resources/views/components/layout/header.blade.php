@@ -297,13 +297,19 @@
 
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
                     <div class="hidden md:flex items-center gap-2">
-                        <x-marketing.button variant="secondary" size="sm" href="{{ route('login') }}">
-                            Sign In
-                        </x-marketing.button>
+                        @auth('web')
+                            <x-marketing.button size="sm" icon-trailing="ri-arrow-right-line" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
+                                {{ __('Open app') }}
+                            </x-marketing.button>
+                        @else
+                            <x-marketing.button variant="secondary" size="sm" href="{{ route('login') }}">
+                                Sign In
+                            </x-marketing.button>
 
-                        <x-marketing.button size="sm" href="{{ route('login') }}">
-                            Start for free
-                        </x-marketing.button>
+                            <x-marketing.button size="sm" href="{{ route('login') }}">
+                                Start for free
+                            </x-marketing.button>
+                        @endauth
                     </div>
 
                     {{-- Closing returns focus here, so dismissing the overlay puts a

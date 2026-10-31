@@ -39,7 +39,6 @@
 
         <div class="relative mx-auto mt-12 max-w-6xl px-6 lg:px-8">
             @php
-                $freeCredits = number_format(\App\Enums\Plan::Free->credits());
                 $proCredits = number_format(\App\Enums\Plan::Pro->credits());
                 $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
                 $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
@@ -78,7 +77,7 @@
                         'dearestCost' => $dearestReplyCost,
                     ]
                 );
-                $paidPlanLabel = $billingActive ? __('Cloud Pro') : __('a paid plan');
+                $paidPlanLabel = __('Cloud Pro');
                 $modelsUnlockAnswer = trim(implode(' ', array_filter([
                     $freeCloudModels === ''
                         ? __('Every plan can use any self-hosted model you connect yourself.')
@@ -93,14 +92,11 @@
                     ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'paidPlan' => $paidPlanLabel]
                 );
 
-                $selfHostedCreditAnswer = __(
-                    'No. Self-hosting does not disable credit metering. Self-hosted installs default to the Free plan\'s :credits-credit monthly allowance, and a system administrator can raise a workspace\'s plan and reset its credit period from the sysadmin panel, but no plan removes metering entirely.',
-                    ['credits' => $freeCredits]
-                );
+                $selfHostedCreditAnswer = __('Yes. Self-hosted installs do not meter AI credits, so there is no credit limit. You add your own provider key or local model and pay that provider directly. Only a per-minute send limit applies, and the operator sets it.');
 
                 if ($billingActive) {
                     $selfHostedCreditAnswer .= ' '.__(
-                        'New Cloud workspaces start a :days-day Cloud Pro trial with :proCredits credits, and hosted access pauses when the trial ends without a subscription.',
+                        'On Relaticle Cloud, new workspaces start a :days-day Cloud Pro trial with :proCredits credits. Hosted access pauses when the trial ends without a subscription.',
                         ['days' => $trialDays, 'proCredits' => $proCredits]
                     );
 
@@ -126,8 +122,8 @@
                     $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
                     $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the MCP server, the REST API, custom fields, multiple workspaces, zero-downtime updates, automatic daily backups, and email support. No credit card is required.');
                     $planLimitAnswer = __(
-                        'CRM data itself is never capped on any plan. Every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. :name, the AI assistant, is metered, though: every workspace defaults to the Free plan\'s :credits credits a month, resetting every calendar month. That includes self-hosted installs; see "Are self-hosted installs exempt from AI credit limits?" below. Once they are used up, the assistant declines new chat requests until the reset; nothing else in the CRM is affected.',
-                        ['credits' => $freeCredits, 'name' => config('chat.assistant_name')]
+                        'CRM data itself is never capped on any plan. Every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. :name, the AI assistant, does not meter credits on a self-hosted install, so no credit limit applies. See "Are self-hosted installs exempt from AI credit limits?" below.',
+                        ['name' => config('chat.assistant_name')]
                     );
                 }
             @endphp
@@ -248,9 +244,11 @@
                     [__("What's included in the hosted plan?"), $hostedPlanAnswer],
                     ...($billingActive ? [$trialFaq] : []),
                     [__('What happens when I hit a plan limit?'), $planLimitAnswer],
-                    [__('What counts as an AI credit?'), $creditFaqAnswer],
-                    [__('Which AI models does my plan unlock?'), $modelsUnlockAnswer],
-                    [__('Is there a message rate limit?'), $rateLimitAnswer],
+                    ...($billingActive ? [
+                        [__('What counts as an AI credit?'), $creditFaqAnswer],
+                        [__('Which AI models does my plan unlock?'), $modelsUnlockAnswer],
+                        [__('Is there a message rate limit?'), $rateLimitAnswer],
+                    ] : []),
                     [__('Are self-hosted installs exempt from AI credit limits?'), $selfHostedCreditAnswer],
                     [
                         __('Can I switch between self-hosted and cloud?'),

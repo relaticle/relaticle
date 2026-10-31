@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services;
 
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
+use App\Models\Workspace;
 use Relaticle\Chat\Support\CatalogEntry;
 use Relaticle\Chat\Support\ModelDescriptor;
 
@@ -162,12 +164,13 @@ final readonly class ModelRegistry
     }
 
     /** @return list<string> */
-    public function allowedIdsFor(Plan $plan): array
+    public function allowedIdsFor(?Workspace $workspace): array
     {
+        $entitlements = resolve(Entitlements::class);
         $ids = ['auto'];
 
         foreach ($this->available() as $model) {
-            if ($model->allowedForPlan($plan)) {
+            if ($entitlements->allowsModel($workspace, $model)) {
                 $ids[] = $model->id;
             }
         }

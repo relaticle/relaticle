@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource;
 use Relaticle\SystemAdmin\Filament\Resources\AiCreditBalanceResource\Pages\EditAiCreditBalance;
@@ -17,6 +19,7 @@ use Tests\Helpers\OverviewData;
 mutates(AiCreditBalanceResource::class);
 
 beforeEach(function (): void {
+    Feature::define(Billing::class, true);
     $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
     Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
 });
@@ -139,4 +142,12 @@ it('filters balances of trialing workspaces', function (): void {
         ->filterTable('trialing')
         ->assertCanSeeTableRecords([$trialBalance])
         ->assertCanNotSeeTableRecords([$freeBalance]);
+});
+
+it('hides credit balances from the panel when billing is off', function (): void {
+    Feature::define(Billing::class, false);
+
+    expect(AiCreditBalanceResource::canAccess())->toBeFalse();
+
+    $this->get(AiCreditBalanceResource::getUrl())->assertForbidden();
 });

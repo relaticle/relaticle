@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Laravel\Cashier\Subscription;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\SystemAdmin\Actions\TransferWorkspaceBilling;
 use Relaticle\SystemAdmin\Exceptions\TransferRefused;
@@ -161,6 +163,8 @@ it('keeps the source on its sysadmin-assigned plan when it differs from the tran
 });
 
 it('grants the target the Pro allowance, drops the source to Free and keeps purchased credits', function (): void {
+    Feature::define(Billing::class, true);
+
     [$source, $target, $subscription] = transferPair();
 
     AiCreditBalance::query()
@@ -183,6 +187,8 @@ it('grants the target the Pro allowance, drops the source to Free and keeps purc
 });
 
 it('anchors the target credit period on the original subscription start date', function (): void {
+    Feature::define(Billing::class, true);
+
     [, $target, $subscription] = transferPair();
 
     $anchor = now()->subDays(40)->startOfHour();
@@ -201,6 +207,8 @@ it('anchors the target credit period on the original subscription start date', f
 });
 
 it('falls back the source credit period to the calendar month, not the moved subscription anchor', function (): void {
+    Feature::define(Billing::class, true);
+
     $this->travelTo(new DateTimeImmutable('2026-06-15 12:00:00', new DateTimeZone('UTC')));
 
     [$source, $target, $subscription] = transferPair();

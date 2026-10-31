@@ -189,9 +189,7 @@ it('notifies a newly assigned member with a deep-link that opens the task edit m
     $task = Task::query()->where('title', 'Assigned Task')->sole();
     $url = TaskAssignedNotification::present($assignee->notifications()->sole())->getActions()[0]->getUrl();
 
-    expect($url)->toContain('/tasks')
-        ->and($url)->toContain('tableAction=edit')
-        ->and($url)->toContain('tableActionRecord='.$task->getKey());
+    expect($url)->toEndWith('/tasks?task='.$task->getKey());
 });
 
 it('notifies only the assignees submitted through the create action', function (): void {
@@ -279,6 +277,36 @@ it('opens a task read-only for a member who can view but not edit it', function 
         ->mountAction(TestAction::make('view')->table($record))
         ->assertActionMounted(TestAction::make('view')->table($record))
         ->assertSchemaStateSet(['title' => 'Read me']);
+});
+
+it('keeps the open task in the address bar as ?task= and drops it on close', function (): void {
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(ManageTasks::class)
+        ->assertSet('openTaskId', null)
+        ->mountAction(TestAction::make('edit')->table($record))
+        ->assertSet('openTaskId', $record->getKey())
+        ->unmountAction()
+        ->assertSet('openTaskId', null);
+});
+
+it('keeps a ?task= link to a deleted task so the activity log can open it', function (): void {
+    $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $record->delete();
+
+    Livewire::withQueryParams(['task' => $record->getKey()])
+        ->test(ManageTasks::class)
+        ->assertSet('openTaskId', $record->getKey())
+        ->mountAction(TestAction::make('edit')->table($record))
+        ->assertActionMounted(TestAction::make('edit')->table($record));
+});
+
+it('ignores a ?task= link to a task in another workspace', function (): void {
+    $foreign = Task::factory()->create();
+
+    Livewire::withQueryParams(['task' => $foreign->getKey()])
+        ->test(ManageTasks::class)
+        ->assertSet('openTaskId', null);
 });
 
 it('opens the read-only view when a viewer follows a link to edit a task', function (): void {

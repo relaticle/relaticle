@@ -52,6 +52,8 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
 });
 
 it('refunds the reservation when the job fails without ever streaming', function (): void {
+    Feature::define(BillingFeature::class, true);
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     seedConversation($user, 'conv-123');

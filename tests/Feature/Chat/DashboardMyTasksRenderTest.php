@@ -12,9 +12,9 @@ use App\Models\CustomFieldValue;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
-use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -67,6 +67,40 @@ it('renders task rows and the count when the user has qualifying tasks', functio
         ->assertDontSee(__('filament/pages/dashboard.tasks.empty.title'));
 });
 
+it('shows each due date on the viewer calendar and names the year only when it is not this one', function (): void {
+    $this->travelTo(Date::parse('2026-06-01 12:00:00', 'UTC'));
+
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'Asia/Yerevan']);
+    $workspace = $user->currentWorkspace;
+    $dueFieldId = DB::table('custom_fields')
+        ->where('tenant_id', $workspace->id)
+        ->where('entity_type', 'task')
+        ->where('code', 'due_date')
+        ->value('id');
+
+    foreach (['This year' => '2026-09-15 21:30:00', 'Next year' => '2027-01-15 21:30:00'] as $title => $dueAt) {
+        $task = Task::factory()->for($workspace)->create(['title' => $title]);
+        $task->assignees()->attach($user);
+        CustomFieldValue::query()->create([
+            'id' => (string) Str::ulid(),
+            'entity_type' => 'task',
+            'entity_id' => $task->id,
+            'custom_field_id' => $dueFieldId,
+            'tenant_id' => $workspace->id,
+            'datetime_value' => $dueAt,
+        ]);
+    }
+
+    $this->actingAs($user);
+    Filament::setTenant($workspace);
+
+    livewire(Dashboard::class)
+        ->assertSeeHtml('datetime="2026-09-16"')
+        ->assertSeeHtml('>Sep 16</time>')
+        ->assertSeeHtml('datetime="2027-01-16"')
+        ->assertSeeHtml('>Jan 16, 2027</time>');
+});
+
 it('mounts the createTask action on the page', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
@@ -88,12 +122,15 @@ it('edits a task in place from the dashboard', function (): void {
 
     livewire(Dashboard::class)
         ->assertSeeHtml("mountAction('editTask', { task: '{$task->id}' })")
+        ->assertSet('openTaskId', null)
         ->mountAction('editTask', ['task' => $task->id])
         ->assertActionMounted('editTask')
+        ->assertSet('openTaskId', $task->id)
         ->assertSchemaStateSet(['title' => 'Ship the widget', 'assignees' => [$user->id]])
         ->setActionData(['title' => 'Ship the gadget'])
         ->callMountedAction()
         ->assertHasNoActionErrors()
+        ->assertSet('openTaskId', null)
         ->assertSee('Ship the gadget')
         ->assertDontSee('Ship the widget');
 
@@ -114,10 +151,7 @@ it('leaves the task link to the tasks page for a viewer who cannot edit', functi
 
     livewire(Dashboard::class)
         ->assertSee('Ship the widget')
-        ->assertSeeHtml('href="'.e(TaskResource::getUrl('index', [
-            'tableAction' => EditAction::getDefaultName(),
-            'tableActionRecord' => $task->id,
-        ], panel: 'app', tenant: $workspace)).'"')
+        ->assertSeeHtml('href="'.e(TaskResource::getUrl('index', ['task' => $task->id], panel: 'app', tenant: $workspace)).'"')
         ->assertDontSeeHtml("mountAction('editTask'")
         ->mountAction('editTask', ['task' => $task->id])
         ->assertActionNotMounted('editTask');
