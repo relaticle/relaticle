@@ -111,13 +111,7 @@ final readonly class EmailHtmlSanitizer
         ], ' ', $value);
         $neutral = '/^(?:transparent|none|inherit|initial|unset|white|#fff|#ffffff|repeat|repeat-x|repeat-y|no-repeat|scroll|fixed|local|left|right|top|bottom|center|-?[\d.]+[a-z%]*)$/';
 
-        foreach (preg_split('/[\s,\/]+/', trim($value), flags: PREG_SPLIT_NO_EMPTY) ?: [] as $token) {
-            if (preg_match($neutral, $token) !== 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(preg_split('/[\s,\/]+/', trim($value), flags: PREG_SPLIT_NO_EMPTY) ?: [], fn (string $token): bool => preg_match($neutral, $token) !== 1);
     }
 
     /**
