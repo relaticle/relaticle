@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Filament\Concerns\CountsRelatedRecords;
 use App\Filament\Concerns\HasRecordPageLayout;
+use App\Filament\Resources\CompanyResource;
+use App\Filament\Resources\CompanyResource\RelationManagers\EmailsRelationManager;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
@@ -101,4 +103,31 @@ it('raises the notes tab count when a note is added from the tab', function (): 
         '(() => document.querySelector(".fi-record-pane .fi-tabs-item:nth-child(3)").innerText.replace(/\s+/g, " ").trim())()',
         'Notes 1',
     );
+});
+
+it('keeps the active record tab in view on a phone', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Northwind Traders']);
+    $relation = array_search(EmailsRelationManager::class, CompanyResource::getRelations(), true);
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->resize(390, 844)
+        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}?relation={$relation}")
+        ->assertSeeIn('.fi-record-pane .fi-tabs-item.fi-active', 'Emails');
+
+    $inView = <<<'JS'
+        (() => {
+            const tab = document.querySelector('.fi-record-pane .fi-tabs-item.fi-active').getBoundingClientRect();
+            const bar = document.querySelector('.fi-record-pane .fi-tabs').getBoundingClientRect();
+
+            return tab.left >= bar.left && tab.right <= bar.right && window.scrollY === 0;
+        })();
+    JS;
+
+    expect($page->script($inView))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
 });
