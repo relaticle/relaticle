@@ -208,25 +208,33 @@ it('wraps sanitized email html in a scriptless dark-mode preview document', func
         ->not->toContain('<script');
 });
 
-it('marks an email that sets its own colours so the dark reader leaves it as designed', function (string $body): void {
+it('marks an email that paints its own background so the dark reader leaves it as designed', function (string $body): void {
     expect(EmailHtmlSanitizer::sanitize($body))->toContain('<html class="email-own-colors">');
 })->with([
-    'font colour' => '<table><tr><td><font color="#000000">Hi</font></td></tr></table>',
-    'cell background' => '<table><tr><td bgcolor="#ffffff">Hi</td></tr></table>',
-    'inline text colour' => '<p style="color: #333333">Hi</p>',
-    'inline background colour' => '<div style="background-color:#f5f5f5">Hi</div>',
+    'cell bgcolor' => '<table><tr><td bgcolor="#f4f1ea"><font color="#1a2b3c">Hi</font></td></tr></table>',
+    'inline background colour' => '<div style="background-color:#f4f1ea">Hi</div>',
+    'inline background shorthand' => '<div style="padding:8px; background: #0f3d2e url(https://example.test/band.png) no-repeat">Hi</div>',
     'inline background image' => '<div style="background-image: url(https://example.test/hero.png)">Hi</div>',
-    'inline colour scheme' => '<div style="color-scheme: light">Hi</div>',
+    'outlook white page' => '<div style="background:white">Hi</div>',
 ]);
 
-it('leaves an email without colours of its own to the dark reader', function (string $body): void {
+it('leaves an email that paints no background to the dark reader', function (string $body): void {
     expect(EmailHtmlSanitizer::sanitize($body))
         ->toContain('<html>')
         ->not->toContain('<html class="email-own-colors">');
 })->with([
     'plain reply' => '<div dir="ltr"><p>Thanks for the call.</p><blockquote>On Monday you wrote:</blockquote></div>',
+    'apple mail text colour' => '<div style="caret-color: rgb(0, 0, 0); color: rgb(0, 0, 0);">Thanks</div>',
+    'outlook windowtext' => '<span style="font-size:11.0pt;color:windowtext">Thanks</span>',
+    'gmail signature' => '<div style="color:rgb(136,136,136)">Olivia Owner</div>',
+    'font colour' => '<table><tr><td><font color="#000000">Hi</font></td></tr></table>',
+    'transparent background' => '<div style="background:transparent">x</div>',
+    'no background' => '<div style="background:none">x</div>',
+    'shorthand with nothing painted' => '<div style="background: none repeat scroll 0% 0% transparent !important">x</div>',
+    'zero alpha background' => '<div style="background-color: rgba(0, 0, 0, 0)">x</div>',
+    'transparent bgcolor' => '<table><tr><td bgcolor="transparent">x</td></tr></table>',
     'border colour only' => '<table style="border-color: #dddddd"><tr><td>Hi</td></tr></table>',
-    'colour named in the text' => '<p>Pick a color: blue, or a background: none.</p>',
+    'colour named in the text' => '<p>Pick a color: blue, or a background: red.</p>',
 ]);
 
 it('rewrites cid image references to authorized inline attachment urls', function (): void {
