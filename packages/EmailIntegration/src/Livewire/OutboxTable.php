@@ -90,10 +90,10 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ->defaultSort($this->sortSegment(...))
             ->emptyStateHeading(fn (): string => $this->lockedStatus === EmailStatus::FAILED
                 ? __('filament/pages/email-inbox.failed.empty.heading')
-                : __('filament/pages/email-inbox.outbox.empty.heading'))
+                : $this->activeSegment()->emptyStateHeading())
             ->emptyStateDescription(fn (): string => $this->lockedStatus === EmailStatus::FAILED
                 ? __('filament/pages/email-inbox.failed.empty.description')
-                : __('filament/pages/email-inbox.outbox.empty.description'))
+                : $this->activeSegment()->emptyStateDescription())
             ->emptyStateIcon(fn (): Heroicon => $this->lockedStatus === EmailStatus::FAILED
                 ? Heroicon::OutlinedExclamationCircle
                 : Heroicon::OutlinedClock)

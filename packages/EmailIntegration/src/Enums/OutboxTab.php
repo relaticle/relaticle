@@ -28,6 +28,28 @@ enum OutboxTab: string implements HasLabel
         };
     }
 
+    public function emptyStateHeading(): string
+    {
+        return match ($this) {
+            self::QUEUED => __('filament/pages/email-outbox.empty.queued.heading'),
+            self::SCHEDULED => __('filament/pages/email-outbox.empty.scheduled.heading'),
+            self::SENDING => __('filament/pages/email-outbox.empty.sending.heading'),
+            self::FAILED => __('filament/pages/email-inbox.failed.empty.heading'),
+            self::SENT => __('filament/pages/email-outbox.empty.sent.heading'),
+        };
+    }
+
+    public function emptyStateDescription(): string
+    {
+        return match ($this) {
+            self::QUEUED => __('filament/pages/email-outbox.empty.queued.description'),
+            self::SCHEDULED => __('filament/pages/email-outbox.empty.scheduled.description'),
+            self::SENDING => __('filament/pages/email-outbox.empty.sending.description'),
+            self::FAILED => __('filament/pages/email-inbox.failed.empty.description'),
+            self::SENT => __('filament/pages/email-outbox.empty.sent.description'),
+        };
+    }
+
     /**
      * @param  Builder<Email>  $query
      * @return Builder<Email>
