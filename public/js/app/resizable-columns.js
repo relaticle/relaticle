@@ -326,17 +326,15 @@ function ensureGlobalMorphHook() {
     morphHookRegistered = true
 }
 
-// A block laid out at `max-content` takes the width its content asks for, however deep the
-// truncating wrappers go. Restored before the browser paints, so nothing flickers.
-function naturalWidth(element) {
-    if (!element) return 0
+// A block laid out at `max-content` takes the width its content asks for. All writes come before
+// any read, because a read between writes forces a full table layout per element.
+function naturalWidths(elements) {
+    const saved = elements.map((element) => element && { width: element.style.width, maxWidth: element.style.maxWidth })
+    elements.forEach((element) => element && Object.assign(element.style, { width: 'max-content', maxWidth: 'none' }))
+    const widths = elements.map((element) => (element ? element.getBoundingClientRect().width : 0))
+    elements.forEach((element, index) => element && Object.assign(element.style, saved[index]))
 
-    const { width, maxWidth } = element.style
-    Object.assign(element.style, { width: 'max-content', maxWidth: 'none' })
-    const measured = element.getBoundingClientRect().width
-    Object.assign(element.style, { width, maxWidth })
-
-    return measured
+    return widths
 }
 
 // The cells are border-box, so the width a column is given must also cover its 1px divider.
@@ -903,10 +901,9 @@ function registerResizableColumn() {
                 .map((cell) => cell.firstElementChild)
                 .filter(Boolean)
 
-            const widest = Math.max(
-                naturalWidth(label) + horizontalInset(this.column),
-                ...contents.map((content) => naturalWidth(content) + horizontalInset(content.parentElement)),
-            )
+            const insets = [this.column, ...contents.map((content) => content.parentElement)].map(horizontalInset)
+            const widths = naturalWidths([label, ...contents])
+            const widest = Math.max(...widths.map((width, index) => width + insets[index]))
 
             return Math.ceil(Math.min(this.maxWidth, Math.max(this.minWidth, widest)))
         },
