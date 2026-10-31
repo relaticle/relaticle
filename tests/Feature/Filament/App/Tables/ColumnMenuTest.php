@@ -314,6 +314,35 @@ it('keeps a column on its side of the pins when the column manager moves it', fu
     expect(array_slice(columnOrder($component), 0, 2))->toBe([$pinned, $unpinned]);
 })->with('column menu pages');
 
+it('never moves a pinned column', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    [$first, $second] = shownColumns($component, $entity);
+
+    $component->call('pinTableColumn', $first)->call('pinTableColumn', $second);
+    $order = columnOrder($component);
+
+    $component->call('moveTableColumn', $first, null)->call('moveTableColumn', $second, $first);
+
+    expect(columnOrder($component))->toBe($order)
+        ->and(pinnedColumns($component))->toBe([$first, $second]);
+})->with('column menu pages');
+
+it('clears the pins when the column manager resets the columns', function (string $page, CrmEntity $entity): void {
+    $component = livewire($page);
+    $defaultOrder = columnOrder($component);
+    $column = shownColumns($component, $entity)[2];
+
+    $component->call('pinTableColumn', $column)->call('resetTableColumnManager');
+
+    expect(pinnedColumns($component))->toBe([])
+        ->and(columnOrder($component))->toBe($defaultOrder)
+        ->and($component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes())->toMatchArray(['data-column-pinned' => '0']);
+
+    session()->flush();
+
+    expect(pinnedColumns(livewire($page)))->toBe([]);
+})->with('column menu pages');
+
 it('drops a pin for a column the table no longer has', function (string $page, CrmEntity $entity): void {
     $title = $entity->titleColumn();
     $component = livewire($page);
@@ -386,7 +415,7 @@ it('marks pinned headers and cells in the render that pinned them', function (st
 })->with('column menu pages');
 
 it('hashes a state without pins as it did before pins existed', function (): void {
-    expect((new TableStateData(sort: 'name:desc'))->hash())->toBe('3e415bb40e6c0fb63a7d1b11578db3ea');
+    expect(new TableStateData(sort: 'name:desc')->hash())->toBe('3e415bb40e6c0fb63a7d1b11578db3ea');
 });
 
 function columnLabelText(Testable $component, string $column): string

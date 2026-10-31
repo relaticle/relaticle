@@ -459,7 +459,6 @@ it('pins a column from its menu and keeps the pin after a reload', function (): 
     $page = pinFromMenu(companiesTable($this->user, $this->workspace->slug), 'created_at')
         ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
         ->assertScript(sprintf('document.querySelector(`%s`).dataset.columnPinned', columnHeader('name')), '0')
-        ->wait(1)
         ->refresh()
         ->assertPresent(columnHeader('created_at').' .fi-ta-column-handle')
         ->assertScript(headerOrder().'.slice(0, 2)', ['created_at', 'name'])
@@ -519,15 +518,13 @@ function wideCompaniesTable(User $user, string $slug): AwaitableWebpage
 it('keeps pinned columns in place while the table scrolls sideways', function (): void {
     $page = pinFromMenu(pinFromMenu(wideCompaniesTable($this->user, $this->workspace->slug), 'name'), 'created_at');
     waitUntil($page, 'document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")');
-    $edges = leftEdges("document.querySelector(`th[x-data^=\"resizableColumn('name'\"]`)", firstCell('name'), firstCell('created_at'));
+    $edges = leftEdges('document.querySelector("tbody .fi-ta-selection-cell")', "document.querySelector(`th[x-data^=\"resizableColumn('name'\"]`)", firstCell('name'), firstCell('created_at'));
     $before = $page->script($edges);
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
-    waitUntil($page, 'document.querySelector(".fi-ta-content-ctn").scrollLeft > 300')
-        ->wait(0.2)
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
         ->assertScript($edges, $before)
-        ->assertScript('document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")', true)
         ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
         ->assertNoJavaScriptErrors();
 });
@@ -550,9 +547,10 @@ it('moves the pinned columns after a pinned column that is resized', function ()
     JS, columnHeader('name')));
 
     $page->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60);
+    $page->script('window.__saved = 0; Livewire.hook("request", ({ succeed }) => succeed(() => { window.__saved++ })); true');
     $page->script('document.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, pointerId: 1, isPrimary: true }))');
 
-    $page->wait(1)
+    waitUntil($page, 'window.__saved > 0')
         ->assertScript('parseInt('.firstCell('created_at').'.style.left, 10)', $before + 60)
         ->assertNoJavaScriptErrors();
 });
@@ -566,7 +564,7 @@ it('keeps every pin stuck however much of the table the pins cover', function ()
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
-    $page->wait(0.3)
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
         ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('created_at')), true)
         ->assertNoJavaScriptErrors();
@@ -577,7 +575,7 @@ it('keeps pins stuck on a phone-sized screen', function (): void {
 
     $page->script('(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); wrapper.scrollLeft = wrapper.scrollWidth; return true })()');
 
-    $page->wait(0.3)
+    waitUntil($page, 'document.querySelector("table.fi-ta-table").hasAttribute("data-scrolled-x")')
         ->assertScript('document.querySelector("table.fi-ta-table").classList.contains("fi-ta-has-pinned")', true)
         ->assertScript(sprintf('(() => { const cell = %s; const box = cell.getBoundingClientRect(); return box.left < window.innerWidth && document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)?.closest("td") === cell })()', firstCell('name')), true)
         ->assertNoJavaScriptErrors();

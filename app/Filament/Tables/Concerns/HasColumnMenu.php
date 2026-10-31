@@ -19,6 +19,10 @@ trait HasColumnMenu
     #[Locked]
     public array $tableColumnLabels = [];
 
+    /** @var list<string> */
+    #[Locked]
+    public array $tablePinnedColumns = [];
+
     /** @var array<string, string> */
     private array $originalTableColumnLabels = [];
 
@@ -70,10 +74,6 @@ trait HasColumnMenu
             ],
         ];
     }
-
-    /** @var list<string> */
-    #[Locked]
-    public array $tablePinnedColumns = [];
 
     /**
      * @return list<string>
@@ -131,7 +131,7 @@ trait HasColumnMenu
 
     public function moveTableColumn(string $columnName, ?string $beforeColumnName): void
     {
-        if (! $this->hasTableColumn($columnName) || $columnName === $beforeColumnName) {
+        if (! $this->hasTableColumn($columnName) || $columnName === $beforeColumnName || in_array($columnName, $this->tablePinnedColumns, true)) {
             return;
         }
 
@@ -167,11 +167,22 @@ trait HasColumnMenu
     {
         parent::applyTableColumnManager($state, $wasReordered);
 
+        $this->tablePinnedColumns = $this->shownPinnedTableColumns();
         $columns = $this->arrangedTableColumns($this->tableColumns);
 
         if ($columns !== $this->tableColumns) {
             parent::applyTableColumnManager($columns, wasReordered: true);
         }
+    }
+
+    public function resetTableColumnManager(): void
+    {
+        $this->tablePinnedColumns = [];
+
+        parent::resetTableColumnManager();
+
+        // The pins were stamped at boot, and this request renders none.
+        $this->getTable()->resizableColumns();
     }
 
     private function applyTablePins(): void
@@ -209,16 +220,20 @@ trait HasColumnMenu
         $this->applyTableColumnManager($this->tableColumns, wasReordered: true);
     }
 
+    /** @return list<string> */
+    private function shownPinnedTableColumns(): array
+    {
+        return array_column(array_filter($this->tableColumns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE
+            && $item['isToggled']
+            && in_array($item['name'], $this->tablePinnedColumns, true)), 'name');
+    }
+
     /**
      * @param  array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>  $columns
      * @return array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool, columns?: array<int, array{type: string, name: string, label: string, isHidden: bool, isToggled: bool, isToggleable: bool, isToggledHiddenByDefault: ?bool}>}>
      */
     private function arrangedTableColumns(array $columns): array
     {
-        $this->tablePinnedColumns = array_column(array_filter($columns, fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE
-            && $item['isToggled']
-            && in_array($item['name'], $this->tablePinnedColumns, true)), 'name');
-
         $isPinned = fn (array $item): bool => in_array($item['name'], $this->tablePinnedColumns, true);
 
         usort($columns, fn (array $a, array $b): int => $isPinned($b) <=> $isPinned($a));
