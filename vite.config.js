@@ -3,17 +3,18 @@ import {defineConfig, loadEnv} from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
 
-const cloudInputs = (cloud) => cloud ? [
+const cloudInputs = [
     'packages/Cloud/resources/css/cloud.css',
     'packages/Cloud/resources/js/motion.js',
     'packages/Cloud/resources/css/documentation.css',
     'packages/Cloud/resources/js/documentation.js',
     'packages/Cloud/resources/css/filament/app/theme.css',
     'packages/Cloud/resources/css/filament/admin/theme.css',
-].filter((input) => existsSync(new URL(input, import.meta.url))) : [];
+];
 
 export default defineConfig(({mode}) => {
-    const cloud = ['1', 'true', 'yes', 'on'].includes(String(loadEnv(mode, process.cwd(), '').RELATICLE_CLOUD ?? '').trim().toLowerCase());
+    const cloud = ['1', 'true', 'yes', 'on'].includes(String(loadEnv(mode, process.cwd(), '').RELATICLE_CLOUD ?? '').trim().toLowerCase())
+        && existsSync(new URL('packages/Cloud', import.meta.url));
 
     return {
         plugins: [
@@ -29,7 +30,7 @@ export default defineConfig(({mode}) => {
                     'resources/css/filament/app/theme.css',
                     'resources/css/filament/admin/theme.css',
                     // The cloud package is absent from self-hosted builds
-                    ...cloudInputs(cloud),
+                    ...(cloud ? cloudInputs : []),
                 ],
                 refresh: true,
             }),
