@@ -416,9 +416,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     private function prefixedSubject(string $subject): string
     {
         $isForward = $this->replyMode === 'forward';
-        $existingPrefix = $isForward ? '/^\s*(fwd?|wg)\s*:/iu' : '/^\s*(re|aw|sv)\s*:/iu';
+        $existingPrefix = $isForward ? '(fwd?|wg)' : '(re|aw|sv)';
 
-        if (preg_match($existingPrefix, $subject) === 1) {
+        if (preg_match('/^\s*'.$existingPrefix.'\s*(\[\d+\]|\(\d+\))?\s*:/iu', $subject) === 1) {
             return $subject;
         }
 

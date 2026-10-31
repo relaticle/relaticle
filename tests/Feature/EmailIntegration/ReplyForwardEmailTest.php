@@ -296,6 +296,12 @@ it('keeps a prefix the subject already carries instead of adding a second', func
     'forward a WG' => ['forward', 'WG: Angebot', 'WG: Angebot'],
     'forward a reply' => ['forward', 'Re: Pricing', 'Fwd: Re: Pricing'],
     'a word that starts with re' => ['reply', 'Renewal terms', 'Re: Renewal terms'],
+    'reply to a bracket-counted Re' => ['reply', 'Re[2]: Pricing', 'Re[2]: Pricing'],
+    'reply to a parenthesis-counted RE' => ['reply', 'RE(3): Pricing', 'RE(3): Pricing'],
+    'reply all to a counted Aw' => ['reply_all', 'Aw[2]: Angebot', 'Aw[2]: Angebot'],
+    'forward a bracket-counted Fwd' => ['forward', 'Fwd[2]: Pricing', 'Fwd[2]: Pricing'],
+    'forward a parenthesis-counted FW' => ['forward', 'FW(2): Pricing', 'FW(2): Pricing'],
+    'reply to an unclosed count' => ['reply', 'Re[2 Pricing', 'Re: Re[2 Pricing'],
 ]);
 
 it('sends a reply to a Re subject with a single prefix', function (): void {
