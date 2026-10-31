@@ -66,6 +66,25 @@ it('throttles repeated signup submissions on one discovery', function (): void {
         ->assertNotified(__('auth.login.signup_throttled_title'));
 });
 
+it('creates no account from a throttled signup submission', function (): void {
+    $email = 'throttled-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertNotified(__('auth.login.signup_throttled_title'));
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
 it('renders the signup event once and clears the flag', function (): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);
