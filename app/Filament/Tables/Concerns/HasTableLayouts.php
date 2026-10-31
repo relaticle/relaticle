@@ -162,7 +162,11 @@ trait HasTableLayouts
             ->modalDescription(function (array $arguments): ?string {
                 $layout = $this->argumentTableLayout($arguments);
 
-                return $this->isSomeoneElsesTableLayout($layout) ? __('filament/panel.tables.layouts.rename_description_other', ['owner' => $layout?->user?->name]) : null;
+                if (! $this->isSomeoneElsesTableLayout($layout)) {
+                    return null;
+                }
+
+                return __('filament/panel.tables.layouts.rename_description_other', ['owner' => $layout?->user?->name]);
             })
             ->visible(fn (array $arguments): bool => $this->canUpdateArgumentTableLayout($arguments))
             ->fillForm(fn (array $arguments): array => ['name' => $this->argumentTableLayout($arguments)?->name])
