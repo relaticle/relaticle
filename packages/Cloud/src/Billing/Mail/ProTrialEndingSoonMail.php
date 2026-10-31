@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Mail;
 
+use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Bus\Queueable;
@@ -35,6 +36,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
+                'credits' => number_format(Plan::Pro->credits()),
                 'endsOn' => $this->workspace->trial_ends_at?->setTimezone($timezone)->format('M j, Y') ?? '',
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'grandfathered' => $this->workspace->hosted_free_grandfathered_at !== null,

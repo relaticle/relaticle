@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\AppServiceProvider;
@@ -714,6 +715,7 @@ it('reconnects a previously default mailbox without violating the live default c
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     $team = $user->currentWorkspace;
+    $team->forceFill(['plan' => Plan::Pro])->save();
 
     $default = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->default()->create([
         'user_id' => $user->getKey(),
@@ -758,6 +760,7 @@ it('makes the first connected account the default and leaves later connections n
     Bus::fake();
 
     $user = User::factory()->withWorkspace()->create();
+    $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
     $this->actingAs($user);
 
     $connect = function (string $email) use ($user): ConnectedAccount {

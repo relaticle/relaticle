@@ -6,10 +6,9 @@
 
 <div {{ $attributes->class('inline-flex items-center rounded-full bg-gray-100 p-1 dark:bg-white/[0.06]') }} role="group" aria-label="{{ __('Billing interval') }}">
     <button type="button" @click="yearly = true" :aria-pressed="yearly" :class="yearly ? @js($active) : @js($inactive)" class="{{ $segment }}">
-        {{ __('cloud::billing.pro_plan.yearly') }}
-        <span :class="yearly ? 'bg-primary/[0.1] text-primary-700 dark:bg-primary/[0.25] dark:text-primary-300' : 'bg-gray-200/80 text-gray-600 dark:bg-white/[0.08] dark:text-gray-400'" class="rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-none transition-colors duration-200">{{ __('cloud::billing.pro_plan.yearly_save') }}</span>
+        {{ __('cloud::billing.yearly') }}
     </button>
     <button type="button" @click="yearly = false" :aria-pressed="!yearly" :class="yearly ? @js($inactive) : @js($active)" class="{{ $segment }}">
-        {{ __('cloud::billing.pro_plan.monthly') }}
+        {{ __('cloud::billing.monthly') }}
     </button>
 </div>

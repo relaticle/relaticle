@@ -75,7 +75,7 @@ it('hides the trial CTA once the workspace used its trial', function (): void {
 
     livewire(Billing::class)
         ->assertDontSee(__('cloud::billing.trial.start_button'))
-        ->assertSee(__('cloud::billing.upgrade.button'))
+        ->assertSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']))
         ->assertDontSee('@js(', false);
 });
 
@@ -92,7 +92,7 @@ it('asks a paused workspace that never trialed to subscribe, without offering a 
         ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertDontSee(__('cloud::billing.trial.start_button'))
-        ->assertDontSee(__('cloud::billing.upgrade.now'))
+        ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']))
         ->assertDontSee(__('cloud::billing.packs.buy', ['credits' => number_format(1000)]));
 });
 
@@ -222,13 +222,13 @@ it('names the lapsed managed plan on the paused screen and offers to restart it 
 
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
-    endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test');
+    endedSubscriptionOn($workspace, 'managed', 'sub_ended_enterprise', product: 'prod_enterprise_test');
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.paused.heading.managed_ended', ['plan' => 'Cloud Concierge']))
-        ->assertSee(__('cloud::billing.paused.owner_body_managed', ['plan' => 'Cloud Concierge', 'workspace' => $workspace->name]))
-        ->assertSee(__('cloud::billing.paused.restart_managed', ['plan' => 'Cloud Concierge']))
-        ->assertSee('/contact?plan=concierge', false)
+        ->assertSee(__('cloud::billing.paused.heading.managed_ended', ['plan' => 'Enterprise']))
+        ->assertSee(__('cloud::billing.paused.owner_body_managed', ['plan' => 'Enterprise', 'workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.restart_managed', ['plan' => 'Enterprise']))
+        ->assertSee('/contact?plan=enterprise', false)
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertDontSee(__('cloud::billing.paused.heading.subscription_ended'))
         ->assertDontSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]));
@@ -239,12 +239,12 @@ it('names Cloud Pro when Pro ended after an older managed plan', function (): vo
 
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
-    endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test', endedAt: now()->subMonth());
+    endedSubscriptionOn($workspace, 'managed', 'sub_ended_enterprise', product: 'prod_enterprise_test', endedAt: now()->subMonth());
     endedSubscriptionOn($workspace, 'default', 'sub_ended_pro', product: 'prod_pro_test');
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.heading.subscription_ended'))
-        ->assertDontSee(__('cloud::billing.paused.heading.managed_ended', ['plan' => 'Cloud Concierge']));
+        ->assertDontSee(__('cloud::billing.paused.heading.managed_ended', ['plan' => 'Enterprise']));
 });
 
 it('tells a member of a lapsed managed workspace that the owner restarts the plan with us', function (): void {
@@ -252,7 +252,7 @@ it('tells a member of a lapsed managed workspace that the owner restarts the pla
 
     [, $workspace] = billingPageOwner();
     $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
-    endedSubscriptionOn($workspace, 'managed', 'sub_ended_concierge', product: 'prod_concierge_test');
+    endedSubscriptionOn($workspace, 'managed', 'sub_ended_enterprise', product: 'prod_enterprise_test');
     $member = User::factory()->create();
     $workspace->users()->attach($member, ['role' => 'member']);
 
@@ -260,13 +260,13 @@ it('tells a member of a lapsed managed workspace that the owner restarts the pla
     Filament::setTenant($workspace->refresh());
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.paused.member_body_managed', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name, 'plan' => 'Cloud Concierge']))
-        ->assertDontSee(__('cloud::billing.paused.restart_managed', ['plan' => 'Cloud Concierge']));
+        ->assertSee(__('cloud::billing.paused.member_body_managed', ['owner' => $workspace->owner->name, 'workspace' => $workspace->name, 'plan' => 'Enterprise']))
+        ->assertDontSee(__('cloud::billing.paused.restart_managed', ['plan' => 'Enterprise']));
 });
 
 function endedSubscriptionOn(Workspace $workspace, string $type, string $stripeId, string $product, ?CarbonImmutable $endedAt = null): void
 {
-    config()->set('services.stripe.products.concierge', 'prod_concierge_test');
+    config()->set('services.stripe.products.enterprise', 'prod_enterprise_test');
 
     $workspace->subscriptions()->create([
         'type' => $type,
@@ -452,7 +452,7 @@ it('shows manage state for an active subscription', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.manage.button'))
-        ->assertDontSee(__('cloud::billing.upgrade.button'));
+        ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']));
 });
 
 it('says when the first charge lands instead of claiming the plan renews', function (): void {
@@ -543,19 +543,7 @@ it('shows enterprise manual state without upgrade actions', function (): void {
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.enterprise.title'))
-        ->assertDontSee(__('cloud::billing.upgrade.button'));
-});
-
-it('states a Concierge plan as managed once, without repeating the heading in a body', function (): void {
-    withHostedBilling();
-
-    [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['plan' => Plan::Concierge])->save();
-
-    $html = livewire(Billing::class)->html();
-
-    expect(substr_count($html, __('cloud::billing.managed.title')))->toBe(1)
-        ->and($html)->not->toContain(__('cloud::billing.enterprise.body'));
+        ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']));
 });
 
 it('keeps the Enterprise title and body on an Enterprise plan', function (): void {
@@ -569,18 +557,19 @@ it('keeps the Enterprise title and body on an Enterprise plan', function (): voi
         ->assertSee(__('cloud::billing.enterprise.body'));
 });
 
-it('shows Concierge as a managed plan with its allowance and no upgrade actions', function (): void {
+it('shows Enterprise as a managed plan with its allowance and no upgrade actions', function (): void {
     withHostedBilling();
 
     [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
     livewire(Billing::class)
-        ->assertSee(__('billing.plans.cloud_concierge'))
-        ->assertSee(__('cloud::billing.managed.title'))
-        ->assertSee('/ '.number_format(Plan::Concierge->credits()))
+        ->assertSee(__('billing.plans.enterprise'))
+        ->assertSee(__('cloud::billing.enterprise.title'))
+        ->assertSee('/ '.number_format(Plan::Enterprise->credits()))
         ->assertDontSee(__('billing.plans.cloud_pro'))
-        ->assertDontSee(__('cloud::billing.upgrade.button'));
+        ->assertDontSee(__('billing.plans.cloud_scale'))
+        ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']));
 });
 
 it('shows a managed plan, not a pending activation, when a checkout returns', function (Plan $plan): void {
@@ -592,7 +581,7 @@ it('shows a managed plan, not a pending activation, when a checkout returns', fu
     livewire(Billing::class, ['checkout' => Billing::CHECKOUT_SUCCESS])
         ->assertSee(__('cloud::billing.status.managed'))
         ->assertDontSee(__('cloud::billing.upgrade.activating'));
-})->with([Plan::Enterprise, Plan::Concierge]);
+})->with([Plan::Enterprise]);
 
 it('renders read-only info for members', function (): void {
     withHostedBilling();
@@ -783,7 +772,7 @@ it('keeps an Enterprise grant managed after an older subscription ended', functi
         ->assertSee(__('cloud::billing.enterprise.body'))
         ->assertSee('Contact your Relaticle team')
         ->assertSeeHtml('href="https://marketing.test/contact"')
-        ->assertDontSee(__('cloud::billing.upgrade.button'))
+        ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']))
         ->assertDontSee('From $20,000 / year');
 });
 
@@ -806,7 +795,7 @@ it('keeps a managed plan clear while an older Pro subscription is canceling', fu
         ->assertSee('Your current plan is unchanged.')
         ->assertDontSee('After that, workspace access pauses.')
         ->assertDontSee(__('cloud::billing.trial.active_title'));
-})->with([Plan::Enterprise, Plan::Concierge]);
+})->with([Plan::Enterprise]);
 
 it('keeps the managed allowance when an older Pro subscription is past due', function (Plan $plan): void {
     withHostedBilling();
@@ -825,7 +814,7 @@ it('keeps the managed allowance when an older Pro subscription is past due', fun
         ->assertSee('/ '.number_format($plan->credits()))
         ->assertSee('Your previous subscription has a payment issue.')
         ->assertDontSee(__('cloud::billing.manage.past_due_body'));
-})->with([Plan::Enterprise, Plan::Concierge]);
+})->with([Plan::Enterprise]);
 
 it('identifies a manually managed Pro plan without calling it Enterprise', function (): void {
     withHostedBilling();
@@ -859,9 +848,8 @@ afterEach(function (): void {
     StripeRecorder::uninstall();
 });
 
-function managedPageWorkspace(Workspace $workspace, string $status = 'active', Plan $plan = Plan::Concierge, ?Plan $held = null): Subscription
+function managedPageWorkspace(Workspace $workspace, string $status = 'active', Plan $plan = Plan::Enterprise, ?Plan $held = null): Subscription
 {
-    config()->set('services.stripe.products.concierge', 'prod_concierge_test');
     config()->set('services.stripe.products.enterprise', 'prod_enterprise_test');
 
     $workspace->forceFill(['plan' => $held ?? $plan, 'stripe_id' => 'cus_managed_page'])->save();
@@ -951,7 +939,7 @@ it('warns the owner when the managed invoice is overdue', function (): void {
     managedPageWorkspace($workspace, 'past_due');
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']))
+        ->assertSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']))
         ->assertSee(__('cloud::billing.managed.overdue_body', ['button' => __('cloud::billing.manage.button')]))
         ->assertSee('Pay it from '.__('cloud::billing.manage.button').' to keep the plan.');
 });
@@ -976,7 +964,7 @@ it('keeps the plain managed tagline when no subscription bills the plan', functi
     withHostedBilling();
 
     [, $workspace] = billingPageOwner();
-    $workspace->forceFill(['plan' => Plan::Concierge])->save();
+    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.managed.tagline'))
@@ -991,7 +979,7 @@ it('hides the renewal line while the managed invoice is overdue', function (): v
     cacheManagedRenewalForPage();
 
     livewire(Billing::class)
-        ->assertSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']))
+        ->assertSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']))
         ->assertDontSee('Renews');
 });
 
@@ -1009,12 +997,11 @@ it('ignores a managed subscription that sells a plan the workspace does not hold
     withHostedBilling();
 
     [, $workspace] = billingPageOwner();
-    managedPageWorkspace($workspace, 'past_due', Plan::Concierge, held: Plan::Enterprise);
+    managedPageWorkspace($workspace, 'past_due', Plan::Enterprise, held: Plan::Pro);
     cacheManagedRenewalForPage();
 
     livewire(Billing::class)
         ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']))
-        ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']))
         ->assertDontSee('Renews')
         ->assertDontSee(__('cloud::billing.manage.button'));
 });
@@ -1026,7 +1013,7 @@ it('shows no overdue warning while the managed invoice is current', function ():
     managedPageWorkspace($workspace);
 
     livewire(Billing::class)
-        ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']));
+        ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']));
 });
 
 it('opens the Stripe portal with the managed configuration', function (): void {
@@ -1071,9 +1058,9 @@ it('shows a member the managed plan without billing controls', function (): void
     Filament::setTenant($workspace->refresh());
 
     livewire(Billing::class)
-        ->assertSee(__('billing.plans.cloud_concierge'))
+        ->assertSee(__('billing.plans.enterprise'))
         ->assertSee(__('cloud::billing.member.ask_owner', ['owner' => $workspace->owner->name]))
         ->assertDontSee(__('cloud::billing.manage.button'))
         ->assertDontSee('Renews')
-        ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Cloud Concierge']));
+        ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']));
 });

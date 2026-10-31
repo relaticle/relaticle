@@ -31,14 +31,14 @@ final cost settles after the answer completes.
 | Plan | Credits per month | Messages per minute |
 |------|-------------------|---------------------|
 | Cloud Pro and its trial | 2,000 | 30 |
-| Cloud Concierge | 5,000 | 30 |
+| Cloud Scale | 5,000 | 60 |
 | Enterprise | Agreed with your team | Agreed with your team |
 | Self-hosted | Not metered | 60, set by `CHAT_RATE_LIMIT_PER_MINUTE` (0 for no limit) |
 
 Relaticle Cloud has no free plan; what each plan costs is in
 [Billing and plans](/help/workspace/billing-and-plans).
 
-Cloud allowances reset with your billing period. Pro workspaces can also buy
+Cloud allowances reset with your billing period. Paid workspaces can also buy
 credit packs. Purchased credits are only drawn on after the monthly allowance
 and **never expire**. Your remaining balance for the period is shown on the
 **Billing** page, under your workspace name.
@@ -46,7 +46,7 @@ and **never expire**. Your remaining balance for the period is shown on the
 ## When credits run out
 
 On Relaticle Cloud, the chat shows **You've used all your AI credits** with
-your reset date, and new messages wait until then. Nothing else in Relaticle is affected. Pro
+your reset date, and new messages wait until then. Nothing else in Relaticle is affected. Paid
 workspaces get an **Add credits** button on the same notice. The rest of the
 CRM never spends credits; only assistant messages do.
 

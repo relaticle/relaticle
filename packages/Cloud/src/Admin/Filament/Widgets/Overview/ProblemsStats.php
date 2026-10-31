@@ -30,7 +30,7 @@ use Relaticle\SystemAdmin\Metrics\Scopes\StuckAfterSetup;
 
 final class ProblemsStats extends StatsOverviewWidget
 {
-    protected static ?int $sort = 5;
+    protected static ?int $sort = 6;
 
     protected ?string $heading = "What's going wrong?";
 

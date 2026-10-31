@@ -16,6 +16,7 @@ use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
 use Throwable;
@@ -112,6 +113,10 @@ final readonly class CallbackController
             return $this->redirectWithError($request, $user, 'Relaticle needs permission to read your mail. Reconnect and allow every permission.', $workspace);
         }
 
+        if (! $workspace->hasMailboxCapacity() && ! $this->reconnectsMailbox($user, $workspace, $provider, $socialUser)) {
+            return $this->redirectWithError($request, $user, $workspace->plan->mailboxLimitMessage(), $workspace);
+        }
+
         $this->connect($user, $workspace, $provider, $socialUser);
 
         Notification::make()
@@ -145,6 +150,16 @@ final readonly class CallbackController
             hasCalendar: $this->detectCalendarCapability($provider, $grantedScopes),
             hasSend: $this->detectSendCapability($provider, $grantedScopes),
         ));
+    }
+
+    private function reconnectsMailbox(User $user, Workspace $workspace, string $provider, TwoUser $socialUser): bool
+    {
+        return ConnectedAccount::query()
+            ->ownedBy($user, $workspace)
+            ->connected()
+            ->where('provider', $provider)
+            ->where('email_address', $socialUser->getEmail())
+            ->exists();
     }
 
     private function boundWorkspace(Request $request, User $user): ?Workspace

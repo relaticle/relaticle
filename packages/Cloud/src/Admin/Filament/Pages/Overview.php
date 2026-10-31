@@ -11,6 +11,7 @@ use Filament\Widgets\WidgetConfiguration;
 use Override;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\CohortTable;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\MoneyStats;
+use Relaticle\Cloud\Admin\Filament\Widgets\Overview\PlanStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ProblemsStats;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\SalesLeads;
 use Relaticle\Cloud\Admin\Filament\Widgets\Overview\ValueStats;
@@ -43,6 +44,7 @@ final class Overview extends BaseDashboard
     {
         return [
             MoneyStats::class,
+            PlanStats::class,
             ValueStats::class,
             CohortTable::class,
             SalesLeads::class,

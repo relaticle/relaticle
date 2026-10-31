@@ -608,7 +608,7 @@ it('renders managed invoice rows without per-row queries', function (): void {
 
     $overdueWorkspaces = function (int $count): void {
         Workspace::factory()->count($count)->create(['user_id' => $this->user->getKey(), 'personal_workspace' => false])
-            ->each(fn (Workspace $workspace) => $this->user->notify(new ManagedInvoiceOverdueNotification($workspace, Plan::Concierge)));
+            ->each(fn (Workspace $workspace) => $this->user->notify(new ManagedInvoiceOverdueNotification($workspace, Plan::Enterprise)));
     };
     $queriesPerRender = function (): int {
         $component = Livewire::actingAs($this->user)->test(AppDatabaseNotifications::class);

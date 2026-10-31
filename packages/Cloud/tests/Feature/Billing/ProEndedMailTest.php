@@ -65,13 +65,12 @@ it('offers to restart the managed plan that ended instead of selling Pro', funct
         $mail->assertDontSeeInText($proCopy);
     }
 })->with([
-    'concierge' => [Plan::Concierge, 'Cloud Concierge', []],
     'enterprise' => [Plan::Enterprise, 'Enterprise', []],
-    'grandfathered concierge' => [Plan::Concierge, 'Cloud Concierge', ['hosted_free_grandfathered_at' => now()->subYear()]],
+    'grandfathered enterprise' => [Plan::Enterprise, 'Enterprise', ['hosted_free_grandfathered_at' => now()->subYear()]],
 ]);
 
 it('keeps the pause notice in the managed plan mail', function (): void {
-    $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Concierge);
+    $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise);
 
     $mail->assertSeeInHtml(__('mail.pro_ended.paused', ['workspace' => 'Acme']));
 });
@@ -98,8 +97,8 @@ it('says mailbox sync resumes with the managed plan, not a subscription', functi
     $workspace = proEndedWorkspace();
     ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $workspace->id]));
 
-    $mail = ProEndedMail::afterManagedPlan($workspace, Plan::Concierge);
+    $mail = ProEndedMail::afterManagedPlan($workspace, Plan::Enterprise);
 
-    $mail->assertSeeInHtml(__('mail.pro_ended.managed_ended.mailbox_sync_paused', ['plan' => 'Cloud Concierge']));
+    $mail->assertSeeInHtml(__('mail.pro_ended.managed_ended.mailbox_sync_paused', ['plan' => 'Enterprise']));
     $mail->assertDontSeeInHtml(__('mail.pro_ended.mailbox_sync_paused'));
 });

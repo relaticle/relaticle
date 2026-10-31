@@ -32,9 +32,9 @@ it('still shows a bell row stored under the class name it had before the move', 
         fn (): string => __('cloud::billing.payment_failed.notification_title', ['workspace' => 'Aging Workspace']),
     ],
     'managed invoice overdue' => [
-        fn (Workspace $workspace): ManagedInvoiceOverdueNotification => new ManagedInvoiceOverdueNotification($workspace, Plan::Concierge),
+        fn (Workspace $workspace): ManagedInvoiceOverdueNotification => new ManagedInvoiceOverdueNotification($workspace, Plan::Enterprise),
         'App\Notifications\ManagedInvoiceOverdueNotification',
-        fn (): string => __('cloud::billing.managed.overdue_title', ['plan' => Plan::Concierge->marketingLabel()]),
+        fn (): string => __('cloud::billing.managed.overdue_title', ['plan' => Plan::Enterprise->marketingLabel()]),
     ],
 ]);
 

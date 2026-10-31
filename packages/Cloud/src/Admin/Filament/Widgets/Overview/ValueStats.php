@@ -23,7 +23,7 @@ use Relaticle\SystemAdmin\Metrics\Scopes\ReachedFirstValue;
 
 final class ValueStats extends StatsOverviewWidget
 {
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 3;
 
     protected ?string $heading = 'Is anyone getting value?';
 

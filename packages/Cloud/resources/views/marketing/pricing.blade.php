@@ -1,16 +1,19 @@
 @php
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
-    $conciergePrice = number_format(config('relaticle.concierge.price_yearly'));
-    $conciergeCredits = number_format(\App\Enums\Plan::Concierge->credits());
+    $proPlan = \App\Enums\Plan::Pro;
+    $scalePlan = \App\Enums\Plan::Scale;
+    $scaleCredits = number_format($scalePlan->credits());
+    $setupPrice = number_format(config('relaticle.guided_setup.price_yearly'));
     $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
+    $pageTitle = __('Pricing - $:price/mo flat, unlimited users - Relaticle', ['price' => $proPlan->yearlyPricePerMonth()]);
 @endphp
 
 <x-cloud::guest-layout
-    title="Pricing - $19/mo flat, unlimited users - Relaticle"
+    :title="$pageTitle"
     :description="$billingActive
-        ? __('Cloud Pro is $19/mo billed yearly. Cloud Concierge sets it up for you at $:concierge/year. Enterprise from $:price/year. Unlimited users and records.', ['concierge' => $conciergePrice, 'price' => $enterprisePrice])
+        ? __('Cloud Pro is $:pro/mo and Cloud Scale $:scale/mo, billed yearly. Enterprise from $:price/year. Guided setup available at $:setup/year. Unlimited users and records.', ['pro' => $proPlan->yearlyPricePerMonth(), 'scale' => $scalePlan->yearlyPricePerMonth(), 'price' => $enterprisePrice, 'setup' => $setupPrice])
         : __('Self-host for free, or let us run Relaticle for you. Unlimited users and records. No per-seat pricing.')"
-    ogTitle="Pricing - $19/mo flat, unlimited users - Relaticle"
+    :ogTitle="$pageTitle"
 >
     <section class="relative overflow-hidden bg-white pb-16 pt-32 dark:bg-gray-950 md:pb-20 md:pt-40">
         <div class="absolute inset-x-0 top-0 h-[36rem] bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black_20%,transparent_100%)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)]"></div>
@@ -87,10 +90,15 @@
                         : __(':paidPlan additionally unlocks the higher-multiplier models: :paidModels.', ['paidModels' => $paidCloudModels, 'paidPlan' => $paidPlanLabel]),
                 ])));
 
-                $rateLimitAnswer = __(
-                    'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
-                    ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'paidPlan' => $paidPlanLabel]
-                );
+                $rateLimitAnswer = $billingActive
+                    ? __(
+                        'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on Cloud Pro, :scale/minute on Cloud Scale. It exists to stop runaway usage, not to constrain normal work.',
+                        ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'scale' => $scalePlan->rateLimit()]
+                    )
+                    : __(
+                        'Yes. A per-minute cap is shared across the whole workspace, not per person: :free messages/minute on Free, :pro/minute on :paidPlan. It exists to stop runaway usage, not to constrain normal work.',
+                        ['free' => $freeRateLimit, 'pro' => $proRateLimit, 'paidPlan' => $paidPlanLabel]
+                    );
 
                 $selfHostedCreditAnswer = __('Yes. Self-hosted installs do not meter AI credits, so there is no credit limit. You add your own provider key or local model and pay that provider directly. Only a per-minute send limit applies, and the operator sets it.');
 
@@ -100,12 +108,19 @@
                         ['days' => $trialDays, 'proCredits' => $proCredits]
                     );
 
-                    $hostedPriceCell = __('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)');
+                    $hostedPriceCell = __('$:yearlyPerMonth/mo per workspace ($:yearly billed yearly, or $:monthly/mo billed monthly)', [
+                        'yearlyPerMonth' => $proPlan->yearlyPricePerMonth(),
+                        'yearly' => $proPlan->yearlyPrice(),
+                        'monthly' => $proPlan->monthlyPrice(),
+                    ]);
                     $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
                     $hostedPlanAnswer = __(
-                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from :cheapestModel up to :dearestModel, the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. New workspaces start on a :days-day trial automatically, with no card required.',
+                        'Cloud Pro is :price and includes unlimited users and records, every supported AI model from :cheapestModel up to :dearestModel, the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
                         [
-                            'price' => '$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)',
+                            'price' => $hostedPriceCell,
+                            'scaleCredits' => $scaleCredits,
+                            'scaleMailboxes' => $scalePlan->connectedMailboxes(),
+                            'scalePrice' => $scalePlan->yearlyPricePerMonth(),
                             'credits' => $proCredits,
                             'cheapestModel' => $cheapestModel,
                             'dearestModel' => $dearestEntry['label'],
@@ -114,8 +129,8 @@
                         ]
                     );
                     $planLimitAnswer = __(
-                        'CRM data itself is never capped. Every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is :name, the AI assistant: Cloud Pro\'s :credits credits a month reset each billing (or trial) period. Once they are used up, :name declines new chat requests until the next reset. Cloud Pro workspaces can buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
-                        ['credits' => $proCredits, 'name' => config('chat.assistant_name')]
+                        'CRM data itself is never capped. Every plan supports unlimited users, companies, people, opportunities, tasks, and notes. The only metered resource is :name, the AI assistant: Cloud Pro\'s :credits credits a month and Cloud Scale\'s :scaleCredits reset each billing (or trial) period. Once they are used up, :name declines new chat requests until the next reset. Paid workspaces can buy a prepaid credit top-up instead of waiting. Nothing else in the CRM is affected.',
+                        ['credits' => $proCredits, 'scaleCredits' => $scaleCredits, 'name' => config('chat.assistant_name')]
                     );
                 } else {
                     $hostedPriceCell = __('$0/mo per workspace');
@@ -143,33 +158,33 @@
                     <h2 class="font-display text-2xl font-bold tracking-[-0.02em] text-gray-950 dark:text-white sm:text-3xl">{{ __('Choose how you get started') }}</h2>
                     <p class="mt-4 text-base leading-relaxed text-gray-500 dark:text-gray-400">{{ __('The same CRM at the core. A different level of help around it.') }}</p>
                 </div>
-                <div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.02]" role="region" aria-label="{{ __('Compare Cloud Pro, Cloud Concierge and Enterprise') }}">
+                <div class="overflow-hidden rounded-2xl border border-gray-200/80 bg-white dark:border-white/[0.06] dark:bg-white/[0.02]" role="region" aria-label="{{ __('Compare Cloud Pro, Cloud Scale and Enterprise') }}">
                     <table class="w-full text-left text-sm">
-                        <caption class="sr-only">{{ __('Compare Cloud Pro, Cloud Concierge and Enterprise') }}</caption>
+                        <caption class="sr-only">{{ __('Compare Cloud Pro, Cloud Scale and Enterprise') }}</caption>
                         <thead class="hidden border-b border-gray-100 dark:border-white/[0.06] sm:table-header-group">
                             <tr>
                                 <th scope="col" class="w-[28%] px-5 py-4 text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">{{ __('What’s included') }}</th>
-                                <th scope="col" class="w-[24%] bg-primary/[0.04] px-5 py-4 font-semibold text-primary-700 dark:bg-primary/[0.08] dark:text-primary-300">{{ __('billing.plans.cloud_pro') }}</th>
-                                <th scope="col" class="w-[24%] px-5 py-4 font-semibold text-gray-950 dark:text-white">{{ __('billing.plans.cloud_concierge') }}</th>
+                                <th scope="col" class="w-[24%] px-5 py-4 font-semibold text-gray-950 dark:text-white">{{ __('billing.plans.cloud_pro') }}</th>
+                                <th scope="col" class="w-[24%] bg-primary/[0.04] px-5 py-4 font-semibold text-primary-700 dark:bg-primary/[0.08] dark:text-primary-300">{{ __('billing.plans.cloud_scale') }}</th>
                                 <th scope="col" class="w-[24%] px-5 py-4 font-semibold text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-white/[0.06]">
                             @foreach(array_filter([
                                 [__('Users and records'), __('Unlimited'), __('Unlimited'), __('Unlimited')],
-                                [__(':name, the AI assistant', ['name' => config('chat.assistant_name')]), __(':credits credits each month', ['credits' => $proCredits]), __(':credits credits each month', ['credits' => $conciergeCredits]), __('Usage agreed with your team')],
+                                [__(':name, the AI assistant', ['name' => config('chat.assistant_name')]), __(':credits credits each month', ['credits' => $proCredits]), __(':credits credits each month', ['credits' => $scaleCredits]), __(':credits credits each month', ['credits' => number_format(\App\Enums\Plan::Enterprise->credits())])],
                                 \Laravel\Pennant\Feature::active(\App\Features\EmailIntegration::class)
-                                    ? [__('Email and calendar'), __('Gmail and Outlook sync'), __('Gmail and Outlook sync'), __('Gmail and Outlook sync')]
+                                    ? [__('Email and calendar'), __('Up to :count connected mailboxes', ['count' => $proPlan->connectedMailboxes()]), __('Up to :count connected mailboxes', ['count' => $scalePlan->connectedMailboxes()]), __('Unlimited connected mailboxes')]
                                     : null,
-                                [__('Getting started'), __('Self-service setup'), __('Set up for you'), __('Scoped implementation project')],
-                                [__('cloud::billing.comparison.integrations'), __('REST API and MCP server'), __('REST API and MCP server'), __('Custom integrations by agreement')],
+                                [__('cloud::billing.comparison.integrations'), __('REST API and MCP server'), __(':multiplierx REST API and MCP throughput', ['multiplier' => $scalePlan->throughputMultiplier()]), __(':multiplierx throughput and custom integrations by agreement', ['multiplier' => \App\Enums\Plan::Enterprise->throughputMultiplier()])],
+                                [__('Getting started'), __('Self-service setup'), __('Guided setup as an add-on'), __('Guided setup included')],
                                 [__('Hosting and updates'), __('Managed by Relaticle'), __('Managed by Relaticle'), __('Agreed deployment and maintenance')],
-                                [__('cloud::billing.comparison.support'), __('Email support'), __('Changes within one business day'), __('Agreed support with the founding team')],
-                            ]) as [$feature, $pro, $concierge, $enterprise])
+                                [__('cloud::billing.comparison.support'), __('Email support'), __('Priority support'), __('Agreed support with the founding team')],
+                            ]) as [$feature, $pro, $scale, $enterprise])
                                 <tr class="block px-5 py-4 sm:table-row sm:p-0">
                                     <th scope="row" class="block pb-2 text-left font-semibold text-gray-900 dark:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:font-medium">{{ $feature }}</th>
-                                    <td data-label="{{ __('billing.plans.cloud_pro') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-primary-700 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-primary-300 sm:table-cell sm:bg-primary/[0.04] sm:px-5 sm:py-4 sm:align-top sm:before:content-none dark:sm:bg-primary/[0.08]">{{ $pro }}</td>
-                                    <td data-label="{{ __('billing.plans.cloud_concierge') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-gray-900 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:before:content-none">{{ $concierge }}</td>
+                                    <td data-label="{{ __('billing.plans.cloud_pro') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-gray-900 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:before:content-none">{{ $pro }}</td>
+                                    <td data-label="{{ __('billing.plans.cloud_scale') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-primary-700 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-primary-300 sm:table-cell sm:bg-primary/[0.04] sm:px-5 sm:py-4 sm:align-top sm:before:content-none dark:sm:bg-primary/[0.08]">{{ $scale }}</td>
                                     <td data-label="{{ __('billing.plans.enterprise') }}:" class="block py-0.5 text-gray-600 before:mr-1.5 before:font-medium before:text-gray-900 before:content-[attr(data-label)] dark:text-gray-400 dark:before:text-white sm:table-cell sm:px-5 sm:py-4 sm:align-top sm:before:content-none">{{ $enterprise }}</td>
                                 </tr>
                             @endforeach
@@ -257,8 +272,8 @@
                 ];
 
                 if ($billingActive) {
-                    $pricingFaqs[] = [__('cloud::billing.concierge.faq_title'), __('cloud::billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])];
-                    $pricingFaqs[] = [__('cloud::billing.concierge.change_title'), __('cloud::billing.concierge.change_body')];
+                    $pricingFaqs[] = [__('cloud::billing.services.setup.faq_title'), __('cloud::billing.services.setup.faq_body', ['price' => $setupPrice])];
+                    $pricingFaqs[] = [__('cloud::billing.services.setup.change_title'), __('cloud::billing.services.setup.change_body')];
                     $pricingFaqs[] = [__('cloud::billing.enterprise.faq_title'), __('cloud::billing.enterprise.faq_body', ['price' => $enterprisePrice])];
                     $pricingFaqs[] = [__('cloud::billing.enterprise.timeline_title'), __('cloud::billing.enterprise.timeline_body')];
                 }
@@ -323,21 +338,25 @@
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
                             ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
-                        \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Cloud Pro')
-                            ->price('19')
+                        ...collect([$proPlan, $scalePlan])->map(fn (\App\Enums\Plan $plan): \Spatie\SchemaOrg\Offer => \Spatie\SchemaOrg\Schema::offer()
+                            ->name($plan->marketingLabel())
+                            ->price((string) $plan->yearlyPricePerMonth())
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(route('pricing'))
-                            ->description('Per workspace, billed yearly at $228/year ($19/mo); $24/mo billed monthly.'),
+                            ->description(__('Per workspace, billed yearly at $:yearly/year ($:yearlyPerMonth/mo); $:monthly/mo billed monthly.', [
+                                'yearly' => $plan->yearlyPrice(),
+                                'yearlyPerMonth' => $plan->yearlyPricePerMonth(),
+                                'monthly' => $plan->monthlyPrice(),
+                            ])))->all(),
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Cloud Concierge')
+                            ->name(__('cloud::billing.services.setup.title'))
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
-                                ->price(config('relaticle.concierge.price_yearly'))
+                                ->price(config('relaticle.guided_setup.price_yearly'))
                                 ->priceCurrency('USD')
                                 ->unitText('year'))
-                            ->url(route('contact', ['plan' => 'concierge']))
-                            ->description(__('cloud::billing.concierge.faq_body', ['credits' => $conciergeCredits, 'pro_credits' => $proCredits, 'price' => $conciergePrice])),
+                            ->url(route('contact', ['plan' => 'setup']))
+                            ->description(__('cloud::billing.services.setup.faq_body', ['price' => $setupPrice])),
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name('Enterprise')
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()

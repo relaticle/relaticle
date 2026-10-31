@@ -134,7 +134,7 @@ dataset('non-essential mailables', [
     'managed plan ended' => function (User $user, Workspace $workspace): Mailable {
         withHostedBilling();
 
-        return ProEndedMail::afterManagedPlan($workspace, Plan::Concierge);
+        return ProEndedMail::afterManagedPlan($workspace, Plan::Enterprise);
     },
     'setup nudge' => fn (User $user, Workspace $workspace): Mailable => new SetupNudgeMail($user, $workspace, 'first_record', 'https://relaticle.test/chat'),
     'task assigned' => fn (User $user, Workspace $workspace): Mailable => new TaskAssignedMail('Call back', 'https://relaticle.test/tasks', $workspace->name),
