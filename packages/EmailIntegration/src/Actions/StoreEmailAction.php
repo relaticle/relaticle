@@ -66,6 +66,7 @@ final readonly class StoreEmailAction
                     'provider_message_id' => $data->providerMessageId,
                     'thread_id' => $data->threadId,
                     'in_reply_to' => $data->inReplyTo,
+                    'references' => $data->references,
                     'subject' => $data->subject,
                     'snippet' => $data->snippet,
                     'sent_at' => $data->sentAt,
@@ -89,14 +90,7 @@ final readonly class StoreEmailAction
                     'body_html' => $data->bodyHtml,
                 ]);
 
-                foreach ($data->participants as $participant) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $email->getKey(),
-                        'email_address' => $participant['email_address'],
-                        'name' => $participant['name'] ?? null,
-                        'role' => $participant['role'],
-                    ]);
-                }
+                $this->storeParticipants($email, $data);
 
                 foreach ($data->attachments as $attachment) {
                     EmailAttachment::query()->create([
@@ -161,6 +155,18 @@ final readonly class StoreEmailAction
             }
 
             throw $exception;
+        }
+    }
+
+    private function storeParticipants(Email $email, FetchedEmailData $data): void
+    {
+        foreach ($data->participants as $participant) {
+            EmailParticipant::query()->create([
+                'email_id' => $email->getKey(),
+                'email_address' => $participant['email_address'],
+                'name' => $participant['name'] ?? null,
+                'role' => $participant['role'],
+            ]);
         }
     }
 

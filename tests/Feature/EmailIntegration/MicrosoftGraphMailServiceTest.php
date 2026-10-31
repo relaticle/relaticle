@@ -1098,3 +1098,35 @@ it('downloads an attachment after a folder move by translating a stored rest id'
     Http::assertSent(fn (Request $r): bool => $r->method() === 'GET'
         && str_contains((string) $r->url(), '/me/messages/IMMUTABLE1/attachments/att-1'));
 });
+
+it('reads In-Reply-To and References from Graph message headers', function (array $headers, ?string $inReplyTo, ?string $references): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'internetMessageHeaders' => $headers,
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1');
+
+    expect($email->inReplyTo)->toBe($inReplyTo)
+        ->and($email->references)->toBe($references);
+})->with([
+    'both headers' => [
+        [
+            ['name' => 'in-reply-to', 'value' => '<parent@acme.example>'],
+            ['name' => 'References', 'value' => '<root@acme.example> <parent@acme.example>'],
+        ],
+        '<parent@acme.example>',
+        '<root@acme.example> <parent@acme.example>',
+    ],
+    'a repeated header keeps the last' => [
+        [
+            ['name' => 'In-Reply-To', 'value' => '<first@acme.example>'],
+            ['name' => 'In-Reply-To', 'value' => '<last@acme.example>'],
+        ],
+        '<last@acme.example>',
+        null,
+    ],
+    'unrelated headers only' => [[['name' => 'X-Foo', 'value' => '<x@acme.example>']], null, null],
+]);
