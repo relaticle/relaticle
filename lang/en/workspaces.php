@@ -304,6 +304,9 @@ return [
         'activity' => [
             'view' => ['label' => 'View the activity log'],
         ],
+        'layouts' => [
+            'manage' => ['label' => 'Edit and delete table layouts shared with the workspace'],
+        ],
     ],
 
     'role_matrix' => [

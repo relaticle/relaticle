@@ -46,6 +46,15 @@ return [
             'title_without_actor' => 'You have a new task',
             'action' => 'View task',
         ],
+        'table_layout_changed' => [
+            'deleted_title' => ':actor deleted your layout ":name"',
+            'deleted_title_without_actor' => 'Your layout ":name" was deleted',
+            'deleted_body' => 'It was on the :table table. Members who used it keep what their table shows.',
+            'unshared_title' => ':actor stopped sharing your layout ":name"',
+            'unshared_title_without_actor' => 'Your layout ":name" is no longer shared',
+            'unshared_body' => 'It is private to you again on the :table table.',
+            'action' => 'Open :table',
+        ],
     ],
 
     'panel' => [

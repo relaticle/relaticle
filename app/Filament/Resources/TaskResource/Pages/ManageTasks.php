@@ -11,7 +11,6 @@ use App\Filament\Concerns\KeepsOpenTaskInUrl;
 use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource;
 use App\Models\Task;
-use Asmit\ResizedColumn\HasResizableColumn;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
@@ -27,7 +26,6 @@ use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 final class ManageTasks extends ManageRecords
 {
     use HasCustomFieldColumns;
-    use HasResizableColumn;
     use HasViewSwitcher;
     use KeepsOpenTaskInUrl;
 

@@ -334,9 +334,9 @@ function assertActionHasMailboxOAuthUrl(
  * Log in through the real two-step login form: type the email and submit to
  * reveal the password field, then type the password and submit again.
  */
-function loginViaBrowser(User $user, ?string $theme = null): AwaitableWebpage
+function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $page = null): AwaitableWebpage
 {
-    $page = test()->visit('/app/login');
+    $page ??= test()->visit('/app/login');
 
     if ($theme !== null) {
         $page = $page->{$theme}();

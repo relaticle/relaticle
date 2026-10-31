@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8b458ef7b37b7becaab7136806db21ed",
+    "content-hash": "823d899db2efe8aa66decb2f39bf04e6",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -200,65 +200,6 @@
                 }
             ],
             "time": "2026-07-23T09:07:33+00:00"
-        },
-        {
-            "name": "asmit/resized-column",
-            "version": "4.0.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/AsmitNepali/resized-column.git",
-                "reference": "7743d92b8d3b8935e2bdb5e99018e544f279f72e"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/AsmitNepali/resized-column/zipball/7743d92b8d3b8935e2bdb5e99018e544f279f72e",
-                "reference": "7743d92b8d3b8935e2bdb5e99018e544f279f72e",
-                "shasum": ""
-            },
-            "require": {
-                "filament/support": "^3.2|^4.0|^5.0"
-            },
-            "require-dev": {
-                "filament/filament": "^4.0",
-                "filament/tables": "^4.0",
-                "orchestra/testbench": "^9.0|^10.0|^11.0",
-                "pestphp/pest": "^3.0 || ^4.0"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "Asmit\\ResizedColumn\\ResizedColumnServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Asmit\\ResizedColumn\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "AsmitNepali",
-                    "email": "mail2asmitnepali@gmail.com"
-                }
-            ],
-            "description": "Resizeable column for filament",
-            "support": {
-                "issues": "https://github.com/AsmitNepali/resized-column/issues",
-                "source": "https://github.com/AsmitNepali/resized-column/tree/v4.0.2"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/asmitnepali",
-                    "type": "github"
-                }
-            ],
-            "time": "2026-07-31T23:55:44+00:00"
         },
         {
             "name": "aws/aws-crt-php",
