@@ -166,9 +166,14 @@ enum Plan: string implements HasColor, HasLabel
         };
     }
 
-    /**
-     * The factor the REST API and MCP per-minute limits are multiplied by.
-     */
+    public function mailboxLimitMessage(): string
+    {
+        return __('filament/pages/email-accounts.notifications.limit_reached.title', [
+            'plan' => $this->getLabel(),
+            'limit' => $this->connectedMailboxes(),
+        ]);
+    }
+
     public function throughputMultiplier(): int
     {
         return match ($this) {
@@ -196,8 +201,7 @@ enum Plan: string implements HasColor, HasLabel
         };
     }
 
-    // Granted by hand and invoiced outside Stripe Managed Payments, which cannot sell a
-    // plan that includes human service, so no Stripe subscription may replace one.
+    // Granted by hand and invoiced outside Stripe, so no Stripe subscription may replace it.
     public function isManaged(): bool
     {
         return match ($this) {

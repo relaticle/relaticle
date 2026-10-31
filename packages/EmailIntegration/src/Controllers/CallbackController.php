@@ -114,7 +114,7 @@ final readonly class CallbackController
         }
 
         if (! $workspace->hasMailboxCapacity() && ! $this->reconnectsMailbox($user, $workspace, $provider, $socialUser)) {
-            return $this->redirectWithError($request, $user, $this->mailboxLimitMessage($workspace), $workspace);
+            return $this->redirectWithError($request, $user, $workspace->plan->mailboxLimitMessage(), $workspace);
         }
 
         $this->connect($user, $workspace, $provider, $socialUser);
@@ -150,14 +150,6 @@ final readonly class CallbackController
             hasCalendar: $this->detectCalendarCapability($provider, $grantedScopes),
             hasSend: $this->detectSendCapability($provider, $grantedScopes),
         ));
-    }
-
-    private function mailboxLimitMessage(Workspace $workspace): string
-    {
-        return __('filament/pages/email-accounts.notifications.limit_reached.title', [
-            'plan' => $workspace->plan->getLabel(),
-            'limit' => $workspace->plan->connectedMailboxes(),
-        ]);
     }
 
     private function reconnectsMailbox(User $user, Workspace $workspace, string $provider, TwoUser $socialUser): bool

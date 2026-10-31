@@ -74,10 +74,7 @@ final readonly class RedirectController
     private function redirectAtMailboxLimit(Workspace $workspace, mixed $returnUrl): RedirectResponse
     {
         Notification::make()
-            ->title(__('filament/pages/email-accounts.notifications.limit_reached.title', [
-                'plan' => $workspace->plan->getLabel(),
-                'limit' => $workspace->plan->connectedMailboxes(),
-            ]))
+            ->title($workspace->plan->mailboxLimitMessage())
             ->danger()
             ->send();
 
