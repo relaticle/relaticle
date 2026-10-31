@@ -264,14 +264,38 @@ it('skips the challenge when keys are set but the flag is off', function (): voi
     expect(User::where('email', $email)->exists())->toBeTrue();
 });
 
-it('refuses a signup from a tor exit relay', function (): void {
+it('refuses a signup from a tor exit relay at the email step', function (): void {
     enableSignupChallengeWithoutTurnstile();
     Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody('127.0.0.1'))]);
     $this->artisan('tor:update-exit-nodes')->assertSuccessful();
 
     $email = 'jane-tor-'.uniqid().'@gmail.com';
 
-    completeSignup($email)->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')]);
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')])
+        ->assertSet('authMethod', null);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('refuses a signup whose address joined the tor exit list after the email step', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::sequence()
+        ->push(torExitListBody())
+        ->push(torExitListBody('127.0.0.1'))]);
+    resolve(TorExitNodes::class)->refresh();
+
+    $email = 'jane-tor-late-'.uniqid().'@gmail.com';
+    $signup = startSignup($email);
+
+    resolve(TorExitNodes::class)->refresh();
+
+    $signup->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')])
+        ->assertSet('authMethod', null);
 
     expect(User::where('email', $email)->exists())->toBeFalse();
 });

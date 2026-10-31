@@ -269,6 +269,8 @@ final class Login extends \Filament\Auth\Pages\Login
             return;
         }
 
+        $this->forgetDiscovery();
+
         throw ValidationException::withMessages([
             'data.email' => __('auth.login.signup_over_tor'),
         ]);
@@ -372,6 +374,10 @@ final class Login extends \Filament\Auth\Pages\Login
             $this->socialProvider = $user->availableSocialAccount()?->provider_name;
             $this->authMethod = $this->socialProvider === null ? 'password' : 'social';
         }, (int) config('auth.timebox_duration', 200_000));
+
+        if ($this->authMethod === 'signup') {
+            $this->assertNotSigningUpOverTor();
+        }
     }
 
     private function assertDiscoveryIsNotRateLimited(string $email): void
