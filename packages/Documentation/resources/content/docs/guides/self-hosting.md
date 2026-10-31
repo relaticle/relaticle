@@ -218,7 +218,7 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, people, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. The API reference at `/developers/api` loads the same spec, so it stays empty until then. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. The API reference at `/developers/api` is relaticle.com's docs page and loads the same spec. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Enable email and calendar sync for Google and Microsoft accounts, the email composer, and the Email & calendar help pages. Requires `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`. Microsoft accounts also need `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The flag also refuses sign-ups from Tor exit relays, which needs no keys. It checks the Tor Project's exit list, refreshed every hour. Sign-in over Tor still works. |
 
@@ -688,10 +688,13 @@ git pull
 composer install --no-dev --optimize-autoloader
 pnpm install --frozen-lockfile && pnpm run build
 php artisan migrate --force
+php artisan optimize
 php artisan up
 php artisan horizon:terminate
 php artisan reverb:restart
 ```
+
+`php artisan optimize` rebuilds the config and route caches, which still name routes the previous release served. If you cache components with `php artisan filament:optimize`, run it again after `php artisan up`. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
 
 Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
