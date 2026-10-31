@@ -7,6 +7,7 @@
 @source "../../../../vendor/relaticle/ink/resources/views";
 @source "../views/docs";
 @source "../views/help";
+@source "../views/overrides";
 @source "../js";
 
 /* The hero mock mirrors the app panel, whose gray is zinc. This bundle's gray is Tailwind's cool gray. */

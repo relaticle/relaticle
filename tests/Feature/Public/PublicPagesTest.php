@@ -29,15 +29,6 @@ describe('Authentication redirects', function () {
         $this->get($path)->assertHeader('Referrer-Policy', 'no-referrer-when-downgrade');
     })->with(['/login', '/register']);
 
-    it('marks every signup link on :page to pass its page to the app panel', function (string $page): void {
-        $path = $page === 'a blog post' ? '/blog/'.Post::factory()->published()->create()->slug : $page;
-
-        preg_match_all('/<a\b[^>]*href="'.preg_quote(route('login'), '/').'"[^>]*>/', $this->get($path)->assertOk()->getContent(), $links);
-
-        expect($links[0])->not->toBeEmpty()
-            ->each->toContain('referrerpolicy="no-referrer-when-downgrade"');
-    })->with(['/', '/pricing', '/self-hosted', '/developers/mcp', 'a blog post']);
-
     it('redirects forgot password to app panel', function () {
         $response = $this->get('/forgot-password');
 

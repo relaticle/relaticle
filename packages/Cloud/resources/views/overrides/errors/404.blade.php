@@ -1,5 +1,5 @@
 @php
-    $suggestion = app(\App\Support\MarketingNavigation::class)->closestTo(request()->path());
+    $suggestion = app(\Relaticle\Cloud\Marketing\Support\MarketingNavigation::class)->closestTo(request()->path());
     $user = auth('web')->user();
     $home = $user || request()->is('app', 'app/*')
         ? ['label' => __('Go to your workspace'), 'url' => $user ? app(\App\Support\Auth\LoginDestination::class)->resolve($user, null) : route('login')]
@@ -14,14 +14,14 @@
     ], fn (?string $url): bool => $url !== null && $url !== $suggestion?->url);
 @endphp
 
-<x-guest-layout :title="__('Page not found').' - Relaticle'" robots="noindex">
+<x-cloud::guest-layout :title="__('Page not found').' - Relaticle'" robots="noindex">
     <section class="relative flex min-h-[calc(100svh-4rem)] items-center overflow-hidden bg-white py-24 dark:bg-gray-950">
         <div class="pointer-events-none absolute inset-x-0 top-0 h-96" aria-hidden="true">
             <svg width="100%" height="100%" class="absolute inset-0 opacity-40 dark:opacity-30">
                 <pattern id="dots-not-found" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.2" fill="#6B7280"/></pattern>
                 <rect width="100%" height="100%" fill="url(#dots-not-found)"/>
             </svg>
-            <x-marketing.interactive-dot-grid-glow/>
+            <x-cloud::marketing.interactive-dot-grid-glow/>
             <div class="absolute inset-0 bg-gradient-to-b from-transparent via-white/70 to-white dark:via-gray-950/70 dark:to-gray-950"></div>
         </div>
 
@@ -42,16 +42,16 @@
 
             <div class="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 @if($suggestion)
-                    <x-marketing.button :href="$suggestion->url" icon-trailing="ri-arrow-right-line">
+                    <x-cloud::marketing.button :href="$suggestion->url" icon-trailing="ri-arrow-right-line">
                         {{ __('Go to :page', ['page' => $suggestion->label]) }}
-                    </x-marketing.button>
-                    <x-marketing.button variant="secondary" :href="$home['url']">
+                    </x-cloud::marketing.button>
+                    <x-cloud::marketing.button variant="secondary" :href="$home['url']">
                         {{ $home['label'] }}
-                    </x-marketing.button>
+                    </x-cloud::marketing.button>
                 @else
-                    <x-marketing.button :href="$home['url']" icon-trailing="ri-arrow-right-line">
+                    <x-cloud::marketing.button :href="$home['url']" icon-trailing="ri-arrow-right-line">
                         {{ $home['label'] }}
-                    </x-marketing.button>
+                    </x-cloud::marketing.button>
                 @endif
             </div>
 
@@ -66,4 +66,4 @@
             </nav>
         </div>
     </section>
-</x-guest-layout>
+</x-cloud::guest-layout>

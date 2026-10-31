@@ -68,6 +68,9 @@ final class CloudServiceProvider extends ServiceProvider
 
         $this->configureBlog();
 
+        // Laravel finds errors::404 under each view path, so this root holds error pages only.
+        config(['view.paths' => [...config('view.paths', []), __DIR__.'/../resources/views/overrides']]);
+
         $this->aliasPreMoveClassNames();
         $this->extendAppPanel();
         $this->extendSystemAdminPanel();
