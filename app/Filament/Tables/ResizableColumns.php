@@ -11,7 +11,9 @@ use Illuminate\Support\Str;
 
 final class ResizableColumns
 {
-    public const int MIN_WIDTH = 40;
+    // Cell padding, the options button reserve, the type icon and the sort chevron take 94px,
+    // so the floor keeps a few characters of the name beside them.
+    public const int MIN_WIDTH = 120;
 
     public const int MAX_WIDTH = 1000;
 
@@ -29,7 +31,9 @@ final class ResizableColumns
         $pinned = method_exists($livewire, 'getPinnedTableColumns') ? $livewire->getPinnedTableColumns() : [];
 
         foreach ($table->getColumns() as $name => $column) {
-            self::stamp($column, $name, $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH, in_array($name, $pinned, true));
+            $width = $widths[$name] ?? self::pixels($column->getWidth()) ?? self::DEFAULT_COLUMN_WIDTH;
+
+            self::stamp($column, $name, max(self::MIN_WIDTH, min(self::MAX_WIDTH, $width)), in_array($name, $pinned, true));
         }
 
         return $table;

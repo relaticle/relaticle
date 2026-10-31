@@ -9,7 +9,6 @@ const ACTIONS_CELL_WIDTH = 64
 
 let dragGuideline = null
 let dragBadge = null
-let resizeMeasureCanvas = null
 
 // The guideline lives inside the scroll wrapper, so a horizontal scroll mid-drag keeps it on
 // the column edge. The badge is fixed and follows the cursor.
@@ -325,6 +324,27 @@ function ensureGlobalMorphHook() {
     window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph)
 
     morphHookRegistered = true
+}
+
+// A block laid out at `max-content` takes the width its content asks for, however deep the
+// truncating wrappers go. Restored before the browser paints, so nothing flickers.
+function naturalWidth(element) {
+    if (!element) return 0
+
+    const { width, maxWidth } = element.style
+    Object.assign(element.style, { width: 'max-content', maxWidth: 'none' })
+    const measured = element.getBoundingClientRect().width
+    Object.assign(element.style, { width, maxWidth })
+
+    return measured
+}
+
+// The cells are border-box, so the width a column is given must also cover its 1px divider.
+function horizontalInset(element) {
+    const style = getComputedStyle(element)
+
+    return ['paddingLeft', 'paddingRight', 'borderLeftWidth', 'borderRightWidth']
+        .reduce((total, property) => total + parseFloat(style[property]), 0)
 }
 
 function createHandleBar() {
@@ -655,7 +675,10 @@ function registerColumnMenu() {
             // A hidden panel still reports its CSS width, which keeps it on screen beside a column at the left edge.
             const rect = detail.trigger.getBoundingClientRect()
             const width = parseFloat(getComputedStyle(this.panel).width) || 0
-            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.min(Math.max(8, window.innerWidth - rect.right), window.innerWidth - width - 8) })
+            // The viewport width without a classic scrollbar, which `fixed` positioning also excludes.
+            const viewportWidth = document.documentElement.clientWidth
+            const right = Math.min(viewportWidth - rect.right, viewportWidth - width - 8)
+            Object.assign(this, detail, { top: rect.bottom + 4, right: Math.max(8, right) })
             this.trigger.setAttribute('aria-expanded', 'true')
 
             this.$nextTick(() => this.items()[0]?.focus())
@@ -866,42 +889,26 @@ function registerResizableColumn() {
             this.$wire.updateResizableColumnWidth(columnName, String(width))
         },
 
-        // `table-layout: fixed` never sizes a column to its content, so the widest visible
-        // text is measured on a canvas instead.
+        // `table-layout: fixed` never sizes a column to its content, so the header label and each
+        // cell's content are laid out at their natural width and measured, icons and padding included.
         autoFit() {
             const width = this.measureContentWidth()
-            if (!width) return
             this.applyWidth(width)
             this.saveWidth(width)
         },
 
         measureContentWidth() {
-            resizeMeasureCanvas ??= document.createElement('canvas')
-            const ctx = resizeMeasureCanvas.getContext('2d')
+            const label = this.column.querySelector(':scope > .fi-ta-resizable-label')
+            const contents = [...this.table.querySelectorAll(this.cellSelector)]
+                .map((cell) => cell.firstElementChild)
+                .filter(Boolean)
 
-            const sampleCell = this.table.querySelector(this.cellSelector)
-            let padding = 24
-            if (sampleCell) {
-                const cellStyle = getComputedStyle(sampleCell)
-                padding = parseFloat(cellStyle.paddingLeft) + parseFloat(cellStyle.paddingRight)
-            }
+            const widest = Math.max(
+                naturalWidth(label) + horizontalInset(this.column),
+                ...contents.map((content) => naturalWidth(content) + horizontalInset(content.parentElement)),
+            )
 
-            const measure = (host, reserve = 0) => {
-                const label = host.querySelector('.fi-ta-resizable-label') ?? host
-                const text = label.textContent.trim()
-                if (!text) return 0
-                const style = getComputedStyle(label)
-                ctx.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
-                return ctx.measureText(text).width + reserve
-            }
-
-            // Leaves room for the header's sort icon and handle.
-            let widest = measure(this.column, 28)
-            this.table.querySelectorAll(this.cellSelector).forEach((cell) => {
-                widest = Math.max(widest, measure(cell))
-            })
-
-            return Math.round(Math.min(this.maxWidth, Math.max(this.minWidth, widest + padding + 2)))
+            return Math.ceil(Math.min(this.maxWidth, Math.max(this.minWidth, widest)))
         },
     }))
 }

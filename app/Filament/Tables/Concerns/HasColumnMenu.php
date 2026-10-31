@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\Concerns;
 
+use App\Enums\ColumnMenuState;
+use App\Filament\Tables\Actions\ColumnMenuAction;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\Icons\Heroicon;
 use Livewire\Attributes\Locked;
 
 trait HasColumnMenu
@@ -18,6 +21,55 @@ trait HasColumnMenu
 
     /** @var array<string, string> */
     private array $originalTableColumnLabels = [];
+
+    /** @return array<int, array<int, ColumnMenuAction>> */
+    public function columnMenuActions(): array
+    {
+        return [
+            [
+                ColumnMenuAction::make('moveLeft')
+                    ->label(__('filament/panel.tables.column_menu.move_left'))
+                    ->icon(Heroicon::ArrowLeft)
+                    ->callsWire('moveTableColumn', ColumnMenuState::LeftTarget)
+                    ->visibleWhen(ColumnMenuState::Movable)
+                    ->enabledWhen(ColumnMenuState::CanMoveLeft)
+                    ->refocus(ColumnMenuState::Column),
+                ColumnMenuAction::make('moveRight')
+                    ->label(__('filament/panel.tables.column_menu.move_right'))
+                    ->icon(Heroicon::ArrowRight)
+                    ->callsWire('moveTableColumn', ColumnMenuState::RightTarget)
+                    ->visibleWhen(ColumnMenuState::Movable)
+                    ->enabledWhen(ColumnMenuState::CanMoveRight)
+                    ->refocus(ColumnMenuState::Column),
+            ],
+            [
+                ColumnMenuAction::make('pin')
+                    ->label(__('filament/panel.tables.column_menu.pin'))
+                    ->icon(Heroicon::LockClosed)
+                    ->callsWire('pinTableColumn')
+                    ->hiddenWhen(ColumnMenuState::Pinned)
+                    ->refocus(ColumnMenuState::Column),
+                ColumnMenuAction::make('unpin')
+                    ->label(__('filament/panel.tables.column_menu.unpin'))
+                    ->icon(Heroicon::LockOpen)
+                    ->callsWire('unpinTableColumn')
+                    ->visibleWhen(ColumnMenuState::Pinned)
+                    ->refocus(ColumnMenuState::Column),
+            ],
+            [
+                ColumnMenuAction::make('editLabel')
+                    ->label(__('filament/panel.tables.column_menu.edit_label'))
+                    ->icon(Heroicon::OutlinedTag)
+                    ->mountsAction('editTableColumnLabel'),
+                ColumnMenuAction::make('hide')
+                    ->label(__('filament/panel.tables.column_menu.hide'))
+                    ->icon(Heroicon::OutlinedEyeSlash)
+                    ->callsWire('hideTableColumn')
+                    ->visibleWhen(ColumnMenuState::Hideable)
+                    ->refocus(ColumnMenuState::Neighbour),
+            ],
+        ];
+    }
 
     /** @var list<string> */
     #[Locked]
