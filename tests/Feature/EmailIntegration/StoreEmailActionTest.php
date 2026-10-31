@@ -60,6 +60,7 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
         attachments: $overrides['attachments'] ?? [],
         providerCategory: $overrides['providerCategory'] ?? null,
         reconciliationMessageId: $overrides['reconciliationMessageId'] ?? null,
+        references: $overrides['references'] ?? null,
     );
 }
 
@@ -858,4 +859,12 @@ it('does not adopt a pending Microsoft send that belongs to another mailbox', fu
         'connected_account_id' => $otherAccount->getKey(),
         'provider_message_id' => 'ms-pending-OTHERMAILBOX',
     ]);
+});
+
+it('stores the References header on the email', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'references' => '<root@acme.example> <parent@acme.example>',
+    ]));
+
+    expect($email->refresh()->references)->toBe('<root@acme.example> <parent@acme.example>');
 });
