@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\Plan;
+use App\Enums\ContactInquiry;
 use App\Features\Billing as BillingFeature;
 use App\Http\Controllers\ContactController;
 use App\Http\Requests\ContactRequest;
@@ -28,11 +28,11 @@ it('carries the Enterprise offer into the inquiry form', function (): void {
         ->assertSee('Workflow and integrations we need:');
 });
 
-it('carries the Concierge offer into the inquiry form', function (): void {
+it('carries the guided setup offer into the inquiry form', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $this->get('/contact?plan=concierge')
-        ->assertSee('Let’s set up your Concierge workspace')
+    $this->get('/contact?plan=setup')
+        ->assertSee('Let’s set up your workspace together')
         ->assertSee('$708 / year')
         ->assertSee('Setup starts once the invoice is paid.')
         ->assertSee('How we sell today:');
@@ -41,10 +41,10 @@ it('carries the Concierge offer into the inquiry form', function (): void {
 it('treats a malformed plan parameter as a general contact', function (): void {
     Feature::define(BillingFeature::class, true);
 
-    $this->get('/contact?plan[]=concierge')
+    $this->get('/contact?plan[]=setup')
         ->assertOk()
         ->assertSee('Get in touch')
-        ->assertDontSee('Let’s set up your Concierge workspace');
+        ->assertDontSee('Let’s set up your workspace together');
 });
 
 it('treats a self-serve plan as a general contact', function (): void {
@@ -52,7 +52,7 @@ it('treats a self-serve plan as a general contact', function (): void {
 
     $this->get('/contact?plan=pro')
         ->assertSee('Get in touch')
-        ->assertDontSee('Let’s set up your Concierge workspace')
+        ->assertDontSee('Let’s set up your workspace together')
         ->assertDontSee('Let’s plan your Enterprise workspace');
 });
 
@@ -89,18 +89,18 @@ it('delivers the Enterprise inquiry details through the contact workflow', funct
         && $mail->data['company'] === 'Northstar Operations');
 });
 
-it('names the Concierge plan on the inquiry mail and keeps it in the redirect', function (): void {
+it('names the guided setup service on the inquiry mail and keeps it in the redirect', function (): void {
     Mail::fake();
     Feature::define(BillingFeature::class, true);
 
-    $this->post('/contact?plan=concierge', honeypotFields() + [
+    $this->post('/contact?plan=setup', honeypotFields() + [
         'name' => 'Maya Chen',
         'email' => 'maya@gmail.com',
         'message' => 'We want Relaticle set up for our twelve person sales team.',
-    ])->assertRedirect('/contact?plan=concierge')->assertSessionHas('success');
+    ])->assertRedirect('/contact?plan=setup')->assertSessionHas('success');
 
-    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->plan === Plan::Concierge
-        && $mail->envelope()->subject === 'New Cloud Concierge inquiry: Maya Chen');
+    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->inquiry === ContactInquiry::Setup
+        && $mail->envelope()->subject === 'New Guided setup inquiry: Maya Chen');
 });
 
 it('keeps the general contact subject and redirect without a managed plan', function (): void {
@@ -113,7 +113,7 @@ it('keeps the general contact subject and redirect without a managed plan', func
         'message' => 'We want Relaticle set up for our twelve person sales team.',
     ])->assertRedirect('/contact')->assertSessionHas('success');
 
-    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->plan === null
+    Mail::assertQueued(NewContactSubmissionMail::class, fn (NewContactSubmissionMail $mail): bool => $mail->inquiry === null
         && $mail->envelope()->subject === 'New contact: Maya Chen');
 });
 

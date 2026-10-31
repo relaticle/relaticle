@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\Billing\CreateProCheckout;
+use App\Actions\Billing\CreateSubscriptionCheckout;
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Billing;
@@ -12,7 +12,7 @@ use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Tests\Helpers\StripeRecorder;
 
-mutates(Billing::class, CreateProCheckout::class);
+mutates(Billing::class, CreateSubscriptionCheckout::class);
 
 beforeEach(function (): void {
     Feature::define(BillingFeature::class, true);
@@ -63,7 +63,7 @@ it('builds a hosted checkout session that keeps managed payments', function (): 
     $recorder = StripeRecorder::install();
     config()->set('services.stripe.managed_payments', true);
 
-    $url = resolve(CreateProCheckout::class)->execute($this->workspace, 'monthly');
+    $url = resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'monthly');
 
     expect($url)->toBe('https://checkout.stripe.com/c/pay/cs_test_fake');
 
@@ -82,7 +82,7 @@ it('returns a paused workspace to a checkout result that reopens it', function (
         'pro_trial_used_at' => now()->subDays(20),
     ])->save();
 
-    resolve(CreateProCheckout::class)->execute($this->workspace->refresh(), 'yearly');
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace->refresh(), Plan::Pro, 'yearly');
 
     expect($recorder->paramsFor('/checkout/sessions')['success_url'])->toEndWith('/billing?checkout=reopened');
 });
@@ -92,7 +92,7 @@ it('carries a running trial into the subscription', function (): void {
     $recorder = StripeRecorder::install();
     $this->workspace->forceFill(['trial_ends_at' => now()->addDays(9)])->save();
 
-    resolve(CreateProCheckout::class)->execute($this->workspace, 'yearly');
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'yearly');
 
     $params = $recorder->paramsFor('/checkout/sessions');
 
@@ -104,7 +104,7 @@ it('does not grant a trial to a workspace whose trial already ended', function (
     $recorder = StripeRecorder::install();
     $this->workspace->forceFill(['trial_ends_at' => now()->subMonth()])->save();
 
-    resolve(CreateProCheckout::class)->execute($this->workspace, 'yearly');
+    resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'yearly');
 
     $params = $recorder->paramsFor('/checkout/sessions');
 
@@ -114,6 +114,6 @@ it('does not grant a trial to a workspace whose trial already ended', function (
 it('rejects an interval that is not on the price map', function (): void {
     StripeRecorder::install();
 
-    expect(fn (): string => resolve(CreateProCheckout::class)->execute($this->workspace, 'weekly'))
+    expect(fn (): string => resolve(CreateSubscriptionCheckout::class)->execute($this->workspace, Plan::Pro, 'weekly'))
         ->toThrow(InvalidArgumentException::class);
 });

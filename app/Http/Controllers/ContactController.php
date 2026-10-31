@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
-use App\Enums\Plan;
+use App\Enums\ContactInquiry;
 use App\Features\Billing;
 use App\Http\Requests\ContactRequest;
 use App\Mail\NewContactSubmissionMail;
@@ -19,7 +19,7 @@ final readonly class ContactController
     public function show(Request $request): View
     {
         return view('contact', [
-            'inquiryPlan' => $this->inquiryPlan($request),
+            'inquiry' => $this->inquiry($request),
         ]);
     }
 
@@ -28,19 +28,19 @@ final readonly class ContactController
         /** @var array{name: string, email: string, company: ?string, message: string} $data */
         $data = $request->validated();
 
-        $plan = $this->inquiryPlan($request);
+        $inquiry = $this->inquiry($request);
 
-        Mail::to(config('relaticle.contact.email'))->send(new NewContactSubmissionMail($data, $plan));
+        Mail::to(config('relaticle.contact.email'))->send(new NewContactSubmissionMail($data, $inquiry));
 
-        return to_route('contact', $plan instanceof Plan ? ['plan' => $plan->value] : [])
+        return to_route('contact', $inquiry instanceof ContactInquiry ? ['plan' => $inquiry->value] : [])
             ->with('success', __('Thanks for reaching out! We\'ll get back to you soon.'));
     }
 
-    private function inquiryPlan(Request $request): ?Plan
+    private function inquiry(Request $request): ?ContactInquiry
     {
-        $requestedPlan = $request->query('plan');
-        $plan = is_string($requestedPlan) ? Plan::tryFrom($requestedPlan) : null;
+        $requested = $request->query('plan');
+        $inquiry = is_string($requested) ? ContactInquiry::tryFrom($requested) : null;
 
-        return $plan?->isManaged() === true && Feature::active(Billing::class) ? $plan : null;
+        return $inquiry instanceof ContactInquiry && Feature::active(Billing::class) ? $inquiry : null;
     }
 }

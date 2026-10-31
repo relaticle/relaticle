@@ -56,7 +56,7 @@ it('cancels managed subscriptions and voids their open invoices when the workspa
 
     /** @var Workspace $workspace */
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
-    $workspace->forceFill(['stripe_id' => 'cus_deleted', 'plan' => Plan::Concierge])->save();
+    $workspace->forceFill(['stripe_id' => 'cus_deleted', 'plan' => Plan::Enterprise])->save();
 
     foreach (['managed' => 'sub_paid_managed', 'managed_pending' => 'sub_pending_managed'] as $type => $stripeId) {
         $workspace->subscriptions()->create([

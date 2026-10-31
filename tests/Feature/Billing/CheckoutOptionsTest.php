@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 use App\Actions\Billing\CreateCreditPackCheckout;
-use App\Actions\Billing\CreateProCheckout;
+use App\Actions\Billing\CreateSubscriptionCheckout;
+use App\Enums\Plan;
 use App\Mail\ProTrialEndingSoonMail;
 use App\Models\User;
 use App\Models\Workspace;
@@ -11,11 +12,13 @@ use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
 
-mutates(CreateProCheckout::class);
+mutates(CreateSubscriptionCheckout::class);
 
 beforeEach(function (): void {
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+    config()->set('services.stripe.prices.scale_yearly', 'price_scale_yearly_test');
 });
 
 function checkoutWorkspace(): Workspace
@@ -35,19 +38,19 @@ function checkoutWorkspace(): Workspace
  */
 function invokeCheckout(string $method, array $args): mixed
 {
-    return (new ReflectionMethod(CreateProCheckout::class, $method))
-        ->invoke(app(CreateProCheckout::class), ...$args);
+    return (new ReflectionMethod(CreateSubscriptionCheckout::class, $method))
+        ->invoke(app(CreateSubscriptionCheckout::class), ...$args);
 }
 
 it('builds monthly checkout options with managed payments enabled', function (): void {
     config()->set('services.stripe.managed_payments', true);
 
-    expect(invokeCheckout('priceId', ['monthly']))->toBe('price_pro_monthly_test')
+    expect(invokeCheckout('priceId', [Plan::Pro, 'monthly']))->toBe('price_pro_monthly_test')
         ->and(invokeCheckout('sessionOptions', [checkoutWorkspace(), false]))->toHaveKey('managed_payments.enabled', true);
 });
 
 it('rejects an interval that is not a configured billing period', function (): void {
-    expect(fn (): mixed => invokeCheckout('priceId', ['weekly']))
+    expect(fn (): mixed => invokeCheckout('priceId', [Plan::Pro, 'weekly']))
         ->toThrow(InvalidArgumentException::class);
 });
 
@@ -60,8 +63,18 @@ it('omits managed payments when the switch is off', function (): void {
 });
 
 it('selects the yearly price for the yearly interval', function (): void {
-    expect(invokeCheckout('priceId', ['yearly']))->toBe('price_pro_yearly_test');
+    expect(invokeCheckout('priceId', [Plan::Pro, 'yearly']))->toBe('price_pro_yearly_test');
 });
+
+it('selects the Scale price for the Scale plan', function (): void {
+    expect(invokeCheckout('priceId', [Plan::Scale, 'monthly']))->toBe('price_scale_monthly_test')
+        ->and(invokeCheckout('priceId', [Plan::Scale, 'yearly']))->toBe('price_scale_yearly_test');
+});
+
+it('rejects a plan that is not sold through checkout', function (Plan $plan): void {
+    expect(fn (): mixed => invokeCheckout('priceId', [$plan, 'yearly']))
+        ->toThrow(InvalidArgumentException::class);
+})->with([Plan::Free, Plan::Enterprise]);
 
 it('points success and cancel urls at the workspace billing page', function (): void {
     $workspace = checkoutWorkspace();

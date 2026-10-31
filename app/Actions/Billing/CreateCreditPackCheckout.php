@@ -16,7 +16,7 @@ final readonly class CreateCreditPackCheckout
     /**
      * Create a one-time Stripe Checkout session for a prepaid credit pack and
      * return its redirect URL. Stripe round-trip, covered by the staging E2E
-     * checklist, not unit tests (same policy as CreateProCheckout).
+     * checklist, not unit tests (same policy as CreateSubscriptionCheckout).
      */
     public function execute(Workspace $workspace, string $pack): string
     {

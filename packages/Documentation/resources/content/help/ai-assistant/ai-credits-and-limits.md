@@ -2,7 +2,7 @@
 title: AI credits and rate limits
 description: How assistant messages spend credits, what each plan includes monthly, and what happens at zero.
 order: 4
-updated: "2026-10-26"
+updated: "2026-10-30"
 related: [help/ai-assistant/choose-an-ai-model, help/workspace/billing-and-plans]
 ---
 
@@ -24,14 +24,14 @@ final cost settles after the answer completes.
 | Plan | Credits per month | Messages per minute |
 |------|-------------------|---------------------|
 | Cloud Pro and its trial | 2,000 | 30 |
-| Cloud Concierge | 5,000 | 30 |
+| Cloud Scale | 5,000 | 60 |
 | Enterprise | Agreed with your team | Agreed with your team |
 | Self-hosted (default) | 300 | 10 |
 
 Relaticle Cloud has no free plan; what each plan costs is in
 [Billing and plans](/help/workspace/billing-and-plans).
 
-Allowances reset with your billing period. Pro workspaces can also buy credit
+Allowances reset with your billing period. Paid workspaces can also buy credit
 packs. Purchased credits are only drawn on after the monthly allowance and
 **never expire**. Your remaining balance for the period is shown on the
 **Billing** page, under your workspace name.
