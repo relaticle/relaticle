@@ -73,9 +73,9 @@ it('allows a workspace with a managed Enterprise grant', function (): void {
         ->assertOk();
 });
 
-it('allows a Concierge grant whose old trial date has passed', function (): void {
+it('allows an Enterprise grant whose old trial date has passed', function (): void {
     $this->workspace->forceFill([
-        'plan' => Plan::Concierge,
+        'plan' => Plan::Enterprise,
         'trial_ends_at' => now()->subMinute(),
     ])->save();
 

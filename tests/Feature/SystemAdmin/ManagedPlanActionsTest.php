@@ -41,7 +41,6 @@ const INVOICE_DUE_DATE = 1795996800;
 
 beforeEach(function (): void {
     config()->set('cashier.secret', 'sk_test_fake');
-    config()->set('services.stripe.products.concierge', 'prod_concierge_test');
     config()->set('services.stripe.products.enterprise', 'prod_enterprise_test');
     config()->set('services.stripe.managed_days_until_due', 30);
 
@@ -72,7 +71,7 @@ function managedSubscriptionBody(): array
             'data' => [[
                 'id' => 'si_managed_test',
                 'object' => 'subscription_item',
-                'price' => ['id' => 'price_managed_test', 'object' => 'price', 'product' => 'prod_concierge_test'],
+                'price' => ['id' => 'price_managed_test', 'object' => 'price', 'product' => 'prod_enterprise_test'],
                 'quantity' => 1,
             ]],
         ],
@@ -96,10 +95,10 @@ function subscriptionRequests(StripeRecorder $stripe): int
     return count(array_filter($stripe->requests, fn (array $request): bool => str_ends_with($request['url'], '/v1/subscriptions')));
 }
 
-it('starts a Concierge subscription billed by invoice at the configured yearly price', function (): void {
+it('starts an Enterprise subscription billed by invoice at the configured yearly price', function (): void {
     $workspace = managedPlanWorkspace();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     $params = $this->stripe->paramsFor('/v1/subscriptions');
@@ -108,8 +107,8 @@ it('starts a Concierge subscription billed by invoice at the configured yearly p
     expect($params['collection_method'])->toBe('send_invoice')
         ->and($params['days_until_due'])->toBe(30)
         ->and($params['payment_behavior'])->toBe('allow_incomplete')
-        ->and($params['items'][0]['price_data']['unit_amount'])->toBe(70800)
-        ->and($params['items'][0]['price_data']['product'])->toBe('prod_concierge_test')
+        ->and($params['items'][0]['price_data']['unit_amount'])->toBe(2000000)
+        ->and($params['items'][0]['price_data']['product'])->toBe('prod_enterprise_test')
         ->and($params['items'][0]['price_data']['recurring']['interval'])->toBe('year')
         ->and($params['metadata']['workspace_id'])->toBe((string) $workspace->getKey())
         ->and($params['metadata']['type'])->toBe('managed_pending')
@@ -121,7 +120,7 @@ it('starts a Concierge subscription billed by invoice at the configured yearly p
 it('creates the Stripe customer with the owner email and the workspace name', function (): void {
     $workspace = managedPlanWorkspace();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     $params = $this->stripe->paramsFor('/v1/customers');
@@ -135,7 +134,7 @@ it('sets the owner email on an existing Stripe customer that has none', function
     $workspace->forceFill(['stripe_id' => 'cus_existing_test'])->save();
     $this->stripe->respondTo('/v1/customers', ['id' => 'cus_existing_test', 'object' => 'customer', 'email' => null, 'balance' => 0]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     $updates = array_filter(
@@ -151,7 +150,7 @@ it('leaves an existing Stripe customer that already has an email alone', functio
     $workspace->forceFill(['stripe_id' => 'cus_existing_test'])->save();
     $this->stripe->respondTo('/v1/customers', ['id' => 'cus_existing_test', 'object' => 'customer', 'email' => 'billing@example.test', 'balance' => 0]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     $updates = array_filter($this->stripe->requests, fn (array $request): bool => isset($request['params']['email']));
@@ -171,13 +170,11 @@ it('invoices Enterprise at the amount the sysadmin types', function (): void {
         ->and($price['product'])->toBe('prod_enterprise_test');
 });
 
-it('offers each managed plan its default yearly amount', function (): void {
+it('offers Enterprise its default yearly amount', function (): void {
     $workspace = managedPlanWorkspace();
 
     livewire(ListWorkspaces::class)
         ->mountAction(TestAction::make('startManagedPlan')->table($workspace))
-        ->fillForm(['plan' => Plan::Concierge->value])
-        ->assertSchemaStateSet(['amount' => 708])
         ->fillForm(['plan' => Plan::Enterprise->value])
         ->assertSchemaStateSet(['amount' => 20000]);
 });
@@ -189,7 +186,7 @@ it('keeps a paused workspace paused while the managed invoice is unpaid', functi
 
     expect(resolve(Entitlements::class)->allowsAccess($workspace))->toBeFalse();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     expect(resolve(Entitlements::class)->allowsAccess($workspace->refresh()))->toBeFalse();
@@ -209,14 +206,14 @@ it('mails the billing contact the hosted invoice link', function (): void {
     Mail::fake();
     $workspace = managedPlanWorkspace();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708, 'billing_email' => 'finance@example.test'])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000, 'billing_email' => 'finance@example.test'])
         ->assertHasNoActionErrors();
 
     $dueOn = Date::createFromTimestamp(INVOICE_DUE_DATE)->toFormattedDateString();
 
     Mail::assertQueued(ManagedPlanInvoiceMail::class, fn (ManagedPlanInvoiceMail $mail): bool => $mail->hasTo('finance@example.test')
         && str_contains($mail->render(), HOSTED_INVOICE_URL)
-        && str_contains($mail->render(), "is \$708, due {$dueOn}. The plan switches on when it is paid."));
+        && str_contains($mail->render(), "is \$20,000, due {$dueOn}. The plan switches on when it is paid."));
 });
 
 it('mails the billing contact without a due date when Stripe sends none', function (): void {
@@ -224,16 +221,16 @@ it('mails the billing contact without a due date when Stripe sends none', functi
     $workspace = managedPlanWorkspace();
     $this->stripe->respondTo('/v1/invoices/in_managed_test/send', ['id' => 'in_managed_test', 'object' => 'invoice', 'hosted_invoice_url' => HOSTED_INVOICE_URL, 'due_date' => null]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708, 'billing_email' => 'finance@example.test'])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000, 'billing_email' => 'finance@example.test'])
         ->assertHasNoActionErrors();
 
-    Mail::assertQueued(ManagedPlanInvoiceMail::class, fn (ManagedPlanInvoiceMail $mail): bool => str_contains($mail->render(), 'is $708. The plan switches on when it is paid.'));
+    Mail::assertQueued(ManagedPlanInvoiceMail::class, fn (ManagedPlanInvoiceMail $mail): bool => str_contains($mail->render(), 'is $20,000. The plan switches on when it is paid.'));
 });
 
 it('mails nobody when the billing email is empty', function (): void {
     Mail::fake();
 
-    startManagedPlanFor(managedPlanWorkspace(), ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor(managedPlanWorkspace(), ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     Mail::assertNothingQueued();
@@ -242,7 +239,7 @@ it('mails nobody when the billing email is empty', function (): void {
 it('refuses while another managed invoice is unpaid', function (): void {
     $workspace = managedPlanWorkspace();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
@@ -257,7 +254,7 @@ it('tells the sysadmin to reload when Stripe fails to start the plan', function 
 
     Exceptions::fake();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertNotified(
             Notification::make()
                 ->danger()
@@ -277,7 +274,7 @@ it('refuses a second start while the first is still talking to Stripe', function
     $lock = Cache::lock("managed-plan-start:{$workspace->getKey()}", 60);
     $lock->get();
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasActionErrors(['plan']);
 
     $lock->release();
@@ -302,7 +299,7 @@ it('refuses a customer with a Stripe balance', function (): void {
     $workspace->forceFill(['stripe_id' => 'cus_'.Str::ulid()])->save();
     $this->stripe->respondTo('/v1/customers', ['id' => $workspace->stripe_id, 'object' => 'customer', 'email' => null, 'balance' => -5000]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasActionErrors(['plan']);
 
     expect(subscriptionRequests($this->stripe))->toBe(0);
@@ -321,7 +318,7 @@ it('refuses a workspace whose owner is gone', function (): void {
     $workspace = managedPlanWorkspace();
     $workspace->owner()->delete();
 
-    startManagedPlanFor($workspace->refresh(), ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace->refresh(), ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasActionErrors(['plan']);
 
     expect(subscriptionRequests($this->stripe))->toBe(0);
@@ -346,7 +343,7 @@ it('refuses a plan that is not managed when the action is called directly', func
 it('refuses a yearly amount below one dollar when the action is called directly', function (int $amount): void {
     $administrator = SystemAdministrator::factory()->create();
 
-    expect(fn () => resolve(StartManagedPlan::class)->execute($administrator, managedPlanWorkspace(), Plan::Concierge, $amount))
+    expect(fn () => resolve(StartManagedPlan::class)->execute($administrator, managedPlanWorkspace(), Plan::Enterprise, $amount))
         ->toThrow(ValidationException::class);
 
     expect(subscriptionRequests($this->stripe))->toBe(0);
@@ -356,7 +353,7 @@ it('refuses while a pending managed invoice is still open, whatever its Stripe s
     $workspace = managedPlanWorkspace();
     Subscription::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::ManagedPending->value, 'stripe_status' => $status]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasActionErrors(['plan']);
 
     expect(subscriptionRequests($this->stripe))->toBe(0);
@@ -366,7 +363,7 @@ it('starts again after the pending managed invoice was withdrawn', function (str
     $workspace = managedPlanWorkspace();
     Subscription::factory()->create(['workspace_id' => $workspace->getKey(), 'type' => SubscriptionType::ManagedPending->value, 'stripe_status' => $status]);
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     expect(subscriptionRequests($this->stripe))->toBe(1);
@@ -386,7 +383,7 @@ it('hides the action from a sysadmin who cannot manage customer access', functio
 it('forbids a sysadmin without customer access from starting a plan directly', function (): void {
     $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
 
-    expect(fn () => resolve(StartManagedPlan::class)->execute($administrator, managedPlanWorkspace(), Plan::Concierge, 708))
+    expect(fn () => resolve(StartManagedPlan::class)->execute($administrator, managedPlanWorkspace(), Plan::Enterprise, 20000))
         ->toThrow(HttpException::class);
 
     expect(subscriptionRequests($this->stripe))->toBe(0);
@@ -586,7 +583,7 @@ it('offers withdraw on the workspace page right after the invoice is sent', func
     $workspace = managedPlanWorkspace();
 
     livewire(ViewWorkspace::class, ['record' => $workspace->getRouteKey()])
-        ->callAction('startManagedPlan', ['plan' => Plan::Concierge->value, 'amount' => 708, 'amount_confirmation' => 708])
+        ->callAction('startManagedPlan', ['plan' => Plan::Enterprise->value, 'amount' => 20000, 'amount_confirmation' => 20000])
         ->assertHasNoActionErrors()
         ->assertActionVisible('withdrawManagedInvoice');
 });
@@ -596,12 +593,12 @@ it('lets the sysadmin start again after withdrawing', function (): void {
     unpaidManagedSubscription($workspace);
     withLatestInvoiceStatus($this->stripe, 'open');
 
-    startManagedPlanFor($workspace, ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace, ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasActionErrors(['plan']);
 
     withdrawManagedInvoiceFor($workspace)->assertNotified('Invoice withdrawn');
 
-    startManagedPlanFor($workspace->refresh(), ['plan' => Plan::Concierge->value, 'amount' => 708])
+    startManagedPlanFor($workspace->refresh(), ['plan' => Plan::Enterprise->value, 'amount' => 20000])
         ->assertHasNoActionErrors();
 
     expect(subscriptionRequests($this->stripe))->toBe(1);

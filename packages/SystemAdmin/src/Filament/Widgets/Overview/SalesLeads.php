@@ -21,7 +21,7 @@ use Relaticle\SystemAdmin\Metrics\SalesLeadsQuery;
 
 final class SalesLeads extends TableWidget
 {
-    protected static ?int $sort = 4;
+    protected static ?int $sort = 5;
 
     protected int|string|array $columnSpan = 'full';
 

@@ -4,12 +4,7 @@
     ogTitle="Contact: Deployments and integrations - Relaticle"
 >
     @php
-        $inquiry = $inquiryPlan?->value;
-        $inquiryPrice = match ($inquiryPlan) {
-            \App\Enums\Plan::Enterprise => __('billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]),
-            \App\Enums\Plan::Concierge => __('billing.concierge.price', ['price' => number_format(config('relaticle.concierge.price_yearly'))]),
-            default => null,
-        };
+        $inquiryKey = $inquiry?->value;
     @endphp
     <section class="pt-28 pb-20 sm:pt-32 sm:pb-24 bg-white dark:bg-gray-950">
 
@@ -24,16 +19,16 @@
                         </a>
                     @endif
                     <h1 class="font-display text-3xl sm:text-4xl font-bold text-gray-950 dark:text-white tracking-tight leading-tight">
-                        {{ $inquiry ? __("billing.inquiry.{$inquiry}.title") : __('Get in touch') }}
+                        {{ $inquiry ? __("billing.inquiry.{$inquiryKey}.title") : __('Get in touch') }}
                     </h1>
                     <p class="mt-5 text-base text-gray-500 dark:text-gray-400 leading-relaxed max-w-sm">
-                        {{ $inquiry ? __("billing.inquiry.{$inquiry}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
+                        {{ $inquiry ? __("billing.inquiry.{$inquiryKey}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
                     </p>
 
                     @if($inquiry)
                         <div class="mt-6 border-t border-[var(--surface-card-border)] pt-6">
-                            <p class="font-display text-xl font-semibold text-gray-950 dark:text-white">{{ $inquiryPrice }}</p>
-                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __("billing.{$inquiry}.terms") }}</p>
+                            <p class="font-display text-xl font-semibold text-gray-950 dark:text-white">{{ $inquiry->price() }}</p>
+                            <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ $inquiry->terms() }}</p>
                         </div>
                     @endif
 
@@ -71,7 +66,7 @@
                             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ session('success') }}</p>
                         </div>
                     @else
-                        <form method="POST" action="{{ route('contact', $inquiry ? ['plan' => $inquiry] : []) }}" class="space-y-6">
+                        <form method="POST" action="{{ route('contact', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="space-y-6">
                             @csrf
                             <x-honeypot />
 
@@ -81,10 +76,10 @@
 
                             <x-marketing.input label="Company" type="text" name="company" id="company" autocomplete="organization" :value="old('company')" placeholder="Your company"/>
 
-                            <x-marketing.textarea :label="$inquiry ? __('billing.inquiry.'.$inquiry.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message', $inquiry ? __("billing.inquiry.{$inquiry}.message") : '') }}</x-marketing.textarea>
+                            <x-marketing.textarea :label="$inquiry ? __('billing.inquiry.'.$inquiryKey.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message', $inquiry ? __("billing.inquiry.{$inquiryKey}.message") : '') }}</x-marketing.textarea>
 
                             <x-marketing.button type="submit" class="w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
-                                {{ $inquiry ? __("billing.inquiry.{$inquiry}.submit") : __('Send message') }}
+                                {{ $inquiry ? __("billing.inquiry.{$inquiryKey}.submit") : __('Send message') }}
                             </x-marketing.button>
                         </form>
                     @endif

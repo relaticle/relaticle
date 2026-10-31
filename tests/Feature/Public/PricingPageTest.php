@@ -48,7 +48,7 @@ it('keeps self-hosting separate from the three paid plan choices', function (): 
     $crawler = new Crawler((string) $response->getContent());
 
     expect($crawler->filter('#pricing-plans h2')->each(fn (Crawler $heading): string => trim($heading->text())))
-        ->toBe(['Cloud Pro', 'Cloud Concierge', 'Enterprise'])
+        ->toBe(['Cloud Pro', 'Cloud Scale', 'Enterprise'])
         ->and($crawler->filter('#self-hosting a')->attr('href'))->toBe(route('selfHosted'));
 });
 
@@ -159,7 +159,8 @@ it('compares hosted product access with scoped Enterprise services when billing 
         ->assertOk()
         ->assertSee(__('Choose how you get started'))
         ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
-        ->assertSee(__('Scoped implementation project'))
+        ->assertSee(__('Guided setup as an add-on'))
+        ->assertSee(__('Agreed deployment and maintenance'))
         ->assertDontSee(__('$0/mo per workspace'))
         ->assertDontSee(__('Zero-downtime updates and automatic daily backups, handled for you'));
 });
@@ -201,7 +202,7 @@ it('keeps the Enterprise starting price consistent with its annual structured of
         ->and($offer['url'])->toBe(route('contact', ['plan' => 'enterprise']));
 });
 
-it('names Cloud Concierge in the meta description when billing is on', function (): void {
+it('names Cloud Scale and guided setup in the meta description when billing is on', function (): void {
     Feature::define(BillingFeature::class, true);
 
     $response = $this->get('/pricing')->assertOk();
@@ -209,30 +210,55 @@ it('names Cloud Concierge in the meta description when billing is on', function 
         ->filter('meta[name="description"]')
         ->attr('content');
 
-    expect($description)->toContain('Cloud Concierge')
-        ->toContain('$708/year');
+    expect($description)->toContain('Cloud Scale $49/mo')
+        ->toContain('Guided setup available at $708/year')
+        ->not->toContain('Concierge');
 });
 
-it('sells Cloud Concierge through a sales inquiry at its yearly price', function (): void {
+it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
     Feature::define(BillingFeature::class, true);
-    config(['relaticle.concierge.price_yearly' => 1_200]);
 
     $response = $this->get('/pricing')->assertOk();
     $crawler = new Crawler((string) $response->getContent());
-    $card = $crawler->filter('#concierge-plan');
+    $card = $crawler->filter('#scale-plan');
 
-    expect($card->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'concierge']))
-        ->and($card->text())->toContain('$100')
-        ->toContain('$1,200 billed yearly')
-        ->toContain(number_format(Plan::Concierge->credits()).' AI credits / month')
+    expect($card->filter('a')->attr('href'))->toBe(route('login'))
+        ->and($card->text())->toContain('Most popular')
+        ->toContain('$49')
+        ->toContain('$588 billed yearly')
+        ->toContain(number_format(Plan::Scale->credits()).' AI credits / month')
+        ->toContain('Up to '.Plan::Scale->connectedMailboxes().' connected mailboxes')
+        ->and($crawler->filter('#pro-plan')->text())->not->toContain('Most popular');
+
+    $graph = json_decode($crawler->filter('script[type="application/ld+json"]')->text(), true, 512, JSON_THROW_ON_ERROR);
+    $offer = collect(collect($graph['@graph'])->firstWhere('@type', 'Product')['offers'])->firstWhere('name', 'Cloud Scale');
+
+    expect($offer['price'])->toBe('49')
+        ->and($offer['description'])->toContain('$588/year');
+});
+
+it('sells guided setup as a service through a sales inquiry at its yearly price', function (): void {
+    Feature::define(BillingFeature::class, true);
+    config(['relaticle.guided_setup.price_yearly' => 1_200]);
+
+    $response = $this->get('/pricing')->assertOk();
+    $crawler = new Crawler((string) $response->getContent());
+    $strip = $crawler->filter('#guided-setup');
+
+    expect($crawler->filter('#pricing-plans section'))->toHaveCount(3)
+        ->and($strip->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'setup']))
+        ->and($strip->text())->toContain('Guided setup')
+        ->toContain('$1,200 / year')
         ->toContain('Setup starts once the invoice is paid.');
 
     $graph = json_decode($crawler->filter('script[type="application/ld+json"]')->text(), true, 512, JSON_THROW_ON_ERROR);
-    $offer = collect(collect($graph['@graph'])->firstWhere('@type', 'Product')['offers'])->firstWhere('name', 'Cloud Concierge');
+    $offers = collect(collect($graph['@graph'])->firstWhere('@type', 'Product')['offers']);
+    $offer = $offers->firstWhere('name', 'Guided setup');
 
     expect($offer['priceSpecification']['price'])->toBe(1_200)
         ->and($offer['priceSpecification']['unitText'])->toBe('year')
-        ->and($offer['url'])->toBe(route('contact', ['plan' => 'concierge']));
+        ->and($offer['url'])->toBe(route('contact', ['plan' => 'setup']))
+        ->and($offers->pluck('name')->all())->not->toContain('Cloud Concierge');
 });
 
 it('emits accurate product json-ld offers when billing is off', function (): void {
@@ -374,7 +400,8 @@ it('offers Enterprise through a scoped sales inquiry with an annual starting pri
     $card = (new Crawler((string) $response->getContent()))->filter('#enterprise-plan');
 
     expect($card->filter('a')->attr('href'))->toBe(route('contact', ['plan' => 'enterprise']))
-        ->and($card->text())->toContain('Implementation scoped to your workflow');
+        ->and($card->text())->toContain('Everything in Cloud Scale, plus')
+        ->toContain('Guided setup included');
 });
 
 it('does not claim an unconfirmed Enterprise tier is a purchasable offering when billing is off', function (): void {
@@ -524,8 +551,15 @@ it('keeps the plans help article in step with the pricing page', function (): vo
         '$19/mo',
         '$24/mo',
         '$228',
+        '$49/mo',
+        '$59/mo',
+        '$588',
         Workspace::PRO_TRIAL_DAYS.'-day',
         number_format(Plan::Pro->credits()),
+        number_format(Plan::Scale->credits()),
+        Plan::Pro->connectedMailboxes().' connected mailboxes',
+        Plan::Scale->connectedMailboxes().' connected mailboxes',
+        '$'.number_format(config('relaticle.guided_setup.price_yearly')),
         '$'.number_format(config('relaticle.enterprise.starting_price_yearly')),
     ];
 
@@ -543,7 +577,7 @@ it('keeps the credits help article in step with each plan allowance', function (
 
     expect($rows->all())->toBe([
         'Cloud Pro and its trial' => ['Cloud Pro and its trial', number_format(Plan::Pro->credits()), (string) Plan::Pro->rateLimit()],
-        'Cloud Concierge' => ['Cloud Concierge', number_format(Plan::Concierge->credits()), (string) Plan::Concierge->rateLimit()],
+        'Cloud Scale' => ['Cloud Scale', number_format(Plan::Scale->credits()), (string) Plan::Scale->rateLimit()],
         'Enterprise' => ['Enterprise', 'Agreed with your team', 'Agreed with your team'],
         'Self-hosted' => ['Self-hosted', 'Not metered', config('chat.rate_limit_per_minute').', set by CHAT_RATE_LIMIT_PER_MINUTE (0 for no limit)'],
     ]);

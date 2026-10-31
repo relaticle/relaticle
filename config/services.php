@@ -86,9 +86,10 @@ return [
         'prices' => [
             'pro_monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
             'pro_yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
+            'scale_monthly' => env('STRIPE_PRICE_SCALE_MONTHLY'),
+            'scale_yearly' => env('STRIPE_PRICE_SCALE_YEARLY'),
         ],
         'products' => [
-            'concierge' => env('STRIPE_PRODUCT_CONCIERGE') ?: null,
             'enterprise' => env('STRIPE_PRODUCT_ENTERPRISE') ?: null,
         ],
         'portal_configurations' => [
@@ -98,6 +99,7 @@ return [
         'credit_packs' => [
             'small' => ['price' => env('STRIPE_PRICE_CREDITS_1K'), 'credits' => 1_000],
             'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
+            'bulk' => ['price' => env('STRIPE_PRICE_CREDITS_20K'), 'credits' => 20_000],
         ],
     ],
 ];

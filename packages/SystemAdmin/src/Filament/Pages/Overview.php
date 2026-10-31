@@ -10,6 +10,7 @@ use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Widgets\WidgetConfiguration;
 use Relaticle\SystemAdmin\Filament\Widgets\Overview\CohortTable;
 use Relaticle\SystemAdmin\Filament\Widgets\Overview\MoneyStats;
+use Relaticle\SystemAdmin\Filament\Widgets\Overview\PlanStats;
 use Relaticle\SystemAdmin\Filament\Widgets\Overview\ProblemsStats;
 use Relaticle\SystemAdmin\Filament\Widgets\Overview\SalesLeads;
 use Relaticle\SystemAdmin\Filament\Widgets\Overview\ValueStats;
@@ -34,6 +35,7 @@ final class Overview extends BaseDashboard
     {
         return [
             MoneyStats::class,
+            PlanStats::class,
             ValueStats::class,
             CohortTable::class,
             SalesLeads::class,

@@ -34,7 +34,7 @@ final class ManagedPlan
             ->schema([
                 Select::make('plan')
                     ->options(self::planOptions())
-                    ->default(Plan::Concierge->value)
+                    ->default(Plan::Enterprise->value)
                     ->live()
                     ->afterStateUpdated(fn (?string $state, Set $set): mixed => $set('amount', Plan::tryFrom((string) $state)?->defaultYearlyPrice()))
                     ->required(),
@@ -44,7 +44,7 @@ final class ManagedPlan
                     ->integer()
                     ->minValue(1)
                     ->prefix('$')
-                    ->default(Plan::Concierge->defaultYearlyPrice())
+                    ->default(Plan::Enterprise->defaultYearlyPrice())
                     ->required(),
                 TextInput::make('amount_confirmation')
                     ->label('Type the yearly amount again')

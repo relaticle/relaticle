@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Billing;
 
-use App\Actions\Billing\CreateProCheckout;
+use App\Actions\Billing\CreateSubscriptionCheckout;
+use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
@@ -20,7 +21,7 @@ final class UpgradeModal extends Component
 {
     public const string MODAL_ID = 'upgrade-plan';
 
-    public function checkout(string $interval): void
+    public function checkout(string $plan, string $interval): void
     {
         $workspace = $this->workspace();
 
@@ -28,16 +29,16 @@ final class UpgradeModal extends Component
             return;
         }
 
-        // Rejected here so any InvalidArgumentException escaping the action means
-        // a missing price config, which must still reach Flare.
-        if (! in_array($interval, CreateProCheckout::INTERVALS, true)) {
+        $chosen = Plan::tryFrom($plan);
+
+        if (! $chosen instanceof Plan || ! $chosen->isSelfServe() || ! in_array($interval, CreateSubscriptionCheckout::INTERVALS, true)) {
             $this->notifyCheckoutFailed();
 
             return;
         }
 
         try {
-            $this->redirect(resolve(CreateProCheckout::class)->execute($workspace, $interval));
+            $this->redirect(resolve(CreateSubscriptionCheckout::class)->execute($workspace, $chosen, $interval));
         } catch (Throwable $exception) {
             report($exception);
             $this->notifyCheckoutFailed();

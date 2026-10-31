@@ -34,7 +34,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Routing\Middleware\ThrottleRequests;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
@@ -159,8 +159,9 @@ return Application::configure(basePath: dirname(__DIR__))
             );
         }, subdomains: false);
 
+        // The API and MCP limiters read the plan from the token's workspace, so it must be bound first.
         $middleware->prependToPriorityList(
-            before: SubstituteBindings::class,
+            before: ThrottleRequests::class,
             prepend: SetApiWorkspaceContext::class,
         );
 

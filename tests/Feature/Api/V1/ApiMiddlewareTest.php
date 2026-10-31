@@ -2,12 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Models\Company;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\Http\RequestAbility;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\TransientToken;
@@ -125,6 +128,39 @@ describe('rate limit headers', function (): void {
 
         expect((int) $response->headers->get('Retry-After'))->toBeGreaterThan(0)
             ->and($response->headers->get('X-RateLimit-Remaining'))->toBe('0');
+    });
+
+    it('multiplies the API and MCP limits by the plan throughput', function (Plan $plan, int $factor): void {
+        $this->user->currentWorkspace->forceFill(['plan' => $plan])->save();
+
+        $read = Request::create('/api/v1/companies')->setUserResolver(fn (): User => $this->user);
+        $write = Request::create('/api/v1/companies', 'POST')->setUserResolver(fn (): User => $this->user);
+        $maxAttempts = fn (array $limits): array => array_map(fn (Limit $limit): int => $limit->maxAttempts, $limits);
+
+        expect($maxAttempts(RateLimiter::limiter('api')($read)))->toBe([600 * $factor, 300 * $factor])
+            ->and($maxAttempts(RateLimiter::limiter('api')($write)))->toBe([600 * $factor, 60 * $factor])
+            ->and(RateLimiter::limiter('mcp')($read)->maxAttempts)->toBe(120 * $factor);
+    })->with([
+        'Pro' => [Plan::Pro, 1],
+        'Scale' => [Plan::Scale, 3],
+        'Enterprise' => [Plan::Enterprise, 10],
+    ]);
+
+    it('reads the plan throughput from the workspace the token is pinned to, not the one open in the browser', function (): void {
+        $scaleWorkspace = Workspace::factory()->create(['plan' => Plan::Scale]);
+        $scaleWorkspace->users()->attach($this->user, ['role' => 'admin']);
+        $raw = Str::random(40);
+        $token = $this->user->tokens()->create([
+            'name' => 'scale',
+            'token' => hash('sha256', $raw),
+            'abilities' => ['*'],
+            'workspace_id' => $scaleWorkspace->id,
+        ]);
+
+        $response = $this->withToken("{$token->id}|{$raw}")->getJson('/api/v1/companies')->assertOk();
+
+        expect($this->user->fresh()->current_workspace_id)->toBe($this->workspace->id)
+            ->and((int) $response->headers->get('X-RateLimit-Limit'))->toBe(300 * Plan::Scale->throughputMultiplier());
     });
 });
 
