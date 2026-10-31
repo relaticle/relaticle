@@ -15,7 +15,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 mutates(EmailHtmlSanitizer::class);
 
-function openEmailInReader(string $systemTheme, string $bodyHtml): AwaitableWebpage
+function openEmailOnPersonPage(string $systemTheme, ?string $bodyHtml, string $bodyText, int $width = 1440, int $height = 900): AwaitableWebpage
 {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->currentWorkspace;
@@ -27,16 +27,21 @@ function openEmailInReader(string $systemTheme, string $bodyHtml): AwaitableWebp
         'workspace_id' => $workspace->id, 'user_id' => $user->id, 'connected_account_id' => $account->id,
         'subject' => 'Pricing for 40 seats', 'privacy_tier' => EmailPrivacyTier::FULL,
     ]);
-    EmailBody::create(['email_id' => $email->id, 'body_html' => $bodyHtml, 'body_text' => 'Thanks for the call.']);
+    EmailBody::create(['email_id' => $email->id, 'body_html' => $bodyHtml, 'body_text' => $bodyText]);
     $person->emails()->attach($email->id);
     $relation = array_search(EmailsRelationManager::class, PeopleResource::getRelations(), true);
 
-    $page = loginViaBrowser($user, $systemTheme)
+    return loginViaBrowser($user, $systemTheme)
         ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
+        ->resize($width, $height)
         ->navigate("/app/{$workspace->slug}/people/{$person->id}?relation={$relation}")
         ->waitForText('Pricing for 40 seats')
-        ->click('Pricing for 40 seats')
+        ->click('Pricing for 40 seats');
+}
+
+function openEmailInReader(string $systemTheme, string $bodyHtml): AwaitableWebpage
+{
+    $page = openEmailOnPersonPage($systemTheme, $bodyHtml, 'Thanks for the call.')
         ->assertVisible('.fi-email-reader-panel iframe');
 
     waitForReaderFrame($page, "doc.readyState === 'complete' && doc.querySelector('.own') !== null");
@@ -124,4 +129,23 @@ it('renders an Outlook reply that only sets a text colour dark with light text i
 
     $page->screenshot(filename: "email-reader-body-outlook-reply-{$systemTheme}")
         ->assertNoJavaScriptErrors();
+})->with(['inLightMode', 'inDarkMode']);
+
+it('wraps a long link in a text-only email body on a phone', function (string $systemTheme): void {
+    $link = 'https://example.com/pricing?ref='.str_repeat('Q2VudGVycHJpc2VTZWF0cw', 12);
+
+    $page = openEmailOnPersonPage($systemTheme, null, "Here is the quote: {$link}", 390, 844)
+        ->assertVisible('.fi-email-reader-panel pre');
+
+    $wraps = <<<'JS'
+        (() => {
+            const text = document.querySelector('.fi-email-reader-panel pre');
+
+            return text.scrollWidth <= text.clientWidth
+                && text.getBoundingClientRect().right <= document.querySelector('.fi-email-reader-panel').getBoundingClientRect().right;
+        })()
+    JS;
+
+    expect($page->script($wraps))->toBeTrue();
+    $page->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
