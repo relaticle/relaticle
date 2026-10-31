@@ -29,8 +29,6 @@ final class UpgradeModal extends Component
             return;
         }
 
-        // Rejected here so any InvalidArgumentException escaping the action means
-        // a missing price config, which must still reach Flare.
         $chosen = Plan::tryFrom($plan);
 
         if (! $chosen instanceof Plan || ! $chosen->isSelfServe() || ! in_array($interval, CreateSubscriptionCheckout::INTERVALS, true)) {

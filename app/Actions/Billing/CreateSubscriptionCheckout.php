@@ -18,11 +18,6 @@ final readonly class CreateSubscriptionCheckout
 
     public function __construct(private HostedWorkspaceAccess $hostedAccess) {}
 
-    /**
-     * Create the hosted Stripe Checkout session for a self-serve plan and return
-     * its redirect URL. Stripe round-trip, covered by the staging E2E checklist,
-     * not unit tests.
-     */
     public function execute(Workspace $workspace, Plan $plan, string $interval): string
     {
         $builder = $workspace
@@ -43,8 +38,6 @@ final readonly class CreateSubscriptionCheckout
 
     private function priceId(Plan $plan, string $interval): string
     {
-        // Both arrive from the browser, so pin them to the sellable plans and the
-        // known intervals before anything reaches a config lookup.
         throw_unless($plan->isSelfServe(), InvalidArgumentException::class, "Plan [{$plan->value}] is not sold through checkout.");
         throw_unless(in_array($interval, self::INTERVALS, true), InvalidArgumentException::class, "Unsupported billing interval [{$interval}].");
 
