@@ -19,14 +19,14 @@ final class ExtendTrial
     public static function action(): Action
     {
         return Action::make('extendTrial')
-            ->label(fn (Workspace $record): string => self::isRestart($record) ? 'Restart trial' : 'Extend trial')
+            ->label(fn (Workspace $record): string => self::isRestart($record) ? __('cloud::admin.trials.restart') : __('cloud::admin.trials.extend'))
             ->icon('heroicon-o-calendar-days')
             ->authorize('extendTrial')
-            ->modalHeading(fn (Workspace $record): string => self::isRestart($record) ? 'Restart this trial?' : 'Extend this trial?')
+            ->modalHeading(fn (Workspace $record): string => self::isRestart($record) ? __('cloud::admin.trials.restart_heading') : __('cloud::admin.trials.extend_heading'))
             ->modalDescription(fn (Workspace $record): string => self::isRestart($record)
-                ? 'The workspace returns to Pro until the date below and gets a fresh Pro credit allowance. The owner is not emailed.'
-                : 'The trial runs until the date below. Credits refill when the current period ends. The owner is not emailed.')
-            ->modalSubmitActionLabel(fn (Workspace $record): string => self::isRestart($record) ? 'Restart trial' : 'Extend trial')
+                ? __('cloud::admin.trials.restart_description')
+                : __('cloud::admin.trials.extend_description'))
+            ->modalSubmitActionLabel(fn (Workspace $record): string => self::isRestart($record) ? __('cloud::admin.trials.restart') : __('cloud::admin.trials.extend'))
             ->schema([
                 DateTimePicker::make('trial_ends_at')
                     ->label(__('cloud::admin.trials.trial_ends'))
@@ -44,7 +44,7 @@ final class ExtendTrial
 
                 resolve(ExtendWorkspaceTrial::class)->execute($administrator, $record, Date::parse($data['trial_ends_at']));
 
-                Notification::make()->title($restart ? 'Trial restarted' : 'Trial extended')->success()->send();
+                Notification::make()->title($restart ? __('cloud::admin.trials.restarted') : __('cloud::admin.trials.extended'))->success()->send();
             });
     }
 
