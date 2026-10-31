@@ -38,7 +38,7 @@ final class Billing extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-credit-card';
 
-    protected static ?string $slug = 'billing';
+    protected static ?string $slug = self::BILLING_SLUG;
 
     protected string $view = 'cloud::filament.pages.billing';
 

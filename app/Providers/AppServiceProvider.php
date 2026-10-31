@@ -140,10 +140,7 @@ final class AppServiceProvider extends ServiceProvider
         Cashier::useCustomerModel(Workspace::class);
         Cashier::keepPastDueSubscriptionsActive();
 
-        // Cashier attaches signature verification only when the webhook secret
-        // happens to be set, and also exposes an unauthenticated payment route
-        // this app never links to. The webhook is registered by the billing
-        // package instead, so verification is unconditional.
+        // Cashier's own routes verify signatures only when a secret is set; the billing package registers a verified webhook.
         Cashier::ignoreRoutes();
 
         // One batch_uuid per request/job, lazily generated and forgotten between

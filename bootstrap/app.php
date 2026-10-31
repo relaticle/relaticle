@@ -229,15 +229,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $indexes = [
+            $indexes = array_filter([
                 __('Site index') => DocUrl::root().'/llms.txt',
                 __('Help centre') => DocUrl::area(DocUrl::HELP),
                 __('Developer docs') => DocUrl::area(DocUrl::DOCS),
-            ];
-
-            if (Route::has('openapi.json')) {
-                $indexes[__('REST API spec')] = route('openapi.json');
-            }
+                __('REST API spec') => Route::has('openapi.json') ? route('openapi.json') : null,
+            ]);
 
             $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
 

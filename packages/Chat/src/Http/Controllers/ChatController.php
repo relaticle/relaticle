@@ -254,6 +254,7 @@ final readonly class ChatController
 
         $isFree = $workspace->plan === Plan::Free;
         $canTopUp = ! $isFree && $this->billing->sellsCredits($workspace);
+        $billingUrl = $this->billing->url($workspace);
         // Not $workspace->plan->credits(): a past-due workspace refills at the
         // Free allowance, so the plan's figure would name credits it never got.
         $allowance = $this->creditService->allowanceFor($workspace);
@@ -265,11 +266,11 @@ final readonly class ChatController
             'allowance' => $allowance,
             'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),
             'upgrade_available' => $isFree,
-            'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
+            'upgrade_url' => $isFree ? $billingUrl : null,
             // A top-up is only offered when a pack can actually be bought;
             // otherwise the CTA lands on a billing page with nothing to buy.
             'top_up_available' => $canTopUp,
-            'top_up_url' => $canTopUp ? $this->billing->url($workspace) : null,
+            'top_up_url' => $canTopUp ? $billingUrl : null,
         ], 402);
     }
 
