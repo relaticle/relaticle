@@ -28,34 +28,19 @@ final readonly class Extensions
     /** @param Closure(): array<int, Action|ActionGroup> $actions */
     public static function addWorkspaceTableActions(Closure $actions): void
     {
-        app()->extend(self::class, static fn (self $extensions): self => new self(
-            [...$extensions->workspaceTableActions, $actions],
-            $extensions->workspaceBulkActions,
-            $extensions->workspaceHeaderActions,
-            $extensions->workspaceRelationManagers,
-        ));
+        self::extend(table: [$actions]);
     }
 
     /** @param Closure(): array<int, BulkAction> $actions */
     public static function addWorkspaceBulkActions(Closure $actions): void
     {
-        app()->extend(self::class, static fn (self $extensions): self => new self(
-            $extensions->workspaceTableActions,
-            [...$extensions->workspaceBulkActions, $actions],
-            $extensions->workspaceHeaderActions,
-            $extensions->workspaceRelationManagers,
-        ));
+        self::extend(bulk: [$actions]);
     }
 
     /** @param Closure(): array<int, Action|ActionGroup> $actions */
     public static function addWorkspaceHeaderActions(Closure $actions): void
     {
-        app()->extend(self::class, static fn (self $extensions): self => new self(
-            $extensions->workspaceTableActions,
-            $extensions->workspaceBulkActions,
-            [...$extensions->workspaceHeaderActions, $actions],
-            $extensions->workspaceRelationManagers,
-        ));
+        self::extend(header: [$actions]);
     }
 
     // Call from a provider's or a plugin's register(): the panel registers relation managers as Livewire
@@ -63,10 +48,21 @@ final readonly class Extensions
     /** @param list<class-string<RelationManager>> $relationManagers */
     public static function addWorkspaceRelationManagers(array $relationManagers): void
     {
+        self::extend(relationManagers: $relationManagers);
+    }
+
+    /**
+     * @param  list<Closure(): array<int, Action|ActionGroup>>  $table
+     * @param  list<Closure(): array<int, BulkAction>>  $bulk
+     * @param  list<Closure(): array<int, Action|ActionGroup>>  $header
+     * @param  list<class-string<RelationManager>>  $relationManagers
+     */
+    private static function extend(array $table = [], array $bulk = [], array $header = [], array $relationManagers = []): void
+    {
         app()->extend(self::class, static fn (self $extensions): self => new self(
-            $extensions->workspaceTableActions,
-            $extensions->workspaceBulkActions,
-            $extensions->workspaceHeaderActions,
+            [...$extensions->workspaceTableActions, ...$table],
+            [...$extensions->workspaceBulkActions, ...$bulk],
+            [...$extensions->workspaceHeaderActions, ...$header],
             [...$extensions->workspaceRelationManagers, ...$relationManagers],
         ));
     }
