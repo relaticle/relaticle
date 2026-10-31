@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Http;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Client\HttpClientException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -28,7 +29,12 @@ final readonly class TorExitNodes
 
     public function contains(string $ip): bool
     {
-        return isset(Cache::get(self::CACHE_KEY, [])[$ip]);
+        return isset(Cache::get(self::CACHE_KEY)['exits'][$ip]);
+    }
+
+    public function refreshedAt(): ?CarbonImmutable
+    {
+        return Cache::get(self::CACHE_KEY)['refreshed_at'] ?? null;
     }
 
     /**
@@ -54,7 +60,10 @@ final readonly class TorExitNodes
             "The Tor exit list returned only {$exits->count()} addresses.",
         );
 
-        Cache::forever(self::CACHE_KEY, $exits->all());
+        Cache::forever(self::CACHE_KEY, [
+            'exits' => $exits->all(),
+            'refreshed_at' => now(),
+        ]);
 
         return $exits->count();
     }
