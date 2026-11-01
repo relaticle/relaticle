@@ -49,7 +49,7 @@ it('disables the preference when the workspace turned web search off', function 
 
     Livewire::test(WebSearchSettings::class)
         ->assertFormFieldDisabled('web_search')
-        ->assertSee('Your workspace admin turned web search off.')
+        ->assertSee('Your workspace owner turned web search off.')
         ->fillForm(['web_search' => WebSearchPreference::Allow->value]);
 
     expect($this->user->fresh()->ai_preferences['web_search'] ?? null)->toBeNull();
@@ -77,4 +77,32 @@ it('lets only a workspace owner turn web search off', function (): void {
         ->assertNotified();
 
     expect($this->workspace->fresh()->ai_web_search_enabled)->toBeFalse();
+});
+
+it('refuses the owner of another workspace', function (): void {
+    $otherOwner = User::factory()->withWorkspace()->create();
+
+    $this->actingAs($otherOwner);
+
+    Livewire::test(WorkspaceWebSearchSettings::class, ['workspace' => $this->workspace])
+        ->fillForm(['ai_web_search_enabled' => false])
+        ->call('updateWebSearch')
+        ->assertForbidden();
+
+    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeTrue();
+});
+
+it('refuses an admin of the workspace', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => 'admin']);
+    $admin->switchWorkspace($this->workspace);
+
+    $this->actingAs($admin);
+
+    Livewire::test(WorkspaceWebSearchSettings::class, ['workspace' => $this->workspace])
+        ->fillForm(['ai_web_search_enabled' => false])
+        ->call('updateWebSearch')
+        ->assertForbidden();
+
+    expect($this->workspace->fresh()->ai_web_search_enabled)->toBeTrue();
 });

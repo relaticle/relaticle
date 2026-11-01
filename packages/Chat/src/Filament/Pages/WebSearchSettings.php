@@ -72,7 +72,7 @@ final class WebSearchSettings extends Page
                     ->disabled(! $workspaceAllows)
                     ->helperText($workspaceAllows
                         ? __('Search queries go to the AI provider\'s web search. Each search uses 2 credits.')
-                        : __('Your workspace admin turned web search off.'))
+                        : __('Your workspace owner turned web search off.'))
                     ->live()
                     ->afterStateUpdated(function (): void {
                         $this->save();
@@ -99,7 +99,7 @@ final class WebSearchSettings extends Page
     {
         $workspace = Filament::getTenant();
 
-        return ! $workspace instanceof Workspace || $workspace->ai_web_search_enabled;
+        return $workspace instanceof Workspace && $workspace->ai_web_search_enabled;
     }
 
     private function user(): User
