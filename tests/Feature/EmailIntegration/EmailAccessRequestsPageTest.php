@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -625,6 +626,7 @@ describe('subject privacy', function (): void {
             'privacy_tier' => EmailPrivacyTier::SUBJECT,
             'subject' => 'Visible Subject Line',
         ]);
+        Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($email->id);
 
         $request = EmailAccessRequest::factory()->pending()->forTier(EmailPrivacyTier::FULL)->create([
             'owner_id' => $owner->id,

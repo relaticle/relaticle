@@ -149,6 +149,7 @@ it('inline composer prefills the original subject only when the viewer may see i
     ]));
 
     $this->inboundEmail->update(['privacy_tier' => $tier]);
+    $this->person->emails()->attach($this->inboundEmail->id);
 
     $this->actingAs($viewer);
 

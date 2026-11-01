@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -70,6 +71,7 @@ it('still allows a teammate to view a shared-tier email in the same workspace', 
     $teammate = User::factory()->create();
     $teammate->workspaces()->attach($this->workspace);
     $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+    Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($this->email->id);
 
     expect($teammate->can('view', $this->email))->toBeTrue()
         ->and($teammate->can('viewBody', $this->email))->toBeTrue()
@@ -100,4 +102,20 @@ it('gives a teammate full access when they already synced the same message', fun
     expect($teammate->can('viewBody', $this->email))->toBeTrue()
         ->and($teammate->can('requestAccess', $this->email))->toBeFalse()
         ->and($teammate->can('share', $this->email))->toBeFalse();
+});
+
+it('denies a teammate every view ability on an email no record links to', function (): void {
+    $teammate = User::factory()->create();
+    $teammate->workspaces()->attach($this->workspace);
+    $teammate->forceFill(['current_workspace_id' => $this->workspace->id])->save();
+
+    expect($teammate->can('view', $this->email))->toBeFalse()
+        ->and($teammate->can('viewSubject', $this->email))->toBeFalse()
+        ->and($teammate->can('viewBody', $this->email))->toBeFalse()
+        ->and($teammate->can('requestAccess', $this->email))->toBeFalse()
+        ->and($this->owner->can('viewBody', $this->email))->toBeTrue();
+
+    Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($this->email->id);
+
+    expect($teammate->can('viewBody', $this->email->fresh()))->toBeTrue();
 });

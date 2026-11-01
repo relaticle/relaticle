@@ -55,6 +55,10 @@ final readonly class PrivacyService
             return $tier;
         }
 
+        if (! $email->isLinkedToRecord()) {
+            return null;
+        }
+
         // Email's own tier
         $tier = $email->privacy_tier;
 
