@@ -55,6 +55,6 @@ Relaticle has no obligation to use Your Contributions, and You are not expected 
 
 Relaticle may assign or transfer this agreement and the licenses in it, in whole or in part, including in a merger, acquisition, or sale of assets, without Your consent.
 
-A later version of this agreement applies only to Contributions You Submit after You accept that version.
+This version replaces every earlier version of this agreement You accepted, for all of Your Contributions. A later version replaces this one only if You accept it.
 
 Delaware law governs this agreement, without regard to its conflict of law rules. The United Nations Convention on Contracts for the International Sale of Goods does not apply.
