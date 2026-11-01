@@ -9,6 +9,7 @@ use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
+use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
@@ -20,11 +21,12 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
-mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class);
+mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -995,4 +997,48 @@ it('prefers the In-Reply-To parent over the provider thread', function (): void 
 
     expect($onThread->conversation_key)->not->toBe($earlier->conversation_key)
         ->and($reply->conversation_key)->toBe($earlier->conversation_key);
+});
+
+it('summarises reply timing on the conversation without storing text', function (): void {
+    $this->travelTo(now()->startOfHour());
+    $inbound = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'in', 'rfcMessageId' => '<in@acme.example>', 'sentAt' => now()->subHours(2), 'hasAttachments' => true,
+    ]));
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'out', 'rfcMessageId' => '<out@acme.example>', 'inReplyTo' => '<in@acme.example>',
+        'direction' => EmailDirection::OUTBOUND, 'folder' => EmailFolder::Sent, 'sentAt' => now()->subHour(),
+        'participants' => [['email_address' => $this->account->email_address, 'name' => null, 'role' => 'from']],
+    ]));
+
+    $summary = EmailConversation::query()->where('conversation_key', $inbound->conversation_key)->sole();
+
+    expect($summary->message_count)->toBe(2)
+        ->and($summary->first_message_at->equalTo(now()->subHours(2)))->toBeTrue()
+        ->and($summary->last_external_inbound_at->equalTo(now()->subHours(2)))->toBeTrue()
+        ->and($summary->last_member_outbound_at->equalTo(now()->subHour()))->toBeTrue()
+        ->and($summary->has_attachments)->toBeTrue()
+        ->and($summary->getAttributes())->not->toHaveKeys(['subject', 'snippet']);
+});
+
+it('counts one message once when two mailboxes hold it', function (): void {
+    $mine = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<shared@acme.example>', 'threadId' => 'ta',
+    ]));
+    resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'b', 'rfcMessageId' => '<shared@acme.example>', 'threadId' => 'tb',
+    ]));
+
+    expect(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole())
+        ->conversation_key->toBe($mine->conversation_key)
+        ->message_count->toBe(1);
+});
+
+it('treats mail from a teammate as member mail, not external inbound', function (): void {
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'participants' => [['email_address' => strtoupper(secondMailbox($this->workspace)->email_address), 'name' => null, 'role' => 'from']],
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole())
+        ->last_external_inbound_at->toBeNull()
+        ->last_member_outbound_at->not->toBeNull();
 });
