@@ -145,7 +145,7 @@ this table in the same PR.
 | 2 | `Relaticle\EmailIntegration\Actions\RefreshConversationSummary` | `execute(string $workspaceId, string $conversationKey): void`, idempotent |
 | 2 | `Relaticle\EmailIntegration\Jobs\MergeConversations` | `(string $workspaceId, string $emailId)`, unique per workspace and email until processing; merges every key linked to the email into the oldest |
 | 2 | `Relaticle\EmailIntegration\Models\EmailConversation` | model over `email_conversations`, no text columns |
-| 2 | `email:backfill-conversations` | command, `--force`, `--workspace=`, `--chunk=5000` (emails keyed plus summaries rebuilt per run) |
+| 2 | `email:backfill-conversations` | command, `--force`, `--workspace=`, `--chunk=10000` (emails keyed plus summaries rebuilt per run) |
 | 4 | `Relaticle\EmailIntegration\Enums\AutomatedReason` | cases `List`, `AutoSubmitted`, `Bulk`, `RoleSender`, `ProviderCategory` |
 | 4 | `Relaticle\EmailIntegration\Services\AutomatedMailDetector` | `detect(FetchedEmailData $data, string $workspaceId): ?AutomatedReason` |
 | 4 | `email:backfill-automated-reasons` | command |

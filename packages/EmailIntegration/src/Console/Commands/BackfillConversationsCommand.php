@@ -28,7 +28,7 @@ use stdClass;
 #[Signature('email:backfill-conversations
     {--force : Write keys and summaries instead of reporting them}
     {--workspace= : Only this workspace}
-    {--chunk=5000 : Emails to key and summaries to rebuild in one run before queueing the rest}')]
+    {--chunk=10000 : Emails to key and summaries to rebuild in one run before queueing the rest}')]
 final class BackfillConversationsCommand extends Command
 {
     public function handle(ConversationKeyResolver $resolver, RefreshConversationSummary $refresh, CurrentWorkspace $currentWorkspace): int
@@ -92,14 +92,21 @@ final class BackfillConversationsCommand extends Command
 
     private function key(Email $email, ConversationKeyResolver $resolver): void
     {
-        $email->timestamps = false;
-        $email->in_reply_to = MessageIdList::first($email->in_reply_to);
-        $email->conversation_key = $resolver->resolveStored($email);
-        $email->saveQuietly();
+        // A failed merge rolls the key back, so the next run keys and merges this email again.
+        DB::transaction(function () use ($email, $resolver): void {
+            $email->in_reply_to = MessageIdList::first($email->in_reply_to);
+            $email->conversation_key = $resolver->resolveStored($email);
 
-        if ($resolver->keysToMerge($email) !== []) {
-            dispatch_sync(new MergeConversations($email->workspace_id, $email->getKey()));
-        }
+            $written = Email::query()->withoutGlobalScopes()
+                ->whereKey($email->getKey())
+                ->whereNull('conversation_key')
+                ->toBase()
+                ->update(['conversation_key' => $email->conversation_key, 'in_reply_to' => $email->in_reply_to]);
+
+            if ($written === 1 && $resolver->keysToMerge($email) !== []) {
+                dispatch_sync(new MergeConversations($email->workspace_id, $email->getKey()));
+            }
+        });
     }
 
     /** @param  Collection<int, stdClass>  $stale */
@@ -135,7 +142,9 @@ final class BackfillConversationsCommand extends Command
             ->when($this->option('workspace'), fn (QueryBuilder $query, string $id): QueryBuilder => $query->where('workspace_id', $id))
             ->groupBy('workspace_id', 'conversation_key')
             ->select('workspace_id', 'conversation_key')
-            ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count, max(sent_at) as last_message_at');
+            ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count')
+            ->selectRaw('min(sent_at) as first_message_at, max(sent_at) as last_message_at')
+            ->selectRaw('coalesce(bool_or(has_attachments), false) as has_attachments');
 
         $stale = DB::query()->fromSub($live, 'live')
             ->leftJoin('email_conversations as summary', fn (JoinClause $join): JoinClause => $join
@@ -144,7 +153,9 @@ final class BackfillConversationsCommand extends Command
             ->where(fn (QueryBuilder $query): QueryBuilder => $query
                 ->whereNull('summary.id')
                 ->orWhereColumn('summary.message_count', '!=', 'live.message_count')
-                ->orWhereColumn('summary.last_message_at', '!=', 'live.last_message_at'))
+                ->orWhereColumn('summary.first_message_at', '!=', 'live.first_message_at')
+                ->orWhereColumn('summary.last_message_at', '!=', 'live.last_message_at')
+                ->orWhereColumn('summary.has_attachments', '!=', 'live.has_attachments'))
             ->select('live.workspace_id', 'live.conversation_key');
 
         $orphans = EmailConversation::query()->toBase()
