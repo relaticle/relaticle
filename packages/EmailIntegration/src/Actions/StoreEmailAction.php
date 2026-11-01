@@ -150,10 +150,9 @@ final readonly class StoreEmailAction
     {
         resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
-        $this->refreshConversation($email);
-
         // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
         DB::afterCommit(function () use ($email): void {
+            $this->refreshConversation($email);
             $this->mergeLinkedConversations($email);
         });
     }
@@ -316,7 +315,7 @@ final readonly class StoreEmailAction
 
             $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
 
-            $this->refreshConversation($pending);
+            DB::afterCommit(fn () => $this->refreshConversation($pending));
 
             return $pending->refresh();
         });

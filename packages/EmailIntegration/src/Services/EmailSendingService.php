@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Services;
 
 use Illuminate\Support\Facades\Storage;
-use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\SyncEmailThreadAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -56,10 +55,6 @@ final readonly class EmailSendingService
 
         if ($email->thread_id !== null) {
             resolve(SyncEmailThreadAction::class)->execute($email->connectedAccount, $email->thread_id);
-        }
-
-        if ($email->conversation_key !== null) {
-            resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
         }
 
         return $email;
