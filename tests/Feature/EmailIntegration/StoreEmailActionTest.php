@@ -1130,3 +1130,70 @@ it('treats mail from a teammate\'s sign-in address as member mail', function ():
         ->last_external_inbound_at->toBeNull()
         ->last_member_outbound_at->not->toBeNull();
 });
+
+it('merges every conversation a reply links into the oldest', function (): void {
+    $this->travelTo(now()->startOfHour());
+
+    $root = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'root', 'rfcMessageId' => '<root@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(3),
+    ]));
+    resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'x', 'rfcMessageId' => '<x@acme.example>', 'threadId' => 'tx',
+        'inReplyTo' => '<e@acme.example>', 'sentAt' => now()->subDays(2),
+    ]));
+    resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'tb', 'sentAt' => now()->subDay(),
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'e', 'rfcMessageId' => '<e@acme.example>', 'threadId' => 'tc',
+        'inReplyTo' => '<p@acme.example>', 'references' => '<root@acme.example> <p@acme.example>', 'sentAt' => now(),
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$root->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(4);
+});
+
+it('rewrites a trashed copy in a disconnected mailbox when conversations merge', function (): void {
+    $this->travelTo(now()->startOfHour());
+
+    $grandparent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'g', 'rfcMessageId' => '<g@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(2),
+    ]));
+    $mailbox = secondMailbox($this->workspace);
+    $reply = resolve(StoreEmailAction::class)->execute($mailbox, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tb',
+        'inReplyTo' => '<p@acme.example>', 'sentAt' => now(),
+    ]));
+    $reply->delete();
+    ConnectedAccount::withoutEvents(fn (): ?bool => $mailbox->delete());
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'tc',
+        'inReplyTo' => '<g@acme.example>', 'sentAt' => now()->subDay(),
+    ]));
+
+    expect(Email::query()->withoutGlobalScopes()->whereKey($reply->getKey())->value('conversation_key'))
+        ->toBe($grandparent->conversation_key)
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(2);
+});
+
+it('keeps the smaller key when two linked conversations start at the same moment', function (): void {
+    $this->travelTo(now()->startOfHour());
+
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'a', 'rfcMessageId' => '<a@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDay(),
+    ]));
+    $second = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'b', 'rfcMessageId' => '<b@acme.example>', 'threadId' => 'tb', 'sentAt' => now()->subDay(),
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'e', 'rfcMessageId' => '<e@acme.example>', 'threadId' => 'tc',
+        'inReplyTo' => '<b@acme.example>', 'references' => '<a@acme.example> <b@acme.example>', 'sentAt' => now(),
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([min($first->conversation_key, $second->conversation_key)]);
+});

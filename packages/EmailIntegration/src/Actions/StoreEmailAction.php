@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -151,17 +152,25 @@ final readonly class StoreEmailAction
         resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
         // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
-        DB::afterCommit(function () use ($email): void {
+        $this->afterCommit(function () use ($email): void {
             $this->refreshConversation($email);
-            $this->mergeLinkedConversations($email);
+
+            if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
+                MergeConversations::dispatch($email->workspace_id, $email->getKey());
+            }
         });
     }
 
-    private function mergeLinkedConversations(Email $email): void
+    private function afterCommit(Closure $callback): void
     {
-        foreach (resolve(ConversationKeyResolver::class)->keysToMerge($email) as $otherKey) {
-            MergeConversations::dispatch($email->workspace_id, (string) $email->conversation_key, $otherKey);
-        }
+        // The email is committed by then: a throw here would reach the catch that deletes its inline files.
+        DB::afterCommit(function () use ($callback): void {
+            try {
+                $callback();
+            } catch (Throwable $exception) {
+                report($exception);
+            }
+        });
     }
 
     private function refreshConversation(Email $email): void
@@ -315,7 +324,9 @@ final readonly class StoreEmailAction
 
             $this->forgetPendingThread($connectedAccount, $previousThreadId, $threadId);
 
-            DB::afterCommit(fn () => $this->refreshConversation($pending));
+            $this->afterCommit(function () use ($pending): void {
+                $this->refreshConversation($pending);
+            });
 
             return $pending->refresh();
         });

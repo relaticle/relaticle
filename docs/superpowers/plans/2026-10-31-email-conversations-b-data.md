@@ -780,11 +780,11 @@ a non-null key.
 
 **Files:**
 - Create: `src/Jobs/MergeConversations.php`
-- Modify: `src/Actions/StoreEmailAction.php`
+- Modify: `src/Actions/StoreEmailAction.php`, `src/Services/ConversationKeyResolver.php`
 
 **Interfaces:**
-- Produces: `MergeConversations(string $workspaceId, string $key, string $otherKey)` on
-  `emails-sync`, unique per workspace and key pair.
+- Produces: `MergeConversations(string $workspaceId, string $emailId)` on `emails-sync`, unique
+  per workspace and email until processing; merges every key linked to the email into the oldest.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -820,70 +820,60 @@ The queue is `sync` in tests, so the after-commit dispatch runs before the asser
 Run: `php artisan test --compact tests/Feature/EmailIntegration/StoreEmailActionTest.php --filter='late parent'`
 Expected: FAIL, two keys and two summary rows.
 
-- [ ] **Step 3: Write the job**
+- [ ] **Step 3: Write the job.** It takes the email, not a key pair: two key strings stop
+converging once either key has been merged away (a reply citing two stored ancestors, racing
+chains, a stale in-memory key).
 
 ```php
 #[Queue('emails-sync')]
 #[Tries(3)]
 #[UniqueFor(600)]
-final class MergeConversations implements ShouldBeUnique, ShouldQueue
+final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Queueable;
 
     public function __construct(
         public readonly string $workspaceId,
-        public readonly string $key,
-        public readonly string $otherKey,
+        public readonly string $emailId,
     ) {}
 
     public function uniqueId(): string
     {
-        $pair = [$this->key, $this->otherKey];
-        sort($pair);
-
-        return "{$this->workspaceId}:".implode(':', $pair);
+        return "{$this->workspaceId}:{$this->emailId}";
     }
 
-    public function handle(CurrentWorkspace $currentWorkspace, RefreshConversationSummary $refresh): void
+    public function handle(CurrentWorkspace $currentWorkspace, ConversationKeyResolver $resolver, RefreshConversationSummary $refresh): void
     {
-        $currentWorkspace->within($this->workspaceId, function () use ($refresh): void {
-            [$keep, $retire] = $this->survivorFirst();
+        $currentWorkspace->within($this->workspaceId, function () use ($resolver, $refresh): void {
+            $keys = DB::transaction(fn (): array => $this->mergeLinkedKeys($resolver));
 
-            Email::query()->withoutGlobalScopes()
-                ->where('workspace_id', $this->workspaceId)
-                ->where('conversation_key', $retire)
-                ->toBase()
-                ->update(['conversation_key' => $keep]);
-
-            $refresh->execute($this->workspaceId, $retire);
-            $refresh->execute($this->workspaceId, $keep);
+            foreach ($keys as $key) {
+                $refresh->execute($this->workspaceId, $key);
+            }
         });
-    }
-
-    /** @return array{string, string} */
-    private function survivorFirst(): array
-    {
-        $keep = Email::query()->withoutGlobalScopes()
-            ->where('workspace_id', $this->workspaceId)
-            ->whereIn('conversation_key', [$this->key, $this->otherKey])
-            ->groupBy('conversation_key')
-            ->orderByRaw('min(sent_at) asc nulls last, conversation_key asc')
-            ->value('conversation_key') ?? $this->key;
-
-        return [$keep, $keep === $this->key ? $this->otherKey : $this->key];
     }
 }
 ```
 
-`toBase()->update()` leaves `updated_at` alone: a key rewrite is not a user edit.
+`mergeLinkedKeys()` takes `pg_advisory_xact_lock(hashtext(workspace id))`, re-reads the email
+without global scopes, and gathers its current key plus `keysToMerge()`. The survivor is the key
+whose oldest message is older; a tie keeps the smaller string. One `whereIn('conversation_key', ...)`
+`toBase()->update()` rewrites every other key, so `updated_at` stays: a key rewrite is not a user
+edit. Each key involved is refreshed after commit, which deletes the retired summary rows.
+`ShouldBeUniqueUntilProcessing` lets a dispatch that arrives during a run still run.
 
-- [ ] **Step 4: Dispatch from the store,** after the summary refresh:
+- [ ] **Step 4: Dispatch from the store,** in the after-commit callback, after the summary refresh,
+so a copy or parent another mailbox committed at the same moment is visible:
 
 ```php
-                foreach (resolve(ConversationKeyResolver::class)->keysToMerge($email) as $otherKey) {
-                    MergeConversations::dispatch($email->workspace_id, $email->conversation_key, $otherKey)->afterCommit();
-                }
+            if (resolve(ConversationKeyResolver::class)->keysToMerge($email) !== []) {
+                MergeConversations::dispatch($email->workspace_id, $email->getKey());
+            }
 ```
+
+The callback catches and `report()`s: it runs after the commit, and a throw would reach the store's
+catch, which deletes the committed email's inline files. `keysToMerge()` also returns the keys of
+the email's stored parents, so the later of two racing stores finds the other.
 
 - [ ] **Step 5: Run** the Step 2 command and the whole file. Expected: PASS.
 
@@ -1122,8 +1112,8 @@ final class BackfillConversationsCommand extends Command
         $email->conversation_key = $resolver->resolveStored($email);
         $email->saveQuietly();
 
-        foreach ($resolver->keysToMerge($email) as $otherKey) {
-            MergeConversations::dispatchSync($email->workspace_id, $email->conversation_key, $otherKey);
+        if ($resolver->keysToMerge($email) !== []) {
+            MergeConversations::dispatchSync($email->workspace_id, $email->getKey());
         }
     }
 

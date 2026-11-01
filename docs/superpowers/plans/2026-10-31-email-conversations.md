@@ -143,7 +143,7 @@ this table in the same PR.
 | 3 | linked-only condition | on the default branch only (`VisibleEmailScope.php:106-120`, `PrivacyService.php:58-65`); explicit shares and the viewer's own copy stay visible |
 | 3 | `ApplyDefaultSharingTierToExistingEmailsAction` | never widens past mail, raising or lowering; PR 13 only adds the notice |
 | 2 | `Relaticle\EmailIntegration\Actions\RefreshConversationSummary` | `execute(string $workspaceId, string $conversationKey): void`, idempotent |
-| 2 | `Relaticle\EmailIntegration\Jobs\MergeConversations` | unique per workspace and key; rewrites the newer key to the older |
+| 2 | `Relaticle\EmailIntegration\Jobs\MergeConversations` | `(string $workspaceId, string $emailId)`, unique per workspace and email until processing; merges every key linked to the email into the oldest |
 | 2 | `Relaticle\EmailIntegration\Models\EmailConversation` | model over `email_conversations`, no text columns |
 | 2 | `email:backfill-conversations` | command, `--force`, `--workspace=` |
 | 4 | `Relaticle\EmailIntegration\Enums\AutomatedReason` | cases `List`, `AutoSubmitted`, `Bulk`, `RoleSender`, `ProviderCategory` |
