@@ -23,7 +23,7 @@ final readonly class ApplyDefaultSharingTierToExistingEmailsAction
                 ->whereNull('sharing_tier')
                 ->select('id'))
             ->where('privacy_tier_customized', false)
-            ->where('privacy_tier', '!=', $tier->value)
+            ->whereIn('privacy_tier', array_map(fn (EmailPrivacyTier $open): string => $open->value, $tier->moreOpenTiers()))
             ->update(['privacy_tier' => $tier->value]);
     }
 
