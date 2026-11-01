@@ -30,14 +30,24 @@ it('reopens the model picker after Escape closes it', function (): void {
         ->assertVisible('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]');
 });
 
-it('shows an icon on the model picker button and on every option', function (): void {
+it('shows a provider icon on the model picker button for a named model and on every option', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
+    $buttonIcon = '[data-chat-context="dashboard"] [aria-label="Select AI model"] > span[aria-hidden="true"]';
 
-    loginViaBrowser($user)
+    $page = loginViaBrowser($user)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/chats")
-        ->assertVisible('[data-chat-context="dashboard"] [aria-label="Select AI model"] > span[aria-hidden="true"] svg')
+        ->assertMissing($buttonIcon);
+
+    $page->script(<<<'JS'
+        (() => {
+            const scope = Alpine.$data(document.querySelector('[data-chat-context="dashboard"] [aria-label="Select AI model"]'));
+            scope.selectedModel = scope.modelOptions.find((option) => option.value !== 'auto').value;
+        })()
+        JS);
+
+    $page->assertVisible("{$buttonIcon} svg")
         ->click('[data-chat-context="dashboard"] [aria-label="Select AI model"]')
         ->assertVisible('[data-chat-context="dashboard"] [role="listbox"][aria-label="AI model options"]')
         ->assertScript(<<<'JS'

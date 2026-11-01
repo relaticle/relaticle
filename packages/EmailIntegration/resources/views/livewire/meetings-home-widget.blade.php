@@ -5,7 +5,8 @@
 
 <div class="mt-14" data-testid="meetings-home">
     <div class="mb-3 flex items-center justify-between gap-3">
-        <h2 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <x-filament::icon :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendar" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
             <span>{{ __('filament/pages/dashboard.meetings.heading') }}</span>
             @if ($mailboxConnected && ! $mailboxSyncing)
                 <span class="text-gray-400 dark:text-gray-500">{{ $this->meetings->count() }}</span>
