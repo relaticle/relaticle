@@ -19,9 +19,9 @@ The goal is simple: when someone sees the Relaticle name, they should be able to
 
 ## You need our written permission to
 
-- Offer Relaticle, modified or not, to anyone outside your organization as a hosted, managed, or resold service under the Relaticle name or logo.
-- Distribute a modified version of Relaticle under the Relaticle name or logo.
-- Use the Marks, or anything confusingly similar to them, as or in the name of your company, product, service, domain, app store listing, or social media handle, beyond the integration naming above.
+- Offer Relaticle, modified or not, to anyone outside your organization and its affiliates as a hosted, managed, or resold service under the Relaticle name or logo.
+- Distribute a modified version of Relaticle under the Relaticle name or logo to anyone outside your organization and its affiliates.
+- Use the Marks, or anything confusingly similar to them, as or in the name of your company, product, service, domain, app store listing, or social media handle, beyond the uses the section above allows.
 - Use the Marks in advertising in a way that suggests your offer comes from us or that we endorse it. That includes ad text or a display URL that uses "Relaticle" as your brand, and bidding on "Relaticle" for an ad that does not make clear the offer is not ours.
 - Sell merchandise that carries the Marks.
 - Register the Marks, or anything confusingly similar to them, as a trademark, domain name, or business name.
