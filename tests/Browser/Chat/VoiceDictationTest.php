@@ -108,33 +108,27 @@ it('swaps the mic for send only while the dashboard composer has something to se
         })()
         JS);
 
-    $visibleControls = fn (): array => $page->script(<<<'JS'
-        (() => {
-            const composer = document.querySelector('[data-chat-context="dashboard"][x-data*="chatEditor"]');
-            const shown = (selector) => composer.querySelector(selector)?.checkVisibility() ?? false;
-            return {
-                mic: shown('[x-data^="voiceRecorder"] > button'),
-                send: shown('button[aria-label="Send message"]'),
-            };
-        })()
-        JS);
+    $expectControls = fn (array $expected): mixed => expect($page->script(composerControlsSettledTo(
+        '[data-chat-context="dashboard"][x-data*="chatEditor"]',
+        $expected,
+    )))->toBe($expected);
 
-    expect($visibleControls())->toBe(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => false]);
 
     $setState("editor.setText('How is the pipeline?');");
-    expect($visibleControls())->toBe(['mic' => false, 'send' => true]);
+    $expectControls(['mic' => false, 'send' => true]);
 
     $setState('recorder.recording = true;');
-    expect($visibleControls())->toBe(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => false]);
 
     $setState('recorder.recording = false; recorder.transcribing = true;');
-    expect($visibleControls())->toBe(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => false]);
 
     $setState("recorder.transcribing = false; editor.setText('');");
-    expect($visibleControls())->toBe(['mic' => true, 'send' => false]);
+    $expectControls(['mic' => true, 'send' => false]);
 
     $setState("editor.pendingAttachment = { id: 'a', name: 'leads.csv', kind: 'csv', row_count: 3 };");
-    expect($visibleControls())->toBe(['mic' => false, 'send' => true]);
+    $expectControls(['mic' => false, 'send' => true]);
 });
 
 it('hides both the mic and send while a reply streams', function (): void {
@@ -150,24 +144,15 @@ it('hides both the mic and send while a reply streams', function (): void {
     $page->script(<<<JS
         (() => {
             {$resolveInterface}
+            host.setAttribute('data-streaming-probe', '');
             data.isStreaming = true;
             return true;
         })()
         JS);
 
-    $controls = $page->script(<<<JS
-        (() => {
-            {$resolveInterface}
-            const shown = (selector) => host.querySelector(selector)?.checkVisibility() ?? false;
-            return {
-                mic: shown('[x-data^="voiceRecorder"] > button'),
-                send: shown('button[aria-label="Send message"]'),
-                stop: shown('button[aria-label="Stop generation"]'),
-            };
-        })()
-        JS);
+    $expected = ['mic' => false, 'send' => false, 'stop' => true];
 
-    expect($controls)->toBe(['mic' => false, 'send' => false, 'stop' => true]);
+    expect($page->script(composerControlsSettledTo('[x-data^="chatInterface"][data-streaming-probe]', $expected)))->toBe($expected);
 });
 
 it('keeps the send button on an empty composer when voice input is off', function (): void {
@@ -193,3 +178,29 @@ it('keeps the send button on an empty composer when voice input is off', functio
 
     expect($controls)->toBe(['mic' => false, 'send' => true, 'sendDisabled' => true]);
 });
+
+/**
+ * @param  array<string, bool>  $expected
+ */
+function composerControlsSettledTo(string $composer, array $expected): string
+{
+    $expectedJson = json_encode($expected, JSON_THROW_ON_ERROR);
+
+    return <<<JS
+        (async () => {
+            const composer = document.querySelector('{$composer}');
+            const shown = (selector) => composer.querySelector(selector)?.checkVisibility() ?? false;
+            const read = () => Object.fromEntries(Object.keys({$expectedJson}).map((key) => [key, shown({
+                mic: '[x-data^="voiceRecorder"] > button',
+                send: 'button[aria-label="Send message"]',
+                stop: 'button[aria-label="Stop generation"]',
+            }[key])]));
+
+            for (let waited = 0; waited < 2000 && JSON.stringify(read()) !== JSON.stringify({$expectedJson}); waited += 50) {
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            return read();
+        })()
+        JS;
+}
