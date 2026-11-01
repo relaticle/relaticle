@@ -18,6 +18,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -26,7 +27,7 @@ use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailClassifier;
 
-mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class);
+mutates(StoreEmailAction::class, AutoCreatePersonAction::class, ConversationKeyResolver::class, RefreshConversationSummary::class, MergeConversations::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1041,4 +1042,45 @@ it('treats mail from a teammate as member mail, not external inbound', function 
     expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole())
         ->last_external_inbound_at->toBeNull()
         ->last_member_outbound_at->not->toBeNull();
+});
+
+it('merges two conversations when a late parent links them', function (): void {
+    $this->travelTo(now()->startOfHour());
+
+    $grandparent = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'g', 'rfcMessageId' => '<g@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(2),
+    ]));
+    $reply = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tb',
+        'inReplyTo' => '<p@acme.example>', 'sentAt' => now(),
+    ]));
+
+    expect($reply->conversation_key)->not->toBe($grandparent->conversation_key);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'tc',
+        'inReplyTo' => '<g@acme.example>', 'sentAt' => now()->subDay(),
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$grandparent->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
+});
+
+it('merges the conversations of two stored ancestors a reply links', function (): void {
+    $root = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'root', 'rfcMessageId' => '<root@acme.example>', 'threadId' => 'ta', 'sentAt' => now()->subDays(2),
+    ]));
+    resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'tb', 'sentAt' => now()->subDay(),
+    ]));
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'tc',
+        'inReplyTo' => '<p@acme.example>', 'references' => '<root@acme.example> <p@acme.example>',
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$root->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
 });
