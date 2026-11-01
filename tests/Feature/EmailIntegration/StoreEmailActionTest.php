@@ -10,10 +10,12 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
+use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
+use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
@@ -1196,4 +1198,61 @@ it('keeps the smaller key when two linked conversations start at the same moment
 
     expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
         ->toBe([min($first->conversation_key, $second->conversation_key)]);
+});
+
+function pendingMicrosoftSend(User $user, ConnectedAccount $account, string $sentAt): Email
+{
+    $email = resolve(SendEmailAction::class)->execute($user, [
+        'connected_account_id' => $account->getKey(),
+        'subject' => 'Intro',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+    $email->update([
+        'status' => EmailStatus::SENT,
+        'sent_at' => $sentAt,
+        'provider_message_id' => 'ms-pending-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+        'thread_id' => 'ms-pending-thread-01ARZ3NDEKTSV4RRFFQ69G5FAV',
+    ]);
+
+    return $email;
+}
+
+it('summarises an adopted Microsoft send as member mail', function (): void {
+    $sent = pendingMicrosoftSend($this->user, $this->account, now()->subHour()->toDateTimeString());
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'AAA1',
+        'rfcMessageId' => (string) $sent->rfc_message_id,
+        'threadId' => 'conversation-1',
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Sent,
+    ]));
+
+    expect(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole())
+        ->conversation_key->toBe($sent->conversation_key)
+        ->last_member_outbound_at->not->toBeNull();
+});
+
+it('joins a teammate copy stored under the provider Message-ID once the send is adopted', function (): void {
+    $sent = pendingMicrosoftSend($this->user, $this->account, now()->subHour()->toDateTimeString());
+    $teammateCopy = resolve(StoreEmailAction::class)->execute(secondMailbox($this->workspace), makeFetchedEmailData([
+        'providerMessageId' => 'copy', 'rfcMessageId' => '<provider-id@example.com>', 'threadId' => 'tb', 'sentAt' => now(),
+    ]));
+
+    expect($teammateCopy->conversation_key)->not->toBe($sent->conversation_key);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'AAA1',
+        'rfcMessageId' => '<provider-id@example.com>',
+        'reconciliationMessageId' => (string) $sent->rfc_message_id,
+        'threadId' => 'conversation-1',
+        'direction' => EmailDirection::OUTBOUND,
+        'folder' => EmailFolder::Sent,
+    ]));
+
+    expect(Email::query()->where('workspace_id', $this->workspace->getKey())->distinct()->pluck('conversation_key')->all())
+        ->toBe([$sent->conversation_key])
+        ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(1);
 });
