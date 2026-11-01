@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -32,7 +33,9 @@ beforeEach(function (): void {
         'user_id' => $this->coworker->id,
     ]));
 
-    $this->makeCoworkerEmail = function (array $participants): Email {
+    $this->anchor = Company::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $this->makeCoworkerEmail = function (array $participants, bool $linked = true): Email {
         $email = Email::factory()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $this->coworker->id,
@@ -48,6 +51,10 @@ beforeEach(function (): void {
                 'name' => null,
                 'role' => EmailParticipantRole::FROM,
             ]);
+        }
+
+        if ($linked) {
+            $this->anchor->emails()->attach($email->id);
         }
 
         return $email;
@@ -318,4 +325,48 @@ it('hides a coworker email when every participant is a connected mailbox address
     $internal = ($this->makeCoworkerEmail)(['whitesacks.dev@gmail.com', 'xyg@gmail.com']);
 
     expect(visibleTo($this->viewer)->modelKeys())->not->toContain($internal->id);
+});
+
+it('hides a teammate email that no record links to', function (): void {
+    $linked = ($this->makeCoworkerEmail)(['client@acme.test']);
+    $unlinked = ($this->makeCoworkerEmail)(['client@acme.test'], false);
+
+    expect(visibleTo($this->viewer)->modelKeys())->toContain($linked->id)
+        ->not->toContain($unlinked->id);
+});
+
+it('still shows the owner their own unlinked email', function (): void {
+    $unlinked = ($this->makeCoworkerEmail)(['client@acme.test'], false);
+
+    expect(visibleTo($this->coworker)->modelKeys())->toContain($unlinked->id);
+});
+
+it('shows an unlinked teammate email the owner shared with the viewer', function (): void {
+    $unlinked = ($this->makeCoworkerEmail)(['client@acme.test'], false);
+    EmailShare::factory()->tier(EmailPrivacyTier::SUBJECT)->create([
+        'email_id' => $unlinked->id, 'shared_by' => $this->coworker->id, 'shared_with' => $this->viewer->id,
+    ]);
+
+    expect(visibleTo($this->viewer)->modelKeys())->toContain($unlinked->id);
+});
+
+it('shows an unlinked teammate copy of a message the viewer also holds', function (): void {
+    $unlinked = ($this->makeCoworkerEmail)(['client@acme.test'], false);
+    $unlinked->update(['rfc_message_id' => '<shared@acme.test>']);
+    $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id, 'user_id' => $this->viewer->id, 'email_address' => 'viewer@northwind.test',
+    ]));
+    Email::factory()->create([
+        'workspace_id' => $this->workspace->id, 'user_id' => $this->viewer->id,
+        'connected_account_id' => $viewerAccount->id, 'rfc_message_id' => '<shared@acme.test>',
+    ]);
+
+    expect(visibleTo($this->viewer)->modelKeys())->toContain($unlinked->id);
+});
+
+it('hides a teammate email again once its last link is removed', function (): void {
+    $email = ($this->makeCoworkerEmail)(['client@acme.test']);
+    $this->anchor->emails()->detach($email->id);
+
+    expect(visibleTo($this->viewer)->modelKeys())->not->toContain($email->id);
 });

@@ -2165,5 +2165,7 @@ function teammateSentEmailReturningEmail(
         'role' => $role,
     ]);
 
+    Company::factory()->create(['workspace_id' => $viewer->current_workspace_id])->emails()->attach($email->id);
+
     return $email;
 }

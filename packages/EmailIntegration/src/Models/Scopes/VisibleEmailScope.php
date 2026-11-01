@@ -111,6 +111,9 @@ final readonly class VisibleEmailScope implements Scope
                             $this->excludeTeammateHiddenEmails($publicGate, $workspaceId);
                         })
                         ->whereIn('privacy_tier', $visibleTiers)
+                        ->whereExists(fn (BaseBuilder $link): BaseBuilder => $link
+                            ->from('emailables')
+                            ->whereColumn('emailables.email_id', 'emails.id'))
                         ->whereDoesntHave('shares', fn (Builder $shareQuery): Builder => $shareQuery
                             ->where('shared_with', $viewerId))
                         ->whereNotExists(fn (BaseBuilder $shareQuery): BaseBuilder => $this->crossMessageShareExists(
