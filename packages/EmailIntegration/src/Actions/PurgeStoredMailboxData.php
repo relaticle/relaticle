@@ -37,10 +37,6 @@ final readonly class PurgeStoredMailboxData
         }
 
         DB::afterCommit(function () use ($owner, $paths, $conversations): void {
-            foreach ($conversations as $conversation) {
-                resolve(RefreshConversationSummary::class)->execute($conversation->workspace_id, $conversation->conversation_key);
-            }
-
             $disk = Storage::disk(EmailAttachment::DISK);
 
             foreach (array_chunk($paths, self::FILES_PER_DELETE) as $chunk) {
@@ -49,6 +45,10 @@ final readonly class PurgeStoredMailboxData
 
             if ($owner instanceof Workspace) {
                 $disk->deleteDirectory(EmailAttachment::composeImagesDirectory((string) $owner->getKey()));
+            }
+
+            foreach ($conversations as $conversation) {
+                resolve(RefreshConversationSummary::class)->execute($conversation->workspace_id, $conversation->conversation_key);
             }
         });
     }
