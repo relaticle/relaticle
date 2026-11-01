@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Jobs\MergeConversations;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -150,6 +151,18 @@ final readonly class StoreEmailAction
         resolve(SyncEmailThreadAction::class)->execute($connectedAccount, $email->thread_id);
 
         $this->refreshConversation($email);
+
+        // After commit, so a copy or a parent another mailbox stored at the same moment is visible.
+        DB::afterCommit(function () use ($email): void {
+            $this->mergeLinkedConversations($email);
+        });
+    }
+
+    private function mergeLinkedConversations(Email $email): void
+    {
+        foreach (resolve(ConversationKeyResolver::class)->keysToMerge($email) as $otherKey) {
+            MergeConversations::dispatch($email->workspace_id, (string) $email->conversation_key, $otherKey);
+        }
     }
 
     private function refreshConversation(Email $email): void
