@@ -53,10 +53,10 @@ final readonly class DisconnectConnectedAccountAction
             }
         });
 
+        $this->grantRevoker->revoke($account, $grant);
+
         Artisan::queue('email:backfill-conversations', ['--force' => true, '--workspace' => $account->workspace_id])
             ->onQueue('imports')
             ->afterCommit();
-
-        $this->grantRevoker->revoke($account, $grant);
     }
 }

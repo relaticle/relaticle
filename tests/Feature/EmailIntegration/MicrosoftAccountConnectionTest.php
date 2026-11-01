@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\AppServiceProvider;
+use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -311,6 +312,37 @@ it('dispatches history import when a disconnected account is reconnected', funct
 
     Bus::assertDispatched(InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->connectedAccount->is($account));
     Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
+});
+
+it('queues a conversation rebuild for the workspace when a disconnected account is reconnected', function (): void {
+    Bus::fake();
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->trashed()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $user->current_workspace_id,
+        'email_address' => 'again@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-reconnect-rebuild',
+    ]));
+    $social = new SocialiteUser;
+    $social->id = 'gmail-reconnect-rebuild';
+    $social->email = 'again@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = ['https://www.googleapis.com/auth/gmail.readonly'];
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    Bus::assertDispatched(QueuedCommand::class, fn (QueuedCommand $job): bool => $job->queue === 'imports'
+        && (fn (): array => $this->data)->call($job) === [
+            'email:backfill-conversations',
+            ['--force' => true, '--workspace' => $user->current_workspace_id],
+        ]);
 });
 
 it('dispatches history import when reconnecting a mailbox whose listing stopped', function (): void {

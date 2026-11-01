@@ -956,7 +956,7 @@ The command test in Task 6 covers the rebuild, because the command is the entry 
 - Modify: `src/EmailIntegrationServiceProvider.php:215-218`, the master contracts table
 
 **Interfaces:**
-- Produces: `email:backfill-conversations {--force} {--workspace=} {--chunk=20000}`.
+- Produces: `email:backfill-conversations {--force} {--workspace=} {--chunk=10000}`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1073,7 +1073,7 @@ Expected: FAIL, `The command "email:backfill-conversations" does not exist.`
 #[Signature('email:backfill-conversations
     {--force : Write keys and summaries instead of reporting them}
     {--workspace= : Only this workspace}
-    {--chunk=20000 : Emails to key in one run before queueing the rest}')]
+    {--chunk=10000 : Emails to key and summaries to rebuild in one run before queueing the rest}')]
 final class BackfillConversationsCommand extends Command
 {
     public function handle(ConversationKeyResolver $resolver, RefreshConversationSummary $refresh, CurrentWorkspace $currentWorkspace): int
@@ -1238,7 +1238,7 @@ select count(*) from emails where status <> 'draft' and conversation_key is null
 -- expect 0: no key spans two workspaces
 select count(*) from (select conversation_key from emails where conversation_key is not null
                       group by 1 having count(distinct workspace_id) > 1) x;
--- expect 0: no other column changed
+-- expect 202: only the production rows whose raw in_reply_to header the backfill normalised to one id
 select count(*) from emails e join rehearsal_before b using (id)
 where md5(row(e.workspace_id, e.user_id, e.connected_account_id, e.rfc_message_id, e.provider_message_id,
               e.thread_id, e.in_reply_to, e.status, e.sent_at, e.deleted_at, e.updated_at)::text) <> b.fingerprint;
