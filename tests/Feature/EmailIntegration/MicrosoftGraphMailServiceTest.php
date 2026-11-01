@@ -1130,3 +1130,24 @@ it('reads In-Reply-To and References from Graph message headers', function (arra
     ],
     'unrelated headers only' => [[['name' => 'X-Foo', 'value' => '<x@acme.example>']], null, null],
 ]);
+
+it('threads a Graph reply onto the stored message it answers', function (): void {
+    $account = makeAzureAccount();
+    $store = function (string $id, array $overrides) use ($account): Email {
+        Http::fake([
+            ...graphWellKnownFolderFakes(),
+            "https://graph.microsoft.com/v1.0/me/messages/{$id}*" => Http::response(graphMessagePayload(['id' => $id, ...$overrides])),
+        ]);
+
+        return resolve(StoreEmailAction::class)->execute($account, resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchMessage($id));
+    };
+
+    $parent = $store('P1', ['internetMessageId' => '<p@acme.example>', 'conversationId' => 'c1']);
+    $reply = $store('R1', [
+        'internetMessageId' => '<r@acme.example>',
+        'conversationId' => 'c2',
+        'internetMessageHeaders' => [['name' => 'In-Reply-To', 'value' => '<p@acme.example>']],
+    ]);
+
+    expect($reply->conversation_key)->toBe($parent->conversation_key);
+});
