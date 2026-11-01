@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Actions\MarkEmailsSendFailedAction;
+use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Jobs\Concerns\ReleasesOnProviderRateLimit;
@@ -95,6 +96,10 @@ final class SendEmailJob implements ShouldQueue
         }
 
         $linkEmailAction->execute($email);
+
+        if ($email->conversation_key !== null) {
+            resolve(RefreshConversationSummary::class)->execute($email->workspace_id, $email->conversation_key);
+        }
 
         $this->syncBatchCounters($email->batch_id);
     }

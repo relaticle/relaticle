@@ -1084,3 +1084,49 @@ it('merges the conversations of two stored ancestors a reply links', function ()
         ->toBe([$root->conversation_key])
         ->and(EmailConversation::query()->where('workspace_id', $this->workspace->getKey())->sole()->message_count)->toBe(3);
 });
+
+it('leaves mail in a disconnected mailbox out of the conversation summary', function (): void {
+    $teammateMailbox = secondMailbox($this->workspace);
+    resolve(StoreEmailAction::class)->execute($teammateMailbox, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>', 'threadId' => 'tb',
+    ]));
+    ConnectedAccount::withoutEvents(fn (): ?bool => $teammateMailbox->delete());
+
+    $reply = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'threadId' => 'ta', 'inReplyTo' => '<p@acme.example>',
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $reply->conversation_key)->sole()->message_count)->toBe(1);
+});
+
+it('counts a stored message that has no Message-ID', function (): void {
+    $first = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'p', 'rfcMessageId' => '<p@acme.example>',
+    ]));
+    Email::factory()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $this->account->getKey(),
+        'rfc_message_id' => null,
+        'conversation_key' => $first->conversation_key,
+    ]);
+
+    resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'r', 'rfcMessageId' => '<r@acme.example>', 'inReplyTo' => '<p@acme.example>',
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $first->conversation_key)->sole()->message_count)->toBe(3);
+});
+
+it('treats mail from a teammate\'s sign-in address as member mail', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'participants' => [['email_address' => $teammate->email, 'name' => null, 'role' => 'from']],
+    ]));
+
+    expect(EmailConversation::query()->where('conversation_key', $email->conversation_key)->sole())
+        ->last_external_inbound_at->toBeNull()
+        ->last_member_outbound_at->not->toBeNull();
+});

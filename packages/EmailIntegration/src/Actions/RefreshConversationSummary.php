@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
-use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
-use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
@@ -19,6 +17,16 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 final readonly class RefreshConversationSummary
 {
     public function execute(string $workspaceId, string $conversationKey): void
+    {
+        DB::transaction(function () use ($workspaceId, $conversationKey): void {
+            // Serialises refreshes of one conversation, so each reads every copy committed before it.
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', ["{$workspaceId}:{$conversationKey}"]);
+
+            $this->write($workspaceId, $conversationKey);
+        });
+    }
+
+    private function write(string $workspaceId, string $conversationKey): void
     {
         $totals = $this->messages($workspaceId, $conversationKey)->toBase()
             ->selectRaw('count(distinct coalesce(rfc_message_id, id::text)) as message_count')
@@ -98,9 +106,14 @@ final readonly class RefreshConversationSummary
     /** @return list<string> */
     private function memberAddresses(string $workspaceId): array
     {
-        return array_values(Workspace::query()->findOrFail($workspaceId)->allUsers()->pluck('email')
-            ->merge(ConnectedAccount::query()->withoutGlobalScopes()->where('workspace_id', $workspaceId)->pluck('email_address'))
-            ->map(fn (string $address): string => Str::lower($address))
-            ->unique()->all());
+        $members = DB::table('users')->selectRaw('lower(email) as address')
+            ->whereIn('id', DB::table('workspace_user')->select('user_id')->where('workspace_id', $workspaceId))
+            ->orWhereIn('id', DB::table('workspaces')->select('user_id')->where('id', $workspaceId));
+
+        return array_values(DB::table('connected_accounts')->selectRaw('lower(email_address) as address')
+            ->where('workspace_id', $workspaceId)
+            ->union($members)
+            ->pluck('address')
+            ->all());
     }
 }
