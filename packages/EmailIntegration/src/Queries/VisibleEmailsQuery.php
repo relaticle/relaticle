@@ -83,6 +83,7 @@ final readonly class VisibleEmailsQuery
 
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)
+            ->withRecordLinkState()
             ->with(['participants', 'shares'])
             ->latest('sent_at')
             ->orderByDesc('id')
@@ -117,6 +118,7 @@ final readonly class VisibleEmailsQuery
     {
         return $query
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->withRecordLinkState()
             ->with(['participants', 'shares', 'body', 'attachments'])
             ->whereKey($id)
             ->first();
