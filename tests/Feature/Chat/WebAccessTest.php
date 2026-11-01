@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Providers\Tools\ProviderTool;
 use Laravel\Ai\Providers\Tools\WebFetch;
@@ -14,6 +17,7 @@ use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Tools\Web\RequestWebAccessTool;
+use Tests\Helpers\AnthropicSse;
 
 mutates(WebAccess::class, CrmAssistant::class, RequestWebAccessTool::class);
 
@@ -24,7 +28,24 @@ beforeEach(function (): void {
 });
 
 /** @param array{provider: string, model: string, id: string, source: string} $resolved */
-function agentForWebTurn(User $user, array $resolved, int $failoverDepth = 0): CrmAssistant
+function agentForWebTurn(User $user, array $resolved): CrmAssistant
+{
+    seedWebConversation($user);
+
+    CrmAssistant::fake(['ok']);
+
+    new ProcessChatMessage(
+        user: $user,
+        workspace: $user->currentWorkspace,
+        message: 'Research filaforms.com',
+        conversationId: 'conv-web',
+        resolved: $resolved,
+    )->handle(resolve(CreditService::class));
+
+    return promptedAgent();
+}
+
+function seedWebConversation(User $user): void
 {
     DB::table('agent_conversations')->insert([
         'id' => 'conv-web',
@@ -35,18 +56,10 @@ function agentForWebTurn(User $user, array $resolved, int $failoverDepth = 0): C
         'created_at' => now(),
         'updated_at' => now(),
     ]);
+}
 
-    CrmAssistant::fake(['ok']);
-
-    new ProcessChatMessage(
-        user: $user,
-        workspace: $user->currentWorkspace,
-        message: 'Research filaforms.com',
-        conversationId: 'conv-web',
-        resolved: $resolved,
-        failoverDepth: $failoverDepth,
-    )->handle(resolve(CreditService::class));
-
+function promptedAgent(): CrmAssistant
+{
     $agent = null;
 
     CrmAssistant::assertPrompted(function ($prompt) use (&$agent): bool {
@@ -85,7 +98,8 @@ it('resolves web access per turn and gives the assistant only the matching tools
     'deny' => ['deny', true, 'anthropic', 'claude-sonnet-5', [], 'Web: you cannot open web pages or search the web on this turn.'],
     'allow' => ['allow', true, 'anthropic', 'claude-sonnet-5', [WebSearch::class, WebFetch::class], 'Web: you can search the web and read pages on this turn, up to 5 searches.'],
     'allow on openai' => ['allow', true, 'openai', 'gpt-5.5', [WebSearch::class, WebFetch::class], 'Web: you can search the web and read pages on this turn, up to 5 searches.'],
-    'default ask' => [null, true, 'anthropic', 'claude-sonnet-5', [RequestWebAccessTool::class], 'Web: before any web lookup and before any write, call RequestWebAccessTool once with the search you plan, then stop.'],
+    'cloud provider without web with allow' => ['allow', true, 'gemini', 'gemini-3-flash', [], 'Web: you cannot open web pages or search the web on this turn.'],
+    'default ask' => [null, true, 'anthropic', 'claude-sonnet-5', [RequestWebAccessTool::class], 'Web: only when answering needs the web (a URL, a website, or something online), call RequestWebAccessTool once'],
 ]);
 
 it('caps web searches and page reads at five per turn', function (): void {
@@ -103,15 +117,38 @@ it('caps web searches and page reads at five per turn', function (): void {
 });
 
 it('drops web tools when failover lands on a model without web', function (): void {
+    config()->set('ai.providers.selfhosted.url', 'http://127.0.0.1:11434/v1');
+    config()->set('ai.providers.openai.key', '');
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->update(['ai_preferences' => ['web_search' => 'allow']]);
+    $user = $user->fresh();
+    seedWebConversation($user);
 
-    $agent = agentForWebTurn(
-        $user->fresh(),
-        ['provider' => 'selfhosted', 'model' => 'qwen3', 'id' => 'selfhosted:qwen3', 'source' => 'auto'],
-        failoverDepth: 1,
-    );
+    AnthropicSse::fake(AnthropicSse::TERMINAL_ERROR);
+    Queue::fake();
 
-    expect(webToolClasses($agent))->toBe([])
+    new ProcessChatMessage(
+        user: $user,
+        workspace: $user->currentWorkspace,
+        message: 'Research filaforms.com',
+        conversationId: 'conv-web',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: 'turn-web',
+    )->handle(resolve(CreditService::class));
+
+    Http::assertSent(fn (HttpRequest $request): bool => collect($request->data()['tools'] ?? [])
+        ->contains(fn (array $tool): bool => str_starts_with((string) ($tool['type'] ?? ''), 'web_search')));
+
+    $failover = Queue::pushed(ProcessChatMessage::class)->sole();
+
+    CrmAssistant::fake(['ok']);
+    $failover->handle(resolve(CreditService::class));
+
+    $agent = promptedAgent();
+
+    expect($failover->failoverDepth)->toBe(1)
+        ->and($agent->modelLabel)->toBe('qwen3')
+        ->and(webToolClasses($agent))->toBe([])
         ->and($agent->instructions())->toContain('Web: you cannot open web pages or search the web on this turn.');
 });

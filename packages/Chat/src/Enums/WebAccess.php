@@ -32,7 +32,7 @@ enum WebAccess
     {
         return match ($this) {
             self::Unavailable => 'Web: you cannot open web pages or search the web on this turn. Ask the user to paste the page text or attach it as a .txt file.',
-            self::Ask => 'Web: before any web lookup and before any write, call RequestWebAccessTool once with the search you plan, then stop.',
+            self::Ask => 'Web: only when answering needs the web (a URL, a website, or something online), call RequestWebAccessTool once with the search you plan, before any web lookup and before any write for that request, then stop. A request the workspace data can answer, and every write that needs nothing from the web, never calls it.',
             self::Allowed => 'Web: you can search the web and read pages on this turn, up to 5 searches.',
         };
     }

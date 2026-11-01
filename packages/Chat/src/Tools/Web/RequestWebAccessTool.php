@@ -13,8 +13,8 @@ final class RequestWebAccessTool implements Tool
     public function description(): string
     {
         return 'Ask the user to let you search the web and read web pages on this turn. '
-            .'Call it once, before any web lookup and before any write, with the search you plan, then stop: the user allows or declines it on a card. '
-            .'Check the workspace records first, and never call it for a question the workspace data already answers.';
+            .'Call it only when answering needs the web (a URL, a website, or something online): once, before any web lookup and before any write for that request, with the search you plan, then stop. The user allows or declines it on a card. '
+            .'Never call it for a request the workspace data can answer or for a write that needs nothing from the web.';
     }
 
     public function schema(JsonSchema $schema): array
