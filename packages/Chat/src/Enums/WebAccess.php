@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Enums;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ModelDescriptor;
 
 enum WebAccess
@@ -24,8 +25,20 @@ enum WebAccess
             ! $workspace->ai_web_search_enabled => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Deny => self::Unavailable,
             WebSearchPreference::of($user) === WebSearchPreference::Allow => self::Allowed,
+            self::resumesApprovedRequest($user, $workspace, $resumesTurnId) => self::Allowed,
             default => self::Ask,
         };
+    }
+
+    private static function resumesApprovedRequest(User $user, Workspace $workspace, ?string $resumesTurnId): bool
+    {
+        return $resumesTurnId !== null && PendingAction::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('user_id', $user->getKey())
+            ->where('turn_id', $resumesTurnId)
+            ->where('entity_type', ProposalEntity::WebAccess)
+            ->where('status', PendingActionStatus::Approved)
+            ->exists();
     }
 
     public function promptLine(): string

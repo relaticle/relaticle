@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Actions\GrantWebAccess;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
@@ -105,6 +106,7 @@ final readonly class PendingActionService
         CancelAssistantEmail::class,
         RescheduleAssistantEmail::class,
         RetryAssistantEmail::class,
+        GrantWebAccess::class,
     ];
 
     /**
@@ -952,6 +954,12 @@ final readonly class PendingActionService
         );
 
         $action = app()->make($actionClass);
+
+        if ($action instanceof GrantWebAccess) {
+            $action->execute($user, Workspace::query()->findOrFail($pendingAction->workspace_id));
+
+            return null;
+        }
 
         return match ($pendingAction->operation) {
             PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction, $excludedFields),

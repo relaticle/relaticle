@@ -16,6 +16,7 @@
     $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
     $isDestructive = $operation === 'delete' && ! $isPlan;
     $activePosition = $steps[0]['activeItemPosition'] ?? 1;
+    $isWebAccess = ! $isPlan && ($steps[0]['entity_type'] ?? null) === \Relaticle\Chat\Enums\ProposalEntity::WebAccess->value;
 
     // Every change of an update unchecked: approving would write nothing, so
     // the confirm is disabled rather than minting an "Approved" no-op.
@@ -62,6 +63,9 @@
                 </div>
             @endif
 
+            @if ($isWebAccess)
+                @include('chat::livewire.chat.partials._dock-web-access', ['step' => $steps[0], 'proposal' => $proposal])
+            @else
             {{-- A plan can be taller than the dock: the steps scroll, so the
                  decision buttons never leave the viewport. --}}
             <div @class([
@@ -174,6 +178,7 @@
                 @endif
                 </div>
             </div>
+            @endif
         </div>
     @endif
 
