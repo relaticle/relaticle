@@ -1,3 +1,12 @@
 {
-   "signedContributors": []
+  "signedContributors": [
+    {
+      "name": "AsmitNepali",
+      "id": 33512152,
+      "comment_id": 6555909217,
+      "created_at": "2026-11-01T09:08:09Z",
+      "repoId": 863069155,
+      "pullRequestNo": 1028
+    }
+  ]
 }
