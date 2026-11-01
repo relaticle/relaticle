@@ -47,7 +47,9 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
                 return $keys;
             });
 
-            $this->mergeStrandedCopy(array_slice($keys, 1));
+            if ($keys !== []) {
+                $this->moveStrandedRows($keys[0], array_slice($keys, 1), $refresh);
+            }
         });
     }
 
@@ -56,20 +58,23 @@ final class MergeConversations implements ShouldBeUniqueUntilProcessing, ShouldQ
      *
      * @param  list<string>  $absorbed
      */
-    private function mergeStrandedCopy(array $absorbed): void
+    private function moveStrandedRows(string $survivor, array $absorbed, RefreshConversationSummary $refresh): void
     {
-        if ($absorbed === []) {
-            return;
-        }
+        DB::transaction(function () use ($survivor, $absorbed, $refresh): void {
+            DB::select('select pg_advisory_xact_lock(hashtext(?))', [$this->workspaceId]);
 
-        $stranded = Email::query()->withoutGlobalScopes()
-            ->where('workspace_id', $this->workspaceId)
-            ->whereIn('conversation_key', $absorbed)
-            ->value('id');
+            $moved = Email::query()->withoutGlobalScopes()
+                ->where('workspace_id', $this->workspaceId)
+                ->whereIn('conversation_key', $absorbed)
+                ->toBase()
+                ->update(['conversation_key' => $survivor]);
 
-        if (is_string($stranded)) {
-            dispatch(new self($this->workspaceId, $stranded));
-        }
+            if ($moved > 0) {
+                foreach ([$survivor, ...$absorbed] as $key) {
+                    $refresh->execute($this->workspaceId, $key);
+                }
+            }
+        });
     }
 
     /** @return list<string> the surviving key first, then the keys it absorbed */
